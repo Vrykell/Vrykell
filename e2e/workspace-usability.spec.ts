@@ -41,7 +41,7 @@ test('global search stays centered without covering actions or the title in both
       await expect(page.getByTestId('window-close')).toBeInViewport();
     }
   }
-  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await page.keyboard.press('Control+,');
   const search = await page.getByTestId('global-search-trigger').boundingBox();
   const bar = (await page.locator('.workspace-titlebar').boundingBox())!;
   expect(Math.abs(search!.x + search!.width / 2 - (bar.x + bar.width / 2))).toBeLessThan(1);
@@ -130,14 +130,14 @@ test('the full-height navigation and titlebar separate workspace and auxiliary c
   await expect(panel.locator('.workspace-panel-heading')).toHaveCSS('border-bottom-style', 'none');
   await expect(panel).toHaveCSS('border-left-style', 'none');
   const panelBg = await panel.locator(':scope > div').first().evaluate(el => getComputedStyle(el).backgroundColor);
-  expect(panelBg).toBe(await nav.evaluate(el => getComputedStyle(el).backgroundColor));
+  expect(panelBg).not.toBe(await nav.evaluate(el => getComputedStyle(el).backgroundColor));
   expect(panelBg).toBe(await resolvedColor(page, '--sidebar-bg'));
   const contentBg = await page.locator('main').evaluate(el => getComputedStyle(el).backgroundColor);
   expect(panelBg).not.toBe(contentBg);
   expect(contentBg).not.toBe(await nav.evaluate(el => getComputedStyle(el).backgroundColor));
   const mainRect = await page.locator('main').boundingBox();
   expect(mainRect!.y).toBeGreaterThan(0);
-  expect(mainRect!.y + mainRect!.height).toBeLessThan(800);
+  expect(mainRect!.y + mainRect!.height).toBe(800);
   for (const id of ['files', 'git', 'command-history']) {
     if (await page.locator(`[data-dock-btn="${id}"]`).getAttribute('aria-pressed') === 'true') await page.locator(`[data-dock-btn="${id}"]`).click();
     await page.locator(`[data-dock-btn="${id}"]`).click();
@@ -148,15 +148,15 @@ test('the full-height navigation and titlebar separate workspace and auxiliary c
   await expect(page.locator('.workspace-side-panel[data-side="right"] .terminal-composer').locator('..')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 });
 
-test('the workspace has rounded outer corners and flush resize boundaries', async ({ page }) => {
+test('workspace regions have square corners and flush resize boundaries', async ({ page }) => {
   const main = page.locator('main');
-  await expect(main).toHaveCSS('border-radius', '14px');
+  await expect(main).toHaveCSS('border-radius', '0px');
   expect((await main.boundingBox())!.x).toBe(208);
 
   await page.locator('[data-dock-btn="chat"]').click();
   const rightPanel = page.locator('.workspace-side-panel[data-side="right"]:visible');
   await expect(rightPanel).toHaveCount(1);
-  await expect(rightPanel).toHaveCSS('border-radius', '0px 14px 14px 0px');
+  await expect(rightPanel).toHaveCSS('border-radius', '0px');
   await expect(rightPanel).toHaveCSS('margin-left', '0px');
   // The shared edge squares off and the divider stays on the actual color boundary.
   await expect(main).toHaveCSS('border-top-right-radius', '0px');
@@ -169,10 +169,10 @@ test('the workspace has rounded outer corners and flush resize boundaries', asyn
   await expect(line).toHaveCSS('background-color', await resolvedColor(page, '--resize-divider'));
   const lineBox = (await line.boundingBox())!;
   expect(Math.abs(lineBox.x + lineBox.width / 2 - (mainBox.x + mainBox.width))).toBeLessThan(0.5);
-  await expect(main).toHaveCSS('border-top-left-radius', '14px');
-  await expect(main).toHaveCSS('border-bottom-left-radius', '14px');
+  await expect(main).toHaveCSS('border-top-left-radius', '0px');
+  await expect(main).toHaveCSS('border-bottom-left-radius', '0px');
   await page.locator('[data-dock-btn="chat"]').click();
-  await expect(main).toHaveCSS('border-radius', '14px');
+  await expect(main).toHaveCSS('border-radius', '0px');
 });
 
 test('settings and terminal use the same content background in both themes', async ({ page }) => {
@@ -189,7 +189,7 @@ test('settings and terminal use the same content background in both themes', asy
     await expect(page.locator('html')).toHaveAttribute('data-theme', label === '浅色' ? 'light' : 'dark');
     expect(await background('.workspace-titlebar')).not.toBe(await background('main'));
     const sidebarBg = await background('.workspace-side-panel[data-side="right"] > div:first-child');
-    expect(sidebarBg).toBe(await background('.workspace-sidebar'));
+    expect(sidebarBg).not.toBe(await background('.workspace-sidebar'));
     expect(sidebarBg).not.toBe(await background('main'));
     expect(await background('.settings-navigation')).toBe(sidebarBg);
     expect(await background('.settings-content')).toBe(await resolvedColor(page, '--xterm-bg'));
@@ -274,15 +274,18 @@ test('auxiliary resize edges remain visible and strengthen during dragging', asy
 test('narrow layouts preserve command space and fit the toolbar', async ({ page }) => {
   await page.setViewportSize({ width: 720, height: 480 });
   await page.locator('[data-dock-btn="files"]').click();
+  await page.getByTestId('workspace-sidebar-expand').click();
   await page.locator('[data-dock-btn="ssh"]').click();
+  await page.getByTestId('workspace-sidebar-toggle').click();
+  await page.locator('[data-dock-btn="files"]').click();
   await expect(page.getByTestId('ssh-search')).toBeVisible();
   await expect(page.getByText('notes.txt')).toBeVisible();
   const main = await page.locator('main').boundingBox();
   expect(main!.width).toBeGreaterThanOrEqual(360);
-  await expect(page.getByTestId('workspace-area-terminal')).toBeInViewport();
+  await expect(page.getByTestId('workspace-sidebar-expand')).toBeInViewport();
   const overlap = await page.evaluate(() => {
     const search = document.querySelector('[data-testid="global-search-trigger"]')!.getBoundingClientRect();
-    const ai = document.querySelector('[data-dock-btn="chat"]')!.getBoundingClientRect();
+    const ai = document.querySelector('.workspace-title-actions')!.getBoundingClientRect();
     return search.right > ai.left;
   });
   expect(overlap).toBe(false);

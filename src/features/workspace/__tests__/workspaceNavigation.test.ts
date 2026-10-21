@@ -16,11 +16,11 @@ it('retains the last instance in each area and the return area for side docking'
   expect(useWorkspaceNavigation.getState().previousArea).toBe('code');
   expect(useWorkspaceNavigation.getState().lastTabs).toEqual({ terminal: 'terminal-a', code: 'editor-a' });
 });
-it('keeps the collapsed preference when narrow windows temporarily use a rail', () => {
-  expect(workspaceSidebarWidth(760)).toBe(48);
+it('removes all sidebar space when collapsed and permits expansion at any width', () => {
+  expect(workspaceSidebarWidth(760)).toBe(208);
   expect(workspaceSidebarWidth(1240)).toBe(208);
   useWorkspaceNavigation.getState().setCollapsed(true);
-  expect(workspaceSidebarWidth(1240)).toBe(48);
+  expect(workspaceSidebarWidth(1240)).toBe(0);
   expect(JSON.parse(localStorage.getItem('workspace-navigation-v1')!).collapsed).toBe(true);
 });
 it('interleaves files and comparisons while ignoring stale saved identifiers', () => {

@@ -4,7 +4,6 @@ import { isHistoryGroupColor, type HistoryGroupColor } from '@ui/historyGroupCol
 
 export type WorkspaceArea = 'terminal' | 'code' | 'ai' | 'ssh';
 export const WORKSPACE_SIDEBAR_WIDTH = 208;
-export const WORKSPACE_RAIL_WIDTH = 48;
 export const WORKSPACE_COMPACT_BREAKPOINT = 900;
 const STORAGE_KEY = 'workspace-navigation-v1';
 
@@ -39,7 +38,7 @@ if (savedColors && typeof savedColors === 'object') {
 
 /** Navigation owns presentation preferences; session and document stores retain their data. */
 export const useWorkspaceNavigation = create<NavigationState>((set) => ({
-  area: 'terminal', previousArea: 'terminal', collapsed: saved?.collapsed === true,
+  area: 'terminal', previousArea: 'terminal', collapsed: saved?.collapsed === true || window.innerWidth <= WORKSPACE_COMPACT_BREAKPOINT,
   lastTabs: {}, groupColors, codeOrder: [], aiPlacement: 'main',
   selectArea: area => set(state => ({ area, previousArea: state.area !== 'ai' ? state.area : state.previousArea })),
   rememberTab: (area, id) => set(state => state.lastTabs[area] === id ? state : ({ lastTabs: { ...state.lastTabs, [area]: id } })),
@@ -65,8 +64,8 @@ useWorkspaceNavigation.subscribe((state, previous) => {
   }
 });
 
-export function workspaceSidebarWidth(width = window.innerWidth): number {
-  return width <= WORKSPACE_COMPACT_BREAKPOINT || useWorkspaceNavigation.getState().collapsed ? WORKSPACE_RAIL_WIDTH : WORKSPACE_SIDEBAR_WIDTH;
+export function workspaceSidebarWidth(_width = window.innerWidth): number {
+  return useWorkspaceNavigation.getState().collapsed ? 0 : WORKSPACE_SIDEBAR_WIDTH;
 }
 
 export function orderedWorkspaceIds(ids: string[], savedOrder: string[]): string[] {

@@ -60,18 +60,18 @@ it('creates AI conversations in the focused side surface without replacing the m
   expect(useWorkspaceStore.getState().tabs).toEqual([]);
 });
 
-it('switches only main utility pages while the AI session group is docked elsewhere', () => {
+it('keeps all conversation navigation in the main AI workspace while a native chat is docked', () => {
   const workspace = useWorkspaceStore.getState();
   workspace.openHarnessTab();
   useAiWorkspace.getState().openNative(useChatStore.getState().createConversation());
   workspace.openUsageTab(); workspace.openAiHistoryTab();
   useWorkspaceNavigation.setState({ aiPlacement: 'side' });
-  expect(activateWorkspaceInstance(0)).toBe(true);
+  expect(activateWorkspaceInstance(1)).toBe(true);
   expect(useWorkspaceStore.getState().tabs.find(tab => tab.id === useWorkspaceStore.getState().activeId)?.kind).toBe('usage');
   expect(useWorkspaceNavigation.getState().aiPlacement).toBe('side');
-  expect(activateWorkspaceInstance(2)).toBe(false);
+  expect(activateWorkspaceInstance(3)).toBe(false);
   const harness = useWorkspaceStore.getState().tabs.find(tab => tab.kind === 'harness')!;
   useWorkspaceStore.getState().activate(harness.id);
   closeWorkspaceItem();
-  expect(useAiWorkspace.getState().nativeTabs).toHaveLength(1);
+  expect(useAiWorkspace.getState().nativeTabs).toHaveLength(0);
 });

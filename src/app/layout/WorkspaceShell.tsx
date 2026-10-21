@@ -9,9 +9,7 @@ import WorkspaceSidebar from '@features/workspace/components/WorkspaceSidebar';
 import PanelTabs from '@features/workspace/components/PanelTabs';
 import { WORKSPACE_GAP, workspaceFrameWidth } from '@features/workspace/stores/dock';
 import { useWorkspaceNavigation, workspaceAreaForKind, workspaceSidebarWidth } from '@features/workspace/stores/navigation';
-import { WorkspaceHeaderProvider } from '@ui/WorkspaceHeader';
-import WorkspaceHeader from '@ui/WorkspaceHeader';
-import FolderTabs from '@ui/FolderTabs';
+import { WorkspaceHeaderProvider, WorkspaceHeaderSlot } from '@ui/WorkspaceHeader';
 import { AiWorkspaceProvider } from '@features/chat/components/AiWorkspaceSurface';
 import PanelSsh from '@features/ssh/components/PanelSsh';
 import NewTabModal from '@features/workspace/components/NewTabModal';
@@ -36,11 +34,10 @@ export default function WorkspaceShell() {
   const collapsed = useWorkspaceNavigation(state => state.collapsed);
   const aiPlacement = useWorkspaceNavigation(state => state.aiPlacement);
   const activeTab = useSessionStore(state => state.tabs.find(tab => tab.id === state.activeId));
-  const contentVisible = !!activeTab && area === workspaceAreaForKind(activeTab.kind) && !(activeTab.kind === 'harness' && aiPlacement === 'side');
+  const contentVisible = !!activeTab && area === workspaceAreaForKind(activeTab.kind);
   const chatOpen = useDockStore(state => state.leftPanels.includes('chat') || state.rightPanels.includes('chat'));
   const [sidebarWidth, setSidebarWidth] = useState(workspaceSidebarWidth);
   const [newTerminal, setNewTerminal] = useState(false);
-  const utilityPages = useSessionStore(state => state.tabs).filter(tab => tab.kind === 'usage' || tab.kind === 'ai-history');
   const frameWidth = useDockStore(workspaceFrameWidth);
   const sshStatusOwner = useSshStatusOwner();
   const terminalMinWidth = useSessionStore((state) => {
@@ -66,11 +63,9 @@ export default function WorkspaceShell() {
       <TopDock />
       <SshAuthenticationDialog />
       <PanelTabs active={area === 'terminal' && !settingsOpen} />
-      {aiPlacement === 'side' && <WorkspaceHeader active={area === 'ai' && activeTab?.kind !== 'harness' && !settingsOpen}>
-        <FolderTabs label={t('AI workspace')} listId="ai-pages" selected={activeTab?.id ?? ''} items={utilityPages.map(page => ({ id: page.id, label: page.title, tip: page.title, dataAttributes: { 'data-tab-kind': page.kind }, icon: <Sparkles size={16} />, closeLabel: t('Close this tab') }))}
-          onSelect={id => useSessionStore.getState().activate(id)} onClose={id => useSessionStore.getState().closeTab(id)} onMove={() => {}} toolbar={null} />
-      </WorkspaceHeader>}
       <div className="workspace-body" data-settings-open={settingsOpen || undefined} style={{ '--workspace-frame-width': `${frameWidth}px`, '--workspace-terminal-min-width': `${Math.max(360, area === 'terminal' ? terminalMinWidth : MIN_PANE_SIZE)}px`, '--workspace-left-panel-width': '0px', '--workspace-activity-width': `${sidebarWidth}px`, '--workspace-gap': `${WORKSPACE_GAP}px` } as CSSProperties}>
+        <div className="workspace-primary" style={{ minWidth: area === 'terminal' ? terminalMinWidth : 0 }}>
+        <WorkspaceHeaderSlot />
         <main className="workspace-main" inert={settingsOpen} aria-hidden={settingsOpen || undefined} style={{ flex: 1, minWidth: area === 'terminal' ? terminalMinWidth : 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
           <div className="workspace-content-host" style={{ display: contentVisible ? 'flex' : 'none' }} inert={!contentVisible}>
             <EditorWorkspace><GitWorkspace><TerminalView active={contentVisible && !settingsOpen} /></GitWorkspace></EditorWorkspace>
@@ -83,6 +78,7 @@ export default function WorkspaceShell() {
             <OutlineButton onClick={() => area === 'code' ? void openWorkspaceFile() : area === 'ai' ? useSessionStore.getState().openHarnessTab() : setNewTerminal(true)}>{t(area === 'code' ? 'Open file' : area === 'ai' ? 'Open AI workspace' : 'New terminal')}</OutlineButton>
           </div>}
         </main>
+        </div>
         <SidePanel side="right" />
         <div id="ssh-status-sidebar-host" className="workspace-ssh-status-slot" inert={settingsOpen} aria-hidden={settingsOpen || undefined} />
         {settingsOpen && <SettingsScreen />}

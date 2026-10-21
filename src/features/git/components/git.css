@@ -36,5 +36,5 @@
 .git-reference-form label { display: flex; flex-direction: column; gap: 6px; color: var(--text-secondary); font-size: var(--fs-caption); }
 .git-reference-form p { margin: 0; }
 .git-panel > .text-control { align-self: flex-start; margin-left: 8px; }
-.git-review .code-diff .monaco-diff-editor.side-by-side .editor { box-shadow: none; border: none; border-radius: var(--radius-block); }
+.git-review .code-diff .monaco-diff-editor.side-by-side .editor { box-shadow: none; border: none; border-radius: 0; }
 .git-review .code-diff .monaco-diff-editor.side-by-side .monaco-sash.vertical { width: 8px; background: var(--surface); }

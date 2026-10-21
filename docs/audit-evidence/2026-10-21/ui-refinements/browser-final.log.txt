@@ -1,0 +1,94 @@
+
+> vrykell@0.1.0 test:e2e
+> playwright test git-panel.spec.ts macos-titlebar.spec.ts navigation-drag.spec.ts settings-responsive.spec.ts settings-window.spec.ts workspace-ai-utilities.spec.ts workspace-navigation.spec.ts workspace-usability.spec.ts workspace-surface-refinements.spec.ts --reporter=line
+
+
+[1A[2K[WebServer] (node:73900) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 64 tests using 1 worker
+
+
+
+[1A[2K(node:35596) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:35596) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K[1/64] git-panel.spec.ts:21:1 › reviews both sides of a partially staged file and preserves the terminal
+
+[1A[2K[WebServer] 19:32:43 [vite] (client) Failed to load source map for D:/projects/typescript/Vrykell/node_modules/monaco-editor/esm/vs/base/common/marked/marked.js.
+[WebServer] Error: An error occurred while trying to read the map file at marked.umd.js.map
+[WebServer] Error: ENOENT: no such file or directory, open 'D:\projects\typescript\Vrykell\node_modules\monaco-editor\esm\vs\base\common\marked\marked.umd.js.map'
+[WebServer]     at async open (node:internal/fs/promises:637:25)
+[WebServer]     at async Object.readFile (node:internal/fs/promises:1269:14)
+[WebServer]     at async extractSourcemapFromFile (file:///D:/projects/typescript/Vrykell/node_modules/vite/dist/node/chunks/config.js:8066:65)
+[WebServer]     at async loadAndTransform (file:///D:/projects/typescript/Vrykell/node_modules/vite/dist/node/chunks/config.js:22717:22)
+[1A[2K[2/64] git-panel.spec.ts:76:1 › keeps comparisons as workspace tabs and returns to the running terminal
+[1A[2K[3/64] git-panel.spec.ts:91:1 › generates an editable commit message and runs commit and remote operations
+[1A[2K[4/64] git-panel.spec.ts:126:1 › stages and unstages complete files and filters paths
+[1A[2K[5/64] git-panel.spec.ts:137:1 › shows binary, conflict, empty and failure states
+[1A[2K[6/64] git-panel.spec.ts:152:1 › uses one joined button and adapts clean repositories to synchronization and publication
+[1A[2K[7/64] git-panel.spec.ts:192:1 › offers hover actions and confirms discards without touching staged changes
+[1A[2K[8/64] git-panel.spec.ts:209:1 › opens the composer branch menu, switches a clean branch and preserves command drafts
+[1A[2K[9/64] git-panel.spec.ts:241:1 › keeps Git usable in settings and saves a prompt for the remembered workspace
+[1A[2K[10/64] git-panel.spec.ts:272:1 › forces one comparison page despite a saved multi-page preference
+[1A[2K[11/64] git-panel.spec.ts:293:1 › scrolls comparison tabs with the wheel and keeps scrolling while a dragged tab rests at the edge
+[1A[2K[12/64] git-panel.spec.ts:316:1 › reorders comparison tabs and moves secondary actions into the compact menu
+[1A[2K[13/64] git-panel.spec.ts:351:1 › moving the selected comparison backward keeps its editor hosts attached
+[1A[2K[14/64] git-panel.spec.ts:384:1 › shows rounded groups, a collapsible file tree and selectable worktrees
+[1A[2K[15/64] git-panel.spec.ts:412:1 › uses reload feedback and dismisses operation errors from the heading
+[1A[2K[16/64] git-panel.spec.ts:425:1 › manages branches and tags and exposes conflict recovery
+[1A[2K[17/64] git-panel.spec.ts:469:1 › stages a reviewed conflict resolution only after confirmation
+[1A[2K[18/64] macos-titlebar.spec.ts:13:3 › native controls, title, search and actions have room at 720px
+[1A[2K[19/64] macos-titlebar.spec.ts:13:3 › native controls, title, search and actions have room at 1240px
+[1A[2K[20/64] macos-titlebar.spec.ts:44:1 › fullscreen releases the traffic-light space and restores it on exit
+[1A[2K[21/64] navigation-drag.spec.ts:18:1 › auxiliary actions reorder horizontally and retain their order and open panel after reload
+[1A[2K[22/64] navigation-drag.spec.ts:29:1 › reordering and hiding the assistant keep its conversation draft and right placement
+[1A[2K[23/64] navigation-drag.spec.ts:43:1 › narrow windows keep all fixed and auxiliary controls inside the application
+[1A[2K[24/64] navigation-drag.spec.ts:65:1 › Escape cancels the preview without toggling or saving a panel
+[1A[2K[25/64] navigation-drag.spec.ts:78:1 › search stays centered within the right titlebar and never overlaps actions
+[1A[2K[26/64] navigation-drag.spec.ts:93:1 › settings is fixed at the foot of the full-height sidebar and remains keyboard accessible
+[1A[2K[27/64] navigation-drag.spec.ts:105:1 › a toolbar drag reserves a stable shared insertion gap before saving
+[1A[2K[28/64] navigation-drag.spec.ts:122:1 › panel headings retain their appearance and only offer a right-edge placement target
+[1A[2K[29/64] settings-responsive.spec.ts:6:3 › settings keep their directory and close control available in 深色
+[1A[2K[30/64] settings-responsive.spec.ts:6:3 › settings keep their directory and close control available in 浅色
+[1A[2K[31/64] settings-responsive.spec.ts:31:1 › settings cover the auxiliary panel and preserve the workspace layout
+[1A[2K[32/64] settings-window.spec.ts:5:1 › settings cover the content card and toggle back to the unchanged workspace
+[1A[2K[33/64] settings-window.spec.ts:78:1 › language and appearance choices apply immediately and persist
+[1A[2K[34/64] settings-window.spec.ts:115:1 › wallpaper mode darkens the sidebar backdrop while preserving the UI layout
+[1A[2K[35/64] workspace-ai-utilities.spec.ts:4:1 › an unavailable side dock keeps the same conversation visible in the main workspace
+[1A[2K[36/64] workspace-ai-utilities.spec.ts:18:1 › main utility pages and docked conversations keep separate shortcut scopes
+[1A[2K[37/64] workspace-ai-utilities.spec.ts:45:1 › hidden terminal splits do not reserve the resource or code workspace width
+[1A[2K[38/64] workspace-navigation.spec.ts:10:1 › uses a full-height sidebar and keeps terminals alive across empty workspaces
+[1A[2K[39/64] workspace-navigation.spec.ts:47:1 › moves the same native conversation and composer between main and side
+[1A[2K[40/64] workspace-navigation.spec.ts:67:1 › keeps native and connected sessions in one AI strip without closing either on navigation
+[1A[2K[41/64] workspace-navigation.spec.ts:93:1 › collapses colored terminal groups while preserving the active session and actions
+[1A[2K[42/64] workspace-navigation.spec.ts:116:1 › routes every auxiliary panel to the right and keeps the workspace full height
+[1A[2K[43/64] workspace-navigation.spec.ts:132:1 › new, close and numeric shortcuts follow the workspace and the focused side conversation
+[1A[2K[44/64] workspace-surface-refinements.spec.ts:5:35 › acrylic is confined to navigation and region edges stay square in 深色
+[1A[2K[45/64] workspace-surface-refinements.spec.ts:5:35 › acrylic is confined to navigation and region edges stay square in 浅色
+[1A[2K[46/64] workspace-surface-refinements.spec.ts:26:1 › terminal dragging carries the complete tab and closing preview never closes the session
+[1A[2K[47/64] workspace-usability.spec.ts:23:1 › global search stays centered without covering actions or the title in both page types
+[1A[2K[48/64] workspace-usability.spec.ts:50:1 › Windows working directories show their drive prefix without the URI slash
+[1A[2K[49/64] workspace-usability.spec.ts:57:1 › terminal error notifications follow the active gray theme and can be closed
+[1A[2K[50/64] workspace-usability.spec.ts:97:1 › navigation supports Enter and Space and shows its active state
+[1A[2K[51/64] workspace-usability.spec.ts:109:1 › navigation switches panels without losing their local state
+[1A[2K[52/64] workspace-usability.spec.ts:120:1 › the full-height navigation and titlebar separate workspace and auxiliary content
+[1A[2K[53/64] workspace-usability.spec.ts:151:1 › workspace regions have square corners and flush resize boundaries
+[1A[2K[54/64] workspace-usability.spec.ts:178:1 › settings and terminal use the same content background in both themes
+[1A[2K[55/64] workspace-usability.spec.ts:205:1 › settings, both history pages, the editor and diffs share the terminal background
+[1A[2K[56/64] workspace-usability.spec.ts:246:1 › auxiliary resize edges remain visible and strengthen during dragging
+[1A[2K[57/64] workspace-usability.spec.ts:274:1 › narrow layouts preserve command space and fit the toolbar
+[1A[2K[58/64] workspace-usability.spec.ts:294:1 › AI drafts stay separate when opening the AI assistant
+[1A[2K[59/64] workspace-usability.spec.ts:307:1 › separate command and AI drafts survive repeated switches
+[1A[2K[60/64] workspace-usability.spec.ts:316:1 › split placement previews the hovered slot and closes with Escape
+[1A[2K[61/64] workspace-usability.spec.ts:328:1 › split placement closes when it loses focus
+[1A[2K[62/64] workspace-usability.spec.ts:343:1 › auxiliary navigation shares the right side and AI preserves the main workspace
+[1A[2K[63/64] workspace-usability.spec.ts:360:1 › panel headings close auxiliary content without hiding the workspace
+[1A[2K[64/64] workspace-usability.spec.ts:370:1 › dragging a navigation action preserves panel placement and order
+[1A[2K  Slow test file: git-panel.spec.ts (49.7s)
+  Slow test file: workspace-usability.spec.ts (32.7s)
+  Consider splitting slow test files to speed up parallel execution
+  64 passed (2.3m)

@@ -6,6 +6,7 @@ interface AiWorkspaceState {
   selected: string;
   order: string[];
   openNative: (id: string) => void;
+  ensureNative: (id: string) => void;
   select: (id: string) => void;
   closeNative: (id: string) => void;
   move: (ids: string[], id: string, over: string, after: boolean) => void;
@@ -15,6 +16,7 @@ interface AiWorkspaceState {
 export const useAiWorkspace = create<AiWorkspaceState>((set) => ({
   nativeTabs: [], selected: '', order: [],
   openNative: id => set(state => ({ nativeTabs: state.nativeTabs.includes(id) ? state.nativeTabs : [...state.nativeTabs, id], selected: `chat:${id}` })),
+  ensureNative: id => set(state => state.nativeTabs.includes(id) ? state : ({ nativeTabs: [...state.nativeTabs, id] })),
   select: selected => set({ selected }),
   closeNative: id => set(state => ({ nativeTabs: state.nativeTabs.filter(item => item !== id), selected: state.selected === `chat:${id}` ? '' : state.selected })),
   move: (ids, id, over, after) => set(state => {

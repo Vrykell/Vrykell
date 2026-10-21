@@ -12,6 +12,7 @@ afterEach(() => { Object.defineProperty(window, 'innerWidth', { configurable: tr
 
 it.each([1240, 940, 908, 760, 600])('keeps a usable right panel at width %s', width => {
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+  useWorkspaceNavigation.setState({ collapsed: width <= 900 });
   useDockStore.getState().openPanel('chat');
   expect(useDockStore.getState().rightPanels).toEqual(['chat']);
   expect(useDockStore.getState().leftPanels).toEqual([]);

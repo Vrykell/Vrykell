@@ -1,14 +1,20 @@
 import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
 import { useWorkspaceNavigation, workspaceAreaForKind } from '../stores/navigation';
-import { closeAiWorkspaceSession } from '@features/chat';
+import { closeAiWorkspaceSession, useChatStore } from '@features/chat';
+import { useDockStore } from '../stores/dock';
 import { focusedWorkspaceArea, sideAiHasFocus } from './workspaceActions';
 
 /** Close the visible instance instead of the enclosing functional workspace. */
 export function closeWorkspaceItem() {
   const workspace = useWorkspaceStore.getState();
   const tab = workspace.tabs.find(item => item.id === workspace.activeId);
-  if (focusedWorkspaceArea() === 'ai' && (sideAiHasFocus() || tab?.kind === 'harness')) {
-    if (sideAiHasFocus() || useWorkspaceNavigation.getState().aiPlacement === 'main') closeAiWorkspaceSession();
+  if (sideAiHasFocus()) {
+    closeAiWorkspaceSession(`chat:${useChatStore.getState().activeConversationId}`);
+    useDockStore.getState().togglePanel('right', 'chat');
+    return;
+  }
+  if (focusedWorkspaceArea() === 'ai' && tab?.kind === 'harness') {
+    closeAiWorkspaceSession();
     return;
   }
   if (!tab || workspaceAreaForKind(tab.kind) !== useWorkspaceNavigation.getState().area) return;

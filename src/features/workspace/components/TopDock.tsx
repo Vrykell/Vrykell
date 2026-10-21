@@ -1,6 +1,7 @@
 import KeyHint from '@ui/KeyHint';
 import { useEffect, useRef, useState } from 'react';
-import { iconSizes, Search } from '@ui/icons';
+import { iconSizes, Search, PanelLeft } from '@ui/icons';
+import { IconButton } from '@ui/IconButton';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useSessionStore, useTabDisplayTitle, useUiStore, useWorkspaceNavigation, workspaceAreaForKind } from '@features/workspace';
 import DockNavigation from './DockNavigation';
@@ -15,6 +16,7 @@ export default function TopDock() {
   const displayTitle = useTabDisplayTitle(activeTab);
   const settingsOpen = useUiStore(state => state.settingsOpen);
   const area = useWorkspaceNavigation(state => state.area);
+  const collapsed = useWorkspaceNavigation(state => state.collapsed);
   const workspaceTitle = t(area === 'code' ? 'Code workspace' : area === 'ai' ? 'AI workspace' : area === 'ssh' ? 'SSH hosts' : 'Terminal workspace');
   const [fullscreen, setFullscreen] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
@@ -44,6 +46,8 @@ export default function TopDock() {
     // attribute blocks dragging for the whole path.
     <header ref={headerRef} className="workspace-titlebar" data-platform={isMacOS ? 'macos' : 'other'} data-fullscreen={fullscreen} data-tauri-drag-region>
       <div data-tauri-drag-region className="workspace-title">
+        {collapsed && <IconButton compact className="workspace-sidebar-toggle" data-testid="workspace-sidebar-expand" aria-label={t('Expand sidebar')} data-tip={t('Expand sidebar')}
+          onClick={() => useWorkspaceNavigation.getState().setCollapsed(false)}><PanelLeft size={iconSizes.control} /></IconButton>}
         <span data-tauri-drag-region>{settingsOpen ? t('Settings') : activeTab && workspaceAreaForKind(activeTab.kind) === area ? displayTitle : workspaceTitle}</span>
       </div>
       <button data-subtle data-testid="global-search-trigger" className="workspace-search"

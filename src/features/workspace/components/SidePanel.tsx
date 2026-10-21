@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState, type FC } from 'react';
-import { iconSizes, X  } from '@ui/icons';
+import { iconSizes, X, ArrowLeft } from '@ui/icons';
+import { IconButton } from '@ui/IconButton';
+import { useAiWorkspace, useChatStore } from '@features/chat';
+import { selectWorkspaceArea } from '../services/selectWorkspaceArea';
 import { useDockStore, useUiStore, PANEL_DEFS, MIN_PANEL_WIDTH, useNavigationButtonDrag, useNavigationDrag, type DockSide } from '@features/workspace';
 import ResizeHandle from '@ui/ResizeHandle';
 import PanelFiles from '@features/files/components/PanelFiles';
@@ -101,8 +104,16 @@ function SinglePanel({ side, panelId, visible }: { side: DockSide; panelId: stri
         <div className="workspace-panel-heading" data-testid={`panel-drag-handle-${panelId}`} data-dragging={dragging}
           onPointerDown={event => startDrag(event, panelId)}>
           <span>{def.label}</span>
+          <div className="workspace-panel-heading-actions">
+          {panelId === 'chat' && <IconButton compact data-testid="ai-return-to-workspace" aria-label={t('Move AI to workspace')} data-tip={t('Move AI to workspace')}
+            onClick={() => {
+              const id = useChatStore.getState().activeConversationId;
+              if (id) useAiWorkspace.getState().openNative(id);
+              selectWorkspaceArea('ai');
+            }}><ArrowLeft size={iconSizes.control} /></IconButton>}
           <button data-subtle className="workspace-panel-close" aria-label={t('Close {{panel}} panel', { panel: def.label })}
             onClick={() => useDockStore.getState().togglePanel(side, panelId)}><X size={iconSizes.control} /></button>
+          </div>
         </div>
         <div style={{ flex: 1, minHeight: 0 }}>
           <PanelContent />

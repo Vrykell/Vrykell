@@ -16,9 +16,9 @@ for (const theme of ['深色', '浅色']) {
       await expect(page.getByRole('button', { name: '关闭设置', exact: true })).toBeVisible();
       await expect(page.locator('.settings-navigation-toggle, .settings-navigation-backdrop')).toHaveCount(0);
       const settings = (await page.locator('.settings-screen').boundingBox())!;
-      const sidebarWidth = width <= 900 ? 48 : 208;
+      const sidebarWidth = width <= 900 ? 0 : 208;
       expect(settings.x).toBe(sidebarWidth);
-      expect(settings.width).toBe(width - sidebarWidth - 8);
+      expect(settings.width).toBe(width - sidebarWidth);
       expect((await nav.boundingBox())!.width).toBeGreaterThanOrEqual(180);
       await page.screenshot({ path: info.outputPath(`settings-${width}.png`), animations: 'disabled' });
     }
@@ -39,7 +39,7 @@ test('settings cover the auxiliary panel and preserve the workspace layout', asy
   for (const panel of await page.locator('.workspace-side-panel[data-visible="true"]').all()) {
     await expect(panel).toBeHidden(); await expect(panel).toHaveAttribute('inert', '');
   }
-  expect((await page.locator('.settings-screen').boundingBox())!.width).toBe(1024);
+  expect((await page.locator('.settings-screen').boundingBox())!.width).toBe(1032);
   await page.getByRole('button', { name: '关闭设置', exact: true }).click();
   expect(await page.locator('.workspace-main').boundingBox()).toEqual(before);
   await expect(input).toHaveValue('preserved draft');

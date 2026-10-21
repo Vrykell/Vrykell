@@ -1972,7 +1972,11 @@ export async function expectAnyTermContains(page: Page, text: string, timeout = 
 
 /** 确保会话列表面板打开，兼容默认布局与按需打开状态。 */
 export async function ensureTabsOpen(page: Page): Promise<void> {
-  await page.getByTestId('workspace-area-terminal').click();
+  const terminal = page.getByTestId('workspace-area-terminal');
+  if (await terminal.getAttribute('aria-current') !== 'page' || await page.locator('.settings-screen').isVisible()) {
+    if (!(await terminal.isVisible())) await page.getByTestId('workspace-sidebar-expand').click();
+    await terminal.click();
+  }
   const search = page.getByTestId('tab-search');
   if (!(await search.isVisible())) await page.getByTestId('tab-search-toggle').click();
   await expect(search).toBeVisible();

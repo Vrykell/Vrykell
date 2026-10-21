@@ -68,7 +68,7 @@ describe('right auxiliary dock', () => {
   it('clamps resizing to the full-height sidebar and terminal budget', () => {
     Object.defineProperty(window, 'innerWidth', { value: 1000 });
     useDockStore.getState().setPanelWidth('chat', 10000);
-    expect(useDockStore.getState().panelWidths.chat).toBe(424);
+    expect(useDockStore.getState().panelWidths.chat).toBe(432);
   });
   it('ignores invalid resize requests', () => {
     useDockStore.getState().setPanelWidth('unknown', 100);

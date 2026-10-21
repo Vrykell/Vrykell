@@ -43,11 +43,18 @@ test('reordering and hiding the assistant keep its conversation draft and right 
 test('narrow windows keep all fixed and auxiliary controls inside the application', async ({ page }, info) => {
   for (const width of [760, 560]) {
     await page.setViewportSize({ width, height: 500 });
-    for (const id of ['tabs', 'ssh', 'chat', 'files', 'git', 'command-history', 'settings']) {
+    await expect(page.getByTestId('workspace-sidebar')).toBeHidden();
+    await expect(page.getByTestId('workspace-sidebar-expand')).toBeVisible();
+    await expect(page.getByTestId('auxiliary-more')).toBeVisible();
+    for (const id of ['files', 'git']) {
       const bounds = (await button(page, id).boundingBox())!;
       expect(bounds.x).toBeGreaterThanOrEqual(0);
       expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
     }
+    await page.getByTestId('auxiliary-more').click();
+    await expect(page.getByRole('menuitemradio', { name: 'AI 助手', exact: true })).toBeVisible();
+    await expect(page.getByRole('menuitemradio', { name: '历史命令', exact: true })).toBeVisible();
+    await page.keyboard.press('Escape');
     await page.screenshot({ path: info.outputPath(`fixed-navigation-${width}.png`) });
   }
   const before = await order(page);

@@ -52,6 +52,8 @@ test('reviews both sides of a partially staged file and preserves the terminal',
       const right = (await review.locator('.editor.modified').boundingBox())!;
       expect(left.x + left.width).toBeLessThanOrEqual(right.x + 1);
       expect(left.width).toBeGreaterThan(200); expect(right.width).toBeGreaterThan(200);
+      await expect(review.locator('.editor.original')).toHaveCSS('border-radius', '0px');
+      await expect(review.locator('.editor.modified')).toHaveCSS('border-radius', '0px');
       await expect(review.locator('.original .view-lines')).toContainText('base');
       await expect(review.locator('.modified .view-lines')).toContainText('staged');
     } else await expect(review.getByTestId('code-diff')).toHaveAttribute('data-layout', 'inline');
@@ -66,6 +68,7 @@ test('reviews both sides of a partially staged file and preserves the terminal',
   await page.keyboard.press('Control+w');
   await expect(review).toHaveCount(0);
   await expect(page.getByTestId('code-workspace-empty')).toBeVisible();
+  await page.getByTestId('workspace-sidebar-expand').click();
   await page.getByTestId('workspace-area-terminal').click();
   await expect(page.locator('[data-terminal-input]').first()).toBeVisible();
 });

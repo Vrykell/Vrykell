@@ -28,7 +28,9 @@ export function newWorkspaceItem() {
   else if (area === 'code') void openWorkspaceFile();
   else if (area === 'ai') {
     const side = sideAiHasFocus();
-    useAiWorkspace.getState().openNative(useChatStore.getState().createConversation());
+    const id = useChatStore.getState().createConversation();
+    if (side) useAiWorkspace.getState().ensureNative(id);
+    else useAiWorkspace.getState().openNative(id);
     if (!side) useWorkspaceStore.getState().openHarnessTab();
   }
 }
@@ -61,14 +63,13 @@ export function activateWorkspaceInstance(index: number): boolean {
     const ai = useAiWorkspace.getState();
     const connections = useHarnessWorkspace.getState();
     const side = sideAiHasFocus();
-    const sessionsVisible = side || navigation.aiPlacement === 'main';
-    const ids = [...(sessionsVisible ? ai.nativeTabs.filter(id => useChatStore.getState().conversations.some(item => item.id === id)).map(id => `chat:${id}`) : []),
-      ...(sessionsVisible ? connections.connections.map(item => `acp:${item.id}`) : []), ...(!side ? workspace.tabs.filter(tab => tab.kind === 'usage' || tab.kind === 'ai-history').map(tab => `page:${tab.id}`) : [])];
+    const ids = [...ai.nativeTabs.filter(id => useChatStore.getState().conversations.some(item => item.id === id)).map(id => `chat:${id}`),
+      ...(!side ? connections.connections.map(item => `acp:${item.id}`) : []), ...(!side ? workspace.tabs.filter(tab => tab.kind === 'usage' || tab.kind === 'ai-history').map(tab => `page:${tab.id}`) : [])];
     const id = orderedWorkspaceIds(ids, ai.order)[index];
     if (!id) return false;
     if (id.startsWith('page:')) workspace.activate(id.slice(5));
     else {
-      ai.select(id);
+      if (!side) ai.select(id);
       if (id.startsWith('chat:')) void useChatStore.getState().selectConversation(id.slice(5)); else connections.select(id.slice(4));
       if (!side) workspace.openHarnessTab();
     }

@@ -1,5 +1,8 @@
 ﻿/** Simplified Chinese messages for shared UI and feature namespaces. */
 const zh: Record<string, string> = {
+  'More panels': '更多面板',
+  'This conversation is open in the side panel.': '此对话已在右侧面板打开。',
+  'Use acrylic material in the left sidebar. Other regions stay opaque.': '在左侧栏使用亚克力材质，其他区域保持不透明。',
   'Run now': '运行',
   "Enter a command before running it.": "请输入要运行的命令。",
   "Explain this action before running it: {{action}}": "请先解释这个操作的作用，再决定是否运行：{{action}}",

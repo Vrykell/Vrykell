@@ -80,7 +80,7 @@ export function ThemePage() {
         </div>
       </Field>
 
-      <Field title={t('Desktop material')} description={t('Use a translucent black window frame. Content stays opaque.')}>
+      <Field title={t('Desktop material')} description={t('Use acrylic material in the left sidebar. Other regions stay opaque.')}>
         <Toggle label={t('Desktop material')} on={config.desktopTint ?? true} onChange={desktopTint => themeUpdate({ desktopTint })} />
       </Field>
 

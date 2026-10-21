@@ -23,7 +23,7 @@ export const NAVIGATION_DEFS: Record<string, Pick<PanelDef, 'id' | 'icon' | 'lab
 const STORAGE_KEY = 'dock-layout-v5';
 const PANEL_IDS = Object.keys(PANEL_DEFS);
 export const MIN_PANEL_WIDTH = 160;
-export const WORKSPACE_GAP = 8;
+export const WORKSPACE_GAP = 0;
 
 interface PersistedLayout {
   leftZone: string[];

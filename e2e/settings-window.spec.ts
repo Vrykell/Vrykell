@@ -14,6 +14,7 @@ test('settings cover the content card and toggle back to the unchanged workspace
   const verifyButtonCenters = async () => {
     const bounds = (await rail.boundingBox())!;
     for (const button of await rail.locator('.sidebar-row[role="button"]').all()) {
+      if (!(await button.isVisible())) continue;
       const box = (await button.boundingBox())!;
       expect(Math.abs(box.x + box.width / 2 - bounds.x - bounds.width / 2)).toBeLessThanOrEqual(0.5);
     }
@@ -24,10 +25,10 @@ test('settings cover the content card and toggle back to the unchanged workspace
   for (const width of [1240, 720]) {
     await page.setViewportSize({ width, height: 800 });
     await expect(settings).toBeVisible();
-    const sidebarWidth = width <= 900 ? 48 : 208;
-    expect((await rail.boundingBox())!.width).toBe(sidebarWidth);
+    const sidebarWidth = width <= 900 ? 0 : 208;
+    expect(await rail.evaluate(element => element.getBoundingClientRect().width)).toBe(sidebarWidth);
     await verifyButtonCenters();
-    expect(await settings.boundingBox()).toEqual({ x: sidebarWidth, y: 42, width: width - sidebarWidth - 8, height: 750 });
+    expect(await settings.boundingBox()).toEqual({ x: sidebarWidth, y: 42, width: width - sidebarWidth, height: 758 });
     const close = settings.getByRole('button', { name: '关闭设置', exact: true });
     await expect(close).toBeVisible();
     await expect(close).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
@@ -39,7 +40,7 @@ test('settings cover the content card and toggle back to the unchanged workspace
     await expect(settings.locator('.settings-navigation-toggle')).toHaveCount(0);
     await page.screenshot({ path: info.outputPath(`settings-${width}.png`) });
   }
-  await page.getByRole('button', { name: '设置', exact: true }).click();
+  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
   await expect(settings).toHaveCount(0);
   await expect(input).toHaveValue('keep this command draft');
   await page.setViewportSize({ width: 1240, height: 800 });
@@ -58,10 +59,11 @@ test('settings cover the content card and toggle back to the unchanged workspace
       background: style.backgroundImage,
     };
   });
-  expect(chrome).toEqual({ color: 'rgba(0, 0, 0, 0.6)', background: 'none' });
+  expect(chrome).toEqual({ color: 'rgba(0, 0, 0, 0)', background: 'none' });
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(page.locator('.workspace-titlebar')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(page.locator('.workspace-titlebar')).toHaveCSS('background-color', 'rgb(40, 40, 43)');
   await page.screenshot({ path: info.outputPath('sampled-palette-workspace.png') });
+  await page.getByTestId('workspace-sidebar-expand').click();
   expect((await rail.boundingBox())!.width).toBe(railBefore!.width);
   await page.keyboard.press('Control+,');
   await expect(settings).toBeVisible();
@@ -92,7 +94,7 @@ test('language and appearance choices apply immediately and persist', async ({ p
   await tint.click();
   await expect(tint).toHaveAttribute('aria-checked', 'false');
   await expect(page.locator('.application-window')).toHaveAttribute('data-desktop-tint', 'false');
-  await expect(page.locator('.application-chrome')).toHaveCSS('background-color', 'rgb(233, 240, 250)');
+  await expect(page.locator('.workspace-sidebar')).toHaveCSS('background-color', 'rgb(240, 242, 243)');
   await page.screenshot({ path: info.outputPath('appearance-light.png') });
   await modes.getByRole('radio', { name: 'Dark', exact: true }).click();
   await page.screenshot({ path: info.outputPath('appearance-dark.png') });
@@ -130,7 +132,8 @@ test('wallpaper mode darkens the sidebar backdrop while preserving the UI layout
   });
   const window = page.locator('.application-window');
   await expect(window).toHaveAttribute('data-wallpaper', 'true');
-  await expect(page.locator('.settings-navigation')).toHaveCSS('backdrop-filter', 'brightness(0.55) saturate(0.88)');
+  await expect(page.locator('.workspace-sidebar')).toHaveCSS('backdrop-filter', 'brightness(0.55) saturate(0.88)');
+  await expect(page.locator('.settings-navigation')).toHaveCSS('backdrop-filter', 'none');
   await expect(page.locator('.settings-navigation')).toBeVisible();
   await page.screenshot({ path: info.outputPath('wallpaper-sidebar-mask.png') });
 });

@@ -25,3 +25,11 @@ it('reuses native navigation tabs and interleaves them with connected sessions',
   useAiWorkspace.getState().move(['chat:native-a', 'acp:agent-a'], 'acp:agent-a', 'chat:native-a', false);
   expect(useAiWorkspace.getState().order).toEqual(['acp:agent-a', 'chat:native-a']);
 });
+
+it('registers a side conversation without replacing the selected connected session', () => {
+  useAiWorkspace.getState().select('acp:agent-a');
+  useAiWorkspace.getState().ensureNative('native-a');
+  useAiWorkspace.getState().ensureNative('native-a');
+  expect(useAiWorkspace.getState().nativeTabs).toEqual(['native-a']);
+  expect(useAiWorkspace.getState().selected).toBe('acp:agent-a');
+});

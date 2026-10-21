@@ -1,8 +1,7 @@
 import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { iconSizes,
-  Plus, History, Sparkles, DataUsage, Bot,
-  Folder, Search,
+  Plus, History, Bot, Search,
  } from '@ui/icons';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, tabIconKey, tabIconColor, type Tab, type TabGroup } from '@features/workspace';
 import { useIconColorStore } from '@config/iconColors';
@@ -15,6 +14,7 @@ import { useDefaultShellType } from '../hooks/useDefaultShellType';
 import NewTabModal from '@features/workspace/components/NewTabModal';
 import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
 import { FolderTabContent } from '@ui/FolderTabs';
+import EditorActions from '@ui/EditorActions';
 import { useHorizontalWheel } from '@ui/hooks/useHorizontalWheel';
 import { useActiveTabVisibility } from '@ui/hooks/useActiveTabVisibility';
 import { historyGroupColor } from '@ui/historyGroupColor';
@@ -178,12 +178,17 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
       <div className="folder-actions terminal-tab-tools">
         <IconBtn title={t('Search session titles…')} data-testid="tab-search-toggle" onClick={() => { setSearchOpen(!searchOpen); setQuery(''); }}><Search size={iconSizes.control} /></IconBtn>
         {searchOpen && <TextInput autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder={t('Search session titles…')} data-testid="tab-search" className="terminal-tab-search" />}
-        <IconBtn title={t('Session history')} data-testid="tab-history-btn" onClick={openHistoryTab}>
+        <span className="folder-action-secondary terminal-secondary-actions"><IconBtn title={t('Session history')} data-testid="tab-history-btn" onClick={openHistoryTab}>
           <History size={iconSizes.control} />
         </IconBtn>
         <IconBtn title={t('ACP')} data-testid="tab-acp-btn" onClick={() => useSessionStore.getState().openHarnessTab()}>
           <Bot size={iconSizes.control} />
         </IconBtn>
+        </span>
+        <span className="terminal-overflow-actions"><EditorActions items={[
+          { label: t('Session history'), onClick: openHistoryTab },
+          { label: t('ACP'), onClick: () => useSessionStore.getState().openHarnessTab() },
+        ]} /></span>
         {/* The panel button always creates ungrouped tabs; only a group's own + assigns that group. */}
         <IconBtn title={t('Create terminal')} data-testid="tab-new-btn" onClick={() => { setModalGroupId(undefined); setModalOpen(true); }}>
           <Plus size={iconSizes.control} />
@@ -296,18 +301,19 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
         />
       )}
 
-      <ListReorderPreview listId={LIST_ID}>
+      <ListReorderPreview listId={LIST_ID} variant="item">
         {(drag) => {
-          const tab = drag.kind !== 'group' ? tabs.find((t) => t.id === drag.id) : undefined;
-          const first = tab ? firstTerminalOf(tab) : null;
-          const Icon = drag.kind === 'group' ? Folder
-            : tab?.kind === 'history' ? History
-              : tab?.kind === 'ai-history' ? Sparkles
-              : tab?.kind === 'usage' ? DataUsage
-              : first?.kind === 'ssh' ? SshIcon
-                : shellIconFor(first?.kind === 'local' ? first.shellType ?? defaultShellType : undefined);
-          return <Icon size={iconSizes.row} style={{ color: tab && isSessionTab(tab)
-            ? tabIconColor(tab, iconColors) : 'var(--text-secondary)' }} />;
+          if (drag.kind === 'group') {
+            const group = groups.find(item => item.id === drag.id);
+            if (!group) return null;
+            const color = useWorkspaceNavigation.getState().groupColors[group.id] ?? historyGroupColor(group.id);
+            return <div className="terminal-tab-group terminal-group-preview" style={{ '--terminal-group-color': color === 'neutral' ? 'var(--text-secondary)' : `var(--group-${color})` } as React.CSSProperties}>
+              <span className="terminal-group-chip">{group.title}</span>
+              {!group.collapsed && groupTabs(group.id).map(tab => <TerminalTabPreview key={tab.id} tab={tab} active={tab.id === activeId} defaultShellType={defaultShellType} />)}
+            </div>;
+          }
+          const tab = tabs.find(item => item.id === drag.id);
+          return tab ? <TerminalTabPreview tab={tab} active={tab.id === activeId} defaultShellType={defaultShellType} /> : null;
         }}
       </ListReorderPreview>
 
@@ -317,6 +323,16 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
       ]} />}
     </div></WorkspaceHeader>
   );
+}
+
+function TerminalTabPreview({ tab, active, defaultShellType }: { tab: Tab; active: boolean; defaultShellType?: ShellType }) {
+  const title = useTabDisplayTitle(tab);
+  const colors = useIconColorStore(state => state.colors);
+  const first = firstTerminalOf(tab);
+  const Icon = tab.kind === 'history' ? History : first?.kind === 'ssh' ? SshIcon : shellIconFor(first?.kind === 'local' ? first.shellType ?? defaultShellType : undefined);
+  return <div className="folder-tab folder-tab-preview terminal-instance-tab" data-active={active}>
+    <FolderTabContent selected={active} item={{ id: tab.id, label: title, tip: title, closeLabel: t('Close this tab'), icon: <Icon size={iconSizes.compact} style={{ color: tabIconColor(tab, colors) }} /> }} />
+  </div>;
 }
 
 /** A colored group chip owns contiguous terminal tabs and their shared drop zone. */

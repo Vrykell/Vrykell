@@ -22,13 +22,26 @@ test('uses a full-height sidebar and keeps terminals alive across empty workspac
   await expect(page.locator(`[data-tab-row-id="${terminal}"]`)).toHaveAttribute('data-active', 'true');
   await page.screenshot({ path: info.outputPath('workspace-wide.png') });
   await page.getByTestId('workspace-sidebar-toggle').click();
-  expect((await rail.boundingBox())!.width).toBe(48);
-  await page.getByTestId('workspace-sidebar-toggle').click();
+  await expect(rail).toBeHidden();
+  expect(await rail.evaluate(element => element.getBoundingClientRect().width)).toBe(0);
+  const expand = page.getByTestId('workspace-sidebar-expand');
+  await expect(expand).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expand.hover();
+  await expand.evaluate(async element => {
+    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    await Promise.all(element.getAnimations().map(animation => animation.finished));
+  });
+  await expect(expand).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expand.click();
   await page.setViewportSize({ width: 760, height: 800 });
   await expect(rail).toHaveAttribute('data-collapsed', 'true');
-  expect((await rail.boundingBox())!.width).toBe(48);
+  await expect(rail).toBeHidden();
+  expect(await rail.evaluate(element => element.getBoundingClientRect().width)).toBe(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(760);
   await page.screenshot({ path: info.outputPath('workspace-narrow.png') });
+  await expand.click();
+  await expect(rail).toBeVisible();
+  expect((await rail.boundingBox())!.width).toBe(208);
 });
 
 test('moves the same native conversation and composer between main and side', async ({ page }, info) => {
@@ -42,8 +55,9 @@ test('moves the same native conversation and composer between main and side', as
   await expect(composer).toHaveValue('keep this draft');
   expect(await composer.evaluate(element => element === (window as unknown as { savedComposer: Element }).savedComposer)).toBe(true);
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  await expect(page.getByTestId('ai-surface-side').getByRole('tablist')).toHaveCount(0);
   await page.screenshot({ path: info.outputPath('workspace-ai-side.png') });
-  await page.getByTestId('ai-relocate').click();
+  await page.getByTestId('ai-return-to-workspace').click();
   await expect(page.getByTestId('workspace-area-ai')).toHaveAttribute('aria-current', 'page');
   await expect(composer).toHaveValue('keep this draft');
   expect(await composer.evaluate(element => element === (window as unknown as { savedComposer: Element }).savedComposer)).toBe(true);
@@ -68,6 +82,12 @@ test('keeps native and connected sessions in one AI strip without closing either
   expect((await acpCalls(page)).filter(call => call.startsWith('acp_close:'))).toHaveLength(0);
   await page.getByTestId('workspace-area-ai').click();
   await expect(page.getByTestId('harness-composer')).toHaveValue('agent draft');
+  await page.locator('[data-dock-btn="chat"]').click();
+  await expect(page.getByTestId('harness-composer')).toHaveValue('agent draft');
+  const side = page.getByTestId('ai-surface-side');
+  await expect(side.locator('[data-chat-composer]')).toHaveValue('native draft');
+  await expect(side.getByRole('tablist')).toHaveCount(0);
+  await expect(side.getByTestId('harness-composer')).toHaveCount(0);
 });
 
 test('collapses colored terminal groups while preserving the active session and actions', async ({ page }, info) => {
@@ -99,6 +119,10 @@ test('routes every auxiliary panel to the right and keeps the workspace full hei
     const visible = page.locator('.workspace-side-panel:visible');
     await expect(visible).toHaveCount(1);
     await expect(visible).toHaveAttribute('data-side', 'right');
+    expect((await visible.boundingBox())!.y).toBe(42);
+    expect((await visible.boundingBox())!.height).toBe(758);
+    const strip = (await page.getByTestId('workspace-instance-bar').boundingBox())!;
+    expect(strip.x + strip.width).toBeCloseTo((await visible.boundingBox())!.x, 0);
   }
   await page.getByTestId('workspace-settings').click();
   await expect(page.locator('.settings-screen')).toBeVisible();
@@ -128,12 +152,12 @@ test('new, close and numeric shortcuts follow the workspace and the focused side
   await page.getByTestId('ai-relocate').click();
   const composer = page.locator('[data-chat-composer]:visible');
   await composer.focus(); await page.keyboard.press('Control+t');
-  await expect(page.locator('[data-testid="ai-surface-side"] [role="tab"]')).toHaveCount(2);
+  await expect(page.locator('[data-testid="ai-surface-side"] [role="tab"]')).toHaveCount(0);
   await expect(strip.locator('[data-tab-kind="session"]')).toHaveCount(2);
   await composer.fill('keep the second draft');
   await page.keyboard.press('Control+1'); await expect(composer).toHaveValue('');
   await page.keyboard.press('Control+2'); await expect(composer).toHaveValue('keep the second draft');
   await page.keyboard.press('Control+w');
-  await expect(page.locator('[data-testid="ai-surface-side"] [role="tab"]')).toHaveCount(1);
+  await expect(page.getByTestId('ai-surface-side')).toBeHidden();
   await expect(strip.locator('[data-tab-kind="session"]')).toHaveCount(2);
 });

@@ -15,13 +15,13 @@ for (const width of [720, 1240]) {
     const header = page.locator('.workspace-titlebar');
     await expect(header).toHaveAttribute('data-platform', 'macos');
     await expect(page.getByTestId('window-controls')).toHaveCount(0);
-    const sidebarWidth = width <= 900 ? 48 : 208;
+    const sidebarWidth = width <= 900 ? 0 : 208;
     const inset = Math.max(16, 92 - sidebarWidth);
     await expect(page.locator('.workspace-title')).toHaveCSS('padding-left', `${inset}px`);
     const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
     const title = (await page.locator('.workspace-title span').boundingBox())!;
-    const ai = (await page.locator('[data-dock-btn="chat"]').boundingBox())!;
-    expect(title.x).toBe(sidebarWidth + inset);
+    const ai = (await page.locator(width <= 760 ? '[data-testid="auxiliary-more"]' : '[data-dock-btn="chat"]').boundingBox())!;
+    expect(title.x).toBe(sidebarWidth + inset + (sidebarWidth === 0 ? 36 : 0));
     expect(title.width).toBeGreaterThan(0);
     expect(title.x + title.width).toBeLessThan(search.x);
     expect(Math.abs(search.x + search.width / 2 - (sidebarWidth + (width - sidebarWidth) / 2))).toBeLessThan(1);
@@ -36,7 +36,7 @@ for (const width of [720, 1240]) {
     await page.getByTestId('global-search-trigger').click();
     await expect(page.getByPlaceholder(/搜索文件、命令、设置/)).toBeVisible();
     await page.keyboard.press('Escape');
-    await page.locator('[data-dock-btn="settings"]').click();
+    await page.keyboard.press('Control+,');
     await expect(page.getByTestId('provider-endpoint-input').first()).toBeVisible();
   });
 }
