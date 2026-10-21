@@ -8,7 +8,8 @@ for (const theme of ['深色', '浅色']) test(`acrylic is confined to navigatio
   await page.getByRole('button', { name: '关闭设置', exact: true }).click();
   await page.locator('[data-dock-btn="files"]').click();
   const sidebar = page.getByTestId('workspace-sidebar');
-  await expect(sidebar).toHaveCSS('background-color', 'rgba(0, 0, 0, 0.6)');
+  const materialColor = await sidebar.evaluate(element => getComputedStyle(element).backgroundColor);
+  expect(materialColor).toMatch(/(?:rgba\([^)]*,\s*0\.6\)|\/\s*0\.6\))/);
   for (const selector of ['.workspace-titlebar', '.workspace-body', '.workspace-main', '.workspace-side-panel > div:first-child']) {
     const color = await page.locator(selector).first().evaluate(element => getComputedStyle(element).backgroundColor);
     expect(color).not.toMatch(/rgba\([^)]*,\s*0(?:\.\d+)?\)/);
@@ -20,7 +21,7 @@ for (const theme of ['深色', '浅色']) test(`acrylic is confined to navigatio
   await gotoSetting(page, '主题');
   await page.getByRole('switch', { name: '桌面材质', exact: true }).click();
   await page.getByRole('button', { name: '关闭设置', exact: true }).click();
-  expect(await sidebar.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0.6)');
+  expect(await sidebar.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe(materialColor);
 });
 
 test('terminal dragging carries the complete tab and closing preview never closes the session', async ({ page }, info) => {

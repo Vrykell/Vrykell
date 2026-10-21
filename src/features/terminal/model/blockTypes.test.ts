@@ -10,7 +10,7 @@ describe('terminal block palette', () => {
 
   it('默认前景、背景和光标映射到同一套终端变量', () => {
     expect(indexToCss(256)).toBe('var(--xterm-foreground, #E9EBED)');
-    expect(indexToCss(257)).toBe('var(--xterm-bg, #141414)');
+    expect(indexToCss(257)).toBe('var(--xterm-bg, #1C1C1C)');
     expect(indexToCss(258)).toBe('var(--xterm-cursor, #E9EBED)');
   });
 });

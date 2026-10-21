@@ -12,7 +12,7 @@ export const PANEL_DEFS: Record<string, PanelDef> = {
   files: { id: 'files', icon: Folder, label: t('dock.files'), width: 200 },
   git: { id: 'git', icon: GitBranch, label: t('Source control'), width: 280 },
   'command-history': { id: 'command-history', icon: Terminal, label: t('Command history'), width: 300 },
-  chat: { id: 'chat', icon: Sparkles, label: 'AI', width: 320 },
+  chat: { id: 'chat', icon: Sparkles, get label() { return t('dock.chat'); }, width: 320 },
 };
 
 /** Older commands can request either side; auxiliary panels always resolve to the right. */

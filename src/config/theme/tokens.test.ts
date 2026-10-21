@@ -41,7 +41,7 @@ describe('toRgba', () => {
 describe('default blue palette', () => {
   it('uses the sampled neutral surfaces and blue action from the appearance reference', () => {
     expect(themes.dark).toMatchObject({
-      canvas: '#202020', sidebarBg: '#1C1C1C', xtermBg: '#141414', surface: '#282828',
+      canvas: '#1C1C1C', sidebarBg: '#28282B', xtermBg: '#1C1C1C', surface: '#282828',
       fieldBg: '#2C2C2C', selectionBg: '#183C57', accent: '#50C0FF', primaryAction: '#183C57',
     });
   });
@@ -159,8 +159,13 @@ describe('default blue palette', () => {
     expect(themes.dark.warning).toBe('#D5AD54');
   });
 
-  it('终端表面与应用外壳分层，并提供完整 ANSI 色板', () => {
-    expect(themes.dark.xtermBg).not.toBe(themes.dark.canvas);
+  it.each(['dark', 'light'] as const)('%s unifies resting application surfaces while retaining navigation and field hierarchy', mode => {
+    expect(themes[mode].xtermBg).toBe(themes[mode].canvas);
+    expect(themes[mode].chromeBg).toBe(themes[mode].canvas);
+    expect(themes[mode].sidebarBg).not.toBe(themes[mode].canvas);
+    expect(themes[mode].fieldBg).not.toBe(themes[mode].canvas);
+  });
+  it('retains the complete terminal color palette', () => {
     expect(themes.dark.xtermForeground).toBe('#E9EBED');
     expect(themes.dark.xtermBlue).toBe('#8DB7E8');
     expect(themes.dark.xtermBrightRed).toBe('#FF9A92');

@@ -44,7 +44,7 @@ export default function TopDock() {
     // Every non-interactive part of the titlebar is a window drag handle; buttons
     // below keep their own behaviour because a clickable element without the
     // attribute blocks dragging for the whole path.
-    <header ref={headerRef} className="workspace-titlebar" data-platform={isMacOS ? 'macos' : 'other'} data-fullscreen={fullscreen} data-tauri-drag-region>
+    <header ref={headerRef} className="workspace-titlebar" data-platform={isMacOS ? 'macos' : 'other'} data-fullscreen={fullscreen} data-sidebar-collapsed={collapsed} data-tauri-drag-region>
       <div data-tauri-drag-region className="workspace-title">
         {collapsed && <IconButton compact className="workspace-sidebar-toggle" data-testid="workspace-sidebar-expand" aria-label={t('Expand sidebar')} data-tip={t('Expand sidebar')}
           onClick={() => useWorkspaceNavigation.getState().setCollapsed(false)}><PanelLeft size={iconSizes.control} /></IconButton>}

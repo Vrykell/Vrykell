@@ -1,0 +1,178 @@
+
+> vrykell@0.1.0 test:e2e
+> playwright test e2e/workspace-interface-polish.spec.ts e2e/folder-tab-corners.spec.ts e2e/macos-titlebar.spec.ts e2e/navigation-drag.spec.ts e2e/settings-model.spec.ts e2e/macos-feedback-refinements.spec.ts e2e/field-surfaces.spec.ts e2e/settings-responsive.spec.ts e2e/context-menu.spec.ts e2e/settings-window.spec.ts e2e/workspace-surface-refinements.spec.ts --reporter=line
+
+
+[1A[2K[WebServer] (node:74144) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 47 tests using 1 worker
+
+
+[1A[2K(node:78340) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:78340) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K[1/47] context-menu.spec.ts:5:1 › settings require certificate trust and manage registration explicitly
+[1A[2K[2/47] context-menu.spec.ts:21:1 › a shell launch opens exactly one terminal at the requested path even with empty startup mode
+[1A[2K[3/47] context-menu.spec.ts:34:1 › a shell launch forwarded to the running window opens a tab instead of a second window
+[1A[2K[4/47] context-menu.spec.ts:50:1 › a launch forwarded before the window listened still opens its tab
+[1A[2K[5/47] context-menu.spec.ts:56:1 › Windows leaves corner clipping to the compositor and fills the control edges
+[1A[2K[6/47] field-surfaces.spec.ts:62:3 › editable fields are lighter than panels and readouts stay quiet in 深色
+[1A[2K[7/47] field-surfaces.spec.ts:62:3 › editable fields are lighter than panels and readouts stay quiet in 浅色
+[1A[2K[8/47] folder-tab-corners.spec.ts:46:7 › folder tab corners in dark mode at 1x density › file and comparison tabs join the content without gaps or square protrusions
+
+[1A[2K[WebServer] 00:54:20 [vite] (client) Failed to load source map for D:/projects/typescript/Vrykell/node_modules/monaco-editor/esm/vs/base/common/marked/marked.js.
+[WebServer] Error: An error occurred while trying to read the map file at marked.umd.js.map
+[WebServer] Error: ENOENT: no such file or directory, open 'D:\projects\typescript\Vrykell\node_modules\monaco-editor\esm\vs\base\common\marked\marked.umd.js.map'
+[WebServer]     at async open (node:internal/fs/promises:637:25)
+[WebServer]     at async Object.readFile (node:internal/fs/promises:1269:14)
+[WebServer]     at async extractSourcemapFromFile (file:///D:/projects/typescript/Vrykell/node_modules/vite/dist/node/chunks/config.js:8066:65)
+[WebServer]     at async loadAndTransform (file:///D:/projects/typescript/Vrykell/node_modules/vite/dist/node/chunks/config.js:22717:22)
+[1A[2K[9/47] folder-tab-corners.spec.ts:46:7 › folder tab corners in light mode at 1x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[10/47] folder-tab-corners.spec.ts:46:7 › folder tab corners in dark mode at 1.25x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[11/47] folder-tab-corners.spec.ts:46:7 › folder tab corners in light mode at 1.25x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[12/47] folder-tab-corners.spec.ts:46:7 › folder tab corners in dark mode at 2x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[13/47] folder-tab-corners.spec.ts:46:7 › folder tab corners in light mode at 2x density › file and comparison tabs join the content without gaps or square protrusions
+[1A[2K[14/47] macos-feedback-refinements.spec.ts:6:1 › settings save feedback lives in the page header while field titles stay regular
+[1A[2K[15/47] macos-feedback-refinements.spec.ts:23:1 › wallpaper picker filters images and rejects both documents and renamed invalid images
+[1A[2K[16/47] macos-feedback-refinements.spec.ts:80:1 › the full panel preview accepts release and shares its surface with split placement
+[1A[2K[17/47] macos-titlebar.spec.ts:13:3 › native controls, title, search and actions have room at 720px
+[1A[2K[18/47] macos-titlebar.spec.ts:13:3 › native controls, title, search and actions have room at 1240px
+[1A[2K[19/47] macos-titlebar.spec.ts:44:1 › fullscreen releases the traffic-light space and restores it on exit
+[1A[2K[20/47] navigation-drag.spec.ts:18:1 › auxiliary actions reorder horizontally and retain their order and open panel after reload
+[1A[2K[21/47] navigation-drag.spec.ts:29:1 › reordering and hiding the assistant keep its conversation draft and right placement
+[1A[2K[22/47] navigation-drag.spec.ts:43:1 › narrow windows keep all fixed and auxiliary controls inside the application
+[1A[2K[23/47] navigation-drag.spec.ts:65:1 › Escape cancels the preview without toggling or saving a panel
+[1A[2K[24/47] navigation-drag.spec.ts:78:1 › search stays centered within the whole application and never overlaps actions
+[1A[2K[25/47] navigation-drag.spec.ts:93:1 › settings is fixed at the foot of the full-height sidebar and remains keyboard accessible
+[1A[2K[26/47] navigation-drag.spec.ts:105:1 › a toolbar drag reserves a stable shared insertion gap before saving
+[1A[2K[27/47] navigation-drag.spec.ts:122:1 › panel headings retain their appearance and only offer a right-edge placement target
+[1A[2K[28/47] settings-model.spec.ts:21:3 › 模型配置页 › 服务商按钮：默认选中、中央浮层切换、添加动作与 ⋯ 菜单三项
+[1A[2K[29/47] settings-model.spec.ts:47:3 › 模型配置页 › ⋯ 删除服务商：先确认，移除其模型行；只剩一个时拒绝
+[1A[2K[30/47] settings-model.spec.ts:63:3 › 模型配置页 › API Key：按服务商各存各的，掩码显示、查看/复制/清除、保存恢复
+[1A[2K[31/47] settings-model.spec.ts:104:3 › 模型配置页 › 端点与连接：预览行、检测、同步模型
+[1A[2K[32/47] settings-model.spec.ts:119:3 › 模型配置页 › 模型列表：按服务商过滤，设为当前、添加/改名/删除
+[1A[2K[33/47] settings-model.spec.ts:169:3 › 模型配置页 › 添加服务商：同一浮层内切到预设网格，返回键可回到列表
+[1A[2K[34/47] settings-model.spec.ts:193:3 › 模型配置页 › 服务商选择跨重载保持（lastSelectedProvider）
+[1A[2K[35/47] settings-responsive.spec.ts:6:3 › settings keep their directory and close control available in 深色
+[1A[2K[36/47] settings-responsive.spec.ts:6:3 › settings keep their directory and close control available in 浅色
+[1A[2K[37/47] settings-responsive.spec.ts:31:1 › settings cover the auxiliary panel and preserve the workspace layout
+[1A[2K[38/47] settings-window.spec.ts:5:1 › settings cover the content card and toggle back to the unchanged workspace
+[1A[2K[39/47] settings-window.spec.ts:78:1 › language and appearance choices apply immediately and persist
+[1A[2K  1) settings-window.spec.ts:78:1 › language and appearance choices apply immediately and persist ──
+
+    Error: [31mTimed out 5000ms waiting for [39m[2mexpect([22m[31mlocator[39m[2m).[22mtoHaveCSS[2m([22m[32mexpected[39m[2m)[22m
+
+    Locator: locator('.workspace-sidebar')
+    Expected string: [32m"rgb(2[7m40[27m, 24[7m2[27m, 2[7m43[27m)"[39m
+    Received string: [31m"rgb(2[7m33[27m, 24[7m0[27m, 2[7m50[27m)"[39m
+    Call log:
+      [2m- expect.toHaveCSS with timeout 5000ms[22m
+    [2m  - waiting for locator('.workspace-sidebar')[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "rgb(233, 240, 250)"[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "rgb(233, 240, 250)"[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "rgb(233, 240, 250)"[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "rgb(233, 240, 250)"[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "rgb(233, 240, 250)"[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "rgb(233, 240, 250)"[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "rgb(233, 240, 250)"[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "rgb(233, 240, 250)"[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "rgb(233, 240, 250)"[22m
+
+
+       95 |   await expect(tint).toHaveAttribute('aria-checked', 'false');
+       96 |   await expect(page.locator('.application-window')).toHaveAttribute('data-desktop-tint', 'false');
+    >  97 |   await expect(page.locator('.workspace-sidebar')).toHaveCSS('background-color', 'rgb(240, 242, 243)');
+          |                                                    ^
+       98 |   await page.screenshot({ path: info.outputPath('appearance-light.png') });
+       99 |   await modes.getByRole('radio', { name: 'Dark', exact: true }).click();
+      100 |   await page.screenshot({ path: info.outputPath('appearance-dark.png') });
+
+        at D:\projects\typescript\Vrykell\e2e\settings-window.spec.ts:97:52
+
+
+
+
+[1A[2K(node:76128) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K(node:76128) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K[40/47] settings-window.spec.ts:115:1 › wallpaper mode darkens the sidebar backdrop while preserving the UI layout
+[1A[2K  2) settings-window.spec.ts:115:1 › wallpaper mode darkens the sidebar backdrop while preserving the UI layout 
+
+    Error: [31mTimed out 5000ms waiting for [39m[2mexpect([22m[31mlocator[39m[2m).[22mtoHaveCSS[2m([22m[32mexpected[39m[2m)[22m
+
+    Locator: locator('.workspace-sidebar')
+    Expected string: [32m"brightness(0.55) saturate(0.88)"[39m
+    Received string: [31m"[7mblur(20px) [27mbrightness(0.55) saturate(0.88)"[39m
+    Call log:
+      [2m- expect.toHaveCSS with timeout 5000ms[22m
+    [2m  - waiting for locator('.workspace-sidebar')[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "blur(20px) brightness(0.55) saturate(0.88)"[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "blur(20px) brightness(0.55) saturate(0.88)"[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "blur(20px) brightness(0.55) saturate(0.88)"[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "blur(20px) brightness(0.55) saturate(0.88)"[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "blur(20px) brightness(0.55) saturate(0.88)"[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "blur(20px) brightness(0.55) saturate(0.88)"[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "blur(20px) brightness(0.55) saturate(0.88)"[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "blur(20px) brightness(0.55) saturate(0.88)"[22m
+    [2m  -   locator resolved to <aside data-collapsed="false" class="workspace-sidebar" data-testid="workspace-sidebar">…</aside>[22m
+    [2m  -   unexpected value "blur(20px) brightness(0.55) saturate(0.88)"[22m
+
+
+      133 |   const window = page.locator('.application-window');
+      134 |   await expect(window).toHaveAttribute('data-wallpaper', 'true');
+    > 135 |   await expect(page.locator('.workspace-sidebar')).toHaveCSS('backdrop-filter', 'brightness(0.55) saturate(0.88)');
+          |                                                    ^
+      136 |   await expect(page.locator('.settings-navigation')).toHaveCSS('backdrop-filter', 'none');
+      137 |   await expect(page.locator('.settings-navigation')).toBeVisible();
+      138 |   await page.screenshot({ path: info.outputPath('wallpaper-sidebar-mask.png') });
+
+        at D:\projects\typescript\Vrykell\e2e\settings-window.spec.ts:135:52
+
+
+[1A[2K(node:76820) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+
+
+[1A[2K(node:76820) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K[41/47] workspace-interface-polish.spec.ts:5:35 › workspace colors and model controls remain consistent in 深色
+[1A[2K[42/47] workspace-interface-polish.spec.ts:5:35 › workspace colors and model controls remain consistent in 浅色
+[1A[2K[43/47] workspace-interface-polish.spec.ts:51:3 › macos settings and materials › omits unsupported system integration and retains a usable material treatment
+[1A[2K[44/47] workspace-interface-polish.spec.ts:51:3 › linux settings and materials › omits unsupported system integration and retains a usable material treatment
+[1A[2K[45/47] workspace-surface-refinements.spec.ts:5:35 › acrylic is confined to navigation and region edges stay square in 深色
+[1A[2K[46/47] workspace-surface-refinements.spec.ts:5:35 › acrylic is confined to navigation and region edges stay square in 浅色
+[1A[2K[47/47] workspace-surface-refinements.spec.ts:27:1 › terminal dragging carries the complete tab and closing preview never closes the session
+[1A[2K  Slow test file: folder-tab-corners.spec.ts (28.8s)
+  Slow test file: settings-model.spec.ts (15.4s)
+  Consider splitting slow test files to speed up parallel execution
+  2 failed
+    settings-window.spec.ts:78:1 › language and appearance choices apply immediately and persist ───
+    settings-window.spec.ts:115:1 › wallpaper mode darkens the sidebar backdrop while preserving the UI layout 
+  45 passed (2.2m)

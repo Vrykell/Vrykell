@@ -78,6 +78,8 @@ not pretend to protect "the renderer itself" or "the programs the user installs"
 
 ## 6. History
 
+- Interface materials, 2026-10-22: platform selection uses the existing native window-effects permission. Unsupported systems use the themed opaque fallback. This adds no IPC command, capability, CSP relaxation, external content, filesystem access or authorization path; preview masks and blur operate only on existing UI surfaces.
+
 - Native close, 2026-10-21: the main window adds `core:window:allow-destroy` because the registered close callback completes an approved close through the native destroy operation. Unsaved documents still prevent the request until saving or discarding succeeds; cancelling and failed saves retain the window and draft. No own IPC commands, CSP relaxation or resource scope changes are introduced. Browser mocks read the actual capability list and cover titlebar and system close requests.
 
 - Workspace navigation, 2026-10-21: main/side AI placement moves one existing content host within the same webview. It does not duplicate a session, add a renderer, interpret HTML, or change IPC, capabilities, CSP, resource scope or approval ownership. File opening uses the existing native picker and path-grant chain. ACP close guards and process cleanup remain on the original close path; transcript and dock movement are covered by unit and browser regressions.

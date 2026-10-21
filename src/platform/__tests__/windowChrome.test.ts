@@ -2,8 +2,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 const material = vi.hoisted(() => ({ setTheme: vi.fn(), setEffects: vi.fn(), clearEffects: vi.fn() }));
-vi.mock('@platform/runtime', () => ({ isWindows: true }));
-vi.mock('@tauri-apps/api/window', () => ({ Effect: { Acrylic: 'acrylic' }, getCurrentWindow: () => material }));
+const platform = vi.hoisted(() => ({ windows: true, mac: false }));
+vi.mock('@platform/runtime', () => ({ get isWindows() { return platform.windows; }, get isMacOS() { return platform.mac; } }));
+vi.mock('@tauri-apps/api/window', () => ({ Effect: { Acrylic: 'acrylic', Sidebar: 'sidebar' }, getCurrentWindow: () => material }));
 vi.mock('@platform/diagnostics', () => ({ invoke: invokeMock, diagnostic: vi.fn() }));
 
 import { syncWindowFrame, syncWindowMaterial } from '../windowChrome';
@@ -12,9 +13,11 @@ const root = () => document.documentElement;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  platform.windows = true; platform.mac = false;
   invokeMock.mockResolvedValue(undefined);
   root().removeAttribute('style');
   delete root().dataset.toolWindow;
+  delete root().dataset.nativeMaterial;
 });
 
 afterEach(() => { vi.clearAllMocks(); });
@@ -73,6 +76,23 @@ it('retains the last choice when multiple material updates are queued', async ()
   expect(material.clearEffects).toHaveBeenCalledOnce();
   material.setTheme.mockRejectedValueOnce(new Error('unsupported'));
   await expect(syncWindowMaterial(true, 'dark')).resolves.toBeUndefined();
+  expect(root().dataset.nativeMaterial).toBe('fallback');
   await syncWindowMaterial(false, 'light');
   expect(material.clearEffects).toHaveBeenCalledTimes(2);
+});
+
+it('uses the native sidebar material on a supported desktop', async () => {
+  platform.windows = false; platform.mac = true;
+  await syncWindowMaterial(true, 'light');
+  expect(material.setEffects).toHaveBeenCalledWith({ effects: ['sidebar'] });
+  expect(root().dataset.nativeMaterial).toBe('active');
+});
+
+it('publishes a CSS fallback when the compositor has no native material implementation', async () => {
+  platform.windows = false;
+  await syncWindowMaterial(true, 'dark');
+  expect(material.setEffects).not.toHaveBeenCalled();
+  expect(root().dataset.nativeMaterial).toBe('fallback');
+  await syncWindowMaterial(false, 'dark');
+  expect(root().dataset.nativeMaterial).toBe('off');
 });

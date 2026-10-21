@@ -93,8 +93,10 @@ test('the full panel preview accepts release and shares its surface with split p
   await expect(preview).toBeVisible();
   const colors = await preview.evaluate(element => {
     const css = getComputedStyle(element);
-    return { background: css.backgroundColor, border: css.borderColor, radius: css.borderRadius };
+    return { background: css.backgroundColor, border: css.borderColor, radius: css.borderRadius, blur: css.backdropFilter };
   });
+  expect(colors.blur).toBe(await page.getByTestId('workspace-sidebar').evaluate(element => getComputedStyle(element).backdropFilter));
+  expect(colors.blur).toContain('blur(20px)');
   await page.mouse.up();
   await expect(page.locator('.workspace-side-panel[data-side="right"]').getByText('notes.txt')).toBeVisible();
   await page.keyboard.press('Meta+d');
@@ -105,6 +107,7 @@ test('the full panel preview accepts release and shares its surface with split p
   await expect(zone).toHaveCSS('background-color', colors.background);
   await expect(zone).toHaveCSS('border-color', colors.border);
   await expect(zone).toHaveCSS('border-radius', colors.radius);
+  await expect(zone).toHaveCSS('backdrop-filter', colors.blur);
   // 指针离开布局区后预览消失，不残留网格描边
   const dock = (await page.locator('[data-dock-btn="files"]').boundingBox())!;
   await page.mouse.move(dock.x + dock.width / 2, dock.y + dock.height / 2);

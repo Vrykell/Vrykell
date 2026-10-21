@@ -24,7 +24,7 @@ for (const width of [720, 1240]) {
     expect(title.x).toBe(sidebarWidth + inset + (sidebarWidth === 0 ? 36 : 0));
     expect(title.width).toBeGreaterThan(0);
     expect(title.x + title.width).toBeLessThan(search.x);
-    expect(Math.abs(search.x + search.width / 2 - (sidebarWidth + (width - sidebarWidth) / 2))).toBeLessThan(1);
+    expect(Math.abs(search.x + search.width / 2 - width / 2)).toBeLessThan(1);
     expect(search.x + search.width).toBeLessThan(ai.x);
     expect(width - ai.x - ai.width).toBe(16);
     await expect(header).toHaveCSS('height', '42px');

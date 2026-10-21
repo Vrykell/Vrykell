@@ -39,9 +39,9 @@ export interface ThemePalette {
   groupOrange: string;
   groupCoral: string;
 
-  /** Shared frame for the titlebar and primary navigation. */
+  /** Shared resting surface for the titlebar, content and auxiliary panels. */
   chromeBg: string;
-  /** Secondary navigation rests on a darker level than the window frame. */
+  /** Primary navigation keeps its own material tint and opaque fallback. */
   sidebarBg: string;
   chromeField: string;
   selectionBg: string;
@@ -173,13 +173,13 @@ export interface ThemePalette {
 
 // Structural colors have one source; component roles reuse these surface levels.
 const DARK_SURFACES = {
-  content: '#141414', canvas: '#202020', sidebar: '#1C1C1C', card: '#282828',
+  content: '#1C1C1C', canvas: '#1C1C1C', sidebar: '#28282B', card: '#282828',
   field: '#2C2C2C', elevated: '#303030', control: '#333333', hover: '#343638',
   border: '#38393B', borderStrong: '#4B4E52',
 } as const;
 
 const LIGHT_SURFACES = {
-  content: '#F7F8F9', canvas: '#F7F8F9', sidebar: '#F0F2F3', card: '#F5F5F5',
+  content: '#F0F2F3', canvas: '#F0F2F3', sidebar: '#E9F0FA', card: '#F5F5F5',
   field: '#FFFFFF', elevated: '#FAFAFA', control: '#FFFFFF', hover: '#F2F2F2',
   border: '#DFE3E5', borderStrong: '#B9C2C8',
 } as const;
@@ -221,8 +221,8 @@ const dark: ThemePalette = {
   groupOrange: DARK_ACCENTS.orange,
   groupCoral: DARK_ACCENTS.coral,
 
-  // Structural grays follow the reference; terminal output uses the darkest surface.
-  chromeBg: '#28282B',
+  // Resting application regions share one base; cards and fields retain their hierarchy.
+  chromeBg: DARK_SURFACES.content,
   sidebarBg: DARK_SURFACES.sidebar,
   chromeField: DARK_SURFACES.control,
   selectionBg: '#183C57',
@@ -396,7 +396,7 @@ const light: ThemePalette = {
   groupOrange: LIGHT_ACCENTS.orange,
   groupCoral: LIGHT_ACCENTS.coral,
 
-  chromeBg: '#E9F0FA',
+  chromeBg: LIGHT_SURFACES.content,
   sidebarBg: LIGHT_SURFACES.sidebar,
   chromeField: LIGHT_SURFACES.control,
   selectionBg: '#DFEAF9',

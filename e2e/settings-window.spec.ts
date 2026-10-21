@@ -51,7 +51,7 @@ test('settings cover the content card and toggle back to the unchanged workspace
     const style = getComputedStyle(element);
     return ['--canvas', '--sidebar-bg', '--xterm-bg', '--surface', '--field-bg', '--primary-action'].map(name => style.getPropertyValue(name).trim().toUpperCase());
   });
-  expect(sampledColors).toEqual(['#202020', '#1C1C1C', '#141414', '#282828', '#2C2C2C', '#183C57']);
+  expect(sampledColors).toEqual(['#1C1C1C', '#28282B', '#1C1C1C', '#282828', '#2C2C2C', '#183C57']);
   const chrome = await page.locator('.application-chrome').evaluate(element => {
     const style = getComputedStyle(element);
     return {
@@ -61,7 +61,7 @@ test('settings cover the content card and toggle back to the unchanged workspace
   });
   expect(chrome).toEqual({ color: 'rgba(0, 0, 0, 0)', background: 'none' });
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(page.locator('.workspace-titlebar')).toHaveCSS('background-color', 'rgb(40, 40, 43)');
+  await expect(page.locator('.workspace-titlebar')).toHaveCSS('background-color', 'rgb(28, 28, 28)');
   await page.screenshot({ path: info.outputPath('sampled-palette-workspace.png') });
   await page.getByTestId('workspace-sidebar-expand').click();
   expect((await rail.boundingBox())!.width).toBe(railBefore!.width);
@@ -94,7 +94,7 @@ test('language and appearance choices apply immediately and persist', async ({ p
   await tint.click();
   await expect(tint).toHaveAttribute('aria-checked', 'false');
   await expect(page.locator('.application-window')).toHaveAttribute('data-desktop-tint', 'false');
-  await expect(page.locator('.workspace-sidebar')).toHaveCSS('background-color', 'rgb(240, 242, 243)');
+  await expect(page.locator('.workspace-sidebar')).toHaveCSS('background-color', 'rgb(233, 240, 250)');
   await page.screenshot({ path: info.outputPath('appearance-light.png') });
   await modes.getByRole('radio', { name: 'Dark', exact: true }).click();
   await page.screenshot({ path: info.outputPath('appearance-dark.png') });
@@ -132,7 +132,7 @@ test('wallpaper mode darkens the sidebar backdrop while preserving the UI layout
   });
   const window = page.locator('.application-window');
   await expect(window).toHaveAttribute('data-wallpaper', 'true');
-  await expect(page.locator('.workspace-sidebar')).toHaveCSS('backdrop-filter', 'brightness(0.55) saturate(0.88)');
+  await expect(page.locator('.workspace-sidebar')).toHaveCSS('backdrop-filter', 'blur(20px) brightness(0.55) saturate(0.88)');
   await expect(page.locator('.settings-navigation')).toHaveCSS('backdrop-filter', 'none');
   await expect(page.locator('.settings-navigation')).toBeVisible();
   await page.screenshot({ path: info.outputPath('wallpaper-sidebar-mask.png') });

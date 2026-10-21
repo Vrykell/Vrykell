@@ -1,7 +1,7 @@
 /** Native window borders use the theme's neutral gray divider color. */
 import { invoke } from '@platform/diagnostics';
 import { Effect, getCurrentWindow } from '@tauri-apps/api/window';
-import { isWindows } from './runtime';
+import { isWindows, isMacOS } from './runtime';
 import type { ThemeMode } from '@config/theme/tokens';
 
 let materialUpdate = Promise.resolve();
@@ -11,13 +11,17 @@ let materialRevision = 0;
 export function syncWindowMaterial(enabled: boolean, mode: ThemeMode): Promise<void> {
   const revision = ++materialRevision;
   materialUpdate = materialUpdate.then(async () => {
-    if (!isWindows || revision !== materialRevision) return;
+    if (revision !== materialRevision) return;
+    const root = document.documentElement;
+    root.dataset.nativeMaterial = enabled ? 'fallback' : 'off';
+    if (!isWindows && !isMacOS) return;
     try {
       const window = getCurrentWindow();
       await window.setTheme(mode);
       // Remove a previously selected material before applying the live translucent backdrop.
       await window.clearEffects();
-      if (enabled) await window.setEffects({ effects: [Effect.Acrylic] });
+      if (enabled) await window.setEffects({ effects: [isMacOS ? Effect.Sidebar : Effect.Acrylic] });
+      if (revision === materialRevision) root.dataset.nativeMaterial = enabled ? 'active' : 'off';
       syncWindowFrame();
     } catch { /* Unsupported compositors keep the CSS navigation treatment. */ }
   });
