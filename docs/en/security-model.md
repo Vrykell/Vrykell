@@ -78,6 +78,8 @@ not pretend to protect "the renderer itself" or "the programs the user installs"
 
 ## 6. History
 
+- Integration fixes, 2026-10-21: temporary tool and command-shape grants are scoped to conversation identity throughout approval, authorization and revocation. Requests without an identity cannot reuse grants, and revoking one conversation leaves others intact. Danger rules, native confirmation and single-use execution leases retain the existing authorization chain.
+- ACP runtime connections use local IDs for isolation; remote session IDs are used only for protocol requests and resume records. Closing an established connection stops its process tree, I/O tasks and waiting requests; probes and failed opens also clean up. Configuration read failures do not return an empty list. Diagnostics record metadata without directories or raw protocol errors. Credential migration retains legacy values until all target writes succeed. This change adds no IPC commands, capabilities or CSP scope.
 - `8ddffb1`: authorization decided in Rust, single-use leases
 - `f3ca94f`: keys and passwords encrypted at rest
 - `ab34159` / `5ee61b9`: danger rules (wrapper passthrough, Windows paths and shell family)

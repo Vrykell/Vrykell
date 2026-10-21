@@ -1,0 +1,138 @@
+import { test, expect } from '@playwright/test';
+import { setupTauriMock, emitAcpSession, acpUpdate } from './tauri-mock';
+
+test.beforeEach(async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+});
+
+test('audit ACP draft and scroll continuity across tab switches', async ({ page }) => {
+  await page.getByTestId('tab-acp-btn').click();
+  await page.getByTestId('acp-launcher-Fake ACP').click();
+  await expect(page.getByTestId('harness-send')).toBeVisible();
+  await page.getByTestId('harness-composer').fill('unfinished draft');
+  await page.locator('[data-tab-kind="session"]').first().click();
+  await page.locator('[data-tab-kind="harness"]').click();
+  await expect.soft(page.getByTestId('harness-composer')).toHaveValue('unfinished draft');
+  await emitAcpSession(page, acpUpdate('sess_e2e', {
+    sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'long output\n\n'.repeat(200) },
+  }));
+  const body = page.getByTestId('harness-page').locator('.scroll-region');
+  await body.evaluate(el => { el.scrollTop = 300; });
+  const before = await body.evaluate(el => el.scrollTop);
+  await page.locator('[data-tab-kind="session"]').first().click();
+  await page.locator('[data-tab-kind="harness"]').click();
+  expect.soft(await body.evaluate(el => el.scrollTop)).toBe(before);
+});
+
+test('audit ACP follows the focused split pane directory', async ({ page }) => {
+  const directory = await page.evaluate(async () => {
+    const workspacePath = '/src/features/workspace/stores/workspace.ts';
+    const terminalPath = '/src/features/terminal/stores/terminal.ts';
+    const { useWorkspaceStore } = await import(workspacePath) as typeof import('../src/features/workspace/stores/workspace');
+    const { useTerminalStore } = await import(terminalPath) as typeof import('../src/features/terminal/stores/terminal');
+    const state = useWorkspaceStore.getState();
+    const active = state.tabs.find(tab => tab.id === state.activeId)!;
+    if (active.kind !== 'session') throw new Error('Expected terminal');
+    const left = { id: 'audit-left', kind: 'local' as const, cwd: 'D:/project-left' };
+    const right = { id: 'audit-right', kind: 'local' as const, cwd: 'D:/project-right' };
+    useWorkspaceStore.setState({ tabs: state.tabs.map(tab => tab.id === active.id
+      ? { ...active, layout: { type: 'split', dir: 'row', ratio: 0.5, first: { type: 'leaf', terminal: left }, second: { type: 'leaf', terminal: right } } }
+      : tab) });
+    useTerminalStore.setState({ focusedPaneId: right.id });
+    useWorkspaceStore.getState().openHarnessTab('Fake ACP');
+    const tab = useWorkspaceStore.getState().tabs.find(item => item.kind === 'harness');
+    return tab?.kind === 'harness' ? tab.cwd : null;
+  });
+  expect(directory).toBe('D:/project-right');
+});
+
+test('audit streamed ACP responses keep following while at the bottom', async ({ page }) => {
+  await page.getByTestId('tab-acp-btn').click();
+  await page.getByTestId('acp-launcher-Fake ACP').click();
+  await expect(page.getByTestId('harness-send')).toBeVisible();
+  await page.getByTestId('harness-composer').fill('Explain the result');
+  await page.getByTestId('harness-send').click();
+  await emitAcpSession(page, acpUpdate('sess_e2e', {
+    sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Starting\n\n' },
+  }));
+  await expect(page.getByTestId('harness-page')).toContainText('Starting');
+  await emitAcpSession(page, acpUpdate('sess_e2e', {
+    sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'another paragraph\n\n'.repeat(200) },
+  }));
+  const body = page.getByTestId('harness-page').locator('.scroll-region');
+  await expect.poll(() => body.evaluate(el => el.scrollHeight - el.clientHeight - el.scrollTop)).toBeLessThan(25);
+});
+
+test('audit saving an ACP server survives immediately leaving settings', async ({ page }) => {
+  await page.evaluate(() => {
+    const runtime = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__;
+    const original = runtime.invoke;
+    (window as unknown as { auditSaves: unknown[] }).auditSaves = [];
+    runtime.invoke = async (command, args) => {
+      if (command === 'acp_harness_save') (window as unknown as { auditSaves: unknown[] }).auditSaves.push(args);
+      return original(command, args);
+    };
+  });
+  await page.keyboard.press('Control+,');
+  await page.getByRole('button', { name: 'ACP', exact: true }).click();
+  await page.getByTestId('harness-add').click();
+  await page.getByTestId('harness-dialog-name').fill('Audit server');
+  await page.getByTestId('harness-dialog-command').fill('node');
+  await page.getByTestId('harness-dialog-save').click();
+  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { auditSaves: unknown[] }).auditSaves.length)).toBeGreaterThan(0);
+});
+
+test('audit grants stay inside the conversation that approved them', async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const path = '/src/features/agent/stores/permissions.ts';
+    const { gate, resolveApproval } = await import(path) as typeof import('../src/features/agent/stores/permissions');
+    await gate('run_command', { command: 'npm run build' }, 'audit-grant-a', {
+      tabId: 'audit-conversation-a', shellType: 'powershell',
+      setToolState: (id, state) => {
+        if (state === 'approval-pending') queueMicrotask(() => resolveApproval(id, 'shape'));
+      },
+    });
+    let asked = false;
+    const other = await gate('run_command', { command: 'npm run test' }, 'audit-grant-b', {
+      tabId: 'audit-conversation-b', shellType: 'powershell',
+      setToolState: (id, state) => {
+        if (state === 'approval-pending') {
+          asked = true;
+          queueMicrotask(() => resolveApproval(id, 'deny'));
+        }
+      },
+    });
+    return { asked, proceeded: other.proceed };
+  });
+  expect(result).toEqual({ asked: true, proceeded: false });
+});
+
+test('audit usage search action leaves the settings screen', async ({ page }) => {
+  await page.keyboard.press('Control+,');
+  await expect(page.locator('.settings-screen')).toBeVisible();
+  await page.evaluate(async () => {
+    const path = '/src/features/settings/services/registry.ts';
+    const { getSettings } = await import(path) as typeof import('../src/features/settings/services/registry');
+    getSettings().find(setting => setting.id === 'usage')!.onSelect();
+  });
+  await expect(page.getByTestId('usage-page')).toBeVisible();
+});
+
+test('audit captures ACP surfaces at wide and narrow widths', async ({ page }, info) => {
+  await page.getByTestId('tab-acp-btn').click();
+  await page.screenshot({ path: info.outputPath('acp-launcher-wide.png') });
+  await page.getByTestId('acp-launcher-Fake ACP').click();
+  await expect(page.getByTestId('harness-send')).toBeVisible();
+  await emitAcpSession(page, acpUpdate('sess_e2e', {
+    sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'A short response with the shared conversation renderer.' },
+  }));
+  await page.screenshot({ path: info.outputPath('acp-session-wide.png') });
+  await page.setViewportSize({ width: 760, height: 700 });
+  await page.screenshot({ path: info.outputPath('acp-session-narrow.png') });
+  await page.keyboard.press('Control+,');
+  await page.getByRole('button', { name: 'ACP', exact: true }).click();
+  await page.screenshot({ path: info.outputPath('acp-settings-narrow.png') });
+});

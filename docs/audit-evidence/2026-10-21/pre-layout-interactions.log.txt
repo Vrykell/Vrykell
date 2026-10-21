@@ -1,0 +1,36 @@
+[WebServer] (node:7600) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 23 tests using 1 worker
+
+(node:23604) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:23604) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 acp-launcher.spec.ts:10:1 › the sidebar ACP button reuses a singleton workspace with an inline server picker (8.2s)
+  ok 2 acp-launcher.spec.ts:22:1 › picking a server opens its session tab and closes the panel (1.6s)
+  ok 3 acp-workspace.spec.ts:17:1 › retains drafts and reading positions across workspace and internal session switches (1.7s)
+  ok 4 acp-workspace.spec.ts:41:1 › follows streamed replies, pauses for reading and offers a return to the latest reply (1.7s)
+  ok 5 acp-workspace.spec.ts:64:1 › opens the focused pane directory instead of the first split pane (1.2s)
+  ok 6 acp-workspace.spec.ts:84:1 › asks another conversation even after a matching command shape was approved (995ms)
+  ok 7 acp-workspace.spec.ts:106:1 › keeps failed server edits, saves argument boundaries and persists before leaving settings (2.0s)
+  ok 8 acp-workspace.spec.ts:138:1 › protects active work and only closes sessions after explicit confirmation (2.2s)
+  ok 9 acp-workspace.spec.ts:153:1 › search navigation leaves settings and server dialogs retain keyboard focus (1.9s)
+  ok 10 acp-workspace.spec.ts:170:1 › keeps connected session controls usable in narrow and wide layouts (1.6s)
+  ok 11 approval-shape.spec.ts:17:3 › shape approvals › approves one kind of command for the session instead of the whole tool (3.1s)
+  ok 12 approval-timeout.spec.ts:9:3 › approval timeout › a card nobody answers is denied, explained and lets the next turn start (5.3s)
+  ok 13 harness-session.spec.ts:31:3 › harness session › streams the harness output and answers its permission request (2.3s)
+  ok 14 settings-model.spec.ts:21:3 › 模型配置页 › 服务商按钮：默认选中、中央浮层切换、添加动作与 ⋯ 菜单三项 (2.1s)
+  ok 15 settings-model.spec.ts:47:3 › 模型配置页 › ⋯ 删除服务商：先确认，移除其模型行；只剩一个时拒绝 (2.2s)
+  ok 16 settings-model.spec.ts:63:3 › 模型配置页 › API Key：按服务商各存各的，掩码显示、查看/复制/清除、保存恢复 (3.0s)
+  ok 17 settings-model.spec.ts:104:3 › 模型配置页 › 端点与连接：预览行、检测、同步模型 (2.0s)
+  ok 18 settings-model.spec.ts:119:3 › 模型配置页 › 模型列表：按服务商过滤，设为当前、添加/改名/删除 (3.4s)
+  ok 19 settings-model.spec.ts:169:3 › 模型配置页 › 添加服务商：同一浮层内切到预设网格，返回键可回到列表 (2.3s)
+  ok 20 settings-model.spec.ts:193:3 › 模型配置页 › 服务商选择跨重载保持（lastSelectedProvider） (2.7s)
+  ok 21 tool-approval.spec.ts:4:1 › compact AI cards keep their color on disclosure, react to hover and review edited commands (2.0s)
+  ok 22 usage-page.spec.ts:26:3 › usage statistics page › opens from conversation settings and accounts for one turn (2.5s)
+  ok 23 usage-page.spec.ts:114:3 › usage statistics page › shows only the ACP numbers when a server is the selected source (2.2s)
+
+  Slow test file: settings-model.spec.ts (17.7s)
+  Consider splitting slow test files to speed up parallel execution
+  23 passed (1.0m)

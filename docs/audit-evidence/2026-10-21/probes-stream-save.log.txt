@@ -1,0 +1,69 @@
+
+[1A[2K[WebServer] (node:69072) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 2 tests using 1 worker
+
+
+[1A[2K(node:72880) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+
+[1A[2K(node:72880) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[1A[2K[1/2] review-audit.tmp.spec.ts:51:1 › audit streamed ACP responses keep following while at the bottom
+[1A[2K  1) review-audit.tmp.spec.ts:51:1 › audit streamed ACP responses keep following while at the bottom
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeLessThan[2m([22m[32mexpected[39m[2m)[22m
+
+    Expected: < [32m25[39m
+    Received:   [31m5298[39m
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      63 |   }));
+      64 |   const body = page.getByTestId('harness-page').locator('.scroll-region');
+    > 65 |   await expect.poll(() => body.evaluate(el => el.scrollHeight - el.clientHeight - el.scrollTop)).toBeLessThan(25);
+         |   ^
+      66 | });
+      67 |
+      68 | test('audit saving an ACP server survives immediately leaving settings', async ({ page }) => {
+
+        at D:\projects\typescript\Vrykell\e2e\review-audit.tmp.spec.ts:65:3
+
+
+
+[1A[2K(node:56448) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+[1A[2K(node:56448) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+
+
+[1A[2K[2/2] review-audit.tmp.spec.ts:68:1 › audit saving an ACP server survives immediately leaving settings
+[1A[2K  2) review-audit.tmp.spec.ts:68:1 › audit saving an ACP server survives immediately leaving settings
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBeGreaterThan[2m([22m[32mexpected[39m[2m)[22m
+
+    Expected: > [32m0[39m
+    Received:   [31m0[39m
+
+    Call Log:
+    - Timeout 5000ms exceeded while waiting on the predicate
+
+      83 |   await page.getByTestId('harness-dialog-save').click();
+      84 |   await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+    > 85 |   await expect.poll(() => page.evaluate(() => (window as unknown as { auditSaves: unknown[] }).auditSaves.length)).toBeGreaterThan(0);
+         |   ^
+      86 | });
+      87 |
+      88 | test('audit captures ACP surfaces at wide and narrow widths', async ({ page }, info) => {
+
+        at D:\projects\typescript\Vrykell\e2e\review-audit.tmp.spec.ts:85:3
+
+
+[1A[2K  2 failed
+    review-audit.tmp.spec.ts:51:1 › audit streamed ACP responses keep following while at the bottom
+    review-audit.tmp.spec.ts:68:1 › audit saving an ACP server survives immediately leaving settings
