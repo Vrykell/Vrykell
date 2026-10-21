@@ -127,6 +127,9 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     const answered: { toolCallId: string; optionId: string | null }[] = [];
     /** Harness commands the page invoked, in order: one open per tab, never two. */
     const acpCalls: string[] = [];
+    let acpSessionCount = 0;
+    let acpServers = JSON.parse(localStorage.getItem('mock-acp-servers') ?? 'null') as Array<Record<string, unknown>> | null;
+    acpServers ??= [{ name: 'Fake ACP', command: 'node', args: ['scripts/fake-acp-agent.mjs'], env: {}, cwd: '', enabled: true }];
     /** Native picker invocations the page made, so a spec can assert the mode it asked for. */
     const pickCalls: { mode: string }[] = [];
     const aiConfig: { hasKey: boolean; baseUrl: string; model: string } = {
@@ -800,21 +803,23 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return undefined;
           case 'tool_policy_clear_session_grants':
             policyOps.push({ op: 'clear-grants' });
-            sessionGrants.clear();
-            shapeGrants.clear();
+            for (const grants of [sessionGrants, shapeGrants]) {
+              for (const key of grants) if (!args.conversationId || key.startsWith(`${String(args.conversationId)}\n`)) grants.delete(key);
+            }
             return undefined;
           case 'authorize_tool_call': {
             // Mirrors the Rust table: deny → deny, allow → lease, ask → the approval card, and a
             // session approval (whole tool or one command shape) answers without the card. The
             // danger/credential heuristics and the shape derivation live in Rust (cargo tests).
-            const request = (args as { request?: { tool?: string; mode?: string; args?: Record<string, unknown> } }).request ?? {};
+            const request = (args as { request?: { tool?: string; mode?: string; conversationId?: string; args?: Record<string, unknown> } }).request ?? {};
             const tool = String(request.tool ?? '');
             const mode = request.mode ?? 'standard';
             const level = mode === 'relaxed' ? 'allow' : mode === 'strict' ? 'ask' : (policyLevels[tool] ?? 'ask');
             if (level === 'deny') return { decision: 'deny', reason: 'policy.denied' };
             if (level === 'allow') return { decision: 'allow', lease: nextLease() };
             const shape = mockShape(tool, request.args ?? {});
-            if (sessionGrants.has(tool) || (shape && shapeGrants.has(shape))) {
+            const owner = request.conversationId;
+            if (owner && (sessionGrants.has(`${owner}\n${tool}`) || (shape && shapeGrants.has(`${owner}\n${shape}`)))) {
               return { decision: 'allow', lease: nextLease() };
             }
             return { decision: 'ask', shape };
@@ -822,10 +827,11 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'approve_tool_call': {
             const scope = String(args.scope ?? 'once');
             approvalScopes.push(scope);
-            if (scope === 'session') sessionGrants.add(String(args.tool ?? ''));
+            if (scope !== 'once' && !args.conversationId) return { decision: 'deny' };
+            if (scope === 'session') sessionGrants.add(`${String(args.conversationId)}\n${String(args.tool ?? '')}`);
             if (scope === 'shape') {
               const shape = mockShape(String(args.tool ?? ''), (args.args ?? {}) as Record<string, unknown>);
-              if (shape) shapeGrants.add(shape);
+              if (shape) shapeGrants.add(`${String(args.conversationId)}\n${shape}`);
             }
             return { decision: 'allow', lease: nextLease() };
           }
@@ -1251,17 +1257,22 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return undefined;
           case 'acp_harnesses':
             acpCalls.push('acp_harnesses');
-            return [{ name: 'Fake ACP', command: 'node', args: ['scripts/fake-acp-agent.mjs'], env: {}, cwd: '', enabled: true }];
+            return acpServers;
+          case 'acp_harness_save':
+            acpServers = args.harnesses as Array<Record<string, unknown>>;
+            localStorage.setItem('mock-acp-servers', JSON.stringify(acpServers));
+            return undefined;
           case 'acp_open': {
             const resuming = Boolean(args.resumeSessionId);
+            const sessionId = resuming ? String(args.resumeSessionId) : ++acpSessionCount === 1 ? 'sess_e2e' : `sess_e2e_${acpSessionCount}`;
             acpCalls.push(resuming ? `acp_open:${String(args.name ?? '')}:resume` : `acp_open:${String(args.name ?? '')}`);
             const replay = (text: string, sessionUpdate: string) => ({
-              sessionId: 'sess_e2e',
+              sessionId,
               kind: 'update',
-              payload: { params: { sessionId: 'sess_e2e', update: { sessionUpdate, content: { type: 'text', text } } } },
+              payload: { params: { sessionId, update: { sessionUpdate, content: { type: 'text', text } } } },
             });
             return {
-              sessionId: 'sess_e2e',
+              sessionId,
               harness: 'Fake ACP',
               cwd: String(args.cwd ?? ''),
               agent: {
@@ -1302,6 +1313,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'acp_prompt':
           case 'acp_cancel':
           case 'acp_close':
+            acpCalls.push(`${cmd}:${String(args.sessionId ?? '')}`);
             return undefined;
           case 'acp_answer_permission':
             answered.push({ toolCallId: String(args.toolCallId ?? ''), optionId: (args.optionId ?? null) as string | null });

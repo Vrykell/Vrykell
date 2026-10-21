@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tokio::io::{AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader};
@@ -61,9 +61,7 @@ fn format_agent_error(error: &Value) -> String {
     }
 }
 
-/// Windows cannot start a `.cmd` shim (`npx`, and most CLIs installed through npm) directly, and
-/// `CreateProcess` does not apply `PATHEXT` either: the same preset that works in a terminal fails
-/// with "program not found" from the app. Resolve the program the way a shell would.
+/// Resolve executable extensions explicitly, skipping extensionless shims for other platforms.
 #[cfg(windows)]
 fn resolve_program(command: &str) -> Option<PathBuf> {
     let direct = Path::new(command);
@@ -93,30 +91,14 @@ fn resolve_program(command: &str) -> Option<PathBuf> {
     None
 }
 
-/// A command script has to be run by the command interpreter, not started as a program.
-fn is_command_script(program: &Path) -> bool {
-    matches!(
-        program.extension().and_then(|extension| extension.to_str()).map(str::to_ascii_lowercase).as_deref(),
-        Some("cmd") | Some("bat")
-    )
-}
-
 /// The program to start and the arguments to start it with, after the platform's own resolution.
 fn launch_command(command: &str, args: &[String]) -> (String, Vec<String>) {
     #[cfg(windows)]
     {
         if let Some(resolved) = resolve_program(command) {
-            if is_command_script(&resolved) {
-                let mut wrapped = vec!["/c".to_string(), resolved.to_string_lossy().to_string()];
-                wrapped.extend(args.iter().cloned());
-                return ("cmd".to_string(), wrapped);
-            }
-            let mut direct = args.to_vec();
-            direct.insert(0, resolved.to_string_lossy().to_string());
-            return (resolved.to_string_lossy().to_string(), direct);
+            return (resolved.to_string_lossy().to_string(), args.to_vec());
         }
     }
-    let _ = is_command_script;
     (command.to_string(), args.to_vec())
 }
 /// What we tell an agent we can do. Small on purpose: a capability we advertise but cannot gate is
@@ -170,7 +152,9 @@ pub struct AcpClient {
     /// mutex so the event pump and a request can run side by side.
     events: tokio::sync::Mutex<mpsc::UnboundedReceiver<Value>>,
     /// Held so the child is killed when the client is dropped (`kill_on_drop`).
-    _child: Option<Child>,
+    child: Mutex<Option<Child>>,
+    tasks: Vec<tokio::task::AbortHandle>,
+    closed: AtomicBool,
 }
 
 impl AcpClient {
@@ -185,7 +169,7 @@ impl AcpClient {
         let pending: Pending = Arc::new(Mutex::new(HashMap::new()));
 
         // Writer task: one line per message, exactly as the protocol frames them.
-        tokio::spawn(async move {
+        let writer_task = tokio::spawn(async move {
             let mut writer = writer;
             while let Some(line) = out_rx.recv().await {
                 if writer.write_all(line.as_bytes()).await.is_err() {
@@ -203,7 +187,7 @@ impl AcpClient {
         let reader_pending = pending.clone();
         // The reader answers agent requests, so it needs its own handle to the write queue.
         let answer_tx = out_tx.clone();
-        tokio::spawn(async move {
+        let reader_task = tokio::spawn(async move {
             let mut lines = BufReader::new(reader).lines();
             while let Ok(Some(line)) = lines.next_line().await {
                 if line.trim().is_empty() {
@@ -278,7 +262,8 @@ impl AcpClient {
             }
         });
 
-        Self { out: out_tx, next_id: AtomicU64::new(0), pending, events: tokio::sync::Mutex::new(events), _child: None }
+        Self { out: out_tx, next_id: AtomicU64::new(0), pending, events: tokio::sync::Mutex::new(events),
+            child: Mutex::new(None), tasks: vec![writer_task.abort_handle(), reader_task.abort_handle()], closed: AtomicBool::new(false) }
     }
 
     /// Spawn a program and speak ACP to it. `kill_on_drop` keeps a killed client from leaking a
@@ -290,8 +275,7 @@ impl AcpClient {
         env: &HashMap<String, String>,
         permission: PermissionHandler,
     ) -> Result<Self, String> {
-        // The platform's own resolution decides what actually starts: a `.cmd` shim has to go
-        // through the command interpreter (see `launch_command`).
+        // Resolve the configured program; the process builder owns native argument encoding.
         let (program, program_args) = launch_command(command, args);
         let mut cmd = Command::new(&program);
         cmd.args(&program_args)
@@ -299,6 +283,13 @@ impl AcpClient {
             .stdout(std::process::Stdio::piped())
             .stderr(std::process::Stdio::null())
             .kill_on_drop(true);
+        #[cfg(windows)]
+        cmd.creation_flags(0x08000000);
+        #[cfg(unix)]
+        {
+            use std::os::unix::process::CommandExt;
+            cmd.as_std_mut().process_group(0);
+        }
         if let Some(dir) = cwd {
             cmd.current_dir(dir);
         }
@@ -308,12 +299,44 @@ impl AcpClient {
         let mut child = cmd.spawn().map_err(|e| format!("could not start the harness: {e}"))?;
         let stdin = child.stdin.take().ok_or("the harness gave no stdin")?;
         let stdout = child.stdout.take().ok_or("the harness gave no stdout")?;
-        let mut client = Self::over(BufReader::new(stdout), stdin, permission);
-        client._child = Some(child);
+        let client = Self::over(BufReader::new(stdout), stdin, permission);
+        *client.child.lock().map_err(|_| "the client state is poisoned")? = Some(child);
         Ok(client)
     }
 
+    fn stop_io(&self) {
+        self.closed.store(true, Ordering::SeqCst);
+        for task in &self.tasks { task.abort(); }
+        if let Ok(mut pending) = self.pending.lock() {
+            for (_, waiter) in pending.drain() {
+                let _ = waiter.send(Err("the harness connection is closed".to_string()));
+            }
+        }
+    }
+
+    /// Closing is explicit: pending requests and the event pump may still own this client.
+    async fn shutdown(&self) {
+        self.stop_io();
+        let child = self.child.lock().ok().and_then(|mut child| child.take());
+        if let Some(mut child) = child {
+            #[cfg(unix)]
+            if let Some(pid) = child.id() {
+                // The process has its own group, so descendants close with their session.
+                unsafe { libc::kill(-(pid as i32), libc::SIGKILL); }
+            }
+            #[cfg(windows)]
+            if let Some(pid) = child.id() {
+                // Include descendants started by command-script wrappers.
+                let _ = Command::new("taskkill").args(["/PID", &pid.to_string(), "/T", "/F"])
+                    .creation_flags(0x08000000).output().await;
+            }
+            let _ = child.start_kill();
+            let _ = child.wait().await;
+        }
+    }
+
     fn send_line(&self, message: Value) -> Result<(), String> {
+        if self.closed.load(Ordering::SeqCst) { return Err("the harness connection is closed".to_string()); }
         let line = serde_json::to_string(&message).map_err(|e| e.to_string())?;
         self.out.send(line).map_err(|_| "the harness connection is closed".to_string())
     }
@@ -326,9 +349,13 @@ impl AcpClient {
         let (tx, rx) = oneshot::channel();
         {
             let mut map = self.pending.lock().map_err(|_| "the client state is poisoned".to_string())?;
+            if self.closed.load(Ordering::SeqCst) { return Err("the harness connection is closed".to_string()); }
             map.insert(id, tx);
         }
-        self.send_line(json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params }))?;
+        if let Err(error) = self.send_line(json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params })) {
+            if let Ok(mut pending) = self.pending.lock() { pending.remove(&id); }
+            return Err(error);
+        }
         match tokio::time::timeout(budget, rx).await {
             Ok(Ok(outcome)) => outcome,
             Ok(Err(_)) => Err(format!("{method} answered nothing")),
@@ -456,6 +483,13 @@ impl AcpClient {
     }
 }
 
+impl Drop for AcpClient {
+    fn drop(&mut self) {
+        self.stop_io();
+        // The child also has kill_on_drop for failed handshakes and unexpected teardown.
+    }
+}
+
 /// Small helper so the reader task can send an agent-request answer without owning the sender.
 fn out_tx_for_error(tx: &mpsc::UnboundedSender<String>, payload: Value) -> Result<(), String> {
     let line = serde_json::to_string(&payload).map_err(|e| e.to_string())?;
@@ -489,11 +523,16 @@ impl HarnessFile {
         dirs::home_dir().unwrap_or_default().join(".vrykell").join("harnesses.json")
     }
 
-    pub fn load() -> Self {
-        std::fs::read_to_string(Self::path())
-            .ok()
-            .and_then(|raw| serde_json::from_str(&raw).ok())
-            .unwrap_or_default()
+    pub fn load() -> Result<Self, String> {
+        Self::read_from(&Self::path())
+    }
+
+    fn read_from(path: &Path) -> Result<Self, String> {
+        match std::fs::read_to_string(path) {
+            Ok(raw) => serde_json::from_str(&raw).map_err(|_| "harness-config-invalid".to_string()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::default()),
+            Err(_) => Err("harness-config-unreadable".to_string()),
+        }
     }
 
     /// Write the config back. The settings page is the caller, and it is also what the built-in
@@ -504,7 +543,10 @@ impl HarnessFile {
             std::fs::create_dir_all(dir).map_err(|e| format!("cannot create the config directory: {e}"))?;
         }
         let json = serde_json::to_string_pretty(self).map_err(|e| e.to_string())?;
-        std::fs::write(&path, json).map_err(|e| format!("cannot write the harness config: {e}"))
+        let temporary = path.with_file_name(format!("harnesses-{}.tmp", uuid::Uuid::new_v4().simple()));
+        let result = std::fs::write(&temporary, json).and_then(|_| std::fs::rename(&temporary, &path));
+        if result.is_err() { let _ = std::fs::remove_file(&temporary); }
+        result.map_err(|_| "harness-config-write-failed".to_string())
     }
 
     /// A configured harness that is switched on, by name.
@@ -518,7 +560,7 @@ impl HarnessFile {
 /// put in the config — the same class as the terminal.
 #[tauri::command]
 pub async fn acp_handshake(name: String) -> Result<Value, String> {
-    let config = HarnessFile::load();
+    let config = HarnessFile::load()?;
     note("acp-handshake", json!({ "name": name, "configured": config.harnesses.len() }));
     let harness = config
         .find_enabled(&name)
@@ -535,17 +577,15 @@ pub async fn acp_handshake(name: String) -> Result<Value, String> {
     .map_err(|error| {
         // Say which program was missing: "program not found" alone leaves the user guessing.
         let error = format!("{error} (command: {})", harness.command);
-        note("acp-handshake-failed", json!({ "name": harness.name, "command": harness.command, "error": error }));
+        note("acp-handshake-failed", json!({ "name": harness.name, "stage": "spawn" }));
         error
     })?;
-    let info = client
-        .initialize("vrykell", env!("CARGO_PKG_VERSION"))
-        .await
-        .map_err(|e| {
-            let error = format!("harness handshake failed: {e}");
-            note("acp-handshake-failed", json!({ "name": harness.name, "error": error }));
-            error
-        })?;
+    let outcome = client.initialize("vrykell", env!("CARGO_PKG_VERSION")).await;
+    client.shutdown().await;
+    let info = outcome.map_err(|error| {
+        note("acp-handshake-failed", json!({ "name": harness.name, "stage": "initialize" }));
+        format!("harness handshake failed: {error}")
+    })?;
     note("acp-handshake-ok", json!({
         "name": harness.name,
         "protocolVersion": info.get("protocolVersion").cloned().unwrap_or(Value::Null),
@@ -581,18 +621,20 @@ pub fn acp_harness_save(harnesses: Vec<HarnessConfig>) -> Result<(), String> {
 /// The configured harnesses, for the settings list. Commands and arguments are included on purpose:
 /// the user is looking at what will run.
 #[tauri::command]
-pub fn acp_harnesses() -> Vec<HarnessConfig> {
-    HarnessFile::load().harnesses
+pub fn acp_harnesses() -> Result<Vec<HarnessConfig>, String> {
+    Ok(HarnessFile::load()?.harnesses)
 }
 
 /// Sessions currently open. Dropping the last reference kills the child (`kill_on_drop`).
 #[derive(Default)]
 pub struct AcpRuntime {
-    sessions: Mutex<HashMap<String, Arc<AcpClient>>>,
+    sessions: Mutex<HashMap<String, Arc<RuntimeSession>>>,
     /// Permission requests waiting for the page's answer, keyed by session and tool call id: two
     /// sessions may use the same tool call id, and an answer must only reach the one that asked.
     pending: Arc<Mutex<HashMap<String, oneshot::Sender<PermissionOutcome>>>>,
 }
+
+struct RuntimeSession { client: Arc<AcpClient>, agent_session_id: String }
 
 /// Key of a pending permission request: the session and the tool call id it belongs to.
 fn pending_key(session: &str, tool_call_id: &str) -> String {
@@ -600,13 +642,13 @@ fn pending_key(session: &str, tool_call_id: &str) -> String {
 }
 
 impl AcpRuntime {
-    fn insert(&self, session: String, client: Arc<AcpClient>) {
+    fn insert(&self, session: String, agent_session_id: String, client: Arc<AcpClient>) {
         if let Ok(mut map) = self.sessions.lock() {
-            map.insert(session, client);
+            map.insert(session, Arc::new(RuntimeSession { client, agent_session_id }));
         }
     }
 
-    fn get(&self, session: &str) -> Result<Arc<AcpClient>, String> {
+    fn get(&self, session: &str) -> Result<Arc<RuntimeSession>, String> {
         self.sessions
             .lock()
             .map_err(|_| "the ACP state is poisoned".to_string())?
@@ -615,10 +657,13 @@ impl AcpRuntime {
             .ok_or_else(|| format!("no open harness session {session}"))
     }
 
-    fn remove(&self, session: &str) {
-        if let Ok(mut map) = self.sessions.lock() {
-            map.remove(session);
-        }
+    fn remove(&self, session: &str) -> Option<Arc<RuntimeSession>> {
+        let client = self.sessions.lock().ok().and_then(|mut map| map.remove(session));
+        self.reject_pending(session);
+        client
+    }
+
+    fn reject_pending(&self, session: &str) {
         // Requests this session was waiting on cannot be answered any more; drop them with it so a
         // stale id cannot resolve later.
         if let Ok(mut pending) = self.pending.lock() {
@@ -707,7 +752,7 @@ async fn open_session(
                 note("acp-load-ok", json!({ "name": name, "sessionId": id, "replayed": replayed.len() }));
                 return Ok((loaded, id.to_string(), replayed));
             }
-            Err(error) => note("acp-load-failed", json!({ "name": name, "error": error })),
+            Err(_) => note("acp-load-failed", json!({ "name": name, "stage": "load" })),
         }
     }
     let session = client
@@ -728,9 +773,9 @@ pub async fn acp_open<R: tauri::Runtime>(
     cwd: String,
     resume_session_id: Option<String>,
 ) -> Result<Value, String> {
-    let config = HarnessFile::load();
+    let config = HarnessFile::load()?;
     note("acp-open", json!({
-        "name": name, "cwd": cwd, "configured": config.harnesses.len(),
+        "name": name, "hasDirectory": !cwd.is_empty(), "configured": config.harnesses.len(),
         "resume": resume_session_id.is_some(),
     }));
     let harness = config
@@ -741,13 +786,15 @@ pub async fn acp_open<R: tauri::Runtime>(
     // Phase 1 shows the request in the transcript; the answer comes back through
     // `acp_answer_permission`, and an unanswered request refuses itself when the deadline passes.
     let permission_app = app.clone();
+    let connection_id = format!("acp_{}", uuid::Uuid::new_v4().simple());
+    let permission_session = connection_id.clone();
     let pending = state.pending.clone();
     // Cloned up front: the handler runs on the reader task and cannot borrow the command's state.
     let pending_handle = pending.clone();
     let permission: PermissionHandler = Arc::new(move |params: Value| {
         let tool_call = params.get("toolCall").cloned().unwrap_or(Value::Null);
         let tool_call_id = tool_call.get("toolCallId").and_then(Value::as_str).unwrap_or_default().to_string();
-        let session = params.get("sessionId").and_then(Value::as_str).unwrap_or_default().to_string();
+        let session = permission_session.clone();
         let (sender, receiver) = oneshot::channel();
         if let Ok(mut map) = pending_handle.lock() {
             map.insert(pending_key(&session, &tool_call_id), sender);
@@ -769,13 +816,13 @@ pub async fn acp_open<R: tauri::Runtime>(
     .map_err(|error| {
         // Same reason as the handshake: name the program that could not be started.
         let error = format!("{error} (command: {})", harness.command);
-        note("acp-open-failed", json!({ "name": harness.name, "command": harness.command, "error": error }));
+        note("acp-open-failed", json!({ "name": harness.name, "stage": "spawn" }));
         error
     })?);
-    let info = client
-        .initialize("vrykell", env!("CARGO_PKG_VERSION"))
-        .await
-        .map_err(|e| format!("harness handshake failed: {e}"))?;
+    let info = match client.initialize("vrykell", env!("CARGO_PKG_VERSION")).await {
+        Ok(info) => info,
+        Err(error) => { client.shutdown().await; return Err(format!("harness handshake failed: {error}")); }
+    };
     // The protocol requires an absolute working directory, and an empty one is refused by the agent
     // ("cwd must be an absolute path"). Fall back to the directory the app itself runs in; a caller
     // that knows the project directory (the workspace does) should pass it.
@@ -795,8 +842,12 @@ pub async fn acp_open<R: tauri::Runtime>(
         .and_then(Value::as_bool)
         .unwrap_or(false);
     let resume = resume_session_id.filter(|id| !id.trim().is_empty());
-    let (session, session_id, replayed) =
-        open_session(&client, &harness.name, &session_cwd, resume.as_deref(), can_load).await?;
+    let (session, agent_session_id, mut replayed) = match open_session(&client, &harness.name, &session_cwd, resume.as_deref(), can_load).await {
+        Ok(result) => result,
+        Err(error) => { client.shutdown().await; state.reject_pending(&connection_id); return Err(error); }
+    };
+    let session_id = connection_id;
+    for event in &mut replayed { event.session_id = session_id.clone(); }
 
     // Pump the agent's notifications for as long as the session lives.
     let pump_app = app.clone();
@@ -806,8 +857,7 @@ pub async fn acp_open<R: tauri::Runtime>(
     let pump_client = Arc::downgrade(&client);
     tokio::spawn(async move {
         loop {
-            // A weak handle on purpose: closing the session drops the last strong reference, this pump
-            // ends, and the child is then killed by `kill_on_drop` instead of running on unreachable.
+            // Explicit shutdown closes the notification channel even while this task owns a client.
             let Some(pump_client) = pump_client.upgrade() else { break };
             let Some(message) = pump_client.next_event().await else { break };
             // The first notification is the interesting one for diagnosis: an open session that
@@ -826,12 +876,13 @@ pub async fn acp_open<R: tauri::Runtime>(
         }
     });
 
-    state.insert(session_id.clone(), client);
-    note("acp-open-ok", json!({ "name": harness.name, "sessionId": session_id, "cwd": session_cwd }));
+    state.insert(session_id.clone(), agent_session_id.clone(), client);
+    note("acp-open-ok", json!({ "name": harness.name, "sessionId": session_id }));
     // The session's own state travels with the id: the page shows the modes, models and config
     // options the agent published, and needs them before the first turn.
     Ok(json!({
         "sessionId": session_id,
+        "resumeSessionId": agent_session_id,
         "harness": harness.name,
         "cwd": session_cwd,
         "agent": describe_agent(&info),
@@ -849,7 +900,8 @@ pub async fn acp_set_mode(
     session_id: String,
     mode_id: String,
 ) -> Result<(), String> {
-    state.get(&session_id)?.set_mode(&session_id, &mode_id).await
+    let session = state.get(&session_id)?;
+    session.client.set_mode(&session.agent_session_id, &mode_id).await
 }
 
 /// Switch the session model (legacy model API; see `acp_set_config_option` for the newer one).
@@ -859,7 +911,8 @@ pub async fn acp_set_model(
     session_id: String,
     model_id: String,
 ) -> Result<(), String> {
-    state.get(&session_id)?.set_model(&session_id, &model_id).await
+    let session = state.get(&session_id)?;
+    session.client.set_model(&session.agent_session_id, &model_id).await
 }
 
 /// Set one session config option and answer with the complete configuration state the agent returns.
@@ -870,7 +923,8 @@ pub async fn acp_set_config_option(
     config_id: String,
     value: Value,
 ) -> Result<Value, String> {
-    state.get(&session_id)?.set_config_option(&session_id, &config_id, value).await
+    let session = state.get(&session_id)?;
+    session.client.set_config_option(&session.agent_session_id, &config_id, value).await
 }
 
 /// Send a prompt. The turn runs in the background; its content and stop reason arrive as events.
@@ -885,8 +939,8 @@ pub async fn acp_prompt<R: tauri::Runtime>(
     let app = app.clone();
     let session = session_id.clone();
     tokio::spawn(async move {
-        let outcome = client
-            .prompt(&session, json!([{ "type": "text", "text": text }]))
+        let outcome = client.client
+            .prompt(&client.agent_session_id, json!([{ "type": "text", "text": text }]))
             .await;
         match outcome {
             Ok(stop) => emit(
@@ -909,13 +963,16 @@ pub async fn acp_prompt<R: tauri::Runtime>(
 /// Ask the agent to stop the current turn.
 #[tauri::command]
 pub fn acp_cancel(state: tauri::State<'_, AcpRuntime>, session_id: String) -> Result<(), String> {
-    state.get(&session_id)?.cancel(&session_id)
+    state.reject_pending(&session_id);
+    let session = state.get(&session_id)?;
+    session.client.cancel(&session.agent_session_id)
 }
 
 /// Close a session: the agent's process goes with it.
 #[tauri::command]
-pub fn acp_close(state: tauri::State<'_, AcpRuntime>, session_id: String) -> Result<(), String> {
-    state.remove(&session_id);
+pub async fn acp_close(state: tauri::State<'_, AcpRuntime>, session_id: String) -> Result<(), String> {
+    if let Some(session) = state.remove(&session_id) { session.client.shutdown().await; }
+    note("acp-closed", json!({ "sessionId": session_id }));
     Ok(())
 }
 
@@ -924,6 +981,80 @@ mod tests {
     use super::*;
     use serde_json::json;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[test]
+    fn idle_child_fixture() {
+        if std::env::var("APP_ACP_TEST_CHILD").as_deref() == Ok("1") {
+            loop { std::thread::park(); }
+        }
+    }
+
+    #[tokio::test]
+    async fn closing_an_idle_child_releases_waiters_and_the_event_pump() {
+        let executable = std::env::current_exe().unwrap();
+        let client = Arc::new(AcpClient::spawn(executable.to_str().unwrap(),
+            &["--exact".into(), "agent::acp::tests::idle_child_fixture".into(), "--nocapture".into()],
+            None, &HashMap::from([("APP_ACP_TEST_CHILD".into(), "1".into())]), Arc::new(|_| None)).unwrap());
+        let runtime = AcpRuntime::default();
+        runtime.insert("idle".into(), "agent-id".into(), client.clone());
+        let pump_client = client.clone();
+        let pump = tokio::spawn(async move { pump_client.next_event().await });
+        let request_client = client.clone();
+        let request = tokio::spawn(async move { request_client.request("initialize", json!({}), Duration::from_secs(60)).await });
+        tokio::task::yield_now().await;
+        runtime.remove("idle").unwrap().client.shutdown().await;
+        assert!(tokio::time::timeout(Duration::from_secs(2), pump).await.unwrap().unwrap().is_none());
+        assert!(tokio::time::timeout(Duration::from_secs(2), request).await.unwrap().unwrap().is_err());
+        assert!(client.child.lock().unwrap().is_none());
+        assert!(runtime.get("idle").is_err());
+    }
+
+    #[tokio::test]
+    async fn native_executable_keeps_the_original_argument_list() {
+        let executable = std::env::current_exe().unwrap();
+        let (program, args) = launch_command(executable.to_str().unwrap(), &["--list".into()]);
+        let output = Command::new(program).args(args).output().await.unwrap();
+        assert!(output.status.success());
+        assert!(String::from_utf8_lossy(&output.stdout).contains("agent::acp::tests::idle_child_fixture"));
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn command_script_keeps_paths_and_arguments_containing_spaces() {
+        let directory = std::env::temp_dir().join(format!("acp test {}", uuid::Uuid::new_v4().simple()));
+        std::fs::create_dir_all(&directory).unwrap();
+        let path = directory.join("agent shim.cmd");
+        std::fs::write(&path, "@echo off\r\necho %~1\r\necho %~2\r\n").unwrap();
+        let (program, args) = launch_command(path.to_str().unwrap(), &["a path with spaces".into(), "--flag".into()]);
+        let output = Command::new(program).args(args).output().await.unwrap();
+        std::fs::remove_file(path).unwrap();
+        std::fs::remove_dir(directory).unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert_eq!(String::from_utf8_lossy(&output.stdout).replace('\r', ""), "a path with spaces\n--flag\n");
+    }
+
+    #[test]
+    fn invalid_configuration_is_reported_instead_of_becoming_an_empty_list() {
+        let path = std::env::temp_dir().join(format!("acp-config-test-{}.json", uuid::Uuid::new_v4().simple()));
+        assert!(HarnessFile::read_from(&path).unwrap().harnesses.is_empty());
+        std::fs::write(&path, "{invalid").unwrap();
+        assert!(HarnessFile::read_from(&path).is_err());
+        std::fs::remove_file(&path).unwrap();
+    }
+
+    #[tokio::test]
+    async fn equal_agent_ids_on_different_connections_remain_independent() {
+        let runtime = AcpRuntime::default();
+        let (first, first_agent) = client_pair(Arc::new(Mutex::new(Vec::new())), Arc::new(|_| None));
+        let (second, second_agent) = client_pair(Arc::new(Mutex::new(Vec::new())), Arc::new(|_| None));
+        runtime.insert("local-a".into(), "same-agent-id".into(), Arc::new(first));
+        runtime.insert("local-b".into(), "same-agent-id".into(), Arc::new(second));
+        runtime.remove("local-a").unwrap().client.shutdown().await;
+        assert!(!runtime.get("local-b").unwrap().client.closed.load(Ordering::SeqCst));
+        runtime.remove("local-b").unwrap().client.shutdown().await;
+        first_agent.abort();
+        second_agent.abort();
+    }
 
     #[test]
     fn reads_a_readable_line_from_a_jsonrpc_error() {

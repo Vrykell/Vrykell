@@ -7,15 +7,16 @@
 import { test, expect } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
-test('the sidebar ACP button opens the launcher without crashing the tab bar', async ({ page }) => {
+test('the sidebar ACP button reuses a singleton workspace with an inline server picker', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await page.waitForTimeout(600);
   await expect(page.getByTestId('tab-acp-btn')).toBeVisible();
   await page.getByTestId('tab-acp-btn').click();
   await expect(page.getByTestId('acp-launcher')).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(page.getByTestId('acp-launcher')).toHaveCount(0);
+  await expect(page.getByTestId('harness-workspace')).toBeVisible();
+  await page.getByTestId('tab-acp-btn').click();
+  await expect(page.locator('[data-tab-kind="harness"]')).toHaveCount(1);
 });
 
 test('picking a server opens its session tab and closes the panel', async ({ page }) => {

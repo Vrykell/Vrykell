@@ -8,18 +8,21 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import { t } from '@i18n';
-import { ArrowUp, Bot, Plus, Square, iconSizes } from '@ui/icons';
+import { ArrowDown, ArrowUp, Bot, Plus, Square, iconSizes } from '@ui/icons';
 import { IconButton } from '@ui/IconButton';
 import ErrorBox from '@ui/ErrorBox';
 import { TextArea } from '@ui/TextInput';
 import KeyHint from '@ui/KeyHint';
 import { formatCompact } from '@features/agent/model/usageStats';
-import { useActiveWorkspace } from '@features/workspace';
+import { useComposerDrafts } from '../stores/composerDrafts';
+import { useHarnessWorkspace } from '../stores/harnessWorkspace';
+import { useTranscriptFollow } from '../hooks/useTranscriptFollow';
+import { OutlineButton } from '@ui/OutlineButton';
 import { toExchanges } from '@features/chat/model/exchanges';
 import AiBlock from '@features/chat/components/AiBlock';
 import ChatComposerShell from './ChatComposerShell';
 import HarnessSelector, { type HarnessSelectorOption } from './HarnessSelector';
-import { bindHarnessEvents, useHarnessStore, type HarnessSession } from '../stores/harness';
+import { useHarnessStore, type HarnessSession } from '../stores/harness';
 import type { AcpConfigGroup, AcpConfigValue } from '@platform/api/acp';
 
 /** One control in the composer's status row. */
@@ -105,32 +108,23 @@ function contextLabel(context: { used: number; size: number }): string {
 }
 
 /**
- * HarnessView — the workspace page of one external harness session.
- *
- * Deliberately built out of the AI panel's own vocabulary: `AiBlock` in conversation presentation
- * gives the same question bubble, answer meta, action row and tool cards, and the composer mirrors
- * the panel's markup (`chat-composer-wrap` / `terminal-composer` / `chat-composer-input` /
- * `chat-input-status`) so the two surfaces read as one product. This page is where the local chat
- * will move next, so the panel's look is the contract, not a coincidence.
+ * A connected session reuses the conversation blocks, composer shell and transcript follow behavior.
  */
-export default function HarnessView({ tabId, harness, cwd }: { tabId: string; harness: string; cwd?: string }) {
+export default function HarnessView({ tabId, harness, cwd, fresh = false, active = true }: { tabId: string; harness: string; cwd?: string; fresh?: boolean; active?: boolean }) {
   const session = useHarnessStore((state) => state.byTab[tabId]);
-  // The session works where the user's terminal is: the workspace already knows that directory, and
-  // the backend falls back to its own only when there is no terminal to ask.
-  const { activeCwd } = useActiveWorkspace();
-  const [text, setText] = useState('');
-  const bodyRef = useRef<HTMLDivElement>(null);
+  const text = useComposerDrafts(state => state.byTab[tabId]?.text ?? '');
+  const setText = (value: string) => useComposerDrafts.getState().setText(tabId, value);
+  const follow = useTranscriptFollow(tabId, session?.messages, active);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   /** Escape hides the command list for the current text without touching what was typed. */
   const [commandDismissed, setCommandDismissed] = useState(false);
   const [commandIndex, setCommandIndex] = useState(0);
-  useEffect(() => { bindHarnessEvents(); }, []);
   /** The store refuses a second open for a tab that is already opening, so a re-rendered effect or a
    *  double click can only ever start one agent process. */
   useEffect(() => {
     if (session) return;
-    void useHarnessStore.getState().open(tabId, harness, cwd ?? activeCwd ?? '');
-  }, [tabId, harness, session, activeCwd, cwd]);
+    void useHarnessStore.getState().open(tabId, harness, cwd ?? '', fresh);
+  }, [tabId, harness, session, cwd, fresh]);
 
   const agent = session?.agent?.agentInfo;
   const exchanges = toExchanges(session?.messages ?? []);
@@ -153,26 +147,27 @@ export default function HarnessView({ tabId, harness, cwd }: { tabId: string; ha
     composerRef.current?.focus();
   };
 
-  useEffect(() => {
-    const body = bodyRef.current;
-    // Only follow while the view is already at the bottom: a scrollbar dragged upwards stays put.
-    if (body && body.scrollHeight - body.scrollTop - body.clientHeight <= 24) body.scrollTop = body.scrollHeight;
-  }, [exchanges.length, session?.pending]);
-
   const submit = () => {
     if (!canSend) return;
     const value = text;
+    follow.jumpToLatest();
     setText('');
     void useHarnessStore.getState().prompt(tabId, value);
   };
 
   return (
     <div data-testid="harness-page" className="ai-chat-panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-      <div ref={bodyRef} className="scroll-region" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 14px 4px' }}>
+      <div className="chat-conversation-context" data-testid="harness-directory" data-tip={session?.cwd || cwd || undefined}>
+        {session?.cwd || cwd || t('Default project folder')}
+      </div>
+      <div ref={follow.scrollRef} className="scroll-region chat-transcript" onScroll={follow.onScroll}
+        onWheel={follow.onWheel} onTouchMove={follow.onTouchMove}
+        style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 14px 4px' }}>
         {!session && <p style={{ margin: '10px 4px', color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
           {t('Opening the harness session…')}
         </p>}
-        {session?.error && <ErrorBox compact>{session.error}</ErrorBox>}
+        {session?.error && <ErrorBox title={t('Connection failed')} details={session.error}
+          actions={!session.sessionId && <OutlineButton onClick={() => void useHarnessStore.getState().open(tabId, harness, cwd ?? '', fresh)}>{t('Retry')}</OutlineButton>} />}
         {/* A failed turn is often just a missing login: the agent said how to sign in at handshake. */}
         {session?.error && hints.length > 0 && (
           <p data-testid="harness-auth-hint" style={{ margin: '2px 4px 8px', color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
@@ -226,8 +221,13 @@ export default function HarnessView({ tabId, harness, cwd }: { tabId: string; ha
         )}
       </div>
 
+      <div className="chat-jump-slot" style={{ visibility: follow.following ? 'hidden' : 'visible' }} aria-hidden={follow.following}>
+        <button type="button" data-subtle className="chat-jump-latest" aria-label={t('Jump to latest reply')}
+          data-tip={t('Jump to latest reply')} onClick={follow.jumpToLatest}><ArrowDown size={16} /></button>
+      </div>
+
       <ChatComposerShell
-        heading={<span data-tip={activeCwd || undefined} data-tip-description={activeCwd ? t('The harness works in this directory.') : undefined}
+        heading={<span data-tip={session?.cwd || cwd || undefined} data-tip-description={t('The harness works in this directory.')}
           style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {harness}{agent ? ` · ${agent.title || agent.name || ''}` : ''}
         </span>}
@@ -252,7 +252,7 @@ export default function HarnessView({ tabId, harness, cwd }: { tabId: string; ha
         status={<>
           <IconButton compact aria-label={t('New session')} data-tip={t('New session')} data-testid="harness-new-session"
             disabled={!session?.sessionId || session.pending}
-            onClick={() => void useHarnessStore.getState().restart(tabId)}>
+            onClick={() => useHarnessWorkspace.getState().connect(harness, session?.cwd || cwd, true)}>
             <Plus size={iconSizes.compact} />
           </IconButton>
           {selectors.map((selector) => (
@@ -280,7 +280,7 @@ export default function HarnessView({ tabId, harness, cwd }: { tabId: string; ha
         </>}
       >
         <Bot size={20} aria-hidden="true" className="chat-composer-lead" />
-        <TextArea ref={composerRef} data-testid="harness-composer" data-chat-composer value={text}
+        <TextArea ref={composerRef} data-testid="harness-composer" data-chat-composer={active || undefined} value={text}
           placeholder={t('Describe what you want to do…')} rows={1}
           onChange={(event) => { setText(event.target.value); setCommandDismissed(false); setCommandIndex(0); }}
           onKeyDown={(event) => {

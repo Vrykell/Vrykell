@@ -8,14 +8,17 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AcpLauncher from '@features/workspace/components/AcpLauncher';
 import { useSessionStore } from '@features/workspace';
+import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 
 const invokeMock = vi.hoisted(() => vi.fn());
 
-vi.mock('@platform/diagnostics', () => ({ invoke: invokeMock }));
+vi.mock('@platform/diagnostics', () => ({ invoke: invokeMock, diagnostic: vi.fn() }));
 
 const CONFIGURED = [{ name: 'Claude Code', command: 'claude', args: [], env: {}, cwd: '', enabled: true }];
 
 beforeEach(() => {
+  useSessionStore.setState({ tabs: [], activeId: '' });
+  useHarnessWorkspace.setState({ connections: [], selected: '' });
   invokeMock.mockReset();
   invokeMock.mockImplementation((command: string) => {
     if (command === 'acp_harnesses') return Promise.resolve(CONFIGURED);
@@ -41,7 +44,7 @@ describe('AcpLauncher', () => {
 
     const opened = useSessionStore.getState().tabs.filter((tab) => tab.kind === 'harness');
     expect(opened).toHaveLength(1);
-    expect(opened[0]).toMatchObject({ harness: 'Claude Code' });
+    expect(useHarnessWorkspace.getState().connections[0]).toMatchObject({ harness: 'Claude Code' });
     expect(onClose).toHaveBeenCalled();
   });
 

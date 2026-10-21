@@ -14,6 +14,8 @@ import { SettingsGroup, Field } from '@features/settings/components/ui';
 import { IconButton } from '@ui/IconButton';
 import { OutlineButton } from '@ui/OutlineButton';
 import ConfirmDialog from '@ui/ConfirmDialog';
+import ErrorBox from '@ui/ErrorBox';
+import { useSettingsSave } from '../components/SettingsSaveProvider';
 import { Minus, Plus, RefreshCw, Settings } from '@ui/icons';
 import HarnessBadge from '@features/agent/components/HarnessBadge';
 import HarnessDialog from '@features/settings/components/HarnessDialog';
@@ -26,8 +28,9 @@ export default function HarnessPage() {
   const [list, setList] = useState<HarnessEntry[] | null>(null);
   const [probe, setProbe] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
-  /** Set once the user changes anything, so the auto-save never writes the freshly loaded list. */
-  const [touched, setTouched] = useState(false);
+  const { save: saveSettings } = useSettingsSave();
+  const [loadError, setLoadError] = useState('');
+  const [probeErrors, setProbeErrors] = useState<Record<string, string>>({});
   const [problems, setProblems] = useState<string[]>([]);
   /** command → whether the program exists on this machine. */
   const [installed, setInstalled] = useState<Record<string, boolean>>({});
@@ -37,26 +40,14 @@ export default function HarnessPage() {
   const toast = (message: string, tone: 'success' | 'error') => useToastStore.getState().addToast(message, tone);
 
   const reload = useCallback(() => {
+    setLoadError('');
     void acpHarnesses()
       .then((entries) => setList(entries.map((entry) => ({
         name: entry.name, command: entry.command, args: entry.args, env: entry.env, cwd: entry.cwd, enabled: entry.enabled,
       }))))
-      .catch(() => setList([]));
+      .catch((error: unknown) => setLoadError(String(error)));
   }, []);
   useEffect(() => { reload(); }, [reload]);
-
-  // Auto-save: a row that exists on screen has to exist in the file, because the buttons beside it
-  // (test connection, connect) read the file. A broken row is never written down.
-  useEffect(() => {
-    if (!touched || !list) return;
-    const problems = harnessProblems(list);
-    setProblems(problems);
-    if (problems.length > 0) return;
-    const timer = window.setTimeout(() => {
-      void acpHarnessSave(list).catch((error) => toast(String((error as Error)?.message ?? error), 'error'));
-    }, 600);
-    return () => window.clearTimeout(timer);
-  }, [list, touched]);
 
   // Ask once per command whether the program exists, so a preset that cannot run says so before the
   // user presses anything: most presets need a program the machine may not have.
@@ -72,25 +63,29 @@ export default function HarnessPage() {
     }
   }, [list, installed]);
 
-  const save = async () => {
-    if (!list) return;
-    const problems = harnessProblems(list);
+  const persist = async (next: HarnessEntry[]): Promise<boolean> => {
+    const problems = harnessProblems(next);
+    setProblems(problems);
     if (problems.length > 0) {
       toast(t('Fix the highlighted harnesses first: {{problems}}', { problems: problems.join('; ') }), 'error');
-      return;
+      return false;
     }
     setBusy(true);
+    let saved = false;
     try {
-      await acpHarnessSave(list);
-      toast(t('Harness list saved.'), 'success');
-    } catch (error) {
-      toast(String((error as Error)?.message ?? error), 'error');
+      await saveSettings(async () => {
+        await acpHarnessSave(next);
+        setList(next);
+        saved = true;
+      });
+      return saved;
     } finally {
       setBusy(false);
     }
   };
 
   const test = async (name: string) => {
+    setProbeErrors(current => ({ ...current, [name]: '' }));
     setProbe((current) => ({ ...current, [name]: t('Testing…') }));
     try {
       const agent: AgentDescription = await acpHandshake(name);
@@ -100,27 +95,27 @@ export default function HarnessPage() {
         [name]: `${info?.title || info?.name || name}${info?.version ? ` ${info.version}` : ''} · ACP v${agent.protocolVersion ?? '?'}`,
       }));
     } catch (error) {
-      setProbe((current) => ({ ...current, [name]: String((error as Error)?.message ?? error) }));
+      setProbe(current => ({ ...current, [name]: '' }));
+      setProbeErrors(current => ({ ...current, [name]: String(error) }));
     }
   };
 
   const writeEntry = (entry: HarnessEntry) => {
-    setTouched(true);
-    setList((current) => {
-      const next = [...(current ?? [])];
-      if (editing?.index != null) next[editing.index] = entry;
-      else next.push(entry);
-      return next;
-    });
+    const next = [...(list ?? [])];
+    if (editing?.index != null) next[editing.index] = entry;
+    else next.push(entry);
+    return persist(next);
   };
 
   return (
     <SettingsGroup title={t('ACP')}>
       <Field layout="stacked" title={t('Servers')}
         description={t('A harness is a program you add to the list. Adding it is the authorization: it runs with your account, like a command typed into the terminal. Third-party programs are not bundled — install them yourself and follow their licences.')}>
-        {list === null && <span style={{ color: 'var(--text-muted)' }}>{t('Loading…')}</span>}
+        {loadError && <ErrorBox title={t('Could not load servers')} details={loadError}
+          actions={<OutlineButton onClick={reload}>{t('Retry')}</OutlineButton>} />}
+        {list === null && !loadError && <span style={{ color: 'var(--text-muted)' }}>{t('Loading…')}</span>}
         {problems.length > 0 && (
-          <span data-testid="harness-problems" style={{ color: 'var(--error)' }}>{problems.join(' · ')}</span>
+          <ErrorBox compact testId="harness-problems">{problems.join(' · ')}</ErrorBox>
         )}
         {list?.length === 0 && (
           <span data-testid="harness-none" style={{ color: 'var(--text-muted)' }}>
@@ -129,7 +124,8 @@ export default function HarnessPage() {
         )}
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {list?.map((harness, index) => (
-            <div key={`${harness.name}-${index}`} data-testid={`harness-row-${index}`} className="acp-row">
+            <div key={`${harness.name}-${index}`}>
+            <div data-testid={`harness-row-${index}`} className="acp-row">
               <HarnessBadge name={harness.name} size={30} />
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
                 <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
@@ -164,7 +160,7 @@ export default function HarnessPage() {
                   {harness.command} {harness.args.join(' ')}
                 </span>
               </span>
-              <button data-subtle data-testid={`harness-connect-${index}`} disabled={!harness.enabled}
+              <button data-subtle data-testid={`harness-connect-${index}`} disabled={!harness.enabled || busy}
                 onClick={() => {
                   // Settings render as a workspace screen over the tabs: leaving it open would hide
                   // the session this button just opened.
@@ -182,24 +178,29 @@ export default function HarnessPage() {
                 <RefreshCw size={14} />
               </IconButton>
               <IconButton compact data-testid={`harness-edit-${index}`}
+                disabled={busy}
                 aria-label={t('Edit server')} data-tip={t('Edit server')} onClick={() => setEditing({ index })}>
                 <Settings size={14} />
               </IconButton>
               <IconButton compact tone="danger" data-testid={`harness-remove-${index}`}
+                disabled={busy}
                 aria-label={t('Remove')} data-tip={t('Remove')} onClick={() => setConfirmRemove(index)}>
                 <Minus size={14} />
               </IconButton>
             </div>
+            {probeErrors[harness.name] && <ErrorBox title={t('Connection failed')} details={probeErrors[harness.name]}
+              actions={<OutlineButton onClick={() => void test(harness.name)}>{t('Retry')}</OutlineButton>} />}
+            </div>
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-          <OutlineButton data-testid="harness-add" onClick={() => setEditing({ index: null })}
+          <OutlineButton data-testid="harness-add" disabled={busy || list === null} onClick={() => setEditing({ index: null })}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <Plus size={12} /> {t('Add server')}
           </OutlineButton>
           <span style={{ flex: 1 }} />
-          <OutlineButton data-testid="harness-save" disabled={busy} onClick={() => void save()}>{t('Save the list')}</OutlineButton>
-          <IconButton compact aria-label={t('Reload')} data-tip={t('Reload')} onClick={reload}><RefreshCw size={14} /></IconButton>
+          <OutlineButton data-testid="harness-save" disabled={busy || list === null} onClick={() => list && void persist(list)}>{t('Save the list')}</OutlineButton>
+          <IconButton compact disabled={busy} aria-label={t('Reload')} data-tip={t('Reload')} onClick={reload}><RefreshCw size={14} /></IconButton>
         </div>
         {list?.some((entry) => installed[entry.command] === false) && (
           <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>
@@ -213,8 +214,9 @@ export default function HarnessPage() {
         <div data-testid="harness-presets" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {HARNESS_PRESETS.map((preset) => (
             <OutlineButton key={preset.name} data-testid={`harness-preset-${preset.name}`}
+              disabled={busy || list === null}
               data-tip={`${preset.command} ${preset.args.join(' ')}`} data-tip-description={t(preset.hint)}
-              onClick={() => { setTouched(true); setList((current) => upsertPreset(current ?? [], preset)); }}>
+              onClick={() => list && void persist(upsertPreset(list, preset))}>
               <HarnessBadge name={preset.name} size={19} /> {preset.name}
             </OutlineButton>
           ))}
@@ -243,10 +245,8 @@ export default function HarnessPage() {
         danger
         onConfirm={() => {
           const at = confirmRemove;
-          setConfirmRemove(null);
           if (at === null) return;
-          setTouched(true);
-          setList((current) => current?.filter((_entry, index) => index !== at) ?? current);
+          if (list) void persist(list.filter((_entry, index) => index !== at)).then(saved => { if (saved) setConfirmRemove(null); });
         }}
         onCancel={() => setConfirmRemove(null)}
       />

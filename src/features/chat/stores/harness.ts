@@ -1,7 +1,7 @@
 /**
  * harness — the state of the harness session pages.
  *
- * One entry per workspace tab. Nothing here decides anything security-relevant: the session, the
+ * One entry per internal connection tab. Nothing here decides anything security-relevant: the session, the
  * process and the answers to the agent's requests all live in Rust (see `docs/zh/security-model.md`),
  * and this store only keeps what the page renders and forwards the user's intent.
  */
@@ -16,6 +16,7 @@ import {
 } from '@platform/api/acp';
 import { useUsageStore } from '@features/agent/stores/usage';
 import { useHarnessSessionRefs } from './harnessSessions';
+import { useToastStore } from '@ui/Toast';
 
 /** One step of the plan an agent publishes while it works. */
 export interface HarnessPlanEntry {
@@ -72,9 +73,7 @@ export interface HarnessSession {
 
 interface HarnessStore {
   byTab: Record<string, HarnessSession>;
-  open: (tabId: string, harness: string, cwd: string) => Promise<void>;
-  /** End the current session and open a fresh one in the same directory. */
-  restart: (tabId: string) => Promise<void>;
+  open: (tabId: string, harness: string, cwd: string, fresh?: boolean) => Promise<void>;
   prompt: (tabId: string, text: string) => Promise<void>;
   cancel: (tabId: string) => Promise<void>;
   close: (tabId: string) => Promise<void>;
@@ -98,14 +97,16 @@ const fresh = (harness: string): HarnessSession => ({
 
 /** sessionId → tabId, so an event finds its page. */
 const tabOfSession = new Map<string, string>();
+const openingEvents = new Map<string, AcpSessionEvent[]>();
 let binding: Promise<void> | null = null;
 
 /** Subscribe to the backend's events once; every harness page calls this on mount. */
-export function bindHarnessEvents(): void {
-  if (binding) return;
+export function bindHarnessEvents(): Promise<void> {
+  if (binding) return binding;
   binding = onAcpSession((event) => useHarnessStore.getState().applyEvent(event))
     .then(() => undefined)
-    .catch(() => { binding = null; });
+    .catch((error: unknown) => { binding = null; throw error; });
+  return binding;
 }
 
 /** Messages of a tab, patched through one function. */
@@ -120,25 +121,22 @@ function patch(tabId: string, update: (session: HarnessSession) => HarnessSessio
 export const useHarnessStore = create<HarnessStore>()((set, get) => ({
   byTab: {},
 
-  open: async (tabId, harness, cwd) => {
-    // One open per tab: a second click on restart (or a remount racing the first attempt) would
-    // otherwise start a second agent process that nothing would ever close.
+  open: async (tabId, harness, cwd, newSession = false) => {
+    // One open per tab prevents a remount racing the first attempt from starting an extra process.
     if (get().byTab[tabId]?.opening) return;
     if (!(tabId in get().byTab)) {
       set((state) => ({ byTab: { ...state.byTab, [tabId]: fresh(harness) } }));
     }
     patch(tabId, (session) => ({ ...session, opening: true, error: null }));
     try {
+      await bindHarnessEvents();
       // Resume the harness's last conversation when we remember one from the same directory; the
       // agent replays it and the replay travels back with the open result. A stale reference (a
       // deleted session, another directory) falls back to a new session inside the backend.
       const stored = useHarnessSessionRefs.getState().refs[harness];
-      const resume = stored && (!cwd || stored.cwd === cwd) ? stored.sessionId : undefined;
+      const resume = !newSession && stored && (!cwd || stored.cwd === cwd) ? stored.sessionId : undefined;
       const result = await acpOpen(harness, cwd, resume);
       tabOfSession.set(result.sessionId, tabId);
-      useHarnessSessionRefs.getState().remember(harness, {
-        sessionId: result.sessionId, cwd: result.cwd || cwd, at: Date.now(),
-      });
       const known = get().byTab[tabId];
       if (!known) {
         // The tab was closed while this open was in flight: do not resurrect it, and do not leave a
@@ -148,6 +146,9 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
         tabOfSession.delete(result.sessionId);
         return;
       }
+      useHarnessSessionRefs.getState().remember(harness, {
+        sessionId: result.resumeSessionId ?? result.sessionId, cwd: result.cwd || cwd, at: Date.now(),
+      });
       const replayed = result.replayed ?? [];
       patch(tabId, (current) => replayEvents({
         ...current, opening: false, sessionId: result.sessionId, cwd: result.cwd || cwd,
@@ -155,25 +156,14 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
         modes: result.modes ?? null, models: result.models ?? null, configOptions: result.configOptions ?? null,
         note: replayed.length > 0 ? t('Resumed the previous conversation.') : current.note,
       }, replayed));
+      const queued = openingEvents.get(result.sessionId) ?? [];
+      openingEvents.delete(result.sessionId);
+      for (const event of queued) get().applyEvent(event);
     } catch (error) {
       patch(tabId, (session) => ({ ...session, opening: false, error: String((error as Error)?.message ?? error) }));
+    } finally {
+      if (!Object.values(get().byTab).some(session => session.opening)) openingEvents.clear();
     }
-  },
-
-  restart: async (tabId) => {
-    const session = get().byTab[tabId];
-    // An open that is still running owns the tab; restarting under it would race two agent processes.
-    if (!session || session.opening) return;
-    const { harness, cwd } = session;
-    // A restart is how the user says "forget that conversation": the reference goes first, or the
-    // open below would load it straight back.
-    useHarnessSessionRefs.getState().forget(harness);
-    if (session.sessionId) {
-      tabOfSession.delete(session.sessionId);
-      await acpClose(session.sessionId).catch(() => undefined);
-    }
-    set((state) => ({ byTab: { ...state.byTab, [tabId]: fresh(harness) } }));
-    await get().open(tabId, harness, cwd);
   },
 
   prompt: async (tabId, text) => {
@@ -195,6 +185,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     if (!session?.sessionId) return;
     try {
       await acpCancel(session.sessionId);
+      patch(tabId, current => ({ ...current, permission: null }));
     } catch (error) {
       patch(tabId, (current) => ({ ...current, note: String((error as Error)?.message ?? error) }));
     }
@@ -244,14 +235,16 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
 
   close: async (tabId) => {
     const session = get().byTab[tabId];
-    if (session?.sessionId) {
-      tabOfSession.delete(session.sessionId);
-      await acpClose(session.sessionId).catch(() => {});
-    }
     set((state) => {
       const { [tabId]: _dropped, ...rest } = state.byTab;
       return { byTab: rest };
     });
+    if (session?.sessionId) {
+      tabOfSession.delete(session.sessionId);
+      await acpClose(session.sessionId).catch(() => {
+        useToastStore.getState().addToast(t('Could not close the agent session.'), 'error');
+      });
+    }
   },
 
   answerPermission: async (tabId, generation, optionId) => {
@@ -273,7 +266,13 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
 
   applyEvent: (event) => {
     const tabId = tabOfSession.get(event.sessionId);
-    if (!tabId) return;
+    if (!tabId) {
+      if (Object.values(get().byTab).some(session => session.opening)) {
+        const queued = openingEvents.get(event.sessionId) ?? [];
+        if (queued.length < 1000) openingEvents.set(event.sessionId, [...queued, event]);
+      }
+      return;
+    }
     const session = get().byTab[tabId];
     // The usage panel counts what the ACP servers report about their own sessions. A loaded
     // conversation arrives through `replayEvents`, which must not count it a second time.
@@ -318,10 +317,10 @@ function foldSessionEvent(session: HarnessSession, event: AcpSessionEvent): Harn
       const note = reason === 'cancelled'
         ? t('Harness stopped.')
         : reason && reason !== 'end_turn' ? t('The harness stopped the turn: {{reason}}', { reason }) : null;
-      return { ...session, pending: false, note };
+      return { ...session, pending: false, permission: null, note };
     }
     case 'error':
-      return { ...session, pending: false, error: String(event.payload.message ?? t('The harness failed.')) };
+      return { ...session, pending: false, permission: null, error: String(event.payload.message ?? t('The harness failed.')) };
     case 'permission': {
       // The card waits for the user; the backend holds the agent until the answer comes back.
       const toolCall = (event.payload.toolCall ?? {}) as Record<string, unknown>;

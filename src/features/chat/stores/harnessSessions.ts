@@ -2,8 +2,8 @@
  * harnessSessions — which session each harness last used, so reopening it continues the conversation.
  *
  * The agent keeps the history; this only remembers the id and the directory it belongs to, and the
- * page asks the agent to load that session. Closing the tab keeps the reference (reopening resumes);
- * the view's "New session" action forgets it.
+ * page asks the agent to load that session. Closing the tab keeps the reference; opening a fresh
+ * connection skips it and replaces it only after the new session opens successfully.
  */
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
@@ -19,17 +19,12 @@ export interface HarnessSessionRef {
 interface HarnessSessionRefs {
   refs: Record<string, HarnessSessionRef>;
   remember: (harness: string, ref: HarnessSessionRef) => void;
-  forget: (harness: string) => void;
 }
 
 export const useHarnessSessionRefs = create<HarnessSessionRefs>()(persist(
   (set) => ({
     refs: {},
     remember: (harness, ref) => set((state) => ({ refs: { ...state.refs, [harness]: ref } })),
-    forget: (harness) => set((state) => {
-      const { [harness]: _dropped, ...rest } = state.refs;
-      return { refs: rest };
-    }),
   }),
   { name: 'vrykell-harness-sessions', version: 1 },
 ));

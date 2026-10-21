@@ -42,7 +42,7 @@ import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
 import ErrorBox from '@ui/ErrorBox';
 import { TextButton } from '@ui/TextButton';
 import UsageView from '@features/agent/components/UsageView';
-import HarnessView from '@features/chat/components/HarnessView';
+import HarnessWorkspace from '@features/chat/components/HarnessWorkspace';
 import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { copyTerminalSelection, getPaneTerminal, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
@@ -115,13 +115,16 @@ export default function TerminalView() {
             />
           );
         }
-        if (tab.id !== activeId) return null; // history/settings/usage 无 PTY，无需保活
+        if (tab.kind === 'harness') return <div key={tab.id} inert={tab.id !== activeId}
+          style={{ display: tab.id === activeId ? 'flex' : 'none', flex: 1, minHeight: 0, minWidth: 0 }}>
+          <HarnessWorkspace active={tab.id === activeId} />
+        </div>;
+        if (tab.id !== activeId) return null;
         if (tab.kind === 'git-diff' || tab.kind === 'editor') return null;
         return tab.kind === 'history' ? <SessionHistoryView key={tab.id} />
           : tab.kind === 'ai-history' ? <AiHistoryView key={tab.id} />
             : tab.kind === 'usage' ? <UsageView key={tab.id} />
-              : tab.kind === 'harness' ? <HarnessView key={tab.id} tabId={tab.id} harness={tab.harness} cwd={tab.cwd} />
-                : null;
+              : null;
       })}
 
       {/* Manual fullscreen host for a running block, with room for the toolbar. */}

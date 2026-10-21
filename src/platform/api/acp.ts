@@ -80,6 +80,8 @@ export interface AcpConfigOption {
 
 export interface HarnessOpenResult {
   sessionId: string;
+  /** Agent-owned history id; the live session id is local to the client runtime. */
+  resumeSessionId?: string;
   harness: string;
   /** The directory the session was actually opened in (an empty request falls back to the app's). */
   cwd: string;

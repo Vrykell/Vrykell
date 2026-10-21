@@ -8,7 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useHarnessStore } from '@features/chat/stores/harness';
 import { useHarnessSessionRefs } from '@features/chat/stores/harnessSessions';
-import { acpOpen, acpSetConfigOption, acpSetMode, acpSetModel } from '@platform/api/acp';
+import { acpClose, acpOpen, acpSetConfigOption, acpSetMode, acpSetModel, type HarnessOpenResult } from '@platform/api/acp';
 
 vi.mock('@platform/api/acp', () => ({
   acpAnswerPermission: vi.fn(async () => undefined),
@@ -140,12 +140,20 @@ describe('harness session state', () => {
     expect(useHarnessSessionRefs.getState().refs['Claude Code']?.sessionId).toBe('older');
   });
 
-  it('starts a fresh session on request and forgets the old one', async () => {
+  it('opens a fresh connection without closing the previous conversation', async () => {
     expect(useHarnessSessionRefs.getState().refs['Claude Code']?.sessionId).toBe('s1');
-    await useHarnessStore.getState().restart(TAB);
+    const previous = current();
+    const closed = vi.mocked(acpClose).mock.calls.length;
+    vi.mocked(acpOpen).mockResolvedValueOnce({ sessionId: 'fresh-live', resumeSessionId: 'fresh-history',
+      harness: 'Claude Code', cwd: '/tmp/project',
+      agent: { protocolVersion: 1, agentInfo: null, agentCapabilities: null, authMethods: [] },
+      modes: null, models: null, configOptions: null });
+    await useHarnessStore.getState().open('second-connection', 'Claude Code', '/tmp/project', true);
 
-    // The reference is dropped before the reopen, so it cannot load the old conversation back.
     expect(acpOpen).toHaveBeenLastCalledWith('Claude Code', '/tmp/project', undefined);
+    expect(acpClose).toHaveBeenCalledTimes(closed);
+    expect(current()).toBe(previous);
+    expect(useHarnessSessionRefs.getState().refs['Claude Code']?.sessionId).toBe('fresh-history');
   });
 
   it('keeps the slash commands the agent advertises', () => {
@@ -182,9 +190,42 @@ describe('harness session state', () => {
 
     const first = useHarnessStore.getState().open(TAB, 'Claude Code', '/tmp/project');
     const second = useHarnessStore.getState().open(TAB, 'Claude Code', '/tmp/project');
+    await vi.waitFor(() => expect(acpOpen).toHaveBeenCalledTimes(1));
     release!();
     await Promise.all([first, second]);
 
     expect(acpOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it('closes a late open without resurrecting its page or replacing the history reference', async () => {
+    let finish: ((result: HarnessOpenResult) => void) | undefined;
+    vi.mocked(acpOpen).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    useHarnessStore.setState({ byTab: {} });
+    const reference = useHarnessSessionRefs.getState().refs['Claude Code'];
+    const opening = useHarnessStore.getState().open(TAB, 'Claude Code', '/tmp/project', true);
+    await vi.waitFor(() => expect(finish).toBeDefined());
+    await useHarnessStore.getState().close(TAB);
+    finish!({ sessionId: 'late-live', resumeSessionId: 'late-history', harness: 'Claude Code', cwd: '/tmp/project',
+      agent: { protocolVersion: 1, agentInfo: null, agentCapabilities: null, authMethods: [] },
+      modes: null, models: null, configOptions: null });
+    await opening;
+    expect(useHarnessStore.getState().byTab[TAB]).toBeUndefined();
+    expect(acpClose).toHaveBeenCalledWith('late-live');
+    expect(useHarnessSessionRefs.getState().refs['Claude Code']).toBe(reference);
+  });
+
+  it('stores the history id separately and retains notifications received before open returns', async () => {
+    vi.mocked(acpOpen).mockImplementationOnce(async () => {
+      useHarnessStore.getState().applyEvent(notification({
+        sessionUpdate: 'available_commands_update', availableCommands: [{ name: 'early', description: 'Ready' }],
+      }) as never);
+      return { sessionId: SESSION, resumeSessionId: 'history-id', harness: 'Claude Code', cwd: '/tmp/project',
+        agent: { protocolVersion: 1, agentInfo: null, agentCapabilities: null, authMethods: [] },
+        modes: null, models: null, configOptions: null };
+    });
+    await useHarnessStore.getState().close(TAB);
+    await useHarnessStore.getState().open(TAB, 'Claude Code', '/tmp/project');
+    expect(current().commands[0]?.name).toBe('early');
+    expect(useHarnessSessionRefs.getState().refs['Claude Code']?.sessionId).toBe('history-id');
   });
 });

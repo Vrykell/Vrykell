@@ -118,6 +118,7 @@ await expect(page.getByTestId('harness-page')).toContainText('Working on it.');
     // A new session drops the conversation and opens a fresh one in the same directory.
     await page.getByTestId('harness-new-session').click();
     await expect.poll(async () => (await acpCalls(page)).filter((call) => call.startsWith('acp_open'))).toHaveLength(2);
-    await expect(page.getByTestId('harness-plan')).toHaveCount(0);
+    await expect(page.locator('[data-testid="harness-page"]:visible').getByTestId('harness-plan')).toHaveCount(0);
+    await expect(page.getByRole('tablist', { name: 'ACP 会话' }).getByRole('tab')).toHaveCount(2);
   });
 });

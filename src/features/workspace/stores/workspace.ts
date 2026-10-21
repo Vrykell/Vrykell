@@ -6,7 +6,8 @@ import { editorFileKey, interceptEditorClose, type EditorFile } from '@core/edit
 import type { SshOptions } from '@core/ssh';
 import { useToastStore } from '@ui/Toast';
 import { t } from '@i18n';
-import { useHarnessStore } from '@features/chat/stores/harness';
+import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
+import { interceptHarnessClose } from '@core/harness';
 import * as sessionManager from '@features/workspace/services/sessionManager';
 import {
   groupsList, groupCreate, groupRename, groupSetCollapsed, groupDelete,
@@ -64,9 +65,7 @@ export type Tab =
   | (TabBase & { kind: 'git-diff'; selection: GitSelection; comparisons?: GitComparison[] })
   | (TabBase & { kind: 'editor'; files: EditorFile[]; selected: EditorFile })
   | (TabBase & { kind: 'usage' })
-  /** An external harness session; one tab per configured harness. The directory is captured when the
-   *  tab is opened (the page is not a terminal, so it has none of its own to ask). */
-  | (TabBase & { kind: 'harness'; harness: string; cwd?: string });
+  | (TabBase & { kind: 'harness' });
 
 export interface TabGroup {
   id: string;
@@ -79,10 +78,6 @@ export interface AddTabOptions {
   title?: string;
   /** Defaults to local; history and usage kinds create workspace pages. */
   kind?: 'local' | 'ssh' | 'history' | 'ai-history' | 'usage' | 'harness';
-  /** Configured harness this page belongs to (kind='harness'). */
-  harness?: string;
-  /** Directory the harness works in (kind='harness'); resolved when the tab is opened. */
-  harnessCwd?: string;
   shellType?: ShellType;
   /** SSH 连接目标（kind='ssh' 时） */
   ssh?: SshTabTarget;
@@ -166,7 +161,8 @@ interface WorkspaceState {
   openAiHistoryTab: () => void;
   openUsageTab: () => void;
   /** Open (or focus) the session page of a configured harness. */
-  openHarnessTab: (name: string, cwd?: string) => void;
+  openHarnessTab: (name?: string, cwd?: string) => void;
+  lastLocalPaneId: string | null;
   /** 新建/复用设置标签页 */
   openSettings: () => void;
   openGitDiff: (selection: GitSelection) => string;
@@ -241,18 +237,14 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   groups: [],
   terminalCwds: {},
   programTitles: {},
+  lastLocalPaneId: null,
   addTab: (opts) => {
     const o = opts ?? {};
-    if (o.kind === 'history' || o.kind === 'ai-history' || o.kind === 'usage') {
+    const current = get().tabs.find(tab => tab.id === get().activeId);
+    const focused = current && isSessionTab(current) ? findLeaf(current.layout, useTerminalStore.getState().focusedPaneId ?? '') ?? firstLeaf(current.layout) : null;
+    if (focused?.kind === 'local') set({ lastLocalPaneId: focused.id });
+    if (o.kind === 'history' || o.kind === 'ai-history' || o.kind === 'usage' || o.kind === 'harness') {
       const existing = get().tabs.find(tab => tab.kind === o.kind);
-      if (existing) {
-        get().activate(existing.id);
-        return existing.id;
-      }
-    }
-    // Harness pages are singletons per harness: connecting twice means going back to the session.
-    if (o.kind === 'harness') {
-      const existing = get().tabs.find(tab => tab.kind === 'harness' && tab.harness === (o.harness ?? ''));
       if (existing) {
         get().activate(existing.id);
         return existing.id;
@@ -286,8 +278,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } else if (o.kind === 'usage') {
       tab = { id, title: USAGE_TITLE, kind: 'usage', titleSource: 'manual' };
     } else if (o.kind === 'harness') {
-      const harness = o.harness ?? '';
-      tab = { id, title: harness || 'Harness', kind: 'harness', harness, cwd: o.harnessCwd, titleSource: 'manual' };
+      tab = { id, title: t('ACP'), kind: 'harness', titleSource: 'manual' };
     } else {
       const preference = useTerminalDefaults.getState().shell;
       const shellType = o.shellType ?? (preference === 'system' ? undefined : preference);
@@ -329,19 +320,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     get().addTab({ kind: 'history' });
   },
   openAiHistoryTab: () => { get().addTab({ kind: 'ai-history' }); },
-  openUsageTab: () => { get().addTab({ kind: 'usage' }); },
+  openUsageTab: () => { useUiStore.getState().setSettingsOpen(false); get().addTab({ kind: 'usage' }); },
   openHarnessTab: (name, cwd) => {
-    // The harness should work where the user was, and the tab it opens is not a terminal: the
-    // directory has to be read from the active session before the switch happens.
+    // Capture the focused local context before switching to the singleton page.
     const state = get();
-    // Connecting from a page (the hub) means the active tab is not a terminal, so the most recent
-    // session tab is the fallback: the harness should still start where the user was working.
     const active = state.tabs.find((tab) => tab.id === state.activeId);
-    const sessionLeaves = state.tabs.flatMap((tab) => (isSessionTab(tab) ? [firstLeaf(tab.layout)] : []));
-    const spec = (active && isSessionTab(active) ? firstLeaf(active.layout) : null)
-      ?? sessionLeaves[sessionLeaves.length - 1] ?? null;
+    const sessionLeaves = state.tabs.flatMap(tab => isSessionTab(tab) ? layoutLeaves(tab.layout) : []).filter(pane => pane.kind === 'local');
+    const focused = active && isSessionTab(active) ? findLeaf(active.layout, useTerminalStore.getState().focusedPaneId ?? '') ?? firstLeaf(active.layout) : null;
+    const spec = focused?.kind === 'local' ? focused : sessionLeaves.find(pane => pane.id === state.lastLocalPaneId);
     const directory = cwd ?? (spec ? state.terminalCwds[spec.id] ?? spec.cwd : undefined);
-    get().addTab({ kind: 'harness', harness: name, harnessCwd: directory });
+    if (name) useHarnessWorkspace.getState().connect(name, directory);
+    useUiStore.getState().setSettingsOpen(false);
+    get().addTab({ kind: 'harness' });
   },
   openEditorFile: file => {
     get().configureEditorTabs();
@@ -462,6 +452,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const idx = tabs.findIndex((t) => t.id === id);
     if (idx === -1) return;
     const closed = tabs[idx]!;
+    if (closed.kind === 'harness' && !force && interceptHarnessClose(useHarnessWorkspace.getState().connections.map(item => item.id), () => get().closeTab(id, true))) {
+      get().activate(id);
+      return;
+    }
     if (closed.kind === 'editor' && !force && interceptEditorClose(closed.files, () => get().closeTab(id, true))) return;
     const next = tabs.filter((t) => t.id !== id);
     const nextActiveId = activeId === id ? next[Math.max(0, idx - 1)]?.id ?? '' : activeId;
@@ -489,9 +483,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
     // Workspace pages have no backend session to archive.
     if (isSessionTab(closed)) sessionManager.close(id);
-    // A harness page owns a session and a process: closing the tab is what ends them, so it must not
-    // depend on the page being unmounted (it is not, while the app keeps tabs alive).
-    if (closed.kind === 'harness') void useHarnessStore.getState().close(id);
+    if (closed.kind === 'harness') useHarnessWorkspace.getState().close(useHarnessWorkspace.getState().connections.map(item => item.id));
     // Historical members still belong to their original group after its last tab closes.
     get().pruneEmptyGroups();
   },
@@ -507,7 +499,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } else if (closed.kind === 'usage') {
       get().addTab({ kind: 'usage' });
     } else if (closed.kind === 'harness') {
-      get().addTab({ kind: 'harness', harness: closed.harness });
+      get().openHarnessTab();
     } else if (closed.kind === 'git-diff') {
       for (const item of closed.comparisons ?? [{ selection: closed.selection }]) get().openGitDiff(item.selection);
       get().openGitDiff(closed.selection);
@@ -528,6 +520,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   activate: (id) => {
     const prev = get().activeId;
+    const previous = get().tabs.find(tab => tab.id === prev);
+    const focused = previous && isSessionTab(previous) ? findLeaf(previous.layout, useTerminalStore.getState().focusedPaneId ?? '') ?? firstLeaf(previous.layout) : null;
+    if (focused?.kind === 'local') set({ lastLocalPaneId: focused.id });
+    useUiStore.getState().setSettingsOpen(false);
     set({ activeId: id });
     // 切 tab：重置手动全屏标志（全屏宿主/块终端全屏只属于当前活跃 tab，
     // 保活后旧 tab 仍挂载，标志残留会让隐藏 tab 的 RunningTerm 误进全屏宿主）
