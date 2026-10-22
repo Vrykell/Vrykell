@@ -39,10 +39,12 @@ export interface ThemePalette {
   groupOrange: string;
   groupCoral: string;
 
-  /** Shared resting surface for the titlebar, content and auxiliary panels. */
+  /** Window titlebar surface. */
   chromeBg: string;
   /** Primary navigation keeps its own material tint and opaque fallback. */
   sidebarBg: string;
+  /** Auxiliary panels retain their own opaque resting surface. */
+  auxiliaryBg: string;
   chromeField: string;
   selectionBg: string;
   // 背景层（从深到浅）
@@ -50,6 +52,8 @@ export interface ThemePalette {
   surface: string;
   /** Editable fields sit above panel and floating surfaces. */
   fieldBg: string;
+  /** Terminal and conversation inputs share this raised surface. */
+  composerBg: string;
   block: string;
   elevated: string;
   hover: string;
@@ -173,13 +177,13 @@ export interface ThemePalette {
 
 // Structural colors have one source; component roles reuse these surface levels.
 const DARK_SURFACES = {
-  content: '#1C1C1C', canvas: '#1C1C1C', sidebar: '#28282B', card: '#282828',
+  content: '#141414', canvas: '#202020', sidebar: '#28282B', card: '#282828',
   field: '#2C2C2C', elevated: '#303030', control: '#333333', hover: '#343638',
   border: '#38393B', borderStrong: '#4B4E52',
 } as const;
 
 const LIGHT_SURFACES = {
-  content: '#F0F2F3', canvas: '#F0F2F3', sidebar: '#E9F0FA', card: '#F5F5F5',
+  content: '#F7F8F9', canvas: '#F7F8F9', sidebar: '#E9F0FA', card: '#F5F5F5',
   field: '#FFFFFF', elevated: '#FAFAFA', control: '#FFFFFF', hover: '#F2F2F2',
   border: '#DFE3E5', borderStrong: '#B9C2C8',
 } as const;
@@ -221,14 +225,16 @@ const dark: ThemePalette = {
   groupOrange: DARK_ACCENTS.orange,
   groupCoral: DARK_ACCENTS.coral,
 
-  // Resting application regions share one base; cards and fields retain their hierarchy.
-  chromeBg: DARK_SURFACES.content,
+  // Navigation keeps its tint while content and auxiliary panels retain separate levels.
+  chromeBg: '#28282B',
   sidebarBg: DARK_SURFACES.sidebar,
+  auxiliaryBg: '#1C1C1C',
   chromeField: DARK_SURFACES.control,
   selectionBg: '#183C57',
   canvas: DARK_SURFACES.canvas,
   surface: DARK_SURFACES.card,
   fieldBg: DARK_SURFACES.field,
+  composerBg: '#363636',
   block: DARK_SURFACES.card,
   elevated: DARK_SURFACES.elevated,
   hover: 'rgba(255,255,255,0.07)',
@@ -396,13 +402,15 @@ const light: ThemePalette = {
   groupOrange: LIGHT_ACCENTS.orange,
   groupCoral: LIGHT_ACCENTS.coral,
 
-  chromeBg: LIGHT_SURFACES.content,
+  chromeBg: '#E9F0FA',
   sidebarBg: LIGHT_SURFACES.sidebar,
+  auxiliaryBg: '#F0F2F3',
   chromeField: LIGHT_SURFACES.control,
   selectionBg: '#DFEAF9',
   canvas: LIGHT_SURFACES.canvas,
   surface: LIGHT_SURFACES.card,
   fieldBg: LIGHT_SURFACES.field,
+  composerBg: LIGHT_SURFACES.field,
   block: LIGHT_SURFACES.card,
   elevated: LIGHT_SURFACES.elevated,
   hover: 'rgba(0,0,0,0.05)',
@@ -564,11 +572,13 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--group-coral': p.groupCoral,
     '--chrome-bg': p.chromeBg,
     '--sidebar-bg': p.sidebarBg,
+    '--auxiliary-bg': p.auxiliaryBg,
     '--chrome-field': p.chromeField,
     '--selection-bg': p.selectionBg,
     '--canvas': p.canvas,
     '--surface': p.surface,
     '--field-bg': p.fieldBg,
+    '--composer-bg': p.composerBg,
     '--block': p.block,
     '--elevated': p.elevated,
     '--hover': p.hover,

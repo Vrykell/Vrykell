@@ -1,0 +1,21 @@
+
+> vrykell@0.1.0 test:e2e
+> playwright test e2e/ai-toolbar-settings.spec.ts e2e/workspace-interface-polish.spec.ts
+
+[WebServer] (node:38800) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 6 tests using 1 worker
+
+(node:77072) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:77072) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 ai-toolbar-settings.spec.ts:4:40 › conversation toolbar and floating settings retain scope and content in dark (6.9s)
+  ok 2 ai-toolbar-settings.spec.ts:4:40 › conversation toolbar and floating settings retain scope and content in light (1.9s)
+  ok 3 workspace-interface-polish.spec.ts:5:35 › workspace colors and model controls remain consistent in 深色 (3.3s)
+  ok 4 workspace-interface-polish.spec.ts:5:35 › workspace colors and model controls remain consistent in 浅色 (3.3s)
+  ok 5 workspace-interface-polish.spec.ts:57:3 › macos settings and materials › omits unsupported system integration and retains a usable material treatment (1.4s)
+  ok 6 workspace-interface-polish.spec.ts:57:3 › linux settings and materials › omits unsupported system integration and retains a usable material treatment (1.4s)
+
+  6 passed (21.8s)

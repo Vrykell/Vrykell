@@ -51,7 +51,7 @@ test('settings cover the content card and toggle back to the unchanged workspace
     const style = getComputedStyle(element);
     return ['--canvas', '--sidebar-bg', '--xterm-bg', '--surface', '--field-bg', '--primary-action'].map(name => style.getPropertyValue(name).trim().toUpperCase());
   });
-  expect(sampledColors).toEqual(['#1C1C1C', '#28282B', '#1C1C1C', '#282828', '#2C2C2C', '#183C57']);
+  expect(sampledColors).toEqual(['#202020', '#28282B', '#141414', '#282828', '#2C2C2C', '#183C57']);
   const chrome = await page.locator('.application-chrome').evaluate(element => {
     const style = getComputedStyle(element);
     return {
@@ -61,7 +61,7 @@ test('settings cover the content card and toggle back to the unchanged workspace
   });
   expect(chrome).toEqual({ color: 'rgba(0, 0, 0, 0)', background: 'none' });
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(page.locator('.workspace-titlebar')).toHaveCSS('background-color', 'rgb(28, 28, 28)');
+  await expect(page.locator('.workspace-titlebar')).toHaveCSS('background-color', 'rgb(40, 40, 43)');
   await page.screenshot({ path: info.outputPath('sampled-palette-workspace.png') });
   await page.getByTestId('workspace-sidebar-expand').click();
   expect((await rail.boundingBox())!.width).toBe(railBefore!.width);

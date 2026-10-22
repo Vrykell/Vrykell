@@ -41,7 +41,7 @@ describe('toRgba', () => {
 describe('default blue palette', () => {
   it('uses the sampled neutral surfaces and blue action from the appearance reference', () => {
     expect(themes.dark).toMatchObject({
-      canvas: '#1C1C1C', sidebarBg: '#28282B', xtermBg: '#1C1C1C', surface: '#282828',
+      canvas: '#202020', sidebarBg: '#28282B', chromeBg: '#28282B', auxiliaryBg: '#1C1C1C', xtermBg: '#141414', surface: '#282828', composerBg: '#363636',
       fieldBg: '#2C2C2C', selectionBg: '#183C57', accent: '#50C0FF', primaryAction: '#183C57',
     });
   });
@@ -141,7 +141,7 @@ describe('default blue palette', () => {
 
   it.each(['dark', 'light'] as const)('%s separates navigation and content surfaces', mode => {
     const palette = themes[mode];
-    expect(palette.chromeBg).not.toBe(palette.sidebarBg);
+    expect(palette.chromeBg).not.toBe(palette.auxiliaryBg);
     expect(palette.sidebarBg).not.toBe(palette.canvas);
     expect(palette.canvas).not.toBe(palette.surface);
     expect(palette.fieldBg).not.toBe(palette.surface);
@@ -159,11 +159,12 @@ describe('default blue palette', () => {
     expect(themes.dark.warning).toBe('#D5AD54');
   });
 
-  it.each(['dark', 'light'] as const)('%s unifies resting application surfaces while retaining navigation and field hierarchy', mode => {
-    expect(themes[mode].xtermBg).toBe(themes[mode].canvas);
-    expect(themes[mode].chromeBg).toBe(themes[mode].canvas);
+  it.each(['dark', 'light'] as const)('%s retains navigation tint and distinct content, auxiliary and composer surfaces', mode => {
+    expect(themes[mode].chromeBg).toBe(themes[mode].sidebarBg);
+    expect(themes[mode].auxiliaryBg).not.toBe(themes[mode].canvas);
     expect(themes[mode].sidebarBg).not.toBe(themes[mode].canvas);
     expect(themes[mode].fieldBg).not.toBe(themes[mode].canvas);
+    expect(paletteToCssVars(themes[mode])['--composer-bg']).toBe(mode === 'dark' ? '#363636' : '#FFFFFF');
   });
   it('retains the complete terminal color palette', () => {
     expect(themes.dark.xtermForeground).toBe('#E9EBED');
@@ -214,7 +215,8 @@ describe('paletteToCssVars', () => {
       const channels = [1, 3, 5].map(offset => parseInt(vars[key].slice(offset, offset + 2), 16));
       expect(channels[2]).toBeGreaterThanOrEqual(channels[0]!);
     }
-    expect(vars['--sidebar-bg']).not.toBe(vars['--chrome-bg']);
+    expect(vars['--sidebar-bg']).toBe(vars['--chrome-bg']);
+    expect(vars['--auxiliary-bg']).not.toBe(vars['--chrome-bg']);
     expect(vars['--sidebar-bg']).not.toBe(vars['--canvas']);
   });
   it.each(['dark', 'light'] as const)('%s separates window chrome, content, fields and selection', (mode) => {

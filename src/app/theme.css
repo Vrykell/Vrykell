@@ -25,10 +25,10 @@
   --approval-border: #8B6E30;
   --approval-bg: #2E2A22;
   --approval-status: #D5AD54;
-  --preview-light-canvas: #F0F2F3;
+  --preview-light-canvas: #FFFFFF;
   --preview-light-sidebar: #E9F0FA;
   --preview-light-line: #CDD2DB;
-  --preview-dark-canvas: #1C1C1C;
+  --preview-dark-canvas: #202020;
   --preview-dark-sidebar: #28282B;
   --preview-dark-line: #4B4E52;
   --chrome-translucent-bg: color-mix(in srgb, var(--sidebar-bg) 60%, transparent);
@@ -63,7 +63,6 @@
   --tab-radius: 4px;
   /* Group header hover actions: three 28px buttons plus their 2px gaps. */
   --group-actions-width: 88px;
-  --composer-bg: var(--field-bg);
   --placement-bg: color-mix(in srgb, var(--surface) 92%, transparent);
   --placement-hover: color-mix(in srgb, var(--surface) 96%, transparent);
   --control-size: 32px;
@@ -284,7 +283,7 @@ button.chat-mode-option[data-active="true"] { background: var(--hover); }
 .workspace-body[data-settings-open] > :is(.workspace-primary, .workspace-side-panel, .workspace-ssh-status-slot) { visibility: hidden; }
 .settings-view { container: settings-layout / inline-size; min-width: 0; min-height: 0; position: relative; }
 .settings-layout { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
-.settings-navigation { width: clamp(180px, 20vw, 224px); flex-shrink: 0; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding-top: 16px; background: var(--chrome-bg); }
+.settings-navigation { width: clamp(180px, 20vw, 224px); flex-shrink: 0; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding-top: 16px; background: var(--auxiliary-bg); }
 .settings-navigation-title { flex-shrink: 0; padding: 0 20px 12px; color: var(--text-primary); font-size: var(--fs-subtitle); font-weight: var(--fw-semibold); }
 .settings-navigation-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 6px 8px; }
 .settings-content { container: settings / inline-size; flex: 1; min-width: 0; min-height: 0; overflow: auto; padding: 28px 40px; background: var(--xterm-bg); }

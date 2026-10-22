@@ -19,10 +19,13 @@ for (const theme of ['深色', '浅色']) test(`workspace colors and model contr
   await page.locator('[data-dock-btn="chat"]').click();
   const panel = page.locator('.workspace-side-panel[data-visible="true"]');
   await expect(panel.locator('.workspace-panel-heading > span')).toHaveText('AI 助手');
-  expect(await panel.locator(':scope > div').first().evaluate(element => getComputedStyle(element).backgroundColor))
-    .toBe(await page.locator('.workspace-titlebar').evaluate(element => getComputedStyle(element).backgroundColor));
-  expect(await page.locator('.workspace-main').evaluate(element => getComputedStyle(element).backgroundColor))
-    .toBe(await page.locator('.workspace-titlebar').evaluate(element => getComputedStyle(element).backgroundColor));
+  const dark = theme === '深色';
+  await expect(panel.locator(':scope > div').first()).toHaveCSS('background-color', dark ? 'rgb(28, 28, 28)' : 'rgb(240, 242, 243)');
+  await expect(page.locator('.workspace-titlebar')).toHaveCSS('background-color', dark ? 'rgb(40, 40, 43)' : 'rgb(233, 240, 250)');
+  await expect(page.locator('.workspace-main')).toHaveCSS('background-color', dark ? 'rgb(32, 32, 32)' : 'rgb(247, 248, 249)');
+  for (const composer of [page.locator('main .terminal-composer').first(), panel.locator('.chat-composer')]) {
+    await expect(composer).toHaveCSS('background-color', dark ? 'rgb(54, 54, 54)' : 'rgb(255, 255, 255)');
+  }
   await page.screenshot({ path: info.outputPath(`workspace-colors-${theme}.png`), animations: 'disabled' });
   await page.getByTestId('workspace-sidebar-toggle').click();
   for (const width of [1240, 760]) {

@@ -1,0 +1,13 @@
+
+> vrykell@0.1.0 test
+> vitest run
+
+
+ RUN  v4.1.11 D:/projects/typescript/Vrykell
+
+
+ Test Files  333 passed | 1 skipped (334)
+      Tests  2045 passed | 1 skipped (2046)
+   Start at  08:14:11
+   Duration  83.29s (transform 35.25s, setup 118.58s, import 185.81s, tests 116.06s, environment 935.41s)
+
