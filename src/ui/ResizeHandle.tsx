@@ -11,6 +11,9 @@ interface ResizeHandleProps {
   onUp?: () => void;
   testId?: string;
   label?: string;
+  valueNow?: number;
+  valueMin?: number;
+  valueMax?: number;
   onReset?: () => void;
   lineThickness?: number;
 }
@@ -34,7 +37,7 @@ const LINE_THICKNESS = 1;
  * document-level listeners must keep working until the button is released so the user
  * can drag back out of the collapse.
  */
-export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, testId, label, onReset, lineThickness = LINE_THICKNESS }: ResizeHandleProps) {
+export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, testId, label, valueNow, valueMin, valueMax, onReset, lineThickness = LINE_THICKNESS }: ResizeHandleProps) {
   const startRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
   const lineRef = useRef<HTMLDivElement>(null);
@@ -56,6 +59,9 @@ export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, test
       data-testid={testId}
       role={label ? 'separator' : undefined}
       aria-label={label}
+      aria-valuenow={valueNow}
+      aria-valuemin={valueMin}
+      aria-valuemax={valueMax}
       aria-orientation={label ? isX ? 'vertical' : 'horizontal' : undefined}
       tabIndex={label ? 0 : undefined}
       data-tip={label}

@@ -1,0 +1,5 @@
+# Sidebar width regression, 2026-10-22
+
+The full-height navigation uses the shared resize handle with a 208 px default, 400 px cap and complete fold below 160 px. Pointer movement remains active while folded, so reversing before release restores the sidebar. A completed fold retains the previous expanded width. Preferences persist across launches; viewport clamping preserves the active terminal layout's minimum width without replacing the remembered size. Keyboard arrows resize; Home and double-click reset.
+
+Typechecking and architecture checks passed, retaining the existing two-command advisory. Focused unit tests passed 54 cases; the full unit suite passed 2056 with one skipped. All 15 browser scenarios passed, covering pointer reversal, persistence, narrow-window manual expansion, terminal drafts, global search centering, settings geometry, AI movement and terminal resize stability with both renderers. Reviewed expanded and narrow screenshots and raw logs are in [the evidence folder](../audit-evidence/2026-10-22/sidebar-width/). Auxiliary-panel left docking follows separately.

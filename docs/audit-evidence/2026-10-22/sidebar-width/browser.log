@@ -1,0 +1,41 @@
+
+> vrykell@0.1.0 test:e2e
+> playwright test e2e/workspace-sidebar-resize.spec.ts e2e/workspace-navigation.spec.ts e2e/settings-window.spec.ts e2e/resize-stability.spec.ts
+
+[WebServer] (node:43560) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 15 tests using 1 worker
+
+(node:55884) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:55884) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 resize-stability.spec.ts:5:3 › classic dom keeps its text origin stable through continuous resizing (23.3s)
+  ok 2 resize-stability.spec.ts:5:3 › classic webgl keeps its text origin stable through continuous resizing (5.2s)
+  ok 3 resize-stability.spec.ts:35:1 › a held divider drag keeps the local grid live and notifies the remote once, on release (4.3s)
+  ok 4 resize-stability.spec.ts:63:1 › short commands complete without mounting a temporary live output canvas (3.4s)
+  ok 5 settings-window.spec.ts:5:1 › settings cover the content card and toggle back to the unchanged workspace (5.9s)
+  ok 6 settings-window.spec.ts:78:1 › language and appearance choices apply immediately and persist (7.7s)
+  ok 7 settings-window.spec.ts:115:1 › wallpaper mode darkens the sidebar backdrop while preserving the UI layout (3.6s)
+  ok 8 workspace-navigation.spec.ts:10:1 › uses a full-height sidebar and keeps terminals alive across empty workspaces (4.3s)
+  ok 9 workspace-navigation.spec.ts:47:1 › moves the same native conversation and composer between main and side (3.8s)
+  ok 10 workspace-navigation.spec.ts:67:1 › keeps native and connected sessions in one AI strip without closing either on navigation (4.6s)
+  ok 11 workspace-navigation.spec.ts:93:1 › collapses colored terminal groups while preserving the active session and actions (3.4s)
+  ok 12 workspace-navigation.spec.ts:116:1 › routes every auxiliary panel to the right and keeps the workspace full height (4.4s)
+[WebServer] 08:28:31 [vite] (client) Failed to load source map for D:/projects/typescript/Vrykell/node_modules/monaco-editor/esm/vs/base/common/marked/marked.js.
+[WebServer] Error: An error occurred while trying to read the map file at marked.umd.js.map
+[WebServer] Error: ENOENT: no such file or directory, open 'D:\projects\typescript\Vrykell\node_modules\monaco-editor\esm\vs\base\common\marked\marked.umd.js.map'
+[WebServer]     at async open (node:internal/fs/promises:637:25)
+[WebServer]     at async Object.readFile (node:internal/fs/promises:1269:14)
+[WebServer]     at async extractSourcemapFromFile (file:///D:/projects/typescript/Vrykell/node_modules/vite/dist/node/chunks/config.js:8066:65)
+[WebServer]     at async loadAndTransform (file:///D:/projects/typescript/Vrykell/node_modules/vite/dist/node/chunks/config.js:22717:22)
+  ok 13 workspace-navigation.spec.ts:132:1 › new, close and numeric shortcuts follow the workspace and the focused side conversation (4.3s)
+  ok 14 workspace-sidebar-resize.spec.ts:11:1 › sidebar width is bounded, reversible while held, persisted and fully collapsed on release (3.8s)
+  ok 15 workspace-sidebar-resize.spec.ts:46:1 › narrow windows retain manual expansion without consuming the terminal minimum (1.7s)
+
+  Slow test file: resize-stability.spec.ts (36.3s)
+  Slow test file: workspace-navigation.spec.ts (24.8s)
+  Slow test file: settings-window.spec.ts (17.2s)
+  Consider splitting slow test files to speed up parallel execution
+  15 passed (1.5m)

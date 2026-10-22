@@ -85,7 +85,8 @@ function currentTerminalMinWidth(): number {
 export function workspaceFrameWidth(_state: Pick<DockState, 'leftPanels'>): number { return WORKSPACE_GAP; }
 
 function availablePanelWidth(state: DockState): number {
-  return window.innerWidth - workspaceSidebarWidth() - workspaceFrameWidth(state) - Math.max(360, currentTerminalMinWidth());
+  const mainWidth = Math.max(360, currentTerminalMinWidth());
+  return window.innerWidth - workspaceSidebarWidth(window.innerWidth, mainWidth) - workspaceFrameWidth(state) - mainWidth;
 }
 
 function visiblePanels(state: DockState, ids: string[]): string[] {

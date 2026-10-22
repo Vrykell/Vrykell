@@ -32,6 +32,8 @@ export default function WorkspaceShell() {
   const settingsOpen = useUiStore(state => state.settingsOpen);
   const area = useWorkspaceNavigation(state => state.area);
   const collapsed = useWorkspaceNavigation(state => state.collapsed);
+  const sidebarPreference = useWorkspaceNavigation(state => state.sidebarWidth);
+  const sidebarDragWidth = useWorkspaceNavigation(state => state.sidebarDragWidth);
   const aiPlacement = useWorkspaceNavigation(state => state.aiPlacement);
   const activeTab = useSessionStore(state => state.tabs.find(tab => tab.id === state.activeId));
   const contentVisible = !!activeTab && area === workspaceAreaForKind(activeTab.kind);
@@ -46,11 +48,16 @@ export default function WorkspaceShell() {
   });
 
   useEffect(() => {
-    const reconcile = () => { setSidebarWidth(workspaceSidebarWidth()); useDockStore.getState().reconcilePanelSpace(); };
+    const reconcile = () => {
+      const width = workspaceSidebarWidth(window.innerWidth, Math.max(360, area === 'terminal' ? terminalMinWidth : MIN_PANE_SIZE));
+      setSidebarWidth(width);
+      if (!width && !useWorkspaceNavigation.getState().collapsed) useWorkspaceNavigation.getState().setCollapsed(true);
+      useDockStore.getState().reconcilePanelSpace();
+    };
     reconcile();
     window.addEventListener('resize', reconcile);
     return () => window.removeEventListener('resize', reconcile);
-  }, [terminalMinWidth, sshStatusOwner, collapsed, area]);
+  }, [terminalMinWidth, sshStatusOwner, collapsed, area, sidebarPreference, sidebarDragWidth]);
   useEffect(() => {
     if (aiPlacement === 'main' && chatOpen) useDockStore.getState().togglePanel('right', 'chat');
   }, [aiPlacement, chatOpen]);
@@ -59,7 +66,7 @@ export default function WorkspaceShell() {
     <div className="workspace-layout" data-area={area} data-settings-open={settingsOpen || undefined} style={{ '--workspace-sidebar-width': `${sidebarWidth}px` } as CSSProperties}>
       <WorkspaceHeaderProvider>
       <AiWorkspaceProvider placement={aiPlacement} mainActive={contentVisible && area === 'ai' && activeTab?.kind === 'harness' && !settingsOpen} headerActive={area === 'ai' && !settingsOpen} sideActive={chatOpen && !sshStatusOwner && !settingsOpen}>
-      <WorkspaceSidebar />
+      <WorkspaceSidebar maxWidth={Math.min(400, window.innerWidth - Math.max(360, area === 'terminal' ? terminalMinWidth : MIN_PANE_SIZE))} />
       <TopDock />
       <SshAuthenticationDialog />
       <PanelTabs active={area === 'terminal' && !settingsOpen} />

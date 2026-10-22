@@ -1822,6 +1822,7 @@ const zh: Record<string, string> = {
   'AI workspace': 'AI 工作区',
   'SSH hosts': 'SSH 主机',
   'Expand sidebar': '展开侧栏',
+  'Resize workspace sidebar': '调整工作区侧栏宽度',
   'Collapse sidebar': '收起侧栏',
   'Terminal sessions': '终端会话',
   'Collapse or expand group · Double-click to rename · Drag to reorder': '点击折叠或展开分组 · 双击重命名 · 拖动排序',

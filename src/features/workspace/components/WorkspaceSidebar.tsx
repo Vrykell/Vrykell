@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { t } from '@i18n';
 import SidebarItem from '@ui/sidebarItem';
 import { IconButton } from '@ui/IconButton';
+import ResizeHandle from '@ui/ResizeHandle';
 import { TerminalPrompt, FileCode, Sparkles, Server, Settings, PanelLeft, History, iconSizes } from '@ui/icons';
 import { useSessionStore, useUiStore } from '@features/workspace';
 import { useWorkspaceNavigation, WORKSPACE_COMPACT_BREAKPOINT } from '../stores/navigation';
@@ -10,9 +11,10 @@ import NavigationDragPreview from './NavigationDragPreview';
 import { isMacOS } from '@platform/runtime';
 
 /** Functional navigation disappears completely when collapsed. */
-export default function WorkspaceSidebar() {
+export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number }) {
   const area = useWorkspaceNavigation(state => state.area);
   const collapsed = useWorkspaceNavigation(state => state.collapsed);
+  const sidebarWidth = useWorkspaceNavigation(state => state.sidebarDragWidth ?? state.sidebarWidth);
   const settingsOpen = useUiStore(state => state.settingsOpen);
   useEffect(() => {
     let narrow = window.innerWidth <= WORKSPACE_COMPACT_BREAKPOINT;
@@ -29,7 +31,7 @@ export default function WorkspaceSidebar() {
     { id: 'ai' as const, label: t('AI workspace'), Icon: Sparkles },
     { id: 'ssh' as const, label: t('SSH hosts'), Icon: Server },
   ];
-  return <aside className="workspace-sidebar" data-collapsed={collapsed} data-testid="workspace-sidebar" inert={collapsed} aria-hidden={collapsed || undefined}>
+  return <><aside className="workspace-sidebar" data-collapsed={collapsed} data-testid="workspace-sidebar" inert={collapsed} aria-hidden={collapsed || undefined}>
     <div className="workspace-sidebar-heading" data-tauri-drag-region>
       <span data-tauri-drag-region>{t('Workspaces')}</span>
       <div className="workspace-sidebar-header-actions">
@@ -49,5 +51,13 @@ export default function WorkspaceSidebar() {
         onClick={() => useUiStore.getState().setSettingsOpen(!settingsOpen)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); useUiStore.getState().setSettingsOpen(!settingsOpen); } }} />
     </div>
     <NavigationDragPreview />
-  </aside>;
+  </aside>
+    <div className="workspace-sidebar-resize" hidden={collapsed}>
+      <ResizeHandle axis="x" edge="right" label={t('Resize workspace sidebar')} testId="workspace-sidebar-resize"
+        valueNow={Math.min(sidebarWidth, maxWidth)} valueMin={160} valueMax={maxWidth}
+        onDelta={delta => useWorkspaceNavigation.getState().resizeSidebar(delta, maxWidth)}
+        onUp={() => useWorkspaceNavigation.getState().commitSidebarWidth()}
+        onReset={() => useWorkspaceNavigation.getState().resetSidebarWidth()} />
+    </div>
+  </>;
 }

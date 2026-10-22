@@ -32,3 +32,21 @@ it('collapses on entering a narrow window and preserves a manual expansion withi
   act(() => window.dispatchEvent(new Event('resize')));
   expect(useWorkspaceNavigation.getState().collapsed).toBe(false);
 });
+
+it('resizes through the shared separator, keeps a held collapsed drag reversible and supports keyboard reset', () => {
+  useWorkspaceNavigation.setState({ collapsed: false, sidebarWidth: 208, sidebarDragWidth: null });
+  render(<WorkspaceSidebar />);
+  const handle = screen.getByRole('separator', { name: '调整工作区侧栏宽度' });
+  expect(handle).toHaveAttribute('aria-valuenow', '208');
+  fireEvent.mouseDown(handle, { clientX: 208 });
+  fireEvent.mouseMove(document, { clientX: 150 });
+  expect(screen.getByTestId('workspace-sidebar')).toHaveAttribute('inert');
+  fireEvent.mouseMove(document, { clientX: 300 });
+  expect(screen.getByTestId('workspace-sidebar')).not.toHaveAttribute('inert');
+  fireEvent.mouseUp(document);
+  expect(useWorkspaceNavigation.getState().sidebarWidth).toBe(300);
+  fireEvent.keyDown(handle, { key: 'ArrowLeft' });
+  expect(useWorkspaceNavigation.getState().sidebarWidth).toBe(284);
+  fireEvent.keyDown(handle, { key: 'Home' });
+  expect(useWorkspaceNavigation.getState().sidebarWidth).toBe(208);
+});
