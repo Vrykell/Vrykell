@@ -43,16 +43,25 @@ it('dismisses the status sidebar when selecting the assistant', () => {
 });
 it('reserves an insertion slot without saving until a drag completes', () => {
   render(<><DockNavigation side="right" /><NavigationDragPreview /></>);
-  const saved = localStorage.getItem('dock-layout-v5');
+  const saved = localStorage.getItem('dock-layout-v6');
   act(() => { useNavigationDrag.getState().start('files', { x: 500, y: 24 }); useNavigationDrag.getState().hover('right', 2); });
   const placeholder = document.querySelector('[data-dock-placeholder="2"]')!;
   expect(placeholder.nextElementSibling).toHaveAttribute('data-dock-slot', 'chat');
   expect(document.querySelector('.workspace-navigation-drag-preview')).toHaveStyle({ left: '500px', top: '24px' });
-  expect(localStorage.getItem('dock-layout-v5')).toBe(saved);
+  expect(localStorage.getItem('dock-layout-v6')).toBe(saved);
   act(() => useNavigationDrag.getState().end());
   expect(document.querySelector('[data-dock-placeholder]')).toBeNull();
 });
 it('does not render an auxiliary navigation on the left', () => {
   const { container } = render(<DockNavigation side="left" />);
   expect(container).toBeEmptyDOMElement();
+});
+
+it('opens the remembered left panel without dismissing right-side host status', () => {
+  useDockStore.setState({ leftZone: ['files'], rightZone: ['chat'] });
+  render(<DockNavigation side="left" />);
+  act(() => useAuxiliarySidebarStore.getState().showSshStatus('ssh-pane'));
+  fireEvent.click(screen.getByRole('button', { name: '资源' }));
+  expect(useDockStore.getState().leftPanels).toEqual(['files']);
+  expect(useAuxiliarySidebarStore.getState().sshStatusOwner).toBe('ssh-pane');
 });

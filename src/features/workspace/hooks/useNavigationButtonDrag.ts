@@ -1,25 +1,25 @@
 import { useEffect, useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import { useDockStore, PANEL_DEFS } from '../stores/dock';
 import { useNavigationDrag, type NavigationDropTarget } from '../stores/navigationDrag';
-import { panelPlacementRects } from '../model/navigationPlacement';
+import { panelPlacementRegions } from '../services/panelPlacementRegions';
 
 function locateTarget(x: number, y: number, id: string): NavigationDropTarget | null {
   const hit = document.elementFromPoint(x, y);
   const area = hit?.closest<HTMLElement>('[data-dock-zone]');
   const side = area?.dataset.dockZone;
-  if (!area || side !== 'right') {
+  if (!area || (side !== 'right' && side !== 'left')) {
     if (!PANEL_DEFS[id]) return null;
-    const body = document.querySelector<HTMLElement>('.workspace-body')?.getBoundingClientRect();
-    if (!body || y < body.top || y > body.bottom || x < body.left || x > body.right) return null;
     const dock = useDockStore.getState();
-    const regions = panelPlacementRects(body, dock.panelWidths[id] ?? PANEL_DEFS[id]!.width);
-    const destination = x >= regions.right.left ? 'right' : null;
+    const regions = panelPlacementRegions(id);
+    if (!regions) return null;
+    const contains = (rect: typeof regions.right | null) => !!rect && x >= rect.left && x <= rect.left + rect.width && y >= rect.top && y <= rect.top + rect.height;
+    const destination = contains(regions.left) ? 'left' : contains(regions.right) ? 'right' : null;
     if (!destination) return null;
-    const zone = dock.rightZone;
+    const zone = destination === 'left' ? dock.leftZone : dock.rightZone;
     return { side: destination, index: zone.includes(id) ? zone.indexOf(id) : zone.length, openPanel: true };
   }
   const dock = useDockStore.getState();
-  const zone = dock.rightZone;
+  const zone = side === 'left' ? dock.leftZone : dock.rightZone;
   const placeholder = hit?.closest<HTMLElement>('[data-dock-placeholder]');
   if (placeholder && area.contains(placeholder)) return { side, index: Number(placeholder.dataset.dockPlaceholder) };
   const slot = hit?.closest<HTMLElement>('[data-dock-slot]');

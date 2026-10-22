@@ -1,5 +1,7 @@
 .workspace-layout { position: relative; display: grid; grid-template-columns: var(--workspace-sidebar-width) minmax(0, 1fr); grid-template-rows: 42px minmax(0, 1fr); flex: 1; min-width: 0; min-height: 0; }
 .workspace-sidebar-resize { position: absolute; top: 0; bottom: 0; left: var(--workspace-sidebar-width); width: 0; z-index: 60; }
+.workspace-layout[data-sidebar-overlay] .workspace-sidebar { position: absolute; inset: 0 auto 0 0; width: var(--workspace-sidebar-overlay-width); z-index: 55; box-shadow: var(--shadow-lg); }
+.workspace-layout[data-sidebar-overlay] .workspace-sidebar-resize { left: var(--workspace-sidebar-overlay-width); }
 .workspace-layout > .workspace-titlebar { grid-column: 2; grid-row: 1; min-width: 0; }
 .workspace-instance-bar { min-width: 0; display: flex; height: 34px; flex-shrink: 0; overflow: hidden; background: var(--surface); }
 .workspace-primary { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
@@ -25,7 +27,10 @@ button.workspace-sidebar-toggle.icon-button:focus-visible { outline: 1px solid v
 .workspace-area-navigation .sidebar-row[data-active="true"] .sidebar-row-icon, .workspace-sidebar-footer .sidebar-row[data-active="true"] .sidebar-row-icon { color: var(--group-blue); }
 .workspace-side-panel[data-side="right"], .workspace-ssh-status-slot { --sidebar-bg: var(--auxiliary-bg); }
 .workspace-sidebar .sidebar-row:focus-visible > .sidebar-row-content { background: var(--hover); }
-.workspace-sidebar-tools { margin-top: auto; min-height: 0; padding-top: 20px; }
+.workspace-sidebar-tools { flex: 1; display: flex; flex-direction: column; min-height: 0; margin-top: 12px; }
+.workspace-sidebar-tools > .workspace-right-navigation { padding: 0 8px 8px; flex-shrink: 0; }
+.workspace-panel-host, .workspace-panel-slot[data-panel-slot="right"] { display: contents; }
+.workspace-panel-slot[data-panel-slot="left"] { display: flex; flex: 1; min-height: 0; min-width: 0; }
 .workspace-sidebar-footer { padding: 8px 6px 12px; border-top: 1px solid var(--border); }
 .application-window[data-platform="macos"] .workspace-sidebar-heading { padding-top: 32px; height: 76px; }
 .application-window:has(.workspace-titlebar[data-fullscreen="true"]) .workspace-sidebar-heading { padding-top: 0; height: 42px; }

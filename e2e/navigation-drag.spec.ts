@@ -63,14 +63,14 @@ test('narrow windows keep all fixed and auxiliary controls inside the applicatio
 });
 
 test('Escape cancels the preview without toggling or saving a panel', async ({ page }) => {
-  const saved = await page.evaluate(() => localStorage.getItem('dock-layout-v5'));
+  const saved = await page.evaluate(() => localStorage.getItem('dock-layout-v6'));
   const source = (await button(page, 'files').boundingBox())!, target = (await button(page, 'chat').boundingBox())!;
   await page.mouse.move(source.x + 16, source.y + 16); await page.mouse.down();
   await page.mouse.move(target.x + 12, target.y + 16, { steps: 8 });
   await expect(zone(page)).toHaveAttribute('data-drop-active', 'true');
   await page.keyboard.press('Escape'); await page.mouse.up();
   expect(await order(page)).toEqual(['files', 'git', 'command-history', 'chat']);
-  expect(await page.evaluate(() => localStorage.getItem('dock-layout-v5'))).toBe(saved);
+  expect(await page.evaluate(() => localStorage.getItem('dock-layout-v6'))).toBe(saved);
   await expect(panel(page)).toHaveCount(0);
   await button(page, 'files').click(); await expect(panel(page).getByText('notes.txt')).toBeVisible();
 });
@@ -104,7 +104,7 @@ test('settings is fixed at the foot of the full-height sidebar and remains keybo
 
 test('a toolbar drag reserves a stable shared insertion gap before saving', async ({ page }) => {
   const source = (await button(page, 'chat').boundingBox())!, target = (await button(page, 'files').boundingBox())!;
-  const saved = await page.evaluate(() => localStorage.getItem('dock-layout-v5'));
+  const saved = await page.evaluate(() => localStorage.getItem('dock-layout-v6'));
   await page.mouse.move(source.x + 16, source.y + 16); await page.mouse.down();
   await page.mouse.move(target.x + 4, target.y + 16, { steps: 8 });
   const gap = zone(page).locator('[data-dock-placeholder="0"]'); await expect(gap).toBeVisible();
@@ -114,12 +114,12 @@ test('a toolbar drag reserves a stable shared insertion gap before saving', asyn
     await page.mouse.move(bounds.x + bounds.width / 2 + delta, bounds.y + bounds.height / 2);
     expect((await gap.boundingBox())!.x).toBe(bounds.x);
   }
-  expect(await page.evaluate(() => localStorage.getItem('dock-layout-v5'))).toBe(saved);
+  expect(await page.evaluate(() => localStorage.getItem('dock-layout-v6'))).toBe(saved);
   await page.mouse.up(); expect((await order(page))[0]).toBe('chat');
   await expect(page.locator('[data-dock-placeholder]')).toHaveCount(0);
 });
 
-test('panel headings retain their appearance and only offer a right-edge placement target', async ({ page }, info) => {
+test('panel headings retain their appearance and offer the left middle and right edge', async ({ page }, info) => {
   await button(page, 'files').click();
   const heading = page.getByTestId('panel-drag-handle-files');
   const background = await heading.evaluate(element => getComputedStyle(element).backgroundColor);
@@ -127,6 +127,9 @@ test('panel headings retain their appearance and only offer a right-edge placeme
   expect(await heading.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(background);
   const start = (await heading.boundingBox())!, body = (await page.locator('.workspace-body').boundingBox())!;
   await page.mouse.move(start.x + 24, start.y + start.height / 2); await page.mouse.down();
+  const left = (await page.getByTestId('workspace-left-dock').boundingBox())!;
+  await page.mouse.move(left.x + 50, left.y + 100, { steps: 8 });
+  await expect(page.getByTestId('panel-drop-preview')).toHaveAttribute('data-side', 'left');
   await page.mouse.move(body.x + 50, body.y + 200, { steps: 8 });
   await expect(page.getByTestId('panel-drop-preview')).toHaveCount(0);
   await page.mouse.move(body.x + body.width - 24, body.y + 200, { steps: 8 });

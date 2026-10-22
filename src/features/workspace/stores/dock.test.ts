@@ -7,7 +7,7 @@ const originalWidth = window.innerWidth;
 beforeEach(() => {
   localStorage.clear();
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 1400 });
-  useWorkspaceNavigation.setState({ collapsed: false, area: 'code' });
+  useWorkspaceNavigation.setState({ collapsed: false, sidebarOverlay: false, area: 'code' });
   useDockStore.setState({ leftZone: [], rightZone: ['files', 'git', 'command-history', 'chat'], leftPanels: [], rightPanels: [], panelWidths: {}, collapsedPanels: [] });
 });
 afterEach(() => { useDockStore.setState(snapshot, true); Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalWidth }); });
@@ -30,12 +30,13 @@ describe('right auxiliary dock', () => {
     useDockStore.getState().moveButton('files', 'right', 3);
     expect(useDockStore.getState().rightZone).toEqual(['git', 'command-history', 'files', 'chat']);
     expect(useDockStore.getState().rightPanels).toEqual(['chat']);
-    expect(JSON.parse(localStorage.getItem('dock-layout-v5')!).rightZone).toEqual(useDockStore.getState().rightZone);
+    expect(JSON.parse(localStorage.getItem('dock-layout-v6')!).rightZone).toEqual(useDockStore.getState().rightZone);
   });
-  it('redirects legacy left placement requests to right-hand ordering', () => {
+  it('moves an action to the independent left zone without opening a closed panel', () => {
     useDockStore.getState().moveButton('files', 'left');
-    expect(useDockStore.getState().rightZone).toEqual(['git', 'command-history', 'chat', 'files']);
-    expect(useDockStore.getState().leftZone).toEqual([]);
+    expect(useDockStore.getState().rightZone).toEqual(['git', 'command-history', 'chat']);
+    expect(useDockStore.getState().leftZone).toEqual(['files']);
+    expect(useDockStore.getState().leftPanels).toEqual([]);
   });
   it('does not reorder an unknown item or open a closed item during reordering', () => {
     const before = useDockStore.getState().rightZone;
@@ -49,7 +50,7 @@ describe('right auxiliary dock', () => {
     useDockStore.getState().setPanelWidth('chat', -1000);
     expect(useDockStore.getState().rightPanels).toEqual(['chat']);
     expect(useDockStore.getState().collapsedPanels).toEqual(['chat']);
-    expect(JSON.parse(localStorage.getItem('dock-layout-v5')!).rightPanels).toEqual([]);
+    expect(JSON.parse(localStorage.getItem('dock-layout-v6')!).rightPanels).toEqual([]);
     useDockStore.getState().setPanelWidth('chat', 100);
     useDockStore.getState().commitPanelWidth('chat');
     expect(useDockStore.getState().rightPanels).toEqual(['chat']);
@@ -120,6 +121,57 @@ describe('layout migration', () => {
     expect(migrated.getState().leftZone).toEqual([]);
     expect(migrated.getState().rightPanels).toEqual(['files']);
     expect(localStorage.getItem('dock-layout-v4')).toBe(JSON.stringify(seed));
-    expect(JSON.parse(localStorage.getItem('dock-layout-v5')!).rightPanels).toEqual(['files']);
+    expect(JSON.parse(localStorage.getItem('dock-layout-v6')!).rightPanels).toEqual(['files']);
+  });
+});
+
+describe('independent auxiliary sides', () => {
+  it('opens a remembered left panel as an overlay when the content leaves no sidebar budget', () => {
+    Object.defineProperty(window, 'innerWidth', { value: 500 });
+    const dock = useDockStore.getState();
+    dock.moveButton('files', 'left'); dock.openPanel('files');
+    expect(useWorkspaceNavigation.getState()).toMatchObject({ collapsed: false, sidebarOverlay: true });
+    expect(useDockStore.getState().leftPanels).toEqual(['files']);
+  });
+  it('keeps one different panel on each side and closes either without affecting the other', () => {
+    const dock = useDockStore.getState();
+    dock.moveButton('files', 'left'); dock.openPanel('files'); dock.openPanel('chat');
+    expect(useDockStore.getState()).toMatchObject({ leftPanels: ['files'], rightPanels: ['chat'] });
+    dock.openPanel('git');
+    expect(useDockStore.getState()).toMatchObject({ leftPanels: ['files'], rightPanels: ['git'] });
+    dock.closePanel('files');
+    expect(useDockStore.getState()).toMatchObject({ leftPanels: [], rightPanels: ['git'] });
+  });
+  it('transfers an open panel once and replaces only the destination panel', () => {
+    const dock = useDockStore.getState();
+    dock.moveButton('files', 'left'); dock.openPanel('files'); dock.openPanel('chat');
+    dock.moveButton('chat', 'left');
+    expect(useDockStore.getState()).toMatchObject({ leftZone: ['files', 'chat'], leftPanels: ['chat'], rightPanels: [] });
+    dock.moveButton('chat', 'right', 0);
+    expect(useDockStore.getState()).toMatchObject({ leftZone: ['files'], leftPanels: [], rightPanels: ['chat'] });
+    expect(useDockStore.getState().rightZone.filter(id => id === 'chat')).toHaveLength(1);
+  });
+  it('restores a collapsed left panel without replacing the right panel or its saved width', () => {
+    const dock = useDockStore.getState();
+    dock.moveButton('chat', 'left'); dock.openPanel('chat'); dock.openPanel('files');
+    useWorkspaceNavigation.getState().setCollapsed(true);
+    dock.reconcilePanelSpace();
+    expect(useDockStore.getState()).toMatchObject({ leftPanels: ['chat'], rightPanels: ['files'] });
+    dock.openPanel('chat');
+    expect(useWorkspaceNavigation.getState().collapsed).toBe(false);
+    expect(useDockStore.getState()).toMatchObject({ leftPanels: ['chat'], rightPanels: ['files'] });
+  });
+  it('normalizes and reloads both sides without rewriting the previous version', async () => {
+    const seed = { layoutVersion: 6, widthPreset: 'compact', leftZone: ['files', 'files'], rightZone: ['files', 'chat'],
+      leftPanels: ['files', 'chat'], rightPanels: ['files', 'chat'], panelWidths: { chat: 370 } };
+    const expected = normalizeDockLayout(seed)!;
+    expect(expected).toMatchObject({ leftZone: ['files'], leftPanels: ['files'], rightPanels: ['chat'], panelWidths: { chat: 370 } });
+    expect(expected.rightZone).not.toContain('files');
+    localStorage.setItem('dock-layout-v6', JSON.stringify(seed));
+    localStorage.setItem('dock-layout-v5', 'previous layout');
+    vi.resetModules();
+    const { useDockStore: restored } = await import('./dock');
+    expect(restored.getState()).toMatchObject(expected);
+    expect(localStorage.getItem('dock-layout-v5')).toBe('previous layout');
   });
 });

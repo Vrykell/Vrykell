@@ -1,0 +1,27 @@
+
+> vrykell@0.1.0 test:e2e
+> playwright test e2e/ai-chat-panel.spec.ts
+
+[WebServer] (node:56724) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 10 tests using 1 worker
+
+(node:78668) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:78668) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 ai-chat-panel.spec.ts:25:3 › AI 对话面板 › opening the panel does not move focus into the chat composer (7.0s)
+  ok 2 ai-chat-panel.spec.ts:34:3 › AI 对话面板 › conversation settings start with discussion and the composer keeps attachment controls (1.4s)
+  ok 3 ai-chat-panel.spec.ts:45:3 › AI 对话面板 › 打开面板发送消息，流式渲染回复 (1.4s)
+  ok 4 ai-chat-panel.spec.ts:55:3 › AI 对话面板 › 停止生成：中断后收尾回到发送按钮（读取器不再永久挂起） (1.5s)
+  ok 5 ai-chat-panel.spec.ts:82:3 › AI 对话面板 › 复制被终止的回复：还没有正文时复制工具日志，而不是空串 (1.6s)
+  ok 6 ai-chat-panel.spec.ts:106:3 › AI 对话面板 › 复制被终止的回复：停止后复制按钮给出已经收到的正文 (2.3s)
+  ok 7 ai-chat-panel.spec.ts:132:3 › AI 对话面板 › opening the AI assistant leaves command input available (1.4s)
+  ok 8 ai-chat-panel.spec.ts:142:3 › AI 对话面板 › 模型选择窗口：搜索过滤 + 能力标签过滤 + 点击选中 (1.9s)
+  ok 9 ai-chat-panel.spec.ts:179:3 › AI 对话面板 › 模型选择窗口：思考强度只在模型配置页调整 (1.5s)
+  ok 10 ai-chat-panel.spec.ts:195:3 › AI 对话面板 › the unified chat and approval menu persists model and permission choices (2.6s)
+
+  Slow test file: ai-chat-panel.spec.ts (22.6s)
+  Consider splitting slow test files to speed up parallel execution
+  10 passed (25.9s)

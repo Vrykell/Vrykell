@@ -50,28 +50,31 @@
 
 ## 3. Top-Level Layout
 
-`src/App.tsx` (100vh flex column):
+`src/app/layout/WorkspaceShell.tsx` owns the full-height application grid:
 
 ```
-App
-├── TopDock            (28px full-width top bar, left/right action zones + draggable buttons)
-├── flex row
-│   ├── SidePanel (left)   — controlled by Dock buttons
-│   ├── TerminalView       — main terminal area (core)
-│   └── SidePanel (right)  — controlled by Dock buttons
-├── StatusBar (removed, 2026-09)
-├── CommandPalette (overlay)
-├── ToastContainer (overlay)
-└── ApiKeyField     (fixed bottom-right, out of the document flow)
+WorkspaceShell
+├── WorkspaceSidebar (full height, resizable and completely collapsible)
+│   ├── Functional navigation
+│   ├── Left auxiliary actions and panel slot
+│   └── Settings
+├── TopDock (42px, beside the sidebar)
+└── Workspace body
+    ├── Primary column
+    │   ├── Horizontal instance tabs (34px)
+    │   └── Terminal, code, AI or host-resource content
+    ├── Right auxiliary panel slot
+    ├── Conditional SSH status slot
+    └── Settings overlay
 ```
 
 `TerminalView` (`src/features/terminal/components/TerminalView.tsx`) is the main terminal surface, driven internally by the SessionController's **scene state** (see §6).
 
-The left navigation bar and the top-right navigation zone share `DockNavigation`, supporting reordering within one side and moving across sides. `leftZone` / `rightZone` in `dock.ts` determine both button order and sidebar position; open sidebars move with their button, and closed sidebars stay closed. The layout is persisted via `dock-layout-v4`; on load, custom positions are retained, duplicates are removed, and missing buttons are filled in. The drag source and insertion position are maintained temporarily by `navigationDrag.ts` and are not written to settings. The settings entry is fixed below the left toolbar and does not participate in dragging or ordering; `NAVIGATION_DEFS` contains sidebars and page actions, while `PANEL_DEFS` contains only real sidebars. Clicking the settings entry opens or activates the single settings page without creating a settings sidebar. Window control buttons stay fixed.
+The left middle and top-right action zones share `DockNavigation`. `leftZone` / `rightZone` in `dock.ts` determine button order and panel placement, with one different panel open per side. Version 6 stores both sides independently; older layouts retain their previous right-only migration and their original storage is not rewritten. `PanelSurfaces` gives each visited panel one DOM host and reparents it between slots. Its portal identity stays stable, preserving feature state when the panel moves, closes or reopens. Collapsing navigation hides its left host without deleting its open state. Conditional SSH status replaces only the right panel. Settings remains fixed in the navigation footer; window controls remain fixed in the titlebar.
 
 Navigation buttons are dragged via Pointer Events by `useNavigationButtonDrag`, starting only after the pointer moves more than 6px. The source button remains mounted but is removed from the arrangement, and its icon follows the pointer via `NavigationDragPreview`; a real 32px placeholder is inserted at the target position and the other buttons rearrange to make room. The placeholder region retains the corresponding insertion index, preventing the drop point from jumping due to repeated hits after the rearrangement; the gaps between buttons are computed from the neighboring positions. The preview does not modify the layout or persist anything; the commit happens only on release, and the original arrangement is restored on cancel. HTML5 Drag and Drop is forbidden: native file drag-and-drop in Windows desktop windows intercepts these events, and browser preview cannot verify that behavior directly. Native file drop-in is retained; navigation buttons and the top-right action zone are not marked as window drag regions. Esc, blur, pointercancel, and unmount cancel the drag; the click produced on release does not trigger a panel switch. Interaction tests disable HTML drag-and-drop events to confirm that pointer dragging works independently.
 
-The top bar uses `useBalancedTitlebar` to observe the actual width of the right-side action zone and reserve symmetric space on the left and right of the search box. Adding or moving navigation buttons does not switch to an asymmetric grid; a narrow window only tightens the search box width, and it expands again in sync once the width is restored, keeping the search box centered and avoiding covering the buttons.
+The titlebar uses `useBalancedTitlebar` to observe the action zone, navigation offset and native control insets. Search is centered relative to the whole application; available space narrows the field before actions overlap. Navigation width is remembered separately from temporary pointer width, so held collapse can reverse and viewport clamping does not overwrite the user's saved size.
 
 ## 4. End-to-End Layering
 

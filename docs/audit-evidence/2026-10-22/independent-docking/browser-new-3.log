@@ -1,0 +1,20 @@
+
+> vrykell@0.1.0 test:e2e
+> playwright test e2e/independent-panel-docking.spec.ts
+
+[WebServer] (node:53496) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 3 tests using 1 worker
+
+(node:59580) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:59580) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 independent-panel-docking.spec.ts:13:35 › left and right panels retain their content independently in 深色 (25.6s)
+  ok 2 independent-panel-docking.spec.ts:13:35 › left and right panels retain their content independently in 浅色 (6.2s)
+  ok 3 independent-panel-docking.spec.ts:47:1 › a collapsed left target expands on drop and both sides restore after reload (6.7s)
+
+  Slow test file: independent-panel-docking.spec.ts (38.5s)
+  Consider splitting slow test files to speed up parallel execution
+  3 passed (45.8s)

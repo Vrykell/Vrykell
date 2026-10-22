@@ -58,3 +58,42 @@ test('narrow windows retain manual expansion without consuming the terminal mini
   await page.setViewportSize({ width: 1240, height: 800 });
   await expect.poll(async () => (await sidebar.boundingBox())!.width).toBe(400);
 });
+
+test('a full terminal grid can open navigation as a temporary overlay without resizing its panes', async ({ page }, info) => {
+  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  const input = page.locator('[data-terminal-input]').first();
+  await input.fill('retain the terminal draft');
+  await page.evaluate(async () => {
+    const path = '/src/features/workspace/stores/workspace.ts';
+    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+    useWorkspaceStore.getState().splitFocusedDirect('row');
+    useWorkspaceStore.getState().splitFocusedDirect('row');
+  });
+  const sidebar = page.getByTestId('workspace-sidebar');
+  await expect(sidebar).toBeHidden();
+  const primary = page.locator('.workspace-primary');
+  const before = (await primary.boundingBox())!;
+  await page.getByTestId('workspace-sidebar-expand').click();
+  await expect(sidebar).toHaveAttribute('data-overlay', 'true');
+  await expect(sidebar).toBeVisible();
+  expect((await sidebar.boundingBox())!.width).toBe(208);
+  expect((await primary.boundingBox())!.width).toBe(before.width);
+  expect((await primary.boundingBox())!.x).toBe(before.x);
+  await page.screenshot({ path: info.outputPath('sidebar-terminal-grid-overlay.png'), animations: 'disabled' });
+  await page.mouse.click(before.x + before.width - 40, before.y + 150);
+  await expect(sidebar).toBeHidden();
+  await expect(input).toHaveValue('retain the terminal draft');
+  await page.getByTestId('workspace-sidebar-expand').click();
+  await page.getByTestId('workspace-area-code').click();
+  await expect(page.getByTestId('code-workspace-empty')).toBeVisible();
+  await expect(sidebar).toBeHidden();
+  await page.getByTestId('workspace-sidebar-expand').click();
+  await expect(sidebar).toBeVisible();
+  await page.getByTestId('workspace-area-terminal').click();
+  await expect(sidebar).toBeHidden();
+  await page.getByTestId('workspace-sidebar-expand').click();
+  await page.keyboard.press('Escape');
+  await expect(sidebar).toBeHidden();
+  await expect(page.getByTestId('workspace-sidebar-expand')).toBeFocused();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(1240);
+});

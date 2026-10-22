@@ -11,7 +11,7 @@ import { t } from '@i18n';
 import { useBalancedTitlebar } from '../hooks/useBalancedTitlebar';
 
 /** Keep window controls and global actions separate from workspace navigation. */
-export default function TopDock() {
+export default function TopDock({ sidebarOverlayRequired = false }: { sidebarOverlayRequired?: boolean }) {
   const activeTab = useSessionStore(s => s.tabs.find(tab => tab.id === s.activeId));
   const displayTitle = useTabDisplayTitle(activeTab);
   const settingsOpen = useUiStore(state => state.settingsOpen);
@@ -47,7 +47,7 @@ export default function TopDock() {
     <header ref={headerRef} className="workspace-titlebar" data-platform={isMacOS ? 'macos' : 'other'} data-fullscreen={fullscreen} data-sidebar-collapsed={collapsed} data-tauri-drag-region>
       <div data-tauri-drag-region className="workspace-title">
         {collapsed && <IconButton compact className="workspace-sidebar-toggle" data-testid="workspace-sidebar-expand" aria-label={t('Expand sidebar')} data-tip={t('Expand sidebar')}
-          onClick={() => useWorkspaceNavigation.getState().setCollapsed(false)}><PanelLeft size={iconSizes.control} /></IconButton>}
+          onClick={() => useWorkspaceNavigation.getState().openSidebar(sidebarOverlayRequired)}><PanelLeft size={iconSizes.control} /></IconButton>}
         <span data-tauri-drag-region>{settingsOpen ? t('Settings') : activeTab && workspaceAreaForKind(activeTab.kind) === area ? displayTitle : workspaceTitle}</span>
       </div>
       <button data-subtle data-testid="global-search-trigger" className="workspace-search"

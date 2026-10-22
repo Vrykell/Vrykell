@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FC } from 'react';
+import { useCallback, useContext, type FC } from 'react';
 import { iconSizes, X, ArrowLeft } from '@ui/icons';
 import { IconButton } from '@ui/IconButton';
 import { useAiWorkspace, useChatStore } from '@features/chat';
@@ -10,6 +10,7 @@ import AiWorkspaceSurface from '@features/chat/components/AiWorkspaceSurface';
 import PanelCommandHistory from '@features/command-history/components/PanelCommandHistory';
 import PanelGit from '@features/git/components/PanelGit';
 import { t } from '@i18n';
+import { PanelSurfaceContext } from './PanelSurfaceContext';
 
 interface SidePanelProps {
   side: DockSide;
@@ -23,28 +24,11 @@ const PANEL_COMPONENTS: Record<string, FC> = {
 };
 
 export default function SidePanel({ side }: SidePanelProps) {
-  const panelIds = useDockStore(s => s.rightPanels);
-  const zone = useDockStore(s => s.rightZone);
-  const [visited, setVisited] = useState<string[]>([]);
-  useEffect(() => {
-    setVisited(previous => {
-      const added = panelIds.filter(id => !previous.includes(id));
-      return added.length ? [...previous, ...added] : previous;
-    });
-  }, [panelIds]);
-  const mountedIds = [...new Set([...visited.filter(id => zone.includes(id)), ...panelIds])];
-  if (side !== 'right') return null;
-
-  return (
-    <>
-      {mountedIds.map((panelId) => {
-        return <SinglePanel key={panelId} side={side} panelId={panelId} visible={panelIds.includes(panelId)} />;
-      })}
-    </>
-  );
+  const context = useContext(PanelSurfaceContext);
+  return <div className="workspace-panel-slot" data-panel-slot={side} ref={context?.[side]} />;
 }
 
-function SinglePanel({ side, panelId, visible }: { side: DockSide; panelId: string; visible: boolean }) {
+export function DockPanel({ side, panelId, visible }: { side: DockSide; panelId: string; visible: boolean }) {
   const settingsOpen = useUiStore(state => state.settingsOpen);
   const startDrag = useNavigationButtonDrag();
   const dragging = useNavigationDrag(state => state.id === panelId);
@@ -52,7 +36,7 @@ function SinglePanel({ side, panelId, visible }: { side: DockSide; panelId: stri
   const commitPanelWidth = useDockStore((s) => s.commitPanelWidth);
   const panelWidths = useDockStore((s) => s.panelWidths);
   // Retain content during a held collapse so reversing the drag preserves local state.
-  const collapsed = useDockStore((s) => s.collapsedPanels.includes(panelId));
+  const collapsed = useDockStore((s) => side === 'right' && s.collapsedPanels.includes(panelId));
 
   const def = PANEL_DEFS[panelId];
   const PanelContent = def ? PANEL_COMPONENTS[panelId] : null;
@@ -88,17 +72,18 @@ function SinglePanel({ side, panelId, visible }: { side: DockSide; panelId: stri
       display: visible ? 'block' : 'none',
       position: 'relative',
       flexShrink: 0,
+      flex: side === 'left' ? 1 : undefined,
       minHeight: 0,
     }}>
       <div style={{
-        width,
+        width: side === 'left' ? '100%' : width,
         // Reserve the same frame space as the dock width budget.
-        maxWidth: 'calc(100vw - var(--workspace-activity-width) - var(--workspace-terminal-min-width) - var(--workspace-frame-width))',
+        maxWidth: side === 'left' ? undefined : 'calc(100vw - var(--workspace-activity-width) - var(--workspace-terminal-min-width) - var(--workspace-frame-width))',
         display: collapsed ? 'none' : 'flex',
         flexDirection: 'column',
         minHeight: 0,
         height: '100%',
-        background: 'var(--sidebar-bg)',
+        background: side === 'left' ? 'transparent' : 'var(--auxiliary-bg)',
         borderRadius: 'inherit', overflow: 'hidden',
       }}>
         <div className="workspace-panel-heading" data-testid={`panel-drag-handle-${panelId}`} data-dragging={dragging}
@@ -112,7 +97,7 @@ function SinglePanel({ side, panelId, visible }: { side: DockSide; panelId: stri
               selectWorkspaceArea('ai');
             }}><ArrowLeft size={iconSizes.control} /></IconButton>}
           <button data-subtle className="workspace-panel-close" aria-label={t('Close {{panel}} panel', { panel: def.label })}
-            onClick={() => useDockStore.getState().togglePanel(side, panelId)}><X size={iconSizes.control} /></button>
+            onClick={() => useDockStore.getState().closePanel(panelId)}><X size={iconSizes.control} /></button>
           </div>
         </div>
         <div style={{ flex: 1, minHeight: 0 }}>
@@ -121,7 +106,7 @@ function SinglePanel({ side, panelId, visible }: { side: DockSide; panelId: stri
       </div>
 
       {/* Keep the resize edge mounted during collapse so dragging back restores the panel. */}
-      <ResizeHandle axis="x" edge="left" lineThickness={2} onDelta={handleDelta} onUp={handleCommit} testId={`resize-handle-${panelId}`} />
+      {side === 'right' && <ResizeHandle axis="x" edge="left" lineThickness={2} onDelta={handleDelta} onUp={handleCommit} testId={`resize-handle-${panelId}`} />}
     </div>
   );
 }

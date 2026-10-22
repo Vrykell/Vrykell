@@ -1,7 +1,7 @@
 ﻿/** Simplified Chinese messages for shared UI and feature namespaces. */
 const zh: Record<string, string> = {
   'More panels': '更多面板',
-  'This conversation is open in the side panel.': '此对话已在右侧面板打开。',
+  'This conversation is open in the side panel.': '此对话已在侧边面板打开。',
   'Use acrylic material in the left sidebar. Other regions stay opaque.': '在左侧栏使用亚克力材质，其他区域保持不透明。',
   'Run now': '运行',
   "Enter a command before running it.": "请输入要运行的命令。",
@@ -1830,7 +1830,7 @@ const zh: Record<string, string> = {
   'Open files and comparisons': '已打开的文件与比较',
   'AI sessions': 'AI 会话',
   'Move AI to workspace': '移回 AI 工作区',
-  'Dock AI to side': '将 AI 停靠到右侧',
+  'Dock AI to side': '将 AI 停靠到侧栏',
   'Your code workspace': '你的代码工作区',
   'Your AI workspace': '你的 AI 工作区',
   'Your terminal workspace': '你的终端工作区',

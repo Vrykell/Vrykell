@@ -66,7 +66,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
   const relocate = () => {
     const dock = useDockStore.getState();
     dock.openPanel('chat');
-    if (!useDockStore.getState().rightPanels.includes('chat')) {
+    if (![...useDockStore.getState().leftPanels, ...useDockStore.getState().rightPanels].includes('chat')) {
       useToastStore.getState().addToast(t('Not enough space. Widen the window or reduce terminal splits.'), 'info');
       return;
     }

@@ -4,6 +4,7 @@ import SettingsScreen from '@features/settings/components/SettingsScreen';
 import { MIN_PANE_SIZE, minTerminalWidth } from '@features/workspace/model/windowLayout';
 import TopDock from '@features/workspace/components/TopDock';
 import SidePanel from '@features/workspace/components/SidePanel';
+import PanelSurfaces from '@features/workspace/components/PanelSurfaces';
 import TerminalView from '@features/terminal/components/TerminalView';
 import WorkspaceSidebar from '@features/workspace/components/WorkspaceSidebar';
 import PanelTabs from '@features/workspace/components/PanelTabs';
@@ -32,13 +33,16 @@ export default function WorkspaceShell() {
   const settingsOpen = useUiStore(state => state.settingsOpen);
   const area = useWorkspaceNavigation(state => state.area);
   const collapsed = useWorkspaceNavigation(state => state.collapsed);
+  const sidebarOverlay = useWorkspaceNavigation(state => state.sidebarOverlay);
   const sidebarPreference = useWorkspaceNavigation(state => state.sidebarWidth);
   const sidebarDragWidth = useWorkspaceNavigation(state => state.sidebarDragWidth);
   const aiPlacement = useWorkspaceNavigation(state => state.aiPlacement);
   const activeTab = useSessionStore(state => state.tabs.find(tab => tab.id === state.activeId));
   const contentVisible = !!activeTab && area === workspaceAreaForKind(activeTab.kind);
   const chatOpen = useDockStore(state => state.leftPanels.includes('chat') || state.rightPanels.includes('chat'));
+  const chatOnLeft = useDockStore(state => state.leftPanels.includes('chat'));
   const [sidebarWidth, setSidebarWidth] = useState(workspaceSidebarWidth);
+  const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
   const [newTerminal, setNewTerminal] = useState(false);
   const frameWidth = useDockStore(workspaceFrameWidth);
   const sshStatusOwner = useSshStatusOwner();
@@ -46,28 +50,49 @@ export default function WorkspaceShell() {
     const tab = selectActiveSessionTab(state);
     return tab ? minTerminalWidth(tab.layout) : MIN_PANE_SIZE;
   });
+  const mainMinWidth = Math.max(360, area === 'terminal' ? terminalMinWidth : MIN_PANE_SIZE);
+  const sidebarMaxWidth = sidebarOverlay ? Math.min(400, viewportWidth - 40) : Math.min(400, viewportWidth - mainMinWidth);
+  const overlayWidth = Math.min(sidebarDragWidth ?? sidebarPreference, Math.max(160, sidebarMaxWidth));
 
   useEffect(() => {
     const reconcile = () => {
+      setViewportWidth(window.innerWidth);
       const width = workspaceSidebarWidth(window.innerWidth, Math.max(360, area === 'terminal' ? terminalMinWidth : MIN_PANE_SIZE));
       setSidebarWidth(width);
-      if (!width && !useWorkspaceNavigation.getState().collapsed) useWorkspaceNavigation.getState().setCollapsed(true);
+      const navigation = useWorkspaceNavigation.getState();
+      if (!width && !navigation.collapsed && !navigation.sidebarOverlay) navigation.setCollapsed(true);
       useDockStore.getState().reconcilePanelSpace();
     };
     reconcile();
     window.addEventListener('resize', reconcile);
     return () => window.removeEventListener('resize', reconcile);
-  }, [terminalMinWidth, sshStatusOwner, collapsed, area, sidebarPreference, sidebarDragWidth]);
+  }, [terminalMinWidth, sshStatusOwner, collapsed, sidebarOverlay, area, sidebarPreference, sidebarDragWidth]);
   useEffect(() => {
-    if (aiPlacement === 'main' && chatOpen) useDockStore.getState().togglePanel('right', 'chat');
+    if (!sidebarOverlay || collapsed) return;
+    const close = () => useWorkspaceNavigation.getState().setCollapsed(true);
+    const outside = (event: PointerEvent) => {
+      if (event.target instanceof Element && event.target.closest('.workspace-primary')) close();
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return;
+      close();
+      requestAnimationFrame(() => document.querySelector<HTMLButtonElement>('[data-testid="workspace-sidebar-expand"]')?.focus());
+    };
+    document.addEventListener('pointerdown', outside, true);
+    document.addEventListener('keydown', escape);
+    return () => { document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', escape); };
+  }, [sidebarOverlay, collapsed]);
+  useEffect(() => {
+    if (aiPlacement === 'main' && chatOpen) useDockStore.getState().closePanel('chat');
   }, [aiPlacement, chatOpen]);
 
   return (
-    <div className="workspace-layout" data-area={area} data-settings-open={settingsOpen || undefined} style={{ '--workspace-sidebar-width': `${sidebarWidth}px` } as CSSProperties}>
+    <div className="workspace-layout" data-area={area} data-sidebar-overlay={sidebarOverlay && !collapsed || undefined} data-settings-open={settingsOpen || undefined} style={{ '--workspace-sidebar-width': `${sidebarWidth}px`, '--workspace-sidebar-overlay-width': `${overlayWidth}px` } as CSSProperties}>
       <WorkspaceHeaderProvider>
-      <AiWorkspaceProvider placement={aiPlacement} mainActive={contentVisible && area === 'ai' && activeTab?.kind === 'harness' && !settingsOpen} headerActive={area === 'ai' && !settingsOpen} sideActive={chatOpen && !sshStatusOwner && !settingsOpen}>
-      <WorkspaceSidebar maxWidth={Math.min(400, window.innerWidth - Math.max(360, area === 'terminal' ? terminalMinWidth : MIN_PANE_SIZE))} />
-      <TopDock />
+      <AiWorkspaceProvider placement={aiPlacement} mainActive={contentVisible && area === 'ai' && activeTab?.kind === 'harness' && !settingsOpen} headerActive={area === 'ai' && !settingsOpen} sideActive={chatOpen && (chatOnLeft ? !collapsed : !sshStatusOwner) && !settingsOpen}>
+      <PanelSurfaces>
+      <WorkspaceSidebar maxWidth={Math.max(160, sidebarMaxWidth)} />
+      <TopDock sidebarOverlayRequired={viewportWidth - mainMinWidth < 160} />
       <SshAuthenticationDialog />
       <PanelTabs active={area === 'terminal' && !settingsOpen} />
       <div className="workspace-body" data-settings-open={settingsOpen || undefined} style={{ '--workspace-frame-width': `${frameWidth}px`, '--workspace-terminal-min-width': `${Math.max(360, area === 'terminal' ? terminalMinWidth : MIN_PANE_SIZE)}px`, '--workspace-left-panel-width': '0px', '--workspace-activity-width': `${sidebarWidth}px`, '--workspace-gap': `${WORKSPACE_GAP}px` } as CSSProperties}>
@@ -91,6 +116,7 @@ export default function WorkspaceShell() {
         {settingsOpen && <SettingsScreen />}
       </div>
       <NewTabModal open={newTerminal} onClose={() => setNewTerminal(false)} />
+      </PanelSurfaces>
       </AiWorkspaceProvider>
       </WorkspaceHeaderProvider>
     </div>

@@ -210,7 +210,7 @@ test.describe('AI 对话面板', () => {
     await page.getByRole('option', { name: /^严格权限/ }).click();
     await expect(mode).toHaveAttribute('data-mode', 'strict');
     await page.reload();
-    await page.locator('[data-dock-btn="chat"]').click();
+    await expect(page.locator('[data-chat-composer]')).toBeVisible();
     await ensureChatSettingsOpen(page);
     await expect(mode).toHaveAttribute('data-mode', 'strict');
     await expect(page.locator('[data-tip="深度思考（reasoning effort）"]')).toHaveCount(0);

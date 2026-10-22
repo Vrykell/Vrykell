@@ -50,28 +50,31 @@
 
 ## 3. 顶层布局
 
-`src/App.tsx`（100vh flex column）：
+`src/app/layout/WorkspaceShell.tsx` 负责应用全高网格：
 
 ```
-App
-├── TopDock            (28px 全宽顶栏，左右功能区 + 可拖拽按钮)
-├── flex row
-│   ├── SidePanel (left)   — 由 Dock 按钮控制
-│   ├── TerminalView       — 终端主区域（核心）
-│   └── SidePanel (right)  — 由 Dock 按钮控制
-├── StatusBar（已移除，2026-09）
-├── CommandPalette (overlay)
-├── ToastContainer (overlay)
-└── ApiKeyField     (fixed 右下角，不在文档流)
+WorkspaceShell
+├── WorkspaceSidebar (full height, resizable and completely collapsible)
+│   ├── Functional navigation
+│   ├── Left auxiliary actions and panel slot
+│   └── Settings
+├── TopDock (42px, beside the sidebar)
+└── Workspace body
+    ├── Primary column
+    │   ├── Horizontal instance tabs (34px)
+    │   └── Terminal, code, AI or host-resource content
+    ├── Right auxiliary panel slot
+    ├── Conditional SSH status slot
+    └── Settings overlay
 ```
 
 `TerminalView`（`src/features/terminal/components/TerminalView.tsx`）是终端主表面，内部由 SessionController 的**场景状态**驱动（见 §6）。
 
-左侧导航栏与右上方导航区共用 `DockNavigation`，支持同侧排序与跨侧移动。`dock.ts` 中的 `leftZone` / `rightZone` 同时决定按钮顺序和侧栏位置；打开的侧栏随按钮移动，关闭的侧栏保持关闭。布局通过 `dock-layout-v4` 持久化，加载时保留自定义位置、去重并补齐缺失按钮。拖动中的来源与插入位置由 `navigationDrag.ts` 临时维护，不写入设置。设置入口固定在左侧功能栏底部，不参与拖动或排序；`NAVIGATION_DEFS` 包含侧栏和页面动作，`PANEL_DEFS` 仅包含真实侧栏。点击设置入口打开或激活唯一的设置页，不创建设置侧栏。窗口控制按钮保持固定。
+左侧中部与右上方操作区共用 `DockNavigation`。`dock.ts` 的 `leftZone` / `rightZone` 决定按钮顺序和面板位置，左右各打开一个不同面板。第 6 版布局独立保存两侧，旧版本仍沿用原来的右侧迁移方式且不覆盖原存储。`PanelSurfaces` 为访问过的每个面板保留一个 DOM 宿主，在两个插槽之间移动；门户身份保持稳定，移动、关闭和重开都保留功能状态。收起导航仅隐藏左侧宿主，不删除打开状态；条件 SSH 状态面板仅替换右侧面板。设置固定在导航底部，窗口按钮固定在顶栏。
 
 导航按钮由 `useNavigationButtonDrag` 通过 Pointer Events 拖动，移动超过 6px 后才开始。来源按钮保留挂载但移出排列，图标通过 `NavigationDragPreview` 跟随指针；目标位置插入 32px 实际占位，其他按钮重新排列让位。占位区域保留对应插入索引，避免让位后重复命中导致落点跳动；按钮之间的间隙按邻近位置计算。预览不修改布局或持久化，松手才提交，取消时恢复原排列。禁止使用 HTML5 Drag and Drop：Windows 桌面窗口的原生文件拖放会拦截这些事件，浏览器预览无法直接验证该行为。保留原生文件拖入；导航按钮及右上方操作区不标记为窗口拖动区域。Esc、失焦、pointercancel 和卸载取消拖动；松手产生的 click 不触发面板切换。交互测试会禁用 HTML 拖放事件，确认指针拖动独立工作。
 
-顶栏通过 `useBalancedTitlebar` 观察右侧操作区的实际宽度，在搜索框左右预留对称空间。导航按钮增加或移动时不切换为非对称网格；窄窗口只收紧搜索框宽度，宽度恢复后同步展开，保持搜索框居中并避免遮挡按钮。
+顶栏通过 `useBalancedTitlebar` 观察操作区、导航偏移和原生控件留白，搜索相对整个应用居中；空间不足时先收紧输入区，避免覆盖操作。导航保存宽度与临时拖动宽度分开，按住收起后可反向恢复，窗口预算不会覆盖已保存的宽度。
 
 ## 4. 端到端分层
 

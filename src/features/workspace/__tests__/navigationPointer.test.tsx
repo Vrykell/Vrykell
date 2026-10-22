@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { useNavigationButtonDrag } from '../hooks/useNavigationButtonDrag';
 import { useDockStore } from '../stores/dock';
 import { useNavigationDrag } from '../stores/navigationDrag';
+import { useWorkspaceNavigation } from '../stores/navigation';
 
 const clicked = vi.fn();
 let hit: Element | null;
@@ -48,7 +49,7 @@ describe('auxiliary navigation pointer gestures', () => {
     expect(clicked).not.toHaveBeenCalled();
     expect(useDockStore.getState().rightZone).toEqual(['git', 'chat', 'files']);
     expect(useDockStore.getState().rightPanels).toEqual(['files']);
-    expect(JSON.parse(localStorage.getItem('dock-layout-v5')!).rightZone).toEqual(['git', 'chat', 'files']);
+    expect(JSON.parse(localStorage.getItem('dock-layout-v6')!).rightZone).toEqual(['git', 'chat', 'files']);
   });
   it('accepts a panel heading while keeping its close button independent', () => {
     render(<Harness />); hit = screen.getByText('Assistant');
@@ -60,14 +61,14 @@ describe('auxiliary navigation pointer gestures', () => {
   });
   it.each(['escape', 'blur', 'pointercancel', 'unmount'])('cancels on %s without saving', reason => {
     const { unmount } = render(<Harness />);
-    const saved = localStorage.getItem('dock-layout-v5'); hit = screen.getByText('Assistant');
+    const saved = localStorage.getItem('dock-layout-v6'); hit = screen.getByText('Assistant');
     pointer('pointerdown', 10, 10, screen.getByText('Files')); pointer('pointermove', 100, 10);
     if (reason === 'escape') fireEvent.keyDown(window, { key: 'Escape' });
     else if (reason === 'unmount') unmount(); else fireEvent(window, new Event(reason));
     pointer('pointerup', 100, 10);
     expect(useDockStore.getState().rightZone).toEqual(['files', 'git', 'chat']);
     expect(useNavigationDrag.getState().id).toBeNull();
-    expect(localStorage.getItem('dock-layout-v5')).toBe(saved);
+    expect(localStorage.getItem('dock-layout-v6')).toBe(saved);
   });
   it('offers only the right content edge and uses the full preview as the release target', () => {
     render(<Harness />);
@@ -86,6 +87,20 @@ describe('auxiliary navigation pointer gestures', () => {
     expect(useNavigationDrag.getState().id).toBeNull();
     pointer('pointerdown', 10, 10, button); pointer('pointermove', 100, 10); pointer('pointerup', 100, 10);
     expect(useDockStore.getState().rightZone).toEqual(['files', 'git', 'chat']);
+  });
+  it('uses the full left middle area for placement while excluding navigation and footer', () => {
+    render(<Harness />);
+    const middle = document.createElement('div'); middle.dataset.testid = 'workspace-left-dock'; document.body.append(middle);
+    vi.spyOn(middle, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 210, width: 208, height: 500 } as DOMRect);
+    const button = screen.getByText('Files');
+    pointer('pointerdown', 10, 10, button); pointer('pointermove', 100, 160);
+    expect(useNavigationDrag.getState().target).toBeNull();
+    pointer('pointermove', 100, 300);
+    expect(useNavigationDrag.getState().target).toMatchObject({ side: 'left', openPanel: true });
+    pointer('pointerup', 200, 700);
+    expect(useDockStore.getState().leftPanels).toEqual(['files']);
+    expect(useWorkspaceNavigation.getState().collapsed).toBe(false);
+    middle.remove();
   });
   it('keeps the indicated insertion slot when released inside the placeholder', () => {
     render(<Harness />);

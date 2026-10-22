@@ -19,6 +19,7 @@ interface NavigationState {
   area: WorkspaceArea;
   previousArea: WorkspaceArea;
   collapsed: boolean;
+  sidebarOverlay: boolean;
   sidebarWidth: number;
   sidebarDragWidth: number | null;
   lastTabs: Partial<Record<WorkspaceArea, string>>;
@@ -28,6 +29,7 @@ interface NavigationState {
   selectArea: (area: WorkspaceArea) => void;
   rememberTab: (area: WorkspaceArea, id: string) => void;
   setCollapsed: (collapsed: boolean) => void;
+  openSidebar: (overlay: boolean) => void;
   resizeSidebar: (delta: number, maxWidth: number) => void;
   commitSidebarWidth: () => void;
   resetSidebarWidth: () => void;
@@ -51,11 +53,13 @@ if (savedColors && typeof savedColors === 'object') {
 /** Navigation owns presentation preferences; session and document stores retain their data. */
 export const useWorkspaceNavigation = create<NavigationState>((set) => ({
   area: 'terminal', previousArea: 'terminal', collapsed: saved?.collapsed === true || window.innerWidth <= WORKSPACE_COMPACT_BREAKPOINT,
-  sidebarWidth: normalizeSidebarWidth(saved?.sidebarWidth), sidebarDragWidth: null,
+  sidebarWidth: normalizeSidebarWidth(saved?.sidebarWidth), sidebarDragWidth: null, sidebarOverlay: false,
   lastTabs: {}, groupColors, codeOrder: [], aiPlacement: 'main',
-  selectArea: area => set(state => ({ area, previousArea: state.area !== 'ai' ? state.area : state.previousArea })),
+  selectArea: area => set(state => ({ area, previousArea: state.area !== 'ai' ? state.area : state.previousArea,
+    ...(state.sidebarOverlay && area !== state.area ? { collapsed: true, sidebarOverlay: false, sidebarDragWidth: null } : {}) })),
   rememberTab: (area, id) => set(state => state.lastTabs[area] === id ? state : ({ lastTabs: { ...state.lastTabs, [area]: id } })),
-  setCollapsed: collapsed => set({ collapsed, sidebarDragWidth: null }),
+  setCollapsed: collapsed => set({ collapsed, sidebarDragWidth: null, sidebarOverlay: false }),
+  openSidebar: sidebarOverlay => set({ collapsed: false, sidebarDragWidth: null, sidebarOverlay }),
   resizeSidebar: (delta, maxWidth) => set(state => {
     if (!Number.isFinite(delta) || !Number.isFinite(maxWidth)) return state;
     const current = state.sidebarDragWidth ?? Math.min(state.sidebarWidth, maxWidth);
@@ -64,6 +68,7 @@ export const useWorkspaceNavigation = create<NavigationState>((set) => ({
     return { sidebarDragWidth: next, collapsed };
   }),
   commitSidebarWidth: () => set(state => ({ sidebarDragWidth: null,
+    sidebarOverlay: !state.collapsed && state.sidebarOverlay,
     sidebarWidth: !state.collapsed && state.sidebarDragWidth !== null ? state.sidebarDragWidth : state.sidebarWidth })),
   resetSidebarWidth: () => set({ sidebarWidth: WORKSPACE_SIDEBAR_WIDTH, sidebarDragWidth: null, collapsed: false }),
   setGroupColor: (id, color) => set(state => {
@@ -82,15 +87,15 @@ export const useWorkspaceNavigation = create<NavigationState>((set) => ({
 }));
 
 useWorkspaceNavigation.subscribe((state, previous) => {
-  if (state.collapsed !== previous.collapsed || state.groupColors !== previous.groupColors || state.sidebarWidth !== previous.sidebarWidth) {
-    safeLocalStorageSet(STORAGE_KEY, JSON.stringify({ collapsed: state.collapsed, groupColors: state.groupColors, sidebarWidth: state.sidebarWidth }));
+  if (state.collapsed !== previous.collapsed || state.sidebarOverlay !== previous.sidebarOverlay || state.groupColors !== previous.groupColors || state.sidebarWidth !== previous.sidebarWidth) {
+    safeLocalStorageSet(STORAGE_KEY, JSON.stringify({ collapsed: state.collapsed || state.sidebarOverlay, groupColors: state.groupColors, sidebarWidth: state.sidebarWidth }));
   }
 });
 
 export function workspaceSidebarWidth(width = window.innerWidth, mainWidth = 360): number {
   const state = useWorkspaceNavigation.getState();
   const available = Math.min(WORKSPACE_SIDEBAR_MAX_WIDTH, width - mainWidth);
-  return state.collapsed || available < WORKSPACE_SIDEBAR_MIN_WIDTH ? 0 : Math.min(state.sidebarDragWidth ?? state.sidebarWidth, available);
+  return state.collapsed || state.sidebarOverlay || available < WORKSPACE_SIDEBAR_MIN_WIDTH ? 0 : Math.min(state.sidebarDragWidth ?? state.sidebarWidth, available);
 }
 
 export function orderedWorkspaceIds(ids: string[], savedOrder: string[]): string[] {

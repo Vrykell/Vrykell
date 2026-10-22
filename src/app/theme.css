@@ -280,7 +280,7 @@ button.chat-mode-option[data-active="true"] { background: var(--hover); }
 .settings-screen > .settings-view { width: 100%; height: 100%; overflow: hidden; }
 .settings-screen > .settings-close { position: absolute; z-index: 3; right: 20px; top: 16px; width: 36px; height: 36px; background: transparent; }
 .settings-screen > .settings-close:is(:hover, :active, :focus-visible) { background: transparent; color: var(--text-primary); }
-.workspace-body[data-settings-open] > :is(.workspace-primary, .workspace-side-panel, .workspace-ssh-status-slot) { visibility: hidden; }
+.workspace-body[data-settings-open] > :is(.workspace-primary, .workspace-ssh-status-slot), .workspace-body[data-settings-open] .workspace-side-panel { visibility: hidden; }
 .settings-view { container: settings-layout / inline-size; min-width: 0; min-height: 0; position: relative; }
 .settings-layout { display: flex; flex: 1; min-width: 0; min-height: 0; overflow: hidden; }
 .settings-navigation { width: clamp(180px, 20vw, 224px); flex-shrink: 0; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding-top: 16px; background: var(--auxiliary-bg); }
@@ -378,7 +378,7 @@ button.state-icon-button[aria-pressed="true"]:hover { background: var(--selectio
 .workspace-body { display: flex; flex: 1; min-height: 0; position: relative; padding: 0; background: var(--chrome-bg); }
 /* Keep content overlays below the neighbouring sidebar resize handles. */
 .workspace-main { background: var(--canvas); border-radius: 0; overflow: hidden; z-index: 0; }
-.workspace-body:has(> .workspace-ssh-status-slot:not(:empty)) > .workspace-side-panel[data-side="right"] { display: none !important; }
+.workspace-body:has(> .workspace-ssh-status-slot:not(:empty)) .workspace-side-panel[data-side="right"] { display: none !important; }
 .workspace-ssh-status-slot { display: flex; flex-shrink: 0; min-width: 0; min-height: 0; border-radius: 0; overflow: hidden; }
 .workspace-ssh-status-slot:empty { display: none; }
 /* A folded status panel shrinks to nothing; keep its resize edge unclipped so it can be dragged back out. */

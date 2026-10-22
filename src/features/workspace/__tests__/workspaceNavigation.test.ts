@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { normalizeSidebarWidth, orderedWorkspaceIds, useWorkspaceNavigation, workspaceAreaForKind, workspaceSidebarWidth } from '../stores/navigation';
 const snapshot = useWorkspaceNavigation.getState();
-beforeEach(() => useWorkspaceNavigation.setState({ collapsed: false, sidebarWidth: 208, sidebarDragWidth: null, area: 'terminal', previousArea: 'terminal', lastTabs: {}, groupColors: {}, codeOrder: [], aiPlacement: 'main' }));
+beforeEach(() => useWorkspaceNavigation.setState({ collapsed: false, sidebarOverlay: false, sidebarWidth: 208, sidebarDragWidth: null, area: 'terminal', previousArea: 'terminal', lastTabs: {}, groupColors: {}, codeOrder: [], aiPlacement: 'main' }));
 afterEach(() => useWorkspaceNavigation.setState(snapshot, true));
 
 it.each([['session', 'terminal'], ['history', 'terminal'], ['editor', 'code'], ['git-diff', 'code'], ['harness', 'ai'], ['usage', 'ai'], ['ai-history', 'ai']])('assigns %s to the %s workspace', (kind, area) => {
@@ -57,6 +57,17 @@ it('keeps the exact collapse boundary and rejects invalid resize values', () => 
   expect(workspaceSidebarWidth()).toBe(160);
   navigation.resizeSidebar(-1, 400);
   expect(workspaceSidebarWidth()).toBe(0);
+});
+it('temporarily overlays without reserving terminal space or persisting an expanded overlay', () => {
+  const navigation = useWorkspaceNavigation.getState();
+  navigation.openSidebar(true);
+  expect(useWorkspaceNavigation.getState()).toMatchObject({ collapsed: false, sidebarOverlay: true, sidebarWidth: 208 });
+  expect(workspaceSidebarWidth(1240, 1092)).toBe(0);
+  expect(JSON.parse(localStorage.getItem('workspace-navigation-v1')!).collapsed).toBe(true);
+  navigation.selectArea('code');
+  expect(useWorkspaceNavigation.getState()).toMatchObject({ area: 'code', collapsed: true, sidebarOverlay: false });
+  navigation.openSidebar(false);
+  expect(workspaceSidebarWidth(1240)).toBe(208);
 });
 it.each([[null, 208], [Number.NaN, 208], [Infinity, 208], ['300', 208], [159, 160], [800, 400], [240.8, 241]])('normalizes saved sidebar width %s', (value, expected) => {
   expect(normalizeSidebarWidth(value)).toBe(expected);

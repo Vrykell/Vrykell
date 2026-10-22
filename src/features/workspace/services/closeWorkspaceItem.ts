@@ -10,7 +10,7 @@ export function closeWorkspaceItem() {
   const tab = workspace.tabs.find(item => item.id === workspace.activeId);
   if (sideAiHasFocus()) {
     closeAiWorkspaceSession(`chat:${useChatStore.getState().activeConversationId}`);
-    useDockStore.getState().togglePanel('right', 'chat');
+    useDockStore.getState().closePanel('chat');
     return;
   }
   if (focusedWorkspaceArea() === 'ai' && tab?.kind === 'harness') {
