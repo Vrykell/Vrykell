@@ -25,6 +25,8 @@ interface NavigationState {
   lastTabs: Partial<Record<WorkspaceArea, string>>;
   groupColors: Record<string, HistoryGroupColor>;
   codeOrder: string[];
+  /** Top-level terminal strip order: group:<id> and tab:<id> entities. */
+  sessionLayoutOrder: string[];
   aiPlacement: 'main' | 'side';
   selectArea: (area: WorkspaceArea) => void;
   rememberTab: (area: WorkspaceArea, id: string) => void;
@@ -35,6 +37,8 @@ interface NavigationState {
   resetSidebarWidth: () => void;
   setGroupColor: (id: string, color: HistoryGroupColor | null) => void;
   moveCodeTab: (ids: string[], id: string, over: string, after: boolean) => void;
+  moveSessionLayoutItem: (id: string, over?: string, after?: boolean) => void;
+  reconcileSessionLayout: (ids: string[]) => void;
   setAiPlacement: (placement: 'main' | 'side') => void;
 }
 
@@ -54,7 +58,8 @@ if (savedColors && typeof savedColors === 'object') {
 export const useWorkspaceNavigation = create<NavigationState>((set) => ({
   area: 'terminal', previousArea: 'terminal', collapsed: saved?.collapsed === true || window.innerWidth <= WORKSPACE_COMPACT_BREAKPOINT,
   sidebarWidth: normalizeSidebarWidth(saved?.sidebarWidth), sidebarDragWidth: null, sidebarOverlay: false,
-  lastTabs: {}, groupColors, codeOrder: [], aiPlacement: 'main',
+  lastTabs: {}, groupColors, codeOrder: [], sessionLayoutOrder: Array.isArray(saved?.sessionLayoutOrder)
+    ? saved.sessionLayoutOrder.filter((id): id is string => typeof id === 'string') : [], aiPlacement: 'main',
   selectArea: area => set(state => ({ area, previousArea: state.area !== 'ai' ? state.area : state.previousArea,
     ...(state.sidebarOverlay && area !== state.area ? { collapsed: true, sidebarOverlay: false, sidebarDragWidth: null } : {}) })),
   rememberTab: (area, id) => set(state => state.lastTabs[area] === id ? state : ({ lastTabs: { ...state.lastTabs, [area]: id } })),
@@ -83,12 +88,29 @@ export const useWorkspaceNavigation = create<NavigationState>((set) => ({
     order.splice(index + (after ? 1 : 0), 0, id);
     return { codeOrder: order };
   }),
+  moveSessionLayoutItem: (id, over, after) => set(state => {
+    if (id === over) return state;
+    const order = state.sessionLayoutOrder.filter(item => item !== id);
+    if (over) {
+      const index = order.indexOf(over);
+      if (index < 0) return state;
+      order.splice(index + (after ? 1 : 0), 0, id);
+    } else order.push(id);
+    return { sessionLayoutOrder: order };
+  }),
+  reconcileSessionLayout: ids => set(state => {
+    const order = orderedWorkspaceIds(ids, state.sessionLayoutOrder);
+    return order.length === state.sessionLayoutOrder.length && order.every((id, index) => id === state.sessionLayoutOrder[index])
+      ? state : { sessionLayoutOrder: order };
+  }),
   setAiPlacement: aiPlacement => set({ aiPlacement }),
 }));
 
 useWorkspaceNavigation.subscribe((state, previous) => {
-  if (state.collapsed !== previous.collapsed || state.sidebarOverlay !== previous.sidebarOverlay || state.groupColors !== previous.groupColors || state.sidebarWidth !== previous.sidebarWidth) {
-    safeLocalStorageSet(STORAGE_KEY, JSON.stringify({ collapsed: state.collapsed || state.sidebarOverlay, groupColors: state.groupColors, sidebarWidth: state.sidebarWidth }));
+  if (state.collapsed !== previous.collapsed || state.sidebarOverlay !== previous.sidebarOverlay || state.groupColors !== previous.groupColors
+    || state.sidebarWidth !== previous.sidebarWidth || state.sessionLayoutOrder !== previous.sessionLayoutOrder) {
+    safeLocalStorageSet(STORAGE_KEY, JSON.stringify({ collapsed: state.collapsed || state.sidebarOverlay, groupColors: state.groupColors,
+      sidebarWidth: state.sidebarWidth, sessionLayoutOrder: state.sessionLayoutOrder }));
   }
 });
 

@@ -37,6 +37,7 @@ test.describe('标签页管理侧栏', () => {
     await expect(page.getByText('Bash', { exact: true })).toBeVisible();
 
     // 搜索过滤
+    await page.getByRole('button', { name: '更多配置文件…', exact: true }).click();
     await page.locator('input[placeholder="搜索标签页类型…"]').fill('bash');
     await expect(page.getByText('Bash', { exact: true })).toBeVisible();
     await expect(page.getByText('Zsh', { exact: true })).toHaveCount(0);

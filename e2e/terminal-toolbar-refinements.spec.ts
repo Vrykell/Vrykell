@@ -44,6 +44,7 @@ for (const theme of ['dark', 'light']) test(`terminal split creation and group m
     const search = page.getByTestId('tab-search');
     await expect(search).toHaveClass(/text-input-field/);
     await expect(search).toHaveCSS('border-radius', '8px');
+    expect((await search.boundingBox())!.width).toBeLessThan(160);
     await search.fill('missing terminal');
     await expect(page.getByText('无匹配会话', { exact: true })).toBeVisible();
     await search.fill('');

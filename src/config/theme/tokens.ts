@@ -226,15 +226,15 @@ const dark: ThemePalette = {
   groupCoral: DARK_ACCENTS.coral,
 
   // Navigation keeps its tint while content and auxiliary panels retain separate levels.
-  chromeBg: '#28282B',
+  chromeBg: '#2E2E2E',
   sidebarBg: DARK_SURFACES.sidebar,
-  auxiliaryBg: '#1C1C1C',
+  auxiliaryBg: '#282828',
   chromeField: DARK_SURFACES.control,
   selectionBg: '#183C57',
   canvas: DARK_SURFACES.canvas,
   surface: DARK_SURFACES.card,
   fieldBg: DARK_SURFACES.field,
-  composerBg: '#363636',
+  composerBg: '#333333',
   block: DARK_SURFACES.card,
   elevated: DARK_SURFACES.elevated,
   hover: 'rgba(255,255,255,0.07)',

@@ -39,7 +39,7 @@ export default function DockNavigation({ side }: { side: DockSide }) {
     }
   };
   if (!zone.length && side === 'left') return null;
-  return <nav className="workspace-right-navigation" aria-label={t('Auxiliary panels')} data-dock-zone={side}
+  return <nav className={`workspace-right-navigation${side === 'left' ? ' workspace-left-navigation' : ''}`} aria-label={t(side === 'left' ? 'Toolbar' : 'Auxiliary panels')} data-dock-zone={side}
     data-dragging={!!dragging} data-compact={zone.length > 1} data-drop-active={!!dragging && target?.side === side}>
     <div className="workspace-right-actions">
       {visible.map(id => <Fragment key={id}>

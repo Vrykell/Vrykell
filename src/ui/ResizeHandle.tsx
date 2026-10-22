@@ -16,6 +16,8 @@ interface ResizeHandleProps {
   valueMax?: number;
   onReset?: () => void;
   lineThickness?: number;
+  /** Paint the resting divider; hover and drag feedback remain available. */
+  showRestingLine?: boolean;
 }
 
 /** Grab strip thickness (px). The strip stays transparent; only its hairline is painted. */
@@ -37,7 +39,7 @@ const LINE_THICKNESS = 1;
  * document-level listeners must keep working until the button is released so the user
  * can drag back out of the collapse.
  */
-export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, testId, label, valueNow, valueMin, valueMax, onReset, lineThickness = LINE_THICKNESS }: ResizeHandleProps) {
+export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, testId, label, valueNow, valueMin, valueMax, onReset, lineThickness = LINE_THICKNESS, showRestingLine = true }: ResizeHandleProps) {
   const startRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
   const lineRef = useRef<HTMLDivElement>(null);
@@ -101,7 +103,7 @@ export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, test
           document.body.style.userSelect = '';
           document.removeEventListener('mousemove', onMove);
           document.removeEventListener('mouseup', onUp);
-          paintLine('var(--resize-divider)');
+          paintLine(showRestingLine ? 'var(--resize-divider)' : 'transparent');
           endLayoutResizeDrag();
         };
         document.addEventListener('mousemove', onMove);
@@ -110,7 +112,7 @@ export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, test
       onMouseEnter={() => paintLine('var(--border-strong)')}
       onMouseLeave={() => {
         // Keep the highlight while dragging, even when the pointer leaves the strip.
-        if (!startRef.current) paintLine('var(--resize-divider)');
+        if (!startRef.current) paintLine(showRestingLine ? 'var(--resize-divider)' : 'transparent');
       }}
       style={{
         position: 'absolute',
@@ -128,7 +130,7 @@ export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, test
         aria-hidden
         style={{
           position: 'absolute',
-          backgroundColor: 'var(--resize-divider)',
+          backgroundColor: showRestingLine ? 'var(--resize-divider)' : 'transparent',
           transition: 'background-color var(--dur) var(--ease)',
           ...(isX
             ? { left: `calc(50% - ${lineThickness / 2}px)`, top: 0, bottom: 0, width: lineThickness }

@@ -41,7 +41,7 @@ describe('toRgba', () => {
 describe('default blue palette', () => {
   it('uses the sampled neutral surfaces and blue action from the appearance reference', () => {
     expect(themes.dark).toMatchObject({
-      canvas: '#202020', sidebarBg: '#28282B', chromeBg: '#28282B', auxiliaryBg: '#1C1C1C', xtermBg: '#141414', surface: '#282828', composerBg: '#363636',
+      canvas: '#202020', sidebarBg: '#28282B', chromeBg: '#2E2E2E', auxiliaryBg: '#282828', xtermBg: '#141414', surface: '#282828', composerBg: '#333333',
       fieldBg: '#2C2C2C', selectionBg: '#183C57', accent: '#50C0FF', primaryAction: '#183C57',
     });
   });
@@ -160,11 +160,12 @@ describe('default blue palette', () => {
   });
 
   it.each(['dark', 'light'] as const)('%s retains navigation tint and distinct content, auxiliary and composer surfaces', mode => {
-    expect(themes[mode].chromeBg).toBe(themes[mode].sidebarBg);
+    if (mode === 'dark') expect(themes[mode].chromeBg).not.toBe(themes[mode].sidebarBg);
+    else expect(themes[mode].chromeBg).toBe(themes[mode].sidebarBg);
     expect(themes[mode].auxiliaryBg).not.toBe(themes[mode].canvas);
     expect(themes[mode].sidebarBg).not.toBe(themes[mode].canvas);
     expect(themes[mode].fieldBg).not.toBe(themes[mode].canvas);
-    expect(paletteToCssVars(themes[mode])['--composer-bg']).toBe(mode === 'dark' ? '#363636' : '#FFFFFF');
+    expect(paletteToCssVars(themes[mode])['--composer-bg']).toBe(mode === 'dark' ? '#333333' : '#FFFFFF');
   });
   it('retains the complete terminal color palette', () => {
     expect(themes.dark.xtermForeground).toBe('#E9EBED');
@@ -215,7 +216,8 @@ describe('paletteToCssVars', () => {
       const channels = [1, 3, 5].map(offset => parseInt(vars[key].slice(offset, offset + 2), 16));
       expect(channels[2]).toBeGreaterThanOrEqual(channels[0]!);
     }
-    expect(vars['--sidebar-bg']).toBe(vars['--chrome-bg']);
+    if (mode === 'dark') expect(vars['--sidebar-bg']).not.toBe(vars['--chrome-bg']);
+    else expect(vars['--sidebar-bg']).toBe(vars['--chrome-bg']);
     expect(vars['--auxiliary-bg']).not.toBe(vars['--chrome-bg']);
     expect(vars['--sidebar-bg']).not.toBe(vars['--canvas']);
   });

@@ -2,9 +2,13 @@ import { preferredShell, useTerminalDefaults } from '@config/terminalDefaults';
 import { loadRecentOpen } from '../model/tabTypes';
 import { TextInput } from '@ui/TextInput';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { iconSizes, Search } from '@ui/icons';
+import { iconSizes, ChevronRight, Columns2, Folder, FolderOpen, Search, Settings, Square, SquareStack, TerminalPrompt } from '@ui/icons';
+import KeyHint from '@ui/KeyHint';
 import { SshIcon, shellIconFor } from '@ui/shellIcons';
 import { getAvailableShells, type ShellOption, type ShellType } from '@platform/shells';
+import { pickPath } from '@platform/api/fs';
+import { openAppWindow } from '@platform/appWindows';
+import { isMacOS } from '@platform/runtime';
 import {
   buildNewTabOptions,
   filterNewTabOptions,
@@ -13,7 +17,7 @@ import {
 } from '@features/workspace/model/tabTypes';
 import { useSshStore, ensureSshLoaded } from '@features/ssh';
 import { connectionTarget, type SshConnection } from '@features/ssh/services/api';
-import { useSessionStore } from '@features/workspace';
+import { getFocusedCwd, useSessionStore, useUiStore } from '@features/workspace';
 import type { TerminalSpec } from '@features/workspace/model/windowLayout';
 import { useAgentSettings } from '@features/agent';
 import SshFormModal from '@features/ssh/components/SshFormModal';
@@ -54,10 +58,14 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [editing, setEditing] = useState<SshConnection | null>(null);
   const [deleting, setDeleting] = useState<SshConnection | null>(null);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [location, setLocation] = useState<'current' | 'home' | 'custom'>('current');
+  const [customCwd, setCustomCwd] = useState('');
   const defaultShell = useTerminalDefaults(state => state.shell);
   const openModeByShell = useAgentSettings(state => state.global.openModeByShell);
   const sshOpenMode = useAgentSettings(state => state.global.sshOpenMode);
   const inputRef = useRef<HTMLInputElement>(null);
+  const dialogRef = useRef<HTMLDivElement>(null);
   const sshConnections = useSshStore((s) => s.connections);
 
   useEffect(() => {
@@ -67,12 +75,15 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
     setMenu(null);
     setEditing(null);
     setDeleting(null);
+    setMoreOpen(false);
+    setLocation('current');
+    setCustomCwd('');
     ensureSshLoaded();
     let cancelled = false;
     getAvailableShells().then((s) => {
       if (!cancelled) setShells(s);
     });
-    requestAnimationFrame(() => inputRef.current?.focus());
+    requestAnimationFrame(() => dialogRef.current?.focus());
     return () => {
       cancelled = true;
     };
@@ -84,11 +95,18 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
   );
 
   const filtered = useMemo(
-    () => filterNewTabOptions(options, query),
-    [options, query],
+    () => moreOpen ? filterNewTabOptions(options, query) : options,
+    [options, query, moreOpen],
   );
 
   useEffect(() => setSelected(0), [query]);
+
+  const targetCwd = location === 'current' ? getFocusedCwd() : location === 'custom' ? customCwd || undefined : undefined;
+  const defaultOption = useMemo(() => {
+    const preferred = preferredShell(defaultShell, shells);
+    return options.find(option => option.kind === 'shell' && option.shellType === preferred)
+      ?? options.find(option => option.kind === 'shell');
+  }, [options, shells, defaultShell]);
 
   const create = useCallback((opt: NewTabOption) => {
     if (opt.kind === 'shell') {
@@ -98,7 +116,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
         onClose();
         return;
       }
-      useSessionStore.getState().addTab({ shellType: opt.shellType, groupId });
+      useSessionStore.getState().addTab({ shellType: opt.shellType, groupId, cwd: targetCwd });
     } else {
       touchRecentOpen(opt.key);
       void useSshStore.getState().touch(opt.sshId);
@@ -120,7 +138,16 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
       }
     }
     onClose();
-  }, [onClose, groupId, onPick]);
+  }, [onClose, groupId, onPick, targetCwd]);
+
+  const chooseDirectory = useCallback(async () => {
+    try {
+      const [path] = await pickPath('directory');
+      if (path) { setCustomCwd(path); setLocation('custom'); }
+    } catch (reason) {
+      useToastStore.getState().addToast(t('Could not open file: {{error}}', { error: String(reason) }), 'error');
+    }
+  }, []);
 
   const setShellMode = useCallback((shell: ShellType, mode: 'classic' | 'block') => {
     const current = useAgentSettings.getState().global.openModeByShell;
@@ -207,70 +234,57 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
 
   if (!open) return null;
 
-  return <>
-    <div
-      style={{
-        position: 'fixed', inset: 0, zIndex: 9996,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--overlay)',
-        animation: 'overlayIn 0.18s var(--ease)',
-      }}
-      onClick={onClose}
-    >
-      <div className="workspace-floating workspace-floating-dialog" role="dialog" aria-modal="true" aria-label={t('New tab')}
-        style={{
-          width: 420, maxWidth: 'calc(100vw - 40px)', maxHeight: '70vh',
-          display: 'flex', flexDirection: 'column', overflow: 'hidden',
-          animation: 'modalIn 0.22s var(--ease-out)',
-        }}
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={handleKey}
-      >
-        <div style={{
-          padding: '12px 16px 4px', fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)',
-          color: 'var(--text-primary)',
-        }}>
-          {t('New tab')}
-        </div>
+  return <><div className="new-tab-overlay" onClick={onClose}>
+      <div ref={dialogRef} tabIndex={-1} className="workspace-floating workspace-floating-dialog new-tab-dialog" role="dialog" aria-modal="true" aria-label={t('New tab')}
+        onClick={event => event.stopPropagation()} onKeyDown={handleKey}>
+        <button type="button" className="new-tab-default" data-testid="new-tab-default" disabled={!defaultOption}
+          onClick={() => defaultOption && create(defaultOption)}>
+          <span className="new-tab-primary-icon"><TerminalPrompt size={iconSizes.navigation} /></span>
+          <span><strong>{t('New tab')}</strong><small>{t('Use the default profile')}</small></span>
+          <KeyHint shortcut={isMacOS ? 'Meta+T' : 'Control+T'} />
+        </button>
 
-        {/* Search field */}
-        <div style={{ padding: '8px 16px' }}>
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 6,
-            background: 'var(--field-bg)',
-            borderRadius: 'var(--radius-inner)', padding: '0 8px', height: 28,
-          }}>
-            <Search size={13} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
-            <TextInput
-              ref={inputRef}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('Search tab types…')}
-              style={{
-                flex: 1, background: 'transparent', border: 'none', outline: 'none',
-                fontSize: 'calc(13px * var(--ui-font-scale))', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)',
-              }}
-            />
+        <section className="new-tab-section" aria-labelledby="new-tab-profiles">
+          <h2 id="new-tab-profiles">{t('Choose a profile')}</h2>
+          <div className="new-tab-option-list">
+            {filtered.map((option, index) => <OptionRow key={option.key} opt={option} index={index}
+              selected={index === selected} onSelect={() => setSelected(index)} onCreate={() => create(option)}
+              onContextMenu={event => { setSelected(index); openMenu(event, option); }} />)}
           </div>
-        </div>
+          {!filtered.length && <div className="new-tab-empty">{t('No matching tab types')}</div>}
+          <button type="button" className="new-tab-row new-tab-more" onClick={() => {
+            setMoreOpen(true); requestAnimationFrame(() => inputRef.current?.focus());
+          }}><Settings size={18} /><span>{t('More profiles…')}</span><ChevronRight size={16} /></button>
+          {moreOpen && <div className="new-tab-search">
+            <Search size={14} /><TextInput ref={inputRef} value={query} onChange={event => setQuery(event.target.value)}
+              placeholder={t('Search tab types…')} />
+          </div>}
+        </section>
 
-        {/* Candidate list */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '4px 8px 10px' }}>
-          {filtered.length === 0 ? (
-            <div style={{ padding: 20, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>
-              {t('No matching tab types')}
-            </div>
-          ) : filtered.map((o, i) => (
-            <OptionRow
-              key={o.key}
-              opt={o}
-              selected={i === selected}
-              onSelect={() => setSelected(i)}
-              onCreate={() => create(o)}
-              onContextMenu={(event) => { setSelected(i); openMenu(event, o); }}
-            />
-          ))}
-        </div>
+        <section className="new-tab-section" aria-labelledby="new-tab-location">
+          <h2 id="new-tab-location">{t('Open location')}</h2>
+          <button type="button" className="new-tab-row" data-active={location === 'current' || undefined}
+            onClick={() => setLocation('current')}><Square size={18} /><span>{t('Open in current directory')}</span>
+            <KeyHint shortcut={isMacOS ? 'Meta+Shift+T' : 'Control+Shift+T'} /></button>
+          <button type="button" className="new-tab-row" data-active={location === 'home' || undefined}
+            onClick={() => setLocation('home')}><FolderOpen size={18} /><span>{t('Open in home directory')}</span>
+            <KeyHint shortcut={isMacOS ? 'Meta+Shift+H' : 'Control+Shift+H'} /></button>
+          <button type="button" className="new-tab-row" data-active={location === 'custom' || undefined}
+            onClick={() => void chooseDirectory()}><Folder size={18} /><span>{customCwd || t('Choose a directory…')}</span>
+            <KeyHint shortcut={isMacOS ? 'Meta+Shift+O' : 'Control+Shift+O'} /></button>
+        </section>
+
+        <section className="new-tab-section" aria-labelledby="new-tab-advanced">
+          <h2 id="new-tab-advanced">{t('Advanced')}</h2>
+          <button type="button" className="new-tab-row" onClick={() => {
+            try { void openAppWindow(); onClose(); }
+            catch (reason) { useToastStore.getState().addToast(t('Could not open a new window: {{error}}', { error: String(reason) }), 'error'); }
+          }}><SquareStack size={18} /><span>{t('Open in new window')}</span>
+            <KeyHint shortcut={isMacOS ? 'Meta+N' : 'Control+N'} /></button>
+          <button type="button" className="new-tab-row" onClick={() => {
+            onClose(); useUiStore.getState().beginSplit(null);
+          }}><Columns2 size={18} /><span>{t('Split tab')}</span><ChevronRight size={16} /></button>
+        </section>
       </div>
     </div>
 
@@ -299,14 +313,9 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
   </>;
 }
 
-function OptionRow({
-  opt,
-  selected,
-  onSelect,
-  onCreate,
-  onContextMenu,
-}: {
+function OptionRow({ opt, index, selected, onSelect, onCreate, onContextMenu }: {
   opt: NewTabOption;
+  index: number;
   selected: boolean;
   onSelect: () => void;
   onCreate: () => void;
@@ -314,36 +323,15 @@ function OptionRow({
 }) {
   const Icon = opt.kind === 'ssh' ? SshIcon : shellIconFor(opt.shellType);
   return (
-    <button
+    <button className="new-tab-row" data-active={selected || undefined}
       onClick={onCreate}
       onMouseEnter={onSelect}
       onContextMenu={onContextMenu}
       data-testid={`new-tab-option-${opt.key}`}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        width: '100%', textAlign: 'left', padding: '8px 10px',
-        border: 'none', borderRadius: 'var(--radius-inner)',
-        background: selected ? 'var(--hover)' : 'transparent',
-        color: 'var(--text-primary)', cursor: 'pointer', fontSize: 'calc(13px * var(--ui-font-scale))',
-      }}
     >
-      <span style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 24, height: 24, borderRadius: 5,
-        color: 'var(--text-secondary)', flexShrink: 0,
-      }}>
-        <Icon size={iconSizes.row} />
-      </span>
-      <span style={{ flex: 1, overflow: 'hidden' }}>
-        <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {opt.label}
-        </span>
-        {opt.subtitle && (
-          <span style={{ display: 'block', fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {opt.subtitle}
-          </span>
-        )}
-      </span>
+      <Icon size={18} />
+      <span><strong>{opt.label}</strong>{opt.subtitle && <small>{opt.subtitle}</small>}</span>
+      <KeyHint shortcut={`${isMacOS ? 'Meta' : 'Control'}+${index + 1}`} />
     </button>
   );
 }

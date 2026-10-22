@@ -86,7 +86,7 @@ export function DockPanel({ side, panelId, visible }: { side: DockSide; panelId:
         background: side === 'left' ? 'transparent' : 'var(--auxiliary-bg)',
         borderRadius: 'inherit', overflow: 'hidden',
       }}>
-        <div className="workspace-panel-heading" data-testid={`panel-drag-handle-${panelId}`} data-dragging={dragging}
+        {side === 'right' && <div className="workspace-panel-heading" data-testid={`panel-drag-handle-${panelId}`} data-dragging={dragging}
           onPointerDown={event => startDrag(event, panelId)}>
           <span>{def.label}</span>
           <div className="workspace-panel-heading-actions">
@@ -99,14 +99,14 @@ export function DockPanel({ side, panelId, visible }: { side: DockSide; panelId:
           <button data-subtle className="workspace-panel-close" aria-label={t('Close {{panel}} panel', { panel: def.label })}
             onClick={() => useDockStore.getState().closePanel(panelId)}><X size={iconSizes.control} /></button>
           </div>
-        </div>
+        </div>}
         <div style={{ flex: 1, minHeight: 0 }}>
           <PanelContent />
         </div>
       </div>
 
       {/* Keep the resize edge mounted during collapse so dragging back restores the panel. */}
-      {side === 'right' && <ResizeHandle axis="x" edge="left" lineThickness={2} onDelta={handleDelta} onUp={handleCommit} testId={`resize-handle-${panelId}`} />}
+      {side === 'right' && <ResizeHandle axis="x" edge="left" lineThickness={2} showRestingLine={false} onDelta={handleDelta} onUp={handleCommit} testId={`resize-handle-${panelId}`} />}
     </div>
   );
 }

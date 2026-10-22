@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { normalizeSidebarWidth, orderedWorkspaceIds, useWorkspaceNavigation, workspaceAreaForKind, workspaceSidebarWidth } from '../stores/navigation';
 const snapshot = useWorkspaceNavigation.getState();
-beforeEach(() => useWorkspaceNavigation.setState({ collapsed: false, sidebarOverlay: false, sidebarWidth: 208, sidebarDragWidth: null, area: 'terminal', previousArea: 'terminal', lastTabs: {}, groupColors: {}, codeOrder: [], aiPlacement: 'main' }));
+beforeEach(() => useWorkspaceNavigation.setState({ collapsed: false, sidebarOverlay: false, sidebarWidth: 208, sidebarDragWidth: null, area: 'terminal', previousArea: 'terminal', lastTabs: {}, groupColors: {}, codeOrder: [], sessionLayoutOrder: [], aiPlacement: 'main' }));
 afterEach(() => useWorkspaceNavigation.setState(snapshot, true));
 
 it.each([['session', 'terminal'], ['history', 'terminal'], ['editor', 'code'], ['git-diff', 'code'], ['harness', 'ai'], ['usage', 'ai'], ['ai-history', 'ai']])('assigns %s to the %s workspace', (kind, area) => {
@@ -77,6 +77,16 @@ it('interleaves files and comparisons while ignoring stale saved identifiers', (
   useWorkspaceNavigation.getState().moveCodeTab(ids, 'diff:c', 'file:a', false);
   expect(orderedWorkspaceIds(ids, useWorkspaceNavigation.getState().codeOrder)).toEqual(['diff:c', 'file:a', 'file:b']);
   expect(orderedWorkspaceIds(['file:b', 'file:d'], useWorkspaceNavigation.getState().codeOrder)).toEqual(['file:b', 'file:d']);
+});
+it('moves groups and loose tabs through one persisted top-level order', () => {
+  useWorkspaceNavigation.setState({ sessionLayoutOrder: ['group:team', 'tab:loose'] });
+  const navigation = useWorkspaceNavigation.getState();
+  navigation.moveSessionLayoutItem('tab:loose', 'group:team');
+  navigation.moveSessionLayoutItem('group:team', 'tab:loose', true);
+  expect(useWorkspaceNavigation.getState().sessionLayoutOrder).toEqual(['tab:loose', 'group:team']);
+  expect(JSON.parse(localStorage.getItem('workspace-navigation-v1')!).sessionLayoutOrder).toEqual(['tab:loose', 'group:team']);
+  navigation.moveSessionLayoutItem('tab:loose');
+  expect(useWorkspaceNavigation.getState().sessionLayoutOrder).toEqual(['group:team', 'tab:loose']);
 });
 it('persists group color overrides independently of terminal icon colors', () => {
   useWorkspaceNavigation.getState().setGroupColor('group-a', 'violet');

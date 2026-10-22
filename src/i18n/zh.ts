@@ -1853,6 +1853,17 @@ const zh: Record<string, string> = {
   'No matching history': '没有匹配的历史记录',
   'No history yet': '暂无历史记录',
   'Loading history…': '正在加载历史记录…',
+  'Toolbar': '工具栏',
+  'Use the default profile': '使用默认配置文件',
+  'Choose a profile': '选择配置文件',
+  'More profiles…': '更多配置文件…',
+  'Open location': '打开位置',
+  'Open in current directory': '在当前目录打开',
+  'Open in home directory': '在用户主目录打开',
+  'Choose a directory…': '选择目录…',
+  'Open in new window': '在新窗口中打开',
+  'Split tab': '拆分标签页',
+  'Could not open a new window: {{error}}': '无法打开新窗口：{{error}}',
 };
 
 export default zh;

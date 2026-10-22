@@ -131,7 +131,7 @@ test('the full-height navigation and titlebar separate workspace and auxiliary c
   await expect(panel).toHaveCSS('border-left-style', 'none');
   const panelBg = await panel.locator(':scope > div').first().evaluate(el => getComputedStyle(el).backgroundColor);
   expect(panelBg).not.toBe(await nav.evaluate(el => getComputedStyle(el).backgroundColor));
-  expect(panelBg).toBe(await resolvedColor(page, '--sidebar-bg'));
+  expect(panelBg).toBe(await resolvedColor(page, '--auxiliary-bg'));
   const contentBg = await page.locator('main').evaluate(el => getComputedStyle(el).backgroundColor);
   expect(panelBg).not.toBe(contentBg);
   expect(contentBg).not.toBe(await nav.evaluate(el => getComputedStyle(el).backgroundColor));
@@ -145,7 +145,7 @@ test('the full-height navigation and titlebar separate workspace and auxiliary c
   }
   await page.locator('[data-dock-btn="chat"]').click();
   await expect(page.locator('.workspace-side-panel[data-side="right"]:visible > div:first-child')).toHaveCSS('background-color', panelBg);
-  await expect(page.locator('.workspace-side-panel[data-side="right"] .terminal-composer').locator('..')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(page.locator('.workspace-side-panel[data-side="right"] .terminal-composer')).toHaveCSS('background-color', await resolvedColor(page, '--composer-bg'));
 });
 
 test('workspace regions have square corners and flush resize boundaries', async ({ page }) => {
@@ -166,7 +166,7 @@ test('workspace regions have square corners and flush resize boundaries', async 
   expect(Math.abs(panelBox.x - (mainBox.x + mainBox.width))).toBeLessThan(0.5);
   const line = page.getByTestId('resize-handle-chat').locator('[data-resize-line]');
   await expect(line).toHaveCSS('width', '2px');
-  await expect(line).toHaveCSS('background-color', await resolvedColor(page, '--resize-divider'));
+  await expect(line).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const lineBox = (await line.boundingBox())!;
   expect(Math.abs(lineBox.x + lineBox.width / 2 - (mainBox.x + mainBox.width))).toBeLessThan(0.5);
   await expect(main).toHaveCSS('border-top-left-radius', '0px');
@@ -175,13 +175,14 @@ test('workspace regions have square corners and flush resize boundaries', async 
   await expect(main).toHaveCSS('border-radius', '0px');
 });
 
-test('settings and terminal use the same content background in both themes', async ({ page }) => {
+test('settings use the auxiliary background and remain distinct from terminal content', async ({ page }) => {
   await page.locator('[data-dock-btn="files"]').click();
   const background = async (selector: string) => page.locator(selector).evaluate(el => getComputedStyle(el).backgroundColor);
   const terminalBg = await resolvedColor(page, '--xterm-bg');
+  const auxiliaryBg = await resolvedColor(page, '--auxiliary-bg');
   await gotoSetting(page, '模型配置');
   await expect(page.getByTestId('provider-switch')).toBeVisible();
-  expect(await background('.settings-content')).toBe(terminalBg);
+  expect(await background('.settings-content')).toBe(auxiliaryBg);
   expect(await background('.settings-navigation')).not.toBe(terminalBg);
   await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
   for (const label of ['浅色', '深色']) {
@@ -192,7 +193,7 @@ test('settings and terminal use the same content background in both themes', asy
     expect(sidebarBg).not.toBe(await background('.workspace-sidebar'));
     expect(sidebarBg).not.toBe(await background('main'));
     expect(await background('.settings-navigation')).toBe(sidebarBg);
-    expect(await background('.settings-content')).toBe(await resolvedColor(page, '--xterm-bg'));
+    expect(await background('.settings-content')).toBe(await resolvedColor(page, '--auxiliary-bg'));
     const aliases = await page.evaluate(() => {
       const css = getComputedStyle(document.documentElement);
       return ['--text-title', '--text-primary', '--tab-hover', '--hover'].map(key => css.getPropertyValue(key).trim());
@@ -202,14 +203,15 @@ test('settings and terminal use the same content background in both themes', asy
   }
 });
 
-test('settings, both history pages, the editor and diffs share the terminal background', async ({ page }) => {
+test('settings and history use the auxiliary background while editor and diffs use terminal content', async ({ page }) => {
   const background = async (selector: string) => page.locator(selector).first().evaluate(el => getComputedStyle(el).backgroundColor);
   const terminalBg = await resolvedColor(page, '--xterm-bg');
+  const auxiliaryBg = await resolvedColor(page, '--auxiliary-bg');
   expect(terminalBg).toBe('rgb(20, 20, 20)');
 
   await gotoSetting(page, '主题');
   for (const selector of ['.settings-screen', '.settings-view', '.settings-content']) {
-    expect(await background(selector), selector).toBe(terminalBg);
+    expect(await background(selector), selector).toBe(auxiliaryBg);
   }
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await expect(page.locator('.settings-screen')).toHaveCount(0);
@@ -235,22 +237,21 @@ test('settings, both history pages, the editor and diffs share the terminal back
   await ensureTabsOpen(page);
   await page.getByTestId('tab-history-btn').click();
   await expect(page.getByTestId('session-history-page')).toBeVisible();
-  expect(await background('.history-page')).toBe(terminalBg);
+  expect(await background('.history-page')).toBe(auxiliaryBg);
 
   await page.locator('[data-dock-btn="chat"]').click();
   await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
   await expect(page.getByTestId('ai-history-page')).toBeVisible();
-  expect(await background('.history-page')).toBe(terminalBg);
+  expect(await background('.history-page')).toBe(auxiliaryBg);
 });
 
-test('auxiliary resize edges remain visible and strengthen during dragging', async ({ page }) => {
+test('auxiliary resize edges appear on hover or drag', async ({ page }) => {
   for (const id of ['files', 'chat']) {
     await page.locator(`[data-dock-btn="${id}"]`).click();
     const handle = page.getByTestId(`resize-handle-${id}`);
     const line = handle.locator('[data-resize-line]');
-    const borderColor = await resolvedColor(page, '--resize-divider');
     const activeColor = await resolvedColor(page, '--border-strong');
-    await expect(line).toHaveCSS('background-color', borderColor);
+    await expect(line).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await expect(handle).toHaveCSS('cursor', 'col-resize');
     expect((await handle.boundingBox())!.width).toBeGreaterThanOrEqual(8);
     const panel = handle.locator('..');
@@ -267,7 +268,7 @@ test('auxiliary resize edges remain visible and strengthen during dragging', asy
     expect((await panel.boundingBox())!.width).toBe(before + 40);
     await page.mouse.up();
     await page.mouse.move(700, 700);
-    await expect(line).toHaveCSS('background-color', borderColor);
+    await expect(line).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   }
 });
 

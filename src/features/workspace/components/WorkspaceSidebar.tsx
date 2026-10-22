@@ -49,6 +49,7 @@ export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number
         onClick={() => selectWorkspaceArea(id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectWorkspaceArea(id); } }} />)}
     </nav>
     <div className="workspace-sidebar-tools" data-testid="workspace-left-dock">
+      <div className="workspace-sidebar-tools-label">{t('Toolbar')}</div>
       <DockNavigation side="left" />
       <SidePanel side="left" />
     </div>

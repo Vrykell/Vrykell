@@ -308,7 +308,7 @@ function SettingsContent() {
   return (
     <div className="settings-view" style={{
       flex: 1, minHeight: 0, display: 'flex', flexDirection: 'row',
-      background: 'var(--xterm-bg)', userSelect: 'none',
+      background: 'var(--auxiliary-bg)', userSelect: 'none',
     }}>
       <div className="settings-layout">
         <SettingsNavigation navigation={navigation} />

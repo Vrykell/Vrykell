@@ -282,14 +282,33 @@ it('keeps an empty session drop zone expandable and previews grouped tabs outsid
   }));
   const { container } = render(<PanelTabs />);
   const zone = container.querySelector<HTMLElement>('[data-reorder-zone="ungrouped"]')!;
-  expect(zone).toHaveClass('terminal-ungrouped-tabs');
+  expect(zone).toHaveClass('terminal-ungrouped-tail');
   expect(zone.closest('[data-reorder-list]')).toHaveClass('terminal-tab-list');
-  expect(zone.querySelectorAll('[data-reorder-item]')).toHaveLength(1);
+  expect(zone.closest('[data-reorder-list]')!.querySelectorAll('[data-reorder-item]')).toHaveLength(3);
   act(() => {
     useListReorder.getState().start({ listId: 'session-tabs', id: 'local', kind: 'tab' }, { x: 10, y: 500 });
     useListReorder.getState().hover({ itemId: 'history', after: true });
   });
-  expect(zone.querySelector('[data-reorder-placeholder="history"]')).not.toBeNull();
+  expect(zone.closest('[data-reorder-list]')!.querySelector('[data-reorder-placeholder="history"]')).not.toBeNull();
   expect(screen.getByTestId('group-header-group-a').parentElement!.querySelector('[data-reorder-placeholder]')).toBeNull();
   expect(moveTab).not.toHaveBeenCalled();
+});
+
+it('treats expanded groups as inactive cards and only folds them visually while dragged', () => {
+  useSessionStore.setState(state => ({
+    tabs: state.tabs.map(tab => tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab),
+    activeId: 'local',
+    groups: [{ id: 'group-a', title: 'Group', collapsed: false }],
+  }));
+  render(<PanelTabs />);
+  const group = screen.getByTestId('group-header-group-a').closest('.terminal-tab-group')!;
+  expect(group.querySelector('[data-group-active]')).toBeNull();
+  expect(screen.getByTestId('group-header-group-a')).not.toHaveAttribute('data-header-selected');
+  expect(screen.getByTestId('tab-row-local')).toBeVisible();
+  act(() => useListReorder.getState().start({ listId: 'session-tabs', id: 'group-a', kind: 'group' }, { x: 10, y: 10 }));
+  expect(screen.queryByTestId('tab-row-local')).toBeNull();
+  expect(screen.getByTestId('group-count-group-a')).toHaveTextContent('1');
+  act(() => useListReorder.getState().end());
+  expect(screen.getByTestId('tab-row-local')).toBeVisible();
+  expect(useSessionStore.getState().groups[0]!.collapsed).toBe(false);
 });

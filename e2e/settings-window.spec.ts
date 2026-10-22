@@ -61,7 +61,7 @@ test('settings cover the content card and toggle back to the unchanged workspace
   });
   expect(chrome).toEqual({ color: 'rgba(0, 0, 0, 0)', background: 'none' });
   await expect(page.locator('body')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await expect(page.locator('.workspace-titlebar')).toHaveCSS('background-color', 'rgb(40, 40, 43)');
+  await expect(page.locator('.workspace-titlebar')).toHaveCSS('background-color', 'rgb(46, 46, 46)');
   await page.screenshot({ path: info.outputPath('sampled-palette-workspace.png') });
   await page.getByTestId('workspace-sidebar-expand').click();
   expect((await rail.boundingBox())!.width).toBe(railBefore!.width);

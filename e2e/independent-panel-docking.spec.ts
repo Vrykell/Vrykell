@@ -3,7 +3,9 @@ import { setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 async function dragPanel(page: Page, id: string, side: 'left' | 'right') {
-  const heading = (await page.getByTestId(`panel-drag-handle-${id}`).boundingBox())!;
+  const headingLocator = page.getByTestId(`panel-drag-handle-${id}`);
+  const source = await headingLocator.isVisible() ? headingLocator : page.locator(`[data-dock-zone="left"] [data-dock-btn="${id}"]`);
+  const heading = (await source.boundingBox())!;
   const target = side === 'left' ? (await page.getByTestId('workspace-left-dock').boundingBox())! : (await page.locator('.workspace-body').boundingBox())!;
   await page.mouse.move(heading.x + 24, heading.y + heading.height / 2); await page.mouse.down();
   await page.mouse.move(side === 'left' ? 80 : target.x + target.width - 20, target.y + Math.min(180, target.height / 2), { steps: 8 });
@@ -33,7 +35,7 @@ for (const theme of ['深色', '浅色']) test(`left and right panels retain the
   await expect(left).toBeHidden(); await expect(right).toBeVisible();
   await page.getByTestId('workspace-sidebar-expand').click();
   await expect(left).toBeVisible(); await expect(composer).toHaveValue('Preserve across both sides');
-  await left.getByRole('button', { name: '关闭AI 助手面板', exact: true }).click();
+  await page.locator('[data-dock-zone="left"] [data-dock-btn="chat"]').click();
   await expect(left).toHaveCount(0); await expect(right).toBeVisible();
   await page.locator('[data-dock-zone="left"] [data-dock-btn="chat"]').click();
   await expect(composer).toHaveValue('Preserve across both sides');

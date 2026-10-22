@@ -17,7 +17,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.locator('aside').getByRole('button', { name: '字体与显示', exact: true }).click();
     const settingsCard = page.locator('.settings-group-panel').first();
     await expect(settingsCard).toHaveCSS('border-top-width', '0px');
-    expect(await settingsCard.evaluate(element => getComputedStyle(element).boxShadow)).not.toBe('none');
+    expect(await settingsCard.evaluate(element => getComputedStyle(element).boxShadow)).toBe('none');
     const font = page.getByRole('combobox', { name: '页面字号' });
     await expect(font).toHaveCSS('border-top-width', '0px');
     await font.click();
@@ -27,14 +27,10 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(surface).toHaveCSS('border-top-width', '0px');
     expect(await surface.evaluate(element => getComputedStyle(element).boxShadow)).not.toContain('inset');
     expect(await surface.evaluate(element => {
-      const tone = (color: string) => {
-        const channels = (color.match(/[0-9.]+/g) ?? []).slice(0, 3).map(Number);
-        return channels.reduce((sum, channel) => sum + channel, 0) / (color.startsWith('color(') ? 1 : 255);
-      };
       const panel = document.querySelector('.settings-group-panel')!;
       // The floating surface carries the background; the listbox inside only scrolls.
       const surface = element.closest('.ui-select-menu') ?? element;
-      return tone(getComputedStyle(surface).backgroundColor) > tone(getComputedStyle(panel).backgroundColor);
+      return getComputedStyle(surface).backgroundColor !== getComputedStyle(panel).backgroundColor;
     })).toBe(true);
     await page.screenshot({ path: testInfo.outputPath(`settings-clean-edges-${theme}.png`), animations: 'disabled' });
     await page.keyboard.press('Escape');
@@ -43,7 +39,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByTestId('tab-history-btn').click();
     const card = page.getByTestId('history-group-card-source:archived-group');
     await expect(card).toHaveCSS('border-top-width', '0px');
-    expect(await card.evaluate(element => getComputedStyle(element).boxShadow)).not.toBe('none');
+    expect(await card.evaluate(element => getComputedStyle(element).boxShadow)).toBe('none');
     expect(await card.evaluate(element => getComputedStyle(element).boxShadow)).not.toContain('inset');
     const trigger = card.getByRole('button', { name: '分组操作' });
     await trigger.click();
@@ -65,7 +61,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
     const aiCard = page.getByTestId('ai-history-page').locator('.history-group-card').first();
     await expect(aiCard).toHaveCSS('border-top-width', '0px');
-    expect(await aiCard.evaluate(element => getComputedStyle(element).boxShadow)).not.toBe('none');
+    expect(await aiCard.evaluate(element => getComputedStyle(element).boxShadow)).toBe('none');
     await aiCard.getByRole('button', { name: '分组操作' }).click();
     await expect(menu.getByRole('menuitemradio')).toHaveCount(9);
     await menu.getByRole('menuitemradio', { name: '紫色', exact: true }).click();

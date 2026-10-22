@@ -18,7 +18,7 @@ import EditorActions from '@ui/EditorActions';
 import { useHorizontalWheel } from '@ui/hooks/useHorizontalWheel';
 import { useActiveTabVisibility } from '@ui/hooks/useActiveTabVisibility';
 import { historyGroupColor } from '@ui/historyGroupColor';
-import { useWorkspaceNavigation } from '../stores/navigation';
+import { orderedWorkspaceIds, useWorkspaceNavigation } from '../stores/navigation';
 import WorkspaceHeader from '@ui/WorkspaceHeader';
 import { SshIcon, shellIconFor } from '@ui/shellIcons';
 import {
@@ -36,6 +36,8 @@ import { applySessionGrouping } from '../services/autoGrouping';
 const LIST_ID = 'session-tabs';
 /** Zone id of the loose (ungrouped) area. */
 const UNGROUPED_ZONE = 'ungrouped';
+const groupEntity = (id: string) => `group:${id}`;
+const tabEntity = (id: string) => `tab:${id}`;
 
 export default function PanelTabs({ active = true }: { active?: boolean }) {
   const strip = useRef<HTMLDivElement>(null);
@@ -46,6 +48,7 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
   const iconColors = useIconColorStore(state => state.colors);
   const activeId = useSessionStore((s) => s.activeId);
   const groups = useSessionStore((s) => s.groups);
+  const sessionLayoutOrder = useWorkspaceNavigation(state => state.sessionLayoutOrder);
   const activate = useSessionStore((s) => s.activate);
   const closeTab = useSessionStore((s) => s.closeTab);
   const renameTab = useSessionStore((s) => s.renameTab);
@@ -78,13 +81,19 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
   function commitDrop(drag: ListReorderDrag, target: ListReorderTarget | null) {
     const ws = useSessionStore.getState();
     if (drag.kind === 'group') {
-      if (!target?.itemId) return;
-      const over = ws.groups.findIndex((g) => g.id === target.itemId);
-      if (over < 0) return;
-      const from = ws.groups.findIndex((g) => g.id === drag.id);
-      let to = over + (target.after ? 1 : 0);
-      if (from < to) to -= 1;
-      if (to !== from) ws.moveGroup(drag.id, to);
+      const overGroup = target?.itemId ? ws.groups.find(group => group.id === target.itemId) : undefined;
+      const overTab = target?.itemId ? ws.tabs.find(tab => tab.id === target.itemId) : undefined;
+      if (overGroup) {
+        const groupOrder = ws.groups.map(group => group.id).filter(id => id !== drag.id);
+        const over = groupOrder.indexOf(overGroup.id);
+        useWorkspaceNavigation.getState().moveSessionLayoutItem(groupEntity(drag.id), groupEntity(overGroup.id), target?.after);
+        groupOrder.splice(over + (target?.after ? 1 : 0), 0, drag.id);
+        ws.moveGroup(drag.id, groupOrder.indexOf(drag.id));
+      } else if (overTab) {
+        useWorkspaceNavigation.getState().moveSessionLayoutItem(groupEntity(drag.id), tabEntity(overTab.id), target?.after);
+      } else if (target?.zoneId === UNGROUPED_ZONE) {
+        useWorkspaceNavigation.getState().moveSessionLayoutItem(groupEntity(drag.id));
+      }
       return;
     }
     // Tab drag
@@ -93,12 +102,18 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
     const overTab = target?.itemId
       ? ws.tabs.find((t) => t.id === target.itemId)
       : undefined;
+    const overGroup = target?.itemId ? ws.groups.find(group => group.id === target.itemId) : undefined;
+    if (overGroup && drag.kind === 'loose-tab') {
+      useWorkspaceNavigation.getState().moveSessionLayoutItem(tabEntity(tab.id), groupEntity(overGroup.id), target?.after);
+      return;
+    }
     if (overTab) {
       const groupId = isSessionTab(overTab) ? overTab.groupId ?? null : null;
       if (!isSessionTab(tab) && groupId !== null) return;
       const scope = ws.tabs.filter((t) => t.id !== drag.id && (isSessionTab(t) ? (t.groupId ?? null) === groupId : groupId === null));
       const idx = scope.findIndex((t) => t.id === overTab.id) + (target?.after ? 1 : 0);
       ws.moveTab(drag.id, groupId, Math.max(0, idx));
+      if (groupId === null) useWorkspaceNavigation.getState().moveSessionLayoutItem(tabEntity(tab.id), tabEntity(overTab.id), target?.after);
       return;
     }
     if (target?.zoneId) {
@@ -106,6 +121,7 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
       if (!isSessionTab(tab) && groupId !== null) return;
       const scope = ws.tabs.filter((t) => t.id !== drag.id && (isSessionTab(t) ? (t.groupId ?? null) === groupId : groupId === null));
       ws.moveTab(drag.id, groupId, scope.length);
+      if (groupId === null) useWorkspaceNavigation.getState().moveSessionLayoutItem(tabEntity(drag.id));
       return;
     }
     // Dropped outside the list: a grouped tab falls back to the ungrouped end.
@@ -116,8 +132,9 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
   }
 
   const startDrag = useListReorderDrag({ listId: LIST_ID, axis: 'horizontal', grouped: true, onDrop: commitDrop,
-    accepts: (dragKind, itemKind) => dragKind === 'group' ? itemKind === 'group'
-      : itemKind === 'loose-tab' || (dragKind === 'tab' && itemKind === 'tab'),
+    accepts: (dragKind, itemKind) => dragKind === 'group' ? itemKind === 'group' || itemKind === 'loose-tab'
+      : dragKind === 'loose-tab' ? itemKind === 'group' || itemKind === 'loose-tab' || itemKind === 'tab'
+        : itemKind === 'loose-tab' || (dragKind === 'tab' && itemKind === 'tab'),
   });
 
   const filtered = useMemo(() => {
@@ -129,6 +146,14 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
 
   const groupTabs = (gid: string) => filtered.filter((t) => isSessionTab(t) && t.groupId === gid);
   const ungroupedTabs = filtered.filter((tab) => !isSessionTab(tab) || !tab.groupId);
+  const topLevelIds = [
+    ...groups.map(group => groupEntity(group.id)),
+    ...ungroupedTabs.map(tab => tabEntity(tab.id)),
+  ];
+  useEffect(() => {
+    useWorkspaceNavigation.getState().reconcileSessionLayout(topLevelIds);
+  }, [topLevelIds.join('|')]);
+  const topLevel = orderedWorkspaceIds(topLevelIds, sessionLayoutOrder);
   // The dragged row does not participate in the final insertion boundary.
   const draggedTabId = useListReorder((s) => (s.drag && s.drag.kind !== 'group' ? s.drag.id : undefined));
   const remainingUngrouped = ungroupedTabs.filter((tab) => tab.id !== draggedTabId);
@@ -204,13 +229,14 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
         setPanelMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget });
       }}
         >
-        {groups.map((g) => (
-          <Fragment key={g.id}>
-            <ListReorderPlaceholder listId={LIST_ID} itemId={g.id} />
+        {topLevel.map(entity => {
+          const group = entity.startsWith('group:') ? groups.find(item => groupEntity(item.id) === entity) : undefined;
+          if (group) return <Fragment key={entity}>
+            <ListReorderPlaceholder listId={LIST_ID} itemId={group.id} />
             <GroupSection
               defaultShellType={defaultShellType}
-              group={g}
-              tabs={groupTabs(g.id)}
+              group={group}
+              tabs={groupTabs(group.id)}
               activeId={activeId}
               editId={editId}
               editTitle={editTitle}
@@ -221,62 +247,51 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
               onStartEdit={(id, title) => { setEditId(id); setEditTitle(title); }}
               onCommitEdit={() => { if (editId) renameTab(editId, editTitle); setEditId(null); }}
               onCancelEdit={() => setEditId(null)}
-              onToggleCollapse={() => toggleGroupCollapse(g.id)}
-              onRenameGroup={title => renameGroup(g.id, title)}
+              onToggleCollapse={() => toggleGroupCollapse(group.id)}
+              onRenameGroup={title => renameGroup(group.id, title)}
               onCancelRenameGroup={() => setRenamingGroupId(null)}
               onDeleteGroup={() => {
-                const hasTabs = tabs.some(tab => isSessionTab(tab) && tab.groupId === g.id);
-                if (!hasTabs) { void deleteGroup(g.id, false); return; }
-                const ok = window.confirm(t('Archive group "{{name}}"? Its tabs will close and move to session history.', { name: g.title }));
+                const hasTabs = tabs.some(tab => isSessionTab(tab) && tab.groupId === group.id);
+                if (!hasTabs) { void deleteGroup(group.id, false); return; }
+                const ok = window.confirm(t('Archive group "{{name}}"? Its tabs will close and move to session history.', { name: group.title }));
                 if (!ok) return;
-                void archiveGroup(g.id);
+                void archiveGroup(group.id);
               }}
               onPointerDownTab={(event, tabId) => startDrag(event, { id: tabId, kind: 'tab' })}
-              onPointerDownGroup={(event) => startDrag(event, { id: g.id, kind: 'group' })}
-              onContextMenuTab={(e, tabId) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, tabId }); }}
-              onAddTab={() => { setModalGroupId(g.id); setModalOpen(true); }}
+              onPointerDownGroup={(event) => startDrag(event, { id: group.id, kind: 'group' })}
+              onContextMenuTab={(event, tabId) => { event.preventDefault(); event.stopPropagation(); setCtxMenu({ x: event.clientX, y: event.clientY, tabId }); }}
+              onAddTab={() => { setModalGroupId(group.id); setModalOpen(true); }}
               onAutoGroup={openGrouping}
             />
-            <ListReorderPlaceholder listId={LIST_ID} itemId={g.id} after />
-            {/* Empty and collapsed groups accept appends at the group boundary. */}
-            {(g.collapsed || groupTabs(g.id).length === 0) && (
-              <ListReorderZonePlaceholder listId={LIST_ID} zoneId={g.id} />
-            )}
-          </Fragment>
-        ))}
+            <ListReorderPlaceholder listId={LIST_ID} itemId={group.id} after />
+            {(group.collapsed || groupTabs(group.id).length === 0) && <ListReorderZonePlaceholder listId={LIST_ID} zoneId={group.id} />}
+          </Fragment>;
+          const tab = entity.startsWith('tab:') ? ungroupedTabs.find(item => tabEntity(item.id) === entity) : undefined;
+          if (!tab) return null;
+          return <Fragment key={entity}>
+            <ListReorderPlaceholder listId={LIST_ID} itemId={tab.id} />
+            <TabRow
+              defaultShellType={defaultShellType}
+              tab={tab}
+              active={tab.id === activeId}
+              editing={editId === tab.id}
+              editTitle={editTitle}
+              setEditTitle={setEditTitle}
+              onActivate={() => activate(tab.id)}
+              onClose={() => closeTab(tab.id)}
+              onStartEdit={() => { if (isSessionTab(tab)) { setEditId(tab.id); setEditTitle(tab.title); } }}
+              onCommitEdit={() => { renameTab(tab.id, editTitle); setEditId(null); }}
+              onCancelEdit={() => setEditId(null)}
+              onPointerDown={(event) => startDrag(event, { id: tab.id, kind: isSessionTab(tab) ? 'loose-tab' : 'page' })}
+              onContextMenu={(event) => { event.preventDefault(); event.stopPropagation(); setCtxMenu({ x: event.clientX, y: event.clientY, tabId: tab.id }); }}
+            />
+            {lastUngroupedId === tab.id && <ListReorderPlaceholder listId={LIST_ID} itemId={tab.id} after />}
+          </Fragment>;
+        })}
 
-        {/* The ungrouped drop zone owns the remaining space, even with no session rows. */}
-        {(ungroupedTabs.length > 0 || groups.length > 0) && (
-          <div
-            data-reorder-zone={UNGROUPED_ZONE}
-            data-reorder-kind="loose-tab"
-            className="terminal-ungrouped-tabs"
-          >
-            {ungroupedTabs.map((t) => (
-              <Fragment key={t.id}>
-                <ListReorderPlaceholder listId={LIST_ID} itemId={t.id} />
-                <TabRow
-                  defaultShellType={defaultShellType}
-                  tab={t}
-                  active={t.id === activeId}
-                  editing={editId === t.id}
-                  editTitle={editTitle}
-                  setEditTitle={setEditTitle}
-                  onActivate={() => activate(t.id)}
-                  onClose={() => closeTab(t.id)}
-                  onStartEdit={() => { if (isSessionTab(t)) { setEditId(t.id); setEditTitle(t.title); } }}
-                  onCommitEdit={() => { renameTab(t.id, editTitle); setEditId(null); }}
-                  onCancelEdit={() => setEditId(null)}
-                  onPointerDown={(event) => startDrag(event, { id: t.id, kind: isSessionTab(t) ? 'tab' : 'page' })}
-                  onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, tabId: t.id }); }}
-                />
-              </Fragment>
-            ))}
-            {lastUngroupedId
-              ? <ListReorderPlaceholder listId={LIST_ID} itemId={lastUngroupedId} after />
-              : <ListReorderZonePlaceholder listId={LIST_ID} zoneId={UNGROUPED_ZONE} />}
-          </div>
-        )}
+        <div data-reorder-zone={UNGROUPED_ZONE} data-reorder-kind="loose-tab" className="terminal-ungrouped-tail">
+          <ListReorderZonePlaceholder listId={LIST_ID} zoneId={UNGROUPED_ZONE} />
+        </div>
 
         {filtered.length === 0 && query.trim().length > 0 && (
           <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>{t('No matching terminal sessions')}</div>
@@ -305,9 +320,8 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
             const group = groups.find(item => item.id === drag.id);
             if (!group) return null;
             const color = useWorkspaceNavigation.getState().groupColors[group.id] ?? historyGroupColor(group.id);
-            return <div className="terminal-tab-group terminal-group-preview" style={{ '--terminal-group-color': color === 'neutral' ? 'var(--text-secondary)' : `var(--group-${color})` } as React.CSSProperties}>
-              <span className="terminal-group-chip">{group.title}</span>
-              {!group.collapsed && groupTabs(group.id).map(tab => <TerminalTabPreview key={tab.id} tab={tab} active={tab.id === activeId} defaultShellType={defaultShellType} />)}
+            return <div className="terminal-tab-group terminal-group-preview" data-group-card="true" style={{ '--terminal-group-color': color === 'neutral' ? 'var(--text-secondary)' : `var(--group-${color})` } as React.CSSProperties}>
+              <span className="terminal-group-chip">{group.title}<span>{groupTabs(group.id).length}</span></span>
             </div>;
           }
           const tab = tabs.find(item => item.id === drag.id);
@@ -358,7 +372,7 @@ function GroupSection(props: {
   onAddTab: () => void;
   onAutoGroup: () => void;
 }) {
-  const { group, tabs, activeId } = props;
+  const { group, tabs } = props;
   const [menu, setMenu] = useState<MenuAnchor | null>(null);
   const [name, setName] = useState(group.title);
   const header = useRef<HTMLDivElement>(null);
@@ -377,16 +391,15 @@ function GroupSection(props: {
   const colorOverride = useWorkspaceNavigation(state => state.groupColors[group.id]);
   const color = colorOverride ?? historyGroupColor(group.id);
   const empty = useSessionStore(state => !state.tabs.some(tab => isSessionTab(tab) && tab.groupId === group.id));
-  const active = tabs.some(tab => tab.id === activeId);
   const dragging = useListReorder(state => state.drag?.listId === LIST_ID && state.drag.id === group.id);
+  const collapsedForDisplay = group.collapsed || dragging;
   const draggedTab = useListReorder(state => state.drag?.listId === LIST_ID ? state.drag.id : undefined);
   const remaining = tabs.filter(tab => tab.id !== draggedTab);
   const last = remaining[remaining.length - 1]?.id;
   return <div className="terminal-tab-group" data-group-color={color} style={{ '--terminal-group-color': color === 'neutral' ? 'var(--text-secondary)' : `var(--group-${color})` } as React.CSSProperties}>
     <div className="tab-group-container" data-reorder-container="" data-reorder-dragging={dragging ? 'true' : undefined}
-      data-group-id={group.id} data-group-active={active} data-reorder-zone={group.id} data-reorder-kind="tab">
+      data-group-id={group.id} data-reorder-zone={group.id} data-reorder-kind="tab">
       <div ref={header} className="folder-tab tab-group-header" data-group-card="true" data-reorder-measure="container" data-group-header-id={group.id}
-        data-header-selected={group.collapsed && active ? 'true' : 'false'}
         data-testid={`group-header-${group.id}`} data-reorder-item={group.id} data-reorder-kind="group"
         data-reorder-dragging={dragging ? 'true' : undefined} tabIndex={0} role="button" aria-expanded={!group.collapsed} aria-label={group.title}
         onContextMenu={event => { event.preventDefault(); event.stopPropagation(); openMenu({ x: event.clientX, y: event.clientY, trigger: event.currentTarget }); }}
@@ -402,18 +415,18 @@ function GroupSection(props: {
         onPointerDown={props.onPointerDownGroup} data-tip={t('Collapse or expand group · Right-click to rename · Drag to reorder')}>
         <span className="terminal-group-chip" data-testid={`group-title-${group.id}`}>
             <span>{group.title}</span>
-            {group.collapsed && <span data-testid={`group-count-${group.id}`}>{tabs.length}</span>}
+            {collapsedForDisplay && <span data-testid={`group-count-${group.id}`}>{tabs.length}</span>}
           </span>
       </div>
-      {!group.collapsed && tabs.map(tab => <Fragment key={tab.id}>
+      {!collapsedForDisplay && tabs.map(tab => <Fragment key={tab.id}>
         <ListReorderPlaceholder listId={LIST_ID} itemId={tab.id} />
-        <TabRow defaultShellType={props.defaultShellType} tab={tab} active={tab.id === activeId}
+        <TabRow defaultShellType={props.defaultShellType} tab={tab} active={tab.id === props.activeId}
           editing={props.editId === tab.id} editTitle={props.editTitle} setEditTitle={props.setEditTitle}
           onActivate={() => props.onActivate(tab.id)} onClose={() => props.onClose(tab.id)}
           onStartEdit={() => props.onStartEdit(tab.id, tab.title)} onCommitEdit={props.onCommitEdit} onCancelEdit={props.onCancelEdit}
           onPointerDown={event => props.onPointerDownTab(event, tab.id)} onContextMenu={event => props.onContextMenuTab(event, tab.id)} />
       </Fragment>)}
-      {!group.collapsed && last && <ListReorderPlaceholder listId={LIST_ID} itemId={last} after />}
+      {!collapsedForDisplay && last && <ListReorderPlaceholder listId={LIST_ID} itemId={last} after />}
     </div>
     {menu && <ContextMenu anchor={menu} label={t('Group actions')} onClose={closeMenu} onCancel={() => setMenu(null)}
       header={<TextInput variant="field" aria-label={t('Group title')} value={name} onChange={event => setName(event.target.value)}

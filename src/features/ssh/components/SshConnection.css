@@ -18,7 +18,7 @@
 .ssh-form-dialog input:not([type="checkbox"]):focus { border-color: var(--border-strong); }
 .ssh-form-file-picker { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .ssh-form-file-picker > .ssh-form-browse { flex: 0 0 auto; height: 32px; min-height: 32px; padding: 0 12px; border-radius: var(--radius-inner); white-space: nowrap; }
-.ssh-check-group { padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-block); background: var(--surface); }
+.ssh-check-group { padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--chrome-field); }
 .ssh-check-row { display: flex !important; flex-direction: row !important; align-items: flex-start; gap: 10px !important; padding: 12px 0; color: var(--text-primary) !important; font-size: var(--fs-label) !important; }
 .ssh-check-row + .ssh-check-row { border-top: 1px solid var(--border); }
 .ssh-check-row .themed-checkbox { margin-top: 2px; }
