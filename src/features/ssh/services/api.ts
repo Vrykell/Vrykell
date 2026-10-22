@@ -182,9 +182,19 @@ export function sshNetworkProbe(host: string, port: number): Promise<NetworkProb
   return invoke('ssh_network_probe', { host, port });
 }
 
-/** Collect metadata through a separate authenticated connection. */
-export function sshSystemStatus(id: string, host: string, port: number, user?: string): Promise<SshSystemStatus> {
-  return invoke('ssh_system_status', { id, host, port, user: user ?? null });
+export interface SshStatusMetrics {
+  status: boolean;
+  cpu: boolean;
+  memory: boolean;
+  disk: boolean;
+  network: boolean;
+  load: boolean;
+  uptime: boolean;
+}
+
+/** Omitted selections retain full collection for existing terminal status panels. */
+export function sshSystemStatus(id: string, host: string, port: number, user?: string, metrics?: SshStatusMetrics): Promise<SshSystemStatus> {
+  return invoke('ssh_system_status', { id, host, port, user: user ?? null, ...(metrics ? { metrics } : {}) });
 }
 
 /** Submit secrets through redacted fields; neither profiles nor diagnostics retain them. */

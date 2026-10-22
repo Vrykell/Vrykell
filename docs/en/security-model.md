@@ -78,6 +78,8 @@ not pretend to protect "the renderer itself" or "the programs the user installs"
 
 ## 6. History
 
+- Selective host metrics, 2026-10-22: the existing resource command accepts only typed boolean selections. Its script is assembled from fixed internal sections, never caller-supplied command text; disabling every section returns before connection/authentication. Saved-profile address matching, host-key checks, credential handling, timeouts and output limits remain unchanged. No new IPC command, capability, CSP exception or resource scope is added. Tests cover section exclusion, no connection when disabled, input rejection and compatibility with existing terminal monitoring.
+
 - File access menu, 2026-10-22: the read-only path control opens the shared action menu; elevation still requires a separate explicit click and uses the existing native administrator or terminal editing path. Opening the menu performs no file write or elevation. Read-only/save guards and credential handling remain unchanged; no new IPC, capability, CSP or resource scope is added.
 
 - Interface materials, 2026-10-22: platform selection uses the existing native window-effects permission. Unsupported systems use the themed opaque fallback. This adds no IPC command, capability, CSP relaxation, external content, filesystem access or authorization path; preview masks and blur operate only on existing UI surfaces.

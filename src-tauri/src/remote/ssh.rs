@@ -9,7 +9,7 @@ use crate::db::{HistoryState, SshConnection};
 use crate::files::fs::{FileOpOutcome, FileOpPair};
 use crate::terminal::ssh_command::SshOptions;
 use base64::Engine;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use ssh2::{CheckResult, ExtendedData, HostKeyType, KnownHostFileKind, KnownHostKeyFormat, Session, Sftp};
 use std::io::{Read, Write};
 use std::net::TcpStream;
@@ -39,15 +39,35 @@ pub struct SshSystemStatus {
     network_transmitted: Option<f64>,
 }
 
-const STATUS_COMMAND: &str = r#"printf 'system=%s\n' "$(uname -sr 2>/dev/null)"
-printf 'hostname=%s\n' "$(hostname 2>/dev/null)"
-if [ -r /proc/uptime ]; then awk '{print "uptime=" $1}' /proc/uptime; fi
-if [ -r /proc/loadavg ]; then awk '{print "load=" $1 " " $2 " " $3}' /proc/loadavg; fi
-if [ -r /proc/stat ]; then awk '/^cpu / {total=0; for(i=2;i<=9;i++) total+=$i; printf "cpuTotal=%.0f\ncpuIdle=%.0f\n", total, $5+$6; exit}' /proc/stat; fi
-if [ -r /proc/meminfo ]; then awk '/^MemTotal:/ {printf "memoryTotal=%.0f\n", $2*1024} /^MemAvailable:/ {printf "memoryAvailable=%.0f\n", $2*1024}' /proc/meminfo; fi
-LC_ALL=C df -Pk / 2>/dev/null | awk 'NR==2 {printf "diskTotal=%.0f\ndiskUsed=%.0f\n", $2*1024, $3*1024}'
-if [ -r /proc/net/dev ]; then awk 'NR>2 {split($0, parts, ":"); iface=parts[1]; gsub(/[[:space:]]/, "", iface); if(iface!="lo") {split(parts[2], bytes); received+=bytes[1]; transmitted+=bytes[9]}} END {printf "networkReceived=%.0f\nnetworkTransmitted=%.0f\n", received, transmitted}' /proc/net/dev; fi
-"#;
+#[derive(Clone, Copy, Debug, Default, Deserialize)]
+#[serde(rename_all = "camelCase", default, deny_unknown_fields)]
+pub struct SshStatusMetrics {
+    status: bool,
+    cpu: bool,
+    memory: bool,
+    disk: bool,
+    network: bool,
+    load: bool,
+    uptime: bool,
+}
+
+impl SshStatusMetrics {
+    fn all() -> Self { Self { status: true, cpu: true, memory: true, disk: true, network: true, load: true, uptime: true } }
+    fn any(self) -> bool { self.status || self.cpu || self.memory || self.disk || self.network || self.load || self.uptime }
+}
+
+/// Only fixed script sections enter the remote command; selections never contain command text.
+fn system_status_command(metrics: SshStatusMetrics) -> String {
+    [
+        (metrics.status, "printf 'system=%s\\n' \"$(uname -sr 2>/dev/null)\"\nprintf 'hostname=%s\\n' \"$(hostname 2>/dev/null)\"\n"),
+        (metrics.uptime, "if [ -r /proc/uptime ]; then awk '{print \"uptime=\" $1}' /proc/uptime; fi\n"),
+        (metrics.load, "if [ -r /proc/loadavg ]; then awk '{print \"load=\" $1 \" \" $2 \" \" $3}' /proc/loadavg; fi\n"),
+        (metrics.cpu, "if [ -r /proc/stat ]; then awk '/^cpu / {total=0; for(i=2;i<=9;i++) total+=$i; printf \"cpuTotal=%.0f\\ncpuIdle=%.0f\\n\", total, $5+$6; exit}' /proc/stat; fi\n"),
+        (metrics.memory, "if [ -r /proc/meminfo ]; then awk '/^MemTotal:/ {printf \"memoryTotal=%.0f\\n\", $2*1024} /^MemAvailable:/ {printf \"memoryAvailable=%.0f\\n\", $2*1024}' /proc/meminfo; fi\n"),
+        (metrics.disk, "LC_ALL=C df -Pk / 2>/dev/null | awk 'NR==2 {printf \"diskTotal=%.0f\\ndiskUsed=%.0f\\n\", $2*1024, $3*1024}'\n"),
+        (metrics.network, "if [ -r /proc/net/dev ]; then awk 'NR>2 {split($0, parts, \":\"); iface=parts[1]; gsub(/[[:space:]]/, \"\", iface); if(iface!=\"lo\") {split(parts[2], bytes); received+=bytes[1]; transmitted+=bytes[9]}} END {printf \"networkReceived=%.0f\\nnetworkTransmitted=%.0f\\n\", received, transmitted}' /proc/net/dev; fi\n"),
+    ].into_iter().filter_map(|(enabled, command)| enabled.then_some(command)).collect()
+}
 
 fn parse_system_status(output: &str, latency_ms: u128) -> SshSystemStatus {
     let fields: std::collections::HashMap<&str, &str> = output.lines().filter_map(|line| line.split_once('=')).collect();
@@ -59,24 +79,27 @@ fn parse_system_status(output: &str, latency_ms: u128) -> SshSystemStatus {
         network_received: number("networkReceived"), network_transmitted: number("networkTransmitted") }
 }
 
-fn ssh_system_status_sync(conn: &SshConnection) -> Result<SshSystemStatus, String> {
+fn ssh_system_status_sync(conn: &SshConnection, metrics: SshStatusMetrics) -> Result<SshSystemStatus, String> {
+    if !metrics.any() { return Ok(parse_system_status("", 0)); }
     let session = connect_with_timeout(conn, Some(Duration::from_secs(5)))?;
     session.set_timeout(5000);
-    let started = std::time::Instant::now();
-    let mut probe = session.channel_session().map_err(|error| error.to_string())?;
-    probe.handle_extended_data(ExtendedData::Merge).map_err(|error| error.to_string())?;
-    probe.exec("true").map_err(|error| error.to_string())?;
-    probe.send_eof().map_err(|error| error.to_string())?;
-    let discarded = std::io::copy(&mut (&mut probe).take(16385), &mut std::io::sink()).map_err(|error| error.to_string())?;
-    if discarded > 16384 { return Err("Probe response exceeded the size limit".into()); }
-    probe.wait_eof().map_err(|error| error.to_string())?;
-    probe.close().map_err(|error| error.to_string())?;
-    probe.wait_close().map_err(|error| error.to_string())?;
-    let latency = started.elapsed().as_millis();
+    let latency = if metrics.status {
+        let started = std::time::Instant::now();
+        let mut probe = session.channel_session().map_err(|error| error.to_string())?;
+        probe.handle_extended_data(ExtendedData::Merge).map_err(|error| error.to_string())?;
+        probe.exec("true").map_err(|error| error.to_string())?;
+        probe.send_eof().map_err(|error| error.to_string())?;
+        let discarded = std::io::copy(&mut (&mut probe).take(16385), &mut std::io::sink()).map_err(|error| error.to_string())?;
+        if discarded > 16384 { return Err("Probe response exceeded the size limit".into()); }
+        probe.wait_eof().map_err(|error| error.to_string())?;
+        probe.close().map_err(|error| error.to_string())?;
+        probe.wait_close().map_err(|error| error.to_string())?;
+        started.elapsed().as_millis()
+    } else { 0 };
     let mut channel = session.channel_session().map_err(|error| error.to_string())?;
     channel.handle_extended_data(ExtendedData::Merge).map_err(|error| error.to_string())?;
     channel.exec("sh -s").map_err(|error| error.to_string())?;
-    channel.write_all(STATUS_COMMAND.as_bytes()).map_err(|error| error.to_string())?;
+    channel.write_all(system_status_command(metrics).as_bytes()).map_err(|error| error.to_string())?;
     channel.send_eof().map_err(|error| error.to_string())?;
     let mut output = String::new();
     // Bound remote output even when the server replaces the requested command.
@@ -87,13 +110,13 @@ fn ssh_system_status_sync(conn: &SshConnection) -> Result<SshSystemStatus, Strin
     channel.wait_close().map_err(|error| error.to_string())?;
     if channel.exit_status().map_err(|error| error.to_string())? != 0 { return Err("Remote resource command failed".into()); }
     let status = parse_system_status(&output, latency);
-    if status.system.is_empty() { return Err("Remote system does not support resource collection".into()); }
+    if metrics.status && status.system.is_empty() { return Err("Remote system does not support resource collection".into()); }
     Ok(status)
 }
 
 /// Read system metadata independently of the interactive terminal.
 #[tauri::command]
-pub async fn ssh_system_status(state: State<'_, HistoryState>, id: String, host: String, port: u16, user: Option<String>) -> Result<SshSystemStatus, String> {
+pub async fn ssh_system_status(state: State<'_, HistoryState>, id: String, host: String, port: u16, user: Option<String>, metrics: Option<SshStatusMetrics>) -> Result<SshSystemStatus, String> {
     let conn = {
         let db = state.0.lock().map_err(|error| error.to_string())?;
         db.get_ssh_connection(&id)?
@@ -101,13 +124,45 @@ pub async fn ssh_system_status(state: State<'_, HistoryState>, id: String, host:
     if conn.host != host || conn.port.unwrap_or(22) != port || user.as_ref().is_some_and(|user| *user != conn.user) {
         return Err("Saved connection address changed. Reopen the terminal to monitor its resources.".into());
     }
-    tauri::async_runtime::spawn_blocking(move || connection_stage(&conn, "resource-collection", || ssh_system_status_sync(&conn)))
+    tauri::async_runtime::spawn_blocking(move || connection_stage(&conn, "resource-collection", || ssh_system_status_sync(&conn, metrics.unwrap_or_else(SshStatusMetrics::all))))
         .await.map_err(|error| error.to_string())?
 }
 
 #[cfg(test)]
 mod status_tests {
-    use super::{connect_with_timeout, parse_system_status, ssh_system_status_sync, STATUS_COMMAND};
+    use super::{connect_with_timeout, parse_system_status, ssh_system_status_sync, system_status_command, SshStatusMetrics};
+
+    #[test]
+    fn metric_selection_excludes_every_disabled_script_section() {
+        let sections = [("status", "uname -sr"), ("cpu", "/proc/stat"), ("memory", "/proc/meminfo"),
+            ("disk", "df -Pk"), ("network", "/proc/net/dev"), ("load", "/proc/loadavg"), ("uptime", "/proc/uptime")];
+        for (selected, _) in sections {
+            let metrics: SshStatusMetrics = serde_json::from_value(serde_json::json!({ selected: true })).unwrap();
+            let command = system_status_command(metrics);
+            for (name, marker) in sections { assert_eq!(command.contains(marker), name == selected, "selection={selected}, section={name}"); }
+        }
+        assert!(system_status_command(SshStatusMetrics::default()).is_empty());
+        let all = system_status_command(SshStatusMetrics::all());
+        for (_, marker) in sections { assert!(all.contains(marker)); }
+    }
+
+    #[test]
+    fn no_metrics_returns_without_opening_a_remote_connection() {
+        let connection = crate::db::SshConnection {
+            id: "disabled".into(), name: "Disabled".into(), host: String::new(), port: Some(0), user: String::new(),
+            password: String::new(), auth_method: "key".into(), options: Default::default(), last_opened_at: None, has_password: false,
+        };
+        let status = ssh_system_status_sync(&connection, SshStatusMetrics::default()).unwrap();
+        assert!(status.system.is_empty());
+        assert_eq!(status.cpu_total, None);
+        assert_eq!(status.latency_ms, 0);
+    }
+
+    #[test]
+    fn metric_selection_rejects_command_text_and_unknown_fields() {
+        assert!(serde_json::from_value::<SshStatusMetrics>(serde_json::json!({ "cpu": "unexpected command text" })).is_err());
+        assert!(serde_json::from_value::<SshStatusMetrics>(serde_json::json!({ "command": "uname" })).is_err());
+    }
 
     #[test]
     #[ignore = "Requires VRYKELL_SSH_PROFILE_ID and a reachable saved SSH profile"]
@@ -141,7 +196,7 @@ mod status_tests {
             Err(error) => println!("SFTP: failed: {error}"),
         }
         drop(session);
-        let resources = ssh_system_status_sync(&connection);
+        let resources = ssh_system_status_sync(&connection, SshStatusMetrics::all());
         match &resources {
             Ok(status) => println!("Resources: succeeded (CPU={}, memory={}, disk={})",
                 status.cpu_total.is_some(), status.memory_total.is_some(), status.disk_total.is_some()),
@@ -166,7 +221,7 @@ mod status_tests {
             .env("PATH", "/usr/bin:/bin")
             .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped())
             .spawn().expect("A POSIX shell is required for the collection test");
-        child.stdin.take().unwrap().write_all(STATUS_COMMAND.as_bytes()).unwrap();
+        child.stdin.take().unwrap().write_all(system_status_command(SshStatusMetrics::all()).as_bytes()).unwrap();
         let output = child.wait_with_output().unwrap();
         assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
         let status = parse_system_status(&String::from_utf8_lossy(&output.stdout), 0);

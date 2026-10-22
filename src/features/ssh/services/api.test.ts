@@ -18,6 +18,7 @@ import {
   sshTrustHostKey,
   sshAuthenticateSession,
   sshNetworkProbe,
+  sshSystemStatus,
   sshSearchFiles,
 } from '@features/ssh/services/api';
 import { diagnosticSnapshot } from '@platform/diagnostics';
@@ -44,6 +45,14 @@ describe('sshApi', () => {
     invokeMock.mockResolvedValue({ dnsMs: 1, attempts: [] });
     await sshNetworkProbe('::1', 2222);
     expect(invokeMock).toHaveBeenCalledWith('ssh_network_probe', { host: '::1', port: 2222 });
+  });
+  it('keeps legacy full collection compatible and passes explicit dashboard metric selections', async () => {
+    invokeMock.mockResolvedValue({});
+    await sshSystemStatus('s1', 'server.test', 22);
+    expect(invokeMock).toHaveBeenLastCalledWith('ssh_system_status', { id: 's1', host: 'server.test', port: 22, user: null });
+    const metrics = { status: false, cpu: true, memory: false, disk: false, network: false, load: false, uptime: false };
+    await sshSystemStatus('s1', 'server.test', 22, 'tester', metrics);
+    expect(invokeMock).toHaveBeenLastCalledWith('ssh_system_status', { id: 's1', host: 'server.test', port: 22, user: 'tester', metrics });
   });
   it('validates keepalive and jump destinations before saving', () => {
     expect(validateSshConnection({ name: 'n', host: 'h', serverAliveInterval: -1 })).toContain('保活');
