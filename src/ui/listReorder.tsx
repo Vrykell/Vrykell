@@ -26,11 +26,17 @@ interface ListReorderState {
   drag: ListReorderDrag | null;
   target: ListReorderTarget | null;
   position: { x: number; y: number } | null;
+  /** Group highlighted for a pending "drop into the collapsed group" dwell. */
+  dwellZoneId: string | null;
   start: (drag: ListReorderDrag, position: { x: number; y: number }) => void;
   movePointer: (x: number, y: number) => void;
   hover: (target: ListReorderTarget | null) => void;
+  setDwell: (zoneId: string | null) => void;
   end: () => void;
 }
+
+/** Dwell before a hovered collapsed group accepts the drop (Firefox uses ~400 ms). */
+const GROUP_DWELL_MS = 400;
 
 function sameTarget(a: ListReorderTarget | null, b: ListReorderTarget | null): boolean {
   return a === b || (!!a && !!b && a.itemId === b.itemId && a.after === b.after && a.zoneId === b.zoneId);
@@ -49,10 +55,12 @@ export const useListReorder = create<ListReorderState>((set) => ({
   drag: null,
   target: null,
   position: null,
-  start: (drag, position) => set({ drag, target: null, position }),
+  dwellZoneId: null,
+  start: (drag, position) => set({ drag, target: null, position, dwellZoneId: null }),
   movePointer: (x, y) => set({ position: { x, y } }),
   hover: (target) => set((state) => (sameTarget(state.target, target) ? state : { target })),
-  end: () => set({ drag: null, target: null, position: null }),
+  setDwell: (zoneId) => set((state) => (state.dwellZoneId === zoneId ? state : { dwellZoneId: zoneId })),
+  end: () => set({ drag: null, target: null, position: null, dwellZoneId: null }),
 }));
 
 /** Keep the destination stable while the pointer is over its placeholder. */
@@ -63,11 +71,25 @@ function locateTarget(
   x: number,
   y: number,
   axis: 'vertical' | 'horizontal',
+  edgeDrop: boolean,
 ): ListReorderTarget | null | undefined {
   const hit = document.elementFromPoint(x, y);
   if (!hit) return null;
   const list = hit.closest<HTMLElement>('[data-reorder-list]');
-  if (!list || list.dataset.reorderList !== listId) return null;
+  if (!list || list.dataset.reorderList !== listId) {
+    // Opt-in for vertical lists that need the empty area just past their rows (the workspace
+    // navigation). Other lists keep strict bounds so their zone drops stay unambiguous.
+    if (!edgeDrop || axis !== 'vertical') return null;
+    const root = document.querySelector<HTMLElement>(`[data-reorder-list="${listId}"]`);
+    if (!root) return null;
+    const bounds = root.getBoundingClientRect();
+    if (x < bounds.left || x > bounds.right || y > bounds.bottom + 200) return null;
+    const rows = Array.from(root.querySelectorAll<HTMLElement>('[data-reorder-item]:not([data-reorder-dragging="true"])'))
+      .filter(item => !item.closest('[hidden]') && accepts(dragKind, item.dataset.reorderKind ?? ''));
+    if (!rows.length) return null;
+    if (y < bounds.top) return { itemId: rows[0]!.dataset.reorderItem, after: false };
+    return { itemId: rows[rows.length - 1]!.dataset.reorderItem, after: true };
+  }
   if (hit.closest('[data-reorder-placeholder]')) return undefined;
   // Resolve rows within the hovered zone, falling back to the zone itself
   // when its rows are hidden or empty.
@@ -86,11 +108,15 @@ function locateTarget(
 }
 
 /** Pointer gesture shared by horizontal and vertical lists. */
-export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical', grouped = false }: {
+export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical', grouped = false, endZoneId, edgeDrop = false }: {
   listId: string;
   axis?: 'vertical' | 'horizontal';
   /** Resolve horizontal destinations within their group or empty drop zone. */
   grouped?: boolean;
+  /** Zone that receives an item dropped past the last unit of a grouped horizontal list. */
+  endZoneId?: string;
+  /** Accept drops past a vertical list's first/last row in the surrounding empty area. */
+  edgeDrop?: boolean;
   /** Item-kind matcher; defaults to "same kind only". */
   accepts?: (dragKind: string, itemKind: string) => boolean;
   onDrop: (drag: ListReorderDrag, target: ListReorderTarget | null) => void;
@@ -115,6 +141,8 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
     const sourceList = event.currentTarget.closest<HTMLElement>('[data-reorder-list]');
     const listBounds = sourceList?.getBoundingClientRect() ?? bounds;
     const scrollLeft = sourceList?.scrollLeft ?? 0;
+    // Captured now: React clears `currentTarget` once the pointerdown handler returns.
+    const sourceZone = container ? undefined : event.currentTarget.closest<HTMLElement>('[data-reorder-zone]')?.dataset.reorderZone;
     const dimensions: Pick<ListReorderDrag, 'height' | 'width' | 'origin'> = bounds.height > 0 ? { height: bounds.height, ...(axis === 'horizontal' ? {
       width: bounds.width,
       origin: { top: bounds.top, offsetX: event.clientX - bounds.left, minLeft: listBounds.left, maxLeft: Math.max(listBounds.left, listBounds.right - bounds.width) },
@@ -122,11 +150,41 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
     const { pointerId, clientX, clientY } = event;
     const match = (dragKind: string, itemKind: string) =>
       (acceptsRef.current ?? ((drag: string, over: string) => drag === over))(dragKind, itemKind);
-    const horizontalRows = axis === 'horizontal' && sourceList ? Array.from(sourceList.querySelectorAll<HTMLElement>('[data-reorder-item]'))
+    // Grouped horizontal lists (terminal tabs) follow the browser tab-strip model: one
+    // flat sequence of visible units — a group label, then its visible members, then loose
+    // tabs — captured once with the dragged unit removed and every later unit shifted by
+    // the space it left behind. Insertion is a single midpoint scan of the dragged leading
+    // edge, so a group can never overlap its own members in the ordering (Firefox's element
+    // index, Chromium's leading-edge comparison).
+    interface HorizontalUnit { id: string; kind: string; zoneId?: string; mid: number; right: number; }
+    const units: HorizontalUnit[] = [];
+    let endTarget: ListReorderTarget | null = null;
+    if (axis === 'horizontal' && grouped && sourceList) {
+      const anchor = container ?? event.currentTarget;
+      const anchorStyle = getComputedStyle(anchor);
+      const gap = parseFloat(getComputedStyle(sourceList).columnGap) || 0;
+      const sourceOuter = bounds.width + (parseFloat(anchorStyle.marginLeft) || 0) + (parseFloat(anchorStyle.marginRight) || 0) + gap;
+      for (const element of Array.from(sourceList.querySelectorAll<HTMLElement>('[data-reorder-item]'))) {
+        if (container ? container.contains(element) : element === event.currentTarget) continue;
+        const kind = element.dataset.reorderKind ?? '';
+        if (!match(item.kind, kind)) continue;
+        const rect = element.getBoundingClientRect();
+        if (rect.width <= 0) continue;
+        const after = !!(anchor.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING);
+        const left = rect.left - listBounds.left + scrollLeft - (after ? sourceOuter : 0);
+        units.push({
+          id: element.dataset.reorderItem!, kind,
+          zoneId: element.closest<HTMLElement>('[data-reorder-zone]')?.dataset.reorderZone,
+          mid: left + rect.width / 2, right: left + rect.width,
+        });
+      }
+      endTarget = endZoneId ? { zoneId: endZoneId }
+        : units.length ? { itemId: units[units.length - 1]!.id, after: true } : null;
+    }
+    const horizontalRows = axis === 'horizontal' && !grouped && sourceList ? Array.from(sourceList.querySelectorAll<HTMLElement>('[data-reorder-item]'))
       .filter(row => !row.closest('[hidden]') && match(item.kind, row.dataset.reorderKind ?? ''))
       .map(row => ({ id: row.dataset.reorderItem!, zoneId: row.closest<HTMLElement>('[data-reorder-zone]')?.dataset.reorderZone,
         bounds: (row.dataset.reorderMeasure === 'container' ? row.closest<HTMLElement>('[data-reorder-container]') ?? row : row).getBoundingClientRect() })) : [];
-    const sourceZone = grouped && !container ? event.currentTarget.closest<HTMLElement>('[data-reorder-zone]')?.dataset.reorderZone : undefined;
     const sourceIndex = horizontalRows.findIndex(row => row.id === item.id);
     const slotWidth = bounds.width + (sourceList ? parseFloat(getComputedStyle(sourceList).columnGap) || 0 : 0);
     const horizontalSlots = horizontalRows.flatMap((row, index) => row.id === item.id ? [] : [{
@@ -142,11 +200,89 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
     let scrollFrame: number | undefined;
     let scrollTime: number | undefined;
     let clickTimer: ReturnType<typeof setTimeout> | undefined;
+    let dwellZone: string | null = null;
+    let dwellTimer: ReturnType<typeof setTimeout> | undefined;
+    let dwellFired = false;
+    const clearDwell = () => {
+      if (dwellTimer !== undefined) clearTimeout(dwellTimer);
+      dwellTimer = undefined;
+      dwellZone = null;
+      dwellFired = false;
+      useListReorder.getState().setDwell(null);
+    };
     source.setPointerCapture?.(pointerId);
 
     const findHorizontalList = () => axis === 'horizontal' ? Array.from(document.querySelectorAll<HTMLElement>('[data-reorder-list]')).find(element => element.dataset.reorderList === listId) : null;
     const updateTarget = (x: number, y: number) => {
       const list = findHorizontalList();
+      if (axis === 'horizontal' && grouped && list && dimensions.origin && listBounds.width > 0) {
+        const previewLeft = horizontalPreviewLeft(x, dimensions.origin);
+        const leading = previewLeft - listBounds.left + list.scrollLeft;
+        const centerX = previewLeft + (dimensions.width ?? 0) / 2;
+        // The empty tail of a grouped list keeps its own zone: dropping there leaves the group.
+        const centerZone = document.elementFromPoint(centerX, y)?.closest<HTMLElement>('[data-reorder-zone]');
+        const emptyZone = centerZone && list.contains(centerZone) && match(item.kind, centerZone.dataset.reorderKind ?? '')
+          ? centerZone.dataset.reorderZone : undefined;
+        // A collapsed group accepts the drop only after the pointer dwells on its label.
+        const pointerZone = document.elementFromPoint(x, y)?.closest<HTMLElement>('[data-reorder-zone]');
+        const pointerZoneId = pointerZone && list.contains(pointerZone) ? pointerZone.dataset.reorderZone : undefined;
+        let dwell: string | undefined;
+        if (pointerZoneId && match(item.kind, 'group')) {
+          const label = units.find(candidate => candidate.id === pointerZoneId && candidate.kind === 'group');
+          const hasMembers = units.some(candidate => candidate.zoneId === pointerZoneId && candidate.kind !== 'group');
+          if (label && !hasMembers) dwell = pointerZoneId;
+        }
+        let index = units.length;
+        for (let i = 0; i < units.length; i++) if (leading < units[i]!.mid) { index = i; break; }
+        const unit = units[index];
+        // A member tab dragged out of its group can leave through the empty tail even while
+        // its leading edge still overlaps the group; a loose tab follows the midpoint scan.
+        let resolved: ListReorderTarget | null;
+        if (!unit) {
+          const last = units[units.length - 1];
+          if (emptyZone && !units.some(candidate => candidate.zoneId === emptyZone)) resolved = { zoneId: emptyZone };
+          // Past the last member's midpoint but still inside the group: append to the group.
+          else if (last && last.kind === 'tab' && last.zoneId && leading < last.right) resolved = { itemId: last.id, after: true };
+          // A trailing collapsed group keeps the tab beside it, never inside it.
+          else if (last && last.kind === 'group') resolved = { itemId: last.id, after: true };
+          else resolved = endTarget;
+        } else if (emptyZone && sourceZone && !units.some(candidate => candidate.zoneId === emptyZone)) {
+          resolved = { zoneId: emptyZone };
+        } else if (item.kind === 'group') {
+          // A dragged group never nests: over a member it lands after that whole group.
+          if (unit.kind === 'group') resolved = { itemId: unit.id, after: leading >= unit.mid };
+          else if (unit.zoneId) resolved = { itemId: unit.zoneId, after: true };
+          else resolved = { itemId: unit.id, after: false };
+        } else if (unit.kind === 'group') {
+          if (leading < unit.mid) resolved = { itemId: unit.id, after: false };
+          else {
+            const member = units[index + 1];
+            if (member && member.zoneId === unit.id) resolved = { itemId: member.id, after: false };
+            // A collapsed or empty group drops after it unless the pointer dwells on it.
+            else resolved = { itemId: unit.id, after: true };
+          }
+        } else {
+          resolved = { itemId: unit.id, after: false };
+        }
+        if (dwell) {
+          if (dwellFired && dwellZone === dwell) { useListReorder.getState().hover({ zoneId: dwell }); return; }
+          if (dwellZone !== dwell) {
+            if (dwellTimer !== undefined) clearTimeout(dwellTimer);
+            dwellZone = dwell;
+            dwellFired = false;
+            dwellTimer = setTimeout(() => {
+              dwellFired = true;
+              useListReorder.getState().setDwell(dwell);
+              useListReorder.getState().hover({ zoneId: dwell });
+            }, GROUP_DWELL_MS);
+          }
+          useListReorder.getState().hover(resolved);
+          return;
+        }
+        clearDwell();
+        useListReorder.getState().hover(resolved);
+        return;
+      }
       if (axis === 'horizontal' && list) {
         if (list !== currentList) { list.scrollLeft = scrollLeft; currentList = list; }
         const bounds = list.getBoundingClientRect();
@@ -155,15 +291,6 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
           const previewLeft = horizontalPreviewLeft(x, dimensions.origin);
           const left = previewLeft - bounds.left + list.scrollLeft;
           const right = left + slotWidth;
-          if (sourceZone) {
-            // Empty and folded zones use the dragged component's center, never the pointer's grab position.
-            const hit = document.elementFromPoint(previewLeft + (dimensions.width ?? 0) / 2, bounds.top + bounds.height / 2);
-            const zone = hit?.closest<HTMLElement>('[data-reorder-zone]');
-            if (zone && list.contains(zone) && match(item.kind, zone.dataset.reorderKind ?? '')
-              && !horizontalSlots.some(row => row.zoneId === zone.dataset.reorderZone)) {
-              useListReorder.getState().hover({ zoneId: zone.dataset.reorderZone }); return;
-            }
-          }
           while (insertionIndex > 0) {
             const previous = horizontalSlots[insertionIndex - 1]!;
             if (left >= previous.left + previous.width / 2 - 2) break;
@@ -174,22 +301,12 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
             if (right <= next.left + slotWidth + next.width / 2 + 2) break;
             insertionIndex += 1;
           }
-          if (sourceZone) {
-            const previous = horizontalSlots[insertionIndex - 1]; const next = horizontalSlots[insertionIndex];
-            const following = horizontalSlots.slice(sourceIndex).find(row => row.zoneId === sourceZone);
-            const preceding = horizontalSlots.slice(0, sourceIndex).filter(row => row.zoneId === sourceZone);
-            const last = preceding[preceding.length - 1];
-            const target = insertionIndex > sourceIndex && previous ? { itemId: previous.id, after: true }
-              : insertionIndex < sourceIndex && next ? { itemId: next.id, after: false }
-              : following ? { itemId: following.id, after: false } : last ? { itemId: last.id, after: true } : { zoneId: sourceZone };
-            useListReorder.getState().hover(target); return;
-          }
           const next = horizontalSlots[insertionIndex]; const last = horizontalSlots[horizontalSlots.length - 1];
           useListReorder.getState().hover(next ? { itemId: next.id, after: false } : last ? { itemId: last.id, after: true } : null);
           return;
         }
       }
-      const target = locateTarget(listId, item.kind, match, x, y, axis);
+      const target = locateTarget(listId, item.kind, match, x, y, axis, edgeDrop);
       if (target === undefined) return;
       useListReorder.getState().hover(target);
     };
@@ -254,6 +371,7 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
     const removeClick = () => window.removeEventListener('click', suppressClick, true);
     const clean = () => {
       stopScrolling();
+      clearDwell();
       window.removeEventListener('pointermove', move, true);
       window.removeEventListener('pointerup', up, true);
       window.removeEventListener('pointercancel', cancel, true);
@@ -316,7 +434,9 @@ export function ListReorderZonePlaceholder({ listId, zoneId }: { listId: string;
 }
 
 /** A preview follows the pointer without intercepting drop targets. */
-export function ListReorderPreview({ listId, variant = 'icon', children }: { listId: string; variant?: 'icon' | 'item'; children: (drag: ListReorderDrag) => ReactNode }) {
+export function ListReorderPreview({ listId, variant = 'icon', className = '', children }: {
+  listId: string; variant?: 'icon' | 'item'; className?: string; children: (drag: ListReorderDrag) => ReactNode;
+}) {
   const drag = useListReorder(state => state.drag?.listId === listId ? state.drag : null);
   const position = useListReorder(state => state.position);
   if (!drag || !position) return null;
@@ -324,5 +444,6 @@ export function ListReorderPreview({ listId, variant = 'icon', children }: { lis
     left: horizontalPreviewLeft(position.x, drag.origin),
     top: drag.origin.top, width: drag.width, height: drag.height,
   } : { left: position.x, top: position.y };
-  return createPortal(<div className={variant === 'item' ? 'list-reorder-item-preview' : 'sidebar-reorder-preview'} data-reorder-preview={variant} aria-hidden="true" inert style={style}>{children(drag)}</div>, document.body);
+  return createPortal(<div className={`${variant === 'item' ? 'list-reorder-item-preview' : 'sidebar-reorder-preview'}${className ? ` ${className}` : ''}`}
+    data-reorder-preview={variant} aria-hidden="true" inert style={style}>{children(drag)}</div>, document.body);
 }

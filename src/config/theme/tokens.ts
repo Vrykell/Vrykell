@@ -178,7 +178,7 @@ export interface ThemePalette {
 // Structural colors have one source; component roles reuse these surface levels.
 const DARK_SURFACES = {
   content: '#141414', canvas: '#202020', sidebar: '#28282B', card: '#282828',
-  field: '#2C2C2C', elevated: '#303030', control: '#333333', hover: '#343638',
+  field: '#333333', elevated: '#303030', control: '#282828', hover: '#343638',
   border: '#38393B', borderStrong: '#4B4E52',
 } as const;
 
@@ -190,7 +190,7 @@ const LIGHT_SURFACES = {
 
 // Syntax, charts, group swatches and session icons share these accent families.
 const DARK_ACCENTS = {
-  blue: '#409CFF', green: '#30D158', violet: '#BF6EFF', amber: '#F5C400',
+  blue: '#44A0FF', green: '#30D158', violet: '#C77DFF', amber: '#F5C400',
   cyan: '#00CFA5', rose: '#FF5CA8', orange: '#FF9F0A', coral: '#FF7066',
   sky: '#32BFFF', magenta: '#E066FF',
 } as const;
@@ -266,7 +266,7 @@ const dark: ThemePalette = {
   // 用户消息：浅灰
   accentUser: '#183C57',
   accentUserDim: 'rgba(24,60,87,0.35)',
-  primaryAction: '#183C57',
+  primaryAction: '#2C67C5',
 
   // Semantic colors remain independent from decorative accents.
   success: DARK_ACCENTS.green,
@@ -439,7 +439,7 @@ const light: ThemePalette = {
 
   accentUser: '#D9E4F7',
   accentUserDim: 'rgba(23,62,118,0.12)',
-  primaryAction: '#183C57',
+  primaryAction: '#2C67C5',
 
   success: LIGHT_ACCENTS.green,
   successDim: 'rgba(48,209,88,0.12)',

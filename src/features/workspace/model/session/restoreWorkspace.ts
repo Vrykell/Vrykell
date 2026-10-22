@@ -1,7 +1,7 @@
 import { archiveSession, listSessions } from '@platform/api/session';
 import type { BackendSessionEntry } from '@platform/api/types';
 import * as sessionManager from '@features/workspace/services/sessionManager';
-import { isSessionTab, serializeSession, useWorkspaceStore } from '@features/workspace/stores/workspace';
+import { isSessionTab, isStartTab, serializeSession, useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { useStartupSettings, type StartupMode } from '@features/settings/stores/startup';
 
 export interface WorkspaceSession {
@@ -106,7 +106,7 @@ function toWorkspaceSession(session: BackendSessionEntry): WorkspaceSession {
 
 function createDefaultSession(): PersistableSession | null {
   const workspace = useWorkspaceStore.getState();
-  if (workspace.tabs.length !== 0) return null;
+  if (workspace.tabs.some(tab => !isStartTab(tab))) return null;
 
   const id = workspace.addTab({});
   const tab = useWorkspaceStore.getState().tabs.find((item) => item.id === id);
@@ -134,7 +134,7 @@ export function restoreWorkspace(
     },
     loadGroups: () => useWorkspaceStore.getState().loadGroups(),
     restoreSession: (session) => sessionManager.restore(session.id, session.title),
-    hasTabs: () => useWorkspaceStore.getState().tabs.length !== 0,
+    hasTabs: () => useWorkspaceStore.getState().tabs.some(tab => !isStartTab(tab)),
     createDefaultSession,
   });
 }

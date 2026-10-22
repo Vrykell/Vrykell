@@ -16,5 +16,8 @@ export function panelPlacementRegions(id: string) {
   const available = Math.min(400, window.innerWidth - minContent);
   const slot = middle.getBoundingClientRect();
   const width = navigation.collapsed ? Math.min(navigation.sidebarWidth, available < 160 ? window.innerWidth - 40 : available) : slot.width;
-  return { right, left: { left: slot.left, top: slot.top, width, height: slot.height } };
+  const panelSlot = document.querySelector<HTMLElement>('[data-panel-slot="left"]')?.getBoundingClientRect();
+  const panelTop = panelSlot && panelSlot.height > 0 ? panelSlot.top : slot.top;
+  const panelHeight = panelSlot && panelSlot.height > 0 ? panelSlot.height : slot.height;
+  return { right, left: { left: slot.left, top: panelTop, width, height: panelHeight } };
 }

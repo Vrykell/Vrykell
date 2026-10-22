@@ -50,7 +50,6 @@ export {
 } from '@features/workspace/model/windowLayout';
 export {
   buildNewTabOptions,
-  filterNewTabOptions,
   loadRecentOpen,
   saveRecentOpen,
   touchRecentOpen,
@@ -59,4 +58,4 @@ export {
 export { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 export { useTabDisplayTitle } from '@features/workspace/hooks/useTabDisplayTitle';
 export { tabIconKey, tabIconColor } from './model/tabAppearance';
-export { useWorkspaceNavigation, orderedWorkspaceIds, workspaceAreaForKind } from './stores/navigation';
+export { useWorkspaceNavigation, orderedWorkspaceIds, workspaceAreaForKind, type HistoryTypePreset } from './stores/navigation';

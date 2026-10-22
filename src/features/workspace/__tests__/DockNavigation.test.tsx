@@ -56,12 +56,3 @@ it('does not render an auxiliary navigation on the left', () => {
   const { container } = render(<DockNavigation side="left" />);
   expect(container).toBeEmptyDOMElement();
 });
-
-it('opens the remembered left panel without dismissing right-side host status', () => {
-  useDockStore.setState({ leftZone: ['files'], rightZone: ['chat'] });
-  render(<DockNavigation side="left" />);
-  act(() => useAuxiliarySidebarStore.getState().showSshStatus('ssh-pane'));
-  fireEvent.click(screen.getByRole('button', { name: '资源' }));
-  expect(useDockStore.getState().leftPanels).toEqual(['files']);
-  expect(useAuxiliarySidebarStore.getState().sshStatusOwner).toBe('ssh-pane');
-});

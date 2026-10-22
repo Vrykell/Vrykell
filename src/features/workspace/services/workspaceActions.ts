@@ -64,7 +64,7 @@ export function activateWorkspaceInstance(index: number): boolean {
     const connections = useHarnessWorkspace.getState();
     const side = sideAiHasFocus();
     const ids = [...ai.nativeTabs.filter(id => useChatStore.getState().conversations.some(item => item.id === id)).map(id => `chat:${id}`),
-      ...(!side ? connections.connections.map(item => `acp:${item.id}`) : []), ...(!side ? workspace.tabs.filter(tab => tab.kind === 'usage' || tab.kind === 'ai-history').map(tab => `page:${tab.id}`) : [])];
+      ...(!side ? connections.connections.map(item => `acp:${item.id}`) : [])];
     const id = orderedWorkspaceIds(ids, ai.order)[index];
     if (!id) return false;
     if (id.startsWith('page:')) workspace.activate(id.slice(5));

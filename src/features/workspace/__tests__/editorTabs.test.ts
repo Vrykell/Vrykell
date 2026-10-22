@@ -18,7 +18,8 @@ it('routes file and whole-page close through the shared unsaved guard', () => {
   const unregister = registerEditorCloseGuard((_files, complete) => { approve = complete; return true; });
   try { store.closeEditorFile(first); expect(useSessionStore.getState().tabs[0]).toMatchObject({ files: [first, second] }); approve();
     expect(useSessionStore.getState().tabs[0]).toMatchObject({ files: [second] });
-    store.closeTab(id); expect(useSessionStore.getState().tabs).toHaveLength(1); approve(); expect(useSessionStore.getState().tabs).toHaveLength(0);
+    store.closeTab(id); expect(useSessionStore.getState().tabs).toHaveLength(1); approve();
+    expect(useSessionStore.getState().tabs.map(tab => tab.kind)).toEqual(['start-code']);
   } finally { unregister(); }
 });
 it('reorders files without changing the active document', () => {

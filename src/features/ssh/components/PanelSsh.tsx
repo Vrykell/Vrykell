@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { Download, iconSizes, Pencil, Plug, Plus } from '@ui/icons';
+import { DataUsage, Download, iconSizes, Pencil, Plug, Plus } from '@ui/icons';
 import { SshIcon } from '@ui/shellIcons';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { t } from '@i18n';
@@ -17,6 +17,7 @@ import type { SshConnection } from '@features/ssh/services/api';
 import { connectionTarget } from '@features/ssh/services/api';
 import SshFormModal from '@features/ssh/components/SshFormModal';
 import SshImportModal from '@features/ssh/components/SshImportModal';
+import SshDashboard from './SshDashboard';
 
 /** List id shared by the rows, their placeholders and the drag hook. */
 const LIST_ID = 'ssh-connections';
@@ -26,10 +27,23 @@ const LIST_ID = 'ssh-connections';
  * 顶栏：搜索（按名字过滤）+ 编辑当前选中 + 新建。
  * 列表：已有连接；点击选中，双击创建活跃会话（终端标签页），拖拽排序。
  */
-export default function PanelSsh() {
+function openSshConnection(conn: SshConnection) {
+  const workspace = useSessionStore.getState();
+  const sessions = useTerminalStore.getState().sessions;
+  for (const tab of workspace.tabs) {
+    if (tab.kind !== 'session') continue;
+    const terms = terminalsOf(tab);
+    if (!terms.some(term => term.kind === 'ssh' && term.ssh?.connectionId === conn.id)) continue;
+    if (terms.some(term => sessions[term.id])) continue;
+    workspace.closeTab(tab.id);
+  }
+  useSshStore.getState().touch(conn.id).catch(() => {});
+  useSessionStore.getState().addTab({ kind: 'ssh', ssh: connectionTarget(conn) });
+}
+
+function SshManagementPanel({ onShowDashboard }: { onShowDashboard: () => void }) {
   const connections = useSshStore((s) => s.connections);
   const iconColors = useIconColorStore(state => state.colors);
-  const touch = useSshStore((s) => s.touch);
   const remove = useSshStore((s) => s.remove);
   const reorder = useSshStore((s) => s.reorder);
   const [query, setQuery] = useState('');
@@ -71,20 +85,7 @@ export default function PanelSsh() {
    */
   const openConnection = (conn: SshConnection) => {
     setSelectedId(conn.id);
-    void touch(conn.id);
-    const workspace = useSessionStore.getState();
-    const sessions = useTerminalStore.getState().sessions;
-    for (const tab of workspace.tabs) {
-      if (tab.kind !== 'session') continue;
-      const terms = terminalsOf(tab);
-      if (!terms.some((term) => term.kind === 'ssh' && term.ssh?.connectionId === conn.id)) continue;
-      if (terms.some((term) => sessions[term.id])) continue;
-      workspace.closeTab(tab.id);
-    }
-    useSessionStore.getState().addTab({
-      kind: 'ssh',
-      ssh: connectionTarget(conn),
-    });
+    openSshConnection(conn);
     // File browsing is an optional service and should not replace connection navigation.
   };
 
@@ -112,6 +113,9 @@ export default function PanelSsh() {
     }}>
       <SidebarToolbar search={{ value: query, onChange: event => setQuery(event.target.value),
         placeholder: t('Search SSH connections…'), 'data-testid': 'ssh-search' }}>
+        <IconBtn title={t('Resource dashboard')} data-testid="ssh-dashboard-open" onClick={onShowDashboard}>
+          <DataUsage size={iconSizes.control} />
+        </IconBtn>
         <IconBtn title={t('ssh.quick.connect')} data-testid="ssh-quick-btn" onClick={() => setQuickOpen(true)}>
           <Plug size={iconSizes.control} />
         </IconBtn>
@@ -131,6 +135,10 @@ export default function PanelSsh() {
               active={c.id === selectedId}
               icon={<SshIcon size={iconSizes.row} style={{ color: iconColorCss(iconColors[iconColorKey('ssh', c.id)]) }} />}
               title={c.name}
+              subtitle={[`${c.user ? `${c.user}@` : ''}${c.host}:${c.port ?? 22}`,
+                c.lastOpenedAt ? t('Last connected {{date}}', { date: new Date(c.lastOpenedAt).toLocaleDateString() }) : undefined]
+                .filter(Boolean).join(' · ')}
+              subtitleFontFamily="var(--font-ui)"
               tooltip={`${c.user ? `${c.user}@` : ''}${c.host}:${c.port ?? 22}；双击连接，右键编辑 / 删除，拖拽排序`}
               testId={`ssh-row-${c.id}`}
               reorderItemId={c.id}
@@ -199,4 +207,17 @@ export default function PanelSsh() {
       }} />
     </div>
   );
+}
+
+export default function PanelSsh({ active = true }: { active?: boolean }) {
+  const [view, setView] = useState<'dashboard' | 'manage'>(() => {
+    try { return localStorage.getItem('vrykell-ssh-workspace-view') === 'manage' ? 'manage' : 'dashboard'; }
+    catch { return 'dashboard'; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('vrykell-ssh-workspace-view', view); } catch { /* Preferences are optional. */ }
+  }, [view]);
+  return view === 'dashboard'
+    ? <SshDashboard active={active} onManage={() => setView('manage')} onOpenTerminal={openSshConnection} />
+    : <SshManagementPanel onShowDashboard={() => setView('dashboard')} />;
 }

@@ -94,14 +94,3 @@ export function buildNewTabOptions(
     .sort((a, b) => (b.o.lastOpenedAt - a.o.lastOpenedAt) || (a.i - b.i))
     .map(({ o }) => o);
 }
-
-/** 按关键字过滤候选（大小写不敏感，匹配 label / subtitle）。 */
-export function filterNewTabOptions(opts: NewTabOption[], query: string): NewTabOption[] {
-  const q = query.trim().toLowerCase();
-  if (!q) return opts;
-  return opts.filter(
-    (o) =>
-      o.label.toLowerCase().includes(q) ||
-      (o.subtitle ?? '').toLowerCase().includes(q),
-  );
-}

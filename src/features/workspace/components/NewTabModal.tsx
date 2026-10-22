@@ -1,17 +1,14 @@
 import { preferredShell, useTerminalDefaults } from '@config/terminalDefaults';
 import { loadRecentOpen } from '../model/tabTypes';
-import { TextInput } from '@ui/TextInput';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { iconSizes, ChevronRight, Columns2, Folder, FolderOpen, Search, Settings, Square, SquareStack, TerminalPrompt } from '@ui/icons';
+import { iconSizes, ChevronRight, Columns2, Folder, FolderOpen, Square, TerminalPrompt } from '@ui/icons';
 import KeyHint from '@ui/KeyHint';
 import { SshIcon, shellIconFor } from '@ui/shellIcons';
 import { getAvailableShells, type ShellOption, type ShellType } from '@platform/shells';
 import { pickPath } from '@platform/api/fs';
-import { openAppWindow } from '@platform/appWindows';
 import { isMacOS } from '@platform/runtime';
 import {
   buildNewTabOptions,
-  filterNewTabOptions,
   touchRecentOpen,
   type NewTabOption,
 } from '@features/workspace/model/tabTypes';
@@ -25,6 +22,10 @@ import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
 import ConfirmDialog from '@ui/ConfirmDialog';
 import { useToastStore } from '@ui/Toast';
 import { t } from '@i18n';
+import BashMark from '~icons/devicon/bash';
+import PowerShellMark from '~icons/devicon/powershell';
+import WindowsMark from '~icons/devicon/windows8';
+import ZshMark from '~icons/devicon/zsh';
 
 interface Props {
   open: boolean;
@@ -52,30 +53,25 @@ interface MenuState {
  * filtered by the search field on top. Right-clicking a row opens that type's quick settings.
  */
 export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
-  const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
   const [shells, setShells] = useState<ShellOption[]>([]);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [editing, setEditing] = useState<SshConnection | null>(null);
   const [deleting, setDeleting] = useState<SshConnection | null>(null);
-  const [moreOpen, setMoreOpen] = useState(false);
   const [location, setLocation] = useState<'current' | 'home' | 'custom'>('current');
   const [customCwd, setCustomCwd] = useState('');
   const defaultShell = useTerminalDefaults(state => state.shell);
   const openModeByShell = useAgentSettings(state => state.global.openModeByShell);
   const sshOpenMode = useAgentSettings(state => state.global.sshOpenMode);
-  const inputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const sshConnections = useSshStore((s) => s.connections);
 
   useEffect(() => {
     if (!open) return;
-    setQuery('');
     setSelected(0);
     setMenu(null);
     setEditing(null);
     setDeleting(null);
-    setMoreOpen(false);
     setLocation('current');
     setCustomCwd('');
     ensureSshLoaded();
@@ -93,13 +89,6 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
     () => buildNewTabOptions(shells, sshConnections, loadRecentOpen(), defaultShell),
     [shells, sshConnections, defaultShell],
   );
-
-  const filtered = useMemo(
-    () => moreOpen ? filterNewTabOptions(options, query) : options,
-    [options, query, moreOpen],
-  );
-
-  useEffect(() => setSelected(0), [query]);
 
   const targetCwd = location === 'current' ? getFocusedCwd() : location === 'custom' ? customCwd || undefined : undefined;
   const defaultOption = useMemo(() => {
@@ -130,7 +119,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
           onClose();
           return;
         }
-      useSessionStore.getState().addTab({
+        useSessionStore.getState().addTab({
           kind: 'ssh',
           ssh: connectionTarget(conn),
           groupId,
@@ -227,10 +216,10 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
 
   const handleKey = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') onClose();
-    else if (e.key === 'ArrowDown') { e.preventDefault(); setSelected((s) => Math.min(s + 1, filtered.length - 1)); }
+    else if (e.key === 'ArrowDown') { e.preventDefault(); setSelected((s) => Math.min(s + 1, options.length - 1)); }
     else if (e.key === 'ArrowUp') { e.preventDefault(); setSelected((s) => Math.max(s - 1, 0)); }
-    else if (e.key === 'Enter') { e.preventDefault(); const o = filtered[selected]; if (o) create(o); }
-  }, [filtered, selected, create, onClose]);
+    else if (e.key === 'Enter') { e.preventDefault(); const o = options[selected]; if (o) create(o); }
+  }, [options, selected, create, onClose]);
 
   if (!open) return null;
 
@@ -247,41 +236,29 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
         <section className="new-tab-section" aria-labelledby="new-tab-profiles">
           <h2 id="new-tab-profiles">{t('Choose a profile')}</h2>
           <div className="new-tab-option-list">
-            {filtered.map((option, index) => <OptionRow key={option.key} opt={option} index={index}
+            {options.map((option, index) => <OptionRow key={option.key} opt={option} index={index}
               selected={index === selected} onSelect={() => setSelected(index)} onCreate={() => create(option)}
               onContextMenu={event => { setSelected(index); openMenu(event, option); }} />)}
           </div>
-          {!filtered.length && <div className="new-tab-empty">{t('No matching tab types')}</div>}
-          <button type="button" className="new-tab-row new-tab-more" onClick={() => {
-            setMoreOpen(true); requestAnimationFrame(() => inputRef.current?.focus());
-          }}><Settings size={18} /><span>{t('More profiles…')}</span><ChevronRight size={16} /></button>
-          {moreOpen && <div className="new-tab-search">
-            <Search size={14} /><TextInput ref={inputRef} value={query} onChange={event => setQuery(event.target.value)}
-              placeholder={t('Search tab types…')} />
-          </div>}
+          {!options.length && <div className="new-tab-empty">{t('No matching tab types')}</div>}
         </section>
 
         <section className="new-tab-section" aria-labelledby="new-tab-location">
           <h2 id="new-tab-location">{t('Open location')}</h2>
-          <button type="button" className="new-tab-row" data-active={location === 'current' || undefined}
+          <button type="button" className="new-tab-row workspace-floating-row" data-active={location === 'current' || undefined}
             onClick={() => setLocation('current')}><Square size={18} /><span>{t('Open in current directory')}</span>
             <KeyHint shortcut={isMacOS ? 'Meta+Shift+T' : 'Control+Shift+T'} /></button>
-          <button type="button" className="new-tab-row" data-active={location === 'home' || undefined}
+          <button type="button" className="new-tab-row workspace-floating-row" data-active={location === 'home' || undefined}
             onClick={() => setLocation('home')}><FolderOpen size={18} /><span>{t('Open in home directory')}</span>
             <KeyHint shortcut={isMacOS ? 'Meta+Shift+H' : 'Control+Shift+H'} /></button>
-          <button type="button" className="new-tab-row" data-active={location === 'custom' || undefined}
+          <button type="button" className="new-tab-row workspace-floating-row" data-active={location === 'custom' || undefined}
             onClick={() => void chooseDirectory()}><Folder size={18} /><span>{customCwd || t('Choose a directory…')}</span>
             <KeyHint shortcut={isMacOS ? 'Meta+Shift+O' : 'Control+Shift+O'} /></button>
         </section>
 
         <section className="new-tab-section" aria-labelledby="new-tab-advanced">
           <h2 id="new-tab-advanced">{t('Advanced')}</h2>
-          <button type="button" className="new-tab-row" onClick={() => {
-            try { void openAppWindow(); onClose(); }
-            catch (reason) { useToastStore.getState().addToast(t('Could not open a new window: {{error}}', { error: String(reason) }), 'error'); }
-          }}><SquareStack size={18} /><span>{t('Open in new window')}</span>
-            <KeyHint shortcut={isMacOS ? 'Meta+N' : 'Control+N'} /></button>
-          <button type="button" className="new-tab-row" onClick={() => {
+          <button type="button" className="new-tab-row workspace-floating-row" onClick={() => {
             onClose(); useUiStore.getState().beginSplit(null);
           }}><Columns2 size={18} /><span>{t('Split tab')}</span><ChevronRight size={16} /></button>
         </section>
@@ -292,7 +269,6 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
     {menu && menuItems.length > 0 && (
       <ContextMenu anchor={{ x: menu.x, y: menu.y }} items={menuItems} onClose={() => setMenu(null)} />
     )}
-
     {/* Connection editor stays above the picker; closing it keeps the picker open */}
     {editing && (
       <SshFormModal open initial={editing} onClose={() => setEditing(null)} />
@@ -322,14 +298,20 @@ function OptionRow({ opt, index, selected, onSelect, onCreate, onContextMenu }: 
   onContextMenu: (event: React.MouseEvent) => void;
 }) {
   const Icon = opt.kind === 'ssh' ? SshIcon : shellIconFor(opt.shellType);
+  const shellType = opt.kind === 'shell' ? opt.shellType : null;
+  const BrandIcon = shellType === 'zsh' ? ZshMark : shellType === 'bash' ? BashMark
+    : shellType === 'powershell' || shellType === 'pwsh' ? PowerShellMark
+      : shellType === 'cmd' ? WindowsMark : null;
   return (
-    <button className="new-tab-row" data-active={selected || undefined}
+    <button className="new-tab-row workspace-floating-row" data-active={selected || undefined}
       onClick={onCreate}
       onMouseEnter={onSelect}
       onContextMenu={onContextMenu}
       data-testid={`new-tab-option-${opt.key}`}
     >
-      <Icon size={18} />
+      {BrandIcon
+        ? <BrandIcon width={20} height={20} data-shell-mark={shellType} aria-hidden="true" style={{ color: 'var(--text-primary)' }} />
+        : <Icon size={18} />}
       <span><strong>{opt.label}</strong>{opt.subtitle && <small>{opt.subtitle}</small>}</span>
       <KeyHint shortcut={`${isMacOS ? 'Meta' : 'Control'}+${index + 1}`} />
     </button>

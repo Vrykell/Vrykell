@@ -142,13 +142,17 @@ describe('independent auxiliary sides', () => {
     dock.closePanel('files');
     expect(useDockStore.getState()).toMatchObject({ leftPanels: [], rightPanels: ['git'] });
   });
-  it('transfers an open panel once and replaces only the destination panel', () => {
+  it('keeps a single left panel and returns the displaced one to the right row', () => {
     const dock = useDockStore.getState();
     dock.moveButton('files', 'left'); dock.openPanel('files'); dock.openPanel('chat');
     dock.moveButton('chat', 'left');
-    expect(useDockStore.getState()).toMatchObject({ leftZone: ['files', 'chat'], leftPanels: ['chat'], rightPanels: [] });
+    expect(useDockStore.getState()).toMatchObject({ leftZone: ['chat'], leftPanels: ['chat'], rightPanels: [] });
+    // The displaced panel never disappears: it waits in the right button row and can be opened again.
+    expect(useDockStore.getState().rightZone).toContain('files');
+    dock.openPanel('files');
+    expect(useDockStore.getState()).toMatchObject({ leftZone: ['chat'], leftPanels: ['chat'], rightPanels: ['files'] });
     dock.moveButton('chat', 'right', 0);
-    expect(useDockStore.getState()).toMatchObject({ leftZone: ['files'], leftPanels: [], rightPanels: ['chat'] });
+    expect(useDockStore.getState()).toMatchObject({ leftZone: [], leftPanels: [], rightPanels: ['chat'] });
     expect(useDockStore.getState().rightZone.filter(id => id === 'chat')).toHaveLength(1);
   });
   it('restores a collapsed left panel without replacing the right panel or its saved width', () => {

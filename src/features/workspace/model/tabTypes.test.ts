@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
   buildNewTabOptions,
-  filterNewTabOptions,
   loadRecentOpen,
   saveRecentOpen,
   touchRecentOpen,
@@ -38,16 +37,6 @@ describe('tabTypes 新建标签页候选', () => {
     expect(opts.map((o) => o.key)).toEqual([
       'ssh:ssh-2', 'shell:bash', 'shell:zsh', 'ssh:ssh-1',
     ]);
-  });
-
-  it('filterNewTabOptions 按关键字匹配 label 与 subtitle，忽略大小写', () => {
-    const opts = buildNewTabOptions(shells, sshs, {});
-    expect(filterNewTabOptions(opts, 'zsh').map((o) => o.key)).toEqual(['shell:zsh']);
-    expect(filterNewTabOptions(opts, 'PROD').map((o) => o.key)).toEqual(['ssh:ssh-1']);
-    expect(filterNewTabOptions(opts, 'staging').map((o) => o.key)).toEqual(['ssh:ssh-2']);
-    expect(filterNewTabOptions(opts, '不存在')).toHaveLength(0);
-    // 空关键字返回全部
-    expect(filterNewTabOptions(opts, '  ')).toHaveLength(4);
   });
 
   it('touchRecentOpen 持久化并可读回', () => {

@@ -5,8 +5,9 @@ export const STARTUP_STORAGE_KEY = 'vrykell-startup-mode';
 
 function loadMode(): StartupMode {
   try {
+    // Older builds offered extra startup targets; they all mean "do not restore".
     const saved = localStorage.getItem(STARTUP_STORAGE_KEY);
-    return saved === 'default' || saved === 'empty' ? saved : 'restore';
+    return saved === null || saved === 'restore' ? 'restore' : 'empty';
   } catch { return 'restore'; }
 }
 

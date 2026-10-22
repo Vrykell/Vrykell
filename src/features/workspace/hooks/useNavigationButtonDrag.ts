@@ -4,12 +4,14 @@ import { useNavigationDrag, type NavigationDropTarget } from '../stores/navigati
 import { panelPlacementRegions } from '../services/panelPlacementRegions';
 
 function locateTarget(x: number, y: number, id: string): NavigationDropTarget | null {
+  const dock = useDockStore.getState();
+  const sourceSide = dock.leftZone.includes(id) ? 'left' : dock.rightZone.includes(id) ? 'right' : null;
+  if (!sourceSide) return null;
   const hit = document.elementFromPoint(x, y);
   const area = hit?.closest<HTMLElement>('[data-dock-zone]');
   const side = area?.dataset.dockZone;
   if (!area || (side !== 'right' && side !== 'left')) {
     if (!PANEL_DEFS[id]) return null;
-    const dock = useDockStore.getState();
     const regions = panelPlacementRegions(id);
     if (!regions) return null;
     const contains = (rect: typeof regions.right | null) => !!rect && x >= rect.left && x <= rect.left + rect.width && y >= rect.top && y <= rect.top + rect.height;
@@ -18,8 +20,10 @@ function locateTarget(x: number, y: number, id: string): NavigationDropTarget | 
     const zone = destination === 'left' ? dock.leftZone : dock.rightZone;
     return { side: destination, index: zone.includes(id) ? zone.indexOf(id) : zone.length, openPanel: true };
   }
-  const dock = useDockStore.getState();
   const zone = side === 'left' ? dock.leftZone : dock.rightZone;
+  // Crossing sides is a placement gesture. The toolbar itself is not a reorder target,
+  // and the preview appears in the real panel region below it.
+  if (side !== sourceSide && PANEL_DEFS[id]) return { side, index: zone.length, openPanel: true };
   const placeholder = hit?.closest<HTMLElement>('[data-dock-placeholder]');
   if (placeholder && area.contains(placeholder)) return { side, index: Number(placeholder.dataset.dockPlaceholder) };
   const slot = hit?.closest<HTMLElement>('[data-dock-slot]');
@@ -27,7 +31,8 @@ function locateTarget(x: number, y: number, id: string): NavigationDropTarget | 
     // Gaps between controls belong to the next insertion boundary, not the end.
     for (const candidate of area.querySelectorAll<HTMLElement>('[data-dock-slot]:not([data-moving="true"])')) {
       const rect = candidate.getBoundingClientRect();
-      if (x < rect.left + rect.width / 2) {
+      const before = side === 'left' ? y < rect.top + rect.height / 2 : x < rect.left + rect.width / 2;
+      if (before) {
         return { side, index: zone.indexOf(candidate.dataset.dockSlot!) };
       }
     }
@@ -35,7 +40,7 @@ function locateTarget(x: number, y: number, id: string): NavigationDropTarget | 
   }
   const index = zone.indexOf(slot.dataset.dockSlot!);
   const rect = slot.getBoundingClientRect();
-  const after = x > rect.left + rect.width / 2;
+  const after = side === 'left' ? y > rect.top + rect.height / 2 : x > rect.left + rect.width / 2;
   return { side, index: index + (after ? 1 : 0) };
 }
 

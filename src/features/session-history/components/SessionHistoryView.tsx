@@ -9,6 +9,7 @@ import HistoryOptionMenu, { type HistoryMenuSection } from '@ui/HistoryOptionMen
 import HistoryGroupCard from '@ui/HistoryGroupCard';
 import HistoryPage from '@ui/HistoryPage';
 import HistoryTextPrompt from '@ui/HistoryTextPrompt';
+import FilterChip from '@ui/FilterChip';
 import SidebarItem from '@ui/sidebarItem';
 import { iconColorCss, iconColorKey, useIconColorStore } from '@config/iconColors';
 import type { BackendSessionEntry } from '@platform/api/types';
@@ -174,6 +175,7 @@ export default function SessionHistoryView() {
     const rect = element.getBoundingClientRect();
     return { x: rect.right - 180, y: rect.bottom + 4, trigger: element };
   };
+  const hasFilterCard = typeFilter !== 'all' || mode !== 'all' || dateFilter !== 'all' || starredOnly;
 
   return (<HistoryPage
     busy={batchBusy}
@@ -187,6 +189,26 @@ export default function SessionHistoryView() {
     searchLabel={t('Search sessions')}
     searchPlaceholder={t('Search sessions…')}
     searchTestId="session-filter-input"
+    filterChips={hasFilterCard ? <>
+      {typeFilter !== 'all' && <FilterChip testId="session-filter-card-type" removeLabel={t('Remove filter: {{filter}}', {
+        filter: t(SESSION_TYPE_OPTIONS.find(option => option.value === typeFilter)?.label ?? typeFilter),
+      })} onRemove={() => setFilter({ type: 'all' })}>
+        {t(SESSION_TYPE_OPTIONS.find(option => option.value === typeFilter)?.label ?? typeFilter)}
+      </FilterChip>}
+      {mode !== 'all' && <FilterChip testId="session-filter-card-mode" removeLabel={t('Remove filter: {{filter}}', {
+        filter: t(SESSION_MODE_OPTIONS.find(option => option.value === mode)?.label ?? mode),
+      })} onRemove={() => setFilter({ mode: 'all' })}>
+        {t(SESSION_MODE_OPTIONS.find(option => option.value === mode)?.label ?? mode)}
+      </FilterChip>}
+      {dateFilter !== 'all' && <FilterChip testId="session-filter-card-date" removeLabel={t('Remove filter: {{filter}}', {
+        filter: t(SESSION_DATE_OPTIONS.find(option => option.value === dateFilter)?.label ?? dateFilter),
+      })} onRemove={() => setFilter({ date: 'all' })}>
+        {t(SESSION_DATE_OPTIONS.find(option => option.value === dateFilter)?.label ?? dateFilter)}
+      </FilterChip>}
+      {starredOnly && <FilterChip testId="session-filter-card-starred" removeLabel={t('Remove filter: {{filter}}', {
+        filter: t('Starred only'),
+      })} onRemove={() => setFilter({ starredOnly: false })}>{t('Starred only')}</FilterChip>}
+    </> : undefined}
     headerActions={<>
       <IconButton compact className="toolbar-icon-button history-icon-button" aria-label={t('Filter sessions')}
         aria-haspopup="menu" aria-expanded={filterMenu !== null}

@@ -54,7 +54,8 @@ export function normalizeDockLayout(value: unknown): PersistedLayout | null {
     || !data.panelWidths || typeof data.panelWidths !== 'object' || Array.isArray(data.panelWidths)) return null;
   const valid = (input: unknown) => (input as unknown[]).filter((id): id is string => typeof id === 'string' && PANEL_IDS.includes(id));
   const independent = data.layoutVersion === 6;
-  const leftZone = independent ? [...new Set(valid(data.leftZone))] : [];
+  // The left dock holds a single panel; any extra saved entry returns to the right row.
+  const leftZone = independent ? [...new Set(valid(data.leftZone))].slice(0, 1) : [];
   const rightZone = [...new Set([...valid(data.rightZone), ...valid(data.leftZone), ...PANEL_IDS])].filter(id => !leftZone.includes(id));
   const leftOpen = independent ? valid(data.leftPanels).find(id => leftZone.includes(id)) : undefined;
   const rightOpen = independent ? valid(data.rightPanels).find(id => rightZone.includes(id)) : [...valid(data.rightPanels), ...valid(data.leftPanels)][0];
@@ -106,17 +107,28 @@ export const useDockStore = create<DockState>((set) => ({
   ...loadLayout(), collapsedPanels: [],
   moveButton: (id, to, atIndex) => set(state => {
     if (!PANEL_DEFS[id]) return state;
-    const destination = to === 'left' ? state.leftZone : state.rightZone;
-    const from = destination.indexOf(id);
-    const zone = destination.filter(item => item !== id);
-    let index = atIndex ?? destination.length;
+    const wasOpen = state.leftPanels.includes(id) || state.rightPanels.includes(id);
+    if (to === 'left') {
+      // The left dock holds a single panel. Docking another one returns the displaced panel
+      // to the right button row, so it can always be opened again.
+      const displaced = state.leftZone.filter(item => item !== id);
+      const patch = { leftZone: [id],
+        rightZone: [...state.rightZone.filter(item => item !== id && !displaced.includes(item)), ...displaced],
+        leftPanels: wasOpen ? [id] : state.leftPanels.filter(item => item !== id),
+        rightPanels: state.rightPanels.filter(item => item !== id),
+        collapsedPanels: state.collapsedPanels.filter(item => item !== id) };
+      saveLayout(persisted({ ...state, ...patch }));
+      return patch;
+    }
+    const from = state.rightZone.indexOf(id);
+    const zone = state.rightZone.filter(item => item !== id);
+    let index = atIndex ?? state.rightZone.length;
     if (from >= 0 && from < index) index -= 1;
     zone.splice(Math.max(0, Math.min(index, zone.length)), 0, id);
-    const wasOpen = state.leftPanels.includes(id) || state.rightPanels.includes(id);
-    const patch = { leftZone: to === 'left' ? zone : state.leftZone.filter(item => item !== id),
-      rightZone: to === 'right' ? zone : state.rightZone.filter(item => item !== id),
-      leftPanels: to === 'left' && wasOpen ? [id] : state.leftPanels.filter(item => item !== id),
-      rightPanels: to === 'right' && wasOpen ? visiblePanels(state, [id]) : state.rightPanels.filter(item => item !== id),
+    const patch = { rightZone: zone,
+      leftZone: state.leftZone.filter(item => item !== id),
+      leftPanels: state.leftPanels.filter(item => item !== id),
+      rightPanels: wasOpen ? visiblePanels(state, [id]) : state.rightPanels.filter(item => item !== id),
       collapsedPanels: state.collapsedPanels.filter(item => item !== id) };
     saveLayout(persisted({ ...state, ...patch }));
     return patch;
@@ -143,7 +155,11 @@ export const useDockStore = create<DockState>((set) => ({
     });
   },
   closePanel: id => set(state => {
+    // A closed left panel returns to the right button row so it stays reachable without a left toolbar.
+    const wasLeft = state.leftZone.includes(id);
     const patch = { leftPanels: state.leftPanels.filter(item => item !== id), rightPanels: state.rightPanels.filter(item => item !== id),
+      leftZone: state.leftZone.filter(item => item !== id),
+      rightZone: wasLeft && !state.rightZone.includes(id) ? [...state.rightZone, id] : state.rightZone,
       collapsedPanels: state.collapsedPanels.filter(item => item !== id) };
     saveLayout(persisted({ ...state, ...patch })); return patch;
   }),

@@ -292,11 +292,10 @@ it('creates, assigns, colors, renames and deletes a group while retaining its co
   await waitFor(() => expect(saved.groupColors?.[groupId]).toBe('blue'));
   expect(group).toHaveAttribute('data-group-color', 'blue');
   fireEvent.click(within(group).getByRole('button', { name: t('Group actions') }));
-  fireEvent.click(screen.getByRole('button', { name: t('Rename group…') }));
   const renameInput = screen.getByRole('textbox', { name: t('Rename command group') });
   expect(renameInput).toHaveValue('Release');
   fireEvent.change(renameInput, { target: { value: 'Deploy' } });
-  fireEvent.blur(renameInput);
+  fireEvent.keyDown(renameInput, { key: 'Enter' });
   expect(screen.queryByRole('textbox', { name: t('Rename command group') })).toBeNull();
   await waitFor(() => expect(saved.groups?.[0]?.name).toBe('Deploy'));
   expect(within(group).getByRole('button', { name: 'Deploy' })).toBeVisible();

@@ -8,6 +8,7 @@ import HistoryOptionMenu, { type HistoryMenuSection } from '@ui/HistoryOptionMen
 import HistoryGroupCard from '@ui/HistoryGroupCard';
 import HistoryPage from '@ui/HistoryPage';
 import HistoryTextPrompt from '@ui/HistoryTextPrompt';
+import FilterChip from '@ui/FilterChip';
 import SidebarItem from '@ui/sidebarItem';
 import { historyDirectory } from '@utils/historyDirectory';
 import ErrorBox from '@ui/ErrorBox';
@@ -269,6 +270,7 @@ export default function AiHistoryView() {
     })),
   }];
 
+  const hasFilterCard = filter.type !== 'all' || filter.date !== 'all' || filter.starredOnly === true;
   return <HistoryPage
     busy={batchBusy}
     pageTestId="ai-history-page"
@@ -282,6 +284,17 @@ export default function AiHistoryView() {
     searchPlaceholder={t('Search conversations…')}
     searchTestId="ai-history-search"
     listClassName="ai-history-list"
+    filterChips={hasFilterCard ? <>
+      {filter.type !== 'all' && <FilterChip testId="ai-history-filter-card-type" removeLabel={t('Remove filter: {{filter}}', {
+        filter: t(TYPE_LABELS[filter.type]),
+      })} onRemove={() => updateFilter({ type: 'all' })}>{t(TYPE_LABELS[filter.type])}</FilterChip>}
+      {filter.date !== 'all' && <FilterChip testId="ai-history-filter-card-date" removeLabel={t('Remove filter: {{filter}}', {
+        filter: t(DATE_LABELS[filter.date]),
+      })} onRemove={() => updateFilter({ date: 'all' })}>{t(DATE_LABELS[filter.date])}</FilterChip>}
+      {filter.starredOnly && <FilterChip testId="ai-history-filter-card-starred" removeLabel={t('Remove filter: {{filter}}', {
+        filter: t('Starred only'),
+      })} onRemove={() => updateFilter({ starredOnly: false })}>{t('Starred only')}</FilterChip>}
+    </> : undefined}
     headerActions={<>
       <IconButton compact className="toolbar-icon-button history-icon-button" aria-label={t('Filter conversations')}
         aria-haspopup="menu" aria-expanded={filterMenu !== null}

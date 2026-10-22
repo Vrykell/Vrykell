@@ -47,7 +47,7 @@ registerField('local-file-undo', 'file-operations', 'Local file undo', 'File ope
 registerField('application-language', 'application-language', 'Application language', 'Choose the interface language. Changes apply immediately.', () => useLanguagePreferences.getState().preference);
 registerField('remote-file-undo', 'file-operations', 'Remote file undo', 'File operations');
 registerField('preferred-file-editor', 'editor-local', 'Preferred file editor', 'Opening files', () => useEditorPreferences.getState().localOpenMode);
-registerField("startup", "startup", "Open on startup", "Restore sessions or open a default terminal", () => useStartupSettings.getState().mode);
+registerField("startup", "startup", "Restore history at startup", "Applies next launch. Restored sessions reconnect without restarting their commands.", () => useStartupSettings.getState().mode);
 registerField('history-run-target', 'command-history', 'Command execution target', 'Choose where commands run from the history panel.', () => useCommandHistorySettings.getState().runIn);
 registerField('history-double-click', 'command-history', 'Double-click command', 'Double-click inserts the command by default. Execution follows the selected target.', () => useCommandHistorySettings.getState().doubleClick);
 registerField('command-highlighting', 'appearance-typography', 'Command syntax highlighting', 'Color commands, arguments and shell operators.', () => String(useTypographyStore.getState().commandHighlighting));

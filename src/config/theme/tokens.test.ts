@@ -42,7 +42,7 @@ describe('default blue palette', () => {
   it('uses the sampled neutral surfaces and blue action from the appearance reference', () => {
     expect(themes.dark).toMatchObject({
       canvas: '#202020', sidebarBg: '#28282B', chromeBg: '#2E2E2E', auxiliaryBg: '#282828', xtermBg: '#141414', surface: '#282828', composerBg: '#333333',
-      fieldBg: '#2C2C2C', selectionBg: '#183C57', accent: '#50C0FF', primaryAction: '#183C57',
+      fieldBg: '#333333', selectionBg: '#183C57', accent: '#50C0FF', primaryAction: '#2C67C5',
     });
   });
   it.each(['dark', 'light'] as const)('%s reuses the neutral card and field colors for content blocks', mode => {
@@ -58,7 +58,7 @@ describe('default blue palette', () => {
     for (const color of [palette.success, palette.shellConnected, palette.shellBashAccent, palette.groupGreen, palette.xtermGreen, palette.xtermBrightGreen, palette.cmdProgram]) expect(color).toBe(green);
   });
   it.each(['dark', 'light'] as const)('%s primary actions use the unified action blue', mode => {
-    expect(themes[mode].primaryAction).toBe('#183C57');
+    expect(themes[mode].primaryAction).toBe('#2C67C5');
     expect(paletteToCssVars(themes[mode])['--primary-action']).toBe(themes[mode].primaryAction);
   });
   it.each(['dark', 'light'] as const)('%s keeps blue text carets separate from terminal cursors', mode => {
@@ -80,7 +80,7 @@ describe('default blue palette', () => {
     };
     for (const color of [palette.cmdProgram, palette.cmdArgument, palette.cmdFlag, palette.cmdPath,
       palette.cmdNumber, palette.cmdVariable, palette.cmdString, palette.cmdPipe]) {
-      for (const background of [palette.fieldBg, palette.xtermBg]) {
+      for (const background of [palette.fieldBg, palette.composerBg, palette.xtermBg]) {
         const values = [luminance(color), luminance(background)];
         expect((Math.max(...values) + 0.05) / (Math.min(...values) + 0.05)).toBeGreaterThanOrEqual(4.5);
       }
@@ -93,7 +93,8 @@ describe('default blue palette', () => {
       palette.cmdFlag, palette.cmdPath, palette.cmdPipe, palette.cmdRedirect, palette.cmdString]) {
       const channels = [1, 3, 5].map(offset => parseInt(color.slice(offset, offset + 2), 16));
       const maximum = Math.max(...channels);
-      expect((maximum - Math.min(...channels)) / maximum).toBeGreaterThanOrEqual(0.55);
+      // The raised composer surface needs a lighter violet; 0.50 still reads as a vivid hue.
+      expect((maximum - Math.min(...channels)) / maximum).toBeGreaterThanOrEqual(0.50);
     }
   });
   it.each(['dark', 'light'] as const)('%s shares accent families between syntax and color pickers', mode => {

@@ -4,7 +4,7 @@ import { themes } from '@config/theme/tokens';
 
 describe('blockColors', () => {
   it('resolves a preset of the requested block type regardless of case', () => {
-    expect(blockColorPreset('ai', '#409cff')?.name).toBe('Blue');
+    expect(blockColorPreset('ai', '#44a0ff')?.name).toBe('Blue');
     expect(blockColorPreset('command', '  #30D158 ')?.name).toBe('Green');
     expect(blockColorPreset('failed', '#ff9f0a')?.name).toBe('Orange');
   });
@@ -29,7 +29,7 @@ describe('blockColors', () => {
   });
 
   it('offers the stored colour only when it is not one of the block presets', () => {
-    expect(blockColorOptions('ai', '#409CFF')).toHaveLength(BLOCK_COLOR_PRESETS.ai.length);
+    expect(blockColorOptions('ai', '#44A0FF')).toHaveLength(BLOCK_COLOR_PRESETS.ai.length);
     const custom = blockColorOptions('ai', '#123456');
     expect(custom).toHaveLength(BLOCK_COLOR_PRESETS.ai.length + 1);
     expect(custom[custom.length - 1]).toEqual({ key: null, value: '#123456' });

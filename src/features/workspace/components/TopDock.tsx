@@ -16,8 +16,11 @@ export default function TopDock({ sidebarOverlayRequired = false }: { sidebarOve
   const displayTitle = useTabDisplayTitle(activeTab);
   const settingsOpen = useUiStore(state => state.settingsOpen);
   const area = useWorkspaceNavigation(state => state.area);
+  const historyPreset = useWorkspaceNavigation(state => state.historyPreset);
   const collapsed = useWorkspaceNavigation(state => state.collapsed);
-  const workspaceTitle = t(area === 'code' ? 'Code workspace' : area === 'ai' ? 'AI workspace' : area === 'ssh' ? 'SSH hosts' : area === 'history' ? 'All history' : 'Terminal workspace');
+  const workspaceTitle = t(area === 'code' ? 'Code workspace' : area === 'ai' ? 'AI workspace' : area === 'ssh' ? 'SSH hosts'
+    : area === 'history' ? historyPreset === 'terminal' ? 'Session history' : historyPreset === 'conversation' ? 'AI conversation history' : 'All history'
+    : 'Terminal workspace');
   const [fullscreen, setFullscreen] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
   const actionsRef = useRef<HTMLDivElement>(null);

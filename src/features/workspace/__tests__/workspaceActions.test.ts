@@ -70,14 +70,14 @@ it('keeps a portaled conversation settings field in the side conversation keyboa
   expect(useWorkspaceNavigation.getState().area).toBe('terminal');
 });
 
-it('keeps all conversation navigation in the main AI workspace while a native chat is docked', () => {
+it('keeps hidden AI pages out of numeric tab navigation while a native chat is docked', () => {
   const workspace = useWorkspaceStore.getState();
   workspace.openHarnessTab();
   useAiWorkspace.getState().openNative(useChatStore.getState().createConversation());
   workspace.openUsageTab(); workspace.openAiHistoryTab();
   useWorkspaceNavigation.setState({ aiPlacement: 'side' });
-  expect(activateWorkspaceInstance(1)).toBe(true);
-  expect(useWorkspaceStore.getState().tabs.find(tab => tab.id === useWorkspaceStore.getState().activeId)?.kind).toBe('usage');
+  expect(activateWorkspaceInstance(1)).toBe(false);
+  expect(useWorkspaceStore.getState().tabs.find(tab => tab.id === useWorkspaceStore.getState().activeId)?.kind).toBe('ai-history');
   expect(useWorkspaceNavigation.getState().aiPlacement).toBe('side');
   expect(activateWorkspaceInstance(3)).toBe(false);
   const harness = useWorkspaceStore.getState().tabs.find(tab => tab.kind === 'harness')!;

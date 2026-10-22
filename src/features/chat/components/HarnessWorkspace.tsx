@@ -4,7 +4,7 @@ import { t } from '@i18n';
 import FolderTabs from '@ui/FolderTabs';
 import { IconButton } from '@ui/IconButton';
 import ConfirmDialog from '@ui/ConfirmDialog';
-import { Plus, DataUsage, Folder, Sparkles, Columns2 } from '@ui/icons';
+import { Plus, DataUsage, Folder, Sparkles, Columns2, History } from '@ui/icons';
 import WorkspaceHeader from '@ui/WorkspaceHeader';
 import { OutlineButton } from '@ui/OutlineButton';
 import { registerHarnessCloseGuard } from '@core/harness';
@@ -12,6 +12,8 @@ import { pickPath } from '@platform/api/fs';
 import { useToastStore } from '@ui/Toast';
 import AcpLauncher from '@features/workspace/components/AcpLauncher';
 import { useSessionStore, useUiStore } from '@features/workspace';
+import { UnifiedHistoryView } from '@features/session-history';
+import UsageView from '@features/agent/components/UsageView';
 import { harnessMark } from '@features/agent/components/HarnessBadge';
 import { useHarnessStore } from '../stores/harness';
 import { useHarnessWorkspace } from '../stores/harnessWorkspace';
@@ -94,6 +96,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
     setPicker(false);
     setDirectory(undefined);
   };
+  const systemPages = pages.filter(page => page.kind === 'ai-history' || page.kind === 'usage' || page.kind === 'start-ai');
   const tabs = [
     ...nativeTabs.flatMap(id => { const conversation = conversations.find(item => item.id === id); return conversation ? [{
       id: `chat:${id}`, label: conversation.title, tip: conversation.title, icon: <Sparkles size={16} />, closeLabel: t('Close session {{name}}', { name: conversation.title }),
@@ -102,10 +105,17 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
         id: `acp:${item.id}`, label: item.harness, tip: item.cwd ? `${item.harness} · ${item.cwd}` : item.harness,
         icon: <Mark size={16} />, closeLabel: t('Close session {{name}}', { name: item.harness }),
     }; }),
-    ...pages.flatMap(page => page.kind === 'usage' || page.kind === 'ai-history' ? [{ id: `page:${page.id}`, label: page.title, tip: page.title, dataAttributes: { 'data-tab-kind': page.kind },
-      icon: page.kind === 'usage' ? <DataUsage size={16} /> : <Sparkles size={16} />, closeLabel: t('Close this tab') }] : []),
+    // System pages ride the same strip but sit on the canvas and never enter groups.
+    ...systemPages.map(page => ({
+      id: `page:${page.id}`, label: page.title, tip: page.title,
+      icon: page.kind === 'usage' ? <DataUsage size={16} /> : page.kind === 'start-ai' ? <Sparkles size={16} /> : <History size={16} />,
+      closeLabel: t('Close this tab'), surface: 'canvas' as const, renameable: false,
+      dataAttributes: { 'data-tab-kind': page.kind },
+    })),
   ];
   const ids = tabs.map(item => item.id);
+  const activeSystemPage = activePage && (activePage.kind === 'ai-history' || activePage.kind === 'usage' || activePage.kind === 'start-ai') ? activePage : undefined;
+  const stripSelected = activePage?.kind === 'harness' ? selected : activeSystemPage ? `page:${activeSystemPage.id}` : '';
   useEffect(() => {
     const sessions = ids.filter(id => !id.startsWith('page:'));
     if (!sessions.includes(selected) && sessions.length) {
@@ -114,9 +124,12 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
       if (id.startsWith('chat:')) void useChatStore.getState().selectConversation(id.slice(5));
     }
   }, [ids.join('|'), selected]);
-  const header = <FolderTabs label={t('AI sessions')} selected={activePage && activePage.kind !== 'harness' ? `page:${activePage.id}` : selected} listId="harness-sessions"
+  const header = <FolderTabs label={t('AI sessions')} selected={stripSelected} listId="harness-sessions"
       items={orderedWorkspaceIds(ids, order).map(id => tabs.find(item => item.id === id)!)} onSelect={select}
-      onMove={(...args) => useAiWorkspace.getState().move(ids, ...args)} onClose={close} menuItems={[
+      onMove={(...args) => useAiWorkspace.getState().move(ids, ...args)} onClose={close}
+      onRename={(id, title) => {
+        if (id.startsWith('chat:')) useChatStore.getState().renameConversation(id.slice(5), title);
+      }} menuItems={[
         { label: t('Choose project folder'), onClick: () => void chooseDirectory() },
         { label: t('Usage statistics'), onClick: () => useSessionStore.getState().openUsageTab() },
         ...(selected.startsWith('chat:') ? [{ label: t('Dock AI to side'), onClick: relocate }] : []),
@@ -132,8 +145,17 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
       </>} />;
   return <div data-testid="harness-workspace" style={{ display: 'flex', flex: 1, minWidth: 0, minHeight: 0, flexDirection: 'column' }}>
     <WorkspaceHeader active={headerActive && !settingsOpen}>{header}</WorkspaceHeader>
-    {ids.every(id => id.startsWith('page:')) && <div className="ai-workspace-empty"><OutlineButton onClick={() => void newConversation()}>{t('New conversation')}</OutlineButton><AcpLauncher open={visible} embedded onClose={() => {}} onPick={pick} /></div>}
-    {nativeVisited && <div className="ai-native-surface" inert={!visible || !selected.startsWith('chat:')} style={{ display: selected.startsWith('chat:') ? 'flex' : 'none' }}>
+    {activeSystemPage && <div data-testid={`ai-system-page-${activeSystemPage.kind}`} style={{ display: visible ? 'flex' : 'none', flex: 1, minHeight: 0, minWidth: 0, flexDirection: 'column' }}>
+      {activeSystemPage.kind === 'usage' ? <UsageView />
+        : activeSystemPage.kind === 'start-ai' ? <div className="workspace-empty workspace-start-page" data-testid="ai-start-page">
+          <Sparkles size={40} />
+          <h2>{t('Your AI workspace')}</h2>
+          <p>{t('Conversations and connected agents share this workspace.')}</p>
+          <OutlineButton data-testid="ai-start-new-conversation" onClick={() => void newConversation()}>{t('New conversation')}</OutlineButton>
+        </div>
+        : <UnifiedHistoryView preset="conversation" />}
+    </div>}
+    {nativeVisited && <div className="ai-native-surface" inert={!visible || activePage?.kind !== 'harness' || !selected.startsWith('chat:')} style={{ display: visible && activePage?.kind === 'harness' && selected.startsWith('chat:') ? 'flex' : 'none' }}>
       <NativeConversationSurface active={placement === 'main'} />
       {placement === 'side' && <div className="workspace-empty"><p>{t('This conversation is open in the side panel.')}</p><OutlineButton onClick={() => selectWorkspaceArea('ai')}>{t('Move AI to workspace')}</OutlineButton></div>}
     </div>}
@@ -141,7 +163,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
       style={{ display: `acp:${item.id}` === selected ? 'flex' : 'none', flex: 1, minHeight: 0, minWidth: 0 }}>
       <HarnessView tabId={item.id} harness={item.harness} cwd={item.cwd} fresh={item.fresh} active={visible && `acp:${item.id}` === selected} />
     </div>)}
-    {ids.some(id => !id.startsWith('page:')) && <AcpLauncher open={picker && visible} onClose={() => { setPicker(false); setDirectory(undefined); }} onPick={pick} />}
+    <AcpLauncher open={picker && visible} onClose={() => { setPicker(false); setDirectory(undefined); }} onPick={pick} />
     {closing && createPortal(<ConfirmDialog open title={t('Close ACP sessions?')}
       message={t('Closing stops active work and discards unsent drafts.')} confirmLabel={t('Close sessions')} cancelLabel={t('Cancel')} danger
       onCancel={() => setClosing(null)} onConfirm={() => { const complete = closing; setClosing(null); complete(); }} />, document.body)}

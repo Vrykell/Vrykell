@@ -17,7 +17,7 @@ export interface HistoryMenuSection {
 }
 
 /** Shared single-select menu used by history filters and sort controls. */
-export default function HistoryOptionMenu({ anchor, testId, sections, onClose, width = 168, maxHeight = 360, align = 'start' }: {
+export default function HistoryOptionMenu({ anchor, testId, sections, onClose, width = 168, maxHeight = 360, align = 'start', closeOnSelect = false }: {
   anchor: MenuAnchor;
   testId: string;
   sections: HistoryMenuSection[];
@@ -25,6 +25,7 @@ export default function HistoryOptionMenu({ anchor, testId, sections, onClose, w
   width?: number;
   maxHeight?: number;
   align?: 'start' | 'end';
+  closeOnSelect?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useExclusiveMenu(ref, onClose, anchor.trigger);
@@ -55,10 +56,13 @@ export default function HistoryOptionMenu({ anchor, testId, sections, onClose, w
         : (current + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
       buttons[next]?.focus();
     }}>
-    {sections.map((section, sectionIndex) => <div className="history-option-section" key={`${section.label ?? 'section'}-${sectionIndex}`}>
+    {sections.map((section, sectionIndex) => <div className="history-option-section" data-history-option-section={section.label ?? ''}
+      key={`${section.label ?? 'section'}-${sectionIndex}`}>
       {section.label && <div className="history-menu-heading">{section.label}</div>}
       {section.options.map(option => <button key={option.label} className="workspace-floating-row history-option-row"
-        type="button" aria-pressed={option.active} onClick={event => { event.currentTarget.focus(); option.onSelect(); }}>
+        type="button" aria-pressed={option.active} onClick={event => {
+          event.currentTarget.focus(); option.onSelect(); if (closeOnSelect) onClose();
+        }}>
         <span>{option.label}</span>
         {option.active && <Check size={12} aria-hidden="true" />}
       </button>)}

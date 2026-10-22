@@ -74,6 +74,7 @@ export function DockPanel({ side, panelId, visible }: { side: DockSide; panelId:
       flexShrink: 0,
       flex: side === 'left' ? 1 : undefined,
       minHeight: 0,
+      minWidth: 0,
     }}>
       <div style={{
         width: side === 'left' ? '100%' : width,
@@ -82,11 +83,12 @@ export function DockPanel({ side, panelId, visible }: { side: DockSide; panelId:
         display: collapsed ? 'none' : 'flex',
         flexDirection: 'column',
         minHeight: 0,
+        minWidth: 0,
         height: '100%',
-        background: side === 'left' ? 'transparent' : 'var(--auxiliary-bg)',
+        background: 'var(--auxiliary-bg)',
         borderRadius: 'inherit', overflow: 'hidden',
       }}>
-        {side === 'right' && <div className="workspace-panel-heading" data-testid={`panel-drag-handle-${panelId}`} data-dragging={dragging}
+        <div className="workspace-panel-heading" data-testid={`panel-drag-handle-${panelId}`} data-dragging={dragging}
           onPointerDown={event => startDrag(event, panelId)}>
           <span>{def.label}</span>
           <div className="workspace-panel-heading-actions">
@@ -99,14 +101,14 @@ export function DockPanel({ side, panelId, visible }: { side: DockSide; panelId:
           <button data-subtle className="workspace-panel-close" aria-label={t('Close {{panel}} panel', { panel: def.label })}
             onClick={() => useDockStore.getState().closePanel(panelId)}><X size={iconSizes.control} /></button>
           </div>
-        </div>}
-        <div style={{ flex: 1, minHeight: 0 }}>
+        </div>
+        <div style={{ flex: 1, minHeight: 0, minWidth: 0 }}>
           <PanelContent />
         </div>
       </div>
 
       {/* Keep the resize edge mounted during collapse so dragging back restores the panel. */}
-      {side === 'right' && <ResizeHandle axis="x" edge="left" lineThickness={2} showRestingLine={false} onDelta={handleDelta} onUp={handleCommit} testId={`resize-handle-${panelId}`} />}
+      {side === 'right' && <ResizeHandle axis="x" edge="left" lineThickness={1} onDelta={handleDelta} onUp={handleCommit} testId={`resize-handle-${panelId}`} />}
     </div>
   );
 }

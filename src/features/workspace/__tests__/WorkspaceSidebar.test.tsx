@@ -1,16 +1,27 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
 import WorkspaceSidebar from '../components/WorkspaceSidebar';
+import { useDockStore } from '../stores/dock';
 import { useWorkspaceNavigation } from '../stores/navigation';
 
 const navigation = useWorkspaceNavigation.getState();
+const dock = useDockStore.getState();
 const width = window.innerWidth;
-afterEach(() => { cleanup(); useWorkspaceNavigation.setState(navigation, true); Object.defineProperty(window, 'innerWidth', { configurable: true, value: width }); });
+afterEach(() => {
+  cleanup();
+  useWorkspaceNavigation.setState(navigation, true);
+  useDockStore.setState(dock, true);
+  Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
+});
 
 it('keeps history next to collapse, one footer destination, and no collapsed rail', () => {
   useWorkspaceNavigation.setState({ collapsed: false });
   const { container } = render(<WorkspaceSidebar />);
   expect(screen.getByTestId('workspace-history').nextElementSibling).toBe(screen.getByTestId('workspace-sidebar-toggle'));
+  expect(screen.getByTestId('workspace-history')).not.toHaveAttribute('aria-pressed');
+  act(() => useWorkspaceNavigation.getState().setHistoryLoading(true));
+  expect(screen.getByTestId('workspace-history')).toHaveAttribute('data-busy', 'true');
+  expect(screen.getByTestId('workspace-history').querySelector('.reload-spin')).not.toBeNull();
   expect(container.querySelectorAll('.workspace-sidebar-footer .sidebar-row')).toHaveLength(1);
   expect(screen.getByTestId('workspace-settings')).toHaveAttribute('data-tip', '打开设置');
   expect(screen.getByTestId('workspace-settings')).toHaveAttribute('data-tip-shortcut', 'Control+,');
@@ -31,6 +42,22 @@ it('collapses on entering a narrow window and preserves a manual expansion withi
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: 700 });
   act(() => window.dispatchEvent(new Event('resize')));
   expect(useWorkspaceNavigation.getState().collapsed).toBe(false);
+});
+
+it('keeps the left dock as a bare panel slot without a toolbar heading or buttons', () => {
+  act(() => useDockStore.setState({ leftZone: ['files'] }));
+  render(<WorkspaceSidebar />);
+  expect(screen.queryByText('工具栏')).not.toBeInTheDocument();
+  expect(screen.getByTestId('workspace-left-dock').querySelector('[data-dock-btn="files"]')).toBeNull();
+});
+
+it('reorders workspace rows and renders them in the saved order', () => {
+  act(() => useWorkspaceNavigation.getState().moveWorkspaceArea('ssh', 'terminal', false));
+  render(<WorkspaceSidebar />);
+  const rows = Array.from(document.querySelectorAll('[data-testid^="workspace-area-"]'))
+    .map(row => row.getAttribute('data-testid'));
+  expect(rows).toEqual(['workspace-area-ssh', 'workspace-area-terminal', 'workspace-area-code', 'workspace-area-ai']);
+  expect(useWorkspaceNavigation.getState().workspaceOrder).toEqual(['ssh', 'terminal', 'code', 'ai']);
 });
 
 it('resizes through the shared separator, keeps a held collapsed drag reversible and supports keyboard reset', () => {

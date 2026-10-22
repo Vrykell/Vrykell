@@ -10,6 +10,7 @@ import { useTerminalStore } from '@features/terminal/stores/terminal';
 import { useInputStore } from '@features/terminal/stores/input';
 import { leaf, firstLeaf } from '@features/workspace/model/windowLayout';
 import { useUiStore } from './ui';
+import { useWorkspaceNavigation } from './navigation';
 
 const initial = useWorkspaceStore.getState();
 
@@ -52,12 +53,35 @@ describe('workspace store', () => {
     expect(s.activeId).toBe(tabs[0]!.id);
   });
 
-  it('关闭最后一个标签后保持空工作区', () => {
+  it('closing the last tab leaves the terminal start page', () => {
     const only = useWorkspaceStore.getState().tabs[0]!.id;
     useWorkspaceStore.getState().closeTab(only);
     const s = useWorkspaceStore.getState();
-    expect(s.tabs).toHaveLength(0);
-    expect(s.activeId).toBe('');
+    expect(s.tabs).toHaveLength(1);
+    expect(s.tabs[0]!.kind).toBe('start');
+    expect(s.activeId).toBe(s.tabs[0]!.id);
+  });
+
+  it('keeps the AI start page visible instead of an empty harness container', () => {
+    useWorkspaceStore.setState({ tabs: [], activeId: '' });
+    useWorkspaceNavigation.getState().selectArea('ai');
+    const ws = useWorkspaceStore.getState();
+    const harness = ws.addTab({ kind: 'harness' });
+    const start = useWorkspaceStore.getState().tabs.find(tab => tab.kind === 'start-ai');
+    expect(start).toBeDefined();
+    expect(useWorkspaceStore.getState().activeId).toBe(start!.id);
+    // Re-activating the empty container falls back to the start page again.
+    useWorkspaceStore.getState().activate(harness);
+    expect(useWorkspaceStore.getState().activeId).toBe(start!.id);
+    useWorkspaceNavigation.getState().selectArea('terminal');
+  });
+
+  it('opening the harness page switches the workspace to the AI area', () => {
+    useWorkspaceNavigation.getState().selectArea('terminal');
+    useWorkspaceStore.getState().openHarnessTab();
+    expect(useWorkspaceNavigation.getState().area).toBe('ai');
+    expect(useWorkspaceStore.getState().tabs.some(tab => tab.kind === 'harness')).toBe(true);
+    useWorkspaceNavigation.getState().selectArea('terminal');
   });
 
   it('closeTab 同时清理每终端输入草稿', () => {
@@ -77,8 +101,8 @@ describe('workspace store', () => {
 
     const state = useWorkspaceStore.getState();
     expect(state.tabs.some(isSessionTab)).toBe(false);
-    expect(state.tabs).toHaveLength(0);
-    expect(state.activeId).toBe('');
+    expect(state.tabs.map(tab => tab.kind)).toEqual(['start']);
+    expect(state.activeId).toBe(state.tabs[0]!.id);
     expect(useUiStore.getState().settingsOpen).toBe(true);
   });
 
@@ -146,7 +170,7 @@ describe('workspace store', () => {
     expect(invokeMock).not.toHaveBeenCalled();
   });
 
-  it('opens and restores one AI history page independently of terminal sessions', () => {
+  it('opens a single AI history page and never reopens it from the close history', () => {
     const ws = useWorkspaceStore.getState();
     ws.openAiHistoryTab();
     const id = useWorkspaceStore.getState().activeId;
@@ -154,11 +178,12 @@ describe('workspace store', () => {
     ws.openAiHistoryTab();
     expect(useWorkspaceStore.getState().tabs.filter(tab => tab.kind === 'ai-history')).toHaveLength(1);
     ws.closeTab(id);
+    expect(useWorkspaceStore.getState().lastClosed).toBeNull();
     ws.undoCloseTab();
-    expect(useWorkspaceStore.getState().tabs.filter(tab => tab.kind === 'ai-history')).toHaveLength(1);
+    expect(useWorkspaceStore.getState().tabs.filter(tab => tab.kind === 'ai-history')).toHaveLength(0);
   });
 
-  it('opens and restores one usage page independently of terminal sessions', () => {
+  it('opens a single usage page and never reopens it from the close history', () => {
     const ws = useWorkspaceStore.getState();
     ws.openUsageTab();
     const id = useWorkspaceStore.getState().activeId;
@@ -168,8 +193,9 @@ describe('workspace store', () => {
     ws.openUsageTab();
     expect(useWorkspaceStore.getState().tabs.filter(item => item.kind === 'usage')).toHaveLength(1);
     ws.closeTab(id);
+    expect(useWorkspaceStore.getState().lastClosed).toBeNull();
     ws.undoCloseTab();
-    expect(useWorkspaceStore.getState().tabs.filter(item => item.kind === 'usage')).toHaveLength(1);
+    expect(useWorkspaceStore.getState().tabs.filter(item => item.kind === 'usage')).toHaveLength(0);
   });
 
   it('allows OSC titles to override a copied manual title while retaining the copy fallback', () => {
@@ -185,13 +211,15 @@ describe('workspace store', () => {
     expect(resolveDisplayTitle(copy.title, copy.titleSource, '')).toBe('手动标题 副本');
   });
 
-  it('keeps an empty functional workspace without activating a page in another area', () => {
+  it('keeps the terminal start page when a page in another area closes', () => {
     useWorkspaceStore.setState({ tabs: [], activeId: '' });
     const ws = useWorkspaceStore.getState();
     const settings = ws.addTab({ kind: 'ai-history' });
     const history = ws.addTab({ kind: 'history' });
     ws.closeTab(history);
-    expect(useWorkspaceStore.getState().activeId).toBe('');
+    const start = useWorkspaceStore.getState().tabs.find(tab => tab.kind === 'start');
+    expect(start).toBeDefined();
+    expect(useWorkspaceStore.getState().activeId).toBe(start!.id);
     const reopened = ws.addTab({ kind: 'history' });
     ws.activate(settings);
     ws.closeTab(reopened);
@@ -366,12 +394,13 @@ describe('workspace store 扩展', () => {
     const s = useWorkspaceStore.getState();
     expect(s.tabs.some((t) => t.id === only)).toBe(true);
     expect(s.lastClosed).toBeNull();
-    // 历史标签撤销（同步路径）
+    // 历史标签是系统页：关闭后不进入可恢复历史
     ws.openHistoryTab();
     const histId = useWorkspaceStore.getState().tabs.find((t) => t.kind === 'history')!.id;
     ws.closeTab(histId);
+    expect(useWorkspaceStore.getState().lastClosed).toBeNull();
     ws.undoCloseTab();
-    expect(useWorkspaceStore.getState().tabs.some((t) => t.kind === 'history')).toBe(true);
+    expect(useWorkspaceStore.getState().tabs.some((t) => t.kind === 'history')).toBe(false);
     // 无可撤销
     useWorkspaceStore.setState({ lastClosed: null });
     const before = useWorkspaceStore.getState().tabs.length;
@@ -638,8 +667,8 @@ describe('workspace store 扩展', () => {
     const s = useWorkspaceStore.getState();
     expect(s.groups.find((g) => g.id === 'g1')).toBeUndefined();
     expect(s.tabs.some((t) => t.id === a || t.id === b)).toBe(false);
-    expect(s.tabs).toHaveLength(0);
-    expect(s.activeId).toBe('');
+    expect(s.tabs.map(tab => tab.kind)).toEqual(['start']);
+    expect(s.activeId).toBe(s.tabs[0]!.id);
     expect(invokeMock).toHaveBeenCalledWith('sessions_reorder', { groupId: 'g1', ids: [initialTab, a, b] });
   });
 

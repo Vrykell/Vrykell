@@ -130,7 +130,7 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
       }}><SlidersHorizontal size={16} /></IconButton>
   </>;
   return <div ref={panelRef} className="ai-chat-panel">
-    <div className="chat-conversation-heading">
+    {workspace && toolbarTarget ? createPortal(actions, toolbarTarget) : <div className="chat-conversation-heading">
       {renaming ? <TextInput autoFocus className="inline-rename-input" aria-label={t('Conversation title')} value={title} onChange={event => setTitle(event.target.value)}
         onFocus={event => event.currentTarget.select()} onClick={event => event.stopPropagation()}
         onBlur={commitTitle} onKeyDown={event => {
@@ -140,8 +140,8 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
           onClick={() => { setTitle(conversation?.title ?? ''); setRenaming(true); }} disabled={!conversation}>
           {conversation?.title ?? t('AI chat')}
         </button>}
-      {workspace && toolbarTarget ? createPortal(actions, toolbarTarget) : actions}
-    </div>
+      {actions}
+    </div>}
     {settingsMenu && <ContextMenu anchor={settingsMenu} label={t('Conversation settings')} onClose={() => setSettingsMenu(null)} items={[]} header={
     <section id="chat-conversation-settings" className="chat-conversation-settings" aria-label={t('Conversation settings')} data-workspace-focus="ai">
       <div className="chat-setting-row"><span>{t('Execution terminal')}</span>

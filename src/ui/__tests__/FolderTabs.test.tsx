@@ -102,3 +102,16 @@ it('opens document actions before the first tab without changing the selection',
   expect(onSelect).not.toHaveBeenCalled();
   expect(screen.getAllByRole('tab')[0]).toHaveAttribute('aria-selected', 'true');
 });
+
+it('renames directly on a tab and cancels from the same input', () => {
+  const onRename = vi.fn();
+  render(<FolderTabs items={items} selected="first" label="Open documents" toolbar={null} onSelect={vi.fn()} onClose={vi.fn()} onMove={vi.fn()} onRename={onRename} />);
+  fireEvent.doubleClick(screen.getAllByRole('tab')[0]!);
+  const input = screen.getByRole('textbox', { name: '标签页标题' });
+  fireEvent.change(input, { target: { value: 'Investigation' } });
+  fireEvent.keyDown(input, { key: 'Enter' });
+  expect(onRename).toHaveBeenCalledWith('first', 'Investigation');
+  fireEvent.doubleClick(screen.getAllByRole('tab')[0]!);
+  fireEvent.keyDown(screen.getByRole('textbox', { name: '标签页标题' }), { key: 'Escape' });
+  expect(onRename).toHaveBeenCalledOnce();
+});

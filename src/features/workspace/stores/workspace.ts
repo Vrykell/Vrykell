@@ -8,6 +8,7 @@ import type { SshOptions } from '@core/ssh';
 import { useToastStore } from '@ui/Toast';
 import { t } from '@i18n';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
+import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { interceptHarnessClose } from '@core/harness';
 import * as sessionManager from '@features/workspace/services/sessionManager';
 import {
@@ -35,7 +36,8 @@ import {
 
 export type { TitleSource };
 
-export type TabKind = 'session' | 'history' | 'ai-history' | 'git-diff' | 'editor' | 'usage' | 'harness';
+export type TabKind = 'session' | 'history' | 'ai-history' | 'git-diff' | 'editor' | 'usage' | 'harness'
+  | 'start' | 'start-code' | 'start-ai';
 
 /** SSH 会话目标（终端类型=ssh 时的专属字段） */
 export interface SshTabTarget extends SshOptions {
@@ -66,7 +68,10 @@ export type Tab =
   | (TabBase & { kind: 'git-diff'; selection: GitSelection; comparisons?: GitComparison[] })
   | (TabBase & { kind: 'editor'; files: EditorFile[]; selected: EditorFile })
   | (TabBase & { kind: 'usage' })
-  | (TabBase & { kind: 'harness' });
+  | (TabBase & { kind: 'harness' })
+  | (TabBase & { kind: 'start' })
+  | (TabBase & { kind: 'start-code' })
+  | (TabBase & { kind: 'start-ai' });
 
 export interface TabGroup {
   id: string;
@@ -78,7 +83,7 @@ export interface AddTabOptions {
   cwd?: string;
   title?: string;
   /** Defaults to local; history and usage kinds create workspace pages. */
-  kind?: 'local' | 'ssh' | 'history' | 'ai-history' | 'usage' | 'harness';
+  kind?: 'local' | 'ssh' | 'history' | 'ai-history' | 'usage' | 'harness' | 'start' | 'start-code' | 'start-ai';
   shellType?: ShellType;
   /** SSH 连接目标（kind='ssh' 时） */
   ssh?: SshTabTarget;
@@ -89,6 +94,11 @@ export interface AddTabOptions {
 /** 是否为真实会话窗口（可落库、可分组） */
 export function isSessionTab(tab: Tab): tab is Extract<Tab, { kind: 'session' }> {
   return tab.kind === 'session';
+}
+
+/** Placeholder pages keep a workspace strip from ever going empty. */
+export function isStartTab(tab: Tab): tab is Extract<Tab, { kind: 'start' | 'start-code' | 'start-ai' }> {
+  return tab.kind === 'start' || tab.kind === 'start-code' || tab.kind === 'start-ai';
 }
 
 /** 窗口内全部终端 */
@@ -146,9 +156,10 @@ const ID_PREFIX = Date.now().toString(36);
 let counter = 0;
 const nextTabId = () => `t${ID_PREFIX}-${counter++}`;
 const DEFAULT_TITLE = '终端';
-const HISTORY_TITLE = '会话历史';
+const HISTORY_TITLE = t('Session history');
 const AI_HISTORY_TITLE = t('AI conversation history');
 const USAGE_TITLE = t('Usage statistics');
+const START_TITLE = t('Start');
 
 interface WorkspaceState {
   tabs: Tab[];
@@ -177,6 +188,8 @@ interface WorkspaceState {
   configureGitDiffTabs: () => void;
   closeTab: (id: string, force?: boolean) => void;
   activate: (id: string) => void;
+  /** Every workspace that would have an empty tab strip gets its placeholder start page. */
+  ensureStartPages: () => void;
   /** Name the tab from the first user message (fills the default title or upgrades a command title). */
   titleFromMessage: (id: string, text: string) => void;
   /** Name the tab from the first meaningful command (a shared naming convention). */
@@ -244,7 +257,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const current = get().tabs.find(tab => tab.id === get().activeId);
     const focused = current && isSessionTab(current) ? findLeaf(current.layout, useTerminalStore.getState().focusedPaneId ?? '') ?? firstLeaf(current.layout) : null;
     if (focused?.kind === 'local') set({ lastLocalPaneId: focused.id });
-    if (o.kind === 'history' || o.kind === 'ai-history' || o.kind === 'usage' || o.kind === 'harness') {
+    if (o.kind === 'history' || o.kind === 'ai-history' || o.kind === 'usage' || o.kind === 'harness'
+      || o.kind === 'start' || o.kind === 'start-code' || o.kind === 'start-ai') {
       const existing = get().tabs.find(tab => tab.kind === o.kind);
       if (existing) {
         get().activate(existing.id);
@@ -280,6 +294,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       tab = { id, title: USAGE_TITLE, kind: 'usage', titleSource: 'manual' };
     } else if (o.kind === 'harness') {
       tab = { id, title: t('AI workspace'), kind: 'harness', titleSource: 'manual' };
+    } else if (o.kind === 'start' || o.kind === 'start-code' || o.kind === 'start-ai') {
+      tab = { id, title: START_TITLE, kind: o.kind, titleSource: 'manual' };
     } else {
       const preference = useTerminalDefaults.getState().shell;
       const shellType = o.shellType ?? (preference === 'system' ? undefined : preference);
@@ -309,19 +325,25 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       // 新建终端不默认入布局（用户拖拽决定停靠位置）
       useTerminalStore.getState().setFocusedPane(firstLeaf(tab.layout).id);
     }
+    // A real tab replaces the area's placeholder start page.
+    get().ensureStartPages();
     return id;
   },
   openHistoryTab: () => {
-    // 已存在历史标签页则直接激活，避免重复开一堆
     const existing = get().tabs.find((t) => t.kind === 'history');
-    if (existing) {
-      get().activate(existing.id);
-      return;
-    }
-    get().addTab({ kind: 'history' });
+    get().activate(existing ? existing.id : get().addTab({ kind: 'history' }));
   },
-  openAiHistoryTab: () => { get().addTab({ kind: 'ai-history' }); },
-  openUsageTab: () => { useUiStore.getState().setSettingsOpen(false); get().addTab({ kind: 'usage' }); },
+  openAiHistoryTab: () => {
+    useWorkspaceNavigation.getState().setAiPlacement('main');
+    const existing = get().tabs.find((t) => t.kind === 'ai-history');
+    get().activate(existing ? existing.id : get().addTab({ kind: 'ai-history' }));
+  },
+  openUsageTab: () => {
+    useUiStore.getState().setSettingsOpen(false);
+    useWorkspaceNavigation.getState().setAiPlacement('main');
+    const existing = get().tabs.find((t) => t.kind === 'usage');
+    get().activate(existing ? existing.id : get().addTab({ kind: 'usage' }));
+  },
   openHarnessTab: (name, cwd) => {
     useWorkspaceNavigation.getState().setAiPlacement('main');
     // Capture the focused local context before switching to the singleton page.
@@ -333,6 +355,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const directory = cwd ?? (spec ? state.terminalCwds[spec.id] ?? spec.cwd : undefined);
     if (name) useHarnessWorkspace.getState().connect(name, directory);
     useUiStore.getState().setSettingsOpen(false);
+    useWorkspaceNavigation.getState().selectArea('ai');
     get().addTab({ kind: 'harness' });
   },
   openEditorFile: file => {
@@ -461,10 +484,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const next = tabs.filter((t) => t.id !== id);
     const neighbor = [...tabs.slice(0, idx).reverse(), ...tabs.slice(idx + 1)].find(tab => workspaceAreaForKind(tab.kind) === workspaceAreaForKind(closed.kind));
     const nextActiveId = activeId === id ? neighbor?.id ?? '' : activeId;
+    // System pages are singletons that never enter the reopen history.
+    const reopenable = closed.kind !== 'history' && closed.kind !== 'ai-history' && closed.kind !== 'usage' && !isStartTab(closed);
     set({
       tabs: next,
       activeId: nextActiveId,
-      lastClosed: closed,
+      lastClosed: reopenable ? closed : null,
     });
     // 聚焦若属于被关标签则回落到新的活跃标签
     const fp = useTerminalStore.getState().focusedPaneId;
@@ -487,6 +512,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (isSessionTab(closed)) sessionManager.close(id);
     if (closed.kind === 'harness') useHarnessWorkspace.getState().close(useHarnessWorkspace.getState().connections.map(item => item.id));
     // Historical members still belong to their original group after its last tab closes.
+    get().ensureStartPages();
     get().pruneEmptyGroups();
   },
   undoCloseTab: () => {
@@ -494,13 +520,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (!closed) return;
     set({ lastClosed: null });
     // Restore a session from storage; rebuild singleton pages directly.
-    if (closed.kind === 'history') {
-      get().addTab({ kind: 'history' });
-    } else if (closed.kind === 'ai-history') {
-      get().addTab({ kind: 'ai-history' });
-    } else if (closed.kind === 'usage') {
-      get().addTab({ kind: 'usage' });
-    } else if (closed.kind === 'harness') {
+    if (closed.kind === 'harness') {
       get().openHarnessTab();
     } else if (closed.kind === 'git-diff') {
       for (const item of closed.comparisons ?? [{ selection: closed.selection }]) get().openGitDiff(item.selection);
@@ -519,6 +539,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       return;
     }
     useToastStore.getState().addToast(t('toast.tabRestored'), 'success');
+    get().ensureStartPages();
   },
   activate: (id) => {
     const prev = get().activeId;
@@ -537,6 +558,46 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const terminal = useTerminalStore.getState();
     const pane = tab && isSessionTab(tab) ? layoutLeaves(tab.layout).find(item => terminal.manualFullscreen[item.id]) ?? firstLeaf(tab.layout) : null;
     terminal.setFocusedPane(pane?.id ?? id);
+    get().ensureStartPages();
+  },
+  ensureStartPages: () => {
+    const state = get();
+    const currentArea = useWorkspaceNavigation.getState().area;
+    const ai = useAiWorkspace.getState();
+    // Conversations and ACP sessions live in the AI stores, so they count as strip entries too.
+    const connections = useHarnessWorkspace.getState().connections;
+    const startKinds = { terminal: 'start', code: 'start-code', ai: 'start-ai' } as const;
+    let tabs = state.tabs;
+    let activeId = state.activeId;
+    let changed = false;
+    for (const area of ['terminal', 'code', 'ai'] as const) {
+      const kind = startKinds[area];
+      const start = tabs.find(tab => isStartTab(tab) && tab.kind === kind);
+      // Inactive areas are seeded when they become active; stale placeholders are always cleaned.
+      if (area !== currentArea && !start) continue;
+      const work = area === 'ai'
+        ? ai.nativeTabs.length + connections.length + tabs.filter(tab => tab.kind === 'ai-history' || tab.kind === 'usage').length
+        : tabs.filter(tab => workspaceAreaForKind(tab.kind) === area && !isStartTab(tab)).length;
+      if (!work && !start) {
+        const id = nextTabId();
+        tabs = [...tabs, { id, title: START_TITLE, kind, titleSource: 'manual' }];
+        changed = true;
+        if (currentArea === area) activeId = id;
+      } else if (work && start) {
+        tabs = tabs.filter(tab => tab.id !== start.id);
+        changed = true;
+        if (activeId === start.id) {
+          activeId = area === 'ai'
+            ? tabs.find(tab => tab.kind === 'harness')?.id ?? ''
+            : tabs.find(tab => workspaceAreaForKind(tab.kind) === area && !isStartTab(tab))?.id ?? '';
+        }
+      } else if (!work && start && area === 'ai' && currentArea === 'ai') {
+        // The harness page is an empty container without sessions; show the placeholder instead.
+        const active = tabs.find(tab => tab.id === activeId);
+        if (active?.kind === 'harness') { activeId = start.id; changed = true; }
+      }
+    }
+    if (changed) set({ tabs, activeId });
   },
   titleFromMessage: (id, text) => {
     const tab = get().tabs.find((t) => t.id === id);
@@ -860,6 +921,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }
       useChatStore.getState().dropTab(t.id);
     }
+    get().ensureStartPages();
     useToastStore.getState().addToast('分组已归档到会话历史', 'success');
   },
 }));

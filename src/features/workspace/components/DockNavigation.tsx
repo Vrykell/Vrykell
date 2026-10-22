@@ -8,10 +8,13 @@ import { useToastStore } from '@ui/Toast';
 import { dismissSshStatus, useSshStatusOwner } from '../hooks/useAuxiliarySidebar';
 import DockButton from './DockButton';
 
-/** Each side owns its ordered actions and independent visible panel. */
+/**
+ * The right auxiliary dock keeps its ordered button row. The left dock holds a single panel
+ * with its own heading (and close button), so it never renders this row.
+ */
 export default function DockNavigation({ side }: { side: DockSide }) {
-  const zone = useDockStore(state => side === 'left' ? state.leftZone : state.rightZone);
-  const panels = useDockStore(state => side === 'left' ? state.leftPanels : state.rightPanels);
+  const zone = useDockStore(state => state.rightZone);
+  const panels = useDockStore(state => state.rightPanels);
   const sshStatusOwner = useSshStatusOwner();
   const settingsActive = useUiStore(state => state.settingsOpen);
   const dragging = useNavigationDrag(state => state.id);
@@ -24,13 +27,13 @@ export default function DockNavigation({ side }: { side: DockSide }) {
     window.addEventListener('resize', resize);
     return () => window.removeEventListener('resize', resize);
   }, []);
-  const preferred = [...new Set([...panels, ...zone])].slice(0, compact && side === 'right' ? 2 : zone.length);
+  const preferred = compact ? [...panels, ...zone.filter(id => !panels.includes(id))].slice(0, 2) : zone;
   const visible = zone.filter(id => preferred.includes(id));
   const overflow = zone.filter(id => !preferred.includes(id));
   const open = (id: string) => {
     useUiStore.getState().setSettingsOpen(false);
     const dock = useDockStore.getState();
-    if (sshStatusOwner && side === 'right') { dismissSshStatus(); dock.openPanel(id); return; }
+    if (sshStatusOwner) { dismissSshStatus(); dock.openPanel(id); return; }
     const wasOpen = panels.includes(id);
     if (settingsActive && wasOpen) return;
     dock.togglePanel(side, id);
@@ -38,15 +41,15 @@ export default function DockNavigation({ side }: { side: DockSide }) {
       useToastStore.getState().addToast(t('Not enough space. Widen the window or reduce terminal splits.'), 'info');
     }
   };
-  if (!zone.length && side === 'left') return null;
-  return <nav className={`workspace-right-navigation${side === 'left' ? ' workspace-left-navigation' : ''}`} aria-label={t(side === 'left' ? 'Toolbar' : 'Auxiliary panels')} data-dock-zone={side}
+  if (side === 'left') return null;
+  return <nav className="workspace-right-navigation" aria-label={t('Auxiliary panels')} data-dock-zone={side}
     data-dragging={!!dragging} data-compact={zone.length > 1} data-drop-active={!!dragging && target?.side === side}>
     <div className="workspace-right-actions">
       {visible.map(id => <Fragment key={id}>
         {!!dragging && !target?.openPanel && target?.side === side && target.index === zone.indexOf(id)
           && <div className="workspace-navigation-placeholder" data-dock-placeholder={zone.indexOf(id)} aria-hidden="true" />}
         <div className="workspace-navigation-slot" data-dock-slot={id} data-moving={dragging === id}>
-          <DockButton panelId={id} side={side} active={panels.includes(id) && (side === 'left' || !sshStatusOwner)} onClick={() => open(id)} onPointerDown={event => startDrag(event, id)} />
+          <DockButton panelId={id} side={side} active={panels.includes(id) && !sshStatusOwner} onClick={() => open(id)} onPointerDown={event => startDrag(event, id)} />
         </div>
       </Fragment>)}
       {!!dragging && !target?.openPanel && target?.side === side && target.index >= zone.length

@@ -13,11 +13,8 @@ import { useWorkspaceNavigation, workspaceAreaForKind, workspaceSidebarWidth } f
 import { WorkspaceHeaderProvider, WorkspaceHeaderSlot } from '@ui/WorkspaceHeader';
 import { AiWorkspaceProvider } from '@features/chat/components/AiWorkspaceSurface';
 import PanelSsh from '@features/ssh/components/PanelSsh';
-import NewTabModal from '@features/workspace/components/NewTabModal';
-import { OutlineButton } from '@ui/OutlineButton';
-import { Terminal, FileCode, Sparkles } from '@ui/icons';
-import { openWorkspaceFile } from '@features/workspace/services/workspaceActions';
-import { t } from '@i18n';
+import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
+import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import './workspaceLayout.css';
 import { useSshStatusOwner } from '@features/workspace/hooks/useAuxiliarySidebar';
 import SshAuthenticationDialog from '@features/ssh/components/SshAuthenticationDialog';
@@ -25,7 +22,7 @@ import { useSshAuthenticationLifetime } from '@features/ssh/hooks/useSessionAuth
 import GitWorkspace from '@features/git/components/GitWorkspace';
 import { useGitContext } from '@features/git/hooks/useGitContext';
 import EditorWorkspace from '@features/editor/components/EditorWorkspace';
-import UnifiedHistoryView from '@features/session-history/components/UnifiedHistoryView';
+import HistoryWorkspaceView from '@features/session-history/components/HistoryWorkspaceView';
 
 /** Compose navigation, auxiliary panels and the terminal workspace. */
 export default function WorkspaceShell() {
@@ -44,7 +41,9 @@ export default function WorkspaceShell() {
   const chatOnLeft = useDockStore(state => state.leftPanels.includes('chat'));
   const [sidebarWidth, setSidebarWidth] = useState(workspaceSidebarWidth);
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
-  const [newTerminal, setNewTerminal] = useState(false);
+  const sessionTabs = useSessionStore(state => state.tabs);
+  const nativeTabs = useAiWorkspace(state => state.nativeTabs);
+  const harnessConnections = useHarnessWorkspace(state => state.connections);
   const frameWidth = useDockStore(workspaceFrameWidth);
   const sshStatusOwner = useSshStatusOwner();
   const terminalMinWidth = useSessionStore((state) => {
@@ -86,11 +85,13 @@ export default function WorkspaceShell() {
   useEffect(() => {
     if (aiPlacement === 'main' && chatOpen) useDockStore.getState().closePanel('chat');
   }, [aiPlacement, chatOpen]);
+  // Safety net for every path that can empty a strip: close, group archive, restore and reload.
+  useEffect(() => { useSessionStore.getState().ensureStartPages(); }, [sessionTabs, nativeTabs, harnessConnections, area]);
 
   return (
     <div className="workspace-layout" data-area={area} data-sidebar-overlay={sidebarOverlay && !collapsed || undefined} data-settings-open={settingsOpen || undefined} style={{ '--workspace-sidebar-width': `${sidebarWidth}px`, '--workspace-sidebar-overlay-width': `${overlayWidth}px` } as CSSProperties}>
       <WorkspaceHeaderProvider>
-      <AiWorkspaceProvider placement={aiPlacement} mainActive={contentVisible && area === 'ai' && activeTab?.kind === 'harness' && !settingsOpen} headerActive={area === 'ai' && !settingsOpen} sideActive={chatOpen && (chatOnLeft ? !collapsed : !sshStatusOwner) && !settingsOpen}>
+      <AiWorkspaceProvider placement={aiPlacement} mainActive={contentVisible && area === 'ai' && (activeTab?.kind === 'harness' || activeTab?.kind === 'ai-history' || activeTab?.kind === 'usage' || activeTab?.kind === 'start-ai') && !settingsOpen} headerActive={area === 'ai' && !settingsOpen} sideActive={chatOpen && (chatOnLeft ? !collapsed : !sshStatusOwner) && !settingsOpen}>
       <PanelSurfaces>
       <WorkspaceSidebar maxWidth={Math.max(160, sidebarMaxWidth)} />
       <TopDock sidebarOverlayRequired={viewportWidth - mainMinWidth < 160} />
@@ -103,21 +104,14 @@ export default function WorkspaceShell() {
           <div className="workspace-content-host" style={{ display: contentVisible ? 'flex' : 'none' }} inert={!contentVisible}>
             <EditorWorkspace><GitWorkspace><TerminalView active={contentVisible && !settingsOpen} /></GitWorkspace></EditorWorkspace>
           </div>
-          <div className="workspace-resource-page" data-testid="ssh-workspace" style={{ display: area === 'ssh' ? 'flex' : 'none' }} inert={area !== 'ssh'}><PanelSsh /></div>
-          {area === 'history' && <UnifiedHistoryView />}
-          {!contentVisible && area !== 'ssh' && area !== 'history' && <div className="workspace-empty" data-testid={`${area}-workspace-empty`}>
-            {area === 'code' ? <FileCode size={40} /> : area === 'ai' ? <Sparkles size={40} /> : <Terminal size={40} />}
-            <h2>{t(area === 'code' ? 'Your code workspace' : area === 'ai' ? 'Your AI workspace' : 'Your terminal workspace')}</h2>
-            <p>{t(area === 'code' ? 'Open files or review changes here.' : area === 'ai' ? 'Conversations and connected agents share this workspace.' : 'Open a local terminal or connect to an SSH host.')}</p>
-            <OutlineButton onClick={() => area === 'code' ? void openWorkspaceFile() : area === 'ai' ? useSessionStore.getState().openHarnessTab() : setNewTerminal(true)}>{t(area === 'code' ? 'Open file' : area === 'ai' ? 'Open AI workspace' : 'New terminal')}</OutlineButton>
-          </div>}
+          <div className="workspace-resource-page" data-testid="ssh-workspace" style={{ display: area === 'ssh' ? 'flex' : 'none' }} inert={area !== 'ssh'}><PanelSsh active={area === 'ssh' && !settingsOpen} /></div>
+          {area === 'history' && <HistoryWorkspaceView />}
         </main>
         </div>
         <SidePanel side="right" />
         <div id="ssh-status-sidebar-host" className="workspace-ssh-status-slot" inert={settingsOpen} aria-hidden={settingsOpen || undefined} />
         {settingsOpen && <SettingsScreen />}
       </div>
-      <NewTabModal open={newTerminal} onClose={() => setNewTerminal(false)} />
       </PanelSurfaces>
       </AiWorkspaceProvider>
       </WorkspaceHeaderProvider>

@@ -6,6 +6,7 @@ import { useIconColorStore } from '@config/iconColors';
 
 const snapshot = useSshStore.getState();
 beforeEach(() => {
+  localStorage.setItem('vrykell-ssh-workspace-view', 'manage');
   useIconColorStore.setState({ colors: {} });
   useSshStore.setState({
     loaded: true,
@@ -27,7 +28,7 @@ it('selects and resets persistent connection colors from its keyboard menu', () 
   fireEvent.click(screen.getByTestId('ssh-icon-color-auto'));
   expect(row.querySelector('svg')!.style.color).toBe('var(--shell-ssh-accent)');
 });
-afterEach(() => { cleanup(); useSshStore.setState(snapshot, true); });
+afterEach(() => { cleanup(); useSshStore.setState(snapshot, true); localStorage.removeItem('vrykell-ssh-workspace-view'); });
 
 it('keeps the SSH tile color stable while selection highlights the row', () => {
   render(<PanelSsh />);

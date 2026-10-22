@@ -73,6 +73,54 @@ function GroupedHarness({ onDrop }: { onDrop: (drag: ListReorderDrag, target: Li
   </div>;
 }
 
+/** Terminal-strip shaped list: one group (label + members) followed by a loose tab and an empty tail. */
+function StripHarness({ onDrop, collapsed = false }: {
+  onDrop: (drag: ListReorderDrag, target: ListReorderTarget | null) => void;
+  collapsed?: boolean;
+}) {
+  const start = useListReorderDrag({ listId: 'strip', axis: 'horizontal', grouped: true, endZoneId: 'ungrouped', onDrop,
+    accepts: (dragKind, itemKind) => dragKind === 'group' ? itemKind === 'group' || itemKind === 'loose-tab'
+      : dragKind === 'loose-tab' ? itemKind === 'group' || itemKind === 'loose-tab' || itemKind === 'tab'
+        : itemKind === 'loose-tab' || itemKind === 'group' || (dragKind === 'tab' && itemKind === 'tab') });
+  return <div data-testid="strip" data-reorder-list="strip">
+    <div data-testid="group-container" data-reorder-container>
+      <div data-testid="group-zone" data-reorder-zone="g1" data-reorder-kind="tab">
+        <div data-testid="label" data-reorder-item="g1" data-reorder-kind="group" data-reorder-measure="container"
+          onPointerDown={event => start(event, { id: 'g1', kind: 'group' })}>G1</div>
+        {!collapsed && <>
+          <div data-testid="m1" data-reorder-item="m1" data-reorder-kind="tab" onPointerDown={event => start(event, { id: 'm1', kind: 'tab' })}>M1</div>
+          <div data-testid="m2" data-reorder-item="m2" data-reorder-kind="tab" onPointerDown={event => start(event, { id: 'm2', kind: 'tab' })}>M2</div>
+        </>}
+      </div>
+    </div>
+    <div data-testid="loose" data-reorder-item="loose" data-reorder-kind="loose-tab" onPointerDown={event => start(event, { id: 'loose', kind: 'loose-tab' })}>C</div>
+    <div data-testid="tail" data-reorder-zone="ungrouped" data-reorder-kind="loose-tab" />
+  </div>;
+}
+
+/** Label 0-60, members 60-140 / 140-220, loose tab 220-300 inside a 300 wide strip. */
+function stripRect(left: number, width: number): DOMRect {
+  return { ...rowRect(0), left, x: left, right: left + width, width };
+}
+
+function mockStripRects() {
+  vi.spyOn(screen.getByTestId('strip'), 'getBoundingClientRect').mockReturnValue(stripRect(0, 300));
+  const rects: Record<string, [number, number]> = { label: [0, 60], m1: [60, 80], m2: [140, 80], loose: [220, 80] };
+  for (const [testId, [left, width]] of Object.entries(rects)) {
+    const element = screen.queryByTestId(testId);
+    if (element) vi.spyOn(element, 'getBoundingClientRect').mockReturnValue(stripRect(left, width));
+  }
+  vi.spyOn(screen.getByTestId('group-container'), 'getBoundingClientRect').mockReturnValue(stripRect(0, 220));
+}
+
+/** Pointer zones follow x: at or past `tailFrom` is the empty tail, otherwise the group container. */
+function mockStripHitTesting(tailFrom = 200) {
+  Object.defineProperty(document, 'elementFromPoint', {
+    configurable: true,
+    value: vi.fn((x: number) => x > tailFrom ? screen.getByTestId('tail') : screen.getByTestId('group-zone')),
+  });
+}
+
 /** Start dragging row-a and move the pointer to the given viewport y. */
 function dragTo(y: number) {
   const rows = ['a', 'b', 'c'].map((id) => screen.getByTestId(`row-${id}`));
@@ -166,36 +214,79 @@ describe('list reorder', () => {
     expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'b' }), { itemId: direction === 'left' ? 'a' : 'c', after: direction === 'right' });
   });
 
-  it('measures complete neighboring groups rather than their narrow headings', () => {
-    const onDrop = vi.fn(); render(<Harness onDrop={onDrop} axis="horizontal" grouped wholeGroups />);
-    const rows = ['a', 'b', 'c'].map(id => screen.getByTestId(`row-${id}`));
-    const lefts = [0, 80, 320]; const widths = [80, 240, 100];
-    const list = rows[0]!.closest<HTMLElement>('[data-reorder-list]')!;
-    vi.spyOn(list, 'getBoundingClientRect').mockReturnValue({ ...rowRect(0), width: 420, right: 420 });
-    rows.forEach((row, index) => {
-      const container = row.closest<HTMLElement>('[data-reorder-container]')!;
-      vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({ ...rowRect(0), left: lefts[index]!, right: lefts[index]! + widths[index]!, width: widths[index]! });
-      vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({ ...rowRect(0), left: lefts[index]!, right: lefts[index]! + 32, width: 32 });
-    });
-    fireEvent.pointerDown(rows[1]!, { pointerId: 1, button: 0, isPrimary: true, clientX: 100, clientY: 10 });
-    fireEvent.pointerMove(window, { pointerId: 1, clientX: 120, clientY: 10 });
-    expect(useListReorder.getState().target).toEqual({ itemId: 'c', after: false });
-    expect(useListReorder.getState().drag?.width).toBe(240);
-    fireEvent.pointerUp(window, { pointerId: 1, clientX: 154, clientY: 10 });
-    expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'b' }), { itemId: 'c', after: true });
+  it('inserts a loose tab before a group member when the dragged leading edge reaches it', () => {
+    const onDrop = vi.fn(); render(<StripHarness onDrop={onDrop} />);
+    mockStripRects(); mockStripHitTesting();
+    const loose = screen.getByTestId('loose');
+    fireEvent.pointerDown(loose, { pointerId: 1, button: 0, isPrimary: true, clientX: 260, clientY: 10 });
+    // Leading edge at 70: the first member's left half, so the tab joins as its first member.
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 110, clientY: 10 });
+    expect(useListReorder.getState().target).toEqual({ itemId: 'm1', after: false });
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 110, clientY: 10 });
+    expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'loose' }), { itemId: 'm1', after: false });
   });
 
-  it('enters an empty group when the component center reaches it, independent of the grab offset', () => {
-    const onDrop = vi.fn(); render(<GroupedHarness onDrop={onDrop} />);
-    const row = screen.getByTestId('row-a'); const zone = screen.getByTestId('empty-zone');
-    vi.spyOn(row, 'getBoundingClientRect').mockReturnValue(rowRect(0));
-    vi.spyOn(row.closest('[data-reorder-list]')!, 'getBoundingClientRect').mockReturnValue({ ...rowRect(0), width: 500, right: 500 });
-    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: vi.fn((x: number) => x >= 160 ? zone : row) });
-    fireEvent.pointerDown(row, { pointerId: 1, button: 0, isPrimary: true, clientX: 100, clientY: 10 });
-    fireEvent.pointerMove(window, { pointerId: 1, clientX: 170, clientY: 10 });
-    expect(useListReorder.getState().target).toEqual({ zoneId: 'filled' });
-    fireEvent.pointerUp(window, { pointerId: 1, clientX: 210, clientY: 10 });
-    expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }), { zoneId: 'empty' });
+  it('keeps a tab inside the group until its leading edge passes the last member', () => {
+    const onDrop = vi.fn(); render(<StripHarness onDrop={onDrop} />);
+    mockStripRects(); mockStripHitTesting(295);
+    const loose = screen.getByTestId('loose');
+    fireEvent.pointerDown(loose, { pointerId: 1, button: 0, isPrimary: true, clientX: 260, clientY: 10 });
+    // Leading edge at 210: past the last member's midpoint but still inside the group.
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 250, clientY: 10 });
+    expect(useListReorder.getState().target).toEqual({ itemId: 'm2', after: true });
+    // Leading edge at the group's right edge: the tab leaves the group for the empty tail.
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 265, clientY: 10 });
+    expect(useListReorder.getState().target).toEqual({ zoneId: 'ungrouped' });
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 250, clientY: 10 });
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 250, clientY: 10 });
+    expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'loose' }), { itemId: 'm2', after: true });
+  });
+
+  it('drops a tab after a collapsed group unless the pointer dwells on its label', () => {
+    vi.useFakeTimers();
+    try {
+      const onDrop = vi.fn(); render(<StripHarness onDrop={onDrop} collapsed />);
+      mockStripRects(); mockStripHitTesting();
+      const loose = screen.getByTestId('loose');
+      fireEvent.pointerDown(loose, { pointerId: 1, button: 0, isPrimary: true, clientX: 260, clientY: 10 });
+      // Over the label: the default is still "after the group" while the dwell is pending.
+      fireEvent.pointerMove(window, { pointerId: 1, clientX: 110, clientY: 10 });
+      expect(useListReorder.getState().target).toEqual({ itemId: 'g1', after: true });
+      expect(useListReorder.getState().dwellZoneId).toBeNull();
+      // Leaving the label cancels the pending dwell and falls back to the empty tail.
+      fireEvent.pointerMove(window, { pointerId: 1, clientX: 260, clientY: 10 });
+      expect(useListReorder.getState().target).toEqual({ zoneId: 'ungrouped' });
+      // Resting on the label fires the dwell and joins the group.
+      fireEvent.pointerMove(window, { pointerId: 1, clientX: 110, clientY: 10 });
+      act(() => { vi.advanceTimersByTime(400); });
+      expect(useListReorder.getState().dwellZoneId).toBe('g1');
+      expect(useListReorder.getState().target).toEqual({ zoneId: 'g1' });
+      fireEvent.pointerUp(window, { pointerId: 1, clientX: 110, clientY: 10 });
+      expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'loose' }), { zoneId: 'g1' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('moves a member tab out of its group and never nests a dragged group', () => {
+    const onDrop = vi.fn(); render(<StripHarness onDrop={onDrop} />);
+    mockStripRects(); mockStripHitTesting();
+    const m1 = screen.getByTestId('m1');
+    fireEvent.pointerDown(m1, { pointerId: 1, button: 0, isPrimary: true, clientX: 100, clientY: 10 });
+    // Leading edge at 160: between the second member and the loose tab, so the tab leaves the group.
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 200, clientY: 10 });
+    expect(useListReorder.getState().target).toEqual({ itemId: 'loose', after: false });
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 200, clientY: 10 });
+    expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'm1' }), { itemId: 'loose', after: false });
+
+    // Dragging the group itself over the loose tab places it beside the tab, never inside anything.
+    onDrop.mockClear();
+    const label = screen.getByTestId('label');
+    fireEvent.pointerDown(label, { pointerId: 2, button: 0, isPrimary: true, clientX: 30, clientY: 10 });
+    fireEvent.pointerMove(window, { pointerId: 2, clientX: 60, clientY: 10 });
+    expect(useListReorder.getState().target).toEqual({ itemId: 'loose', after: false });
+    fireEvent.pointerUp(window, { pointerId: 2, clientX: 60, clientY: 10 });
+    expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'g1', kind: 'group' }), { itemId: 'loose', after: false });
   });
 
   it.each(['left', 'right'] as const)('keeps scrolling at the %s edge with a stationary pointer and updates the drop slot', direction => {

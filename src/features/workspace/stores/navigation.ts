@@ -3,15 +3,17 @@ import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/
 import { isHistoryGroupColor, type HistoryGroupColor } from '@ui/historyGroupColor';
 
 export type WorkspaceArea = 'terminal' | 'code' | 'ai' | 'ssh' | 'history';
+export type HistoryTypePreset = 'all' | 'terminal' | 'conversation';
 export const WORKSPACE_SIDEBAR_WIDTH = 208;
 export const WORKSPACE_SIDEBAR_MIN_WIDTH = 160;
 export const WORKSPACE_SIDEBAR_MAX_WIDTH = 400;
 export const WORKSPACE_COMPACT_BREAKPOINT = 900;
 const STORAGE_KEY = 'workspace-navigation-v1';
+const DEFAULT_WORKSPACE_ORDER: WorkspaceArea[] = ['terminal', 'code', 'ai', 'ssh'];
 
 export function workspaceAreaForKind(kind: string): WorkspaceArea {
-  if (kind === 'editor' || kind === 'git-diff') return 'code';
-  if (kind === 'harness' || kind === 'ai-history' || kind === 'usage') return 'ai';
+  if (kind === 'editor' || kind === 'git-diff' || kind === 'start-code') return 'code';
+  if (kind === 'harness' || kind === 'ai-history' || kind === 'usage' || kind === 'start-ai') return 'ai';
   return 'terminal';
 }
 
@@ -24,11 +26,17 @@ interface NavigationState {
   sidebarDragWidth: number | null;
   lastTabs: Partial<Record<WorkspaceArea, string>>;
   groupColors: Record<string, HistoryGroupColor>;
+  workspaceOrder: WorkspaceArea[];
   codeOrder: string[];
   /** Top-level terminal strip order: group:<id> and tab:<id> entities. */
   sessionLayoutOrder: string[];
   aiPlacement: 'main' | 'side';
+  historyPreset: HistoryTypePreset;
+  historyPresetRevision: number;
+  historyLoading: boolean;
   selectArea: (area: WorkspaceArea) => void;
+  selectHistory: (preset: HistoryTypePreset) => void;
+  setHistoryLoading: (loading: boolean) => void;
   rememberTab: (area: WorkspaceArea, id: string) => void;
   setCollapsed: (collapsed: boolean) => void;
   openSidebar: (overlay: boolean) => void;
@@ -36,6 +44,7 @@ interface NavigationState {
   commitSidebarWidth: () => void;
   resetSidebarWidth: () => void;
   setGroupColor: (id: string, color: HistoryGroupColor | null) => void;
+  moveWorkspaceArea: (id: WorkspaceArea, over: WorkspaceArea, after: boolean) => void;
   moveCodeTab: (ids: string[], id: string, over: string, after: boolean) => void;
   moveSessionLayoutItem: (id: string, over?: string, after?: boolean) => void;
   reconcileSessionLayout: (ids: string[]) => void;
@@ -53,15 +62,24 @@ const groupColors: Record<string, HistoryGroupColor> = {};
 if (savedColors && typeof savedColors === 'object') {
   for (const [id, color] of Object.entries(savedColors)) if (isHistoryGroupColor(color)) groupColors[id] = color;
 }
+const savedWorkspaceOrder = Array.isArray(saved?.workspaceOrder)
+  ? saved.workspaceOrder.filter((id): id is WorkspaceArea => DEFAULT_WORKSPACE_ORDER.includes(id as WorkspaceArea))
+  : [];
+const workspaceOrder = [...new Set([...savedWorkspaceOrder, ...DEFAULT_WORKSPACE_ORDER])];
 
 /** Navigation owns presentation preferences; session and document stores retain their data. */
 export const useWorkspaceNavigation = create<NavigationState>((set) => ({
   area: 'terminal', previousArea: 'terminal', collapsed: saved?.collapsed === true || window.innerWidth <= WORKSPACE_COMPACT_BREAKPOINT,
   sidebarWidth: normalizeSidebarWidth(saved?.sidebarWidth), sidebarDragWidth: null, sidebarOverlay: false,
-  lastTabs: {}, groupColors, codeOrder: [], sessionLayoutOrder: Array.isArray(saved?.sessionLayoutOrder)
-    ? saved.sessionLayoutOrder.filter((id): id is string => typeof id === 'string') : [], aiPlacement: 'main',
+  lastTabs: {}, groupColors, workspaceOrder, codeOrder: [], sessionLayoutOrder: Array.isArray(saved?.sessionLayoutOrder)
+    ? saved.sessionLayoutOrder.filter((id): id is string => typeof id === 'string' && !id.startsWith('page:')) : [], aiPlacement: 'main',
+  historyPreset: 'all', historyPresetRevision: 0, historyLoading: false,
   selectArea: area => set(state => ({ area, previousArea: state.area !== 'ai' ? state.area : state.previousArea,
     ...(state.sidebarOverlay && area !== state.area ? { collapsed: true, sidebarOverlay: false, sidebarDragWidth: null } : {}) })),
+  selectHistory: preset => set(state => ({ area: 'history', previousArea: state.area !== 'ai' ? state.area : state.previousArea,
+    historyPreset: preset, historyPresetRevision: state.historyPresetRevision + 1,
+    ...(state.sidebarOverlay && state.area !== 'history' ? { collapsed: true, sidebarOverlay: false, sidebarDragWidth: null } : {}) })),
+  setHistoryLoading: historyLoading => set({ historyLoading }),
   rememberTab: (area, id) => set(state => state.lastTabs[area] === id ? state : ({ lastTabs: { ...state.lastTabs, [area]: id } })),
   setCollapsed: collapsed => set({ collapsed, sidebarDragWidth: null, sidebarOverlay: false }),
   openSidebar: sidebarOverlay => set({ collapsed: false, sidebarDragWidth: null, sidebarOverlay }),
@@ -80,6 +98,14 @@ export const useWorkspaceNavigation = create<NavigationState>((set) => ({
     const colors = { ...state.groupColors };
     if (color) colors[id] = color; else delete colors[id];
     return { groupColors: colors };
+  }),
+  moveWorkspaceArea: (id, over, after) => set(state => {
+    if (id === over) return state;
+    const order = state.workspaceOrder.filter(item => item !== id);
+    const index = order.indexOf(over);
+    if (index < 0) return state;
+    order.splice(index + (after ? 1 : 0), 0, id);
+    return { workspaceOrder: order };
   }),
   moveCodeTab: (ids, id, over, after) => set(state => {
     const order = orderedWorkspaceIds(ids, state.codeOrder).filter(key => key !== id);
@@ -108,9 +134,10 @@ export const useWorkspaceNavigation = create<NavigationState>((set) => ({
 
 useWorkspaceNavigation.subscribe((state, previous) => {
   if (state.collapsed !== previous.collapsed || state.sidebarOverlay !== previous.sidebarOverlay || state.groupColors !== previous.groupColors
-    || state.sidebarWidth !== previous.sidebarWidth || state.sessionLayoutOrder !== previous.sessionLayoutOrder) {
+    || state.sidebarWidth !== previous.sidebarWidth || state.sessionLayoutOrder !== previous.sessionLayoutOrder
+    || state.workspaceOrder !== previous.workspaceOrder) {
     safeLocalStorageSet(STORAGE_KEY, JSON.stringify({ collapsed: state.collapsed || state.sidebarOverlay, groupColors: state.groupColors,
-      sidebarWidth: state.sidebarWidth, sessionLayoutOrder: state.sessionLayoutOrder }));
+      sidebarWidth: state.sidebarWidth, sessionLayoutOrder: state.sessionLayoutOrder.filter(id => !id.startsWith('page:')), workspaceOrder: state.workspaceOrder }));
   }
 });
 

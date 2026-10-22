@@ -13,7 +13,7 @@ import { showsPaneChatHistory } from '../model/paneHistory';
 import { useTypographyStore } from '@config/typography';
 import { useRef, useEffect, useLayoutEffect, useMemo, useState, useId, useCallback } from 'react';
 import OverlayScrollbar from '@ui/OverlayScrollbar';
-import { CircleX, Minimize2, Square } from '@ui/icons';
+import { CircleX, Minimize2, Square, Terminal } from '@ui/icons';
 import { STATUS_ACTION_ICON_SIZE, StatusActionButton, TerminalStatusBar } from '@features/terminal/components/TerminalStatusBar';
 import { MoveDragLayer, PlacementOverlay } from './TerminalPlacementOverlay';
 import { useSessionStore, useWorkspaceNavigation, type Tab } from '@features/workspace';
@@ -36,12 +36,11 @@ import TerminalBlockList, { hasVisibleContent } from '@features/terminal/compone
 import PinnedCommand from './PinnedCommand';
 import { usePinnedCommand } from '../hooks/usePinnedCommand';
 import TerminalPanel from '@features/terminal/components/TerminalPanel';
-import { SessionHistoryView } from '@features/session-history';
-import AiHistoryView from '@features/chat/components/AiHistoryView';
+import { UnifiedHistoryView } from '@features/session-history';
 import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
 import ErrorBox from '@ui/ErrorBox';
 import { TextButton } from '@ui/TextButton';
-import UsageView from '@features/agent/components/UsageView';
+import { OutlineButton } from '@ui/OutlineButton';
 import AiWorkspaceSurface from '@features/chat/components/AiWorkspaceSurface';
 import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
@@ -115,16 +114,24 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
             />
           );
         }
-        if (tab.kind === 'harness') return <div key={tab.id} inert={tab.id !== activeId}
-          style={{ display: tab.id === activeId ? 'flex' : 'none', flex: 1, minHeight: 0, minWidth: 0 }}>
-          <AiWorkspaceSurface placement="main" />
-        </div>;
+        // One AI surface hosts the harness workspace for every AI page kind; it follows the active tab.
+        if (tab.kind === 'harness' || tab.kind === 'ai-history' || tab.kind === 'usage' || tab.kind === 'start-ai') {
+          if (tab.id !== activeId) return null;
+          return <div key={tab.id} style={{ display: 'flex', flex: 1, minHeight: 0, minWidth: 0 }}>
+            <AiWorkspaceSurface placement="main" />
+          </div>;
+        }
         if (tab.id !== activeId) return null;
         if (tab.kind === 'git-diff' || tab.kind === 'editor') return null;
-        return tab.kind === 'history' ? <SessionHistoryView key={tab.id} />
-          : tab.kind === 'ai-history' ? <AiHistoryView key={tab.id} />
-            : tab.kind === 'usage' ? <UsageView key={tab.id} />
-              : null;
+        // Placeholder start page: a system singleton that keeps the workspace toolbar visible.
+        if (tab.kind === 'start') return <div key={tab.id} className="workspace-empty workspace-start-page" data-testid="start-page">
+          <Terminal size={40} />
+          <h2>{t('Start')}</h2>
+          <p>{t('Open a local terminal or connect to an SSH host.')}</p>
+          <OutlineButton onClick={() => useSessionStore.getState().addTab()}>{t('New terminal')}</OutlineButton>
+        </div>;
+        // The terminal workspace owns the terminal-history page; the persisted filter reopens its search.
+        return tab.kind === 'history' ? <UnifiedHistoryView key={tab.id} preset="terminal" /> : null;
       })}
 
       {/* Manual fullscreen host for a running block, with room for the toolbar. */}

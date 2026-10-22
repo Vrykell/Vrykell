@@ -36,6 +36,7 @@ afterEach(() => {
 it('searches independent conversations and opens one in the dock', () => {
   render(<AiHistoryView />);
   expect(screen.getByTestId('ai-history-page')).toHaveTextContent('2 个对话');
+  fireEvent.click(screen.getByTestId('history-search-toggle'));
   fireEvent.change(screen.getByRole('textbox', { name: '搜索对话' }), { target: { value: 'Build' } });
   expect(screen.getByTestId('conversation-row-first')).toBeInTheDocument();
   expect(screen.queryByTestId('conversation-row-second')).not.toBeInTheDocument();
@@ -56,6 +57,7 @@ it('shows new conversations without replacing the history page', () => {
 
 it('copies the filtered group without including unrelated conversations', async () => {
   render(<AiHistoryView />);
+  fireEvent.click(screen.getByTestId('history-search-toggle'));
   fireEvent.change(screen.getByRole('textbox', { name: '搜索对话' }), { target: { value: 'Build' } });
   expect(screen.queryByRole('button', { name: '复制为 Markdown' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: '分组操作' }));

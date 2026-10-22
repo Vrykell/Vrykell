@@ -81,7 +81,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
   const [collapsed, setCollapsed] = useState<Set<string>>(readCommandCollapse);
   /** Ids a running search reveals; clearing the query returns to the saved layout. */
   const [searchRevealed, setSearchRevealed] = useState<Set<string>>(() => new Set());
-  const [renamingGroup, setRenamingGroup] = useState<{ id: string; name: string } | null>(null);
+  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null);
   const [removingGroup, setRemovingGroup] = useState<string | null>(null);
   const [filterMenu, setFilterMenu] = useState<MenuAnchor | null>(null);
   const [actionsMenu, setActionsMenu] = useState<MenuAnchor | null>(null);
@@ -97,7 +97,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
   const listRef = useRef<HTMLDivElement>(null);
   const listId = `command-history:${context.scope}`;
   const draggingCommand = useListReorder(state => state.drag?.listId === listId && state.drag.kind === 'command-history');
-  useEffect(() => { if (!visible) { setRulesMenu(null); setFilterMenu(null); setActionsMenu(null); setMenu(null); setRenamingGroup(null); } }, [visible]);
+  useEffect(() => { if (!visible) { setRulesMenu(null); setFilterMenu(null); setActionsMenu(null); setMenu(null); setRenamingGroupId(null); } }, [visible]);
   const isFolded = (id: string) => collapsed.has(id) && !searchRevealed.has(id);
   /** Folding follows what the panel currently shows and stores the resulting layout for later launches. */
   const toggleFold = (id: string, folded: boolean) => {
@@ -156,7 +156,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
   const favorite = (item: CommandItem) => update(value => value.favorites.some(entry => commandKey(entry) === commandKey(item)) ? value : {
     ...value, favorites: [...value.favorites, { id: crypto.randomUUID(), name: item.name, command: item.command, cwd: item.cwd, shell: item.shell }],
   });
-  /** New groups start with a unique default name and open their inline rename right away. */
+  /** New groups start with a unique default name and open their rename input in the action menu. */
   const createGroup = (item?: CommandItem) => {
     const base = t('New group');
     const names = new Set(preferences.groups?.map(group => group.name) ?? []);
@@ -165,15 +165,12 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
     const id = crypto.randomUUID();
     changeQuery(''); setStatus('all'); setDirectory('project'); setOrganizedOnly(false); setSameEnvironment(false);
     update(value => prependCommandGroup(value, { id, name, commandKeys: item ? [commandKey(item)] : [] }));
-    setRenamingGroup({ id, name });
+    setRenamingGroupId(id);
   };
-  const commitGroupRename = () => {
-    if (!renamingGroup) return;
-    const name = renamingGroup.name.trim();
-    if (name && name !== preferences.groups?.find(group => group.id === renamingGroup.id)?.name) {
-      update(value => ({ ...value, groups: value.groups?.map(group => group.id === renamingGroup.id ? { ...group, name } : group) }));
-    }
-    setRenamingGroup(null);
+  const renameGroup = (id: string, value: string) => {
+    const name = value.trim();
+    if (!name || name === preferences.groups?.find(group => group.id === id)?.name) return;
+    update(current => ({ ...current, groups: current.groups?.map(group => group.id === id ? { ...group, name } : group) }));
   };
   const fill = (item: CommandItem) => {
     if (hasCommandDraft(context.paneId)) { setReplace({ item, context }); return; }
@@ -316,11 +313,9 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
           onToggle={() => toggleFold(group.id, group.collapsed)}
           toggleLabel={group.id === 'favorites' ? t(group.collapsed ? 'Expand favorites' : 'Collapse favorites') : undefined}
           onColor={group.id === 'history' ? undefined : color => update(value => { const groupColors = { ...value.groupColors }; if (color) groupColors[group.id] = color; else delete groupColors[group.id]; return { ...value, groupColors }; })}
-          onRename={group.custom ? () => setRenamingGroup({ id: group.id, name: group.title }) : undefined}
-          renaming={renamingGroup !== null && renamingGroup.id === group.id}
-          renameValue={renamingGroup !== null && renamingGroup.id === group.id ? renamingGroup.name : ''}
-          onRenameChange={value => setRenamingGroup(current => current ? { ...current, name: value } : current)}
-          onRenameCommit={commitGroupRename} onRenameCancel={() => setRenamingGroup(null)}
+          renaming={renamingGroupId === group.id}
+          onRenameGroup={group.custom ? title => renameGroup(group.id, title) : undefined}
+          onRenameCancel={() => setRenamingGroupId(null)}
           onDelete={group.custom ? () => setRemovingGroup(group.id) : undefined}>
             {group.items.map(item => <HistoryCommandRow key={item.id} item={item} active={menu?.item.id === item.id || expanded === item.id}
               selected={selected?.id === item.id} detailsId={detailsId} showCount={!favoriteIds.has(item.id) && sort === 'frequent'} listId={listId}

@@ -29,3 +29,4 @@ export {
 } from '@features/session-history/model/sessionHistoryModel';
 
 export { default as SessionHistoryView } from '@features/session-history/components/SessionHistoryView';
+export { default as UnifiedHistoryView } from '@features/session-history/components/UnifiedHistoryView';

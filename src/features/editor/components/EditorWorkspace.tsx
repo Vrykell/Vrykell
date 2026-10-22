@@ -1,15 +1,15 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { editorFileKey, registerEditorCloseGuard, type EditorFile } from '@core/editor';
-import { useSessionStore, useWorkspaceNavigation } from '@features/workspace';
+import { useSessionStore, useWorkspaceNavigation, type Tab } from '@features/workspace';
 import { fileIcon, openInTerminal } from '@features/files';
 import CodeEditor from '@ui/CodeEditor';
 import { IconButton } from '@ui/IconButton';
 import ReloadButton from '@ui/ReloadButton';
 import { TextButton } from '@ui/TextButton';
 import { OutlineButton } from '@ui/OutlineButton';
-import { Save, Plus, iconSizes } from '@ui/icons';
+import { Save, Plus, FileCode, iconSizes } from '@ui/icons';
 import { isWindows } from '@platform/runtime';
-import FolderTabs from '@ui/FolderTabs';
+import FolderTabs, { type FolderTab } from '@ui/FolderTabs';
 import WorkspaceHeader from '@ui/WorkspaceHeader';
 import { useCodeWorkspaceTabs } from '@features/workspace/hooks/useCodeWorkspaceTabs';
 import { openWorkspaceFile } from '@features/workspace/services/workspaceActions';
@@ -29,6 +29,8 @@ export default function EditorWorkspace({ children }: { children: ReactNode }) {
   const documents = useEditorDocuments(state => state.documents);
   const area = useWorkspaceNavigation(state => state.area);
   const page = area === 'code' ? tabs.find(tab => tab.id === activeId && tab.kind === 'editor') : undefined;
+  const startTab = tabs.find(tab => tab.kind === 'start-code');
+  const startActive = !!startTab && area === 'code' && activeId === startTab.id;
   const files = tabs.filter(tab => tab.kind === 'editor').flatMap(tab => tab.files.map(file => ({ file, pageId: tab.id })));
   // Keep editor hosts attached when only the navigation order changes.
   const panes = [...files].sort((a, b) => editorFileKey(a.file).localeCompare(editorFileKey(b.file)));
@@ -54,8 +56,9 @@ export default function EditorWorkspace({ children }: { children: ReactNode }) {
     else setCloseError(t('Some files could not be saved. Your unsaved changes are kept.'));
   };
   return <>
-    <div className="editor-content-host" style={{ display: page ? 'none' : 'flex' }} inert={!!page}>{children}</div>
+    <div className="editor-content-host" style={{ display: page || startActive ? 'none' : 'flex' }} inert={!!page || startActive}>{children}</div>
     {panes.map(({ file, pageId }) => <DocumentPane key={editorFileKey(file)} file={file} active={pageId === activeId && page?.kind === 'editor' && editorFileKey(page.selected) === editorFileKey(file)} />)}
+    {startTab && <CodeStartPane tab={startTab} active={startActive} />}
     {closing && <ToolDialog label={t('Unsaved changes')} onClose={() => { if (!saving) setClosing(null); }} busy={saving} width={520}>
       <div className="editor-close-dialog"><p>{t('Save your changes before closing?')}</p><div className="editor-file-list">{closing.files.filter(file => isDocumentDirty(documents[editorFileKey(file)])).map(file => <span key={editorFileKey(file)}>{file.path}</span>)}</div>
         {closeError && <ErrorBox title={t('Could not save files')} details={closeError} />}
@@ -64,6 +67,27 @@ export default function EditorWorkspace({ children }: { children: ReactNode }) {
           <OutlineButton className="primary-button" disabled={saving} onClick={() => { void saveClose(); }}>{t('Save and close')}</OutlineButton></footer></div>
     </ToolDialog>}
   </>;
+}
+
+function CodeStartPane({ tab, active }: { tab: Extract<Tab, { kind: 'start-code' }>; active: boolean }) {
+  const items: FolderTab[] = [{
+    id: tab.id, label: tab.title, tip: tab.title, icon: <FileCode size={iconSizes.control} />,
+    closeLabel: t('Close this tab'), surface: 'canvas', renameable: false,
+    dataAttributes: { 'data-tab-kind': 'start-code' },
+  }];
+  return <section className="editor-pane" data-testid="code-start-page" style={{ display: active ? 'flex' : 'none' }} inert={!active}>
+    <WorkspaceHeader active={active}><FolderTabs items={items} selected={tab.id} label={t('Open files and comparisons')}
+      listId="code-documents" className="editor-tabs" onSelect={() => useSessionStore.getState().activate(tab.id)}
+      onClose={() => useSessionStore.getState().closeTab(tab.id)} onMove={() => {}}
+      menuItems={[{ label: t('Open file'), onClick: () => void openWorkspaceFile() }]}
+      toolbar={<IconButton compact aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}><Plus size={iconSizes.control} /></IconButton>} /></WorkspaceHeader>
+    <div className="workspace-empty workspace-start-page" data-testid="code-start-page-content">
+      <FileCode size={40} />
+      <h2>{t('Your code workspace')}</h2>
+      <p>{t('Open files or review changes here.')}</p>
+      <OutlineButton onClick={() => void openWorkspaceFile()}>{t('Open file')}</OutlineButton>
+    </div>
+  </section>;
 }
 
 function DocumentPane({ file, active }: { file: EditorFile; active: boolean }) {

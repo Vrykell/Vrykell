@@ -28,13 +28,19 @@ export function useTranscriptFollow(id: string, revision: unknown, active = true
   useEffect(() => () => clearTimeout(settle.current), []);
   useLayoutEffect(() => {
     if (!active || !scrollRef.current) return;
-    const scroll = scrollRef.current;
     const saved = positions.current.get(id);
     followRef.current = saved?.following ?? true;
     setFollowing(followRef.current);
-    scroll.scrollTop = saved?.following === false ? saved.top : scroll.scrollHeight;
-    lastTop.current = scroll.scrollTop;
+    const apply = () => {
+      if (!scrollRef.current) return;
+      scrollRef.current.scrollTop = saved?.following === false ? saved.top : scrollRef.current.scrollHeight;
+      lastTop.current = scrollRef.current.scrollTop;
+    };
+    apply();
+    // A parked host has no layout box, so re-apply the position once it is attached again.
+    const frame = saved ? requestAnimationFrame(apply) : undefined;
     return () => {
+      if (frame !== undefined) cancelAnimationFrame(frame);
       positions.current.set(id, { top: lastTop.current, following: followRef.current });
       clearTimeout(settle.current);
     };

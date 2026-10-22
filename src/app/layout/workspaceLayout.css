@@ -26,7 +26,7 @@ button.workspace-sidebar-toggle.icon-button:focus-visible { outline: 1px solid v
 .workspace-sidebar .sidebar-row { cursor: pointer; }
 .workspace-area-navigation .sidebar-row[data-active="true"] .sidebar-row-icon, .workspace-sidebar-footer .sidebar-row[data-active="true"] .sidebar-row-icon { color: var(--group-blue); }
 .workspace-left-navigation .sidebar-row[data-active="true"] .sidebar-row-icon { color: var(--group-blue); }
-.workspace-side-panel[data-side="right"], .workspace-ssh-status-slot { --sidebar-bg: var(--auxiliary-bg); }
+.workspace-side-panel[data-side="right"], .workspace-side-panel[data-side="left"], .workspace-ssh-status-slot { --sidebar-bg: var(--auxiliary-bg); }
 .workspace-sidebar .sidebar-row:focus-visible > .sidebar-row-content { background: var(--hover); }
 .workspace-sidebar-tools { flex: 1; display: flex; flex-direction: column; min-height: 0; margin-top: 8px; }
 .workspace-sidebar-tools-label { padding: 10px 12px 4px; color: var(--text-muted); font-size: var(--fs-caption); text-align: left; }
@@ -36,13 +36,14 @@ button.workspace-sidebar-toggle.icon-button:focus-visible { outline: 1px solid v
 .workspace-left-navigation .workspace-navigation-slot { width: 100%; }
 .workspace-left-navigation .workspace-navigation-placeholder { width: 100%; height: 32px; }
 .workspace-left-navigation .sidebar-row { width: 100%; }
-.workspace-side-panel[data-side="left"][data-visible="true"] { border-top: 1px solid var(--border); }
 .workspace-panel-host, .workspace-panel-slot[data-panel-slot="right"] { display: contents; }
 .workspace-panel-slot[data-panel-slot="left"] { display: flex; flex: 1; min-height: 0; min-width: 0; }
 .workspace-sidebar-footer { padding: 8px 6px 12px; border-top: 1px solid var(--border); }
 .application-window[data-platform="macos"] .workspace-sidebar-heading { padding-top: 32px; height: 76px; }
 .application-window:has(.workspace-titlebar[data-fullscreen="true"]) .workspace-sidebar-heading { padding-top: 0; height: 42px; }
 .workspace-empty { display: flex; flex: 1; min-height: 0; align-items: center; justify-content: center; flex-direction: column; gap: 14px; padding: 24px; text-align: center; color: var(--text-muted); background: var(--xterm-bg); }
+/* Start pages are system pages: their surface matches the active singleton tab above them. */
+.workspace-start-page { background: var(--canvas); }
 .workspace-empty h2 { margin: 0; font-size: var(--fs-title); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .workspace-empty p { margin: 0 0 10px; font-size: var(--fs-label); }
 .workspace-resource-page { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; padding: 16px; background: var(--xterm-bg); }
@@ -51,16 +52,31 @@ button.workspace-sidebar-toggle.icon-button:focus-visible { outline: 1px solid v
 .terminal-instance-header > .folder-more ~ .folder-tab-list { margin-left: -10px; padding-left: 10px; }
 .terminal-new-controls { display: inline-flex; align-items: center; border-radius: var(--radius-inner); background: var(--chrome-field); }
 .terminal-secondary-actions { display: flex; align-items: center; gap: 2px; }
-.terminal-group-preview { height: 100%; box-sizing: border-box; background: var(--surface); align-items: center; }
+.terminal-group-preview { height: 100%; box-sizing: border-box; background: transparent; }
+.terminal-group-preview .terminal-group-chip { border-radius: 5px; box-shadow: none; }
+.terminal-group-preview .tab-group-header { width: max-content; height: 100%; }
+.terminal-group-reorder-preview { width: auto !important; min-width: 0 !important; }
 @container (max-width: 560px) { .terminal-tab-tools .terminal-secondary-actions { display: none; } }
 .terminal-tab-search { width: clamp(72px, 12vw, 160px) !important; height: 30px; min-width: 72px; min-height: 30px; flex: 1 1 72px; }
 .terminal-tab-list { overflow-y: hidden; align-items: stretch; }
-.terminal-ungrouped-tabs { display: flex; flex: 1 0 auto; align-items: stretch; min-width: 32px; }
+.terminal-ungrouped-tabs, .terminal-ungrouped-tail { display: flex; flex: 1 0 auto; align-items: stretch; min-width: 32px; }
 .terminal-tab-group, .terminal-tab-group > .tab-group-container { display: flex; flex-shrink: 0; align-items: stretch; }
-.terminal-tab-group { margin-right: 6px; box-sizing: border-box; border: 1px solid transparent; border-radius: var(--radius-inner); transition: background var(--dur-fast) var(--ease), border-color var(--dur-fast) var(--ease); }
-.terminal-tab-group:is(:hover, :focus-within, .terminal-group-preview) { border-color: var(--border); background: var(--chrome-bg); }
-.terminal-tab-group .tab-group-header { display: flex; align-items: center; padding: 0 6px; cursor: pointer; max-width: 190px; min-width: 28px; }
+.terminal-tab-group { position: relative; margin-right: 6px; min-width: 0; box-sizing: border-box; background: transparent; }
+.terminal-tab-group[data-group-dragging="true"] { display: none; }
+/* The colored edge is an overlay, never a border: it must not shorten the tabs inside,
+   and it paints above them so an active tab cannot cover it. */
+.terminal-tab-group::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: var(--terminal-group-color); pointer-events: none; z-index: 2; }
+/* Collapsed groups drop the colored edge and borrow the active-tab surface only when they
+   own the active tab, are hovered or are being dragged; expanded groups keep the edge. */
+.terminal-tab-group[data-group-collapsed="true"]::after { display: none; }
+.terminal-tab-group[data-group-collapsed="true"] .tab-group-header[data-tab-surface="true"] { background: var(--xterm-bg); }
+.terminal-tab-group > .tab-group-container { min-width: 0; }
+.terminal-tab-group .tab-group-header { display: flex; align-items: center; box-sizing: border-box; padding: 0 6px; border-radius: var(--radius-inner) var(--radius-inner) 0 0; cursor: pointer; max-width: 190px; min-width: 28px; }
+.terminal-tab-group .tab-group-header,
+.terminal-tab-group .tab-group-header:is(:hover, :focus-visible) { background: transparent; }
 .terminal-group-chip { display: flex; align-items: center; gap: 6px; min-width: 0; padding: 3px 8px; border-radius: 5px; white-space: nowrap; font: var(--fs-caption)/1.5 var(--font-ui); color: var(--text-primary); background: color-mix(in srgb, var(--terminal-group-color) 30%, var(--surface)); }
+/* Dwell highlight: this collapsed group will accept the dragged tab when released. */
+.terminal-tab-group[data-drop-into="true"] .terminal-group-chip { box-shadow: 0 0 0 2px var(--terminal-group-color); }
 .terminal-group-chip > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .terminal-tab-group .tab-group-header[data-header-selected="true"] .terminal-group-chip { box-shadow: none; }
 .terminal-instance-tab { max-width: 220px; min-width: 80px; }

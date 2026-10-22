@@ -24,7 +24,7 @@ it('opens one review page, reuses the same comparison and restores a closed page
   expect(useSessionStore.getState().tabs).toHaveLength(1);
   expect(serializeSession(useSessionStore.getState().tabs[0]!)).toBeNull();
   store.closeTab(first);
-  expect(useSessionStore.getState().tabs).toHaveLength(0);
+  expect(useSessionStore.getState().tabs.map(tab => tab.kind)).toEqual(['start-code']);
   store.undoCloseTab();
   const restored = useSessionStore.getState();
   expect(restored.tabs).toHaveLength(1);

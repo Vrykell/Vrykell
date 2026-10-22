@@ -7,7 +7,6 @@ import { useSshStore } from '@features/ssh';
 import { useSessionStore, useUiStore } from '@features/workspace';
 import type { SshConnection } from '@features/ssh/services/api';
 import { pickPath } from '@platform/api/fs';
-import { openAppWindow } from '@platform/appWindows';
 
 vi.mock('@platform/shells', async importOriginal => ({
   ...(await importOriginal<typeof import('@platform/shells')>()),
@@ -25,7 +24,6 @@ vi.mock('@features/ssh/components/SshFormModal', () => ({
 vi.mock('@platform/api/fs', async importOriginal => ({
   ...(await importOriginal<typeof import('@platform/api/fs')>()), pickPath: vi.fn().mockResolvedValue([]),
 }));
-vi.mock('@platform/appWindows', () => ({ openAppWindow: vi.fn() }));
 
 const connection: SshConnection = {
   id: 'ssh-1', name: 'Prod', host: 'prod.example.com', port: 22, user: 'root', authMethod: 'password',
@@ -53,7 +51,6 @@ afterEach(() => {
   save.mockClear();
   remove.mockClear();
   vi.mocked(pickPath).mockReset().mockResolvedValue([]);
-  vi.mocked(openAppWindow).mockClear();
   useSessionStore.setState(workspaceSnapshot, true);
   useUiStore.setState(uiSnapshot, true);
 });
@@ -135,14 +132,15 @@ it('deletes a connection only after confirmation', async () => {
   expect(remove).toHaveBeenCalledWith('ssh-1');
 });
 
-it('shows profile, location and advanced sections and reveals search from More profiles', async () => {
+it('shows compact profile, location and advanced sections with shared row styling', async () => {
   openPicker();
   expect(screen.getByRole('heading', { name: '选择配置文件' })).toBeVisible();
   expect(screen.getByRole('heading', { name: '打开位置' })).toBeVisible();
   expect(screen.getByRole('heading', { name: '高级' })).toBeVisible();
-  expect(await screen.findByRole('button', { name: /在新窗口中打开/ })).toBeEnabled();
-  fireEvent.click(screen.getByRole('button', { name: '更多配置文件…' }));
-  await vi.waitFor(() => expect(screen.getByPlaceholderText('搜索标签页类型…')).toHaveFocus());
+  expect(await screen.findByRole('button', { name: '拆分标签页' })).toHaveClass('workspace-floating-row');
+  expect(screen.queryByRole('button', { name: '更多配置文件…' })).toBeNull();
+  expect(screen.queryByRole('button', { name: /在新窗口中打开/ })).toBeNull();
+  expect((await screen.findByTestId('new-tab-option-shell:zsh')).className).toContain('workspace-floating-row');
 });
 
 it('uses the selected open location for the default profile', async () => {
@@ -165,12 +163,4 @@ it('routes the advanced split action to the shared placement picker', () => {
   fireEvent.click(screen.getByRole('button', { name: '拆分标签页' }));
   expect(close).toHaveBeenCalledOnce();
   expect(useUiStore.getState().splitPlacement.open).toBe(true);
-});
-
-it('opens another application window from the advanced action', async () => {
-  const close = vi.fn();
-  render(<NewTabModal open onClose={close} />);
-  fireEvent.click(await screen.findByRole('button', { name: /在新窗口中打开/ }));
-  expect(openAppWindow).toHaveBeenCalledOnce();
-  expect(close).toHaveBeenCalledOnce();
 });

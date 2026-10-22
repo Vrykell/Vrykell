@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { TextInput } from '@ui/TextInput';
 import { Checkbox } from '@ui/Checkbox';
 import { TextButton } from '@ui/TextButton';
@@ -129,7 +130,8 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
   };
   if (!open) return null;
   const busy = saving || testing;
-  return <div style={{ position: 'fixed', inset: 0, zIndex: 9996, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--overlay)' }} onClick={() => { if (!busy) onClose(); }}>
+  // Portal to the body: the panel stacking context must never cover the centered dialog.
+  return createPortal(<div style={{ position: 'fixed', inset: 0, zIndex: 9996, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--overlay)' }} onClick={() => { if (!busy) onClose(); }}>
     <div ref={dialog} className="workspace-floating workspace-floating-dialog ssh-form-dialog" role="dialog" aria-modal="true" aria-label={t('SSH connection')} tabIndex={-1} onClick={event => event.stopPropagation()}>
       <header className="ssh-form-header"><h2>{t(onConnect ? 'Quick SSH connection' : initial ? 'Edit SSH connection' : 'New SSH connection')}</h2><KeyHint shortcut={isMacOS ? 'Meta+Enter' : 'Control+Enter'} /></header>
       <div className="ssh-form-layout">
@@ -206,5 +208,5 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
     </div>
     {pendingTrust && <ConfirmDialog open title={t('Confirm host fingerprint')} message={pendingTrust.fingerprint} confirmLabel={t('Trust and continue')} cancelLabel={t('Cancel')} onConfirm={() => void confirmTrust()} onCancel={() => setPendingTrust(null)} />}
     {deleting && <ConfirmDialog open danger title={t('Delete SSH connection?')} message={initial?.name} confirmLabel={t('Delete')} cancelLabel={t('Cancel')} onConfirm={() => void doDelete()} onCancel={() => setDeleting(false)} />}
-  </div>;
+  </div>, document.body);
 }

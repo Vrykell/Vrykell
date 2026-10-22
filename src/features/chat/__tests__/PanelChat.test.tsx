@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { useState } from 'react';
-import { firstTerminalOf, useSessionStore } from '@features/workspace';
+import { firstTerminalOf, useSessionStore, useWorkspaceNavigation } from '@features/workspace';
 import { leaf } from '@features/workspace/model/windowLayout';
 import { useTerminalStore } from '@features/terminal';
 import { useChatStore } from '../stores/chat';
@@ -22,6 +22,7 @@ const workspace = useSessionStore.getState();
 const terminal = useTerminalStore.getState();
 const chat = useChatStore.getState();
 const drafts = useComposerDrafts.getState();
+const navigation = useWorkspaceNavigation.getState();
 const paneId = 'chat-tab#0';
 const openSettings = () => fireEvent.click(screen.getByRole('button', { name: '会话设置' }));
 
@@ -84,6 +85,7 @@ it('uses the tab colour in execution targets while preserving failure status', (
 afterEach(() => {
   cleanup(); useSessionStore.setState(workspace, true); useTerminalStore.setState(terminal, true);
   useChatStore.setState(chat, true); useComposerDrafts.setState(drafts, true);
+  useWorkspaceNavigation.setState(navigation, true);
 });
 
 it('allows discussion without implicitly binding the focused terminal', () => {
@@ -110,13 +112,15 @@ it('keeps the same draft and title when the workspace switches to settings', () 
   expect(screen.getByText('Build issue')).toBeInTheDocument();
 });
 
-it('isolates new conversation drafts and opens singleton history in the workspace', () => {
+it('isolates new conversation drafts and opens the AI history singleton', () => {
   render(<PanelChat />);
   fireEvent.change(screen.getByPlaceholderText('自然语言描述你想做什么…'), { target: { value: 'First draft' } });
   fireEvent.click(screen.getByRole('button', { name: '新对话' }));
   expect(screen.getByPlaceholderText('自然语言描述你想做什么…')).toHaveValue('');
   fireEvent.click(screen.getByRole('button', { name: 'AI 对话历史' }));
+  // The AI history opens as one singleton tab in the AI workspace, never duplicated.
   expect(useSessionStore.getState().tabs.filter(tab => tab.kind === 'ai-history')).toHaveLength(1);
+  expect(useSessionStore.getState().activeId).toBe(useSessionStore.getState().tabs.find(tab => tab.kind === 'ai-history')!.id);
   fireEvent.click(screen.getByRole('button', { name: 'AI 对话历史' }));
   expect(useSessionStore.getState().tabs.filter(tab => tab.kind === 'ai-history')).toHaveLength(1);
   expect(screen.getByPlaceholderText('自然语言描述你想做什么…')).toHaveValue('');

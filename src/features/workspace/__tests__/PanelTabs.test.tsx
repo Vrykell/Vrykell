@@ -65,14 +65,6 @@ it('colors terminal icons from their context menu without activating the tab', (
   expect(row.querySelector('svg')!.style.color).toBe('var(--shell-bash-accent)');
 });
 
-it.each(['history'])('leaves the %s icon on its theme color without a palette', id => {
-  useIconColorStore.setState({ colors: { 'page:ai-history': 'coral', 'page:history': 'coral' } });
-  render(<PanelTabs />);
-  const row = screen.getByTestId(`tab-row-${id}`);
-  fireEvent.contextMenu(row);
-  expect(screen.queryByRole('group', { name: '图标颜色' })).toBeNull();
-  expect(row.querySelector('svg')!.style.color).toBe(id === 'ai-history' ? 'var(--text-primary)' : 'var(--text-secondary)');
-});
 afterEach(() => { cleanup(); useListReorder.getState().end(); useSessionStore.setState(snapshot, true); });
 
 it('leaves the tab list empty instead of showing an unmatched-search message when all tabs close', () => {
@@ -126,19 +118,14 @@ it('exposes terminal actions through the leading menu and styles the search as a
   expect(screen.getByTestId('tab-search')).toHaveClass('text-input-field');
 });
 
-it('keeps terminal history in the terminal strip and excludes AI pages', () => {
+it('shows the terminal history singleton in the strip but never the AI pages', () => {
   render(<PanelTabs />);
   expect(screen.queryByTestId('tab-row-ai-history')).toBeNull();
-  const history = screen.getByTestId('tab-row-history');
-  expect(history).toHaveAttribute('data-reorder-kind', 'loose-tab');
-  fireEvent.click(history);
+  expect(screen.queryByTestId('tab-row-usage')).toBeNull();
+  expect(screen.getByTestId('tab-row-history')).toHaveAttribute('data-tab-surface', 'canvas');
+  fireEvent.click(screen.getByTestId('tab-history-btn'));
   expect(useSessionStore.getState().activeId).toBe('history');
-  fireEvent.doubleClick(history);
-  expect(history.querySelector('input')).toBeNull();
-  fireEvent.contextMenu(history);
-  expect(screen.queryByText('复制会话')).toBeNull();
-  fireEvent.click(screen.getByText('关闭标签'));
-  expect(useSessionStore.getState().tabs.some(tab => tab.kind === 'history')).toBe(false);
+  expect(useWorkspaceNavigation.getState()).toMatchObject({ area: 'terminal' });
 });
 
 it('prevents pointer activation from moving focus onto a nested tab button', () => {
@@ -159,6 +146,7 @@ it('filters singleton pages without hiding other rows', () => {
   expect(icon.style.color).toBe('var(--shell-bash-accent)');
   fireEvent.click(screen.getByTestId('tab-search-toggle'));
   fireEvent.change(screen.getByTestId('tab-search'), { target: { value: 'History' } });
+  // The system history page matches by title like any other row; AI pages never appear here.
   expect(screen.getByTestId('tab-row-history')).toBeVisible();
   expect(screen.queryByTestId('tab-row-ai-history')).toBeNull();
   expect(container.querySelectorAll('[data-tab-row-id]')).toHaveLength(1);
@@ -185,6 +173,7 @@ it('renames groups in a styled menu input, commits on dismissal and cancels on E
   render(<PanelTabs />);
   const header = screen.getByTestId('group-header-work');
   expect(header).toHaveClass('folder-tab');
+  expect(header.parentElement?.parentElement).toHaveAttribute('data-group-card', 'true');
   fireEvent.doubleClick(header);
   expect(header.querySelector('input')).toBeNull();
   expect(screen.queryByRole('textbox', { name: '分组名称' })).toBeNull();
@@ -266,7 +255,7 @@ it('opens the panel menu on a blank-area right click even while the native menu 
     expect(screen.queryByText('AI 自动分组')).toBeNull();
 
     // A row keeps its own menu: it stops propagation, so no second panel menu appears.
-    fireEvent.contextMenu(screen.getByTestId('tab-row-history'));
+    fireEvent.contextMenu(screen.getByTestId('tab-row-local'));
     expect(screen.getByText('关闭标签')).toBeVisible();
     expect(screen.getAllByRole('menu')).toHaveLength(1);
   } finally {
@@ -287,11 +276,34 @@ it('keeps an empty session drop zone expandable and previews grouped tabs outsid
   expect(zone.closest('[data-reorder-list]')!.querySelectorAll('[data-reorder-item]')).toHaveLength(3);
   act(() => {
     useListReorder.getState().start({ listId: 'session-tabs', id: 'local', kind: 'tab' }, { x: 10, y: 500 });
-    useListReorder.getState().hover({ itemId: 'history', after: true });
+    useListReorder.getState().hover({ zoneId: 'ungrouped' });
   });
-  expect(zone.closest('[data-reorder-list]')!.querySelector('[data-reorder-placeholder="history"]')).not.toBeNull();
+  expect(zone.querySelector('[data-reorder-placeholder="ungrouped"]')).not.toBeNull();
   expect(screen.getByTestId('group-header-group-a').parentElement!.querySelector('[data-reorder-placeholder]')).toBeNull();
   expect(moveTab).not.toHaveBeenCalled();
+});
+
+it('gives a collapsed group the tab surface only while it owns the active tab, is hovered or dragged', () => {
+  useSessionStore.setState(state => ({
+    tabs: state.tabs.map(tab => tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab),
+    activeId: 'ai-history',
+    groups: [{ id: 'group-a', title: 'Group', collapsed: true }],
+  }));
+  render(<PanelTabs />);
+  const header = screen.getByTestId('group-header-group-a');
+  const group = header.closest('.terminal-tab-group')!;
+  expect(group).toHaveAttribute('data-group-collapsed', 'true');
+  expect(header).not.toHaveAttribute('data-tab-surface');
+  fireEvent.mouseEnter(group);
+  expect(header).toHaveAttribute('data-tab-surface', 'true');
+  fireEvent.mouseLeave(group);
+  expect(header).not.toHaveAttribute('data-tab-surface');
+  act(() => useSessionStore.setState({ activeId: 'local' }));
+  expect(header).toHaveAttribute('data-tab-surface', 'true');
+  act(() => useListReorder.getState().start({ listId: 'session-tabs', id: 'group-a', kind: 'group' }, { x: 10, y: 10 }));
+  expect(document.querySelector('.terminal-group-preview .tab-group-header')).toHaveAttribute('data-tab-surface', 'true');
+  act(() => useListReorder.getState().end());
+  expect(header).toHaveAttribute('data-tab-surface', 'true');
 });
 
 it('treats expanded groups as inactive cards and only folds them visually while dragged', () => {
@@ -307,7 +319,7 @@ it('treats expanded groups as inactive cards and only folds them visually while 
   expect(screen.getByTestId('tab-row-local')).toBeVisible();
   act(() => useListReorder.getState().start({ listId: 'session-tabs', id: 'group-a', kind: 'group' }, { x: 10, y: 10 }));
   expect(screen.queryByTestId('tab-row-local')).toBeNull();
-  expect(screen.getByTestId('group-count-group-a')).toHaveTextContent('1');
+  expect(screen.queryByTestId('group-count-group-a')).toBeNull();
   act(() => useListReorder.getState().end());
   expect(screen.getByTestId('tab-row-local')).toBeVisible();
   expect(useSessionStore.getState().groups[0]!.collapsed).toBe(false);
