@@ -25,6 +25,7 @@ import { useSshAuthenticationLifetime } from '@features/ssh/hooks/useSessionAuth
 import GitWorkspace from '@features/git/components/GitWorkspace';
 import { useGitContext } from '@features/git/hooks/useGitContext';
 import EditorWorkspace from '@features/editor/components/EditorWorkspace';
+import UnifiedHistoryView from '@features/session-history/components/UnifiedHistoryView';
 
 /** Compose navigation, auxiliary panels and the terminal workspace. */
 export default function WorkspaceShell() {
@@ -103,7 +104,8 @@ export default function WorkspaceShell() {
             <EditorWorkspace><GitWorkspace><TerminalView active={contentVisible && !settingsOpen} /></GitWorkspace></EditorWorkspace>
           </div>
           <div className="workspace-resource-page" data-testid="ssh-workspace" style={{ display: area === 'ssh' ? 'flex' : 'none' }} inert={area !== 'ssh'}><PanelSsh /></div>
-          {!contentVisible && area !== 'ssh' && <div className="workspace-empty" data-testid={`${area}-workspace-empty`}>
+          {area === 'history' && <UnifiedHistoryView />}
+          {!contentVisible && area !== 'ssh' && area !== 'history' && <div className="workspace-empty" data-testid={`${area}-workspace-empty`}>
             {area === 'code' ? <FileCode size={40} /> : area === 'ai' ? <Sparkles size={40} /> : <Terminal size={40} />}
             <h2>{t(area === 'code' ? 'Your code workspace' : area === 'ai' ? 'Your AI workspace' : 'Your terminal workspace')}</h2>
             <p>{t(area === 'code' ? 'Open files or review changes here.' : area === 'ai' ? 'Conversations and connected agents share this workspace.' : 'Open a local terminal or connect to an SSH host.')}</p>

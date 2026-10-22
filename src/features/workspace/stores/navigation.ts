@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import { isHistoryGroupColor, type HistoryGroupColor } from '@ui/historyGroupColor';
 
-export type WorkspaceArea = 'terminal' | 'code' | 'ai' | 'ssh';
+export type WorkspaceArea = 'terminal' | 'code' | 'ai' | 'ssh' | 'history';
 export const WORKSPACE_SIDEBAR_WIDTH = 208;
 export const WORKSPACE_SIDEBAR_MIN_WIDTH = 160;
 export const WORKSPACE_SIDEBAR_MAX_WIDTH = 400;

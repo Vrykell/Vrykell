@@ -4,7 +4,7 @@ import SidebarItem from '@ui/sidebarItem';
 import { IconButton } from '@ui/IconButton';
 import ResizeHandle from '@ui/ResizeHandle';
 import { TerminalPrompt, FileCode, Sparkles, Server, Settings, PanelLeft, History, iconSizes } from '@ui/icons';
-import { useSessionStore, useUiStore } from '@features/workspace';
+import { useUiStore } from '@features/workspace';
 import { useWorkspaceNavigation, WORKSPACE_COMPACT_BREAKPOINT } from '../stores/navigation';
 import { selectWorkspaceArea } from '../services/selectWorkspaceArea';
 import NavigationDragPreview from './NavigationDragPreview';
@@ -38,7 +38,7 @@ export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number
     <div className="workspace-sidebar-heading" data-tauri-drag-region>
       <span data-tauri-drag-region>{t('Workspaces')}</span>
       <div className="workspace-sidebar-header-actions">
-        <IconButton compact data-testid="workspace-history" aria-label={t('Session history')} data-tip={t('Session history')} onClick={() => useSessionStore.getState().openHistoryTab()}><History size={iconSizes.control} /></IconButton>
+        <IconButton compact data-testid="workspace-history" aria-label={t('All history')} data-tip={t('All history')} aria-pressed={area === 'history' && !settingsOpen} onClick={() => selectWorkspaceArea('history')}><History size={iconSizes.control} /></IconButton>
         <IconButton compact className="workspace-sidebar-toggle" data-testid="workspace-sidebar-toggle" aria-label={t('Collapse sidebar')} data-tip={t('Collapse sidebar')}
           onClick={() => useWorkspaceNavigation.getState().setCollapsed(true)}><PanelLeft size={iconSizes.control} /></IconButton>
       </div>

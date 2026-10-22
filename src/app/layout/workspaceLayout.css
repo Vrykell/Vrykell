@@ -9,7 +9,7 @@
 .workspace-instance-bar .folder-header { flex: 1; }
 .workspace-layout > .workspace-body { grid-column: 2; grid-row: 2; min-width: 0; }
 .workspace-layout .settings-screen { left: 0; }
-.workspace-layout:is([data-settings-open], [data-area="ssh"]) .workspace-instance-bar { display: none; }
+.workspace-layout:is([data-settings-open], [data-area="ssh"], [data-area="history"]) .workspace-instance-bar { display: none; }
 .workspace-layout .workspace-titlebar[data-platform="macos"][data-fullscreen="false"] { --workspace-title-inset: max(16px, calc(92px - var(--workspace-sidebar-width))); }
 .workspace-layout .workspace-titlebar[data-sidebar-collapsed="true"] { --workspace-title-inset: 7px; }
 .workspace-sidebar { grid-column: 1; grid-row: 1 / -1; display: flex; flex-direction: column; min-height: 0; background: var(--sidebar-bg); border-right: 1px solid var(--border); overflow: hidden; }

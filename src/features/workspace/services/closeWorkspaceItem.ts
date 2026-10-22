@@ -3,6 +3,7 @@ import { useWorkspaceNavigation, workspaceAreaForKind } from '../stores/navigati
 import { closeAiWorkspaceSession, useChatStore } from '@features/chat';
 import { useDockStore } from '../stores/dock';
 import { focusedWorkspaceArea, sideAiHasFocus } from './workspaceActions';
+import { selectWorkspaceArea } from './selectWorkspaceArea';
 
 /** Close the visible instance instead of the enclosing functional workspace. */
 export function closeWorkspaceItem() {
@@ -11,6 +12,11 @@ export function closeWorkspaceItem() {
   if (sideAiHasFocus()) {
     closeAiWorkspaceSession(`chat:${useChatStore.getState().activeConversationId}`);
     useDockStore.getState().closePanel('chat');
+    return;
+  }
+  const navigation = useWorkspaceNavigation.getState();
+  if (navigation.area === 'history') {
+    selectWorkspaceArea(navigation.previousArea === 'history' ? 'terminal' : navigation.previousArea);
     return;
   }
   if (focusedWorkspaceArea() === 'ai' && tab?.kind === 'harness') {

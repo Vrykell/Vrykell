@@ -1842,6 +1842,17 @@ const zh: Record<string, string> = {
   'Not enough space. Widen the window or reduce terminal splits.': '窗口空间不足，请加宽窗口或减少分屏。',
   'Create an instance in the current workspace': '在当前工作区中新建标签',
   'Could not open file: {{error}}': '无法打开文件：{{error}}',
+  'All history': '全部历史',
+  'Search all history': '搜索全部历史',
+  'Search terminals and AI conversations…': '搜索终端与 AI 对话…',
+  'Filter history': '筛选历史',
+  'Refresh history': '刷新历史',
+  'Latest activity': '最近活动',
+  'Local terminals': '本地终端',
+  'SSH terminals': 'SSH 终端',
+  'No matching history': '没有匹配的历史记录',
+  'No history yet': '暂无历史记录',
+  'Loading history…': '正在加载历史记录…',
 };
 
 export default zh;
