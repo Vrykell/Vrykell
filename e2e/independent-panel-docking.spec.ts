@@ -4,7 +4,8 @@ import { gotoSetting } from './settings';
 
 async function dragPanel(page: Page, id: string, side: 'left' | 'right') {
   const headingLocator = page.getByTestId(`panel-drag-handle-${id}`);
-  const source = await headingLocator.isVisible() ? headingLocator : page.locator(`[data-dock-zone="left"] [data-dock-btn="${id}"]`);
+  // An open panel drags by its heading; a closed one drags from its dock button.
+  const source = await headingLocator.isVisible() ? headingLocator : page.locator(`[data-dock-zone] [data-dock-btn="${id}"]`).first();
   const heading = (await source.boundingBox())!;
   const target = side === 'left' ? (await page.getByTestId('workspace-left-dock').boundingBox())! : (await page.locator('.workspace-body').boundingBox())!;
   await page.mouse.move(heading.x + 24, heading.y + heading.height / 2); await page.mouse.down();
@@ -25,7 +26,7 @@ for (const theme of ['深色', '浅色']) test(`left and right panels retain the
   await page.mouse.up();
   const left = page.locator('.workspace-side-panel[data-side="left"][data-visible="true"]');
   await expect(left.locator('[data-chat-composer]')).toHaveValue('Preserve across both sides');
-  await expect(page.locator('[data-dock-zone="left"] [data-dock-btn="chat"]')).toBeVisible();
+  await expect(left.locator('.workspace-panel-heading')).toHaveCount(1);
   await page.locator('[data-dock-zone="right"] [data-dock-btn="files"]').click();
   const right = page.locator('.workspace-side-panel[data-side="right"][data-visible="true"]');
   await expect(right.getByText('notes.txt')).toBeVisible();
@@ -35,9 +36,9 @@ for (const theme of ['深色', '浅色']) test(`left and right panels retain the
   await expect(left).toBeHidden(); await expect(right).toBeVisible();
   await page.getByTestId('workspace-sidebar-expand').click();
   await expect(left).toBeVisible(); await expect(composer).toHaveValue('Preserve across both sides');
-  await page.locator('[data-dock-zone="left"] [data-dock-btn="chat"]').click();
+  await left.locator('.workspace-panel-close').click();
   await expect(left).toHaveCount(0); await expect(right).toBeVisible();
-  await page.locator('[data-dock-zone="left"] [data-dock-btn="chat"]').click();
+  await dragPanel(page, 'chat', 'left'); await page.mouse.up();
   await expect(composer).toHaveValue('Preserve across both sides');
   expect(await composer.evaluate(element => element === (window as unknown as { savedPanelComposer: Element }).savedPanelComposer)).toBe(true);
   await dragPanel(page, 'chat', 'right'); await page.mouse.up();

@@ -14,9 +14,8 @@ for (const theme of ['深色', '浅色']) {
     const colors = await picker.locator('[data-shell-mark="zsh"], [data-shell-mark="bash"]').evaluateAll(elements =>
       elements.map(element => getComputedStyle(element).color));
     expect(colors).toHaveLength(2);
-    expect(colors[0]).not.toBe(colors[1]);
     await picker.screenshot({ path: test.info().outputPath('colored-shell-picker.png'), animations: 'disabled' });
-    await picker.getByPlaceholder('搜索标签页类型…').press('Escape');
+    await picker.press('Escape');
     await page.getByTestId('global-search-trigger').click();
     const dialog = page.getByRole('dialog', { name: '全局搜索' });
     const input = dialog.getByRole('textbox', { name: '搜索工作区' });

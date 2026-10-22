@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { ensureTabsOpen, setupTauriMock } from './tauri-mock';
+import { fillHistorySearch } from './history-search';
 
 type Probe = Window & {
   __TAURI_INTERNALS__: { invoke: (command: string, args: Record<string, unknown>) => Promise<unknown> };
@@ -39,18 +40,18 @@ async function seedSessions(page: Page) {
 async function openSessions(page: Page) {
   await ensureTabsOpen(page);
   await page.getByTestId('tab-history-btn').click();
-  await expect(page.getByTestId('session-history-page')).toBeVisible();
+  await expect(page.getByTestId('unified-history-page')).toBeVisible();
 }
 
 async function groupSessionsByDirectory(page: Page) {
-  await page.getByTestId('session-history-group-by').click();
-  await page.getByTestId('session-group-menu').getByRole('button', { name: '工作目录', exact: true }).click();
+  await page.getByTestId('unified-history-group-by').click();
+  await page.getByTestId('unified-history-group-menu').getByRole('button', { name: '工作目录', exact: true }).click();
 }
 
 async function openAiHistory(page: Page) {
   if (!await page.locator('[data-chat-composer]').isVisible()) await page.locator('[data-dock-btn="chat"]').click();
   await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
-  await expect(page.getByTestId('ai-history-page')).toBeVisible();
+  await expect(page.getByTestId('unified-history-page')).toBeVisible();
 }
 
 test('group names, notes, colors and collapse choices survive reload without changing automatic membership', async ({ page }, testInfo) => {
@@ -60,7 +61,7 @@ test('group names, notes, colors and collapse choices survive reload without cha
   await seedSessions(page);
   await openSessions(page);
   await groupSessionsByDirectory(page);
-  const card = page.getByTestId('history-group-card-cwd:/srv/app');
+  const card = page.getByTestId('history-group-card-cwd:local::/srv/app');
   await card.getByRole('button', { name: '分组操作' }).click();
   const menu = page.getByRole('menu', { name: '分组操作' });
   const bounds = (await menu.boundingBox())!;
@@ -81,18 +82,18 @@ test('group names, notes, colors and collapse choices survive reload without cha
   await note.fill('Follow up after deployment');
   await note.press('Control+Enter');
   await expect(card.locator('.history-group-note')).toHaveText('Follow up after deployment');
-  await page.getByTestId('session-filter-input').fill('Servers');
+  await fillHistorySearch(page, 'unified-history-search', 'Servers');
   await expect(page.locator('.history-row')).toHaveCount(2);
-  await page.getByTestId('session-filter-input').fill('Follow up');
+  await fillHistorySearch(page, 'unified-history-search', 'Follow up');
   await expect(page.locator('.history-row')).toHaveCount(2);
-  await page.getByTestId('session-filter-input').fill('');
+  await fillHistorySearch(page, 'unified-history-search', '');
   await card.getByRole('button', { name: '分组颜色', exact: true }).click();
   const palette = page.getByRole('dialog', { name: '分组颜色' });
   const paletteBounds = (await palette.boundingBox())!;
   expect(paletteBounds.x + paletteBounds.width).toBeLessThanOrEqual(viewport.width - 8);
   await palette.getByRole('button', { name: '绿色', exact: true }).click();
   await expect(card).toHaveAttribute('data-group-color', 'green');
-  await page.getByTestId('session-history-actions-menu-button').click();
+  await page.getByTestId('unified-history-actions').click();
   await page.getByRole('menuitem', { name: '收起全部分组' }).click();
   await expect(page.locator('.history-row')).toHaveCount(0);
   await page.reload();
@@ -103,7 +104,7 @@ test('group names, notes, colors and collapse choices survive reload without cha
   await expect(card).toHaveAttribute('data-group-color', 'green');
   await expect(card.getByRole('heading', { name: 'Servers' })).toBeVisible();
   await expect(card.locator('.history-group-note')).toHaveText('Follow up after deployment');
-  await page.getByTestId('session-history-actions-menu-button').click();
+  await page.getByTestId('unified-history-actions').click();
   await page.getByRole('menuitem', { name: '展开全部分组' }).click();
   await expect(page.locator('.history-row')).toHaveCount(3);
   await page.screenshot({ path: testInfo.outputPath('history-group-details.png'), animations: 'disabled' });
@@ -128,25 +129,26 @@ test('filtered group deletion protects locked records across regrouping and rest
   await seedSessions(page);
   await openSessions(page);
   await groupSessionsByDirectory(page);
-  await page.getByTestId('session-filter-input').fill('Deploy');
-  await page.getByTestId('history-session-alpha').hover();
-  await page.getByTestId('session-menu-alpha').click();
+  await fillHistorySearch(page, 'unified-history-search', 'Deploy');
+  await page.getByTestId('unified-history-session:alpha').hover();
+  await page.getByTestId('unified-history-menu-session:alpha').click();
   await page.getByRole('menuitem', { name: '锁定记录', exact: true }).click();
-  await page.getByTestId('session-history-group-by').click();
-  await page.getByTestId('session-group-menu').getByRole('button', { name: '终端类型', exact: true }).click();
+  await page.getByTestId('unified-history-group-by').click();
+  await page.getByTestId('unified-history-group-menu').getByRole('button', { name: '终端类型', exact: true }).click();
+  await page.keyboard.press('Escape');
   const card = page.getByTestId('history-group-card-terminal:bash');
   await expect(card.locator('.history-row-lock')).toHaveCount(1);
-  await page.getByTestId('history-session-alpha').hover();
-  await page.getByTestId('session-menu-alpha').click();
+  await page.getByTestId('unified-history-session:alpha').hover();
+  await page.getByTestId('unified-history-menu-session:alpha').click();
   await expect(page.getByRole('menuitem', { name: '删除此会话', exact: true })).toBeDisabled();
   await page.keyboard.press('Escape');
   await card.getByRole('button', { name: '分组操作' }).click();
-  await page.getByRole('menuitem', { name: '删除 1 个匹配会话…', exact: true }).click();
-  await expect(page.getByTestId('history-session-beta')).toHaveCount(0);
-  await expect(page.getByTestId('history-session-alpha')).toBeVisible();
+  await page.getByRole('menuitem', { name: '删除匹配记录…', exact: true }).click();
+  await expect(page.getByTestId('unified-history-session:beta')).toHaveCount(0);
+  await expect(page.getByTestId('unified-history-session:alpha')).toBeVisible();
   expect(await page.evaluate(() => (window as Probe).__HISTORY_CALLS__)).toEqual([{ command: 'delete_session', id: 'beta' }]);
   await card.getByRole('button', { name: '分组操作' }).click();
-  await page.getByRole('menuitem', { name: '全部恢复', exact: true }).click();
+  await page.getByRole('menuitem', { name: '打开匹配记录', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as Probe).__HISTORY_CALLS__)).toEqual([
     { command: 'delete_session', id: 'beta' }, { command: 'restore_session', id: 'alpha' },
   ]);
@@ -165,22 +167,22 @@ test('AI group copy and deletion use the filtered set while retaining locked and
   await page.reload();
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await openAiHistory(page);
-  await page.getByTestId('ai-history-search').fill('Deploy');
+  await fillHistorySearch(page, 'unified-history-search', 'Deploy');
   const card = page.locator('.history-group-card');
   await card.getByRole('button', { name: '分组操作' }).click();
-  await page.getByRole('menuitem', { name: '复制为 Markdown', exact: true }).click();
+  await page.getByRole('menuitem', { name: '复制匹配记录', exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as Probe).__CLIPBOARD_TEXT__)).toContain('# Deploy Alpha');
   const copied = await page.evaluate(() => (window as Probe).__CLIPBOARD_TEXT__);
   expect(copied).toContain('# Deploy Beta');
   expect(copied).not.toContain('Unrelated');
-  await page.getByTestId('conversation-row-alpha').hover();
-  await page.getByTestId('conversation-menu-alpha').click();
+  await page.getByTestId('unified-history-conversation:alpha').hover();
+  await page.getByTestId('unified-history-menu-conversation:alpha').click();
   await page.getByRole('menuitem', { name: '锁定记录', exact: true }).click();
   await card.getByRole('button', { name: '分组操作' }).click();
-  await page.getByRole('menuitem', { name: '删除 1 个匹配对话…', exact: true }).click();
-  await expect(page.getByTestId('conversation-row-beta')).toHaveCount(0);
-  await expect(page.getByTestId('conversation-row-alpha')).toBeVisible();
-  await page.getByTestId('ai-history-search').fill('');
-  await expect(page.getByTestId('conversation-row-hidden')).toBeVisible();
+  await page.getByRole('menuitem', { name: '删除匹配记录…', exact: true }).click();
+  await expect(page.getByTestId('unified-history-conversation:beta')).toHaveCount(0);
+  await expect(page.getByTestId('unified-history-conversation:alpha')).toBeVisible();
+  await fillHistorySearch(page, 'unified-history-search', '');
+  await expect(page.getByTestId('unified-history-conversation:hidden')).toBeVisible();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('e2e-conversations')!).map((item: { id: string }) => item.id))).toEqual(['alpha', 'hidden']);
 });

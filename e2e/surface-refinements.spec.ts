@@ -41,13 +41,8 @@ for (const theme of ['深色', '浅色']) {
     await page.getByTestId('tab-icon-color-auto').click();
     await expect(restored.locator('[role="tab"] svg')).toHaveCSS('color', original);
     await page.getByTestId('tab-history-btn').click();
-    await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
-    const marks = await page.locator('[data-tab-kind]:not([data-tab-kind="session"]) [role="tab"] svg').evaluateAll(elements =>
-      elements.map(element => [...element.querySelectorAll('path')].map(path => path.getAttribute('d')).join(' ')));
-    expect(new Set(marks).size).toBe(2);
-    await page.getByTestId('workspace-area-terminal').click();
-    await page.locator('[data-tab-kind="history"]').click();
-    await page.screenshot({ path: testInfo.outputPath('singleton-icons.png'), animations: 'disabled' });
+    await expect(page.locator('[data-testid="unified-history-page"]:visible')).toBeVisible();
+    await expect(page.locator('[data-tab-kind="history"], [data-tab-kind="ai-history"]')).toHaveCount(1);
   });
 
   test(`settings text, hover hints and permanent navigation remain consistent in ${theme}`, async ({ page }, testInfo) => {

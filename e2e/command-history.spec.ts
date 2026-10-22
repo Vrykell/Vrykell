@@ -349,7 +349,6 @@ test('persists command groups, colors and membership through edits and group del
   await expect(group.locator('[data-command-history]')).toContainText('npm run build -- --mode release');
   await group.locator('.command-history-section').hover();
   await group.getByRole('button', { name: '分组操作', exact: true }).click();
-  await page.getByRole('button', { name: '重命名分组…', exact: true }).click();
   const renameGroup = page.getByRole('textbox', { name: '重命名命令分组', exact: true });
   await renameGroup.fill('Deploy');
   await renameGroup.press('Enter');

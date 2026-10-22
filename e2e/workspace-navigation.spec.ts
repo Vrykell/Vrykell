@@ -14,7 +14,7 @@ test('uses a full-height sidebar and keeps terminals alive across empty workspac
   expect((await page.locator('.workspace-titlebar').boundingBox())!.x).toBe(208);
   expect((await page.getByTestId('workspace-instance-bar').boundingBox())!.y).toBe(42);
   await page.getByTestId('workspace-area-code').click();
-  await expect(page.getByTestId('code-workspace-empty')).toBeVisible();
+  await expect(page.getByTestId('code-start-page')).toBeVisible();
   await page.getByTestId('workspace-area-ssh').click();
   await expect(page.getByTestId('ssh-workspace')).toBeVisible();
   await page.getByTestId('workspace-area-terminal').click();
@@ -142,7 +142,7 @@ test('new, close and numeric shortcuts follow the workspace and the focused side
   await page.keyboard.press('Control+1');
   await expect(strip.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
   await page.keyboard.press('Control+w'); await page.keyboard.press('Control+w');
-  await expect(page.getByTestId('code-workspace-empty')).toBeVisible();
+  await expect(page.getByTestId('code-start-page')).toBeVisible();
   await page.getByTestId('workspace-area-terminal').click();
   await page.keyboard.press('Control+t');
   await expect(strip.locator('[data-tab-kind="session"]')).toHaveCount(2);

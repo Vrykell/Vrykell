@@ -116,7 +116,7 @@ test('pickers, tabs and SSH connections retain colored shell marks', async ({ pa
   await expect(dialog.locator('[data-shell-mark="bash"]')).toBeVisible();
   for (const shell of ['zsh', 'bash']) {
     const mark = dialog.locator(`[data-shell-mark="${shell}"]`);
-    await expect(mark).toHaveAttribute('viewBox', '0 0 24 24');
+    await expect(mark).toHaveAttribute('viewBox', '0 0 128 128');
     await expect(mark).toHaveAttribute('width', '20');
     expect(await mark.evaluate(element => getComputedStyle(element).color)).not.toBe('rgb(0, 0, 0)');
     await expect(mark.locator('text')).toHaveCount(0);

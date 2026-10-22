@@ -40,7 +40,8 @@ for (const theme of ['深色', '浅色']) {
     await expect(page.locator('.terminal-composer')).toHaveCSS('box-shadow', 'none');
     await ensureTabsOpen(page);
     await page.getByTestId('tab-history-btn').click();
-    const history = page.getByTestId('session-filter-input');
+    await page.getByTestId('history-search-toggle').click();
+    const history = page.getByTestId('unified-history-search');
     await expectQuietFocus(history);
     const hierarchy = await history.evaluate(element => ({
       field: getComputedStyle(element.parentElement!).backgroundColor,

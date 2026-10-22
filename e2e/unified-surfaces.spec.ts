@@ -14,22 +14,22 @@ for (const theme of ['dark', 'light']) test(`workspace chrome and cards share th
   const titlebar = page.locator('.workspace-titlebar');
   const colors = await page.evaluate(() => {
     const style = getComputedStyle(document.documentElement);
-    return { chrome: style.getPropertyValue('--chrome-bg'), auxiliary: style.getPropertyValue('--auxiliary-bg'), card: style.getPropertyValue('--chrome-field') };
+    return { chrome: style.getPropertyValue('--chrome-bg'), auxiliary: style.getPropertyValue('--auxiliary-bg'), canvas: style.getPropertyValue('--canvas'), card: style.getPropertyValue('--chrome-field'), composer: style.getPropertyValue('--composer-bg') };
   });
   const chrome = asRgb(colors.chrome);
   const auxiliary = asRgb(colors.auxiliary);
+  const canvas = asRgb(colors.canvas);
   const card = asRgb(colors.card);
+  const composer = asRgb(colors.composer);
   expect(await rgb(page, titlebar)).toBe(chrome);
-  expect(await rgb(page, page.locator('.workspace-main .terminal-composer').first())).toBe(card);
+  expect(await rgb(page, page.locator('.workspace-main .terminal-composer').first())).toBe(composer);
 
   await page.locator('[data-dock-zone="right"] [data-dock-btn="files"]').click();
   const rightSurface = page.locator('.workspace-side-panel[data-side="right"][data-visible="true"] > div').first();
   expect(await rgb(page, rightSurface)).toBe(auxiliary);
   expect(await rgb(page, page.locator('.workspace-instance-bar'))).toBe(auxiliary);
   const divider = page.locator('.workspace-side-panel[data-side="right"] [data-resize-line]').first();
-  expect(await rgb(page, divider)).toBe('rgba(0, 0, 0, 0)');
-  await page.getByTestId('resize-handle-files').hover();
-  await expect.poll(async () => rgb(page, divider)).not.toBe('rgba(0, 0, 0, 0)');
+  expect(await rgb(page, divider)).not.toBe('rgba(0, 0, 0, 0)');
 
   await page.evaluate(async () => {
     const { useDockStore } = await import('/src/features/workspace/stores/dock.ts');
@@ -38,20 +38,17 @@ for (const theme of ['dark', 'light']) test(`workspace chrome and cards share th
   });
   const left = page.locator('.workspace-side-panel[data-side="left"][data-visible="true"]');
   await expect(left).toBeVisible();
-  await expect(left.locator('.workspace-panel-heading')).toHaveCount(0);
-  expect(await left.evaluate(element => getComputedStyle(element).borderTopWidth)).toBe('1px');
-  await expect(page.getByText('工具栏', { exact: true })).toBeVisible();
+  // The left dock keeps one panel with its own heading (label + close button) and no button row.
+  await expect(left.locator('.workspace-panel-heading')).toHaveCount(1);
+  await expect(left.locator('.workspace-panel-heading').getByRole('button', { name: /关闭|Close/ })).toBeVisible();
+  await expect(page.locator('[data-dock-zone="left"] [data-dock-btn]')).toHaveCount(0);
+  expect(await left.evaluate(element => getComputedStyle(element).borderTopWidth)).toBe('0px');
   expect(await page.getByTestId('workspace-left-dock').evaluate(element => getComputedStyle(element).borderTopWidth)).toBe('0px');
-  const leftTool = page.locator('.workspace-left-navigation [data-dock-btn="files"]');
-  const leftRow = leftTool.locator('.sidebar-row-content');
-  expect((await leftRow.boundingBox())!.width).toBeGreaterThan(120);
+  // Workspace and settings rows keep the shared geometry after the dock rows were removed.
   const workspaceRow = page.getByTestId('workspace-area-terminal').locator('.sidebar-row-content');
   const settingsRow = page.getByTestId('workspace-settings').locator('.sidebar-row-content');
-  expect((await leftRow.boundingBox())!.height).toBe((await workspaceRow.boundingBox())!.height);
-  expect((await leftRow.boundingBox())!.height).toBe((await settingsRow.boundingBox())!.height);
-  expect((await leftRow.boundingBox())!.x).toBeCloseTo((await workspaceRow.boundingBox())!.x, 0);
-  expect((await leftRow.locator('.sidebar-row-title').boundingBox())!.x).toBeCloseTo((await workspaceRow.locator('.sidebar-row-title').boundingBox())!.x, 0);
-  expect(await leftRow.locator('.sidebar-row-icon').evaluate(element => getComputedStyle(element).color)).toBe(await workspaceRow.locator('.sidebar-row-icon').evaluate(element => getComputedStyle(element).color));
+  expect((await workspaceRow.boundingBox())!.width).toBeGreaterThan(120);
+  expect((await workspaceRow.boundingBox())!.height).toBe((await settingsRow.boundingBox())!.height);
 
   await page.getByTestId('workspace-settings').click();
   const settingsNav = page.locator('.settings-navigation');
@@ -59,7 +56,7 @@ for (const theme of ['dark', 'light']) test(`workspace chrome and cards share th
   expect(await rgb(page, settingsNav)).toBe(auxiliary);
   expect(await settingsNav.evaluate(element => getComputedStyle(element).borderRightWidth)).toBe('1px');
   expect(await rgb(page, page.locator('.settings-screen'))).toBe(auxiliary);
-  expect(await rgb(page, page.locator('.settings-content'))).toBe(auxiliary);
+  expect(await rgb(page, page.locator('.settings-content'))).toBe(canvas);
   expect(await rgb(page, settingsCard)).toBe(card);
   expect(await settingsCard.evaluate(element => getComputedStyle(element).boxShadow)).toBe('none');
   expect(await settingsCard.evaluate(element => getComputedStyle(element).borderRadius)).toBe('8px');
@@ -68,8 +65,8 @@ for (const theme of ['dark', 'light']) test(`workspace chrome and cards share th
   await page.getByTestId('workspace-history').click();
   const historyHeader = page.locator('.history-header');
   const historyCard = page.locator('.history-group-card').first();
-  expect(await rgb(page, historyHeader)).toBe(auxiliary);
-  expect(await rgb(page, page.getByTestId('unified-history-page').locator('.history-list'))).toBe(auxiliary);
+  expect(await rgb(page, historyHeader)).toBe(canvas);
+  expect(await rgb(page, page.getByTestId('unified-history-page').locator('.history-list'))).toBe(canvas);
   expect(await rgb(page, historyCard)).toBe(card);
   expect(await historyCard.evaluate(element => getComputedStyle(element).boxShadow)).toBe('none');
   expect(await historyCard.evaluate(element => getComputedStyle(element).borderRadius)).toBe('8px');
@@ -77,10 +74,7 @@ for (const theme of ['dark', 'light']) test(`workspace chrome and cards share th
 
   await page.getByTestId('workspace-area-ai').click();
   await page.getByTestId('ai-new-conversation').click();
-  const chatToolbar = page.locator('.chat-conversation-heading');
-  expect(await rgb(page, chatToolbar)).toBe(auxiliary);
-  expect((await chatToolbar.boundingBox())!.height).toBe(34);
-  expect(await rgb(page, page.locator('.ai-chat-panel:visible .terminal-composer'))).toBe(card);
+  expect(await rgb(page, page.locator('.ai-chat-panel:visible .terminal-composer'))).toBe(composer);
 
   await page.evaluate(async () => {
     const { useWorkspaceStore } = await import('/src/features/workspace/stores/workspace.ts');

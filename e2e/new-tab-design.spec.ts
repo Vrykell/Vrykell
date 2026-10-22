@@ -15,13 +15,10 @@ for (const theme of ['dark', 'light']) test(`new tab picker follows the profile 
   await dialog.getByRole('button', { name: '在用户主目录打开' }).click();
   await expect(dialog.getByRole('button', { name: '在用户主目录打开' })).toHaveAttribute('data-active', 'true');
   await expect(dialog.getByRole('heading', { name: '高级' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: '在新窗口中打开' })).toBeEnabled();
   await expect(dialog.getByRole('button', { name: '拆分标签页' })).toBeVisible();
-  await dialog.getByRole('button', { name: '更多配置文件…' }).click();
-  const search = dialog.getByPlaceholder('搜索标签页类型…');
-  await expect(search).toBeFocused();
-  await search.fill('zsh');
-  await expect(dialog.getByTestId('new-tab-option-shell:zsh')).toBeVisible();
-  await expect(dialog.getByTestId('new-tab-option-shell:bash')).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: '更多配置文件…' })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: '在新窗口中打开' })).toHaveCount(0);
+  await expect(dialog.getByTestId('new-tab-option-shell:zsh')).toHaveClass(/workspace-floating-row/);
+  expect((await dialog.boundingBox())!.height).toBeLessThan(600);
   await page.screenshot({ path: info.outputPath(`new-tab-${theme}.png`), animations: 'disabled' });
 });

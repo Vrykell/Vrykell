@@ -67,7 +67,7 @@ test('reviews both sides of a partially staged file and preserves the terminal',
   await expect(page.getByRole('tablist', { name: '已打开的文件与比较' }).getByRole('tab')).toHaveCount(1);
   await page.keyboard.press('Control+w');
   await expect(review).toHaveCount(0);
-  await expect(page.getByTestId('code-workspace-empty')).toBeVisible();
+  await expect(page.getByTestId('code-start-page')).toBeVisible();
   await page.getByTestId('workspace-sidebar-expand').click();
   await page.getByTestId('workspace-area-terminal').click();
   await expect(page.locator('[data-terminal-input]').first()).toBeVisible();
@@ -83,7 +83,7 @@ test('keeps comparisons as workspace tabs and returns to the running terminal', 
   await expect(page.getByRole('tablist', { name: '已打开的文件与比较' }).getByRole('tab')).toHaveCount(1);
   await page.getByRole('button', { name: '关闭差异 src/main.ts' }).click();
   await expect(page.getByTestId('git-diff-review')).toHaveCount(0);
-  await expect(page.getByTestId('code-workspace-empty')).toBeVisible();
+  await expect(page.getByTestId('code-start-page')).toBeVisible();
   await page.getByTestId('workspace-area-terminal').click();
   await expect(page.locator('[data-terminal-input]').first()).toBeVisible();
 });

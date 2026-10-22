@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { ensureTabsOpen, setupTauriMock } from './tauri-mock';
 
-test('settings stay outside the tab list while history remains a reusable tab', async ({ page }) => {
+test('settings stay outside the tab list while history opens one singleton tab per workspace', async ({ page }) => {
   await setupTauriMock(page); await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await ensureTabsOpen(page);
@@ -13,21 +13,20 @@ test('settings stay outside the tab list while history remains a reusable tab', 
   await expect(page.locator('.settings-screen')).toBeVisible();
   await page.getByRole('button', { name: '关闭设置', exact: true }).click();
   await expect(page.locator('[data-tab-row-id]')).toHaveCount(before);
+  // The terminal history entry opens one singleton tab in the terminal strip.
   await page.getByTestId('tab-history-btn').click();
-  const history = page.locator('[data-tab-kind="history"]');
+  const history = page.locator('[data-testid="unified-history-page"]:visible');
   await expect(history).toBeVisible();
+  await expect(history.getByTestId('unified-history-session:hist-1')).toBeVisible();
+  await expect(page.locator('[data-tab-kind="history"]')).toHaveCount(1);
+  // Reopening reuses the same tab instead of stacking another one.
   await page.getByTestId('tab-history-btn').click();
-  await expect(history).toHaveCount(1);
-  await history.click({ button: 'right' });
-  await expect(page.getByRole('button', { name: '复制会话', exact: true })).toHaveCount(0);
-  await page.keyboard.press('Escape');
-  await page.getByTestId('tab-search').fill('history-unmatched');
-  await expect(history).toHaveCount(0);
-  await page.getByTestId('tab-search').fill('');
-  await history.getByRole('button', { name: '关闭标签', exact: true }).click();
-  await expect(history).toHaveCount(0);
-  await page.getByTestId('tab-history-btn').click();
-  await expect(history).toHaveCount(1);
+  await expect(page.locator('[data-tab-kind="history"]')).toHaveCount(1);
+  await expect(page.locator('[data-testid="unified-history-page"]:visible')).toHaveCount(1);
+  // The global history entry keeps the workspace page and never adds a tab.
+  await page.getByTestId('workspace-history').click();
+  await expect(page.locator('[data-testid="unified-history-page"]:visible').locator('.history-heading strong')).toContainText('全部历史');
+  await expect(page.locator('[data-tab-kind="history"]')).toHaveCount(1);
 });
 
 test('local and SSH tabs retain colored tiles before and after activation', async ({ page }) => {

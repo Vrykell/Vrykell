@@ -8,35 +8,20 @@ async function boot(page: Page) {
   await ensureTabsOpen(page);
 }
 
-async function dragBefore(page: Page, source: string, target: string) {
-  const from = (await page.locator(`[data-tab-row-id="${source}"]`).boundingBox())!;
-  await page.mouse.move(from.x + 40, from.y + from.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(from.x + 40, from.y + from.height / 2 + 8);
-  const to = (await page.locator(`[data-tab-row-id="${target}"]`).boundingBox())!;
-  await page.mouse.move(to.x + 8, to.y + to.height / 2, { steps: 6 });
-}
-
-test('closing the last tab leaves the workspace empty and closing background sessions preserves the active page', async ({ page }) => {
+test('terminal history opens one singleton tab on the shared workspace surface', async ({ page }) => {
   await boot(page);
   await page.getByTestId('tab-history-btn').click();
-  const settings = page.locator('[data-tab-kind="history"]');
-  const session = page.locator('[data-tab-kind="session"]');
-  await session.hover();
-  await session.getByRole('button', { name: '关闭标签', exact: true }).click();
-  await expect(settings).toBeVisible();
-  await expect(page.getByTestId('session-filter-input')).toBeVisible();
-  await settings.getByRole('button', { name: '关闭标签', exact: true }).click();
-  await expect(page.locator('[data-tab-row-id]')).toHaveCount(0);
-  await expect(page.getByText('无匹配会话')).toHaveCount(0);
-  await expect(page.getByTestId('session-filter-input')).toHaveCount(0);
-  await expect(page.getByPlaceholder(/输入命令/)).toHaveCount(0);
-  await expect(page.locator('.workspace-main')).toBeVisible();
+  await expect(page.locator('[data-testid="unified-history-page"]:visible')).toBeVisible();
+  await expect(page.locator('[data-tab-kind="history"]')).toHaveCount(1);
+  await expect(page.getByTestId('history-search-toggle')).toBeVisible();
+  // Reopening the entry reuses the same singleton instead of stacking another tab.
+  await page.getByTestId('workspace-area-terminal').click();
   await page.getByTestId('tab-history-btn').click();
-  await expect(page.getByTestId('session-filter-input')).toBeVisible();
+  await expect(page.locator('[data-tab-kind="history"]')).toHaveCount(1);
+  await expect(page.locator('[data-testid="unified-history-page"]:visible')).toBeVisible();
 });
 
-test('terminal history reorders with loose sessions while AI history stays in its workspace', async ({ page }) => {
+test('the history singleton never persists into the terminal tab order', async ({ page }) => {
   await boot(page);
   const ids = await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
@@ -44,27 +29,27 @@ test('terminal history reorders with loose sessions while AI history stays in it
     const ws = useWorkspaceStore.getState();
     const grouped = ws.tabs[0]!.id;
     const loose = ws.addTab({ title: 'Loose terminal' });
-    const group = await ws.createGroupForTab(grouped, 'Group');
-    const settings = ws.addTab({ kind: 'history' });
-    const history = ws.addTab({ title: 'Second loose terminal' });
-    ws.addTab({ kind: 'ai-history' });
-    return { grouped, loose, group, settings, history };
+    const second = ws.addTab({ title: 'Second loose terminal' });
+    return { grouped, loose, second };
   });
   await ensureTabsOpen(page);
-  await dragBefore(page, ids.settings, ids.loose);
-  await expect(page.locator('[data-reorder-placeholder]')).toHaveCount(1);
-  await page.mouse.up();
-  const order = () => page.locator('[data-reorder-zone="ungrouped"] [data-tab-row-id]').evaluateAll(rows => rows.map(row => row.getAttribute('data-tab-row-id')));
-  await expect.poll(order).toEqual([ids.settings, ids.loose, ids.history]);
-  await dragBefore(page, ids.history, ids.settings);
-  await page.mouse.up();
-  await expect.poll(order).toEqual([ids.history, ids.settings, ids.loose]);
-  await dragBefore(page, ids.settings, ids.grouped);
-  await expect(page.locator(`[data-group-id="${ids.group}"] [data-reorder-placeholder]`)).toHaveCount(0);
-  await page.mouse.up();
-  await expect(page.locator(`[data-tab-row-id="${ids.settings}"]`)).toHaveAttribute('data-tab-group', '');
-  await expect(page.locator('[data-tab-kind="ai-history"]')).toHaveCount(1);
+  const order = () => page.locator('[data-reorder-list="session-tabs"] > [data-tab-row-id]').evaluateAll(rows => rows
+    .map(row => row.getAttribute('data-tab-row-id')));
+  const before = await order();
+  expect(before).toEqual(expect.arrayContaining([ids.grouped, ids.loose, ids.second]));
+  await page.getByTestId('tab-history-btn').click();
+  await expect(page.locator('[data-testid="unified-history-page"]:visible')).toBeVisible();
   await expect(page.locator('[data-tab-kind="history"]')).toHaveCount(1);
+  // System pages are stripped from the persisted tab order.
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('workspace-navigation-v1') ?? '{}') as { sessionLayoutOrder?: string[] });
+  expect((saved.sessionLayoutOrder ?? []).some(id => id.startsWith('page:'))).toBe(false);
+  // Closing the singleton restores the session-only order.
+  await page.getByTestId('workspace-area-terminal').click();
+  const historyRow = page.locator('[data-tab-kind="history"]');
+  await historyRow.hover();
+  await historyRow.getByRole('button', { name: '关闭标签', exact: true }).click();
+  await expect(page.locator('[data-tab-kind="history"]')).toHaveCount(0);
+  expect(await order()).toEqual(before);
 });
 
 test('failed commands remain in history but do not become completion suggestions', async ({ page }) => {
@@ -96,39 +81,30 @@ test('failed commands remain in history but do not become completion suggestions
   await expect(page.locator('.command-completion-suffix')).toHaveCount(0);
 });
 
-test('session startup-mode filters combine with sorting and survive reopening', async ({ page }) => {
+test('history toolbar aligns right and compact search closes on blur', async ({ page }, info) => {
   await boot(page);
-  await page.evaluate(() => {
-    const internal = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__;
-    const original = internal.invoke;
-    internal.invoke = async (command, args) => {
-      if (command !== 'list_sessions') return original(command, args);
-      return [
-        ['block-a', 'Alpha', 'block', 10], ['block-b', 'Beta', 'block', 20], ['classic', 'Classic', 'classic', 30],
-      ].map(([id, title, openMode, closed_at]) => ({ id, title, status: 'historical', kind: 'local', payload: JSON.stringify({ openMode }),
-        created_at: 1, closed_at, block_count: 0, sort_order: 0, cwd: '', group_id: null }));
-    };
-  });
   await page.getByTestId('tab-history-btn').click();
-  const rows = () => page.locator('[data-testid^="history-session-"]').evaluateAll(items => items.map(item => item.getAttribute('data-testid')));
-  await expect.poll(rows).toEqual(['history-session-classic', 'history-session-block-b', 'history-session-block-a']);
-  await page.getByTestId('session-filter-btn').click();
-  await page.getByTestId('session-filter-menu').getByRole('button', { name: '块终端', exact: true }).click();
-  await page.keyboard.press('Escape');
-  await expect.poll(rows).toEqual(['history-session-block-b', 'history-session-block-a']);
-  const sortButton = page.getByTestId('session-sort-btn');
-  await expect(sortButton).toHaveCSS('width', '28px');
-  await sortButton.click();
-  const sortMenu = page.getByTestId('session-sort-menu');
-  await sortMenu.getByRole('button', { name: '标题正序' }).click();
-  await expect.poll(rows).toEqual(['history-session-block-a', 'history-session-block-b']);
-  await page.locator('[data-tab-kind="history"]').getByRole('button', { name: '关闭标签', exact: true }).click();
-  await page.getByTestId('tab-history-btn').click();
-  await expect.poll(rows).toEqual(['history-session-block-a', 'history-session-block-b']);
-  await sortButton.click();
-  await expect(page.getByTestId('session-sort-menu').getByRole('button', { name: '标题正序' })).toHaveAttribute('aria-pressed', 'true');
-  await page.getByTestId('session-filter-btn').click();
-  await page.getByTestId('session-filter-menu').getByRole('button', { name: '普通终端', exact: true }).click();
-  await page.keyboard.press('Escape');
-  await expect.poll(rows).toEqual(['history-session-classic']);
+  await expect(page.getByTestId('unified-history-page').locator('.history-heading strong')).toHaveText('会话历史');
+  const actionButtons = page.locator('.history-actions > button');
+  await expect(actionButtons).toHaveCount(5);
+  await expect(actionButtons.first()).toHaveAccessibleName('搜索会话');
+  const positions = await actionButtons.evaluateAll(elements => elements.map(element => {
+    const bounds = element.getBoundingClientRect();
+    return { left: bounds.left, right: bounds.right };
+  }));
+  expect(positions).toEqual([...positions].sort((left, right) => left.left - right.left));
+  expect(positions.at(-1)!.right).toBeGreaterThan(1_100);
+  await page.screenshot({ path: info.outputPath('history-toolbar.png'), animations: 'disabled' });
+
+  await page.getByTestId('history-search-toggle').click();
+  const input = page.getByTestId('unified-history-search');
+  await expect(input).toBeVisible();
+  await input.fill('旧');
+  await expect(page.getByTestId('unified-history-session:hist-1')).toBeVisible();
+  await page.locator('.history-heading').click();
+  await expect(input).toHaveCount(0);
+
+  await page.getByTestId('workspace-area-ai').click();
+  await page.getByTestId('workspace-history').click();
+  await expect(page.getByTestId('unified-history-page').locator('.history-heading strong')).toHaveText('全部历史');
 });

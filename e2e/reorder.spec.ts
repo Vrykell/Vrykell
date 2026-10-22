@@ -2,11 +2,12 @@ import { test, expect, type Page } from '@playwright/test';
 import { setupTauriMock, ensureTabsOpen } from './tauri-mock';
 
 /** Press the pointer on a row and drag it onto `ratio` of the target row (mouse stays down). */
-async function startDragRow(page: Page, sourceTestId: string, targetTestId: string, ratio = 0.8) {
+async function startDragRow(page: Page, sourceTestId: string, targetTestId: string, ratio = 0.8, grabOffset = 40) {
   const from = (await page.getByTestId(sourceTestId).boundingBox())!;
   const horizontal = sourceTestId.startsWith('tab-row-');
   const originalTarget = (await page.getByTestId(targetTestId).boundingBox())!;
-  await page.mouse.move(from.x + 40, from.y + from.height / 2);
+  const startX = from.x + Math.min(grabOffset, Math.max(1, from.width - 1));
+  await page.mouse.move(startX, from.y + from.height / 2);
   await page.mouse.down();
   const steps = 6;
   for (let i = 1; i <= steps; i++) {
@@ -14,7 +15,7 @@ async function startDragRow(page: Page, sourceTestId: string, targetTestId: stri
     const toX = target.x + (horizontal ? target.width * ratio : 40);
     const toY = target.y + target.height * (horizontal ? 0.5 : ratio);
     await page.mouse.move(
-      from.x + 40 + (toX - (from.x + 40)) * (i / steps),
+      startX + (toX - startX) * (i / steps),
       from.y + from.height / 2 + (toY - (from.y + from.height / 2)) * (i / steps),
     );
     await page.waitForTimeout(12);
@@ -63,7 +64,8 @@ test.describe('侧栏列表拖拽排序', () => {
       }
       await page.mouse.up();
       await expect(source).toHaveAttribute('data-tab-group', '');
-      await expect(loose.locator(`[data-tab-row-id="${first}"]`)).toHaveCount(1);
+      await expect(list.locator(`[data-tab-row-id="${first}"]`)).toHaveCount(1);
+      await expect(list.locator(`[data-group-id="${groupId}"] [data-tab-row-id="${first}"]`)).toHaveCount(0);
     });
   }
   test('SSH 连接：拖动时源行让位并出现虚线占位，落下后顺序持久化', async ({ page }) => {
@@ -137,13 +139,26 @@ test.describe('侧栏列表拖拽排序', () => {
     await expect(group).toBeVisible();
 
     // 把未分组的 b 拖到组内 a 上：空位出现在组内，而不是列表里最近的行
-    await startDragRow(page, `tab-row-${b}`, `tab-row-${a}`, 0.3);
+    // 前缘判定按“移除源标签后的理想位置”计算，因此从右侧扫动，直到组内出现占位。
+    const dragUntilGroupPlaceholder = async (sourceId: string, memberId: string) => {
+      const source = (await page.getByTestId(`tab-row-${sourceId}`).boundingBox())!;
+      const y = source.y + source.height / 2;
+      await page.mouse.move(source.x + 4, y);
+      await page.mouse.down();
+      await page.mouse.move(source.x + 24, y, { steps: 2 });
+      const member = (await page.getByTestId(`tab-row-${memberId}`).boundingBox())!;
+      for (let x = member.x + member.width + 60; x > 240; x -= 10) {
+        await page.mouse.move(x, y);
+        if (await group.locator('[data-reorder-placeholder]').count() > 0) return;
+      }
+    };
+    await dragUntilGroupPlaceholder(b, a);
     await expect(group.locator('[data-reorder-placeholder]')).toHaveCount(1);
     await page.mouse.up();
     await expect(group.locator(`[data-testid="tab-row-${b}"]`)).toHaveAttribute('data-tab-group', /.+/);
 
     // 组内换序：a 拖到组内 b 上，空位同样在组内出现
-    await startDragRow(page, `tab-row-${a}`, `tab-row-${b}`, 0.85);
+    await dragUntilGroupPlaceholder(a, b);
     await expect(group.locator('[data-reorder-placeholder]')).toHaveCount(1);
     await page.mouse.up();
 

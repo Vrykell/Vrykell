@@ -4,6 +4,7 @@ import { setupTauriMock, emitAcpSession, acpUpdate, acpCalls } from './tauri-moc
 const current = (page: Page) => page.locator('[data-testid="harness-page"]:visible');
 async function connect(page: Page) {
   await page.getByTestId('workspace-area-ai').click();
+  await page.getByTestId('harness-add-session').click();
   await page.getByTestId('acp-launcher-Fake ACP').click();
   await expect(current(page).getByTestId('harness-send')).toBeVisible();
 }
@@ -105,6 +106,7 @@ test('asks another conversation even after a matching command shape was approved
 
 test('keeps failed server edits, saves argument boundaries and persists before leaving settings', async ({ page }) => {
   await page.getByTestId('workspace-area-ai').click();
+  await page.getByTestId('harness-add-session').click();
   await expect(page.getByTestId('acp-launcher-Fake ACP')).toBeVisible();
   await page.evaluate(() => {
     const runtime = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__;

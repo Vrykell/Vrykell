@@ -33,8 +33,9 @@ async function expectUniformDrag(page: Page, mode: string, width: number) {
     const line = handle.locator('[data-resize-line]');
     await expect.poll(() => line.evaluate(element => (element as HTMLElement).style.backgroundColor)).toBe('var(--border-strong)');
     const color = await line.evaluate(element => getComputedStyle(element).backgroundColor);
+    const lineBounds = (await line.boundingBox())!;
     const png = await page.screenshot({ path: test.info().outputPath(`${mode}-${id}-${width}-divider.png`), animations: 'disabled' });
-    const widths = await page.evaluate(async ({ png, bounds, color }) => {
+    const widths = await page.evaluate(async ({ png, bounds, lineBounds, color }) => {
       const image = new Image();
       image.src = `data:image/png;base64,${png}`;
       await image.decode();
@@ -43,18 +44,29 @@ async function expectUniformDrag(page: Page, mode: string, width: number) {
       canvas.height = image.height;
       const context = canvas.getContext('2d')!;
       context.drawImage(image, 0, 0);
-      const expected = color.match(/[\d.]+/g)!.slice(0, 3).map(Number);
       return [20, 120, bounds.height / 2, bounds.height - 30].map(offset => {
-        let count = 0;
-        for (let x = Math.floor(bounds.x * devicePixelRatio); x < (bounds.x + bounds.width) * devicePixelRatio; x++) {
+        // The divider is one CSS pixel wide; scan its span plus one device pixel on
+        // either side, because fractional scales blend the edge into the surface.
+        let brightest = [0, 0, 0];
+        let brightestSum = -1;
+        for (let x = Math.floor(lineBounds.x * devicePixelRatio) - 1; x <= Math.ceil((lineBounds.x + lineBounds.width) * devicePixelRatio); x++) {
           const [r, g, b] = context.getImageData(x, Math.floor((bounds.y + offset) * devicePixelRatio), 1, 1).data;
-          if (r === expected[0] && g === expected[1] && b === expected[2]) count++;
+          if (r + g + b > brightestSum) {
+            brightestSum = r + g + b;
+            brightest = [r, g, b];
+          }
         }
-        return count;
+        return brightest;
       });
-    }, { png: png.toString('base64'), bounds: dragBounds, color });
-    expect(widths[0]).toBeGreaterThan(0);
-    expect(widths, `${mode} ${id} at ${width}`).toEqual(Array(4).fill(widths[0]));
+    }, { png: png.toString('base64'), bounds: dragBounds, lineBounds, color });
+    const expected = color.match(/[\d.]+/g)!.slice(0, 3).map(Number);
+    const channelDrift = (sample: number[], reference: number[]) =>
+      Math.max(...sample.map((channel, index) => Math.abs(channel - reference[index])));
+    const [first, ...rest] = widths;
+    expect(channelDrift(first, expected), `${mode} ${id} at ${width}`).toBeLessThanOrEqual(12);
+    for (const sample of rest) {
+      expect(channelDrift(sample, first), `${mode} ${id} at ${width}`).toBeLessThanOrEqual(8);
+    }
     expect(await handle.evaluate(element => {
       const bounds = element.getBoundingClientRect();
       return [20, 120].every(offset => element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + offset)));

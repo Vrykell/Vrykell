@@ -59,7 +59,7 @@ for (const theme of ['dark', 'light'] as const) {
 
     if (!await page.locator('[data-chat-composer]').isVisible()) await page.locator('[data-dock-btn="chat"]').click();
     await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
-    const aiCard = page.getByTestId('ai-history-page').locator('.history-group-card').first();
+    const aiCard = page.getByTestId('unified-history-page').locator('.history-group-card').first();
     await expect(aiCard).toHaveCSS('border-top-width', '0px');
     expect(await aiCard.evaluate(element => getComputedStyle(element).boxShadow)).toBe('none');
     await aiCard.getByRole('button', { name: '分组操作' }).click();

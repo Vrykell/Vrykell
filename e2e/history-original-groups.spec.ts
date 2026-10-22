@@ -1,15 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
 import { ensureTabsOpen, setupTauriMock } from './tauri-mock';
+import { fillHistorySearch } from './history-search';
 
 async function openHistory(page: Page) {
   await ensureTabsOpen(page);
   await page.getByTestId('tab-history-btn').click();
-  await expect(page.getByTestId('session-history-page')).toBeVisible();
+  await expect(page.getByTestId('unified-history-page')).toBeVisible();
 }
 
 async function classify(page: Page, name: string) {
-  await page.getByTestId('session-history-group-by').click();
-  await page.getByTestId('session-group-menu').getByRole('button', { name, exact: true }).click();
+  await page.getByTestId('unified-history-group-by').click();
+  await page.getByTestId('unified-history-group-menu').getByRole('button', { name, exact: true }).click();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -24,7 +25,7 @@ test('original groups remain intact across classifications, filters and persiste
   await expect(card.locator('.history-row')).toHaveCount(3);
   await classify(page, '工作目录');
   await expect(card.locator('.history-group-subtitle')).toHaveText('原标签组 · 多个工作目录');
-  await page.getByTestId('session-filter-input').fill('Backend');
+  await fillHistorySearch(page, 'unified-history-search', 'Backend');
   await expect(card.locator('.history-row')).toHaveCount(1);
   await expect(card.locator('.history-group-count')).toHaveText('1 / 3 个会话');
   await expect(card.getByRole('button', { name: '恢复匹配项', exact: true })).toHaveCount(0);
@@ -37,7 +38,7 @@ test('original groups remain intact across classifications, filters and persiste
   await name.fill('Project Aurora');
   await name.press('Enter');
   await expect(card.getByRole('heading', { name: 'Project Aurora' })).toBeVisible();
-  await page.getByTestId('session-filter-input').fill('Aurora');
+  await fillHistorySearch(page, 'unified-history-search', 'Aurora');
   await expect(card.locator('.history-row')).toHaveCount(3);
   await card.getByRole('button', { name: '分组操作' }).click();
   await page.getByRole('menuitem', { name: '置顶分组', exact: true }).click();
@@ -49,7 +50,7 @@ test('original groups remain intact across classifications, filters and persiste
 
 test('filtered and whole-group restores retain original membership and order after closing each tab', async ({ page }, testInfo) => {
   const card = page.getByTestId('history-group-card-source:archived-group');
-  await page.getByTestId('session-filter-input').fill('Backend');
+  await fillHistorySearch(page, 'unified-history-search', 'Backend');
   await card.getByRole('button', { name: '分组操作' }).click();
   await page.getByRole('menuitem', { name: '恢复匹配项', exact: true }).click();
   await ensureTabsOpen(page);
@@ -57,7 +58,7 @@ test('filtered and whole-group restores retain original membership and order aft
   await expect(page.getByTestId('tab-row-hist-group-1')).toHaveCount(0);
   await expect(page.getByTestId('tab-row-hist-group-3')).toHaveCount(0);
   await openHistory(page);
-  await page.getByTestId('session-filter-input').fill('Frontend');
+  await fillHistorySearch(page, 'unified-history-search', 'Frontend');
   await expect(card.locator('.history-group-count')).toHaveText('1 / 2 个会话');
   await card.getByRole('button', { name: '分组操作' }).click();
   await page.getByRole('menuitem', { name: '恢复原组全部 2 个会话' }).click();
@@ -71,7 +72,7 @@ test('filtered and whole-group restores retain original membership and order aft
     await page.getByTestId(`tab-close-${id}`).click();
   }
   await openHistory(page);
-  await page.getByTestId('session-filter-input').fill('');
+  await fillHistorySearch(page, 'unified-history-search', '');
   await expect(card.locator('.history-row')).toHaveCount(3);
   await expect(card.getByRole('heading', { name: '已归档分组' })).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('original-group-after-individual-close.png'), animations: 'disabled' });

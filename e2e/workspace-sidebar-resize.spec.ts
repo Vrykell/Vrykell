@@ -85,7 +85,7 @@ test('a full terminal grid can open navigation as a temporary overlay without re
   await expect(input).toHaveValue('retain the terminal draft');
   await page.getByTestId('workspace-sidebar-expand').click();
   await page.getByTestId('workspace-area-code').click();
-  await expect(page.getByTestId('code-workspace-empty')).toBeVisible();
+  await expect(page.getByTestId('code-start-page')).toBeVisible();
   await expect(sidebar).toBeHidden();
   await page.getByTestId('workspace-sidebar-expand').click();
   await expect(sidebar).toBeVisible();

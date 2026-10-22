@@ -119,6 +119,58 @@ test('a toolbar drag reserves a stable shared insertion gap before saving', asyn
   await expect(page.locator('[data-dock-placeholder]')).toHaveCount(0);
 });
 
+test('crossing sides previews the real panel surface and moving a left panel back keeps it usable', async ({ page }, info) => {
+  await page.evaluate(async () => {
+    const { useDockStore } = await import('/src/features/workspace/stores/dock.ts');
+    useDockStore.getState().moveButton('files', 'left');
+    useDockStore.getState().openPanel('files');
+  });
+  // The left dock shows one panel with its own heading and no button row.
+  const leftPanel = page.locator('.workspace-side-panel[data-side="left"][data-visible="true"]');
+  await expect(leftPanel).toBeVisible();
+  await expect(page.locator('[data-dock-zone="left"] [data-dock-btn]')).toHaveCount(0);
+  await expect(page.getByTestId('panel-drag-handle-files')).toBeVisible();
+
+  // Dragging the left panel's heading back to the right dock previews the real right surface.
+  const heading = (await page.getByTestId('panel-drag-handle-files').boundingBox())!;
+  const rightTarget = (await button(page, 'command-history').boundingBox())!;
+  await page.mouse.move(heading.x + 24, heading.y + heading.height / 2); await page.mouse.down();
+  await page.mouse.move(rightTarget.x + rightTarget.width / 2, rightTarget.y + rightTarget.height / 2, { steps: 8 });
+  const preview = page.getByTestId('panel-drop-preview');
+  await expect(preview).toHaveAttribute('data-side', 'right');
+  const previewBox = (await preview.boundingBox())!;
+  const bodyBox = (await page.locator('.workspace-body').boundingBox())!;
+  expect(previewBox.y).toBeGreaterThanOrEqual(bodyBox.y);
+  await expect(page.locator('[data-dock-zone="right"] [data-dock-placeholder]')).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath('left-to-right-panel-preview.png'), animations: 'disabled' });
+  await page.mouse.up();
+  await expect(page.locator('.workspace-side-panel[data-side="right"][data-visible="true"]').getByText('notes.txt')).toBeVisible();
+});
+
+test('workspace navigation rows reorder vertically and retain their order', async ({ page }) => {
+  const source = (await page.getByTestId('workspace-area-ssh').boundingBox())!;
+  const target = (await page.getByTestId('workspace-area-terminal').boundingBox())!;
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(target.x + target.width / 2, target.y + 1, { steps: 8 });
+  await expect(page.locator('[data-reorder-preview]')).toBeVisible();
+  await page.mouse.up();
+  const order = () => page.locator('[data-testid^="workspace-area-"]').evaluateAll(rows =>
+    rows.map(row => row.getAttribute('data-testid')?.replace('workspace-area-', '')));
+  await expect.poll(order).toEqual(['ssh', 'terminal', 'code', 'ai']);
+  await page.reload();
+  await expect.poll(order).toEqual(['ssh', 'terminal', 'code', 'ai']);
+
+  // Dropping past the last row, in the empty sidebar area below the list, appends the row.
+  const terminal = (await page.getByTestId('workspace-area-terminal').boundingBox())!;
+  const last = (await page.getByTestId('workspace-area-ai').boundingBox())!;
+  await page.mouse.move(terminal.x + terminal.width / 2, terminal.y + terminal.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(last.x + last.width / 2, last.y + last.height + 40, { steps: 10 });
+  await page.mouse.up();
+  await expect.poll(order).toEqual(['ssh', 'code', 'ai', 'terminal']);
+});
+
 test('panel headings retain their appearance and offer the left middle and right edge', async ({ page }, info) => {
   await button(page, 'files').click();
   const heading = page.getByTestId('panel-drag-handle-files');

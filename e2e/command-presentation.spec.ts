@@ -22,7 +22,7 @@ test('command coloring is optional, persists and leaves native input editing int
   await expect(overlay.locator('[data-kind="variable"]')).toHaveText(['LANG=zh_CN', '$HOME']);
   await expect(overlay.locator('[data-kind="path"]')).toHaveText('./配置.json');
   await expect(overlay.locator('[data-kind="command"]').first()).toHaveCSS('color', 'rgb(48, 209, 88)');
-  await expect(overlay.locator('[data-kind="argument"]').first()).toHaveCSS('color', 'rgb(64, 156, 255)');
+  await expect(overlay.locator('[data-kind="argument"]').first()).toHaveCSS('color', 'rgb(68, 160, 255)');
   await expect(overlay.locator('[data-kind="flag"]').first()).toHaveCSS('color', 'rgb(50, 191, 255)');
   await expect(overlay.locator('[data-kind="number"]').first()).toHaveCSS('color', 'rgb(245, 196, 0)');
   await expect(overlay.locator('[data-kind="variable"]').first()).toHaveCSS('color', 'rgb(224, 102, 255)');

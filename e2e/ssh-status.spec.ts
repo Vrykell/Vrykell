@@ -4,9 +4,15 @@ import { setupTauriMock, ptyWrites, emitPtyOutput } from './tauri-mock';
 async function expectDockedStatus(page: Page) {
   const panel = page.getByTestId('ssh-status-panel');
   const pane = page.locator('.terminal-pane:visible').last();
+  // The terminal and the docked panel reflow after the status surface mounts; wait for the
+  // final geometry instead of sampling a transitional frame.
+  await expect.poll(async () => {
+    const content = (await pane.locator('.ssh-pane-content').boundingBox())!;
+    const status = (await panel.boundingBox())!;
+    return content.x + content.width <= status.x + 1;
+  }).toBe(true);
   const content = (await pane.locator('.ssh-pane-content').boundingBox())!;
   const status = (await panel.boundingBox())!;
-  expect(content.x + content.width).toBeLessThanOrEqual(status.x + 1);
   expect(content.width).toBeGreaterThanOrEqual(320);
   expect(status.y).toBeCloseTo((await page.locator('.workspace-titlebar').boundingBox())!.y + (await page.locator('.workspace-titlebar').boundingBox())!.height, 0);
   expect(await pane.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);

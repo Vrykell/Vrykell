@@ -3,6 +3,7 @@ import { setupTauriMock } from './tauri-mock';
 
 for (const direction of ['left', 'right'] as const) test(`unequal terminal tabs exchange by their bounds toward the ${direction}`, async ({ page }, info) => {
   await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   const ids = await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
     const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
@@ -31,7 +32,7 @@ for (const direction of ['left', 'right'] as const) test(`unequal terminal tabs 
     .toEqual(direction === 'right' ? [ids[0], ids[2], ids[1]] : [ids[1], ids[0], ids[2]]);
 });
 
-test('group dragging measures the complete neighboring card and carries its members', async ({ page }, info) => {
+test('group dragging shows one folded preview and moves the whole group', async ({ page }, info) => {
   await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
   await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
@@ -51,8 +52,8 @@ test('group dragging measures the complete neighboring card and carries its memb
   await page.mouse.move(source.x + 20, source.y + 16); await page.mouse.down();
   await page.mouse.move(source.x + 20 + target.width / 2 + 16, source.y + 16, { steps: 8 });
   const preview = page.locator('[data-reorder-preview="item"]');
-  await expect(preview).toContainText('A much longer middle terminal title');
-  expect((await preview.boundingBox())!.width).toBeCloseTo(source.width, 0);
+  await expect(preview).toContainText('B');
+  expect((await preview.boundingBox())!.width).toBeLessThan(source.width);
   await page.screenshot({ path: info.outputPath('whole-group-bounds.png'), animations: 'disabled' });
   await page.mouse.up();
   expect(await strip.locator('[data-group-id]').evaluateAll(elements => elements.map(element => element.getAttribute('data-group-id')))).toEqual(['a', 'c', 'b']);

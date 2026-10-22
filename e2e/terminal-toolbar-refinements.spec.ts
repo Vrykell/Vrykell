@@ -26,7 +26,7 @@ for (const theme of ['dark', 'light']) test(`terminal split creation and group m
   await expect(name).toBeFocused();
   await name.fill('Production'); await name.press('Enter');
   const header = page.getByRole('button', { name: 'Production', exact: true });
-  await expect(header).toHaveAttribute('data-group-card', 'true');
+  await expect(header.locator('xpath=../..')).toHaveAttribute('data-group-card', 'true');
   await header.dblclick();
   await expect(header.locator('input')).toHaveCount(0);
   await expect(page.getByRole('textbox', { name: '分组名称' })).toHaveCount(0);

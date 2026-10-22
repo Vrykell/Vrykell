@@ -29,18 +29,12 @@ test.describe('标签页管理侧栏', () => {
     await expect(page.locator('[data-testid^="tab-row-"]')).toHaveCount(2);
   });
 
-  test('点击新建直接弹出类型选择弹窗、支持搜索过滤并创建', async ({ page }) => {
+  test('点击新建直接弹出紧凑的类型选择面板并创建', async ({ page }) => {
     await page.locator('[data-testid="tab-new-btn"]').click();
     // 无中间菜单，直接弹出类型选择弹窗
     await expect(page.getByText('新建标签页')).toBeVisible();
     await expect(page.getByText('Zsh', { exact: true })).toBeVisible();
     await expect(page.getByText('Bash', { exact: true })).toBeVisible();
-
-    // 搜索过滤
-    await page.getByRole('button', { name: '更多配置文件…', exact: true }).click();
-    await page.locator('input[placeholder="搜索标签页类型…"]').fill('bash');
-    await expect(page.getByText('Bash', { exact: true })).toBeVisible();
-    await expect(page.getByText('Zsh', { exact: true })).toHaveCount(0);
 
     // 创建 bash 标签
     await page.getByText('Bash', { exact: true }).click();
@@ -49,11 +43,11 @@ test.describe('标签页管理侧栏', () => {
     await expect(page.getByText('新建标签页')).toHaveCount(0);
   });
 
-  test('历史按钮新建会话历史查看标签页', async ({ page }) => {
+  test('历史按钮打开统一的会话历史工作区', async ({ page }) => {
     await page.locator('[data-testid="tab-history-btn"]').click();
     // 主区域渲染会话历史视图（仅历史会话，mock 返回 1 个历史 + 1 个活跃）
     await expect(page.getByText('旧的调试会话')).toBeVisible();
-    await expect(page.getByTestId('session-history-page').locator('.history-count')).toHaveText('· 1 个会话');
+    await expect(page.getByTestId('unified-history-page').locator('.history-count')).toContainText('1 条记录');
   });
 
   test('标签右键菜单靠近窗口边缘时仍完整显示', async ({ page }) => {

@@ -15,7 +15,7 @@ test('an unavailable side dock keeps the same conversation visible in the main w
   await expect(page.getByRole('status')).toContainText('空间不足');
 });
 
-test('main utility pages and docked conversations keep separate shortcut scopes', async ({ page }) => {
+test('AI utility pages become singleton tabs while docked conversations keep their draft', async ({ page }) => {
   await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.getByTestId('workspace-area-ai').click();
@@ -25,21 +25,19 @@ test('main utility pages and docked conversations keep separate shortcut scopes'
   const side = page.getByTestId('ai-surface-side');
   await side.getByRole('button', { name: '会话设置', exact: true }).click();
   await page.getByRole('region', { name: '会话设置' }).getByTestId('chat-usage-entry').click();
-  await expect(page.getByTestId('usage-page')).toBeVisible();
-  await side.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
-  await expect(page.getByTestId('ai-history-page')).toBeVisible();
-  const strip = page.getByTestId('workspace-instance-bar');
-  await strip.getByRole('tab').last().click();
-  await page.keyboard.press('Control+2');
-  await expect(page.getByTestId('usage-page')).toBeVisible();
-  await page.keyboard.press('Control+3');
-  await expect(page.getByTestId('ai-history-page')).toBeVisible();
-  await page.keyboard.press('Control+w'); await page.keyboard.press('Control+w');
-  await expect(page.getByText('此对话已在侧边面板打开。', { exact: true })).toBeVisible();
-  await expect(side.getByRole('tab')).toHaveCount(0);
-  await expect(side.locator('[data-chat-composer]')).toHaveValue('keep the docked draft');
-  await page.getByTestId('ai-surface-main').getByRole('button', { name: '移回 AI 工作区', exact: true }).click();
-  await expect(page.getByTestId('ai-surface-main').locator('[data-chat-composer]')).toHaveValue('keep the docked draft');
+  // Usage is a singleton tab in the AI strip, so the workspace returns to main and the panel closes.
+  await expect(page.locator('[data-testid="usage-page"]:visible')).toBeVisible();
+  await expect(page.locator('[data-tab-kind="usage"]')).toHaveCount(1);
+  const main = page.getByTestId('ai-surface-main');
+  const strip = page.locator('[data-reorder-list="harness-sessions"]');
+  await expect(strip.locator('[data-reorder-item]')).toHaveCount(2);
+  // Selecting the conversation tab brings the docked conversation back with its draft.
+  await strip.locator('[data-reorder-item]:not([data-reorder-item^="page:"])').first().click();
+  await expect(main.locator('[data-chat-composer]')).toHaveValue('keep the docked draft');
+  // The AI history entry adds one more singleton page tab and renders the history page.
+  await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
+  await expect(page.locator('[data-testid="unified-history-page"]:visible')).toBeVisible();
+  await expect(strip.locator('[data-reorder-item^="page:"]')).toHaveCount(2);
 });
 
 test('hidden terminal splits do not reserve the resource or code workspace width', async ({ page }) => {
@@ -60,5 +58,5 @@ test('hidden terminal splits do not reserve the resource or code workspace width
   await page.getByTestId('workspace-sidebar-expand').click();
   await page.getByTestId('workspace-area-code').click();
   expect((await panel.boundingBox())!.width).toBe(200);
-  await expect(page.getByTestId('code-workspace-empty')).toBeVisible();
+  await expect(page.getByTestId('code-start-page')).toBeVisible();
 });

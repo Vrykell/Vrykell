@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { mockAnthropic, paceLlmStream, setupTauriMock, ensureTabsOpen, ptyWrites, ensureChatSettingsOpen } from './tauri-mock';
+import { fillHistorySearch } from './history-search';
 
 async function boot(page: Page, reply = 'The build is fixed.') {
   await mockAnthropic(page, reply);
@@ -37,16 +38,18 @@ test('history owns separate drafts and messages and restores them after reload',
   await expect(composer).toHaveValue('');
   await composer.fill('Second draft');
   await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
-  await expect(page.getByTestId('ai-history-page')).toBeVisible();
-  await page.locator('.ai-history-list').getByText('Fix the build', { exact: true }).click();
+  const history = page.getByTestId('unified-history-page');
+  await expect(history).toBeVisible();
+  await history.locator('[data-history-kind="conversation"]').filter({ hasText: 'Fix the build' }).click();
   await expect(page.getByText('The build is fixed.', { exact: true })).toBeVisible();
   await expect(composer).toHaveValue('');
   await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
-  await page.locator('.ai-history-list').getByText('新对话', { exact: true }).click();
+  await history.locator('[data-history-kind="conversation"]').filter({ hasText: '新对话' }).click();
   await expect(composer).toHaveValue('Second draft');
   await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
-  await page.locator('.ai-history-list').getByText('Fix the build', { exact: true }).click();
+  await history.locator('[data-history-kind="conversation"]').filter({ hasText: 'Fix the build' }).click();
   await page.reload();
+  await page.locator('[data-dock-btn="chat"]').click();
   await expect(page.getByText('The build is fixed.', { exact: true })).toBeVisible();
 });
 
@@ -97,10 +100,10 @@ test('rename and delete manage conversation history independently of terminals',
   await expect(page.locator('.chat-conversation-title')).toHaveText('Build investigation');
   await page.getByRole('button', { name: '新对话', exact: true }).click();
   await page.getByRole('button', { name: 'AI 对话历史' }).click();
-  const row = page.locator('.ai-history-list [data-testid^="conversation-row-"]').filter({ hasText: 'Build investigation' });
-  await page.getByRole('button', { name: 'AI 对话历史' }).click();
+  const history = page.getByTestId('unified-history-page');
   await expect(page.locator('[data-tab-kind="ai-history"]')).toHaveCount(1);
-  await page.getByTestId('ai-history-search').fill('Build investigation');
+  const row = history.locator('[data-history-kind="conversation"]').filter({ hasText: 'Build investigation' });
+  await fillHistorySearch(page, 'unified-history-search', 'Build investigation');
   await expect(row).toBeVisible();
   await row.hover();
   await row.getByRole('button', { name: '更多操作' }).click();
@@ -112,7 +115,8 @@ test('rename and delete manage conversation history independently of terminals',
   await page.reload();
   if (!await page.getByRole('button', { name: 'AI 对话历史' }).isVisible()) await page.locator('[data-dock-btn="chat"]').click();
   await page.getByRole('button', { name: 'AI 对话历史' }).click();
-  await expect(page.locator('.ai-history-list').getByText('Build investigation')).toHaveCount(0);
+  await expect(page.getByTestId('unified-history-page').locator('[data-history-kind="conversation"]')
+    .filter({ hasText: 'Build investigation' })).toHaveCount(0);
 });
 
 test('command analysis stages a reference before sending and never changes terminal input', async ({ page }) => {
@@ -219,7 +223,7 @@ test('tool activity stays available within the plain conversation flow', async (
     radius: getComputedStyle(element).borderRadius,
     borderTop: getComputedStyle(element).borderTopStyle,
   }));
-  expect(presentation).toMatchObject({ radius: '14px', borderTop: 'solid' });
+  expect(presentation).toMatchObject({ radius: '8px', borderTop: 'solid' });
   expect(presentation.background).not.toBe('rgba(0, 0, 0, 0)');
   await expect(rows.first().locator('.ai-tool-label')).toHaveText('运行命令');
   await expect(rows.first().locator('.ai-tool-state')).toHaveText('退出码 0');

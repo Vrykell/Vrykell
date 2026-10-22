@@ -69,7 +69,7 @@ for (const theme of ['深色', '浅色']) {
     await page.locator('[data-tip="选择类型分裂"]').click();
     const newTab = page.getByRole('dialog', { name: '新建标签页' });
     await assertSurface(newTab, true);
-    await newTab.getByPlaceholder('搜索标签页类型…').press('Escape');
+    await newTab.press('Escape');
 
     await page.locator('[data-dock-btn="ssh"]').click();
     await page.getByTestId('ssh-new-btn').click();

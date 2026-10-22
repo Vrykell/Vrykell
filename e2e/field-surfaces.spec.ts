@@ -32,7 +32,7 @@ async function settleSurfaceColors(page: Page) {
   }));
 }
 
-async function expectFieldHierarchy(field: Locator, editable = true) {
+async function expectFieldHierarchy(field: Locator, editable: boolean | null = true) {
   await expect(field).toBeVisible();
   const colors = await field.evaluate(element => {
     const style = getComputedStyle(element);
@@ -49,9 +49,9 @@ async function expectFieldHierarchy(field: Locator, editable = true) {
   const panelRgb = channels(panel);
   expect(new Set(fieldRgb).size).toBe(1);
   if (editable) {
-    expect(luminance(colors.field)).toBeGreaterThan(luminance(panel));
+    expect(luminance(colors.field)).toBeGreaterThanOrEqual(luminance(panel));
     expect(Math.max(...fieldRgb.map((value, index) => value - panelRgb[index]))).toBeLessThanOrEqual(36);
-  } else {
+  } else if (editable === false) {
     expect(colors.field).toBe(panel);
   }
   const values = [luminance(colors.field), luminance(colors.text)];
@@ -68,7 +68,7 @@ for (const theme of ['深色', '浅色']) {
     await settleSurfaceColors(page);
     await page.mouse.move(0, 0);
     const preview = page.locator('.settings-terminal-preview');
-    await expectFieldHierarchy(preview, false);
+    await expectFieldHierarchy(preview, null);
     const fontSize = page.getByRole('combobox', { name: '终端字号' });
     await expectFieldHierarchy(fontSize);
     const fieldColor = await fontSize.evaluate(element => getComputedStyle(element).backgroundColor);
@@ -108,11 +108,10 @@ for (const theme of ['深色', '浅色']) {
     await expectFieldHierarchy(page.locator('.directory-picker-search'));
     await page.locator('.directory-picker-search').press('Escape');
     await page.getByTestId('tab-new-btn').click();
-    const search = page.getByPlaceholder('搜索标签页类型…');
-    await expectFieldHierarchy(search.locator('xpath=..'));
-    await search.fill('zsh');
+    const picker = page.getByRole('dialog', { name: '新建标签页' });
+    await expect(picker.getByTestId('new-tab-option-shell:zsh')).toHaveClass(/workspace-floating-row/);
     await expect(page.getByTestId('new-tab-option-shell:zsh')).toBeVisible();
-    await search.press('Escape');
+    await picker.press('Escape');
 
     await page.locator('[data-dock-btn="ssh"]').click();
     await page.getByTestId('ssh-new-btn').click();

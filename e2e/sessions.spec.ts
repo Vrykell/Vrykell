@@ -1,5 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, ptyWrites, ensureTabsOpen } from './tauri-mock';
+import { fillHistorySearch } from './history-search';
 
 async function openHistory(page: import('@playwright/test').Page) {
   await ensureTabsOpen(page);
@@ -23,20 +24,20 @@ test.describe('会话历史管理', () => {
     await openHistory(page);
     await expect(page.getByText('旧的调试会话')).toBeVisible();
     // 搜索过滤
-    await page.locator('[data-testid="session-filter-input"]').fill('不存在的会话');
+    await fillHistorySearch(page, 'unified-history-search', '不存在的会话');
     await expect(page.getByText('旧的调试会话')).toHaveCount(0);
-    await page.locator('[data-testid="session-filter-input"]').fill('');
+    await fillHistorySearch(page, 'unified-history-search', '');
     await expect(page.getByText('旧的调试会话')).toBeVisible();
     // 筛选菜单：选 SSH（历史会话是 local → 消失）
-    await page.locator('[data-testid="session-filter-btn"]').click();
-    const menu = page.locator('[data-testid="session-filter-menu"]');
+    await page.locator('[data-testid="unified-history-filter"]').click();
+    const menu = page.locator('[data-testid="unified-history-filter-menu"]');
     await menu.getByRole('button', { name: 'SSH' }).click();
     await expect(page.getByText('旧的调试会话')).toHaveCount(0);
     // Filter choices stay open until dismissed or their trigger is toggled.
-    await page.locator('[data-testid="session-filter-menu"]').getByRole('button', { name: '全部' }).first().click();
+    await menu.locator('[data-history-option-section="连接类型"]').getByRole('button', { name: '全部' }).click();
     await expect(page.getByText('旧的调试会话')).toBeVisible();
     // The selected filters survive a reload in the same application session.
-    await page.locator('[data-testid="session-filter-menu"]').getByRole('button', { name: 'SSH' }).click();
+    await page.locator('[data-testid="unified-history-filter-menu"]').getByRole('button', { name: 'SSH' }).click();
     await page.reload();
     // 幂等打开会话历史页（面板状态可能已被持久化，避免 toggle 关掉它）
     await expect(page.locator('[data-testid^="tab-row-"]').first()).toBeVisible();
@@ -51,8 +52,8 @@ test.describe('会话历史管理', () => {
   test('历史会话可删除', async ({ page }) => {
     await openHistory(page);
     await expect(page.getByText('旧的调试会话')).toBeVisible();
-    const record = page.getByTestId('history-session-hist-1');
-    const remove = page.getByTestId('session-menu-hist-1');
+    const record = page.getByTestId('unified-history-session:hist-1');
+    const remove = page.getByTestId('unified-history-menu-session:hist-1');
     const quickActions = record.locator('.history-row-quick-actions');
     await expect(remove).toHaveCSS('opacity', '0');
     await expect(quickActions).toHaveCSS('opacity', '0');
@@ -62,7 +63,7 @@ test.describe('会话历史管理', () => {
     await remove.click();
     await page.getByRole('menuitem', { name: '删除此会话', exact: true }).click();
     await expect(page.getByText('旧的调试会话')).toHaveCount(0);
-    await expect(page.getByText('暂无历史会话')).toBeVisible();
+    await expect(page.getByText('暂无历史记录')).toBeVisible();
   });
 
   test('恢复历史会话连带恢复命令块', async ({ page }) => {
@@ -79,7 +80,7 @@ test.describe('会话历史管理', () => {
 
   test('restoring one session from an archived group keeps it visible in the tab list', async ({ page }) => {
     await openHistory(page);
-    const historyRow = page.getByText('归档分组中的会话');
+    const historyRow = page.getByTestId('history-group-card-source:archived-group').getByText('归档分组中的会话');
     await expect(historyRow).toBeVisible();
     await historyRow.click();
 
