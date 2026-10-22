@@ -589,7 +589,8 @@ button.window-control-button {
 .chat-conversation-heading { display: flex; align-items: center; gap: 2px; padding: 8px 10px; flex-shrink: 0; min-width: 0; }
 .chat-conversation-title { flex: 1; min-width: 0; padding: 6px; border: 0; background: transparent; text-align: left; color: var(--text-primary); font-size: var(--fs-label); font-weight: var(--fw-semibold); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .chat-conversation-heading > [aria-expanded="true"] { background: var(--control-hover-bg); }
-.chat-conversation-settings { flex-shrink: 0; max-height: 40%; overflow: auto; margin: 0 10px 8px; padding: 8px; background: var(--hover); border-radius: var(--radius-inner); }
+.ai-conversation-toolbar { align-items: center; gap: 2px; }
+.chat-conversation-settings { width: min(300px, calc(100vw - 40px)); min-width: 0; padding: 4px; }
 .chat-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding: 4px; }
 .chat-setting-row > span { flex-shrink: 0; color: var(--text-muted); font-size: var(--fs-caption); }
 .chat-setting-row > .ui-select { flex: 0 1 65%; min-width: 0; font-size: var(--fs-caption); }

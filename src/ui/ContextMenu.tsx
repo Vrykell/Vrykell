@@ -2,7 +2,7 @@ import { Fragment, useEffect, useId, useLayoutEffect, useRef, useState, type Rea
 import { createPortal } from 'react-dom';
 import { menuGroup, orderMenuItems, type MenuGroup } from './menuGroups';
 import { MenuItem } from './UiBtn';
-import { useExclusiveMenu } from './hooks/useExclusiveMenu';
+import { hasOwnedListbox, useExclusiveMenu } from './hooks/useExclusiveMenu';
 import { useFloatingPanelPosition } from './hooks/useFloatingPanelPosition';
 import { t } from '@i18n';
 
@@ -37,6 +37,7 @@ export default function ContextMenu({ anchor, items, onClose, label = t('Action 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
+      if (hasOwnedListbox(tree.current)) return;
       event.preventDefault(); event.stopPropagation();
       if (path.length) closeLevel(); else { anchor.trigger?.focus(); (onCancel ?? onClose)(); }
     };
@@ -78,7 +79,8 @@ function MenuSurface({ anchor, submenuOf, label, focus, children, onClose, onBac
   return <div ref={ref} id={id} role="menu" aria-label={label} className="workspace-floating context-menu-surface"
     onContextMenu={event => { event.preventDefault(); event.stopPropagation(); }}
     onKeyDown={event => {
-      if (event.target instanceof Element && event.target.matches('input, textarea, [contenteditable="true"]')) { event.stopPropagation(); return; }
+      if (event.ctrlKey || event.metaKey) return;
+      if (event.target instanceof Element && event.target.matches('input, textarea, [contenteditable="true"], [role="combobox"]')) { event.stopPropagation(); return; }
       if (event.key === 'Enter' || event.key === ' ') { event.stopPropagation(); return; }
       if (event.key === 'Tab') { onClose(); return; }
       if (event.key === 'ArrowLeft' && onBack) { event.preventDefault(); event.stopPropagation(); onBack(); return; }

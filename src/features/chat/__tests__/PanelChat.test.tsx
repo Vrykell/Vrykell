@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { useState } from 'react';
 import { firstTerminalOf, useSessionStore } from '@features/workspace';
 import { leaf } from '@features/workspace/model/windowLayout';
 import { useTerminalStore } from '@features/terminal';
@@ -23,6 +24,40 @@ const chat = useChatStore.getState();
 const drafts = useComposerDrafts.getState();
 const paneId = 'chat-tab#0';
 const openSettings = () => fireEvent.click(screen.getByRole('button', { name: '会话设置' }));
+
+it('places main conversation actions in the toolbar and keeps settings floating without losing the draft', () => {
+  function Surface({ workspace }: { workspace: boolean }) {
+    const [toolbar, setToolbar] = useState<HTMLDivElement | null>(null);
+    return <><div data-testid="conversation-toolbar" ref={setToolbar} /><PanelChat workspace={workspace} toolbarTarget={toolbar} /></>;
+  }
+  const { rerender, container } = render(<Surface workspace />);
+  const toolbar = screen.getByTestId('conversation-toolbar');
+  expect(within(toolbar).getByRole('button', { name: 'AI 对话历史' })).toBeVisible();
+  expect(container.querySelector('.chat-conversation-heading button[aria-label="会话设置"]')).toBeNull();
+  const draft = screen.getByPlaceholderText('自然语言描述你想做什么…');
+  fireEvent.change(draft, { target: { value: 'Keep this draft' } });
+  openSettings();
+  const settings = screen.getByRole('region', { name: '会话设置' });
+  expect(container.contains(settings)).toBe(false);
+  const select = screen.getByRole('combobox', { name: '选择执行终端' });
+  expect(select).toHaveFocus();
+  fireEvent.keyDown(select, { key: 'ArrowDown' });
+  expect(screen.getByRole('listbox')).toBeVisible();
+  fireEvent.keyDown(select, { key: 'Escape' });
+  expect(screen.queryByRole('listbox')).toBeNull();
+  expect(settings).toBeVisible();
+  fireEvent.keyDown(select, { key: 'Escape' });
+  expect(screen.queryByRole('region', { name: '会话设置' })).toBeNull();
+  expect(within(toolbar).getByRole('button', { name: '会话设置' })).toHaveFocus();
+  rerender(<Surface workspace={false} />);
+  expect(screen.getByPlaceholderText('自然语言描述你想做什么…')).toBe(draft);
+  expect(draft).toHaveValue('Keep this draft');
+  expect(within(toolbar).queryByRole('button')).toBeNull();
+  expect(container.querySelector('.chat-conversation-heading button[aria-label="会话设置"]')).not.toBeNull();
+  openSettings(); fireEvent.pointerDown(draft);
+  expect(screen.queryByRole('region', { name: '会话设置' })).toBeNull();
+  expect(draft).toHaveValue('Keep this draft');
+});
 
 beforeEach(() => {
   useIconColorStore.setState({ colors: {} });

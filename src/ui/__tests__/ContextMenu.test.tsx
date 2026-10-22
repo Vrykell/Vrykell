@@ -2,8 +2,26 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import ContextMenu from '../ContextMenu';
+import Select from '../Select';
 
 describe('independent action menus', () => {
+  it('keeps a controlled select action inside its owning menu during pointer presses', () => {
+    const action = vi.fn();
+    function Example() {
+      const [open, setOpen] = useState(true);
+      return open && <ContextMenu anchor={{ x: 0, y: 0 }} onClose={() => setOpen(false)} items={[]}
+        header={<Select aria-label="Environment" value="discussion" options={[{ value: 'discussion', label: 'Discussion' }]} onChange={() => {}}
+          action={{ label: 'Create terminal', onSelect: action }} />} />;
+    }
+    render(<Example />);
+    fireEvent.click(screen.getByRole('combobox'));
+    const button = screen.getByRole('button', { name: 'Create terminal' });
+    fireEvent.pointerDown(button);
+    expect(screen.getByRole('menu')).toBeVisible();
+    fireEvent.click(button);
+    expect(action).toHaveBeenCalledOnce();
+    expect(screen.getByRole('menu')).toBeVisible();
+  });
   it('keeps header text editing keys local and distinguishes cancellation from committing dismissal', () => {
     const close = vi.fn(); const cancel = vi.fn();
     render(<ContextMenu anchor={{ x: 0, y: 0 }} header={<input aria-label="Group name" defaultValue="Work" />} onClose={close} onCancel={cancel}
@@ -13,6 +31,11 @@ describe('independent action menus', () => {
     expect(fireEvent.keyDown(input, { key: 'Home' })).toBe(true);
     expect(fireEvent.keyDown(input, { key: 'ArrowLeft' })).toBe(true);
     expect(fireEvent.keyDown(input, { key: 'Tab' })).toBe(true);
+    const shortcut = vi.fn();
+    window.addEventListener('keydown', shortcut);
+    fireEvent.keyDown(input, { key: 't', ctrlKey: true });
+    window.removeEventListener('keydown', shortcut);
+    expect(shortcut).toHaveBeenCalledOnce();
     expect(close).not.toHaveBeenCalled();
     fireEvent.keyDown(input, { key: 'Escape' });
     expect(cancel).toHaveBeenCalledOnce();

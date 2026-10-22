@@ -8,7 +8,7 @@ import { useWorkspaceStore } from '../stores/workspace';
 import { orderedWorkspaceIds, useWorkspaceNavigation, workspaceAreaForKind, type WorkspaceArea } from '../stores/navigation';
 
 export function sideAiHasFocus(element: Element | null = document.activeElement): boolean {
-  return useWorkspaceNavigation.getState().aiPlacement === 'side' && !!element?.closest('[data-testid="ai-surface-side"]');
+  return useWorkspaceNavigation.getState().aiPlacement === 'side' && !!element?.closest('[data-testid="ai-surface-side"], [data-workspace-focus="ai"]');
 }
 
 export function focusedWorkspaceArea(): WorkspaceArea {

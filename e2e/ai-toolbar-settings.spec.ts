@@ -1,0 +1,53 @@
+import { expect, test } from '@playwright/test';
+import { setupTauriMock } from './tauri-mock';
+
+for (const theme of ['dark', 'light']) test(`conversation toolbar and floating settings retain scope and content in ${theme}`, async ({ page }, info) => {
+  await setupTauriMock(page, { schedulesSeed: [] });
+  await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
+  await page.goto('/');
+  await page.getByTestId('workspace-area-ai').click();
+  await page.getByTestId('ai-new-conversation').click();
+  const strip = page.getByTestId('workspace-instance-bar');
+  const main = page.getByTestId('ai-surface-main');
+  const draft = page.locator('[data-chat-composer]:visible');
+  await draft.fill('Keep this question');
+  await draft.evaluate(element => { (window as unknown as { savedDraft: Element }).savedDraft = element; });
+  await expect(strip.getByRole('button', { name: 'AI 对话历史', exact: true })).toBeVisible();
+  await expect(main.locator('.chat-conversation-heading').getByRole('button', { name: '会话设置', exact: true })).toHaveCount(0);
+  for (const width of [1240, 760]) {
+    await page.setViewportSize({ width, height: 800 });
+    if (width <= 900) await expect(page.getByTestId('workspace-sidebar')).toBeHidden();
+    const before = (await draft.boundingBox())!;
+    const settingsTrigger = strip.getByRole('button', { name: '会话设置', exact: true });
+    await settingsTrigger.click();
+    const settings = page.getByRole('region', { name: '会话设置' });
+    await expect(settings).toBeVisible();
+    const bounds = (await settings.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(0);
+    expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+    expect(await draft.boundingBox()).toEqual(before);
+    const target = settings.getByRole('combobox', { name: '选择执行终端' });
+    await target.press('ArrowDown');
+    await expect(page.getByRole('listbox', { name: '选择执行终端' })).toBeVisible();
+    await target.press('Escape');
+    await expect(page.getByRole('listbox', { name: '选择执行终端' })).toHaveCount(0);
+    await expect(settings).toBeVisible();
+    await page.screenshot({ path: info.outputPath(`ai-settings-${theme}-${width}.png`), animations: 'disabled' });
+    await target.press('Escape');
+    await expect(settings).toHaveCount(0);
+    await expect(settingsTrigger).toBeFocused();
+    await expect(draft).toHaveValue('Keep this question');
+  }
+  await page.setViewportSize({ width: 1240, height: 800 });
+  await page.getByTestId('ai-relocate').click();
+  const side = page.getByTestId('ai-surface-side');
+  await expect(side.getByRole('button', { name: '会话设置', exact: true })).toBeVisible();
+  await side.getByRole('button', { name: '会话设置', exact: true }).click();
+  const target = page.getByRole('region', { name: '会话设置' }).getByRole('combobox');
+  await expect(target).toBeFocused();
+  await target.press('Control+t');
+  await expect(page.locator('[data-tab-kind="session"]')).toHaveCount(1);
+  await expect(draft).toHaveValue('');
+  await expect(page.getByTestId('workspace-area-terminal')).toHaveAttribute('aria-current', 'page');
+  expect(await draft.evaluate(element => element === (window as unknown as { savedDraft: Element }).savedDraft)).toBe(true);
+});

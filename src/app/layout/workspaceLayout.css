@@ -21,7 +21,7 @@ button.workspace-sidebar-toggle.icon-button:focus-visible { outline: 1px solid v
 .workspace-title > .workspace-sidebar-toggle { flex-shrink: 0; margin-right: 8px; }
 .workspace-area-navigation { padding: 12px 6px 0; display: flex; flex-direction: column; gap: 0; }
 .workspace-sidebar .sidebar-row { cursor: pointer; }
-.workspace-area-navigation .sidebar-row[data-active="true"] .sidebar-row-icon svg, .workspace-sidebar-footer .sidebar-row[data-active="true"] .sidebar-row-icon svg { color: var(--group-blue); }
+.workspace-area-navigation .sidebar-row[data-active="true"] .sidebar-row-icon, .workspace-sidebar-footer .sidebar-row[data-active="true"] .sidebar-row-icon { color: var(--group-blue); }
 .workspace-side-panel[data-side="right"], .workspace-ssh-status-slot { --sidebar-bg: var(--chrome-bg); }
 .workspace-sidebar .sidebar-row:focus-visible > .sidebar-row-content { background: var(--hover); }
 .workspace-sidebar-tools { margin-top: auto; min-height: 0; padding-top: 20px; }

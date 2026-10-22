@@ -8,6 +8,11 @@ for (const theme of ['深色', '浅色']) test(`workspace colors and model contr
   await page.getByRole('button', { name: '关闭设置', exact: true }).click();
   const selected = page.getByTestId('workspace-area-terminal').locator('.sidebar-row-icon svg');
   const color = await selected.evaluate(element => getComputedStyle(element).color);
+  const expectedIconColor = await page.evaluate(() => {
+    const element = document.createElement('span'); element.style.color = 'var(--group-blue)'; document.body.append(element);
+    const color = getComputedStyle(element).color; element.remove(); return color;
+  });
+  await expect(selected).toHaveCSS('color', expectedIconColor);
   expect(color).not.toBe(await page.getByTestId('workspace-area-code').locator('.sidebar-row-icon svg').evaluate(element => getComputedStyle(element).color));
   const [red, , blue] = color.match(/\d+/g)!.map(Number);
   expect(blue).toBeGreaterThan(red!);
@@ -32,6 +37,7 @@ for (const theme of ['深色', '浅色']) test(`workspace colors and model contr
   }
   await page.setViewportSize({ width: 1240, height: 800 });
   await gotoSetting(page, '模型配置');
+  await expect(page.getByTestId('workspace-settings').locator('.sidebar-row-icon svg')).toHaveCSS('color', expectedIconColor);
   const actions = ['model-settings', 'model-remove', 'model-add', 'model-sync'];
   for (const id of actions) {
     const button = page.getByTestId(id).first();

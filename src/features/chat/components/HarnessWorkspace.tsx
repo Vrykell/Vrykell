@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
 import FolderTabs from '@ui/FolderTabs';
@@ -17,7 +17,7 @@ import { useHarnessStore } from '../stores/harness';
 import { useHarnessWorkspace } from '../stores/harnessWorkspace';
 import { useComposerDrafts } from '../stores/composerDrafts';
 import HarnessView from './HarnessView';
-import NativeConversationSurface from './NativeConversationSurface';
+import NativeConversationSurface, { AiSurfaceContext } from './NativeConversationSurface';
 import { useChatStore } from '../stores/chat';
 import { useAiWorkspace } from '../stores/aiWorkspace';
 import { orderedWorkspaceIds, useWorkspaceNavigation } from '@features/workspace';
@@ -27,6 +27,7 @@ import { closeAiWorkspaceSession } from '../services/aiWorkspace';
 
 /** One workspace page hosts independent sessions through the shared connected tabs. */
 export default function HarnessWorkspace({ active, headerActive = active }: { active: boolean; headerActive?: boolean }) {
+  const surface = useContext(AiSurfaceContext);
   const { connections, selected: harnessSelected } = useHarnessWorkspace();
   const { nativeTabs, selected, order } = useAiWorkspace();
   const conversations = useChatStore(state => state.conversations);
@@ -120,6 +121,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
         { label: t('Usage statistics'), onClick: () => useSessionStore.getState().openUsageTab() },
         ...(selected.startsWith('chat:') ? [{ label: t('Dock AI to side'), onClick: relocate }] : []),
       ]} toolbar={<>
+        <div ref={surface?.toolbar} className="ai-conversation-toolbar" style={{ display: placement === 'main' && selected.startsWith('chat:') && activePage?.kind === 'harness' ? 'flex' : 'none' }} />
         <IconButton compact data-testid="ai-new-conversation" aria-label={t('New conversation')} data-tip={t('New conversation')} onClick={() => void newConversation()}><Sparkles size={16} /></IconButton>
         <IconButton compact data-testid="harness-add-session" aria-label={t('Connect a server')} data-tip={t('Connect a server')} onClick={() => { useSessionStore.getState().openHarnessTab(); setPicker(true); }}><Plus size={16} /></IconButton>
         <span className="folder-action-secondary ai-secondary-actions">

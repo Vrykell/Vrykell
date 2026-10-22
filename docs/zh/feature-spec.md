@@ -284,7 +284,7 @@
 | A10 | 工具与停止 | 命令块或 POSIX shell 私有标记确认执行结束；静止输出仍标记未确认，并拒绝并发排队命令；空按键配合正数 wait_ms 只等待不输入；块模式读取当前命令输出 | commandExecution.test.ts、commandCompletion.test.ts、runCommand.test.ts 与 terminal.test.ts |
 | A11 | 后台任务 | 定时任务使用独立后台对话，不改当前对话；任务运行时可跳转查看 | conversations.test.ts |
 | A12 | 保存失败 | 显示统一错误块并保留内存内容，提供重试保存 | conversations.test.ts |
-| A13 | 输入区布局 | 顶部保留标题、历史和新建，滑杆按钮展开终端设置。AI 输入框的基础高度与原有终端输入框一致，保留标题行按键提示，文件、图片、引用位于文本框上方。单行底栏左侧为附件和合并对话/审批，右侧为模型及普通尺寸的蓝色圆形发送/停止。窄面板保留全部入口，不换行、不产生横向溢出 | PanelChat.test.tsx、Select.test.tsx 与 chat-composer-layout.spec.ts 验证顺序、高度一致、草稿保留、深浅主题和宽窄菜单 |
+| A13 | 输入区布局 | AI 主工作区的历史和会话设置位于顶部工具栏，辅助对话保留紧凑标题操作。设置使用共享浮层菜单，不改变记录或输入框高度；嵌套执行终端下拉先于父菜单响应 Escape，焦点位于 AI 设置时快捷键仍归 AI。AI 输入框的基础高度与终端输入框一致，保留标题行按键提示，文件、图片、引用位于文本框上方。单行底栏左侧为附件和合并对话/审批，右侧为模型及普通尺寸的蓝色圆形发送/停止。窄面板保留全部入口，不换行、不产生横向溢出 | PanelChat、ContextMenu、工作区操作单测；ai-toolbar-settings.spec.ts 与 chat-composer-layout.spec.ts 验证工具栏位置、嵌套菜单、焦点归属、草稿与 DOM 保留、高度一致、深浅主题和宽窄布局 |
 | A14 | 终端最小宽度 | 每个横向终端保留 360px；侧栏或窗口缩放后限制分隔线和显示比例，且保留用户保存的比例。长终端和目录名称省略显示，窄布局使用操作图标，放大界面文字后底栏仍位于面板内 | windowLayout.test.ts、split.spec.ts 与 chat-composer-layout.spec.ts |
 | A15 | 终止生成 | 点「停止生成」后请求真正中断：模型请求取消、未完结工具落错误终态、已收到内容保留且不标错；界面随即回到可发送状态，不残留「生成中」（本地读取器必须立即结算） | `llmFetch.test.ts` 覆盖流中中止会结算本地流；`ai-chat-panel.spec.ts` 断言停止后发送键回来 |
 

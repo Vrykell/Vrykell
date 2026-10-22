@@ -1,10 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { t } from '@i18n';
 import { TextArea, TextInput } from '@ui/TextInput';
 import KeyHint from '@ui/KeyHint';
 import Select from '@ui/Select';
 import ErrorBox from '@ui/ErrorBox';
 import { IconButton } from '@ui/IconButton';
+import ContextMenu, { type MenuAnchor } from '@ui/ContextMenu';
 import { ArrowDown, ArrowUp, History, Plus, SlidersHorizontal, Sparkles, Square, Zap } from '@ui/icons';
 import { useAttachmentComposer } from '@features/agent';
 import { useSessionStore } from '@features/workspace';
@@ -31,7 +33,7 @@ import ChatComposerShell from './ChatComposerShell';
 const EMPTY_MESSAGES: ChatMessage[] = [];
 
 /** Conversation navigation, references and execution stay independent of terminal focus. */
-export default function PanelChat({ active = true, workspace = false }: { active?: boolean; workspace?: boolean }) {
+export default function PanelChat({ active = true, workspace = false, toolbarTarget }: { active?: boolean; workspace?: boolean; toolbarTarget?: HTMLElement | null }) {
   const activeId = useChatStore(state => state.activeConversationId);
   const conversations = useChatStore(state => state.conversations);
   const messages = useChatStore(state => state.byTab[activeId] ?? EMPTY_MESSAGES);
@@ -50,8 +52,8 @@ export default function PanelChat({ active = true, workspace = false }: { active
   const [renaming, setRenaming] = useState(false);
   const [newTabOpen, setNewTabOpen] = useState(false);
   const [title, setTitle] = useState('');
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const settingsTrigger = useRef<HTMLButtonElement>(null);
+  const [settingsMenu, setSettingsMenu] = useState<MenuAnchor | null>(null);
+  const settingsOpen = !!settingsMenu;
   const { scrollRef, following, pauseFollow, jumpToLatest, onScroll, onWheel, onTouchMove } = useTranscriptFollow(activeId, messages, active);
   const draft = useChatStore(state => state.draftTabId === activeId ? state.draft : '');
   const composerDraft = useComposerDrafts(state => state.byTab[activeId] ?? EMPTY_COMPOSER_DRAFT);
@@ -106,6 +108,7 @@ export default function PanelChat({ active = true, workspace = false }: { active
 
   useEffect(() => { void useChatStore.getState().loadConversations(); }, []);
   useEffect(() => { setRenaming(false); }, [activeId]);
+  useEffect(() => { setSettingsMenu(null); }, [active, workspace, activeId]);
   const submit = () => {
     if (!composer.canSend) return;
     jumpToLatest();
@@ -115,6 +118,17 @@ export default function PanelChat({ active = true, workspace = false }: { active
     useChatStore.getState().renameConversation(activeId, title);
     setRenaming(false);
   };
+  const actions = <>
+    <IconButton compact aria-label={t('AI conversation history')} data-tip={t('AI conversation history')}
+      onClick={() => useSessionStore.getState().openAiHistoryTab()}><History size={16} /></IconButton>
+    {!workspace && <IconButton compact aria-label={t('New conversation')} data-tip={t('New conversation')}
+      onClick={() => useChatStore.getState().createConversation()}><Plus size={16} /></IconButton>}
+    <IconButton compact aria-label={t('Conversation settings')} data-tip={t('Conversation settings')}
+      aria-haspopup="menu" aria-expanded={settingsOpen} aria-controls={settingsOpen ? 'chat-conversation-settings' : undefined} onClick={event => {
+        const trigger = event.currentTarget; const bounds = trigger.getBoundingClientRect();
+        setSettingsMenu(current => current ? null : { x: bounds.right - 320, y: bounds.bottom + 4, trigger });
+      }}><SlidersHorizontal size={16} /></IconButton>
+  </>;
   return <div ref={panelRef} className="ai-chat-panel">
     <div className="chat-conversation-heading">
       {renaming ? <TextInput autoFocus className="inline-rename-input" aria-label={t('Conversation title')} value={title} onChange={event => setTitle(event.target.value)}
@@ -126,34 +140,23 @@ export default function PanelChat({ active = true, workspace = false }: { active
           onClick={() => { setTitle(conversation?.title ?? ''); setRenaming(true); }} disabled={!conversation}>
           {conversation?.title ?? t('AI chat')}
         </button>}
-      <IconButton compact aria-label={t('AI conversation history')} data-tip={t('AI conversation history')}
-        onClick={() => useSessionStore.getState().openAiHistoryTab()}><History size={16} /></IconButton>
-      {!workspace && <IconButton compact aria-label={t('New conversation')} data-tip={t('New conversation')}
-        onClick={() => useChatStore.getState().createConversation()}><Plus size={16} /></IconButton>}
-      <IconButton ref={settingsTrigger} compact aria-label={t('Conversation settings')} data-tip={t('Conversation settings')}
-        aria-expanded={settingsOpen} aria-controls="chat-conversation-settings" onClick={() => setSettingsOpen(!settingsOpen)}>
-        <SlidersHorizontal size={16} />
-      </IconButton>
+      {workspace && toolbarTarget ? createPortal(actions, toolbarTarget) : actions}
     </div>
-    {settingsOpen && <section id="chat-conversation-settings" className="chat-conversation-settings" aria-label={t('Conversation settings')}
-      onKeyDown={event => {
-        if (event.key === 'Escape' && !event.defaultPrevented) {
-          event.stopPropagation(); setSettingsOpen(false); settingsTrigger.current?.focus();
-        }
-      }}>
+    {settingsMenu && <ContextMenu anchor={settingsMenu} label={t('Conversation settings')} onClose={() => setSettingsMenu(null)} items={[]} header={
+    <section id="chat-conversation-settings" className="chat-conversation-settings" aria-label={t('Conversation settings')} data-workspace-focus="ai">
       <div className="chat-setting-row"><span>{t('Execution terminal')}</span>
         <Select aria-label={t('Select execution environment')} data-testid="chat-execution-target"
           data-tip-description={environmentOptions.find(option => option.value === (environment?.paneId ?? ''))?.description}
           value={environment?.paneId ?? ''} options={environmentOptions} disabled={!ready || sendingTab === activeId}
-          action={{ label: t('New tab'), onSelect: () => setNewTabOpen(true) }}
+          action={{ label: t('New tab'), onSelect: () => { setSettingsMenu(null); setNewTabOpen(true); } }}
           onChange={paneId => useChatStore.getState().setEnvironment(activeId, paneId ? environmentForPane(paneId) : null)} />
       </div>
       <div className="chat-setting-links">
-        {environment && !!sessions[environment.paneId] && <button type="button" data-subtle onClick={() => showExecutionTerminal(environment.paneId)}>{t('View terminal')}</button>}
-        <button type="button" data-subtle data-testid="chat-usage-entry" onClick={() => useSessionStore.getState().openUsageTab()}>{t('Usage')}</button>
-        <button type="button" data-subtle onClick={() => useSessionStore.getState().openSettings()}>{t('Open settings')}</button>
+        {environment && !!sessions[environment.paneId] && <button type="button" data-subtle onClick={() => { setSettingsMenu(null); showExecutionTerminal(environment.paneId); }}>{t('View terminal')}</button>}
+        <button type="button" data-subtle data-testid="chat-usage-entry" onClick={() => { setSettingsMenu(null); useSessionStore.getState().openUsageTab(); }}>{t('Usage statistics')}</button>
+        <button type="button" data-subtle onClick={() => { setSettingsMenu(null); useSessionStore.getState().openSettings(); }}>{t('Open settings')}</button>
       </div>
-    </section>}
+    </section>} />}
     {environment && <div className="chat-conversation-context" data-testid="chat-conversation-context">
       <span className="chat-terminal-status" style={{ background: environmentOptions.find(option => option.value === environment.paneId)?.swatch }} aria-hidden="true" />
       <span>{environmentOptions.find(option => option.value === environment.paneId)?.triggerLabel ?? environment.label}</span>

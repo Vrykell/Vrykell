@@ -24,7 +24,7 @@ test('main utility pages and docked conversations keep separate shortcut scopes'
   await page.getByTestId('ai-relocate').click();
   const side = page.getByTestId('ai-surface-side');
   await side.getByRole('button', { name: '会话设置', exact: true }).click();
-  await side.getByTestId('chat-usage-entry').click();
+  await page.getByRole('region', { name: '会话设置' }).getByTestId('chat-usage-entry').click();
   await expect(page.getByTestId('usage-page')).toBeVisible();
   await side.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
   await expect(page.getByTestId('ai-history-page')).toBeVisible();

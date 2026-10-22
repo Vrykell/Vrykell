@@ -60,10 +60,12 @@ test('the execution environment stays fixed and a closed terminal stays disconne
   const selected = await chip.textContent();
   await page.getByTestId('tab-new-btn').click();
   await page.getByRole('button', { name: /Bash/ }).click();
+  await ensureChatSettingsOpen(page);
   await expect(chip).toHaveText(selected!);
   await ensureTabsOpen(page);
   await page.getByTestId('tab-row-t1').click();
   await page.getByRole('button', { name: '关闭当前终端', exact: true }).click();
+  await ensureChatSettingsOpen(page);
   await expect(chip).toContainText('已断开');
   await expect(page.getByText('终端已断开，选择终端后可继续执行。')).toBeVisible();
 });
@@ -75,11 +77,13 @@ test('the picker opens the new-tab panel and binds the terminal it creates', asy
   await expect(target).toContainText('仅讨论');
   await ensureTabsOpen(page);
   const tabsBefore = await page.locator('[data-tab-kind="session"]').count();
+  await ensureChatSettingsOpen(page);
   await target.click();
   await page.locator('.ui-select-menu').getByRole('button', { name: '新建标签页' }).click();
   // The panel comes first; picking a type creates the tab and binds it to the conversation.
   await page.getByRole('button', { name: /Bash/ }).click();
   await expect(page.locator('[data-tab-kind="session"]')).toHaveCount(tabsBefore + 1);
+  await ensureChatSettingsOpen(page);
   await expect(target).not.toContainText('仅讨论');
   await expect(page.getByTestId('chat-conversation-context')).toBeVisible();
 });

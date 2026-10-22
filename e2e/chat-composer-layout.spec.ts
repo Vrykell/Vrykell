@@ -177,6 +177,7 @@ test('footer matches attachment, approval, model and send order without wrapping
     if (width === 480) await page.getByRole('listbox', { name: '对话与审批模式' }).screenshot({ path: '.cache/chat-approval-menu.png' });
     await expect(page.getByRole('option', { name: /^纯聊天/ })).toBeInViewport();
     await page.getByRole('option', { name: /^纯聊天/ }).click();
+    await ensureChatSettingsOpen(page);
     await page.getByRole('combobox', { name: '选择执行终端' }).scrollIntoViewIfNeeded();
     await page.getByRole('combobox', { name: '选择执行终端' }).click();
     await page.getByRole('option').filter({ hasNotText: '仅讨论' }).first().click();
@@ -237,6 +238,7 @@ for (const theme of ['深色', '浅色'] as const) {
     await expect(target).toHaveText('10.21.76.61');
     await page.getByRole('button', { name: '对话与审批模式' }).click();
     await page.getByRole('option', { name: /^严格权限/ }).click();
+    await ensureChatSettingsOpen(page);
     await page.getByRole('region', { name: '会话设置' }).screenshot({ path: `.cache/chat-settings-${theme === '深色' ? 'dark' : 'light'}.png` });
     await page.getByRole('button', { name: '会话设置', exact: true }).click();
     await page.locator('[data-chat-composer]').click();

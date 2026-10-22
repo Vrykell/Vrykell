@@ -16,9 +16,10 @@ export function AiWorkspaceProvider({ placement, mainActive, headerActive, sideA
   const [side, setSide] = useState<HTMLDivElement | null>(null);
   const [native, setNative] = useState<HTMLDivElement | null>(null);
   const [parking, setParking] = useState<HTMLDivElement | null>(null);
+  const [toolbar, setToolbar] = useState<HTMLDivElement | null>(null);
   const [host] = useState(() => { const element = document.createElement('div'); element.className = 'ai-workspace-host'; return element; });
   const [conversationHost] = useState(() => { const element = document.createElement('div'); element.className = 'ai-native-surface'; return element; });
-  const context = useMemo(() => ({ main: setMain, side: setSide, native: setNative }), []);
+  const context = useMemo(() => ({ main: setMain, side: setSide, native: setNative, toolbar: setToolbar }), []);
   const nativeTabs = useAiWorkspace(state => state.nativeTabs);
   const selected = useAiWorkspace(state => state.selected);
   const nativeSelected = useChatStore(state => state.activeConversationId);
@@ -40,7 +41,7 @@ export function AiWorkspaceProvider({ placement, mainActive, headerActive, sideA
     {children}
     <div hidden ref={setParking} />
     {createPortal(<HarnessWorkspace active={mainActive} headerActive={headerActive} />, host)}
-    {visited && createPortal(<PanelChat active={nativeActive} workspace={placement === 'main'} />, conversationHost)}
+    {visited && createPortal(<PanelChat active={nativeActive} workspace={placement === 'main'} toolbarTarget={toolbar} />, conversationHost)}
   </SurfaceContext.Provider>;
 }
 

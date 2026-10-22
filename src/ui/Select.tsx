@@ -178,7 +178,7 @@ export default function Select<Value extends string | number>({
       <ChevronDown size={iconSizes.compact} aria-hidden="true" className="ui-select-chevron" />
     </button>
     {expanded && createPortal(<div ref={menu}
-      className="workspace-floating ui-select-menu" style={position} data-placement={placement}
+      className="workspace-floating ui-select-menu" style={position} data-placement={placement} data-floating-for={listId}
       onPointerDown={event => event.preventDefault()}>
       <div id={listId} role="listbox" aria-label={label} className="ui-select-options">
         {options.map((option, index) => <div key={option.value} id={`${listId}-${index}`} role="option"

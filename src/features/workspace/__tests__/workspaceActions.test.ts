@@ -60,6 +60,16 @@ it('creates AI conversations in the focused side surface without replacing the m
   expect(useWorkspaceStore.getState().tabs).toEqual([]);
 });
 
+it('keeps a portaled conversation settings field in the side conversation keyboard scope', () => {
+  useWorkspaceNavigation.setState({ area: 'terminal', aiPlacement: 'side' });
+  const menu = document.createElement('section'); menu.dataset.workspaceFocus = 'ai';
+  const field = document.createElement('button'); menu.appendChild(field); document.body.appendChild(menu); field.focus();
+  expect(focusedWorkspaceArea()).toBe('ai');
+  newWorkspaceItem();
+  expect(useWorkspaceStore.getState().tabs).toEqual([]);
+  expect(useWorkspaceNavigation.getState().area).toBe('terminal');
+});
+
 it('keeps all conversation navigation in the main AI workspace while a native chat is docked', () => {
   const workspace = useWorkspaceStore.getState();
   workspace.openHarnessTab();
