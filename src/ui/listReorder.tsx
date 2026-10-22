@@ -124,11 +124,13 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
       (acceptsRef.current ?? ((drag: string, over: string) => drag === over))(dragKind, itemKind);
     const horizontalRows = axis === 'horizontal' && sourceList ? Array.from(sourceList.querySelectorAll<HTMLElement>('[data-reorder-item]'))
       .filter(row => !row.closest('[hidden]') && match(item.kind, row.dataset.reorderKind ?? ''))
-      .map(row => ({ id: row.dataset.reorderItem!, bounds: row.getBoundingClientRect() })) : [];
+      .map(row => ({ id: row.dataset.reorderItem!, zoneId: row.closest<HTMLElement>('[data-reorder-zone]')?.dataset.reorderZone,
+        bounds: (row.dataset.reorderMeasure === 'container' ? row.closest<HTMLElement>('[data-reorder-container]') ?? row : row).getBoundingClientRect() })) : [];
+    const sourceZone = grouped && !container ? event.currentTarget.closest<HTMLElement>('[data-reorder-zone]')?.dataset.reorderZone : undefined;
     const sourceIndex = horizontalRows.findIndex(row => row.id === item.id);
     const slotWidth = bounds.width + (sourceList ? parseFloat(getComputedStyle(sourceList).columnGap) || 0 : 0);
     const horizontalSlots = horizontalRows.flatMap((row, index) => row.id === item.id ? [] : [{
-      id: row.id, width: row.bounds.width,
+      id: row.id, zoneId: row.zoneId, width: row.bounds.width,
       left: row.bounds.left - listBounds.left + scrollLeft - (index > sourceIndex ? slotWidth : 0),
     }]);
     let insertionIndex = sourceIndex;
@@ -148,10 +150,20 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
       if (axis === 'horizontal' && list) {
         if (list !== currentList) { list.scrollLeft = scrollLeft; currentList = list; }
         const bounds = list.getBoundingClientRect();
-        if (!grouped && dimensions.origin && sourceIndex >= 0) {
+        if (dimensions.origin && sourceIndex >= 0 && listBounds.width > 0) {
           // Compare the moving edges against stable slots, independent of the pointer's grab offset and the rendered gap.
-          const left = horizontalPreviewLeft(x, dimensions.origin) - bounds.left + list.scrollLeft;
+          const previewLeft = horizontalPreviewLeft(x, dimensions.origin);
+          const left = previewLeft - bounds.left + list.scrollLeft;
           const right = left + slotWidth;
+          if (sourceZone) {
+            // Empty and folded zones use the dragged component's center, never the pointer's grab position.
+            const hit = document.elementFromPoint(previewLeft + (dimensions.width ?? 0) / 2, bounds.top + bounds.height / 2);
+            const zone = hit?.closest<HTMLElement>('[data-reorder-zone]');
+            if (zone && list.contains(zone) && match(item.kind, zone.dataset.reorderKind ?? '')
+              && !horizontalSlots.some(row => row.zoneId === zone.dataset.reorderZone)) {
+              useListReorder.getState().hover({ zoneId: zone.dataset.reorderZone }); return;
+            }
+          }
           while (insertionIndex > 0) {
             const previous = horizontalSlots[insertionIndex - 1]!;
             if (left >= previous.left + previous.width / 2 - 2) break;
@@ -161,6 +173,16 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
             const next = horizontalSlots[insertionIndex]!;
             if (right <= next.left + slotWidth + next.width / 2 + 2) break;
             insertionIndex += 1;
+          }
+          if (sourceZone) {
+            const previous = horizontalSlots[insertionIndex - 1]; const next = horizontalSlots[insertionIndex];
+            const following = horizontalSlots.slice(sourceIndex).find(row => row.zoneId === sourceZone);
+            const preceding = horizontalSlots.slice(0, sourceIndex).filter(row => row.zoneId === sourceZone);
+            const last = preceding[preceding.length - 1];
+            const target = insertionIndex > sourceIndex && previous ? { itemId: previous.id, after: true }
+              : insertionIndex < sourceIndex && next ? { itemId: next.id, after: false }
+              : following ? { itemId: following.id, after: false } : last ? { itemId: last.id, after: true } : { zoneId: sourceZone };
+            useListReorder.getState().hover(target); return;
           }
           const next = horizontalSlots[insertionIndex]; const last = horizontalSlots[horizontalSlots.length - 1];
           useListReorder.getState().hover(next ? { itemId: next.id, after: false } : last ? { itemId: last.id, after: true } : null);

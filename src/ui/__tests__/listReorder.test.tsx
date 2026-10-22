@@ -22,8 +22,9 @@ function rowRect(top: number): DOMRect {
   } as DOMRect;
 }
 
-function DemoRow({ id, start }: {
+function DemoRow({ id, start, measureContainer = false }: {
   id: string;
+  measureContainer?: boolean;
   start: (event: React.PointerEvent<HTMLElement>, item: { id: string; kind: string }) => void;
 }) {
   const dragging = useListReorder((state) => state.drag?.id === id);
@@ -32,6 +33,7 @@ function DemoRow({ id, start }: {
       data-testid={`row-${id}`}
       data-reorder-item={id}
       data-reorder-kind="demo"
+      data-reorder-measure={measureContainer ? 'container' : undefined}
       data-reorder-dragging={dragging ? 'true' : undefined}
       onPointerDown={(event) => start(event, { id, kind: 'demo' })}
     >
@@ -42,18 +44,20 @@ function DemoRow({ id, start }: {
   );
 }
 
-function Harness({ onDrop, listId = 'demo', axis }: {
+function Harness({ onDrop, listId = 'demo', axis, grouped = false, wholeGroups = false }: {
   onDrop: (drag: ListReorderDrag, target: ListReorderTarget | null) => void;
   listId?: string;
   axis?: 'vertical' | 'horizontal';
+  grouped?: boolean;
+  wholeGroups?: boolean;
 }) {
-  const start = useListReorderDrag({ listId, onDrop, axis });
+  const start = useListReorderDrag({ listId, onDrop, axis, grouped });
   return (
-    <div data-reorder-list={listId}>
+    <div data-reorder-list={listId} data-reorder-zone={grouped ? 'members' : undefined} data-reorder-kind={grouped ? 'demo' : undefined}>
       {['a', 'b', 'c'].map((id) => (
         <Fragment key={id}>
           <ListReorderPlaceholder listId={listId} itemId={id} />
-          <DemoRow id={id} start={start} />
+          {wholeGroups ? <div data-reorder-container><DemoRow id={id} start={start} measureContainer /></div> : <DemoRow id={id} start={start} />}
         </Fragment>
       ))}
       <ListReorderPlaceholder listId={listId} itemId="c" after />
@@ -140,8 +144,8 @@ describe('list reorder', () => {
     expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }), { itemId: 'c', after: true });
   });
 
-  it.each(['left', 'right'])('exchanges unequal horizontal items toward the %s while the pointer stays over the source gap', direction => {
-    const onDrop = vi.fn(); render(<Harness onDrop={onDrop} axis="horizontal" />);
+  it.each([['left', false], ['right', false], ['left', true], ['right', true]] as const)('exchanges unequal horizontal items toward the %s with grouped=%s while the pointer stays over the source gap', (direction, grouped) => {
+    const onDrop = vi.fn(); render(<Harness onDrop={onDrop} axis="horizontal" grouped={grouped} />);
     const rows = ['a', 'b', 'c'].map(id => screen.getByTestId(`row-${id}`));
     const lefts = [0, 80, 320]; const widths = [80, 240, 100];
     rows.forEach((row, index) => vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({
@@ -160,6 +164,38 @@ describe('list reorder', () => {
     fireEvent.pointerMove(window, { pointerId: 1, clientX: destination, clientY: 10 });
     fireEvent.pointerUp(window, { pointerId: 1, clientX: destination, clientY: 10 });
     expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'b' }), { itemId: direction === 'left' ? 'a' : 'c', after: direction === 'right' });
+  });
+
+  it('measures complete neighboring groups rather than their narrow headings', () => {
+    const onDrop = vi.fn(); render(<Harness onDrop={onDrop} axis="horizontal" grouped wholeGroups />);
+    const rows = ['a', 'b', 'c'].map(id => screen.getByTestId(`row-${id}`));
+    const lefts = [0, 80, 320]; const widths = [80, 240, 100];
+    const list = rows[0]!.closest<HTMLElement>('[data-reorder-list]')!;
+    vi.spyOn(list, 'getBoundingClientRect').mockReturnValue({ ...rowRect(0), width: 420, right: 420 });
+    rows.forEach((row, index) => {
+      const container = row.closest<HTMLElement>('[data-reorder-container]')!;
+      vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({ ...rowRect(0), left: lefts[index]!, right: lefts[index]! + widths[index]!, width: widths[index]! });
+      vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({ ...rowRect(0), left: lefts[index]!, right: lefts[index]! + 32, width: 32 });
+    });
+    fireEvent.pointerDown(rows[1]!, { pointerId: 1, button: 0, isPrimary: true, clientX: 100, clientY: 10 });
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 120, clientY: 10 });
+    expect(useListReorder.getState().target).toEqual({ itemId: 'c', after: false });
+    expect(useListReorder.getState().drag?.width).toBe(240);
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 154, clientY: 10 });
+    expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'b' }), { itemId: 'c', after: true });
+  });
+
+  it('enters an empty group when the component center reaches it, independent of the grab offset', () => {
+    const onDrop = vi.fn(); render(<GroupedHarness onDrop={onDrop} />);
+    const row = screen.getByTestId('row-a'); const zone = screen.getByTestId('empty-zone');
+    vi.spyOn(row, 'getBoundingClientRect').mockReturnValue(rowRect(0));
+    vi.spyOn(row.closest('[data-reorder-list]')!, 'getBoundingClientRect').mockReturnValue({ ...rowRect(0), width: 500, right: 500 });
+    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: vi.fn((x: number) => x >= 160 ? zone : row) });
+    fireEvent.pointerDown(row, { pointerId: 1, button: 0, isPrimary: true, clientX: 100, clientY: 10 });
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 170, clientY: 10 });
+    expect(useListReorder.getState().target).toEqual({ zoneId: 'filled' });
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 210, clientY: 10 });
+    expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }), { zoneId: 'empty' });
   });
 
   it.each(['left', 'right'] as const)('keeps scrolling at the %s edge with a stationary pointer and updates the drop slot', direction => {

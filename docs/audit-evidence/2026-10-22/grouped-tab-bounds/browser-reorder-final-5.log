@@ -1,0 +1,22 @@
+
+> vrykell@0.1.0 test:e2e
+> playwright test e2e/reorder.spec.ts
+
+[WebServer] (node:74824) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+[WebServer] (Use `node --trace-warnings ...` to show where the warning was created)
+
+Running 5 tests using 1 worker
+
+(node:59092) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:59092) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ok 1 reorder.spec.ts:34:5 › 侧栏列表拖拽排序 › dragging out of a group uses the empty ungrouped area (7.5s)
+  ok 2 reorder.spec.ts:34:5 › 侧栏列表拖拽排序 › dragging out of a group uses the empty ungrouped area with singleton pages (2.0s)
+  ok 3 reorder.spec.ts:69:3 › 侧栏列表拖拽排序 › SSH 连接：拖动时源行让位并出现虚线占位，落下后顺序持久化 (1.7s)
+  ok 4 reorder.spec.ts:98:3 › 侧栏列表拖拽排序 › 标签页：拖动让位 + 占位，落下后标签顺序更新 (2.0s)
+  ok 5 reorder.spec.ts:121:3 › 侧栏列表拖拽排序 › 标签拖入分组与组内换序：空位都出现在组内 (2.4s)
+
+  Slow test file: reorder.spec.ts (15.6s)
+  Consider splitting slow test files to speed up parallel execution
+  5 passed (19.0s)

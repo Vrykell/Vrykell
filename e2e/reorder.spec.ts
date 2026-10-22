@@ -4,12 +4,13 @@ import { setupTauriMock, ensureTabsOpen } from './tauri-mock';
 /** Press the pointer on a row and drag it onto `ratio` of the target row (mouse stays down). */
 async function startDragRow(page: Page, sourceTestId: string, targetTestId: string, ratio = 0.8) {
   const from = (await page.getByTestId(sourceTestId).boundingBox())!;
+  const horizontal = sourceTestId.startsWith('tab-row-');
+  const originalTarget = (await page.getByTestId(targetTestId).boundingBox())!;
   await page.mouse.move(from.x + 40, from.y + from.height / 2);
   await page.mouse.down();
   const steps = 6;
   for (let i = 1; i <= steps; i++) {
-    const target = (await page.getByTestId(targetTestId).boundingBox())!;
-    const horizontal = sourceTestId.startsWith('tab-row-');
+    const target = horizontal ? originalTarget : (await page.getByTestId(targetTestId).boundingBox())!;
     const toX = target.x + (horizontal ? target.width * ratio : 40);
     const toY = target.y + target.height * (horizontal ? 0.5 : ratio);
     await page.mouse.move(
