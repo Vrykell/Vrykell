@@ -6,6 +6,8 @@ import { ArrowDown, ArrowUp, iconSizes } from '@ui/icons';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import { TextButton } from '@ui/actions/TextButton';
 import { diagnostic } from '@platform/diagnostics';
+import { terminalFontFamily, useTypographyStore } from '@config/typography';
+import { useEditorPreferences } from '@config/editor';
 import '@ui/editor/CodeDiff.css';
 
 type Runtime = typeof import('@ui/editor/code/runtime');
@@ -15,6 +17,11 @@ export default function CodeDiff({ original, modified, path, sideBySide, origina
   original: string; modified: string; path: string; sideBySide: boolean; originalLabel: string; modifiedLabel: string; onLayoutChange?: (split: boolean) => void;
   toolbar?: (navigation: ReactNode, navigate: (direction: 'previous' | 'next') => void) => ReactNode; notice?: ReactNode;
 }) {
+  const fontPreset = useTypographyStore(state => state.editorFontPreset);
+  const fontSize = useTypographyStore(state => state.editorFontSize);
+  const fontWeight = useTypographyStore(state => state.editorFontWeight);
+  const lineHeight = useTypographyStore(state => state.editorLineHeight);
+  const lineNumbers = useEditorPreferences(state => state.lineNumbers);
   const host = useRef<HTMLDivElement>(null);
   const instance = useRef<{ view: editor.IStandaloneDiffEditor; original: editor.ITextModel; modified: editor.ITextModel; runtime: Runtime } | null>(null);
   const [ready, setReady] = useState(false);
@@ -48,7 +55,7 @@ export default function CodeDiff({ original, modified, path, sideBySide, origina
     void import('@ui/editor/code/runtime').then(runtime => {
       if (disposed || !host.current) return;
       runtime.applyCodeTheme();
-      const style = getComputedStyle(document.documentElement);
+      const typography = useTypographyStore.getState();
       const view = runtime.editorApi.editor.createDiffEditor(host.current, {
         automaticLayout: false, readOnly: true, originalEditable: false, ignoreTrimWhitespace: false,
         minimap: { enabled: false }, scrollBeyondLastLine: false, renderOverviewRuler: false,
@@ -56,7 +63,9 @@ export default function CodeDiff({ original, modified, path, sideBySide, origina
         renderSideBySide: false, useInlineViewWhenSpaceIsLimited: false,
         enableSplitViewResizing: true, contextmenu: false,
         scrollbar: { useShadows: false }, renderMarginRevertIcon: false,
-        fontFamily: style.getPropertyValue('--font-mono').trim(), fontSize: 13,
+        fontFamily: terminalFontFamily(typography.editorFontPreset), fontSize: typography.editorFontSize,
+        fontWeight: String(typography.editorFontWeight), lineHeight: typography.editorFontSize * typography.editorLineHeight,
+        lineNumbers: useEditorPreferences.getState().lineNumbers ? 'on' : 'off', lineNumbersMinChars: 3, lineDecorationsWidth: 16,
         theme: 'workspace-code', hideUnchangedRegions: { enabled: true },
         accessibilityVerbose: false, padding: { top: 8 },
       });
@@ -84,6 +93,7 @@ export default function CodeDiff({ original, modified, path, sideBySide, origina
       current?.view.dispose(); current?.original.dispose(); current?.modified.dispose();
     };
   }, [attempt]);
+  useEffect(() => { instance.current?.view.updateOptions({ fontFamily: terminalFontFamily(fontPreset), fontSize, fontWeight: String(fontWeight), lineHeight: fontSize * lineHeight, lineNumbers: lineNumbers ? 'on' : 'off' }); }, [ready, fontPreset, fontSize, fontWeight, lineHeight, lineNumbers]);
   useEffect(() => {
     const current = instance.current;
     if (!ready || !current) return;

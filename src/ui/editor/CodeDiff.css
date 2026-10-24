@@ -14,15 +14,15 @@
 .code-diff-status { padding: 24px 16px; color: var(--text-muted); text-align: center; font-size: var(--fs-caption); line-height: 1.6; }
 .code-diff-labels { display: flex; align-items: center; gap: 8px; padding: 4px 12px 8px; color: var(--text-muted); font-size: var(--fs-caption); }
 .code-diff-labels > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.code-editor-status { display: flex; flex-shrink: 0; align-items: center; justify-content: flex-end; gap: 14px; height: 24px; min-height: 24px; box-sizing: border-box; padding: 0 12px; color: var(--text-muted); font-size: var(--fs-caption); white-space: nowrap; overflow: hidden; }
-.code-editor-status { flex-wrap: nowrap; max-height: 24px; }
-.code-editor-vim-status { flex: 0 1 auto; min-width: 0; max-height: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 24px; }
+.code-editor-status { display: flex; flex-shrink: 0; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: 14px; height: 32px; min-height: 32px; box-sizing: border-box; padding: 2px 12px; color: var(--text-muted); font-size: var(--fs-caption); line-height: 24px; white-space: nowrap; overflow: hidden; }
+.code-editor-vim-status { flex: 0 1 auto; min-width: 0; max-height: 28px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 28px; }
 .code-editor-vim-status > span { white-space: nowrap; }
 .code-editor-vim-status > span:last-child { margin-left: 8px; }
 .code-editor-vim-status .vim-notification { display: none; }
 .code-editor-status[data-vim-prompt="true"] > :not(.code-editor-vim-status) { display: none; }
-.code-editor-status[data-vim-prompt="true"] .code-editor-vim-status { flex: 1; }
-.code-editor-vim-status input { min-width: 0; width: min(560px, calc(100cqw - 150px)); height: 20px; box-sizing: border-box; border: 0; padding: 0 4px; background: transparent; color: var(--text-primary); font: inherit; }
+.code-editor-status[data-vim-prompt="true"] .code-editor-vim-status { display: flex !important; align-items: center; flex: 1; height: 28px; }
+.code-editor-status[data-vim-prompt="true"] .code-editor-vim-status > span { display: inline-flex; align-items: center; min-width: 0; }
+.code-editor-vim-status input { min-width: 0; width: min(560px, calc(100cqw - 48px)); height: 28px; box-sizing: border-box; border: 0; padding: 2px 4px; background: transparent; color: var(--text-primary); font: inherit; line-height: 24px; vertical-align: middle; }
 @container (max-width: 760px) { .code-editor-count { display: none; } }
 @container (max-width: 540px) { .code-editor-cursor { display: none; } }
 .code-editor-preview { flex: 1; min-height: 0; overflow: auto; padding: 18px 24px; user-select: text; }

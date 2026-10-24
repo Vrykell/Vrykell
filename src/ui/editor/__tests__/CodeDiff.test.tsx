@@ -1,6 +1,9 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CodeDiff from '@ui/editor/CodeDiff';
+import { act } from '@testing-library/react';
+import { useTypographyStore } from '@config/typography';
+import { useEditorPreferences } from '@config/editor';
 
 const mocks = vi.hoisted(() => ({
   dispose: vi.fn(), modelDispose: vi.fn(), create: vi.fn(), createModel: vi.fn(),
@@ -28,6 +31,17 @@ beforeEach(() => {
 });
 
 describe('comparison lifecycle', () => {
+  it('applies shared editor preferences without replacing comparison models', async () => {
+    render(<CodeDiff original="old" modified="new" path="file.ts" sideBySide={false} originalLabel="Original" modifiedLabel="Modified" />);
+    await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
+    act(() => {
+      useTypographyStore.setState({ editorFontSize: 18, editorFontWeight: 500, editorLineHeight: 1.8 });
+      useEditorPreferences.setState({ lineNumbers: false });
+    });
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ fontSize: 18, fontWeight: '500', lineHeight: 32.4, lineNumbers: 'off' })));
+    expect(mocks.create).toHaveBeenCalledTimes(1);
+    expect(mocks.createModel).toHaveBeenCalledTimes(2);
+  });
   it('puts change navigation into the supplied toolbar without a duplicate inline heading', async () => {
     const { container } = render(<CodeDiff original="old" modified="new" path="file.ts" sideBySide={false} originalLabel="Original" modifiedLabel="Modified"
       toolbar={navigation => <header aria-label="Comparison toolbar">{navigation}</header>} />);
