@@ -45,7 +45,7 @@ for (const action of ['discard', 'save', 'failure']) test(`a native close preser
   }
   await dialog.getByRole('button', { name: action === 'discard' ? '放弃并关闭' : '保存并关闭', exact: true }).click();
   if (action === 'failure') {
-    await expect(dialog.getByRole('alert')).toBeVisible();
+    await expect(page.locator('#app-notifications').getByRole('alert').filter({ hasText: '无法保存文件' })).toBeVisible();
     expect(await destroys(page)).toBe(0);
     await dialog.getByRole('button', { name: '取消', exact: true }).click();
     await expect(editor.locator('.view-lines')).toContainText('unsaved native-close draft');

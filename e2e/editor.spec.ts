@@ -13,6 +13,15 @@ async function openWorking(page: Page, path = 'src/main.ts', scope = 'unstaged')
 async function replaceText(page: Page, text: string) {
   const input = page.getByTestId('file-editor').locator('textarea.inputarea'); await input.focus(); await page.keyboard.press('Control+a'); await page.keyboard.insertText(text);
 }
+async function reloadFile(page: Page) {
+  const toolbar = page.getByTestId('workspace-instance-bar');
+  const reload = toolbar.getByRole('button', { name: '重新加载文件' });
+  if (await reload.isVisible()) await reload.click();
+  else {
+    await toolbar.getByRole('button', { name: '更多编辑器操作' }).click();
+    await page.getByRole('menuitem', { name: '重新加载文件', exact: true }).click();
+  }
+}
 
 test('identifies read-only files, blocks normal edits and offers explicit administrator opening', async ({ page }, info) => {
   await page.evaluate(() => {
@@ -81,9 +90,9 @@ test('retains drafts on disk conflicts and requires confirmation before reload',
   await page.evaluate(() => localStorage.setItem('mock-editor-files', JSON.stringify({ '["","/home/e2e/project/src/main.ts"]': 'external text' })));
   await page.keyboard.press('Control+s'); await expect(page.locator('#app-notifications').getByRole('alert')).toBeVisible();
   await expect(editor.locator('.view-lines')).toContainText('local draft');
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '重新加载文件' }).click(); await page.getByTestId('confirm-cancel').click();
+  await reloadFile(page); await page.getByTestId('confirm-cancel').click();
   await expect(editor.locator('.view-lines')).toContainText('local draft');
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '重新加载文件' }).click(); await page.getByTestId('confirm-ok').click();
+  await reloadFile(page); await page.getByTestId('confirm-ok').click();
   await expect(editor.locator('.view-lines')).toContainText('external text');
 });
 
@@ -209,6 +218,7 @@ for (const direction of ['left', 'right']) {
     await openWorking(page, direction === 'left' ? paths[0]! : paths[2]!);
     const strip = page.getByRole('tablist', { name: '已打开的文件与比较' });
     const source = strip.getByRole('tab', { name: middle.split('/').pop()!, exact: true });
+    await source.scrollIntoViewIfNeeded();
     const sourceRow = (await strip.locator('.folder-tab').nth(1).boundingBox())!;
     const button = (await source.boundingBox())!;
     const grabX = direction === 'left' ? button.x + button.width - 4 : button.x + 4;

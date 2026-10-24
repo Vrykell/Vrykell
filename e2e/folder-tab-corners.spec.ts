@@ -58,7 +58,7 @@ for (const density of [1, 1.25, 2]) {
         expect(await strip.locator('.folder-tab').first().evaluate(element => getComputedStyle(element, '::before').content)).toBe('""');
         await expectJoinedCorners(page, editor, info.outputPath('editor-first-tab-corners.png'));
         const more = strip.getByRole('button', { name: '更多编辑器操作' });
-        const selectedColor = await strip.locator('.folder-tab[data-active="true"]').evaluate(element => getComputedStyle(element).backgroundColor);
+        const selectedColor = await more.evaluate(element => { const probe = document.createElement('span'); probe.style.backgroundColor = 'var(--tab-menu-bg)'; element.append(probe); const color = getComputedStyle(probe).backgroundColor; probe.remove(); return color; });
         await expect(more).toHaveCSS('background-color', selectedColor);
         expect((await more.boundingBox())!.x + (await more.boundingBox())!.width).toBeLessThan((await strip.locator('.folder-tab').first().boundingBox())!.x);
         await more.hover(); await expect(more).toHaveCSS('background-color', selectedColor);

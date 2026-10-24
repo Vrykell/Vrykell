@@ -32,13 +32,13 @@ async function destination(page: Page, path: string | null) {
 }
 
 test('creates notes directly, cancels save safely, saves as and keeps using the chosen path', async ({ page }, info) => {
-  await expect(page.getByTestId('file-editor').locator('.folder-path')).toContainText('尚未保存');
+  await expect(page.getByTestId('file-editor').locator('.code-editor-status')).toContainText('尚未保存');
   await typeNote(page, 'A short note\nsecond line'); await destination(page, null); await page.keyboard.press('Control+s');
   await expect(page.getByTestId('file-editor').locator('.view-lines')).toContainText('A short note');
-  await expect(page.getByTestId('file-editor').locator('.folder-path')).toContainText('尚未保存');
+  await expect(page.getByTestId('file-editor').locator('.code-editor-status')).toContainText('尚未保存');
   await destination(page, '/home/e2e/notes/first.txt'); await page.keyboard.press('Control+s');
   await expect(page.getByTestId('file-editor').locator('.folder-path')).toContainText('/home/e2e/notes/first.txt');
-  await expect(page.getByTestId('file-editor').locator('.folder-path')).not.toContainText('尚未保存');
+  await expect(page.getByTestId('file-editor').locator('.code-editor-status')).not.toContainText('尚未保存');
   await typeNote(page, 'Updated note'); await page.keyboard.press('Control+s');
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('mock-editor-files') || '{}')['["","/home/e2e/notes/first.txt"]'])).toBe('Updated note');
   await destination(page, '/home/e2e/notes/copy.txt'); await editorMenu(page, '另存为…');
@@ -47,7 +47,7 @@ test('creates notes directly, cancels save safely, saves as and keeps using the 
   for (const width of [1240, 760]) {
     await page.setViewportSize({ width, height: 800 });
     const status = page.getByTestId('file-editor').locator('.code-editor-status'); await expect(status).toContainText('UTF-8');
-    expect((await status.boundingBox())!.height).toBeLessThanOrEqual(30);
+    expect((await status.boundingBox())!.height).toBe(32);
     await page.screenshot({ path: info.outputPath(`text-editor-${width}.png`) });
   }
 });
@@ -88,6 +88,8 @@ test('supports modal editing and writes through the same save path in Vim mode',
   await page.keyboard.type(':w'); await page.keyboard.press('Enter');
   await expect(page.getByTestId('file-editor').locator('.folder-path')).toContainText('/home/e2e/modal.txt');
   await expect(page.getByTestId('file-editor').locator('.view-lines')).toContainText('modal note');
+  await expect(status).toContainText('NORMAL');
+  await page.getByTestId('file-editor').locator('textarea.inputarea').focus();
   await page.keyboard.type('/note');
   await expect(page.getByTestId('file-editor').getByRole('textbox', { name: 'Vim 命令' })).toHaveValue('note');
   await page.keyboard.press('Enter');

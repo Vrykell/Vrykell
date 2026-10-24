@@ -77,7 +77,7 @@ test('keeps comparisons as workspace tabs and returns to the running terminal', 
   const panel = page.getByTestId('git-panel');
   await panel.getByTestId('git-unstaged-src/main.ts').click();
   await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
-  await page.getByRole('button', { name: '返回终端', exact: true }).click();
+  await page.getByRole('menuitem', { name: '返回终端', exact: true }).click();
   await expect(page.locator('[data-terminal-input]').first()).toBeVisible();
   await panel.getByTestId('git-unstaged-src/main.ts').click();
   await expect(page.getByRole('tablist', { name: '已打开的文件与比较' }).getByRole('tab')).toHaveCount(1);
@@ -118,7 +118,7 @@ test('generates an editable commit message and runs commit and remote operations
   await message.fill('fix: keep this draft');
   await page.evaluate(() => localStorage.setItem('mock-git-operation-error', 'Permission denied'));
   await panel.getByRole('button', { name: '提交', exact: true }).click();
-  await expect(panel.getByText('版本库操作失败')).toBeVisible();
+  await expect(page.getByRole('alert').filter({ hasText: '版本库操作失败' })).toBeVisible();
   await expect(message).toHaveValue('fix: keep this draft');
   await page.screenshot({ path: info.outputPath('git-commit-error.png') });
 });
@@ -143,7 +143,7 @@ test('shows binary, conflict, empty and failure states', async ({ page }) => {
   await expect(page.getByTestId('git-diff-review').locator('.monaco-diff-editor')).toBeVisible({ timeout: 15_000 });
   await page.evaluate(() => localStorage.setItem('mock-git-error', 'Repository unavailable'));
   await panel.getByRole('button', { name: '刷新变更' }).click();
-  await expect(panel.getByText('无法读取版本库', { exact: true })).toBeVisible();
+  await expect(page.getByRole('alert').getByText('无法读取版本库', { exact: true })).toBeVisible();
   await page.evaluate(() => { localStorage.removeItem('mock-git-error'); localStorage.setItem('mock-git-snapshot', 'null'); });
   await panel.getByRole('button', { name: '刷新变更' }).click();
   await expect(panel.getByText('当前目录不在版本库中。')).toBeVisible();

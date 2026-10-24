@@ -171,7 +171,7 @@ test.describe('文件面板', () => {
 
     // 更多 → 同步到终端目录：面板回到终端的 cwd
     await page.getByTestId('local-more-btn').click();
-    await page.getByRole('button', { name: '切换到当前终端文件目录', exact: true }).click();
+    await page.getByRole('button', { name: /^切换到当前终端文件目录/ }).click();
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
   });
 
@@ -414,7 +414,7 @@ test.describe('文件面板', () => {
     expect(await menuItems()).toEqual(fromMore);
     await expect(menu.getByRole('button', { name: '下载管理', exact: true })).toBeVisible();
     await expect(menu.getByRole('button', { name: '收起全部文件夹', exact: true })).toBeVisible();
-    await expect(menu.getByRole('button', { name: '切换到当前终端文件目录', exact: true })).toBeVisible();
+    await expect(menu.getByRole('button', { name: /^切换到当前终端文件目录/ })).toBeVisible();
   });
 
   test('refresh re-reads the current directory from both panel menus', async ({ page }) => {

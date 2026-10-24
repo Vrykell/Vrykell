@@ -28,6 +28,8 @@ test('opens actual lines with modal o and O and supports numeric line jumps', as
   await editor.locator('textarea.inputarea').focus(); await page.keyboard.insertText('first\nsecond\nthird');
   await action(page, 'Vim 模式');
   await expect(editor.locator('.code-editor-vim-status')).toContainText('NORMAL');
+  await expect(editor.getByTestId('editor-file-path')).toHaveText('未命名 1.txt');
+  await expect(editor.locator('.code-editor-status')).toContainText('未保存');
   await editor.locator('textarea.inputarea').focus(); await page.keyboard.type('ggo');
   await expect(editor.locator('.code-editor-vim-status')).toContainText('INSERT');
   await page.keyboard.insertText('below'); await page.keyboard.press('Escape');
@@ -72,8 +74,10 @@ test('shares editor preferences, keeps independent metrics and centers a symmetr
   expect(new Set(radii).size).toBe(1); expect(parseFloat(radii[0])).toBeGreaterThan(0);
   for (const width of [1240, 760]) {
     await page.setViewportSize({ width, height: 800 });
-    const bounds = (await find.boundingBox())!; const close = (await find.locator('.codicon-widget-close').boundingBox())!;
-    expect(Math.abs(bounds.y + bounds.height / 2 - close.y - close.height / 2)).toBeLessThanOrEqual(1);
+    await expect.poll(() => find.evaluate(element => {
+      const bounds = element.getBoundingClientRect(); const close = element.querySelector('.codicon-widget-close')!.getBoundingClientRect();
+      return Math.abs(bounds.y + bounds.height / 2 - close.y - close.height / 2);
+    })).toBeLessThanOrEqual(1);
     await page.screenshot({ path: info.outputPath(`editor-find-${width}.png`), animations: 'disabled' });
   }
 });

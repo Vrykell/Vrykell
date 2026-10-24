@@ -21,6 +21,7 @@ test('localization hot updates retain editor registrations, buffers and modal bi
   page.on('pageerror', error => errors.push(error.message));
   await setupTauriMock(page.context(), { schedulesSeed: [] });
   await page.goto(server.resolvedUrls!.local[0], { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/navigation.ts';
     const { useWorkspaceNavigation } = await import(path) as typeof import('../src/features/workspace/stores/navigation');
