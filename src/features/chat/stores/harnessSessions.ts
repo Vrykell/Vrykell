@@ -19,12 +19,17 @@ export interface HarnessSessionRef {
 interface HarnessSessionRefs {
   refs: Record<string, HarnessSessionRef>;
   remember: (harness: string, ref: HarnessSessionRef) => void;
+  forget: (harness: string, sessionId: string) => void;
 }
 
 export const useHarnessSessionRefs = create<HarnessSessionRefs>()(persist(
   (set) => ({
     refs: {},
     remember: (harness, ref) => set((state) => ({ refs: { ...state.refs, [harness]: ref } })),
+    forget: (harness, sessionId) => set(state => {
+      if (state.refs[harness]?.sessionId !== sessionId) return state;
+      const refs = { ...state.refs }; delete refs[harness]; return { refs };
+    }),
   }),
   { name: 'vrykell-harness-sessions', version: 1 },
 ));

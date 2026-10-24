@@ -39,6 +39,20 @@ test('retains drafts and reading positions across workspace and internal session
   await expect(page.getByTestId('workspace-area-ai')).toHaveCount(1);
 });
 
+test('shows only usage when opened after a connected session and restores that session draft', async ({ page }, info) => {
+  await connect(page);
+  const input = current(page).getByTestId('harness-composer');
+  await input.fill('retain this draft');
+  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '用量统计', exact: true }).click();
+  await expect(page.getByTestId('usage-page')).toBeVisible();
+  await expect(page.getByTestId('harness-page')).not.toBeVisible();
+  const usage = (await page.getByTestId('usage-page').boundingBox())!;
+  expect(usage.height).toBeGreaterThan(600);
+  await page.screenshot({ path: info.outputPath('usage-with-hidden-agent.png') });
+  await page.getByRole('tablist', { name: 'AI 会话' }).getByRole('tab', { name: 'Fake ACP', exact: true }).click();
+  await expect(current(page).getByTestId('harness-composer')).toHaveValue('retain this draft');
+});
+
 test('follows streamed replies, pauses for reading and offers a return to the latest reply', async ({ page }) => {
   await connect(page);
   await current(page).getByTestId('harness-composer').fill('Explain the result');
@@ -124,11 +138,12 @@ test('keeps failed server edits, saves argument boundaries and persists before l
   await page.getByTestId('harness-dialog-command').fill('runner');
   await page.getByTestId('harness-dialog-args').fill('D:/folder with spaces\n--test');
   await page.getByTestId('harness-dialog-save').click();
-  await expect(page.getByTestId('harness-dialog')).toContainText('无法保存服务器');
+  await expect(page.locator('#app-notifications').getByRole('alert')).toContainText('无法保存服务器');
   await expect(page.getByTestId('harness-dialog-name')).toHaveValue('Saved agent');
   await page.getByTestId('harness-dialog-save').click();
   await expect(page.getByTestId('harness-dialog')).toHaveCount(0);
-  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await page.keyboard.press('Escape');
+  await page.getByTestId('harness-add-session').click();
   await expect(page.getByTestId('acp-launcher-Saved agent')).toBeVisible();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('mock-acp-servers')!) as Array<{ name: string; args: string[] }>);
   expect(saved.find(server => server.name === 'Saved agent')?.args).toEqual(['D:/folder with spaces', '--test']);

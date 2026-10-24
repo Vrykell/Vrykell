@@ -105,9 +105,8 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
           {answer.pending && index === parts.length - 1 && <PendingCursor />}</div> : null)
         : answer.content ? <div className="md"><SafeMarkdown content={answer.content} paneId={executionPane} />{answer.pending && <PendingCursor />}</div> : null}
       {answer.pending && (!answer.content || parts?.[parts.length - 1]?.kind === 'tool') && <div className="ai-block-working"><PendingCursor />{t('Working')}</div>}
-      {answer.error && <ErrorBox compact actions={question && !sending ? <button type="button" onClick={regenerate}>{t('Retry')}</button> : undefined}>
-        {answer.errorText || t('The reply could not be completed')}
-      </ErrorBox>}
+      {answer.error && <ErrorBox title={t('The reply could not be completed')} details={answer.errorText}
+        actions={question && !sending ? <button type="button" onClick={regenerate}>{t('Retry')}</button> : undefined} />}
       {answer.content && hasLeakedToolCallMarkup(answer.content) && (
         <div className="chat-environment-note" data-testid="chat-leaked-tool-call">
           {t('The provider returned a tool call as plain text, so no tool ran. Use an endpoint or model that reports tool calls in the standard format.')}

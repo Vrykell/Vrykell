@@ -1,10 +1,15 @@
 import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
+import { memoLocalized } from '@ui/memoLocalized';
 import { createPortal } from 'react-dom';
+import ResourceContent from '@ui/ResourceContent';
 import HarnessWorkspace from './HarnessWorkspace';
 import PanelChat from './PanelChat';
 import { useAiWorkspace } from '../stores/aiWorkspace';
 import { useChatStore } from '../stores/chat';
 import { AiSurfaceContext as SurfaceContext } from './NativeConversationSurface';
+
+const StableHarnessWorkspace = memoLocalized(HarnessWorkspace);
+const StablePanelChat = memoLocalized(PanelChat);
 
 type Placement = 'main' | 'side';
 
@@ -18,7 +23,6 @@ export function AiWorkspaceProvider({ placement, mainActive, headerActive, sideA
   const [parking, setParking] = useState<HTMLDivElement | null>(null);
   const [toolbar, setToolbar] = useState<HTMLDivElement | null>(null);
   const [host] = useState(() => { const element = document.createElement('div'); element.className = 'ai-workspace-host'; return element; });
-  const [conversationHost] = useState(() => { const element = document.createElement('div'); element.className = 'ai-native-surface'; return element; });
   const context = useMemo(() => ({ main: setMain, side: setSide, native: setNative, toolbar: setToolbar }), []);
   const nativeTabs = useAiWorkspace(state => state.nativeTabs);
   const selected = useAiWorkspace(state => state.selected);
@@ -32,16 +36,15 @@ export function AiWorkspaceProvider({ placement, mainActive, headerActive, sideA
     return () => { host.remove(); };
   }, [host, main, parking]);
   const target = placement === 'side' ? side : native;
-  useLayoutEffect(() => {
-    (target ?? parking)?.appendChild(conversationHost);
-    return () => { conversationHost.remove(); };
-  }, [conversationHost, target, parking]);
   const nativeActive = placement === 'side' ? sideActive : mainActive && selected === `chat:${nativeSelected}`;
+  const mountedNativeIds = [...new Set([...nativeTabs, ...(visited && nativeSelected ? [nativeSelected] : [])])].sort();
   return <SurfaceContext.Provider value={context}>
     {children}
     <div hidden ref={setParking} />
-    {createPortal(<HarnessWorkspace active={mainActive} headerActive={headerActive} />, host)}
-    {visited && createPortal(<PanelChat active={nativeActive} workspace={placement === 'main'} toolbarTarget={toolbar} />, conversationHost)}
+    {createPortal(<StableHarnessWorkspace active={mainActive} headerActive={headerActive} />, host)}
+    {mountedNativeIds.map(id => <ResourceContent key={id} id={`chat:${id}`} active={nativeActive && id === nativeSelected} fallbackTarget={id === nativeSelected ? target ?? parking : parking}>
+      {state => <StablePanelChat conversationId={id} active={state.visible} workspace={state.placed || placement === 'main'} toolbarTarget={state.placed ? state.header : id === nativeSelected ? toolbar : null} />}
+    </ResourceContent>)}
   </SurfaceContext.Provider>;
 }
 

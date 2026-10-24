@@ -45,6 +45,12 @@ it('searches independent conversations and opens one in the dock', () => {
   expect(useDockStore.getState().rightPanels).toContain('chat');
 });
 
+it('renders favorites as filled yellow stars without inheriting the row color', () => {
+  useHistoryMetaStore.getState().setStarred(['conversation:first'], true);
+  render(<AiHistoryView />);
+  expect(screen.getByTestId('conversation-star-first').querySelector('svg')).toHaveStyle({ color: 'var(--favorite-color)' });
+});
+
 it('shows new conversations without replacing the history page', () => {
   render(<AiHistoryView />);
   fireEvent.click(screen.getByTestId('ai-history-actions-menu-button'));

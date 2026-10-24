@@ -9,6 +9,7 @@ import { useChatStore } from '../stores/chat';
 import { useComposerDrafts } from '../stores/composerDrafts';
 import { useAiWorkspace } from '../stores/aiWorkspace';
 import type { ChatEnvironment, TerminalReference } from '../model/conversation';
+import { useSshStore } from '@features/ssh';
 
 export function environmentForPane(paneId: string): ChatEnvironment | null {
   const workspace = useWorkspaceStore.getState();
@@ -21,7 +22,8 @@ export function environmentForPane(paneId: string): ChatEnvironment | null {
     const splitLabel = panes.length > 1 ? ` · ${t('Pane {{number}}', { number: panes.indexOf(pane) + 1 })}` : '';
     return { paneId, kind: pane.kind, label: `${tab.title} · ${name}${splitLabel}`, cwd: workspace.terminalCwds[paneId] ?? pane.cwd,
       ...(pane.shellType ? { shellType: pane.shellType } : {}),
-      ...(pane.kind === 'ssh' && pane.ssh ? { ssh: { host: pane.ssh.host, user: pane.ssh.user, port: pane.ssh.port } } : {}),
+      ...(pane.kind === 'ssh' && pane.ssh ? { ssh: { host: pane.ssh.host, user: pane.ssh.user, port: pane.ssh.port },
+        aiNotes: useSshStore.getState().connections.find(connection => connection.id === pane.ssh?.connectionId)?.aiNotes ?? pane.ssh.aiNotes } : {}),
     };
   }
   return null;

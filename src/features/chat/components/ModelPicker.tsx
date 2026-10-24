@@ -240,7 +240,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
                 </span>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>{m.name || m.model}</span>
+                    <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-regular)', color: 'var(--text-primary)' }}>{m.name || m.model}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
                     <span style={{ fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', marginRight: 2 }}>

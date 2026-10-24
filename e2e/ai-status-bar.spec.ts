@@ -40,7 +40,7 @@ test('the conversation model picker stays available after leaving settings', asy
   await page.locator('[data-dock-btn="chat"]').click();
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await expect(page.locator('.settings-screen')).toBeVisible();
-  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await page.keyboard.press('Escape');
   await ensureChatSettingsOpen(page);
   await page.locator('.ai-chat-panel [data-tip="切换模型"]').click();
   await expect(page.getByRole('dialog', { name: '选择模型' })).toBeVisible();

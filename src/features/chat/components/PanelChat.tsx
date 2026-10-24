@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
-import { TextArea, TextInput } from '@ui/TextInput';
+import { TextArea } from '@ui/TextInput';
+import InlineRenameInput from '@ui/InlineRenameInput';
 import KeyHint from '@ui/KeyHint';
 import Select from '@ui/Select';
 import ErrorBox from '@ui/ErrorBox';
@@ -23,8 +24,7 @@ import AiBlock from './AiBlock';
 import { toExchanges } from '../model/exchanges';
 import { useChatComposer } from '../hooks/useChatComposer';
 import { environmentForPane, showExecutionTerminal } from '../services/conversationContext';
-import { useIconColorStore } from '@config/iconColors';
-import { firstTerminalOf, isSessionTab, tabIconColor } from '@features/workspace';
+import { firstTerminalOf, isSessionTab } from '@features/workspace';
 import type { ShellType } from '@platform/shells';
 import type { AttachmentMeta } from '@features/agent/model/attachments';
 import { useTranscriptFollow } from '../hooks/useTranscriptFollow';
@@ -33,21 +33,22 @@ import ChatComposerShell from './ChatComposerShell';
 const EMPTY_MESSAGES: ChatMessage[] = [];
 
 /** Conversation navigation, references and execution stay independent of terminal focus. */
-export default function PanelChat({ active = true, workspace = false, toolbarTarget }: { active?: boolean; workspace?: boolean; toolbarTarget?: HTMLElement | null }) {
-  const activeId = useChatStore(state => state.activeConversationId);
+export default function PanelChat({ active = true, workspace = false, toolbarTarget, conversationId }: { active?: boolean; workspace?: boolean; toolbarTarget?: HTMLElement | null; conversationId?: string }) {
+  const activeId = useChatStore(state => conversationId ?? state.activeConversationId);
   const conversations = useChatStore(state => state.conversations);
   const messages = useChatStore(state => state.byTab[activeId] ?? EMPTY_MESSAGES);
   const ready = useChatStore(state => !!activeId && activeId in state.byTab);
   const sendingTab = useChatStore(state => state.sendingTab);
   const loading = useChatStore(state => state.conversationsLoading);
-  const loadError = useChatStore(state => state.conversationError);
+  const storeLoadError = useChatStore(state => state.conversationError);
+  const [scopeLoadError, setScopeLoadError] = useState('');
+  const loadError = scopeLoadError || storeLoadError;
   const persistenceError = useChatStore(state => state.persistenceError);
   const conversation = conversations.find(item => item.id === activeId);
   const environment = conversation?.environment;
   const sessions = useTerminalStore(state => state.sessions);
   const startupStates = useTerminalStore(state => state.startupStates);
   const tabs = useSessionStore(state => state.tabs);
-  const iconColors = useIconColorStore(state => state.colors);
   const terminalCwds = useSessionStore(state => state.terminalCwds);
   const [renaming, setRenaming] = useState(false);
   const [newTabOpen, setNewTabOpen] = useState(false);
@@ -79,12 +80,9 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
         const triggerLabel = pane.kind === 'ssh' ? pane.ssh?.host || pane.ssh?.name || context.label : t('Local terminal');
         const host = pane.kind === 'ssh' ? pane.ssh?.host : undefined;
         const hostLabel = host && !context.label.includes(host) ? ` · ${host}` : '';
-        // Rows carry the session name — the same identity the tab shows. The shell, host and
-        // directory stay in the trigger's tooltip instead of crowding every row; the dot uses the
-        // tab's own colour, and a tab with no colour keeps the default muted tone.
         const name = `${tab.title}${count > 1 ? ` · ${t('Pane {{number}}', { number: index + 1 })}` : ''}`;
         const swatch = startupStates[pane.id] === 'starting' ? 'var(--accent-warm)'
-          : startupStates[pane.id] === 'failed' || startupStates[pane.id] === 'closed' ? 'var(--error)' : tabIconColor(tab, iconColors, pane) ?? 'var(--text-secondary)';
+          : startupStates[pane.id] === 'failed' || startupStates[pane.id] === 'closed' ? 'var(--error)' : 'var(--text-secondary)';
         return { value: pane.id, label: name, triggerLabel, description: `${context.label}${hostLabel}${context.cwd ? ` · ${context.cwd}` : ''}`, swatch };
       });
     return [
@@ -93,7 +91,7 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
         ? [{ value: environment.paneId, label: `${environment.label} · ${t('Disconnected')}`, swatch: 'var(--accent-warm)', disabled: true }] : []),
       ...available,
     ];
-  }, [tabs, sessions, startupStates, terminalCwds, environment, iconColors]);
+  }, [tabs, sessions, startupStates, terminalCwds, environment]);
   /** Create the terminal the new-tab panel returned and bind this conversation to it. */
   const createTerminalTab = (spec: TerminalSpec) => {
     const store = useSessionStore.getState();
@@ -107,6 +105,13 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
   };
 
   useEffect(() => { void useChatStore.getState().loadConversations(); }, []);
+  useEffect(() => {
+    if (!conversationId) return;
+    let disposed = false;
+    setScopeLoadError('');
+    void useChatStore.getState().ensureConversationMessages(conversationId).catch(reason => { if (!disposed) setScopeLoadError(String(reason)); });
+    return () => { disposed = true; };
+  }, [conversationId]);
   useEffect(() => { setRenaming(false); }, [activeId]);
   useEffect(() => { setSettingsMenu(null); }, [active, workspace, activeId]);
   const submit = () => {
@@ -119,8 +124,8 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
     setRenaming(false);
   };
   const actions = <>
-    <IconButton compact aria-label={t('AI conversation history')} data-tip={t('AI conversation history')}
-      onClick={() => useSessionStore.getState().openAiHistoryTab()}><History size={16} /></IconButton>
+    {!workspace && <IconButton compact aria-label={t('AI conversation history')} data-tip={t('AI conversation history')}
+      onClick={() => useSessionStore.getState().openAiHistoryTab()}><History size={16} /></IconButton>}
     {!workspace && <IconButton compact aria-label={t('New conversation')} data-tip={t('New conversation')}
       onClick={() => useChatStore.getState().createConversation()}><Plus size={16} /></IconButton>}
     <IconButton compact aria-label={t('Conversation settings')} data-tip={t('Conversation settings')}
@@ -131,19 +136,25 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
   </>;
   return <div ref={panelRef} className="ai-chat-panel">
     {workspace && toolbarTarget ? createPortal(actions, toolbarTarget) : <div className="chat-conversation-heading">
-      {renaming ? <TextInput autoFocus className="inline-rename-input" aria-label={t('Conversation title')} value={title} onChange={event => setTitle(event.target.value)}
+      {renaming ? <InlineRenameInput autoFocus aria-label={t('Conversation title')} value={title} onChange={event => setTitle(event.target.value)}
         onFocus={event => event.currentTarget.select()} onClick={event => event.stopPropagation()}
         onBlur={commitTitle} onKeyDown={event => {
+          if (event.nativeEvent.isComposing || event.keyCode === 229) return;
           if (event.key === 'Enter') commitTitle();
           if (event.key === 'Escape') setRenaming(false);
         }} /> : <button type="button" data-subtle className="chat-conversation-title" data-tip={t('Rename conversation')} aria-label={t('Rename conversation')}
           onClick={() => { setTitle(conversation?.title ?? ''); setRenaming(true); }} disabled={!conversation}>
           {conversation?.title ?? t('AI chat')}
         </button>}
-      {actions}
+      <div className="chat-conversation-actions">{actions}</div>
     </div>}
     {settingsMenu && <ContextMenu anchor={settingsMenu} label={t('Conversation settings')} onClose={() => setSettingsMenu(null)} items={[]} header={
     <section id="chat-conversation-settings" className="chat-conversation-settings" aria-label={t('Conversation settings')} data-workspace-focus="ai">
+      {!workspace && <div className="chat-setting-row"><span>{t('Recent conversations')}</span>
+        <Select aria-label={t('Restore recent conversation')} value={activeId} disabled={loading}
+          options={[...conversations].sort((first, second) => second.updatedAt - first.updatedAt).filter((item, index) => index < 20 || item.id === activeId).map(item => ({ value: item.id, label: item.title || t('Untitled') }))}
+          onChange={id => { void useChatStore.getState().selectConversation(id); setSettingsMenu(null); }} />
+      </div>}
       <div className="chat-setting-row"><span>{t('Execution terminal')}</span>
         <Select aria-label={t('Select execution environment')} data-testid="chat-execution-target"
           data-tip-description={environmentOptions.find(option => option.value === (environment?.paneId ?? ''))?.description}
@@ -165,7 +176,10 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
     {environment && !sessions[environment.paneId] && <div className="chat-environment-note">{t('Terminal disconnected. Select a terminal to continue execution.')}</div>}
     {loadError && <ErrorBox compact actions={<button onClick={() => {
       if (!useChatStore.getState().conversationsLoaded) void useChatStore.getState().loadConversations();
-      else if (activeId) void useChatStore.getState().selectConversation(activeId);
+      else if (activeId) {
+        useChatStore.setState({ conversationError: null });
+        void useChatStore.getState().ensureConversationMessages(activeId).then(() => setScopeLoadError('')).catch(reason => setScopeLoadError(String(reason)));
+      }
     }}>{t('Retry')}</button>}>{t('Could not load conversations')}: {loadError}</ErrorBox>}
     {persistenceError && <ErrorBox compact actions={<button onClick={() => void useChatStore.getState().retryPersistence().catch(() => {})}>{t('Retry saving')}</button>}>
       {t('Conversation changes have not been saved')}
@@ -182,7 +196,7 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
       onClickCapture={event => { if ((event.target as Element).closest('button[aria-expanded]')) pauseFollow(); }}>
       <div>
         {exchanges.length ? exchanges.map(exchange => <AiBlock key={exchange.id} exchange={exchange} conversationId={activeId} presentation="conversation" />)
-          : <div className="chat-empty"><Sparkles size={26} /><strong>{t('What would you like to work on?')}</strong>
+          : !workspace && <div className="chat-empty"><Sparkles size={26} /><strong>{t('What would you like to work on?')}</strong>
             <span>{loading ? t('Loading conversations…') : t('Ask a question, attach a file, or bring in terminal output.')}</span></div>}
       </div>
     </div>

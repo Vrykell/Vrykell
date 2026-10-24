@@ -7,7 +7,6 @@ import { useTerminalStore } from '@features/terminal';
 import { useChatStore } from '../stores/chat';
 import { useComposerDrafts } from '../stores/composerDrafts';
 import PanelChat from '../components/PanelChat';
-import { useIconColorStore } from '@config/iconColors';
 
 vi.mock('@platform/api/conversation', () => ({
   listConversations: vi.fn().mockResolvedValue([]), saveConversation: vi.fn().mockResolvedValue(undefined),
@@ -26,6 +25,25 @@ const navigation = useWorkspaceNavigation.getState();
 const paneId = 'chat-tab#0';
 const openSettings = () => fireEvent.click(screen.getByRole('button', { name: '会话设置' }));
 
+it('restores recent sidebar conversations and retains the draft of each conversation', async () => {
+  useChatStore.setState({ conversations: [...useChatStore.getState().conversations, { id: 'recent', title: 'Recent session', updatedAt: 4, createdAt: 2, environment: null }], byTab: { conversation: [], recent: [] } });
+  render(<PanelChat />); const composer = screen.getByPlaceholderText('自然语言描述你想做什么…');
+  fireEvent.change(composer, { target: { value: 'Draft in first' } }); openSettings();
+  fireEvent.click(screen.getByRole('combobox', { name: '恢复最近会话' }));
+  await act(async () => { fireEvent.click(screen.getByRole('option', { name: 'Recent session' })); });
+  expect(useChatStore.getState().activeConversationId).toBe('recent'); expect(composer).toHaveValue('');
+  openSettings(); fireEvent.click(screen.getByRole('combobox', { name: '恢复最近会话' }));
+  await act(async () => { fireEvent.click(screen.getByRole('option', { name: 'Build issue' })); });
+  expect(composer).toHaveValue('Draft in first');
+});
+
+it('keeps the empty prompt out of a conversation tab while retaining it in the side panel', () => {
+  const { rerender } = render(<PanelChat workspace />);
+  expect(document.querySelector('.chat-empty')).toBeNull();
+  rerender(<PanelChat workspace={false} />);
+  expect(document.querySelector('.chat-empty')).not.toBeNull();
+});
+
 it('places main conversation actions in the toolbar and keeps settings floating without losing the draft', () => {
   function Surface({ workspace }: { workspace: boolean }) {
     const [toolbar, setToolbar] = useState<HTMLDivElement | null>(null);
@@ -33,7 +51,8 @@ it('places main conversation actions in the toolbar and keeps settings floating 
   }
   const { rerender, container } = render(<Surface workspace />);
   const toolbar = screen.getByTestId('conversation-toolbar');
-  expect(within(toolbar).getByRole('button', { name: 'AI 对话历史' })).toBeVisible();
+  expect(within(toolbar).getByRole('button', { name: '会话设置' })).toBeVisible();
+  expect(within(toolbar).queryByRole('button', { name: 'AI 对话历史' })).toBeNull();
   expect(container.querySelector('.chat-conversation-heading button[aria-label="会话设置"]')).toBeNull();
   const draft = screen.getByPlaceholderText('自然语言描述你想做什么…');
   fireEvent.change(draft, { target: { value: 'Keep this draft' } });
@@ -61,7 +80,6 @@ it('places main conversation actions in the toolbar and keeps settings floating 
 });
 
 beforeEach(() => {
-  useIconColorStore.setState({ colors: {} });
   useSessionStore.setState({ tabs: [{ id: 'chat-tab', title: 'Build', kind: 'session', layout: leaf({ id: paneId, kind: 'local', shellType: 'bash', cwd: '/work' }) }], activeId: 'chat-tab', terminalCwds: {} });
   useTerminalStore.setState({ focusedPaneId: paneId, sessions: { [paneId]: 'pty-chat' } });
   useChatStore.setState({ conversationsLoaded: true, activeConversationId: 'conversation', conversations: [{ id: 'conversation', title: 'Build issue', createdAt: 1, updatedAt: 1, environment: null }], byTab: { conversation: [] } });
@@ -73,12 +91,9 @@ it('uses the tab colour in execution targets while preserving failure status', (
   const selector = screen.getByRole('combobox', { name: '选择执行终端' });
   fireEvent.click(selector);
   const target = screen.getByRole('option', { name: /Build/ });
-  // A tab without a colour of its own keeps the muted default, not a green badge.
   expect(target.querySelector('.ui-select-swatch')).toHaveStyle({ background: 'var(--text-secondary)' });
-  act(() => useIconColorStore.getState().setColor('session:chat-tab', 'cyan'));
-  expect(target.querySelector('.ui-select-swatch')).toHaveStyle({ background: 'var(--group-cyan)' });
   fireEvent.click(target);
-  expect(selector.querySelector('.ui-select-swatch')).toHaveStyle({ background: 'var(--group-cyan)' });
+  expect(selector.querySelector('.ui-select-swatch')).toHaveStyle({ background: 'var(--text-secondary)' });
   act(() => useTerminalStore.setState({ startupStates: { [paneId]: 'failed' } }));
   expect(selector.querySelector('.ui-select-swatch')).toHaveStyle({ background: 'var(--error)' });
 });

@@ -86,6 +86,7 @@ interface ChatState {
   persistenceError: string | null;
   loadConversations: () => Promise<void>;
   selectConversation: (id: string) => Promise<void>;
+  ensureConversationMessages: (id: string) => Promise<void>;
   createConversation: (environment?: ChatEnvironment | null, options?: { activate?: boolean }) => string;
   setEnvironment: (id: string, environment: ChatEnvironment | null) => void;
   renameConversation: (id: string, title: string) => void;
@@ -334,6 +335,7 @@ export const useChatStore = create<ChatState>((set, get) => {
   return {
   conversations: [], activeConversationId: '', conversationsLoaded: false, conversationsLoading: false,
   conversationError: null, persistenceError: null,
+  ensureConversationMessages: loadMessages,
   loadConversations: async () => {
     if (get().conversationsLoaded || get().conversationsLoading) return;
     set({ conversationsLoading: true, conversationError: null });

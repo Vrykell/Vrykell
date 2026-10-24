@@ -4,6 +4,7 @@ import { useToastStore } from '@ui/Toast';
 import { TextButton } from '@ui/TextButton';
 import { Play, Copy, Check, iconSizes } from '@ui/icons';
 import { useTerminalStore } from '@features/terminal';
+import CodeSyntax from '@ui/CodeSyntax';
 
 const SHELL_LANGS = new Set(['bash', 'sh', 'zsh', 'shell']);
 
@@ -87,7 +88,7 @@ export default function CommandBlock({ children, paneId }: { children?: ReactNod
         </div>
       )}
       <pre>
-        {children}
+        {code ? <CodeSyntax text={code.text} language={code.lang} /> : children}
       </pre>
     </div>
   );

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { t } from '@i18n';
-import { ArrowSort, Ellipsis, Filter, Grid, History, LockSmall as Lock, SparklesSmall as Sparkles, StarSmall as Star, Undo2, X } from '@ui/icons';
+import { ArrowSort, Ellipsis, Filter, Grid, History, LockSmall as Lock, StarSmall as Star, Undo2, X } from '@ui/icons';
+import AppMark from '@ui/AppMark';
 import { IconButton } from '@ui/IconButton';
 import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
 import HistoryOptionMenu, { type HistoryMenuSection } from '@ui/HistoryOptionMenu';
@@ -360,7 +361,7 @@ export default function AiHistoryView() {
         count={t('{{count}} conversations', { count: group.items.length })}
         actions={groupItems(group.items)}>
         {group.items.map(item => <SidebarItem key={item.id}
-          icon={<span className="history-row-icon"><Sparkles size={16} aria-hidden="true" /></span>}
+          icon={<span className="history-row-icon"><AppMark size={16} /></span>}
           title={item.title}
           subtitle={[
             item.environment?.label ?? t('Discussion only'),
@@ -390,7 +391,7 @@ export default function AiHistoryView() {
           onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); open(item.id); } }}
           badge={starredIds.has(item.id) || sendingId === item.id || lockedRecords[noteKey(item.id)] ? <span className="history-row-flags">
             {lockedRecords[noteKey(item.id)] && <span className="history-row-lock" data-tip={t('Locked record')}><Lock size={16} aria-hidden="true" /></span>}
-            {starredIds.has(item.id) && <span className="history-row-star" data-tip={t('Starred')} data-testid={`conversation-star-${item.id}`}><Star size={16} aria-hidden="true" /></span>}
+            {starredIds.has(item.id) && <span className="history-row-star" data-tip={t('Starred')} data-testid={`conversation-star-${item.id}`}><Star size={16} color="var(--favorite-color)" aria-hidden="true" /></span>}
             {sendingId === item.id && <span className="ai-history-working">{t('Working')}</span>}
           </span> : undefined}
           action={sendingId === item.id ? undefined : {

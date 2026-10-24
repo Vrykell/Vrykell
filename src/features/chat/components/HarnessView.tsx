@@ -9,6 +9,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { t } from '@i18n';
 import { ArrowDown, ArrowUp, Bot, Plus, Square, iconSizes } from '@ui/icons';
+import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';
 import { IconButton } from '@ui/IconButton';
 import ErrorBox from '@ui/ErrorBox';
 import { TextArea } from '@ui/TextInput';
@@ -28,6 +29,7 @@ import type { AcpConfigGroup, AcpConfigValue } from '@platform/api/acp';
 /** One control in the composer's status row. */
 interface SessionSelector {
   key: string;
+  model?: boolean;
   label: string;
   value: string;
   options: HarnessSelectorOption[];
@@ -45,6 +47,7 @@ function sessionSelectors(session: HarnessSession, tabId: string): SessionSelect
     if (options.length === 0) continue;
     selectors.push({
       key: `config-${option.id}`,
+      model: option.category === 'model' || option.id === 'model',
       label: option.name,
       value: String(option.currentValue),
       options,
@@ -67,6 +70,7 @@ function sessionSelectors(session: HarnessSession, tabId: string): SessionSelect
   if (!hasModel && session.models) {
     selectors.push({
       key: 'model',
+      model: true,
       label: t('Model'),
       value: session.models.currentModelId,
       options: session.models.availableModels.map((model) => ({
@@ -119,6 +123,7 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
   /** Escape hides the command list for the current text without touching what was typed. */
   const [commandDismissed, setCommandDismissed] = useState(false);
   const [commandIndex, setCommandIndex] = useState(0);
+  const commandNavigation = useListNavigationMode(true);
   /** The store refuses a second open for a tab that is already opening, so a re-rendered effect or a
    *  double click can only ever start one agent process. */
   useEffect(() => {
@@ -183,8 +188,8 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
         {/* The plan the agent publishes while it works, in the order it sent it. */}
         {plan.length > 0 && (
           <div data-testid="harness-plan" style={{
-            margin: '10px 4px', padding: '8px 10px', border: '1px solid var(--border)',
-            borderRadius: 'var(--radius-inner)', background: 'var(--surface)',
+            margin: '10px 4px', padding: '8px 10px', border: 0,
+            borderRadius: 'var(--radius-inner)', background: 'var(--card-bg)',
           }}>
             <div style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)', marginBottom: 4 }}>{t('Plan')}</div>
             {plan.map((entry, index) => (
@@ -233,12 +238,12 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
         </span>}
         hints={<><KeyHint shortcut="Enter" />{t('Send')}</>}
         tray={matches.length > 0 ? (
-          <div data-testid="harness-commands" role="listbox" aria-label={t('Slash commands')} className="harness-commands">
+          <div {...commandNavigation.props} data-testid="harness-commands" role="listbox" aria-label={t('Slash commands')} className="harness-commands">
             {matches.map((command, index) => (
               <button key={command.name} type="button" data-subtle role="option"
-                aria-selected={index === activeCommand} data-active={index === activeCommand}
+                aria-selected={index === activeCommand} data-active={commandNavigation.keyboardNavigation && index === activeCommand}
                 className="harness-command" data-testid={`harness-command-${command.name}`}
-                onMouseDown={(event) => event.preventDefault()} onPointerMove={() => setCommandIndex(index)}
+                onMouseDown={(event) => event.preventDefault()} onPointerMove={() => { if (commandNavigation.pointerMoved.current) setCommandIndex(index); }}
                 onClick={() => pickCommand(command.name)}>
                 <span className="harness-command-name">/{command.name}</span>
                 <span className="harness-command-copy">
@@ -256,7 +261,7 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
             <Plus size={iconSizes.compact} />
           </IconButton>
           {selectors.map((selector) => (
-            <HarnessSelector key={selector.key} testId={`harness-selector-${selector.key}`} label={selector.label}
+            <HarnessSelector key={selector.key} testId={`harness-selector-${selector.key}`} label={selector.label} model={selector.model}
               value={selector.value} options={selector.options} onChange={selector.apply} />
           ))}
           {session?.context && (session.context.used > 0 || session.context.size > 0) && (
@@ -282,9 +287,10 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
         <Bot size={20} aria-hidden="true" className="chat-composer-lead" />
         <TextArea ref={composerRef} data-testid="harness-composer" data-chat-composer={active || undefined} value={text}
           placeholder={t('Describe what you want to do…')} rows={1}
-          onChange={(event) => { setText(event.target.value); setCommandDismissed(false); setCommandIndex(0); }}
+          onChange={(event) => { setText(event.target.value); setCommandDismissed(false); setCommandIndex(0); commandNavigation.setKeyboardNavigation(true); }}
           onKeyDown={(event) => {
             if (matches.length > 0) {
+              commandNavigation.setKeyboardNavigation(true);
               if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
                 event.preventDefault();
                 setCommandIndex((index) => (index + (event.key === 'ArrowDown' ? 1 : -1) + matches.length) % matches.length);

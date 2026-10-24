@@ -64,13 +64,22 @@ describe('model-scoped conversation controls', () => {
     fireEvent.click(screen.getByRole('button', { name: '对话与审批模式' }));
     const standard = screen.getByRole('option', { name: /^标准权限/ });
     const relaxed = screen.getByRole('option', { name: /^放行模式/ });
-    const active = () => screen.getAllByRole('option').filter(option => option.getAttribute('data-active') === 'true');
-    expect(standard).toHaveAttribute('data-active', 'true');
-    expect(active()).toHaveLength(1);
+    const menu = screen.getByRole('listbox');
+    expect(standard).toHaveFocus();
+    expect(menu).toHaveAttribute('data-keyboard-navigation', 'true');
     fireEvent.pointerMove(relaxed);
-    expect(relaxed).toHaveAttribute('data-active', 'true');
-    expect(standard).not.toHaveAttribute('data-active', 'true');
-    expect(active()).toHaveLength(1);
+    expect(menu).toHaveAttribute('data-keyboard-navigation', 'false');
+    expect(standard).toHaveAttribute('aria-selected', 'true');
+    expect(standard).toHaveFocus();
+    fireEvent.keyDown(standard, { key: 'End' });
+    expect(menu).toHaveAttribute('data-keyboard-navigation', 'true');
+    expect(relaxed).toHaveFocus();
+    fireEvent.pointerMove(relaxed);
+    fireEvent.keyDown(relaxed, { key: 'Escape' });
+    fireEvent.keyDown(screen.getByRole('button', { name: '对话与审批模式' }), { key: 'ArrowDown' });
+    expect(screen.getByRole('listbox')).toHaveAttribute('data-keyboard-navigation', 'true');
+    expect(standard).not.toBeInTheDocument();
+    expect(screen.getByRole('option', { name: /^标准权限/ })).toHaveFocus();
   });
   it('configures reasoning on its model without changing the conversation mode', () => {
     render(<ModelThinkingSettings modelId="m-one" name="模型一" />);

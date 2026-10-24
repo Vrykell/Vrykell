@@ -4,6 +4,7 @@ export interface ChatEnvironment {
   kind: 'local' | 'ssh';
   cwd?: string;
   shellType?: string;
+  aiNotes?: string;
   ssh?: { host: string; user?: string; port?: number };
 }
 
@@ -35,6 +36,7 @@ export function parseEnvironment(raw: string): ChatEnvironment | null {
     const ssh = typeof entry.ssh === 'object' && entry.ssh !== null ? entry.ssh as Record<string, unknown> : null;
     return { paneId: entry.paneId, label: entry.label, kind: entry.kind, cwd: typeof entry.cwd === 'string' ? entry.cwd : undefined,
       ...(typeof entry.shellType === 'string' ? { shellType: entry.shellType } : {}),
+      ...(typeof entry.aiNotes === 'string' && new TextEncoder().encode(entry.aiNotes).length <= 16384 ? { aiNotes: entry.aiNotes } : {}),
       ...(entry.kind === 'ssh' && typeof ssh?.host === 'string' ? { ssh: {
         host: ssh.host,
         ...(typeof ssh.user === 'string' ? { user: ssh.user } : {}),

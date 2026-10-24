@@ -64,6 +64,14 @@ beforeEach(async () => {
 });
 
 describe('harness session state', () => {
+  it('forgets only the requested saved reference without replacing a newer session', () => {
+    useHarnessSessionRefs.getState().remember('Agent', { sessionId: 'newer', cwd: '/project', at: 20 });
+    useHarnessSessionRefs.getState().forget('Agent', 'older');
+    expect(useHarnessSessionRefs.getState().refs.Agent?.sessionId).toBe('newer');
+    useHarnessSessionRefs.getState().forget('Agent', 'newer');
+    expect(useHarnessSessionRefs.getState().refs.Agent).toBeUndefined();
+    expect(useHarnessSessionRefs.getState().refs['Claude Code']).toBeDefined();
+  });
   it('keeps the plan, the context window and the active mode the agent publishes', () => {
     const store = useHarnessStore.getState();
     store.applyEvent(notification({
