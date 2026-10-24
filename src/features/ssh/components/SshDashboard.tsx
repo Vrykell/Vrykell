@@ -5,12 +5,13 @@ import CheckboxMenu from '@ui/menus/CheckboxMenu';
 import { IconBtn } from '@ui/actions/UiBtn';
 import SidebarToolbar from '@ui/layout/SidebarToolbar';
 import SidebarItem from '@ui/layout/sidebarItem';
+import { ListReorderPlaceholder, ListReorderPreview, useListReorderDrag } from '@ui/layout/listReorder';
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import { TextButton } from '@ui/actions/TextButton';
 import Toggle from '@ui/fields/Toggle';
 import ToolDialog from '@ui/feedback/ToolDialog';
 import SegmentedControl from '@ui/fields/SegmentedControl';
-import { AlertCircle, ArrowDown, ArrowUp, ArrowLeftRight, ChevronDown, Columns2, EyeOff, Folder, Grid, Lock, MoreHorizontal, Plus, RefreshCw, Star, StarFilled, Tag, iconSizes } from '@ui/icons';
+import { AlertCircle, ArrowDown, ArrowUp, ArrowLeftRight, ChevronDown, Columns2, EyeOff, Folder, Grid, Lock, MoreHorizontal, Plus, RefreshCw, ServerStack, Star, StarFilled, Tag, iconSizes } from '@ui/icons';
 import { isSshAuthenticationFailure } from '../model/fileServiceState';
 import { requestSshAuthentication, useSessionAuthenticationStore } from '../stores/sessionAuthentication';
 import ContextMenu, { type MenuAnchor } from '@ui/menus/ContextMenu';
@@ -29,12 +30,12 @@ import './SshDashboard.css';
 
 const PREFERENCES_KEY = 'vrykell-host-view-v2';
 const METRIC_LABELS: Record<HostMetric, string> = { status: 'Status', cpu: 'CPU', memory: 'Memory', disk: 'Disk', network: 'Network', load: 'Load', uptime: 'Uptime' };
-type Sort = 'recent' | 'name' | 'cpu' | 'memory' | 'disk';
+type Sort = 'manual' | 'recent' | 'name' | 'cpu' | 'memory' | 'disk';
 function readPreferences() {
   const saved = safeJsonParse<Record<string, unknown>>(safeLocalStorageGet(PREFERENCES_KEY) ?? '{}');
   const metrics = Object.fromEntries(HOST_METRICS.map(id => [id, !(saved?.metrics && typeof saved.metrics === 'object' && (saved.metrics as Record<string, unknown>)[id] === false)])) as HostMetricSelection;
   return { metrics, resources: saved?.resources === true, layout: saved?.layout === 'cards' ? 'cards' as const : 'table' as const,
-    sort: (saved?.resources === true ? ['name', 'cpu', 'memory', 'disk'] : ['name']).includes(String(saved?.sort)) ? saved!.sort as Sort : 'recent' as Sort };
+    sort: (saved?.resources === true ? ['manual', 'name', 'cpu', 'memory', 'disk'] : ['manual', 'name']).includes(String(saved?.sort)) ? saved!.sort as Sort : 'recent' as Sort };
 }
 
 export default function SshDashboard({ active = true, onManage, onImport, onQuickConnect, onDelete, onOpenTerminal, onForwarding }: {
@@ -54,6 +55,13 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
   const [resources, setResources] = useState(initial.resources);
   const [metrics, setMetrics] = useState(initial.metrics);
   const [sort, setSort] = useState(initial.sort);
+  const startDrag = useListReorderDrag({ listId: 'ssh-hosts', onDrop: (drag, target) => {
+    if (!target?.itemId || drag.id === target.itemId) return;
+    const state = useSshStore.getState(); const from = state.connections.findIndex(connection => connection.id === drag.id);
+    const remaining = state.connections.filter(connection => connection.id !== drag.id); const over = remaining.findIndex(connection => connection.id === target.itemId);
+    if (from < 0 || over < 0) return;
+    state.reorder(from, over + (target.after ? 1 : 0)); setSort('manual');
+  } });
   const [query, setQuery] = useState('');
   const [starredOnly, setStarredOnly] = useState(false);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
@@ -84,7 +92,7 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
   if (groupFilter !== null && !groups.some(group => group.name === groupFilter)) groups.push({ name: groupFilter, hosts: [] });
   const toggleResources = (value: boolean) => {
     setResources(value);
-    if (!value && !['recent', 'name'].includes(sort)) setSort('recent');
+    if (!value && !['manual', 'recent', 'name'].includes(sort)) setSort('recent');
   };
 
   useEffect(() => { ensureSshLoaded(); }, []);
@@ -110,7 +118,7 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
       const state = samples[connection.id]; const sample = state?.data;
       return sort === 'cpu' ? state?.cpu ?? -1 : sort === 'memory' ? resourcePercent(sample?.memoryTotal == null ? null : sample.memoryTotal - (sample.memoryAvailable ?? 0), sample?.memoryTotal) ?? -1 : resourcePercent(sample?.diskUsed, sample?.diskTotal) ?? -1;
     };
-    return filtered.sort((first, second) => sort === 'name' ? first.name.localeCompare(second.name) : resources && ['cpu', 'memory', 'disk'].includes(sort) ? metric(second) - metric(first) : (second.lastOpenedAt ?? 0) - (first.lastOpenedAt ?? 0));
+    return sort === 'manual' ? filtered : filtered.sort((first, second) => sort === 'name' ? first.name.localeCompare(second.name) : resources && ['cpu', 'memory', 'disk'].includes(sort) ? metric(second) - metric(first) : (second.lastOpenedAt ?? 0) - (first.lastOpenedAt ?? 0));
   }, [connections, metadata, query, starredOnly, groupFilter, tagFilter, samples, sort, resources]);
   const grouped = groupHosts(visible, metadata, groupBy);
   const showMenu = (connection: SshConnection, trigger: HTMLElement, x: number, y: number) => { setSelectedId(connection.id); setMenu({ id: connection.id, anchor: { x, y, trigger } }); };
@@ -143,7 +151,7 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
         <TextButton ref={tagTrigger} className="ssh-host-filter" aria-expanded={tagsOpen} disabled={!knownTags.length} data-tip={!knownTags.length ? t('Add tags when editing a host.') : undefined} data-testid="ssh-host-tag-filter" onClick={() => setTagsOpen(value => !value)}><Tag size={16} />{t('Tags')}{tagFilter.length > 0 && <span>{tagFilter.length}</span>}<ChevronDown size={12} /></TextButton>
       </div>
       <div className="ssh-host-view-actions">
-        <Select aria-label={t('Host list order')} value={sort} options={[{ value: 'recent', label: t('Last connected') }, { value: 'name', label: t('Name') }, ...(resources ? (['cpu', 'memory', 'disk'] as const).map(value => ({ value, label: t(METRIC_LABELS[value]) })) : [])]} onChange={value => setSort(value as Sort)} style={{ width: 118 }} />
+        <Select aria-label={t('Host list order')} value={sort} options={[{ value: 'manual', label: t('Manual order') }, { value: 'recent', label: t('Last connected') }, { value: 'name', label: t('Name') }, ...(resources ? (['cpu', 'memory', 'disk'] as const).map(value => ({ value, label: t(METRIC_LABELS[value]) })) : [])]} onChange={value => setSort(value as Sort)} style={{ width: 118 }} />
         <span className="ssh-host-resource-toggle"><Toggle compact on={resources} onChange={toggleResources} label={t('Resource usage')} /><span onClick={() => toggleResources(!resources)}>{t('Resource usage')}</span></span>
         <SegmentedControl variant="buttons" label={t('Host view')} value={layout} onChange={setLayout} options={[{ value: 'table', label: t('List'), ariaLabel: t('Table view'), icon: <Columns2 size={14} /> }, { value: 'cards', label: t('Cards'), ariaLabel: t('Card view'), icon: <Grid size={14} /> }]} />
         {resources && <span className="ssh-dashboard-metric-menu"><IconBtn ref={metricTrigger} title={t('More metrics')} data-testid="ssh-dashboard-metrics" onClick={() => setMetricsOpen(value => !value)}><MoreHorizontal size={16} /></IconBtn>
@@ -156,10 +164,11 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
     {groups.some(group => !!group.name) && <div className="ssh-host-group-filters" role="group" aria-label={t('Host groups')}>{groups.map(group => <TextButton key={group.name} aria-pressed={groupFilter === group.name} onClick={() => setGroupFilter(current => current === group.name ? null : group.name)}><Folder size={16} color="var(--primary-action)" />{group.name || t('Ungrouped')}<span>{group.hosts.length}</span></TextButton>)}</div>}
     {resources && HOST_METRICS.every(id => !metrics[id]) && <div className="ssh-dashboard-paused" role="status">{t('Metrics collection is paused. Turn on one or more metrics to collect host status.')}</div>}
     {layout === 'table' && <div className="ssh-host-columns"><span /><span>{t('Name')}</span>{resources ? <><span>{t('Status')}</span>{(['cpu', 'memory', 'disk'] as const).filter(metric => metrics[metric]).map(metric => <span key={metric}>{t(METRIC_LABELS[metric])}</span>)}</> : <><span>{t('Address')}</span><span>{t('Tags')}</span><span>{t('Last connected')}</span></>}<span /></div>}
-    <div className={layout === 'table' ? 'scroll-region ssh-host-list' : 'scroll-region ssh-dashboard-grid'}>
+    <div className={layout === 'table' ? 'scroll-region ssh-host-list' : 'scroll-region ssh-dashboard-grid'} data-reorder-list={layout === 'table' ? 'ssh-hosts' : undefined}>
       {!visible.length ? <div className="search-empty-state">{t(connections.length ? 'No matching connections' : 'No SSH connections yet. Select + to create one.')}</div> : grouped.map(group => <section key={group.name} className={layout === 'cards' ? 'ssh-dashboard-group-section' : undefined}>
         {groupBy !== 'none' && <h3 className="ssh-dashboard-group"><Folder size={16} />{group.name || t(groupBy === 'tags' ? 'Untagged' : 'Ungrouped')}<span>{group.hosts.length}</span></h3>}
-        {group.hosts.map(connection => <Fragment key={connection.id}>{layout === 'table' ? <SidebarItem active={selectedId === connection.id} icon={icon(connection)} title={connection.name} titleAccessory={favorite(connection)} subtitle={resources ? undefined : address(connection)} tooltip={address(connection)} testId={`ssh-row-${connection.id}`} tabIndex={0}
+        {group.hosts.map(connection => <Fragment key={connection.id}>{layout === 'table' && <ListReorderPlaceholder listId="ssh-hosts" itemId={connection.id} />}{layout === 'table' ? <SidebarItem active={selectedId === connection.id} icon={icon(connection)} title={connection.name} titleAccessory={favorite(connection)} subtitle={resources ? undefined : address(connection)} tooltip={address(connection)} testId={`ssh-row-${connection.id}`} tabIndex={0}
+          reorderItemId={connection.id} reorderListId="ssh-hosts" reorderKind="ssh" onPointerDown={event => startDrag(event, { id: connection.id, kind: 'ssh' })}
           badge={resources ? <HostResources state={samples[connection.id] ?? {}} disabled={metadata[connection.id]?.resourceDisabled} metrics={metrics} onRetry={() => retryHost(connection)} /> : <span className="ssh-host-row-metadata">{tags(connection)}<span className="ssh-host-row-last-connected">{lastConnected(connection)}</span></span>}
           trailingActions={[{ label: t('Connect to {{name}}', { name: connection.name }), control: connectButton(connection) }]}
           onClick={() => setSelectedId(connection.id)} onDoubleClick={() => onOpenTerminal(connection)}
@@ -182,8 +191,10 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
           {!samples[connection.id]?.error && <span className="ssh-host-last-connected">{lastConnected(connection)}</span>}
         </article>}</Fragment>)}
       </section>)}
+      {layout === 'table' && visible.length > 0 && <ListReorderPlaceholder listId="ssh-hosts" itemId={visible[visible.length - 1]!.id} after />}
     </div>
     </div>
+    <ListReorderPreview listId="ssh-hosts">{drag => <ServerStack size={20} aria-label={connections.find(connection => connection.id === drag.id)?.name} />}</ListReorderPreview>
     {details && <ToolDialog label={t('Host details')} onClose={() => setDetails(null)} closePlacement="footer"><div className="ssh-host-details"><strong>{details.name}</strong><code>{address(details)}</code>{tags(details)}<span>{lastConnected(details)}</span>{details.notes && <p>{details.notes}</p>}{resources && <HostResources state={samples[details.id] ?? {}} disabled={metadata[details.id]?.resourceDisabled} metrics={metrics} compact onRetry={() => retryHost(details)} />}</div></ToolDialog>}
     {menu && <ContextMenu anchor={menu.anchor} items={[...annotations.items(menu.id, menu.anchor), ...(onDelete ? [{ label: t('Delete'), danger: true, onClick: () => { const connection = connections.find(value => value.id === menu.id); if (connection) onDelete(connection); } }] : [])]} onClose={() => setMenu(null)} />}
     {tools && <ContextMenu anchor={{ x: tools.getBoundingClientRect().right, y: tools.getBoundingClientRect().bottom, trigger: tools }} onClose={() => setTools(null)} items={[
