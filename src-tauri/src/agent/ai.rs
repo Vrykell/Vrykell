@@ -49,6 +49,8 @@ pub struct ModelProfile {
     pub base_url: String,
     #[serde(default = "default_model")]
     pub model: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_name: Option<String>,
     /// 自定义分组名；缺省按厂商自动分组
     #[serde(default)]
     pub group: Option<String>,
@@ -179,6 +181,7 @@ impl AiConfigInner {
                 provider: self.provider.clone(),
                 base_url: self.base_url.clone(),
                 model: self.model.clone(),
+                provider_name: None,
                 group: None,
                 capabilities: None,
             });
@@ -439,8 +442,13 @@ pub fn set_active_model(state: State<'_, AiConfig>, id: String) {
 
 /// Persist an endpoint credential before marking it configured.
 #[tauri::command]
-pub fn set_provider_key(state: State<'_, AiConfig>, provider_id: String, key: String) -> Result<(), String> {
-    let k = key.trim().to_string();
+pub fn set_provider_key(state: State<'_, AiConfig>, provider_id: String, key: String, copy_from: Option<String>) -> Result<(), String> {
+    let k = if let Some(source) = copy_from {
+        if !can_copy_provider_key(&state.0.lock().unwrap().models, &source, &provider_id) {
+            return Err("provider-key-source-invalid".to_string());
+        }
+        read_provider_key(&provider_id).or_else(|| read_provider_key(&source)).ok_or("provider-key-source-missing")?
+    } else { key.trim().to_string() };
     if k.is_empty() {
         return Err("provider-key-empty".to_string());
     }
@@ -452,6 +460,13 @@ pub fn set_provider_key(state: State<'_, AiConfig>, provider_id: String, key: St
         }
     });
     Ok(())
+}
+
+fn can_copy_provider_key(models: &[ModelProfile], source: &str, destination: &str) -> bool {
+    let (Some((source_kind, _)), Some((destination_kind, address))) = (source.split_once('|'), destination.split_once('|')) else { return false; };
+    source_kind == destination_kind
+        && url::Url::parse(address).map(|url| matches!(url.scheme(), "http" | "https") && url.username().is_empty() && url.password().is_none()).unwrap_or(false)
+        && models.iter().any(|model| provider_identity(&model.provider, &model.base_url) == source)
 }
 
 #[tauri::command]
@@ -1113,5 +1128,20 @@ mod proxy_endpoint_tests {
         assert_eq!(name, provider_secret_name("anthropic|https://api.anthropic.com/v1"));
         assert_ne!(name, provider_secret_name("openai-compatible|https://api.anthropic.com/v1"));
         assert!(name.starts_with("ai.provider."));
+    }
+
+    #[test]
+    fn custom_provider_metadata_round_trips_and_key_copy_requires_a_configured_source() {
+        let model: ModelProfile = serde_json::from_value(serde_json::json!({
+            "id": "custom", "provider": "openai-compatible", "providerName": "Custom endpoint", "baseUrl": "https://source.example/v1", "model": "custom-model"
+        })).unwrap();
+        assert_eq!(serde_json::to_value(&model).unwrap()["providerName"], "Custom endpoint");
+        let source = provider_identity(&model.provider, &model.base_url);
+        let models = vec![model];
+        assert!(can_copy_provider_key(&models, &source, "openai-compatible|https://destination.example/v1"));
+        for destination in ["gemini|https://destination.example/v1", "invalid", "openai-compatible|file:///private", "openai-compatible|https://key@destination.example"] {
+            assert!(!can_copy_provider_key(&models, &source, destination));
+        }
+        assert!(!can_copy_provider_key(&[], &source, "openai-compatible|https://destination.example/v1"));
     }
 }
