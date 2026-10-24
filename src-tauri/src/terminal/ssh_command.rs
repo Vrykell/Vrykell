@@ -5,6 +5,12 @@ use std::path::Path;
 #[derive(Clone, Default, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SshOptions {
+    pub forwarding_rules: Option<Vec<crate::remote::forwarding::ForwardingRule>>,
+    pub authentication_mode: Option<String>,
+    pub proxy_id: Option<String>,
+    pub environment: Option<std::collections::BTreeMap<String, String>>,
+    pub notes: Option<String>,
+    pub ai_notes: Option<String>,
     pub identity_file: Option<String>,
     pub jump_host: Option<String>,
     pub server_alive_interval: Option<u32>,
@@ -42,6 +48,30 @@ pub fn validate_ssh_host(host: &str) -> Result<(), String> {
 }
 
 pub fn validate_options(options: &SshOptions) -> Result<(), String> {
+    if let Some(rules) = &options.forwarding_rules {
+        if rules.len() > 64 { return Err("Too many forwarding rules".into()); }
+        let mut identifiers = std::collections::HashSet::new();
+        for rule in rules {
+            rule.validate()?;
+            if !identifiers.insert(&rule.id) { return Err("Duplicate forwarding rule".into()); }
+        }
+    }
+    if options.authentication_mode.as_deref().is_some_and(|mode| !matches!(mode, "password" | "key" | "ask" | "agent")) { return Err("Invalid authentication mode".into()); }
+    if options.proxy_id.as_ref().is_some_and(|id| id.is_empty() || id.len() > 128 || !id.bytes().all(|character| character.is_ascii_alphanumeric() || b"-_".contains(&character))) {
+        return Err("Invalid proxy profile identifier".into());
+    }
+    if options.notes.iter().chain(options.ai_notes.iter()).any(|value| value.len() > 16384) { return Err("Host notes exceed 16384 bytes".into()); }
+    if let Some(environment) = &options.environment {
+        let valid_name = regex::Regex::new(r"^[A-Za-z_][A-Za-z0-9_]*$").unwrap();
+        if environment.len() > 64 || environment.iter().map(|(name, value)| name.len() + value.len()).sum::<usize>() > 32768 {
+            return Err("Environment variables exceed the supported size".into());
+        }
+        for (name, value) in environment {
+            if name.len() > 128 || !valid_name.is_match(name) || value.len() > 8192 || value.chars().any(|character| matches!(character, '\0' | '\r' | '\n')) {
+                return Err("Invalid environment variable".into());
+            }
+        }
+    }
     if options.server_alive_interval.is_some_and(|value| value > 3600) {
         return Err("保活间隔不能超过 3600 秒".into());
     }
@@ -127,6 +157,21 @@ pub fn build_ssh_command(target: &SshTarget, remote_command: Option<&str>) -> Re
     let known_hosts = dirs::home_dir().ok_or("无法定位 SSH 信任记录目录")?.join(".ssh").join("known_hosts");
     let mut command = CommandBuilder::new("ssh");
     command.arg("-tt");
+    match target.options.authentication_mode.as_deref() {
+        Some("ask") => { command.args(["-o", "PreferredAuthentications=keyboard-interactive,password", "-o", "PubkeyAuthentication=no"]); }
+        Some("agent") => { command.args(["-o", "PreferredAuthentications=publickey", "-o", "IdentityFile=none"]); }
+        _ => {}
+    }
+    if let Some(proxy) = crate::ssh_proxy::command_option(target.options.proxy_id.as_deref(), &target.host)? {
+        if target.options.jump_host.as_deref().is_some_and(|jump| !jump.eq_ignore_ascii_case("none")) { return Err("A proxy and jump host cannot be combined for this connection".into()); }
+        command.arg("-o"); command.arg(proxy);
+    }
+    if let Some(environment) = &target.options.environment {
+        if !environment.is_empty() {
+            let assignments = environment.iter().map(|(name, value)| format!("{name}=\"{}\"", value.replace('\\', "\\\\").replace('"', "\\\""))).collect::<Vec<_>>().join(" ");
+            command.arg("-o"); command.arg(format!("SetEnv={assignments}"));
+        }
+    }
     let mut verified = verified_ssh_options(target.host_key_type.as_deref(), &known_hosts)?;
     // Hop hosts are verified by the client because a direct preflight cannot reach the destination.
     // The same relaxation applies when the preflight itself was unavailable: the client still
@@ -251,5 +296,27 @@ mod tests {
         let remote = args.last().unwrap();
         assert!(remote.starts_with("cd '/remote/a user'\\''s project' || exit;"));
         assert!(remote.contains("exec \"${SHELL:-sh}\" -i"));
+    }
+
+    #[test]
+    fn environment_is_a_remote_option_and_never_changes_local_execution() {
+        let target: SshTarget = serde_json::from_value(serde_json::json!({"host":"server", "proxyId":"none", "environment":{"LANG":"en_US.UTF-8", "CUSTOM":"space and \"quotes\"; $(noop)", "PATH":"/remote/bin"}})).unwrap();
+        let command = build_ssh_command(&target, None).unwrap();
+        let args: Vec<_> = command.get_argv().iter().map(|arg| arg.to_string_lossy().into_owned()).collect();
+        let setenv = args.iter().find(|argument| argument.starts_with("SetEnv=")).unwrap();
+        assert!(setenv.contains("LANG=\"en_US.UTF-8\""));
+        assert!(setenv.contains("CUSTOM=\"space and \\\"quotes\\\"; $(noop)\""));
+        assert!(!args.iter().any(|argument| argument.starts_with("ProxyCommand=")));
+        for environment in [serde_json::json!({"INVALID-NAME":"x"}), serde_json::json!({"LANG":"ok\nBAD=1"}), serde_json::json!({"KEY":"\u{0}"})] {
+            let options: SshOptions = serde_json::from_value(serde_json::json!({"environment":environment})).unwrap(); assert!(validate_options(&options).is_err());
+        }
+    }
+
+    #[test]
+    fn interactive_and_agent_modes_are_explicit_client_options() {
+        for (mode, expected) in [("ask", "PubkeyAuthentication=no"), ("agent", "IdentityFile=none")] {
+            let target: SshTarget = serde_json::from_value(serde_json::json!({"host":"server", "proxyId":"none", "authenticationMode":mode})).unwrap();
+            assert!(build_ssh_command(&target, None).unwrap().get_argv().iter().any(|argument| argument == expected));
+        }
     }
 }

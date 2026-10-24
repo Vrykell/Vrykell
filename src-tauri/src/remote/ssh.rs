@@ -12,7 +12,6 @@ use base64::Engine;
 use serde::{Deserialize, Serialize};
 use ssh2::{CheckResult, ExtendedData, HostKeyType, KnownHostFileKind, KnownHostKeyFormat, Session, Sftp};
 use std::io::{Read, Write};
-use std::net::TcpStream;
 use std::path::Path;
 use std::time::Duration;
 use tauri::State;
@@ -345,20 +344,8 @@ fn tcp_handshake_with_timeout(conn: &SshConnection, timeout: Option<Duration>) -
     let host = conn.host.as_str();
     let port = conn.port.unwrap_or(22);
 
-    let tcp = if let Some(timeout) = timeout {
-        use std::net::ToSocketAddrs;
-        let addresses = (host, port).to_socket_addrs().map_err(|error| error.to_string())?;
-        let started = std::time::Instant::now();
-        let mut result = Err(std::io::Error::new(std::io::ErrorKind::TimedOut, "Resource connection timed out"));
-        for address in addresses {
-            let remaining = timeout.saturating_sub(started.elapsed());
-            if remaining.is_zero() { break; }
-            result = TcpStream::connect_timeout(&address, remaining);
-            if result.is_ok() { break; }
-        }
-        result
-    } else { TcpStream::connect((host, port)) }
-        .map_err(|e| format!("连接 {host}:{port} 失败：{e}"))?;
+    crate::terminal::ssh_command::validate_options(&conn.options)?;
+    let tcp = crate::ssh_proxy::connect_target(host, port, conn.options.proxy_id.as_deref(), timeout)?;
     tcp.set_read_timeout(Some(Duration::from_secs(15))).ok();
     tcp.set_write_timeout(Some(Duration::from_secs(15))).ok();
 
@@ -516,6 +503,7 @@ fn authenticate(sess: &Session, conn: &SshConnection, user: &str, credential: Op
             }
         };
     }
+    if conn.options.authentication_mode.as_deref() == Some("ask") { return Err("SSH_AUTH_FAILED: Enter credentials to connect".into()); }
     if let Some(identity) = &conn.options.identity_file {
         sess.userauth_pubkey_file(user, None, Path::new(identity), None)
             .map_err(|error| format!("SSH_AUTH_FAILED: Private key authentication failed: {error}"))?;
@@ -532,6 +520,7 @@ fn authenticate(sess: &Session, conn: &SshConnection, user: &str, credential: Op
     if sess.userauth_agent(user).is_ok() && sess.authenticated() {
         return Ok(());
     }
+    if conn.options.authentication_mode.as_deref() == Some("agent") { return Err("SSH_AUTH_FAILED: No accepted agent identities are available".into()); }
     if let Some(home) = dirs::home_dir() {
         for key in ["id_ed25519", "id_rsa", "id_ecdsa", "id_dsa"] {
             let priv_path = home.join(".ssh").join(key);
@@ -597,6 +586,7 @@ pub fn ssh_connections_list(state: State<'_, HistoryState>) -> Result<Vec<SshCon
 pub fn ssh_connection_save(state: State<'_, HistoryState>, conn: SshConnection) -> Result<(), String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
     db.save_ssh_connection(&conn)?;
+    super::forwarding::invalidate_connection(&conn);
     AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.clear(&conn.id);
     Ok(())
 }
@@ -605,6 +595,7 @@ pub fn ssh_connection_save(state: State<'_, HistoryState>, conn: SshConnection) 
 pub fn ssh_connection_delete(state: State<'_, HistoryState>, id: String) -> Result<(), String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
     db.delete_ssh_connection(&id)?;
+    super::forwarding::stop_connection(&id);
     AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.clear(&id);
     Ok(())
 }
@@ -675,7 +666,7 @@ pub struct SshHostKeyInfo {
 
 /// 查询主机指纹与 known_hosts 记录状态（不做任何写入）。
 #[tauri::command]
-pub async fn ssh_host_key_info(host: String, port: Option<u16>) -> Result<SshHostKeyInfo, String> {
+pub async fn ssh_host_key_info(host: String, port: Option<u16>, options: Option<SshOptions>) -> Result<SshHostKeyInfo, String> {
     let conn = SshConnection {
         id: String::new(),
         name: String::new(),
@@ -686,7 +677,7 @@ pub async fn ssh_host_key_info(host: String, port: Option<u16>) -> Result<SshHos
         auth_method: "password".to_string(),
         last_opened_at: None,
         has_password: false,
-        options: Default::default(),
+        options: options.unwrap_or_default(),
     };
     tauri::async_runtime::spawn_blocking(move || {
         let sess = tcp_handshake(&conn)?;
@@ -708,7 +699,7 @@ pub async fn ssh_host_key_info(host: String, port: Option<u16>) -> Result<SshHos
 
 /// 用户确认指纹后，记录主机密钥到 known_hosts（幂等）。
 #[tauri::command]
-pub async fn ssh_trust_host_key(host: String, port: Option<u16>, expected_fingerprint: String) -> Result<(), String> {
+pub async fn ssh_trust_host_key(host: String, port: Option<u16>, expected_fingerprint: String, options: Option<SshOptions>) -> Result<(), String> {
     let conn = SshConnection {
         id: String::new(),
         name: String::new(),
@@ -719,7 +710,7 @@ pub async fn ssh_trust_host_key(host: String, port: Option<u16>, expected_finger
         auth_method: "password".to_string(),
         last_opened_at: None,
         has_password: false,
-        options: Default::default(),
+        options: options.unwrap_or_default(),
     };
     tauri::async_runtime::spawn_blocking(move || {
         let sess = tcp_handshake(&conn)?;

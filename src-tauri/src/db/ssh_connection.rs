@@ -33,7 +33,8 @@ impl HistoryDb {
                 |row| map_ssh_connection(row, false),
             )
             .map_err(|e| e.to_string())?;
-        // 旧库明文迁移：列里还有密码而密钥存储没有 → 搬进密钥存储
+        if conn.auth_method != "password" { conn.password.clear(); conn.has_password = false; return Ok(conn); }
+        // Migrate legacy credentials to separate storage.
         if !conn.password.is_empty() && secret::get_secret(id).is_none() {
             if secret::set_secret(id, &conn.password).is_ok() {
                 conn.password = secret::get_secret(id).unwrap_or_default();
@@ -162,7 +163,8 @@ mod tests {
         let mut conn: SshConnection = serde_json::from_value(serde_json::json!({
             "id":"options-roundtrip", "name":"测试", "host":"target", "user":"tester",
             "authMethod":"key", "identityFile":"C:/keys/private", "jumpHost":"user@jump:2222",
-            "serverAliveInterval":45, "shellIntegration":false
+            "serverAliveInterval":45, "shellIntegration":false,
+            "proxyId":"office-proxy", "environment":{"LANG":"en_US.UTF-8"}, "notes":"Inventory", "aiNotes":"Do not restart the database."
         })).unwrap();
         db.save_ssh_connection(&conn).unwrap();
         let saved = serde_json::to_value(db.list_ssh_connections().unwrap().remove(0)).unwrap();
@@ -170,6 +172,10 @@ mod tests {
         assert_eq!(saved["jumpHost"], "user@jump:2222");
         assert_eq!(saved["serverAliveInterval"], 45);
         assert_eq!(saved["shellIntegration"], false);
+        assert_eq!(saved["proxyId"], "office-proxy");
+        assert_eq!(saved["environment"]["LANG"], "en_US.UTF-8");
+        assert_eq!(saved["notes"], "Inventory");
+        assert_eq!(saved["aiNotes"], "Do not restart the database.");
         conn.name = "更新".into();
         db.save_ssh_connection(&conn).unwrap();
         assert_eq!(serde_json::to_value(db.get_ssh_connection(&conn.id).unwrap()).unwrap()["jumpHost"], "user@jump:2222");
