@@ -22,7 +22,7 @@ async function openUsagePage(page: import('@playwright/test').Page) {
 
 /** The chat panel button toggles, so only press it when the composer is not on screen. */
 async function ensureChatPanelOpen(page: import('@playwright/test').Page) {
-  const composer = page.getByPlaceholder(/自然语言描述/);
+  const composer = page.locator('[data-chat-composer]:visible');
   if (!(await composer.isVisible().catch(() => false))) await page.locator('[data-dock-btn="chat"]').click();
   await expect(composer).toBeVisible({ timeout: 3000 });
 }
@@ -44,7 +44,7 @@ test.describe('usage statistics page', () => {
 
     // One turn from the AI panel: the mocked stream reports prompt_tokens 10 / completion_tokens 5.
     await ensureChatPanelOpen(page);
-    const input = page.getByPlaceholder(/自然语言描述/);
+    const input = page.locator('[data-chat-composer]:visible');
     await input.fill('统计一下用量');
     await input.press('Enter');
     await expect(page.getByText('已记录')).toBeVisible({ timeout: 10000 });
@@ -69,8 +69,8 @@ test.describe('usage statistics page', () => {
 
     await expect(page.getByTestId('usage-model-all')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByTestId('usage-filter-model')).toHaveCount(0);
-    await page.getByTestId('usage-model-gpt-4o-mini').click();
-    await expect(page.getByTestId('usage-model-gpt-4o-mini')).toHaveAttribute('aria-pressed', 'true');
+    await page.getByTestId('usage-model-qwen2.5').click();
+    await expect(page.getByTestId('usage-model-qwen2.5')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByTestId('usage-total-requests')).toHaveText('1');
     await page.getByTestId('usage-model-all').click();
     await expect(page.getByTestId('usage-model-all')).toHaveAttribute('aria-pressed', 'true');
@@ -83,7 +83,7 @@ test.describe('usage statistics page', () => {
 
     const logRow = page.getByTestId('usage-log-row');
     await expect(logRow).toHaveCount(1);
-    await expect(logRow).toHaveAttribute('data-model', 'gpt-4o-mini');
+    await expect(logRow).toHaveAttribute('data-model', 'qwen2.5');
     await expect(logRow.getByRole('cell').nth(1)).toHaveText('openai-compatible');
     await expect(logRow.getByRole('cell').nth(3)).toHaveText('10');
     await expect(logRow.getByRole('cell').nth(4)).toHaveText('5');
@@ -94,7 +94,7 @@ test.describe('usage statistics page', () => {
     await page.getByTestId('usage-tab-providers').click();
     await expect(page.locator('[data-testid="usage-provider-row"][data-provider="openai-compatible"]')).toBeVisible();
     await page.getByTestId('usage-tab-models').click();
-    await expect(page.locator('[data-testid="usage-model-row"][data-model="gpt-4o-mini"]')).toBeVisible();
+    await expect(page.locator('[data-testid="usage-model-row"][data-model="qwen2.5"]')).toBeVisible();
     await page.getByTestId('usage-tab-logs').click();
     await expect(page.getByTestId('usage-log-row')).toHaveCount(1);
 
@@ -102,7 +102,7 @@ test.describe('usage statistics page', () => {
     await page.getByTestId('usage-range').click();
     await page.getByRole('option', { name: '全部时间' }).click();
     await expect(page.getByTestId('usage-total-requests')).toHaveText('1');
-    await page.getByTestId('usage-model-gpt-4o-mini').click();
+    await page.getByTestId('usage-model-qwen2.5').click();
     await expect(page.getByTestId('usage-total-tokens')).toHaveText('15');
 
     await page.reload();

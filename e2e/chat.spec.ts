@@ -48,7 +48,7 @@ test.describe('chat 对话链路（内联 AI 模式）', () => {
     await input.fill('麦克斯韦方程组');
     await input.press('Enter');
 
-    await expect(page.getByText('麦克斯韦方程组').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.chat-conversation-title:visible')).toHaveText('麦克斯韦方程组', { timeout: 10000 });
   });
 
   test('发送中输入禁用，完成后恢复', async ({ page }) => {

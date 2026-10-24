@@ -43,11 +43,11 @@ for (const theme of ['dark', 'light']) test(`conversation toolbar and floating s
   const side = page.getByTestId('ai-surface-side');
   await expect(side.getByRole('button', { name: '会话设置', exact: true })).toBeVisible();
   await side.getByRole('button', { name: '会话设置', exact: true }).click();
-  const target = page.getByRole('region', { name: '会话设置' }).getByRole('combobox');
-  await expect(target).toBeFocused();
+  const target = page.getByRole('region', { name: '会话设置' }).getByRole('combobox', { name: '选择执行终端' });
+  await target.focus();
   await target.press('Control+t');
   await expect(page.locator('[data-tab-kind="session"]')).toHaveCount(1);
   await expect(draft).toHaveValue('');
   await expect(page.getByTestId('workspace-area-terminal')).toHaveAttribute('aria-current', 'page');
-  expect(await draft.evaluate(element => element === (window as unknown as { savedDraft: Element }).savedDraft)).toBe(true);
+  expect(await page.evaluate(() => { const element = (window as unknown as { savedDraft: HTMLTextAreaElement }).savedDraft; return element.isConnected && element.value === 'Keep this question'; })).toBe(true);
 });

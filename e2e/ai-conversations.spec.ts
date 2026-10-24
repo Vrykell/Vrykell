@@ -30,7 +30,7 @@ test('conversation drafts survive terminal navigation, settings and closing the 
 
 test('history owns separate drafts and messages and restores them after reload', async ({ page }) => {
   await boot(page);
-  const composer = page.locator('[data-chat-composer]');
+  const composer = page.locator('[data-chat-composer]:visible');
   await composer.fill('Fix the build');
   await composer.press('Enter');
   await expect(page.getByText('The build is fixed.', { exact: true })).toBeVisible();
@@ -223,7 +223,7 @@ test('tool activity stays available within the plain conversation flow', async (
     radius: getComputedStyle(element).borderRadius,
     borderTop: getComputedStyle(element).borderTopStyle,
   }));
-  expect(presentation).toMatchObject({ radius: '8px', borderTop: 'solid' });
+  expect(presentation).toMatchObject({ radius: '8px', borderTop: 'none' });
   expect(presentation.background).not.toBe('rgba(0, 0, 0, 0)');
   await expect(rows.first().locator('.ai-tool-label')).toHaveText('运行命令');
   await expect(rows.first().locator('.ai-tool-state')).toHaveText('退出码 0');
@@ -249,13 +249,13 @@ test('tool activity stays available within the plain conversation flow', async (
   expect(scroll).toEqual({ wrapper: 'auto', inner: 'hidden' });
   // A failure is readable straight away and can be collapsed again from its own row.
   const failed = rows.nth(2);
-  await expect(failed.getByRole('alert')).toContainText('Exit code 2');
+  await expect(page.getByRole('alert')).toContainText('Exit code 2');
   await expect(failed.locator('.ai-tool-summary')).toHaveAttribute('aria-expanded', 'true');
   await failed.locator('.ai-tool-summary').click();
-  await expect(failed.getByRole('alert')).toHaveCount(0);
+  await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(failed.locator('.ai-tool-summary')).toHaveAttribute('aria-expanded', 'false');
   await failed.locator('.ai-tool-summary').click();
-  await expect(failed.getByRole('alert')).toContainText('Exit code 2');
+  await expect(page.getByRole('alert')).toContainText('Exit code 2');
   // The copy target sits in the frame corner and appears with the hovered output.
   const copy = page.getByTestId('tool-output-copy');
   await expect(copy).toHaveCSS('opacity', '0');

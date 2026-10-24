@@ -8,7 +8,7 @@ test('an unavailable side dock keeps the same conversation visible in the main w
   const composer = page.locator('[data-chat-composer]:visible');
   await composer.fill('keep my visible draft');
   await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
-  await page.getByRole('button', { name: '将 AI 停靠到侧栏', exact: true }).click();
+  await page.getByRole('menuitem', { name: '将 AI 停靠到侧栏', exact: true }).click();
   await expect(page.getByTestId('ai-surface-main').locator('[data-chat-composer]')).toHaveValue('keep my visible draft');
   await expect(page.getByTestId('workspace-area-ai')).toHaveAttribute('aria-current', 'page');
   await expect(page.locator('.workspace-side-panel:visible')).toHaveCount(0);

@@ -7,7 +7,7 @@ test('AI 草稿和附件按会话保留，关闭面板后仍能继续发送', as
   await page.goto('/');
   await ensureTabsOpen(page);
   await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
-  const input = page.getByPlaceholder('自然语言描述你想做什么…');
+  const input = page.locator('[data-chat-composer]:visible');
   await input.fill('终端一的草稿');
   await input.evaluate((element) => {
     const event = new Event('paste', { bubbles: true, cancelable: true });
@@ -26,6 +26,7 @@ test('AI 草稿和附件按会话保留，关闭面板后仍能继续发送', as
   await page.getByTestId('unified-history-page').locator('[data-history-kind="conversation"]').last().click();
   await ensureTabsOpen(page);
   await page.getByTestId('tab-row-t1').click();
+  if (!await input.isVisible()) await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
   await expect(input).toHaveValue('终端一的草稿');
   await expect(page.locator('[data-tip="移除附件"]')).toHaveCount(1);
   const visibleComposer = page.locator('[data-chat-composer]:visible');

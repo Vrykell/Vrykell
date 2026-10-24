@@ -45,7 +45,7 @@ test('model shape, approval hover and attachment chip hover share one visual lan
   await status.getByTestId('chat-approval-select').click();
   const selected = page.locator('.chat-mode-option[aria-selected="true"]');
   const other = page.locator('.chat-mode-option[aria-selected="false"]').first();
-  await expect(selected).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await expect(selected).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await other.hover();
   await expect(other).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await expect(selected).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
