@@ -96,3 +96,27 @@ not pretend to protect "the renderer itself" or "the programs the user installs"
 - `ee4c70e` / `0e83644`: per-shape session approvals
 - Production CSP split, links that stay in the app, SSH screen sanitizing: see the matching entries in
   `security-review.md`
+
+## Saved connection extensions
+
+Independent forwarding adds three explicit lifecycle commands: start accepts only a saved connection identifier and a saved rule identifier, stop addresses that pair, and status returns only runtime metadata. The backend reloads and validates the saved endpoints and reuses existing authentication, proxy and strict host-key checks; the renderer cannot supply shell text or credential arguments. Loopback is the default bind address. A user-selected public listener exposes the configured network endpoint, so automatic start remains an explicit per-rule preference. Session and client counts, protocol handshakes and buffers are bounded. Stop, endpoint changes, profile deletion and application exit close the managed listeners. No CSP, capability or path scope is broadened; no new HTML rendering or diagnostic payload is introduced.
+
+The proxy configuration commands validate profile identifiers, endpoint syntax, port ranges and credential sizes. Non-secret profiles are written atomically; passwords stay in the existing platform credential store and are omitted from returned objects. The terminal helper uses a validated profile ID rather than credentials in command arguments. HTTP CONNECT and SOCKS5 headers, addresses and handshake duration are bounded, and destination host-key verification is unchanged. The initial proxy-authentication exchange is not encrypted by these protocols; use trusted proxies on protected networks.
+
+Remote environment values are sent as session options, never installed into the local process environment. Names, sizes, counts and control characters are validated independently in the UI and backend. Notes are byte-bounded user context, not policy or authorization. Diagnostics redact environment contents and both note fields. No capabilities or CSP origins are broadened. Protocol, argument, serialization and database round-trip tests accompany the full-page editor tests. See `ssh-profiles.md` for supported combinations and limitations.
+
+## Endpoint migration and text operations
+
+The existing credential-write command can copy a configured endpoint's key to a validated HTTP(S) endpoint of the same API family. It prefers an already configured destination key and never reveals plaintext to the renderer. The UI asks for explicit consent before reusing a key at a different origin; cancellation leaves the original endpoint and key unchanged. Original credentials remain available for other configured models. Custom provider metadata contains no key material.
+
+Fenced-code highlighting renders token slices as escaped text elements, never injected HTML; unknown languages and oversized input remain plain text. Modal editor commands reuse existing save, picker, revision checks and close guards; explicit force-close does not save a draft. Copy operators write only the text selected by the user to the existing system clipboard channel. No new native command, file grant, network origin or capability is added.
+
+New local terminal processes read registered system/user executable search paths and merge them into the child environment. They never mutate the parent process environment or run a script to obtain paths. Inherited custom entries retain priority; this does not grant access to additional files or change remote environments.
+
+## Completion and marketplace requests
+
+The new `shell_complete` command accepts only known shell identifiers, an absolute working directory, bounded plain completion text and a valid cursor offset. Constant internal child scripts receive input through environment data; execution syntax is rejected before a process starts. Queries never enter the live terminal, child duration and output are capped, standard input is closed, windows stay hidden, and dropped requests terminate the child. Remote panes never query the local shell. This read-only discovery path adds no file-write grant, capability or CSP exception; completion text remains redacted in diagnostics.
+
+The existing marketplace commands now honor operating-system proxies while preserving endpoint allowlisting, redirect restrictions and TLS verification. Index and descriptor bodies are capped; description requests use bounded concurrency and a total deadline. A listing pins descriptor requests to its index revision, and switching the selected repository invalidates stale UI responses. Installed external skills remain untrusted. The shared resource switcher references existing domain identities and guarded-close paths; it neither recreates live resources nor changes authorization.
+
+The read-only `history_page` command accepts bounded sizes, whitelisted source/sort values and length-bounded keyset cursors. SQL fragments come only from internal whitelists; cursor values remain bound parameters. It returns metadata only and exposes no path, script or remote request. Diagnostics contain counts, cursor presence, success and separate lock/query timings, never cursor values or content. Mixed placement moves existing hosts within the same webview, adding no HTML interpretation, file grant, capability, process owner or approval path. Validated layout references cannot reopen files or start processes by themselves.
