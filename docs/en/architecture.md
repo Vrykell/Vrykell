@@ -78,6 +78,8 @@ The titlebar uses `useBalancedTitlebar` to observe the action zone, navigation o
 
 ## 4. End-to-End Layering
 
+Shared interface code is packaged under `src/ui/actions`, `fields`, `menus`, `feedback`, `layout`, `editor`, `history`, `icons` and `hooks`; tests and styles stay with their owner. Root compatibility components are not retained, and the architecture guard rejects root-level interface source files. Terminal and mixed-resource workspaces share the flat split renderer, pane surface, divider and placement picker. Existing domain tab stores remain authoritative; the mixed workspace keeps references and placement only. Its sidebar row opens an independently composed start page using the existing launcher design. Focused-resource actions stay in the tab toolbar, not an extra row.
+
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐
 │  Rust backend (src-tauri/src)                                                    │
