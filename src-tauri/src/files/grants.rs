@@ -96,9 +96,8 @@ impl PathGrants {
         };
         for path in paths {
             if let Some(canonical) = canonical_lenient(&path) {
-                if set.insert(canonical.clone()) {
-                    kept.push(canonical);
-                }
+                set.insert(canonical.clone());
+                kept.push(canonical);
             }
         }
         kept
@@ -273,5 +272,6 @@ mod tests {
         let kept = registry.grant_in_memory(vec![file.clone(), PathBuf::from("/does/not/exist.txt")]);
         assert_eq!(kept.len(), 1, "only the path that exists is kept");
         assert!(kept[0].is_absolute(), "the kept path is absolute");
+        assert_eq!(registry.grant_in_memory(vec![file]), kept);
     }
 }

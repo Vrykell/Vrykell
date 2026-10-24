@@ -30,11 +30,12 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 ignore = "0.4"
 regex = "1"
 dirs = "5"
-reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "stream", "rustls-tls", "system-proxy"] }
 url = "2"
 tokio = { version = "1", features = ["process", "io-util", "sync", "time", "macros", "rt", "fs", "net"] }
 zip = { version = "2", default-features = false, features = ["deflate"] }
 sha2 = "0.10"
+encoding_rs = "0.8.35"
 futures-util = "0.3"
 base64 = "0.22"
 ssh2 = "0.9"
@@ -58,6 +59,6 @@ tokio = { version = "1", features = ["test-util"] }
 
 [target.'cfg(windows)'.dependencies]
 # DPAPI for the local secret store: only the current user can unseal the values.
-windows-sys = { version = "0.60", features = ["Win32_Foundation", "Win32_Security_Cryptography"] }
+windows-sys = { version = "0.60", features = ["Win32_Foundation", "Win32_Security_Cryptography", "Win32_System_Registry"] }
 # 进程树快照/终结（tlhelp32）、ConPTY 的 Ctrl+C/强杀路径，以及文件剪贴板（winuser/shellapi）
 winapi = { version = "0.3", features = ["tlhelp32", "processthreadsapi", "handleapi", "minwinbase", "minwindef", "winnt", "winbase", "winuser", "shellapi"] }
