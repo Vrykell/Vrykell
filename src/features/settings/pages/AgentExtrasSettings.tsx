@@ -94,7 +94,7 @@ export function MemorySettings() {
         <OutlineButton onClick={() => void organize()} disabled={organizing} style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           <Sparkles size={12} /> {organizing ? '整理中…' : '让 AI 整理'}
         </OutlineButton>
-          <OutlineButton onClick={() => void clear()} disabled={organizing} style={{ ...btnStyle, color: 'var(--control-danger-color)' }}>{t('Clear')}</OutlineButton>
+          <OutlineButton onClick={() => void clear()} disabled={organizing} style={{ ...btnStyle, color: 'var(--control-danger-color)' }}>{t('Clear memory')}</OutlineButton>
       </div>
       <ConfigTextArea
         value={saving.value}
