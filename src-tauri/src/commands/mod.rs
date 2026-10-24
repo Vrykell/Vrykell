@@ -3,6 +3,7 @@
 
 pub mod clipboard;
 pub mod conversation;
+pub mod history_page;
 pub mod download;
 pub mod group;
 pub mod git;

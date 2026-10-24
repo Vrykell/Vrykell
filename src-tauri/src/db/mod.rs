@@ -6,6 +6,7 @@ use std::sync::Mutex;
 pub mod download;
 pub mod conversation;
 pub mod history;
+pub mod history_page;
 pub mod command_history;
 pub mod session;
 pub mod ssh_connection;

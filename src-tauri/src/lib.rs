@@ -7,6 +7,7 @@ mod platform;
 mod redact;
 mod remote;
 mod secret;
+mod ssh_proxy;
 mod terminal;
 mod theme;
 mod diagnostics;
@@ -14,6 +15,8 @@ mod diagnostics;
 use db::HistoryState;
 use std::sync::Mutex;
 use tauri::Manager;
+
+pub fn run_ssh_proxy_helper() -> Option<i32> { ssh_proxy::helper_exit_code() }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -178,6 +181,7 @@ pub fn run() {
             agent::permissions::tool_policy_set_level,
             agent::permissions::tool_policy_clear_session_grants,
             terminal::pty::pty_spawn,
+            terminal::completion::shell_complete,
             terminal::pty::pty_close_all,
             diagnostics::diagnostics_set_auto_save,
             diagnostics::diagnostics_auto_save,
@@ -191,8 +195,15 @@ pub fn run() {
             remote::ssh::ssh_connection_save,
             remote::ssh::ssh_connection_delete,
             remote::ssh::ssh_connection_touch,
+            ssh_proxy::ssh_proxy_configuration,
+            ssh_proxy::ssh_proxy_save,
+            ssh_proxy::ssh_proxy_delete,
+            ssh_proxy::ssh_proxy_set_default,
             remote::ssh::ssh_test,
             remote::ssh::ssh_system_status,
+            remote::forwarding::ssh_forward_start,
+            remote::forwarding::ssh_forward_stop,
+            remote::forwarding::ssh_forwards_status,
             remote::network::ssh_network_probe,
             remote::ssh::ssh_authenticate_session,
             remote::ssh::ssh_forget_session_auth,
@@ -260,6 +271,7 @@ pub fn run() {
             commands::search::search_sessions,
             commands::session::create_session,
             commands::conversation::list_conversations,
+            commands::history_page::history_page,
             commands::conversation::save_conversation,
             commands::conversation::append_conversation_message,
             commands::conversation::list_conversation_messages,
@@ -312,6 +324,7 @@ pub fn run() {
             // Do not rely on the operating system closing handles: terminate every
             // PTY child explicitly before the process exits.
             terminal::pty::close_all_sessions(app_handle);
+            remote::forwarding::stop_all();
             if let Err(error) = diagnostics::flush_logs() { eprintln!("[diagnostics] {error}"); }
         }
     });
