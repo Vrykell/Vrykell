@@ -1,4 +1,5 @@
 import { useFileUndoSettings } from '@config/fileUndo';
+import { useFileDirectoryShortcuts } from '../hooks/useFileDirectoryShortcuts';
 import { TextInput } from '@ui/TextInput';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -265,6 +266,7 @@ export default function FilePanel({
     onSyncToTerminal: config.syncToTerminal && onSyncToTerminal && directoryReady
       ? () => { if (path !== null) onSyncToTerminal(path); } : undefined,
   };
+  useFileDirectoryShortcuts(enabled, handlers.onSyncToTerminal, handlers.onSyncToCwd);
 
   /**
    * Path bar commit: directories navigate as usual, while a file path opens
@@ -547,22 +549,8 @@ export default function FilePanel({
                   <div role="status" style={{ padding: `5px 10px 5px ${4 + (row.depth + 1) * 14}px`, color: 'var(--text-muted)' }}>{t('files.loading.directory')}</div>
                 )}
                 {row.expanded && childErrors[row.entry.path] && (
-                  // 与文件树行同缩进、同行高的普通行（不是告警卡片），右侧给一个重试按钮
-                  <div
-                    role="alert"
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 8,
-                      padding: `5px 10px 5px ${4 + (row.depth + 1) * 14}px`,
-                      color: 'var(--danger)',
-                    }}
-                  >
-                    <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {childErrors[row.entry.path]}
-                    </span>
-                    <button onClick={() => void refreshDir(row.entry)} style={{ minHeight: 24, padding: '0 8px' }}>重试</button>
-                  </div>
+                  <ErrorBox title={t('Unable to read directory')} details={childErrors[row.entry.path]}
+                    actions={<button type="button" onClick={() => void refreshDir(row.entry)}>{t('Retry')}</button>} />
                 )}
               </Fragment>
             ))}
@@ -795,6 +783,8 @@ function FileRow({
         {icon ?? <RowIcon size={iconSizes.row} fill={entry.is_dir && highlighted ? 'currentColor' : 'none'} />}
       </span>
       {renaming ? (
+        <span className="file-rename-field">
+        <span aria-hidden="true" className="file-rename-measure">{draft || ' '}</span>
         <TextInput
           autoFocus
           value={draft}
@@ -809,13 +799,14 @@ function FileRow({
           onContextMenu={(event) => event.stopPropagation()}
           data-testid="rename-input"
           style={{
-            flex: 1, minWidth: 0,
+            position: 'absolute', inset: 0, width: '100%', minWidth: 0, boxSizing: 'border-box',
             background: 'var(--field-bg)', border: '1px solid var(--border)',
             borderRadius: 3, padding: '0 4px', fontSize: 'calc(12px * var(--ui-font-scale))',
             color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
             outline: 'none',
           }}
         />
+        </span>
       ) : (
         <span style={{
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',

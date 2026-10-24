@@ -22,7 +22,7 @@ export function pickPath(
       extensions: options?.extensions ?? null,
       fileName: options?.fileName ?? null,
     },
-  });
+  }).then(paths => paths.map(normPath));
 }
 
 /**

@@ -2,7 +2,7 @@ import UploadManager from '@features/files/components/UploadManager';
 import { preferredShell, useTerminalDefaults } from '@config/terminalDefaults';
 import { useEffect, useState } from 'react';
 import { openPath } from '@tauri-apps/plugin-opener';
-import { Folder, HardDrive, Star, iconSizes } from '@ui/icons';
+import { Folder, HardDrive, StarFilled, iconSizes } from '@ui/icons';
 import { fmtSize } from '@ui/UiBtn';
 import type { DiskEntry } from '@platform/api/types';
 import { fileIcon } from '@features/files/utils/fileIcon';
@@ -46,15 +46,15 @@ export default function PanelFiles() {
     const conn = sshConnections.find((c) => c.id === connectionId);
     if (conn) return <RemoteFiles key={conn.id} conn={conn} enabled={filesOpen} />;
   }
-  return <LocalFiles />;
+  return <LocalFiles enabled={filesOpen} />;
 }
 
 /** 本地面板：只提供本地专有的菜单项、图标与磁盘视图。 */
-function LocalFiles() {
+function LocalFiles({ enabled }: { enabled: boolean }) {
   const [transferPage, setTransferPage] = useState<'upload' | 'download' | null>(null);
   const workspaceDirs = useWorkspaceDirsStore();
   const rememberedPath = useLocalPathStore((state) => state.remembered);
-  // Start directory: the session's remembered location, otherwise the focused terminal cwd.
+  // Start with the remembered location, otherwise use the focused terminal directory.
   // Navigation stays decoupled from the terminal afterwards.
   const { focusedPaneId: focused, activeCwd, sessions } = useActiveWorkspace();
 
@@ -99,6 +99,7 @@ function LocalFiles() {
   return (
     <FilePanel
       target={LOCAL_TARGET}
+      enabled={enabled}
       initialPath={rememberedPath ? rememberedPath.path : activeCwd ?? null}
       initialResolved={rememberedPath !== null}
       onPathChange={(next) => useLocalPathStore.getState().remember(next)}
@@ -116,7 +117,7 @@ function LocalFiles() {
       renderIcon={(entry) => {
         if (entry.is_dir) {
           return workspaceDirs.contains(entry.path)
-            ? <Star size={iconSizes.row} fill="currentColor" />
+            ? <StarFilled size={iconSizes.row} color="var(--favorite-color)" />
             : <Folder size={iconSizes.row} fill="none" />;
         }
         const Icon = fileIcon(entry.name);

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, CheckCircle2, Download, FolderOpen, RefreshCw, Server, Trash2, Upload } from '@ui/icons';
+import { ArrowLeft, CheckCircle2, Download, FolderOpen, RefreshCw, Trash2, Upload } from '@ui/icons';
+import { TerminalProfileIcon } from '@ui/shellIcons';
 import { ProgressBar } from '@ui/ProgressBar';
 import { OutlineButton } from '@ui/OutlineButton';
 import { TextButton } from '@ui/TextButton';
@@ -40,7 +41,7 @@ function TransferCard({ record: { job, history }, pending, onControl, onDelete, 
       <FileIcon size={16} aria-hidden="true" />
       <span className="transfer-file-name" data-tip={job.name}>{job.name}</span>
     </div>
-    <div className="transfer-connection"><Server size={12} aria-hidden="true" /><span data-tip={job.connectionName}>{job.connectionName}</span></div>
+    <div className="transfer-connection"><TerminalProfileIcon kind="ssh" connectionId={job.connectionId} size={16} /><span data-tip={job.connectionName}>{job.connectionName}</span></div>
     <dl className="transfer-paths">
       <div><dt>{t('Transfer source')}</dt><dd data-tip={source}>{source}</dd></div>
       <div><dt>{t('Transfer destination')}</dt><dd data-tip={destination}>{destination}</dd></div>
@@ -59,7 +60,7 @@ function TransferCard({ record: { job, history }, pending, onControl, onDelete, 
         {t('About {{seconds}} seconds remaining', { seconds: Math.ceil((job.total - job.bytes) / job.speed) })}
       </div>}
     </>}
-    {job.error && job.status === 'failed' && <ErrorBox compact dismissible={false}>{job.error}</ErrorBox>}
+    {job.error && job.status === 'failed' && <ErrorBox compact>{job.error}</ErrorBox>}
     <div className="transfer-record-footer">
       {!completed && <div className="transfer-controls" data-testid={'transfer-controls-' + job.id}>
         {job.status === 'running'
@@ -71,7 +72,7 @@ function TransferCard({ record: { job, history }, pending, onControl, onDelete, 
       <div className="transfer-actions">
         {completed && job.direction === 'download' && <IconBtn compact className="transfer-action" title={t('Reveal downloaded file')}
           data-testid={history ? 'download-reveal-' + history.name : 'transfer-reveal-' + job.id} onClick={() => onReveal(job.localPath)}><FolderOpen size={14} /></IconBtn>}
-        <IconBtn compact className="transfer-action" title={t('Delete transfer record')}
+        <IconBtn compact tone="danger" className="transfer-action" title={t('Delete transfer record')}
           data-testid={history ? 'download-delete-' + history.id : 'transfer-delete-' + job.id} disabled={pending} onClick={onDelete}><Trash2 size={14} /></IconBtn>
       </div>
     </div>
@@ -163,7 +164,7 @@ export default function TransferManagerView({ onBack, direction }: { onBack: () 
       {groups[2].records.length > 0 && <IconBtn compact title={t('Clear completed transfers')} data-testid="downloads-clear" disabled={clearing} onClick={() => setConfirmClear(true)}><Trash2 size={14} /></IconBtn>}
     </div>
     <div className="transfer-manager-body">
-      {(error || historyError) && <ErrorBox dismissible={false} actions={<OutlineButton onClick={() => { setHistoryRevision(v => v + 1); setRevision(v => v + 1); }}>{t('Retry')}</OutlineButton>}>{error || historyError}</ErrorBox>}
+      {(error || historyError) && <ErrorBox actions={<OutlineButton onClick={() => { setHistoryRevision(v => v + 1); setRevision(v => v + 1); }}>{t('Retry')}</OutlineButton>}>{error || historyError}</ErrorBox>}
       {loading && visible.length === 0 && !error && !historyError && <div className="transfer-empty" role="status"><RefreshCw size={20} className="reload-spin" aria-hidden="true" />{t('Loading transfers…')}</div>}
       {!loading && !error && !historyError && visible.length === 0 && <div className="transfer-empty">
         <DirectionIcon size={28} aria-hidden="true" />

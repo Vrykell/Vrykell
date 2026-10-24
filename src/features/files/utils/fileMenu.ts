@@ -1,4 +1,5 @@
 import { orderMenuItems, type MenuGroup } from '@ui/menuGroups';
+import { FILE_DIRECTORY_SHORTCUTS } from '@config/fileShortcuts';
 import type { FsEntry } from '@platform/api/types';
 import { t } from '@i18n';
 import type { ContextMenuItem } from '@ui/ContextMenu';
@@ -126,9 +127,9 @@ function itemFor(key: FileMenuItemKey, ctx: FileMenuContext): ContextMenuItem | 
     case 'new-tab-here':
       return currentDir === null ? null : { label: '从当前文件夹新建标签页', onClick: () => handlers.onNewTabHere?.(currentDir) };
     case 'sync-cwd':
-      return handlers.onSyncToCwd ? { label: t('files.syncToCwd'), onClick: handlers.onSyncToCwd } : null;
+      return handlers.onSyncToCwd ? { label: t('files.syncToCwd'), shortcut: FILE_DIRECTORY_SHORTCUTS.panel, onClick: handlers.onSyncToCwd } : null;
     case 'sync-terminal':
-      return handlers.onSyncToTerminal ? { label: t('Switch terminal to this directory'), onClick: handlers.onSyncToTerminal } : null;
+      return handlers.onSyncToTerminal ? { label: t('Switch terminal to this directory'), shortcut: FILE_DIRECTORY_SHORTCUTS.terminal, onClick: handlers.onSyncToTerminal } : null;
     case 'uploads-view':
       return handlers.onOpenUploads ? { label: t('Upload manager'), onClick: handlers.onOpenUploads } : null;
     case 'downloads-view':
