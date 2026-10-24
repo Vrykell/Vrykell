@@ -15,6 +15,7 @@
 
 export type SplitDir = 'row' | 'col'; // row = 左右，col = 上下
 import type { SshOptions } from '@core/ssh';
+import { measurePaneTree } from '@core/paneLayout';
 
 export interface TerminalSpec {
   id: string;
@@ -30,6 +31,8 @@ export interface TerminalSpec {
 export type WindowLayout =
   | { type: 'leaf'; terminal: TerminalSpec }
   | { type: 'split'; dir: SplitDir; ratio: number; first: WindowLayout; second: WindowLayout };
+
+export const measureWindowLayout = (layout: WindowLayout) => measurePaneTree(layout, node => node.type === 'leaf' ? { id: node.terminal.id } : node);
 
 export interface Rect {
   x: number;
@@ -123,8 +126,6 @@ export function leafDepth(layout: WindowLayout, id: string, depth = 0): number {
   return d >= 0 ? d : leafDepth(layout.second, id, depth + 1);
 }
 
-const perpendicular = (dir: SplitDir): SplitDir => (dir === 'row' ? 'col' : 'row');
-
 /** 分裂某个叶子，把新终端放到该叶子区域的第一/第二半。 */
 export function splitLeaf(
   root: WindowLayout,
@@ -191,31 +192,7 @@ export function leafRects(
 
 /** 可停靠落点（按上面的停靠规则）。 */
 export function dropTargets(layout: WindowLayout): DropTarget[] {
-  const targets: DropTarget[] = [];
-  const rectMap = new Map(leafRects(layout).map((r) => [r.terminalId, r.rect]));
-
-  const walk = (node: WindowLayout, depth: number, parentDir: SplitDir | null) => {
-    if (node.type === 'leaf') {
-      if (depth > 1) return;
-      const rect = rectMap.get(node.terminal.id)!;
-      const dirs: SplitDir[] = depth === 0 ? ['row', 'col'] : [perpendicular(parentDir!)];
-      for (const dir of dirs) {
-        const first = dir === 'row'
-          ? { x: rect.x, y: rect.y, w: rect.w / 2, h: rect.h }
-          : { x: rect.x, y: rect.y, w: rect.w, h: rect.h / 2 };
-        const second = dir === 'row'
-          ? { x: rect.x + rect.w / 2, y: rect.y, w: rect.w / 2, h: rect.h }
-          : { x: rect.x, y: rect.y + rect.h / 2, w: rect.w, h: rect.h / 2 };
-        targets.push({ leafId: node.terminal.id, dir, position: 'first', rect: first });
-        targets.push({ leafId: node.terminal.id, dir, position: 'second', rect: second });
-      }
-      return;
-    }
-    walk(node.first, depth + 1, node.dir);
-    walk(node.second, depth + 1, node.dir);
-  };
-  walk(layout, 0, null);
-  return targets;
+  return measureWindowLayout(layout).targets;
 }
 
 /**
@@ -246,30 +223,7 @@ export function moveTargets(layout: WindowLayout, dragId: string): DropTarget[] 
 
 /** 全部分隔线（用于渲染与拖拽调比例）。 */
 export function dividers(layout: WindowLayout): Divider[] {
-  const list: Divider[] = [];
-  const walk = (node: WindowLayout, rect: Rect) => {
-    if (node.type === 'leaf') return;
-    const r = Math.max(0, Math.min(1, node.ratio));
-    const aId = firstLeaf(node.first).id;
-    const bId = firstLeaf(node.second).id;
-    const line: Rect = node.dir === 'row'
-      ? { x: rect.x + rect.w * r, y: rect.y, w: 0, h: rect.h }
-      : { x: rect.x, y: rect.y + rect.h * r, w: rect.w, h: 0 };
-    list.push({ dir: node.dir, ratio: node.ratio, aId, bId, rect: line, region: rect });
-    const r2 = node.dir === 'row'
-      ? [
-          { x: rect.x, y: rect.y, w: rect.w * r, h: rect.h },
-          { x: rect.x + rect.w * r, y: rect.y, w: rect.w * (1 - r), h: rect.h },
-        ]
-      : [
-          { x: rect.x, y: rect.y, w: rect.w, h: rect.h * r },
-          { x: rect.x, y: rect.y + rect.h * r, w: rect.w, h: rect.h * (1 - r) },
-        ];
-    walk(node.first, r2[0]!);
-    walk(node.second, r2[1]!);
-  };
-  walk(layout, { x: 0, y: 0, w: 1, h: 1 });
-  return list;
+  return measureWindowLayout(layout).dividers;
 }
 
 /** 调整分隔线比例（用 aId/bId 定位 split 节点）。 */
@@ -298,24 +252,5 @@ export interface LayoutCell {
  * 不重挂终端组件（重挂会 ptyClose 杀掉运行中命令）。
  */
 export function collectLayoutCells(layout: WindowLayout): LayoutCell[] {
-  const out: LayoutCell[] = [];
-  const walk = (node: WindowLayout, rect: Rect, inner: LayoutCell['inner']) => {
-    if (node.type === 'leaf') {
-      out.push({ terminalId: node.terminal.id, rect, inner });
-      return;
-    }
-    const r = Math.max(0.1, Math.min(0.9, node.ratio));
-    const firstInner = node.dir === 'row' ? { ...inner, right: true } : { ...inner, bottom: true };
-    const secondInner = node.dir === 'row' ? { ...inner, left: true } : { ...inner, top: true };
-    const firstRect: Rect = node.dir === 'row'
-      ? { x: rect.x, y: rect.y, w: rect.w * r, h: rect.h }
-      : { x: rect.x, y: rect.y, w: rect.w, h: rect.h * r };
-    const secondRect: Rect = node.dir === 'row'
-      ? { x: rect.x + rect.w * r, y: rect.y, w: rect.w * (1 - r), h: rect.h }
-      : { x: rect.x, y: rect.y + rect.h * r, w: rect.w, h: rect.h * (1 - r) };
-    walk(node.first, firstRect, firstInner);
-    walk(node.second, secondRect, secondInner);
-  };
-  walk(layout, { x: 0, y: 0, w: 1, h: 1 }, { left: false, right: false, top: false, bottom: false });
-  return out;
+  return measureWindowLayout(layout).cells.map(({ id, ...cell }) => ({ terminalId: id, ...cell }));
 }

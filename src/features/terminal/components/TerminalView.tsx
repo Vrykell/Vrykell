@@ -8,7 +8,8 @@
  */
 
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
-import { beginLayoutResizeDrag, endLayoutResizeDrag } from '@ui/layout/layoutResizeDrag';
+import { SplitPaneSurface } from '@ui/layout/SplitPane';
+import SplitPaneLayout from '@ui/layout/SplitPaneLayout';
 import { showsPaneChatHistory } from '../model/paneHistory';
 import { useTypographyStore } from '@config/typography';
 import { useRef, useEffect, useLayoutEffect, useMemo, useState, useId, useCallback } from 'react';
@@ -30,7 +31,7 @@ import { useTerminalPaneDrag } from '@features/terminal/hooks/useTerminalPaneDra
 import { useRunningCommandActions } from '@features/terminal/hooks/useRunningCommandActions';
 import {
   leaves as layoutLeaves, firstLeaf, dividers, collectLayoutCells, fitLayoutWidth, MIN_PANE_SIZE, MIN_PANE_WIDTH, DIVIDER_SIZE,
-  type WindowLayout, type TerminalSpec, type Rect,
+  type WindowLayout, type TerminalSpec,
 } from '@features/workspace/model/windowLayout';
 import InputEditor from '@features/terminal/components/InputEditor';
 import TerminalBlockList, { hasVisibleContent } from '@features/terminal/components/TerminalBlockList';
@@ -195,7 +196,10 @@ function SessionTabView(props: {
   const fullscreenVisible = useManualFullscreenVisible(focusedTermId);
   useTerminalFocus(focused && scene === 'blockList' && hasExecutingBlock, focusedTermId);
   useLayoutEffect(() => {
-    if (focused) focusSessionInput(focusedTermId);
+    if (!focused) return;
+    focusSessionInput(focusedTermId);
+    const frame = requestAnimationFrame(() => focusSessionInput(focusedTermId));
+    return () => cancelAnimationFrame(frame);
   }, [focused, focusedTermId, scene, hasExecutingBlock, sessions[focusedTermId]]);
 
   const {
@@ -293,118 +297,15 @@ function PaneLayout(props: {
     return () => observer.disconnect();
   }, []);
   const layout = useMemo(() => layoutWidth > 0 ? fitLayoutWidth(savedLayout, layoutWidth) : savedLayout, [savedLayout, layoutWidth]);
-  const cells = useMemo(() => {
-    const collected = collectLayoutCells(layout);
-    const rects = new Map(collected.map((c) => [c.terminalId, c.rect]));
-    const inners = new Map(collected.map((c) => [c.terminalId, c.inner]));
-    return layoutLeaves(layout).map((t) => ({
-      terminal: t,
-      rect: rects.get(t.id)!,
-      inner: inners.get(t.id)!,
-    }));
-  }, [layout]);
-  const divs = useMemo(() => dividers(layout), [layout]);
-
-  return (
-    <div ref={layoutRef} style={{ position: 'relative', flex: 1, minWidth: 0, minHeight: 0 }}>
-      {cells.map((cell) => (
-        <div
-          key={cell.terminal.id}
-          style={{
-            position: 'absolute',
-            left: `${cell.rect.x * 100}%`, top: `${cell.rect.y * 100}%`,
-            width: `${cell.rect.w * 100}%`, height: `${cell.rect.h * 100}%`,
-            display: 'flex', minWidth: 0, minHeight: 0,
-          }}
-        >
-          <TerminalPane
-            terminal={cell.terminal}
-            windowId={windowId}
-            focused={active && cell.terminal.id === focusedTermId}
-            setSession={setSession}
-            setFocusedPane={setFocusedPane}
-            onContextMenu={onPaneContextMenu}
-            inner={cell.inner}
-            reorderable={cells.length > 1}
-          />
-        </div>
-      ))}
-      {divs.map((d) => (
-        <Divider key={`${d.aId}-${d.bId}`} dir={d.dir} rect={d.rect} region={d.region} onRatio={(r) => setRatioNode(d.aId, d.bId, r)} />
-      ))}
-    </div>
-  );
+  const geometry = useMemo(() => ({ cells: collectLayoutCells(layout).map(({ terminalId, ...cell }) => ({ id: terminalId, ...cell })), dividers: dividers(layout) }), [layout]);
+  return <SplitPaneLayout ref={layoutRef} {...geometry} onRatio={setRatioNode} minWidth={MIN_PANE_WIDTH} minHeight={MIN_PANE_SIZE} thickness={DIVIDER_SIZE} dividerTestPrefix="terminal-divider"
+    renderPane={cell => <TerminalPane terminal={layoutLeaves(layout).find(terminal => terminal.id === cell.id)!} windowId={windowId}
+      focused={active && cell.id === focusedTermId} setSession={setSession} setFocusedPane={setFocusedPane} onContextMenu={onPaneContextMenu} inner={cell.inner} reorderable={geometry.cells.length > 1} />} />;
 }
 
 // ═══════════════════════════════════════════════════════════
 // 分隔线（拖拽调比例）
 // ═══════════════════════════════════════════════════════════
-
-function Divider({ dir, rect, region, onRatio }: { dir: 'row' | 'col'; rect: Rect; region: Rect; onRatio: (r: number) => void }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const isRow = dir === 'row';
-
-  const onDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const container = ref.current?.parentElement;
-    if (!container) return;
-    beginLayoutResizeDrag();
-    const cRect = container.getBoundingClientRect();
-    // 嵌套分隔线以自身 split 区域（region）为准换算比例，而非整个布局区
-    const regionLeft = cRect.left + region.x * cRect.width;
-    const regionTop = cRect.top + region.y * cRect.height;
-    const regionW = region.w * cRect.width;
-    const regionH = region.h * cRect.height;
-    const move = (ev: MouseEvent) => {
-      const size = isRow ? regionW : regionH;
-      const pos = isRow ? (ev.clientX - regionLeft) : (ev.clientY - regionTop);
-      // Horizontal panes reserve room for their controls; vertical splits keep their height limit.
-      const minimum = (isRow ? MIN_PANE_WIDTH : MIN_PANE_SIZE) + DIVIDER_SIZE / 2;
-      const minRatio = Math.min(0.5, minimum / size);
-      const maxRatio = Math.max(0.5, 1 - minimum / size);
-      const r = Math.max(minRatio, Math.min(maxRatio, pos / size));
-      onRatio(r);
-    };
-    const up = () => {
-      document.removeEventListener('mousemove', move);
-      document.removeEventListener('mouseup', up);
-      endLayoutResizeDrag();
-    };
-    document.addEventListener('mousemove', move);
-    document.addEventListener('mouseup', up);
-  };
-
-  const style: React.CSSProperties = {
-    position: 'absolute',
-    zIndex: 5,
-    cursor: isRow ? 'col-resize' : 'row-resize',
-    transition: 'background 0.12s ease',
-  };
-  if (isRow) {
-    style.left = `${rect.x * 100}%`;
-    style.top = `${rect.y * 100}%`;
-    style.width = DIVIDER_SIZE;
-    style.height = `${rect.h * 100}%`;
-    style.transform = 'translateX(-50%)';
-  } else {
-    style.left = `${rect.x * 100}%`;
-    style.top = `${rect.y * 100}%`;
-    style.width = `${rect.w * 100}%`;
-    style.height = DIVIDER_SIZE;
-    style.transform = 'translateY(-50%)';
-  }
-
-  return (
-    <div
-      ref={ref}
-      data-testid={`terminal-divider-${dir}`}
-      onMouseDown={onDown}
-      onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-bg)'; }}
-      onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
-      style={style}
-    />
-  );
-}
 
 // ═══════════════════════════════════════════════════════════
 // 终端 pane
@@ -508,25 +409,13 @@ function TerminalPane(props: {
   );
 
   return (
-    <div
+    <SplitPaneSurface inner={inner}
       data-testid={`pane-${terminal.id}`}
       className="terminal-pane"
       data-focused={focused ? 'true' : 'false'}
       onClick={() => setFocusedPane(terminal.id)}
       onMouseDown={onPaneMouseDown}
       onContextMenu={(e) => { setFocusedPane(terminal.id); onContextMenu(e, sshActions); }}
-      style={{
-        flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column',
-        position: 'relative',
-        // Match terminal output, pane padding and block history to the classic background.
-        background: 'var(--xterm-bg)',
-        // Interior pane dividers keep the same appearance when focus moves.
-        borderTop: inner.top ? '1px solid var(--border)' : 'none',
-        borderBottom: inner.bottom ? '1px solid var(--border)' : 'none',
-        borderLeft: inner.left ? '1px solid var(--border)' : 'none',
-        borderRight: inner.right ? '1px solid var(--border)' : 'none',
-        overflow: 'hidden',
-      }}
     >
       {terminal.kind === 'ssh' && terminal.ssh ? <SshStatusPanel
         key={`${terminal.ssh.connectionId ?? ''}:${terminal.ssh.host}:${terminal.ssh.port ?? 22}`}
@@ -537,7 +426,7 @@ function TerminalPane(props: {
         toggleRequest={sshStatusToggleRequest} onOpenChange={setSshPanelOpen}
         onReconnect={reconnectSsh}
       >{paneContent}</SshStatusPanel> : paneContent}
-    </div>
+    </SplitPaneSurface>
   );
 }
 

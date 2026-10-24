@@ -1,5 +1,6 @@
 import { editorFileKey, type EditorFile } from '@core/editor';
 import type { Tab } from '../stores/workspace';
+import { measurePaneTree } from '@core/paneLayout';
 
 type ResourceOwner =
   | { kind: 'terminal'; tabId: string }
@@ -29,6 +30,8 @@ export function workspaceResources(tabs: Tab[], nativeIds: string[], conversatio
 export type WorkspacePaneLayout =
   | { type: 'pane'; id: string; resourceId: string }
   | { type: 'split'; direction: 'row' | 'col'; ratio: number; first: WorkspacePaneLayout; second: WorkspacePaneLayout };
+
+export const measureWorkspacePanes = (layout: WorkspacePaneLayout) => measurePaneTree(layout, node => node.type === 'pane' ? { id: node.id } : { ...node, dir: node.direction });
 
 export function workspacePaneIds(layout: WorkspacePaneLayout): string[] {
   return layout.type === 'pane' ? [layout.resourceId] : [...workspacePaneIds(layout.first), ...workspacePaneIds(layout.second)];
@@ -89,12 +92,12 @@ export function parseWorkspacePaneLayout(value: unknown): WorkspacePaneLayout | 
   return layout && resources.size <= 4 ? layout : null;
 }
 
-export function splitWorkspacePane(layout: WorkspacePaneLayout, target: string, pane: Extract<WorkspacePaneLayout, { type: 'pane' }>, direction: 'row' | 'col'): WorkspacePaneLayout {
+export function splitWorkspacePane(layout: WorkspacePaneLayout, target: string, pane: Extract<WorkspacePaneLayout, { type: 'pane' }>, direction: 'row' | 'col', position: 'first' | 'second' = 'second'): WorkspacePaneLayout {
   const resources = workspacePaneIds(layout);
   const paneIds = (node: WorkspacePaneLayout): string[] => node.type === 'pane' ? [node.id] : [...paneIds(node.first), ...paneIds(node.second)];
   if (resources.length >= 4 || resources.includes(pane.resourceId) || paneIds(layout).includes(pane.id)) return layout;
   const insert = (node: WorkspacePaneLayout): WorkspacePaneLayout => {
-    if (node.type === 'pane') return node.id === target ? { type: 'split', direction, ratio: 0.5, first: node, second: pane } : node;
+    if (node.type === 'pane') return node.id === target ? { type: 'split', direction, ratio: 0.5, first: position === 'first' ? pane : node, second: position === 'first' ? node : pane } : node;
     const first = insert(node.first); const second = insert(node.second);
     return first === node.first && second === node.second ? node : { ...node, first, second };
   };
