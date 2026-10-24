@@ -376,10 +376,13 @@ fn cmd_command(cwd: Option<String>) -> CommandBuilder {
 /// 且用户 .zshrc 里 `npm config get prefix` 这类依赖也会失败。
 /// 已存在的目录排在系统 PATH 前面（作为种子，最终 PATH 仍由 .zshrc 决定）。
 fn merge_user_bin_paths(cmd: &mut CommandBuilder) {
+    merge_inherited_bin_paths(cmd, std::env::var_os("PATH").unwrap_or_default());
+}
+
+fn merge_inherited_bin_paths(cmd: &mut CommandBuilder, current: std::ffi::OsString) {
     // `PATH` uses `:` on Unix and `;` on Windows.  Splitting/joining it by
     // hand silently turns Windows drive letters into separate entries and
     // can make the selected shell (especially `pwsh`) impossible to spawn.
-    let current = std::env::var_os("PATH").unwrap_or_default();
     let mut merged: Vec<PathBuf> = Vec::new();
     let mut seen: std::collections::HashSet<PathBuf> = std::collections::HashSet::new();
     let push = |dir: PathBuf,
@@ -1292,14 +1295,7 @@ mod tests {
     #[test]
     fn merge_user_bin_paths_adds_local_bin_and_dedups() {
         let mut cmd = CommandBuilder::new("zsh");
-        let original = std::env::var_os("PATH");
-        // Simulate a minimal GUI environment with a duplicate inherited entry.
-        std::env::set_var("PATH", "/usr/bin:/bin:/usr/sbin:/sbin:/usr/bin");
-        merge_user_bin_paths(&mut cmd);
-        match original {
-            Some(value) => std::env::set_var("PATH", value),
-            None => std::env::remove_var("PATH"),
-        }
+        merge_inherited_bin_paths(&mut cmd, "/usr/bin:/bin:/usr/sbin:/sbin:/usr/bin".into());
         let path = cmd.get_env("PATH").expect("PATH is set");
         let dirs: Vec<&str> = path.to_str().unwrap().split(':').collect();
         if std::path::Path::new("/usr/local/bin").is_dir() {
@@ -1318,11 +1314,8 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn merge_user_bin_paths_preserves_windows_path_entries() {
-        let original = std::env::var_os("PATH");
-        std::env::set_var("PATH", r"C:\Windows\System32;C:\Program Files\PowerShell\7");
-
         let mut cmd = CommandBuilder::new("pwsh");
-        merge_user_bin_paths(&mut cmd);
+        merge_inherited_bin_paths(&mut cmd, r"C:\Windows\System32;C:\Program Files\PowerShell\7".into());
         let path = cmd.get_env("PATH").expect("PATH is set");
         let entries: Vec<_> = std::env::split_paths(path).collect();
         assert_eq!(&entries[..2], &[PathBuf::from(r"C:\Windows\System32"), PathBuf::from(r"C:\Program Files\PowerShell\7")]);
@@ -1334,10 +1327,6 @@ mod tests {
         let unique: std::collections::HashSet<_> = entries.iter().map(|entry| path_identity(entry)).collect();
         assert_eq!(entries.len(), unique.len());
 
-        match original {
-            Some(value) => std::env::set_var("PATH", value),
-            None => std::env::remove_var("PATH"),
-        }
     }
 
     /// GUI 启动 TERM 为空：补 xterm-256color + truecolor；已显式设置时不动。
