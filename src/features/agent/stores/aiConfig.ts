@@ -21,6 +21,7 @@ export interface ModelProfile {
   provider: ProviderKind;
   baseUrl: string;
   model: string;
+  providerName?: string;
   /** 自定义分组名；缺省按厂商自动分组 */
   group?: string;
   /** 创建时自动探测的能力（视觉/推理/工具/搜索）；旧数据缺省 */
@@ -184,11 +185,11 @@ export function selectProvider(id: string | null): void {
 }
 
 /** Set one provider's key; the backend seals it and the store records the provider id. */
-export async function setProviderKey(provider: string, key: string): Promise<void> {
+export async function setProviderKey(provider: string, key: string, copyFrom?: string): Promise<void> {
   const k = key.trim();
-  if (!k) return;
+  if (!k && !copyFrom) return;
   try {
-    await invoke('set_provider_key', { providerId: provider, key: k });
+    await invoke('set_provider_key', { providerId: provider, key: k, ...(copyFrom ? { copyFrom } : {}) });
   } catch {
     throw new Error(t('Could not save the API key. Your previous key is unchanged.'));
   }

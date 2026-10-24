@@ -41,7 +41,7 @@ export interface ProviderRow<T> {
 }
 
 /** Group a model list into provider rows, first appearance first. */
-export function providerList<T extends { provider: ProviderKind; baseUrl: string }>(models: T[]): ProviderRow<T>[] {
+export function providerList<T extends { provider: ProviderKind; baseUrl: string; providerName?: string }>(models: T[]): ProviderRow<T>[] {
   const rows = new Map<string, ProviderRow<T>>();
   for (const model of models) {
     const id = providerId(model.provider, model.baseUrl);
@@ -51,7 +51,7 @@ export function providerList<T extends { provider: ProviderKind; baseUrl: string
         id,
         kind: model.provider,
         baseUrl: effectiveBaseUrl(model.provider, model.baseUrl),
-        name: providerName(model.provider, model.baseUrl),
+        name: model.providerName?.trim() || providerName(model.provider, model.baseUrl),
         models: [],
       };
       rows.set(id, row);

@@ -9,6 +9,7 @@
 import {
   AnthropicMark, DeepSeekMark, GeminiMark, GroqMark, MistralMark, MoonshotMark, OllamaMark,
   OpenAIMark, OpenCodeMark, OpenRouterMark, QwenMark, SiliconFlowMark, XaiMark, ZhipuMark,
+  HunyuanMark, MinimaxMark, LongCatMark, StepfunMark, MiMoMark, MetaMark,
 } from '@ui/brandMarks';
 import { Cpu, Server, type AppIcon } from '@ui/icons';
 import { providerDefinition } from '@config/providers';
@@ -17,7 +18,8 @@ import type { ProviderKind } from '@features/agent/services/provider';
 
 export type ModelVendor =
   | 'anthropic' | 'openai' | 'gemini' | 'deepseek' | 'moonshot' | 'zhipu' | 'qwen' | 'siliconflow'
-  | 'openrouter' | 'groq' | 'xai' | 'mistral' | 'ollama' | 'opencode' | 'local' | 'generic';
+  | 'openrouter' | 'groq' | 'xai' | 'mistral' | 'ollama' | 'opencode' | 'local' | 'generic'
+  | 'hunyuan' | 'minimax' | 'longcat' | 'stepfun' | 'mimo' | 'meta';
 
 export interface VendorInfo {
   label: string;
@@ -29,6 +31,12 @@ export interface VendorInfo {
 }
 
 const VENDORS: Record<Exclude<ModelVendor, 'generic'>, VendorInfo> = {
+  hunyuan: { label: 'Tencent Hy', hue: 'var(--text-secondary)', mark: HunyuanMark, branded: false },
+  minimax: { label: 'MiniMax', hue: 'var(--text-secondary)', mark: MinimaxMark, branded: false },
+  longcat: { label: 'LongCat', hue: 'var(--text-secondary)', mark: LongCatMark, branded: false },
+  stepfun: { label: 'StepFun', hue: 'var(--text-secondary)', mark: StepfunMark, branded: false },
+  mimo: { label: 'MiMo', hue: 'var(--text-secondary)', mark: MiMoMark, branded: false },
+  meta: { label: 'Meta', hue: 'var(--text-secondary)', mark: MetaMark, branded: false },
   anthropic: { label: 'Anthropic', hue: 'var(--brand-anthropic)', mark: AnthropicMark, branded: true },
   openai: { label: 'OpenAI', hue: 'var(--brand-openai)', mark: OpenAIMark, branded: true },
   gemini: { label: 'Gemini', hue: 'var(--brand-gemini)', mark: GeminiMark, branded: true },
@@ -63,6 +71,8 @@ const HOST_RULES: [RegExp, ModelVendor][] = [
 ];
 
 const MODEL_RULES: [RegExp, ModelVendor][] = [
+  [/(?:^|\/)hy[34](?:[-.]|$)|hunyuan/, 'hunyuan'],
+  [/minimax/, 'minimax'], [/longcat/, 'longcat'], [/mimo/, 'mimo'], [/step(?:fun|[-\d])/, 'stepfun'], [/llama|muse-spark/, 'meta'],
   [/claude|sonnet|opus|haiku/, 'anthropic'],
   [/gpt|chatgpt|davinci|codex|^o[134]/, 'openai'],
   [/gemini|gemma|palm/, 'gemini'],
@@ -102,6 +112,7 @@ export function modelVendor(kind: string, model: string, baseUrl = ''): ModelVen
   }
   const name = (model || '').toLowerCase();
   for (const [pattern, vendor] of MODEL_RULES) if (pattern.test(name)) return vendor;
+  if (/^opencode(?:-go)?\//.test(name)) return 'opencode';
   if (kind === 'anthropic') return 'anthropic';
   if (kind === 'gemini') return 'gemini';
   if (kind === 'opencode') return 'opencode';

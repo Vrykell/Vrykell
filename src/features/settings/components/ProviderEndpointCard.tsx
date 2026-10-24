@@ -14,14 +14,37 @@ import { providerId, type ProviderRow } from '@features/settings/model/providerL
 import { commitModels } from '@features/settings/model/modelWrites';
 import { SettingsGroup, Field } from './ui';
 import AutoSaveInput from './AutoSaveInput';
+import { useEffect, useRef, useState } from 'react';
+import ConfirmDialog from '@ui/ConfirmDialog';
+import { setProviderKey, selectProvider, useAiConfigStore } from '@features/agent';
 
 export default function ProviderEndpointCard({ row }: { row: ProviderRow<ModelProfile> }) {
   const name = row.name || providerLabel(row.kind);
+  const [confirmation, setConfirmation] = useState<{ resolve: (allowed: boolean) => void } | null>(null);
+  const [revision, setRevision] = useState(0);
+  const pending = useRef<((allowed: boolean) => void) | null>(null);
+  useEffect(() => () => { pending.current?.(false); pending.current = null; }, [row.id]);
 
   // The address belongs to the provider: every model row of this endpoint moves with it.
-  const commit = (value: string) => commitModels(current => current.map(model =>
-    providerId(model.provider, model.baseUrl) === row.id ? { ...model, baseUrl: value } : model,
-  ));
+  const commit = async (value: string) => {
+    let destination: URL;
+    try { destination = new URL(value); } catch { throw new Error(t('Enter a valid HTTP or HTTPS API address.')); }
+    if (!['http:', 'https:'].includes(destination.protocol) || destination.username || destination.password) throw new Error(t('Enter a valid HTTP or HTTPS API address.'));
+    const nextId = providerId(row.kind, value);
+    if (nextId === row.id) return;
+    const hasKey = useAiConfigStore.getState().providerKeys.includes(row.id);
+    let sameOrigin = false;
+    try { sameOrigin = new URL(row.baseUrl).origin === destination.origin; } catch {}
+    if (hasKey && !sameOrigin) {
+      const allowed = await new Promise<boolean>(resolve => { pending.current = resolve; setConfirmation({ resolve }); });
+      pending.current = null;
+      setConfirmation(null);
+      if (!allowed) { setRevision(previous => previous + 1); return; }
+    }
+    if (hasKey) await setProviderKey(nextId, '', row.id);
+    await commitModels(current => current.map(model => providerId(model.provider, model.baseUrl) === row.id ? { ...model, baseUrl: value } : model));
+    selectProvider(nextId);
+  };
 
   return (
     <SettingsGroup title={t('Connection')}>
@@ -32,6 +55,7 @@ export default function ProviderEndpointCard({ row }: { row: ProviderRow<ModelPr
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <AutoSaveInput
+            key={revision}
             value={row.baseUrl}
             aria-label={t('{{name}} API address', { name })}
             placeholder="https://…"
@@ -52,6 +76,7 @@ export default function ProviderEndpointCard({ row }: { row: ProviderRow<ModelPr
           })}
         </div>
       </Field>
+      <ConfirmDialog open={!!confirmation} title={t('Use the existing API key?')} message={t('The API address points to a different origin. Reuse this provider’s existing key for the new address?')} confirmLabel={t('Use existing key')} cancelLabel={t('Cancel')} onConfirm={() => confirmation?.resolve(true)} onCancel={() => confirmation?.resolve(false)} />
     </SettingsGroup>
   );
 }

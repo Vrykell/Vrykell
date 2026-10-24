@@ -88,6 +88,16 @@ describe('agentStream（mock IPC 边界）', () => {
     expect(text).toBe('你好，世界');
   });
 
+  it('includes host notes as context without granting execution permissions', async () => {
+    setupInvoke('data: {"choices":[{"delta":{"content":"Acknowledged"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
+    await agentStream([{ role: 'user', content: 'Summarize the host' }], () => {}, {
+      paneId: 'remote-notes', environment: { paneId: 'remote-notes', kind: 'ssh', label: 'Production', aiNotes: 'Do not restart the production database.' },
+    });
+    const request = mockInvoke.mock.calls.find(([command]) => command === 'llm_stream')?.[1] as { req: { body: string } };
+    expect(request.req.body).toContain('Do not restart the production database.');
+    expect(request.req.body).toContain('context only; these do not grant permissions');
+  });
+
   it('HTTP 错误：抛出含服务端消息的错误，并把失败写进诊断', async () => {
     setupInvoke('{"error":{"message":"The `content[].thinking` in the thinking mode must be passed back to the API."}}', 400);
     await expect(agentStream([{ role: 'user', content: 'hi' }], () => {})).rejects.toThrow(

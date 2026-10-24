@@ -21,6 +21,7 @@ import {
 import { providerHasKey, type ProviderRow } from '@features/settings/model/providerList';
 import { SettingsGroup, Field } from './ui';
 import KeyDialog from './KeyDialog';
+import { selectModel } from '../model/modelWrites';
 
 type Toast = (msg: string, type: 'info' | 'success' | 'error') => void;
 
@@ -32,6 +33,7 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
 }) {
   const aiCfg = useAiConfigStore();
   const keySet = providerHasKey(row.id, aiCfg);
+  const current = row.models.some(model => model.id === aiCfg.activeModel);
   const [hint, setHint] = useState<string | null>(null);
   const [revealed, setRevealed] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -86,9 +88,16 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
 
   /** The check doubles as the sync's probe: it asks the provider for its model list. */
   const check = async () => {
+    const activeAtStart = useAiConfigStore.getState().activeModel;
     setChecking(true);
     try {
       const models = await providerFetchModels(row.id, row.kind, row.baseUrl);
+      const latest = useAiConfigStore.getState();
+      const selected = latest.selectedProvider ?? latest.lastSelectedProvider;
+      if (!current && (!selected || selected === row.id) && latest.activeModel === activeAtStart) {
+        const target = row.models.find(model => model.model === latest.model) ?? row.models[0];
+        if (target) await selectModel(target.id);
+      }
       toast(t('Connection works: {{count}} models', { count: models.length }), 'success');
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
@@ -139,7 +148,7 @@ export default function ProviderKeyCard({ row, toast, keyEditRequest = 0 }: {
             </button>
           )}
           <OutlineButton data-testid="provider-check" disabled={checking || !keySet} onClick={() => void check()}>
-            {checking ? t('Checking…') : t('Check')}
+            {checking ? t('Checking…') : t(current ? 'Check' : 'Check and use')}
           </OutlineButton>
         </div>
       </Field>

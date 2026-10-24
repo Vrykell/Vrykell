@@ -66,7 +66,7 @@ function ModelRow({ model, active, onRemove }: {
   const [editing, setEditing] = useState(false);
   const Mark = modelMark(model.provider, model.model, model.baseUrl);
   return (
-    <div data-testid="model-row" style={{ borderTop: '1px solid var(--border)', padding: '6px 10px' }}>
+    <div data-testid="model-row" data-active={active || undefined} style={{ padding: '6px 10px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
         <span style={{
           width: 28, height: 28, flexShrink: 0, display: 'inline-flex', alignItems: 'center',
@@ -77,7 +77,7 @@ function ModelRow({ model, active, onRemove }: {
         <span style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}>
           <span data-testid="model-name" style={{
             minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-            fontWeight: active ? 'var(--fw-semibold)' : undefined,
+            fontWeight: 'var(--fw-regular)',
           }}>
             {model.name || model.model || t('Unnamed model')}
           </span>
@@ -155,6 +155,7 @@ export default function ProviderModelList({ row, toast }: {
         ...missing.map(id => ({
           id: `${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`,
           name: id, provider: row.kind, baseUrl: row.baseUrl, model: id,
+          providerName: row.models.find(model => model.providerName)?.providerName,
           capabilities: detectCapabilities(row.kind, id),
         })),
       ]));
@@ -173,7 +174,7 @@ export default function ProviderModelList({ row, toast }: {
         title={t('Model list')}
         description={t('Configure models and choose the active one. Models from the same provider share an API key.')}
       >
-        <div data-testid="model-list-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
+        <div className="settings-model-list-toolbar" data-testid="model-list-toolbar" style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 8 }}>
           <IconButton data-testid="model-collapse-all" disabled={models.length === 0}
             aria-label={t(allCollapsed ? 'Expand all groups' : 'Collapse all groups')}
             data-tip={t(allCollapsed ? 'Expand all groups' : 'Collapse all groups')} onClick={toggleAll}>

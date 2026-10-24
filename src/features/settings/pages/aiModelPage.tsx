@@ -11,11 +11,12 @@ import ContextMenu from '@ui/ContextMenu';
 import ConfirmDialog from '@ui/ConfirmDialog';
 import { Ellipsis, iconSizes } from '@ui/icons';
 import { t } from '@i18n';
-import { selectProvider, useAiConfigStore, type ModelProfile } from '@features/agent';
+import { selectProvider, setProviderKey, useAiConfigStore, type ModelProfile } from '@features/agent';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
 import { useToastStore } from '@ui/Toast';
 import { applyModelPreset, type ModelPreset } from '@config/modelPresets';
 import ProviderDialog from '@features/settings/components/ProviderDialog';
+import type { CustomProviderDraft } from '../components/CustomProviderFields';
 import ProviderKeyCard from '@features/settings/components/ProviderKeyCard';
 import ProviderEndpointCard from '@features/settings/components/ProviderEndpointCard';
 import ProviderModelList from '@features/settings/components/ProviderModelList';
@@ -60,6 +61,18 @@ export function AiModelPage() {
     if (!providerHasKey(providerId(preset.provider, preset.baseUrl), aiCfg)) {
       toast(t('{{name}} added. Configure its API key before sending.', { name: preset.name }), 'info');
     }
+  };
+  const addCustom = async (draft: CustomProviderDraft) => {
+    const id = providerId(draft.provider, draft.baseUrl);
+    if (draft.key.trim()) await setProviderKey(id, draft.key);
+    const profile: ModelProfile = { id: newModelId(), name: draft.model, model: draft.model, baseUrl: draft.baseUrl, provider: draft.provider, providerName: draft.name || undefined };
+    await commitModels(current => {
+      const named = current.map(model => draft.name && providerId(model.provider, model.baseUrl) === id ? { ...model, providerName: draft.name } : model);
+      return named.some(model => providerId(model.provider, model.baseUrl) === id && model.model === draft.model) ? named : [...named, profile];
+    });
+    const target = useAiConfigStore.getState().models.find(model => providerId(model.provider, model.baseUrl) === id && model.model === draft.model);
+    if (target) await selectModel(target.id);
+    selectProvider(id);
   };
 
   const setCurrentProvider = (rowId: string) => {
@@ -161,8 +174,9 @@ export function AiModelPage() {
         rows={rows}
         selectedId={selectedId}
         flags={aiCfg}
-        onSelect={selectProvider}
+        onSelect={setCurrentProvider}
         onAddPreset={addPreset}
+        onAddCustom={addCustom}
         onClose={() => setProviderOpen(false)}
       />
       <ConfirmDialog

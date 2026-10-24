@@ -53,6 +53,7 @@ export default function AddModelDialog({ open, row, toast, onClose, onAdd }: {
       name: name.trim() || id,
       provider: row.kind,
       baseUrl: row.baseUrl,
+      providerName: row.models.find(model => model.providerName)?.providerName,
       model: id,
       group: group.trim() || undefined,
       capabilities: detectCapabilities(row.kind, id),

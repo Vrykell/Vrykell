@@ -1,21 +1,19 @@
 /**
  * HarnessBadge — the small mark that identifies an ACP server in lists, cards and tabs.
  *
- * The agent's own icon comes first (see AGENT_MARKS): the name in the list is the agent, not the
- * model vendor behind it, so an ACP server list shows Claude Code, Codex, OpenCode and the rest
- * with their own marks. A name we do not know falls back to the vendor detection, and anything
- * unrecognised keeps a neutral tile with a generic mark — never a letter tile.
+ * Configured agents use their own identity; unrecognized entries use the application mark.
  */
 import { AGENT_MARKS } from '@ui/brandMarks';
 import type { AppIcon } from '@ui/icons';
 import { modelVendorInfo } from '@features/agent/components/modelIcon';
+import AppMark from '@ui/AppMark';
 
 /** Lowercase letters and digits only, so 'Claude Code' and 'claudecode' resolve alike. */
 const agentKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');
 
-/** The mark for a harness name: the agent's own icon when we know it, else the vendor detection. */
-export function harnessMark(name: string): AppIcon {
-  return AGENT_MARKS[agentKey(name)] ?? modelVendorInfo('openai-compatible', name, '').mark;
+/** Resolve configured agent identity without substituting a model vendor. */
+export function harnessMark(name: string, fallback: AppIcon = AppMark): AppIcon {
+  return AGENT_MARKS[agentKey(name)] ?? fallback;
 }
 
 export default function HarnessBadge({ name, size = 28 }: { name: string; size?: number }) {

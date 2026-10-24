@@ -4,6 +4,9 @@ import { AnthropicMark, GroqMark, MoonshotMark, OllamaMark, OpenCodeMark, QwenMa
 import { Server } from '@ui/icons';
 
 describe('modelVendor', () => {
+  it.each([['hy3', 'hunyuan'], ['hy4-preview', 'hunyuan'], ['longcat-2.0', 'longcat'], ['mimo-v2.6-pro', 'mimo'], ['minimax-m3.1-flash', 'minimax'], ['muse-spark-1.3-contributor', 'meta'], ['step-5-preview', 'stepfun'], ['opencode/beam-free', 'opencode'], ['opencode-go/omen-alpha', 'opencode']])('recognizes %s in model menus', (model, vendor) => {
+    expect(modelVendor('openai-compatible', model)).toBe(vendor);
+  });
   it('reads the endpoint host before the model name', () => {
     expect(modelVendor('openai-compatible', 'llama-3.3-70b-versatile', 'https://api.groq.com/openai/v1')).toBe('groq');
     expect(modelVendor('openai-compatible', 'deepseek-ai/DeepSeek-V3', 'https://api.siliconflow.cn/v1')).toBe('siliconflow');

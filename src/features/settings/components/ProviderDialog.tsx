@@ -8,13 +8,13 @@
  */
 import { useEffect, useState, type CSSProperties } from 'react';
 import { t } from '@i18n';
-import { OutlineButton } from '@ui/OutlineButton';
 import { Check, Plus, iconSizes } from '@ui/icons';
 import { MODEL_PRESETS, type ModelPreset } from '@config/modelPresets';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
 import { providerHasKey, type ProviderRow } from '@features/settings/model/providerList';
 import type { ModelProfile } from '@features/agent';
 import SettingsDialog from './SettingsDialog';
+import CustomProviderFields, { type CustomProviderDraft } from './CustomProviderFields';
 
 const metaStyle: CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 6, marginTop: 3,
@@ -27,16 +27,17 @@ const nameStyle: CSSProperties = {
   overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
 };
 
-export default function ProviderDialog({ open, rows, selectedId, flags, onSelect, onAddPreset, onClose }: {
+export default function ProviderDialog({ open, rows, selectedId, flags, onSelect, onAddPreset, onAddCustom, onClose }: {
   open: boolean;
   rows: ProviderRow<ModelProfile>[];
   selectedId: string | null;
   flags: { providerKeys: string[] };
   onSelect: (id: string) => void;
   onAddPreset: (preset: ModelPreset) => void;
+  onAddCustom?: (draft: CustomProviderDraft) => Promise<void>;
   onClose: () => void;
 }) {
-  const [view, setView] = useState<'list' | 'presets'>('list');
+  const [view, setView] = useState<'list' | 'presets' | 'custom'>('list');
 
   useEffect(() => {
     if (open) setView('list');
@@ -48,9 +49,8 @@ export default function ProviderDialog({ open, rows, selectedId, flags, onSelect
       testId="provider-dialog"
       title={view === 'list' ? t('Provider') : t('Add provider')}
       width={480}
-      onBack={view === 'presets' ? () => setView('list') : undefined}
+      onBack={view !== 'list' ? () => setView(view === 'custom' ? 'presets' : 'list') : undefined}
       onClose={onClose}
-      footer={<OutlineButton onClick={onClose} data-testid="provider-dialog-close">{t('Close')}</OutlineButton>}
     >
       {view === 'list' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -103,9 +103,10 @@ export default function ProviderDialog({ open, rows, selectedId, flags, onSelect
             <span className="provider-option-name">{t('Add provider')}</span>
           </button>
         </div>
-      ) : (
+      ) : view === 'custom' && onAddCustom ? <CustomProviderFields onAdd={async draft => { await onAddCustom(draft); onClose(); }} /> : (
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 6 }}>
+            {onAddCustom && <button type="button" className="settings-preset-cell" data-testid="provider-custom" onClick={() => setView('custom')}><Plus size={15} /><span>{t('Custom provider')}</span></button>}
             {MODEL_PRESETS.map((preset) => {
               const Mark = modelMark(preset.provider, preset.model, preset.baseUrl);
               return (

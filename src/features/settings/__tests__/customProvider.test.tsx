@@ -1,0 +1,75 @@
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, expect, it, vi } from 'vitest';
+import { AiModelPage } from '../pages/aiModelPage';
+import { useAiConfigStore } from '@features/agent';
+import { providerId } from '../model/providerList';
+import CustomProviderFields from '../components/CustomProviderFields';
+const invoke = vi.hoisted(() => vi.fn());
+vi.mock('@platform/diagnostics', () => ({ invoke, diagnostic: vi.fn() }));
+const seed = { id: 'seed', name: 'Seed', model: 'original', provider: 'openai-compatible' as const, baseUrl: 'https://old.example/v1' };
+beforeEach(() => {
+  invoke.mockReset().mockResolvedValue(null);
+  useAiConfigStore.setState({ models: [seed], activeModel: seed.id, providerKeys: [], selectedProvider: null, lastSelectedProvider: null });
+});
+it('adds a named custom endpoint without clearing a key typed before the address', async () => {
+  render(<AiModelPage />);
+  fireEvent.click(screen.getByTestId('provider-switch')); fireEvent.click(screen.getByTestId('provider-dialog-add')); fireEvent.click(screen.getByTestId('provider-custom'));
+  fireEvent.change(screen.getByRole('textbox', { name: '服务商名称' }), { target: { value: 'My endpoint' } });
+  const key = screen.getByLabelText('API Key'); fireEvent.change(key, { target: { value: 'secret-for-test' } });
+  fireEvent.change(screen.getByRole('textbox', { name: 'Base URL' }), { target: { value: 'https://custom.example/v1' } });
+  expect(key).toHaveValue('secret-for-test');
+  fireEvent.change(screen.getByRole('textbox', { name: '模型 ID' }), { target: { value: 'custom-model' } });
+  fireEvent.click(screen.getByRole('button', { name: '添加服务商' }));
+  await waitFor(() => expect(useAiConfigStore.getState().models).toHaveLength(2));
+  expect(useAiConfigStore.getState().models[1]).toMatchObject({ providerName: 'My endpoint', model: 'custom-model' });
+  expect(invoke).toHaveBeenCalledWith('set_provider_key', { providerId: providerId(seed.provider, 'https://custom.example/v1'), key: 'secret-for-test' });
+  expect(useAiConfigStore.getState().providerKeys).toContain(providerId(seed.provider, 'https://custom.example/v1'));
+  await waitFor(() => expect(useAiConfigStore.getState().model).toBe('custom-model'));
+  expect(useAiConfigStore.getState().activeModel).toBe(useAiConfigStore.getState().models[1].id);
+  invoke.mockImplementation((command: string) => Promise.resolve(command === 'provider_fetch_models' ? ['synced-model'] : null));
+  fireEvent.click(screen.getByTestId('model-sync'));
+  await waitFor(() => expect(useAiConfigStore.getState().models.some(model => model.model === 'synced-model')).toBe(true));
+  expect(useAiConfigStore.getState().models.find(model => model.model === 'synced-model')?.providerName).toBe('My endpoint');
+});
+it('selects the provider model used for sending instead of leaving an unconfigured model active', async () => {
+  const configured = { ...seed, id: 'configured', name: 'Configured', model: 'working-model', provider: 'opencode' as const, baseUrl: 'https://gateway.example/v1' };
+  useAiConfigStore.setState({ models: [seed, configured], providerKeys: [providerId(configured.provider, configured.baseUrl)] });
+  render(<AiModelPage />);
+  fireEvent.click(screen.getByTestId('provider-switch'));
+  fireEvent.click(screen.getByTestId(`provider-option-${providerId(configured.provider, configured.baseUrl)}`));
+  await waitFor(() => expect(useAiConfigStore.getState().activeModel).toBe('configured'));
+  expect(useAiConfigStore.getState()).toMatchObject({ provider: 'opencode', model: 'working-model', baseUrl: configured.baseUrl });
+  expect(invoke).toHaveBeenCalledWith('set_active_model', { id: 'configured' });
+});
+it('checks and activates an already selected provider instead of leaving another unconfigured provider active', async () => {
+  const configured = { ...seed, id: 'configured', name: 'Configured', model: 'working-model', baseUrl: 'https://gateway.example/v1' };
+  const id = providerId(configured.provider, configured.baseUrl);
+  useAiConfigStore.setState({ models: [seed, configured], providerKeys: [id], selectedProvider: id });
+  invoke.mockImplementation((command: string) => Promise.resolve(command === 'provider_fetch_models' ? ['working-model'] : null));
+  render(<AiModelPage />);
+  fireEvent.click(screen.getByRole('button', { name: '检测并使用' }));
+  await waitFor(() => expect(useAiConfigStore.getState().activeModel).toBe('configured'));
+  expect(invoke).toHaveBeenCalledWith('provider_fetch_models', { providerId: id, provider: configured.provider, baseUrl: configured.baseUrl });
+});
+it('validates unsafe addresses and preserves a draft after a failed write', async () => {
+  const add = vi.fn().mockRejectedValue(new Error('Storage unavailable')); render(<CustomProviderFields onAdd={add} />);
+  fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'keep-key' } });
+  fireEvent.change(screen.getByRole('textbox', { name: '模型 ID' }), { target: { value: 'model' } });
+  const address = screen.getByRole('textbox', { name: 'Base URL' });
+  fireEvent.change(address, { target: { value: 'file:///etc/private' } }); fireEvent.click(screen.getByRole('button', { name: '添加服务商' })); expect(add).not.toHaveBeenCalled();
+  fireEvent.change(address, { target: { value: 'https://custom.example/v1' } }); fireEvent.click(screen.getByRole('button', { name: '添加服务商' }));
+  await waitFor(() => expect(screen.getByRole('alert')).toBeInTheDocument());
+  expect(screen.getByLabelText('API Key')).toHaveValue('keep-key'); expect(address).toHaveValue('https://custom.example/v1');
+});
+it('requires permission before reusing a key across origins and never reveals it in the renderer', async () => {
+  const source = providerId(seed.provider, seed.baseUrl); useAiConfigStore.setState({ providerKeys: [source] }); render(<AiModelPage />);
+  const input = screen.getByTestId('provider-endpoint-input'); fireEvent.change(input, { target: { value: 'https://new.example/v1' } }); fireEvent.keyDown(input, { key: 'Enter' });
+  await screen.findByTestId('confirm-cancel'); fireEvent.click(screen.getByTestId('confirm-cancel'));
+  await waitFor(() => expect(screen.getByTestId('provider-endpoint-input')).toHaveValue(seed.baseUrl));
+  expect(invoke.mock.calls.some(([name]) => name === 'set_provider_key')).toBe(false);
+  const retry = screen.getByTestId('provider-endpoint-input'); fireEvent.change(retry, { target: { value: 'https://new.example/v1' } }); fireEvent.keyDown(retry, { key: 'Enter' });
+  fireEvent.click(await screen.findByTestId('confirm-ok'));
+  await waitFor(() => expect(useAiConfigStore.getState().models[0].baseUrl).toBe('https://new.example/v1'));
+  expect(invoke).toHaveBeenCalledWith('set_provider_key', { providerId: providerId(seed.provider, 'https://new.example/v1'), key: '', copyFrom: source });
+  expect(invoke.mock.calls.some(([name]) => name === 'provider_key_reveal')).toBe(false);
+});
