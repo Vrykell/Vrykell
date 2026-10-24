@@ -1,8 +1,13 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import KeyHint, { shortcutKeys } from '../KeyHint';
+import { isMacOS } from '@platform/runtime';
 
 describe('shared key hints', () => {
+  it('resolves cross-platform modifier labels before rendering shared shortcut badges', () => {
+    expect(shortcutKeys('Ctrl/Cmd+Shift+S')).toEqual([isMacOS ? 'Meta' : 'Control', 'Shift', 'S']);
+    expect(shortcutKeys('CmdOrCtrl+F')).toEqual([isMacOS ? 'Meta' : 'Control', 'F']);
+  });
   it('renders modifiers as icons and retains a readable accessible shortcut', () => {
     const { container } = render(<KeyHint shortcut="Shift+Meta+S" />);
     expect(container.querySelector('kbd')).toHaveAttribute('aria-label', 'Shift+Meta+S');

@@ -2,6 +2,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { writeClipboardText } from '@platform/clipboard';
 import ErrorBox from '../ErrorBox';
+import { useRef } from 'react';
+import { useDialogKeyboard } from '../useDialogKeyboard';
 
 vi.mock('@platform/clipboard', () => ({
   writeClipboardText: vi.fn().mockResolvedValue(undefined),
@@ -10,6 +12,37 @@ vi.mock('@platform/clipboard', () => ({
 const writeClipboardTextMock = vi.mocked(writeClipboardText);
 
 describe('ErrorBox', () => {
+  it('includes the owning notification in modal keyboard navigation and dismisses it without closing the dialog', () => {
+    const close = vi.fn();
+    function Dialog() {
+      const ref = useRef<HTMLDivElement>(null);
+      useDialogKeyboard(ref, true, { onClose: close });
+      return <div role="dialog" aria-label="Dialog" ref={ref}><button onClick={close}>Owner</button><ErrorBox title="Failed" /></div>;
+    }
+    render(<Dialog />);
+    const dismiss = screen.getByRole('button', { name: '关闭错误提示' });
+    dismiss.focus(); fireEvent.keyDown(dismiss, { key: 'Tab' });
+    expect(screen.getByRole('button', { name: 'Owner' })).toHaveFocus();
+    dismiss.focus(); fireEvent.keyDown(dismiss, { key: 'Escape' });
+    expect(screen.queryByRole('alert')).toBeNull(); expect(close).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Owner' })).toHaveFocus();
+  });
+  it('stacks errors in one shared notification region outside the owning layout', () => {
+    const { container, unmount } = render(<div><ErrorBox title="First" /><ErrorBox title="Second" /></div>);
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    expect(document.querySelector('#app-notifications')?.querySelectorAll('[role="alert"]')).toHaveLength(2);
+    unmount();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('hides errors belonging to a background pane and restores them with their owner', async () => {
+    const { rerender } = render(<div hidden><ErrorBox title="Hidden pane" /></div>);
+    expect(screen.queryByRole('alert')).toBeNull();
+    rerender(<div><ErrorBox title="Hidden pane" /></div>);
+    await screen.findByRole('alert');
+    rerender(<div hidden><ErrorBox title="Hidden pane" /></div>);
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
   beforeEach(() => {
     writeClipboardTextMock.mockReset().mockResolvedValue(undefined);
   });
@@ -26,6 +59,7 @@ describe('ErrorBox', () => {
     );
 
     expect(screen.getByRole('alert')).toBeVisible();
+    expect(screen.getByRole('alert')).toHaveClass('notification-card');
     expect(screen.getByText('暂时无法读取远程文件')).toBeVisible();
     expect(screen.getByText('请检查网络或权限后重试。')).toBeVisible();
     expect(screen.getByRole('button', { name: '重试' })).toBeVisible();

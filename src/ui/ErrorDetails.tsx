@@ -56,7 +56,7 @@ export default function ErrorDetails({
           data-subtle
           type="button"
           aria-expanded={open}
-          data-tip={open ? `收起${title}` : `展开${title}`}
+          data-tip={t(open ? 'Collapse {{name}}' : 'Expand {{name}}', { name: title })}
           onClick={() => setOpen((value) => !value)}
           {...subtleHover}
           style={{

@@ -60,8 +60,8 @@ export default function ConfirmDialog({
           <button className={danger ? undefined : 'primary-button'} onClick={onConfirm} data-testid="confirm-ok" style={{
             padding: '5px 16px', fontSize: 'calc(12px * var(--ui-font-scale))', border: 'none',
             borderRadius: 'var(--radius-inner)',
-            background: danger ? 'var(--error)' : 'var(--primary-button-bg)',
-            color: danger ? 'var(--error-text)' : 'var(--primary-button-text)', cursor: 'pointer',
+            background: danger ? 'var(--danger-action)' : 'var(--primary-button-bg)',
+            color: danger ? 'var(--danger-action-text)' : 'var(--primary-button-text)', cursor: 'pointer',
           }}>{confirmLabel}</button>
         </div>
       </div>

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { Info, CheckCircle2, AlertCircle, TriangleAlert, X } from '@ui/icons';
+import NotificationPortal from './NotificationPortal';
+import NotificationCard from './NotificationCard';
 
 type ToastType = 'info' | 'success' | 'error' | 'warning';
 
@@ -92,33 +93,15 @@ export const useToastStore = create<ToastState>((set) => ({
   },
 }));
 
-const ICONS: Record<ToastType, typeof Info> = {
-  info: Info,
-  success: CheckCircle2,
-  error: AlertCircle,
-  warning: TriangleAlert,
-};
-
-const COLORS: Record<ToastType, string> = {
-  info: 'var(--accent)',
-  success: 'var(--success)',
-  error: 'var(--error)',
-  warning: 'var(--warning)',
-};
-
 /** ToastContainer — 右下角消息通知（不遮底部输入栏）。 */
 export default function ToastContainer() {
   const toasts = useToastStore((s) => s.toasts);
   if (toasts.length === 0) return null;
 
   return (
-    <div style={{
-      position: 'fixed', right: 16, bottom: 16, zIndex: 9999,
-      display: 'flex', flexDirection: 'column', gap: 8,
-      alignItems: 'flex-end', pointerEvents: 'none',
-    }}>
+    <NotificationPortal followOwner={false}><div className="notification-toasts">
       {toasts.map((t) => <ToastItem key={t.id} t={t} />)}
-    </div>
+    </div></NotificationPortal>
   );
 }
 
@@ -126,43 +109,5 @@ function ToastItem({ t }: { t: ToastItem }) {
   const removeToast = useToastStore((s) => s.removeToast);
   const pause = useToastStore((s) => s.pause);
   const resume = useToastStore((s) => s.resume);
-  const Icon = ICONS[t.type];
-  const color = COLORS[t.type];
-
-  return (
-    <div
-      onMouseEnter={() => pause(t.id)}
-      onMouseLeave={() => resume(t.id)}
-      role="status"
-      className="workspace-floating"
-      style={{
-        pointerEvents: 'auto',
-        display: 'flex', alignItems: 'center', gap: 8,
-        maxWidth: 380, padding: '10px 12px',
-        color: 'var(--text-primary)', fontSize: 'calc(12.5px * var(--ui-font-scale))', lineHeight: 1.5,
-        animation: t.leaving
-          ? 'toastOut 0.2s var(--ease) forwards'
-          : 'toastIn 0.24s var(--ease)',
-      }}
-    >
-      {/* A semantic icon identifies the notification without a colored edge. */}
-      <Icon size={15} style={{ color, flexShrink: 0 }} />
-      <span style={{ flex: 1, minWidth: 0, overflowWrap: 'break-word' }}>{t.message}</span>
-      <button
-        onClick={() => removeToast(t.id)}
-        data-tip="关闭"
-        aria-label="关闭通知"
-        style={{
-          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-          width: 20, height: 20, padding: 0,
-          border: 'none', borderRadius: 4, background: 'transparent',
-          color: 'var(--text-muted)', cursor: 'pointer', flexShrink: 0,
-        }}
-        onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--hover)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
-        onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-muted)'; }}
-      >
-        <X size={13} />
-      </button>
-    </div>
-  );
+  return <NotificationCard role="status" tone={t.type} message={t.message} leaving={t.leaving} onDismiss={() => removeToast(t.id)} onMouseEnter={() => pause(t.id)} onMouseLeave={() => resume(t.id)} />;
 }

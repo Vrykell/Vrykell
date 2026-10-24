@@ -1,4 +1,5 @@
 import { Command } from './icons';
+import { isMacOS } from '@platform/runtime';
 
 const paths: Record<string, string> = {
   Shift: 'M3 9 8 3l5 6h-3v4H6V9Z',
@@ -21,7 +22,8 @@ const paths: Record<string, string> = {
 };
 
 export function shortcutKeys(shortcut: string): string[] {
-  return shortcut.replace(/⌘/g, 'Meta+').replace(/⇧/g, 'Shift+').replace(/⌥/g, 'Alt+')
+  return shortcut.replace(/Ctrl\/Cmd|Cmd\/Ctrl|CmdOrCtrl/g, isMacOS ? 'Meta' : 'Control')
+    .replace(/⌘/g, 'Meta+').replace(/⇧/g, 'Shift+').replace(/⌥/g, 'Alt+')
     .replace(/⌃/g, 'Control+').split('+').filter(Boolean).map(key => {
       const value = key.trim();
       return ({ Cmd: 'Meta', Command: 'Meta', Ctrl: 'Control', Option: 'Alt', Return: 'Enter', Esc: 'Escape', '↑': 'ArrowUp', '↓': 'ArrowDown', '←': 'ArrowLeft', '→': 'ArrowRight', '↵': 'Enter', Spacebar: 'Space' } as Record<string, string>)[value] ?? value;

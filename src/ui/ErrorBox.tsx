@@ -3,6 +3,8 @@ import ErrorDetails from '@ui/ErrorDetails';
 import { IconButton } from './IconButton';
 import { X } from './icons';
 import { t } from '@i18n';
+import NotificationPortal from './NotificationPortal';
+import NotificationCard from './NotificationCard';
 
 export type ErrorBoxTone = 'error' | 'info' | 'success';
 
@@ -13,10 +15,10 @@ const TONE: Record<ErrorBoxTone, { background: string; color: string; border: st
 };
 
 /**
- * ErrorBox — inline error / status box shared by panel surfaces.
+ * Shared persistent error notifications and inline informational status.
  *
- * Tone-colored container with an optional bold title, message, action buttons
- * and a collapsible raw-text section (chevron toggle + copy) for diagnostics.
+ * Notifications share the transient-message card and retain actions and diagnostics.
+ * Informational status may remain inline within its owning surface.
  * `compact` renders a single row for tight spots (message + inline actions).
  */
 export default function ErrorBox({
@@ -59,16 +61,32 @@ export default function ErrorBox({
     ...style,
   };
 
+  if (tone === 'error') return <NotificationPortal><NotificationCard role="alert" data-testid={testId} tone="error" message={title ?? children} data-error-notification="true"
+    dismissLabel={t('Dismiss error')} onDismiss={(dismissible ?? true) ? () => { setDismissed(identity); onDismiss?.(); } : undefined}
+    onKeyDown={event => {
+      if (event.key !== 'Escape' || !(dismissible ?? true)) return;
+      event.preventDefault(); event.stopPropagation();
+      const sourceId = event.currentTarget.parentElement?.dataset.notificationSourceId;
+      const source = Array.from(document.querySelectorAll<HTMLElement>('[data-notification-source]')).find(element => element.dataset.notificationSource === sourceId);
+      source?.closest('[role="dialog"]')?.querySelector<HTMLElement>('button:not(:disabled), input:not(:disabled)')?.focus();
+      setDismissed(identity); onDismiss?.();
+    }}>
+    {(title && children || details || actions) ? <>
+    {title && children && <div className="error-notification-message">{children}</div>}
+    {details && <ErrorDetails title={detailsTitle} text={details} preStyle={{ maxHeight: 160 }} />}
+    {actions && <div className="error-box-actions error-notification-actions">{actions}</div>}
+    </> : null}
+  </NotificationCard></NotificationPortal>;
+
   if (compact) {
     return (
       <div
         role={palette.role}
         data-testid={testId}
-        style={{ ...base, display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px' }}
+        style={{ ...base, display: 'flex', alignItems: 'flex-start', gap: 8, padding: '6px 8px' }}
       >
-        <span style={{ flex: 1, minWidth: 0 }}>{children}</span>
-        {actions}
-        {close}
+        <span style={{ flex: 1, minWidth: 0, overflowWrap: 'anywhere' }}>{children}</span>
+        {(actions || close) && <div className="error-box-actions" style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>{actions}{close}</div>}
       </div>
     );
   }
@@ -82,9 +100,9 @@ export default function ErrorBox({
       {(title || close) && <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         <div style={{ flex: 1, minWidth: 0, fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>{title}</div>{close}
       </div>}
-      {children && <div style={{ lineHeight: 1.6 }}>{children}</div>}
-      {actions && <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>{actions}</div>}
+      {children && <div style={{ lineHeight: 1.6, minWidth: 0, overflowWrap: 'anywhere' }}>{children}</div>}
       {details && <ErrorDetails title={detailsTitle} text={details} preStyle={{ maxHeight: 160 }} />}
+      {actions && <div className="error-box-actions" style={{ display: 'flex', justifyContent: 'flex-end', flexWrap: 'wrap', gap: 8 }}>{actions}</div>}
     </div>
   );
 }
