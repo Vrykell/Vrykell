@@ -138,15 +138,16 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     acpServers ??= [{ name: 'Fake ACP', command: 'node', args: ['scripts/fake-acp-agent.mjs'], env: {}, cwd: '', enabled: true }];
     /** Native picker invocations the page made, so a spec can assert the mode it asked for. */
     const pickCalls: { mode: string }[] = [];
+    const activeProfile = models.find(profile => profile.id === active);
     const aiConfig: { hasKey: boolean; baseUrl: string; model: string } = {
       hasKey: true,
-      baseUrl: 'https://api.openai.com/v1',
-      model: 'gpt-4o-mini',
+      baseUrl: activeProfile?.baseUrl ?? 'https://api.openai.com/v1',
+      model: activeProfile?.model ?? 'gpt-4o-mini',
     };
     // ── AI 多模型配置（设置页「模型配置」读写） ──
     const aiModels: { id: string; name: string; provider: string; baseUrl: string; model: string }[] = models;
     let aiActive = active;
-    let aiProvider: string = 'openai-compatible';
+    let aiProvider: string = activeProfile?.provider ?? 'openai-compatible';
     /** Providers (endpoint ids) that hold a key in this mock; the local endpoint starts with one. */
     const aiProviderKeys = new Set<string>(['openai-compatible|http://127.0.0.1:11434/v1']);
     let aiHasTavily = false;
