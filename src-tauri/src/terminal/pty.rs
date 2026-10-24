@@ -388,17 +388,14 @@ fn merge_user_bin_paths(cmd: &mut CommandBuilder) {
                 seen: &mut std::collections::HashSet<PathBuf>| {
         if dir.as_os_str().is_empty()
             || (require_directory && !dir.is_dir())
-            || seen.contains(&dir)
+            || seen.contains(&path_identity(&dir))
         {
             return;
         }
-        seen.insert(dir.clone());
+        seen.insert(path_identity(&dir));
         merged.push(dir);
     };
 
-    // GUI launches on Unix often omit these user directories.  Windows keeps
-    // its normal PATH intact; only the cross-platform path serialization is
-    // needed there to keep shell discovery and spawning reliable.
     #[cfg(unix)]
     {
         let home = dirs::home_dir().unwrap_or_default();
@@ -417,12 +414,46 @@ fn merge_user_bin_paths(cmd: &mut CommandBuilder) {
     for dir in std::env::split_paths(&current) {
         push(dir, false, &mut merged, &mut seen);
     }
+    #[cfg(windows)]
+    for value in registered_windows_paths() {
+        for directory in std::env::split_paths(&value) {
+            push(directory, false, &mut merged, &mut seen);
+        }
+    }
 
     // `join_paths` applies the platform separator and preserves Windows drive
     // letters.  Fall back to the original value if an unusual entry cannot be
     // joined rather than replacing PATH with an empty value.
     let path = std::env::join_paths(merged).unwrap_or(current);
     cmd.env("PATH", path);
+}
+
+#[cfg(windows)]
+fn registered_windows_paths() -> Vec<std::ffi::OsString> {
+    use std::os::windows::ffi::OsStringExt;
+    use windows_sys::Win32::System::Registry::{RegGetValueW, HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE, RRF_RT_REG_EXPAND_SZ, RRF_RT_REG_SZ};
+    let mut result = Vec::new();
+    let value: Vec<u16> = "Path\0".encode_utf16().collect();
+    for (root, path) in [(HKEY_LOCAL_MACHINE, "SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment"), (HKEY_CURRENT_USER, "Environment")] {
+        let subkey: Vec<u16> = path.encode_utf16().chain(Some(0)).collect();
+        let mut bytes = 0u32;
+        let flags = RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ;
+        unsafe {
+            if RegGetValueW(root, subkey.as_ptr(), value.as_ptr(), flags, std::ptr::null_mut(), std::ptr::null_mut(), &mut bytes) != 0 || bytes > 1_048_576 { continue; }
+            let mut buffer = vec![0u16; bytes as usize / 2 + 1];
+            if RegGetValueW(root, subkey.as_ptr(), value.as_ptr(), flags, std::ptr::null_mut(), buffer.as_mut_ptr().cast(), &mut bytes) != 0 { continue; }
+            let length = buffer.iter().position(|value| *value == 0).unwrap_or(buffer.len());
+            result.push(std::ffi::OsString::from_wide(&buffer[..length]));
+        }
+    }
+    result
+}
+
+fn path_identity(directory: &std::path::Path) -> PathBuf {
+    #[cfg(windows)]
+    { PathBuf::from(directory.to_string_lossy().to_lowercase()) }
+    #[cfg(not(windows))]
+    { directory.to_path_buf() }
 }
 
 /// GUI launches may inherit an empty or dumb TERM, which breaks terminal capability checks.
@@ -490,7 +521,7 @@ fn merge_locale_env(cmd: &mut CommandBuilder) {
 
 /// Windows 默认 shell：pwsh → powershell → cmd（进程内缓存，避免每次建终端都 spawn 探测）。
 #[cfg(target_os = "windows")]
-fn default_windows_shell() -> &'static str {
+pub(crate) fn default_windows_shell() -> &'static str {
     use std::sync::OnceLock;
     static DEFAULT: OnceLock<&'static str> = OnceLock::new();
     DEFAULT.get_or_init(|| {
@@ -1284,7 +1315,6 @@ mod tests {
         assert!(dirs.ends_with(&["/usr/bin", "/bin", "/usr/sbin", "/sbin"]));
     }
 
-    /// Windows 的 PATH 必须保留盘符和 `;` 分隔符，否则 `pwsh` 无法被找到。
     #[cfg(windows)]
     #[test]
     fn merge_user_bin_paths_preserves_windows_path_entries() {
@@ -1293,11 +1323,16 @@ mod tests {
 
         let mut cmd = CommandBuilder::new("pwsh");
         merge_user_bin_paths(&mut cmd);
-        let path = cmd.get_env("PATH").expect("PATH 被设置");
-        assert_eq!(
-            path.to_str(),
-            Some(r"C:\Windows\System32;C:\Program Files\PowerShell\7")
-        );
+        let path = cmd.get_env("PATH").expect("PATH is set");
+        let entries: Vec<_> = std::env::split_paths(path).collect();
+        assert_eq!(&entries[..2], &[PathBuf::from(r"C:\Windows\System32"), PathBuf::from(r"C:\Program Files\PowerShell\7")]);
+        for registered in registered_windows_paths() {
+            for directory in std::env::split_paths(&registered).filter(|directory| !directory.as_os_str().is_empty()) {
+                assert!(entries.iter().any(|entry| path_identity(entry) == path_identity(&directory)));
+            }
+        }
+        let unique: std::collections::HashSet<_> = entries.iter().map(|entry| path_identity(entry)).collect();
+        assert_eq!(entries.len(), unique.len());
 
         match original {
             Some(value) => std::env::set_var("PATH", value),
