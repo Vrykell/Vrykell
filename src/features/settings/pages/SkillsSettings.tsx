@@ -10,16 +10,17 @@ import { TextInput } from '@ui/TextInput';
  */
 
 import { useState } from 'react';
-import { ChevronRight, Download, FileText, Folder, ShieldAlert, Store, Trash2, X } from '@ui/icons';
+import { ArrowLeft, ChevronRight, Download, FileText, Folder, ShieldAlert, Store, Trash2, X } from '@ui/icons';
 import { fileOpenWith } from '@platform/api/fs';
 import {
-  setSkillState, removeSkill, marketGithubList, marketGithubInstall,
-  type SkillMeta, type SkillDetail, type MarketSkill,
+  setSkillState, removeSkill,
+  type SkillMeta, type SkillDetail,
 } from '@features/agent/services/skills';
 import { useToastStore } from '@ui/Toast';
 import Select from '@ui/Select';
 import ErrorBox from '@ui/ErrorBox';
 import { useSkillsSettings } from '@features/settings/hooks/useSkillsSettings';
+import { useSkillMarketplace } from '@features/settings/hooks/useSkillMarketplace';
 import { useSkillFileBrowser } from '@features/settings/hooks/useSkillFileBrowser';
 import type { FileNode } from '@features/settings/model/skillFileTree';
 import { SettingsGroup } from '../components/ui';
@@ -31,11 +32,9 @@ const toast = (msg: string, type: 'info' | 'success' | 'error') =>
 /** 预置技能市场（GitHub 仓库 URL，含 SKILL.md 的常见技能库） */
 const MARKETPLACES: { name: string; repo: string }[] = [
   { name: 'anthropics/skills', repo: 'https://github.com/anthropics/skills' },
-  { name: 'agentskills/agentskills', repo: 'https://github.com/agentskills/agentskills' },
   { name: 'magnus919/agent-skills', repo: 'https://github.com/magnus919/agent-skills' },
 ];
 
-const marketplaceOptions = [{ value: '', label: '自定义…' }, ...MARKETPLACES.map(m => ({ value: m.repo, label: m.name }))];
 
 // ── 样式 ──
 
@@ -141,7 +140,7 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
       display: 'flex', flexDirection: 'column', overflow: 'auto', padding: '14px 18px',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <OutlineButton onClick={onClose} style={{ ...btn }}>← 返回</OutlineButton>
+        <OutlineButton onClick={onClose}><ArrowLeft size={16} aria-hidden="true" />{t('Back')}</OutlineButton>
         <div style={{ flex: 1 }} />
         <OutlineButton onClick={() => void fileOpenWith(skill.dir)} style={btn}>打开文件夹</OutlineButton>
         <OutlineButton onClick={() => void toggleTrust()} style={btn}>
@@ -150,7 +149,7 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
         <OutlineButton onClick={() => void toggleEnabled()} style={btn}>
           {skill.enabled ? '禁用' : '启用'}
         </OutlineButton>
-        <OutlineButton onClick={() => void del()} style={{ ...btn, color: 'var(--error-light)' }}>删除</OutlineButton>
+        <OutlineButton onClick={() => void del()} style={{ ...btn, color: 'var(--control-danger-color)' }}>{t('Delete')}</OutlineButton>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -201,39 +200,8 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
   onClose: () => void;
   onInstalled: () => void;
 }) {
-  const [repo, setRepo] = useState('');
-  const [remote, setRemote] = useState<MarketSkill[]>([]);
-  const [browsing, setBrowsing] = useState(false);
-  const [installing, setInstalling] = useState<Set<string>>(new Set());
+  const { repo, remote, browsing, error, changeRepo, browse, install, isInstalling } = useSkillMarketplace(MARKETPLACES[0].repo, onInstalled);
   const [query, setQuery] = useState('');
-
-  const browse = async () => {
-    const r = repo.trim();
-    if (!r) return;
-    setBrowsing(true);
-    try {
-      const list = await marketGithubList(r);
-      setRemote(list);
-      if (list.length === 0) toast('仓库中未找到技能', 'info');
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    } finally {
-      setBrowsing(false);
-    }
-  };
-
-  const install = async (r: MarketSkill) => {
-    setInstalling((s) => new Set(s).add(r.name));
-    try {
-      await marketGithubInstall(repo.trim(), r.dir);
-      toast(`已安装 ${r.name}`, 'success');
-      onInstalled();
-    } catch (e) {
-      toast(String((e as Error)?.message ?? e), 'error');
-    } finally {
-      setInstalling((s) => { const n = new Set(s); n.delete(r.name); return n; });
-    }
-  };
 
   const q = query.trim().toLowerCase();
   const visible = q ? remote.filter((r) => r.name.toLowerCase().includes(q) || (r.description ?? '').toLowerCase().includes(q)) : remote;
@@ -244,61 +212,65 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
       display: 'flex', flexDirection: 'column', padding: '14px 18px', overflow: 'hidden',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <OutlineButton onClick={onClose} style={{ ...btn }}>← 返回</OutlineButton>
-        <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)' }}>技能市场</span>
+        <OutlineButton onClick={onClose}><ArrowLeft size={16} aria-hidden="true" />{t('Back')}</OutlineButton>
+        <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)' }}>{t('Skill marketplace')}</span>
         <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>第三方技能默认未信任，安装后可查看来源再信任</span>
+        <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{t('Third-party skills are untrusted until you review and trust them.')}</span>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-        <Select aria-label="技能市场仓库" value={repo} options={marketplaceOptions} onChange={setRepo}
-          placeholder="自定义…" style={{ flexShrink: 0, width: 190 }} />
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
+        <Select aria-label={t('Skill repository')} value={MARKETPLACES.some(item => item.repo === repo) ? repo : ''}
+          options={[{ value: '', label: t('Custom…') }, ...MARKETPLACES.map(item => ({ value: item.repo, label: item.name }))]}
+          onChange={value => { changeRepo(value); if (value) void browse(value); }}
+          placeholder={t('Custom…')} style={{ flexShrink: 0, width: 190 }} />
         <TextInput
           value={repo}
-          placeholder="GitHub 仓库 URL，如 https://github.com/anthropics/skills"
-          onChange={(e) => setRepo(e.target.value)}
+          aria-label={t('Repository URL')}
+          placeholder={t('Repository URL')}
+          onChange={(e) => changeRepo(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void browse(); }}
           style={input}
         />
         <OutlineButton onClick={() => void browse()} disabled={browsing} style={{ ...btn, flexShrink: 0 }}>
-          {browsing ? '加载中…' : '浏览'}
+          {t(browsing ? 'Loading…' : 'Browse')}
         </OutlineButton>
       </div>
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <TextInput
           value={query}
-          placeholder="搜索技能…"
+          placeholder={t('Search skills…')}
           onChange={(e) => setQuery(e.target.value)}
           style={input}
         />
         <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', alignSelf: 'center', flexShrink: 0 }}>
-          {remote.length > 0 ? `共 ${remote.length} 个` : ''}
+          {remote.length > 0 ? t('{{count}} skills', { count: remote.length }) : ''}
         </span>
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {error && <ErrorBox title={t('Could not load skills')} details={error} actions={<OutlineButton onClick={() => void browse()}>{t('Retry')}</OutlineButton>} />}
+      <div aria-busy={browsing} style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
         {remote.length === 0 && !browsing && (
           <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: '8px 0' }}>
-            选择 GitHub 仓库并点「浏览」加载技能列表。
+            {t(error ? 'Choose another repository or retry loading.' : 'No skills found. Choose a repository and browse its skills.')}
           </div>
         )}
         {visible.map((r) => {
           const installed = metas.some((m) => m.name === r.name);
           return (
-            <div key={r.name} style={{ borderRadius: 'var(--radius-inner)', padding: '8px 12px', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div key={r.dir} style={{ borderRadius: 'var(--radius-inner)', padding: '8px 12px', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)' }}>
                   {r.name}
                   <span style={{ color: 'var(--text-muted)', fontSize: 'calc(11px * var(--ui-font-scale))' }}> · {r.dir}</span>
                 </div>
-                <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-secondary)', marginTop: 2 }}>{r.description || '无描述'}</div>
+                <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-secondary)', marginTop: 2 }}>{r.description || t('No description')}</div>
               </div>
               {installed ? (
-                <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 10px', borderRadius: 4, color: 'var(--success)', background: 'var(--success-bg)', flexShrink: 0 }}>已安装</span>
+                <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 10px', borderRadius: 4, color: 'var(--success)', background: 'var(--success-bg)', flexShrink: 0 }}>{t('Installed')}</span>
               ) : (
-                <OutlineButton onClick={() => void install(r)} disabled={installing.has(r.name)} style={{ ...btn, flexShrink: 0 }}>
-                  {installing.has(r.name) ? '安装中…' : '安装'}
+                <OutlineButton onClick={() => void install(r)} disabled={isInstalling(r)} style={{ ...btn, flexShrink: 0 }}>
+                  {t(isInstalling(r) ? 'Installing…' : 'Install')}
                 </OutlineButton>
               )}
             </div>
