@@ -38,23 +38,22 @@ export default function SshForwardingEditor({ value, onChange }: Props) {
     </div>
     {error && <ErrorBox compact tone="error">{error}</ErrorBox>}
     {mode === 'gui' ? <>
-      {rows.length === 0 && <p className="ssh-empty-forward">{t('No forwarding rules. Add a rule to map a port.')}</p>}
       {rows.map((row, index) => <div key={row.id} className="ssh-forward-rule" data-testid={`ssh-forward-rule-${index}`}>
         <div className="ssh-forward-rule-heading">
           <Select aria-label={t('Forward type')} value={row.kind} options={types()} onChange={kind => changeRow(row.id, { kind: kind as ForwardKind })} />
           <span>{t(row.kind === 'local' ? 'This computer → remote destination' : row.kind === 'remote' ? 'Remote computer → local destination' : 'SOCKS proxy on this computer')}</span>
-          <IconButton aria-label={t('Remove forwarding rule')} data-tip={t('Remove forwarding rule')} onClick={() => update(rows.filter(item => item.id !== row.id))}><Trash2 size={14} /></IconButton>
+          <IconButton tone="danger" aria-label={t('Remove forwarding rule')} data-tip={t('Remove forwarding rule')} onClick={() => update(rows.filter(item => item.id !== row.id))}><Trash2 size={14} /></IconButton>
         </div>
         <div className="ssh-forward-fields">
-          <label>{t('Listen address')}<TextInput value={row.bind} placeholder="127.0.0.1" onChange={e => changeRow(row.id, { bind: e.target.value })} /></label>
-          <label>{t('Listen port')}<TextInput inputMode="numeric" value={row.port} placeholder="8080" data-testid={`ssh-forward-port-${index}`} onChange={e => changeRow(row.id, { port: e.target.value })} /></label>
+          <label>{t('Listen address')}<TextInput variant="field" value={row.bind} placeholder="127.0.0.1" onChange={e => changeRow(row.id, { bind: e.target.value })} /></label>
+          <label>{t('Listen port')}<TextInput variant="field" inputMode="numeric" value={row.port} placeholder="8080" data-testid={`ssh-forward-port-${index}`} onChange={e => changeRow(row.id, { port: e.target.value })} /></label>
           {row.kind !== 'dynamic' && <>
-            <label>{t('Destination host')}<TextInput value={row.host} data-testid={`ssh-forward-host-${index}`} onChange={e => changeRow(row.id, { host: e.target.value })} /></label>
-            <label>{t('Destination port')}<TextInput inputMode="numeric" value={row.targetPort} placeholder="80" data-testid={`ssh-forward-target-port-${index}`} onChange={e => changeRow(row.id, { targetPort: e.target.value })} /></label>
+            <label>{t('Destination host')}<TextInput variant="field" value={row.host} data-testid={`ssh-forward-host-${index}`} onChange={e => changeRow(row.id, { host: e.target.value })} /></label>
+            <label>{t('Destination port')}<TextInput variant="field" inputMode="numeric" value={row.targetPort} placeholder="80" data-testid={`ssh-forward-target-port-${index}`} onChange={e => changeRow(row.id, { targetPort: e.target.value })} /></label>
           </>}
         </div>
       </div>)}
-      <TextButton onClick={add} data-testid="ssh-forward-add"><Plus size={14} />{t('Add forwarding rule')}</TextButton>
+      <TextButton className="ssh-editor-link" onClick={add} data-testid="ssh-forward-add"><Plus size={14} />{t('Add forwarding rule')}</TextButton>
     </> : <div className="ssh-forward-texts">
       {(['local', 'remote', 'dynamic'] as const).map(kind => <ConfigTextArea key={kind} label={t(kind === 'local' ? 'Local forward' : kind === 'remote' ? 'Remote forward' : 'Dynamic forward')}
         aria-label={t(kind === 'local' ? 'Local forward' : kind === 'remote' ? 'Remote forward' : 'Dynamic forward')}

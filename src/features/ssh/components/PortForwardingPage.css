@@ -1,0 +1,47 @@
+.ssh-forwarding-page { container: hosts / inline-size; display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; background: var(--canvas); }
+.ssh-forwarding-page > .ssh-host-page-header { flex-wrap: wrap; }
+.ssh-forwarding-breadcrumb { flex: 1; gap: 6px; }
+.ssh-forwarding-page .ssh-forwarding-breadcrumb { font-size: calc(24px * var(--ui-font-scale)); }
+.ssh-forwarding-breadcrumb > button { background: transparent; border: 0; padding: 0; color: var(--text-muted); font: inherit; cursor: pointer; }
+.ssh-forwarding-breadcrumb > button:hover { color: var(--text-primary); background: transparent; }
+.ssh-forwarding-page .ssh-forwarding-breadcrumb h2 { font-size: inherit; }
+.ssh-forwarding-content { flex: 1; min-height: 0; overflow: auto; padding: 12px 24px 24px; }
+.ssh-forwarding-group { margin-bottom: 20px; }
+.ssh-forwarding-group h3 { display: flex; gap: 8px; min-width: 0; margin: 8px 2px; color: var(--text-secondary); font-size: var(--fs-caption); }
+.ssh-forwarding-group h3 > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); color: var(--text-muted); }
+.ssh-forwarding-rules, .ssh-forwarding-fields { border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--card-bg); }
+.ssh-forwarding-row { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 8px 12px; }
+.ssh-forwarding-row + .ssh-forwarding-row { border-top: 1px solid var(--border); }
+.ssh-forwarding-description { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 3px; font-size: var(--fs-caption); }
+.ssh-forwarding-endpoints { display: flex; align-items: center; gap: 6px; min-width: 0; overflow: hidden; color: var(--text-muted); white-space: nowrap; font-size: var(--fs-micro); }
+.ssh-forwarding-endpoints > code { overflow: hidden; text-overflow: ellipsis; font-family: var(--font-mono); }
+.ssh-forwarding-auto { display: flex; align-items: center; gap: 8px; color: var(--text-muted); font-size: var(--fs-micro); white-space: nowrap; }
+.ssh-forwarding-row > button { flex-shrink: 0; }
+.ssh-forwarding-row > .outline-button { min-width: 52px; height: 24px; min-height: 24px; padding-block: 0; }
+.ssh-forwarding-rule-error { color: var(--error); font-size: var(--fs-micro); }
+.ssh-forwarding-dialog { display: flex; flex-direction: column; width: min(520px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); }
+.ssh-forwarding-dialog > header { padding: 24px 28px 16px; }
+.ssh-forwarding-dialog h2 { margin: 0 0 8px; font-size: var(--fs-title); }
+.ssh-forwarding-dialog p { margin: 0; color: var(--text-muted); font-size: var(--fs-caption); line-height: 1.5; }
+.ssh-forwarding-form { min-height: 0; overflow: auto; padding: 0 28px 24px; }
+.ssh-forwarding-fields > :is(label, .ssh-forwarding-field) { display: grid; grid-template-columns: 120px minmax(0, 1fr); align-items: center; gap: 12px; padding: 7px 12px; min-height: 40px; font-size: var(--fs-caption); }
+.ssh-forwarding-fields > * + * { border-top: 1px solid var(--border); }
+.ssh-forwarding-fields .text-input-field { min-height: 28px; padding-block: 4px; }
+.ssh-forwarding-address { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.ssh-forwarding-address > input:first-child { flex: 1; min-width: 0; }
+.ssh-forwarding-address > input:last-child { width: 72px; min-width: 0; }
+.ssh-forwarding-dialog .segmented-control { width: 100%; box-sizing: border-box; }
+.ssh-forwarding-dialog .segmented-control > button { padding-inline: 6px; }
+.ssh-forwarding-checkbox > span:last-child { display: flex; align-items: center; gap: 8px; }
+.ssh-forwarding-dialog > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
+@media (max-width: 760px) {
+  .ssh-forwarding-auto > span { display: none; }
+  .ssh-forwarding-content { padding-inline: 16px; }
+  .ssh-forwarding-row { gap: 6px; padding-inline: 8px; }
+  .ssh-forwarding-dialog > header { padding-inline: 16px; }
+  .ssh-forwarding-form { padding-inline: 16px; }
+  .ssh-forwarding-fields > :is(label, .ssh-forwarding-field) { grid-template-columns: 88px minmax(0, 1fr); gap: 8px; }
+}
+@container hosts (max-width: 860px) {
+  .ssh-forwarding-content { padding-inline: 16px; }
+}

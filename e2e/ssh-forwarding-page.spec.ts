@@ -1,0 +1,50 @@
+import { expect, test } from '@playwright/test';
+import { setupTauriMock } from './tauri-mock';
+
+test('forwarding has its own compact page with create, edit, start, stop and delete', async ({ page }, info) => {
+  await setupTauriMock(page, { schedulesSeed: [] });
+  await page.addInitScript(() => { localStorage.setItem('workspace-navigation-v1', JSON.stringify({ collapsed: false })); });
+  await page.goto('/');
+  await page.evaluate(() => { document.documentElement.dataset.nativeMaterial = 'fallback'; });
+  await page.getByTestId('workspace-area-ssh').click();
+  await page.getByTestId('ssh-forwarding-entry').click();
+  const root = page.getByTestId('port-forwarding-page');
+  await root.getByRole('button', { name: '添加转发…' }).click();
+  const dialog = page.getByRole('dialog', { name: '添加端口转发' });
+  await dialog.getByTestId('forward-name').fill('Database');
+  await dialog.getByRole('textbox', { name: '监听端口' }).fill('15432');
+  await dialog.getByRole('textbox', { name: '目标端口' }).fill('5432');
+  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  const row = root.locator('.ssh-forwarding-row').filter({ hasText: 'Database' });
+  await expect(row).toBeVisible();
+  await row.getByRole('button', { name: '启动', exact: true }).click();
+  await expect(row.getByRole('button', { name: '停止', exact: true })).toBeVisible();
+  await row.getByRole('button', { name: '停止', exact: true }).click();
+  await row.getByRole('switch').click();
+  await expect(row.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+  await row.getByRole('button', { name: '编辑转发规则' }).click();
+  await page.getByRole('dialog', { name: '编辑端口转发' }).getByRole('combobox', { name: '转发类型' }).click();
+  await page.getByRole('option', { name: '动态（SOCKS）' }).click();
+  await expect(page.getByRole('dialog').getByRole('textbox', { name: '目标端口' })).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath('forwarding-editor.png') });
+  await page.getByRole('dialog').getByRole('button', { name: '保存', exact: true }).click();
+  await page.screenshot({ path: info.outputPath('forwarding-page.png') });
+  await row.getByRole('button', { name: '删除转发规则' }).click();
+  await page.getByTestId('confirm-ok').click();
+  await expect(row).toHaveCount(0);
+});
+
+test('host list never wraps and metric menu stays inside the viewport at narrow width', async ({ page }) => {
+  await setupTauriMock(page, { schedulesSeed: [] });
+  await page.setViewportSize({ width: 780, height: 620 });
+  await page.goto('/');
+  if (await page.getByTestId('workspace-sidebar-expand').isVisible()) await page.getByTestId('workspace-sidebar-expand').click();
+  await page.getByTestId('workspace-area-ssh').click();
+  const root = page.getByTestId('ssh-dashboard');
+  await root.getByRole('switch', { name: '资源占用' }).click();
+  const rows = root.locator('.sidebar-row-content');
+  for (const row of await rows.all()) expect((await row.boundingBox())!.height).toBeLessThanOrEqual(42);
+  await root.getByTestId('ssh-dashboard-metrics').click();
+  const bounds = (await page.getByRole('menu', { name: '采集并显示' }).boundingBox())!;
+  expect(bounds.x).toBeGreaterThanOrEqual(0); expect(bounds.x + bounds.width).toBeLessThanOrEqual(780);
+});

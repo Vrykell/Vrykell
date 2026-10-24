@@ -2,7 +2,8 @@ import { test, expect, type Page, type Locator } from '@playwright/test';
 import { setupTauriMock, emitPtyOutput } from './tauri-mock';
 
 async function textForwarding(page: Page, panel: Page | Locator = page) {
-  await panel.getByTestId('ssh-section-tab-forwarding').click();
+  if (await panel.getByTestId('ssh-section-tab-forwarding').count()) await panel.getByTestId('ssh-section-tab-forwarding').click();
+  else if (await panel.locator('.ssh-editor-advanced:not([open]) > summary').count()) await panel.locator('.ssh-editor-advanced > summary').click();
   await panel.getByRole('combobox', { name: '转发编辑模式' }).click();
   await page.getByRole('option', { name: '文本模式' }).click();
 }
@@ -22,28 +23,27 @@ test('导入 SSH 配置里的主机别名，转发与自动重连随连接保存
 
   await page.getByTestId('ssh-search').fill('web');
   await expect(page.locator('[data-testid^="ssh-row-"]')).toHaveCount(1);
-  await expect(page.getByRole('button', { name: '编辑「web」', exact: true })).toBeVisible();
+  await expect(page.locator('[data-testid^="ssh-row-"]').filter({ hasText: 'web' })).toBeVisible();
   await page.getByTestId('ssh-search').fill('');
 
   // Forwarding and reconnect options survive reopening the saved profile.
   await page.getByTestId('ssh-new-btn').click();
-  const form = page.getByRole('dialog', { name: 'SSH 连接' });
+  const form = page.getByTestId('ssh-host-editor');
   await form.getByTestId('ssh-form-name').fill('带转发的机器');
   await form.getByTestId('ssh-form-host').fill('tunnel.example.com');
   await textForwarding(page, form);
   await form.getByTestId('ssh-form-local-forward').fill('8080:localhost:80');
   await form.getByTestId('ssh-form-dynamic-forward').fill('1080');
-  await form.getByTestId('ssh-section-tab-advanced').click();
   await form.getByTestId('ssh-form-auto-reconnect').check();
   await form.getByTestId('ssh-save-btn').click();
   await expect(form).toHaveCount(0);
 
-  await page.getByRole('button', { name: '编辑「带转发的机器」', exact: true }).click();
-  const reopened = page.getByRole('dialog', { name: 'SSH 连接' });
+  await page.locator('[data-testid^="ssh-row-"]').filter({ hasText: '带转发的机器' }).click({ button: 'right' });
+  await page.getByRole('button', { name: '编辑连接', exact: true }).click();
+  const reopened = page.getByTestId('ssh-host-editor');
   await textForwarding(page, reopened);
   await expect(reopened.getByTestId('ssh-form-local-forward')).toHaveValue('8080:localhost:80');
   await expect(reopened.getByTestId('ssh-form-dynamic-forward')).toHaveValue('1080');
-  await reopened.getByTestId('ssh-section-tab-advanced').click();
   await expect(reopened.getByTestId('ssh-form-auto-reconnect')).toBeChecked();
   await reopened.getByRole('button', { name: '取消', exact: true }).click();
   await expect(reopened).toHaveCount(0);
@@ -55,7 +55,7 @@ test('非法端口转发在保存时被拒绝', async ({ page }) => {
   await page.locator('[data-dock-btn="ssh"]').click();
   await page.getByTestId('ssh-new-btn').click();
 
-  const form = page.getByRole('dialog', { name: 'SSH 连接' });
+  const form = page.getByTestId('ssh-host-editor');
   await form.getByTestId('ssh-form-name').fill('坏转发');
   await form.getByTestId('ssh-form-host').fill('tunnel.example.com');
   await textForwarding(page, form);
@@ -72,13 +72,13 @@ test('SSH forwards reach the terminal, drops retry and remote exits stay closed'
   await setupTauriMock(page, { sshHost: 'known', integration: false });
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
-  await page.getByTestId('ssh-quick-btn').click();
+  await page.getByTestId('ssh-host-actions').click(); await page.getByRole('button', { name: '快速连接', exact: true }).click();
   await page.getByTestId('ssh-form-host').fill('tunnel.example.com');
   await textForwarding(page);
   await page.getByTestId('ssh-form-local-forward').fill('8080:localhost:80');
   await page.getByTestId('ssh-form-remote-forward').fill('9000:localhost:9000');
   await page.getByTestId('ssh-form-dynamic-forward').fill('1080');
-  await page.getByTestId('ssh-section-tab-advanced').click();
+  if (await page.getByTestId('ssh-section-tab-advanced').count()) await page.getByTestId('ssh-section-tab-advanced').click();
   await page.getByTestId('ssh-form-auto-reconnect').check();
   await page.getByTestId('ssh-connect-btn').click();
   const spawns = () => page.evaluate(() =>
@@ -104,7 +104,7 @@ test('SSH multiline paste honours the active bracketed paste mode', async ({ pag
   await setupTauriMock(page, { sshHost: 'known', integration: false });
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
-  await page.getByTestId('ssh-quick-btn').click();
+  await page.getByTestId('ssh-host-actions').click(); await page.getByRole('button', { name: '快速连接', exact: true }).click();
   await page.getByTestId('ssh-form-host').fill('tunnel.example.com');
   await page.getByTestId('ssh-connect-btn').click();
   const input = page.getByRole('textbox', { name: 'SSH 交互终端' });
@@ -159,14 +159,13 @@ test('an explicitly disabled jump remains direct after saving and connecting', a
   await page.getByTestId('ssh-new-btn').click();
   await page.getByTestId('ssh-form-name').fill('direct');
   await page.getByTestId('ssh-form-host').fill('direct.example.com');
-  await page.getByTestId('ssh-section-tab-advanced').click();
   await page.getByTestId('ssh-form-jump').fill('none');
   await page.getByTestId('ssh-save-btn').click();
-  await page.getByRole('button', { name: '编辑「direct」', exact: true }).click();
-  await page.getByTestId('ssh-section-tab-advanced').click();
+  await page.locator('[data-testid^="ssh-row-"]').filter({ hasText: 'direct' }).click({ button: 'right' });
+  await page.getByRole('button', { name: '编辑连接', exact: true }).click();
   await expect(page.getByTestId('ssh-form-jump')).toHaveValue('none');
   await page.getByTestId('ssh-test-btn').click();
-  await expect(page.getByRole('dialog').getByText(/认证成功/)).toBeVisible();
+  await expect(page.getByTestId('ssh-host-editor').getByText(/认证成功/)).toBeVisible();
   await page.getByRole('button', { name: '取消', exact: true }).click();
   await page.locator('[data-testid^="ssh-row-"]').filter({ hasText: 'direct' }).dblclick();
   await expect.poll(() => page.evaluate(() =>
