@@ -23,6 +23,12 @@ export interface SshAuthenticationTarget {
 
 /** Non-secret options shared by saved connections and terminal launch requests. */
 export interface SshOptions {
+  forwardingRules?: SshForwardingRule[];
+  authenticationMode?: 'password' | 'key' | 'ask' | 'agent';
+  proxyId?: string;
+  environment?: Record<string, string>;
+  notes?: string;
+  aiNotes?: string;
   identityFile?: string;
   jumpHost?: string;
   serverAliveInterval?: number;
@@ -42,4 +48,15 @@ export interface SshOptions {
    *   preflight cannot run, so a working ssh is never blocked by the inspector.
    */
   hostKeyPolicy?: 'strict' | 'ask';
+}
+
+export interface SshForwardingRule {
+  id: string;
+  name: string;
+  kind: 'local' | 'remote' | 'dynamic';
+  bind: string;
+  port: number;
+  host: string;
+  targetPort: number;
+  autoStart: boolean;
 }

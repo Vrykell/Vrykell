@@ -2,6 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { normPath, pathSegments, segmentsToPath, parentOf, isDriveRoot } from '@platform/path';
 
 describe('platform/path', () => {
+  it('normalizes extended disk and share paths without damaging device namespaces', () => {
+    expect(normPath('\\\\?\\D:\\projects\\file.go')).toBe('D:/projects/file.go');
+    expect(normPath('\\\\?\\UNC\\server\\share\\file.go')).toBe('//server/share/file.go');
+    expect(segmentsToPath(pathSegments('\\\\?\\UNC\\server\\share\\folder'))).toBe('//server/share/folder');
+    expect(parentOf('//server/share/folder')).toBe('//server/share');
+    expect(parentOf('//server/share')).toBeNull();
+    expect(normPath('\\\\?\\Volume{abc}\\file')).toBe('//?/Volume{abc}/file');
+  });
   it('normPath 归一化反斜杠并去尾斜杠', () => {
     expect(normPath('C:\\Users\\foo\\')).toBe('C:/Users/foo');
     expect(normPath('C:\\')).toBe('C:/');

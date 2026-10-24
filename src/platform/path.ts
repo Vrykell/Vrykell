@@ -14,7 +14,8 @@
 /** 归一化分隔符为 `/`，去掉尾部斜杠；`/C:/Users`（OSC 7 的 Windows 盘符形式）→ `C:/Users`。 */
 export function normPath(p: string): string {
   // 先处理前导斜杠 + 盘符（/C:/Users、/C:/、/C:），再收尾斜杠，避免盘符形式被提前破坏
-  let s = p.replace(/\\/g, '/').replace(/^\/([a-zA-Z]):(\/|$)/, '$1:/');
+  let s = p.replace(/\\/g, '/').replace(/^\/\/\?\/UNC\//i, '//').replace(/^\/\/\?\/([a-zA-Z]:\/)/, '$1')
+    .replace(/^\/([a-zA-Z]):(\/|$)/, '$1:/');
   s = s.replace(/\/+$/, '');
   if (s === '') return '/'; // 根路径
   // 盘符根补齐根斜杠（C: → C:/），避免后端把它当成驱动器相对路径
@@ -24,13 +25,17 @@ export function normPath(p: string): string {
 
 /** 拆成显示段：`C:/Users/foo` → ['C:', 'Users', 'foo']；`/Users` → ['Users']。 */
 export function pathSegments(p: string): string[] {
-  return normPath(p).split('/').filter(Boolean);
+  const path = normPath(p);
+  const parts = path.split('/').filter(Boolean);
+  if (path.startsWith('//') && parts.length) parts[0] = `//${parts[0]}`;
+  return parts;
 }
 
 /** 段 → 路径：['C:'] → 'C:/'，['C:', 'Users'] → 'C:/Users'，['Users'] → '/Users'。 */
 export function segmentsToPath(segs: string[]): string {
   if (segs.length === 0) return '';
   const first = segs[0]!;
+  if (first.startsWith('//')) return segs.join('/');
   const isDrive = /^[a-zA-Z]:$/.test(first);
   if (isDrive) return first + '/' + segs.slice(1).join('/');
   return '/' + segs.join('/');
@@ -48,6 +53,7 @@ export function isDriveRoot(p: string): boolean {
 export function parentOf(p: string): string | null {
   const segs = pathSegments(p);
   if (segs.length === 0) return null; // 已在文件系统根
+  if (segs[0]?.startsWith('//') && segs.length <= 2) return null;
   if (segs.length === 1) {
     // 盘符根（C:）→ 无上级；文件系统根的直接子目录（/Users）→ /
     return isDriveRoot(p) ? null : '/';

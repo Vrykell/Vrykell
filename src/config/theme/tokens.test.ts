@@ -39,10 +39,19 @@ describe('toRgba', () => {
 });
 
 describe('default blue palette', () => {
+  it.each(['dark', 'light'] as const)('%s separates vivid destructive controls from muted diagnostic text', mode => {
+    expect(themes[mode].dangerAction).not.toBe(themes[mode].errorLight);
+    expect(paletteToCssVars(themes[mode])['--danger-action']).toBe(themes[mode].dangerAction);
+    expect(paletteToCssVars(themes[mode])['--danger-action-text']).toBe(themes[mode].dangerActionText);
+  });
+  it('keeps favorites yellow in both themes instead of reusing the darkened light group color', () => {
+    expect(paletteToCssVars(themes.dark)['--favorite-color']).toBe('#F5C400');
+    expect(paletteToCssVars(themes.light)['--favorite-color']).toBe('#F5C400');
+  });
   it('uses the sampled neutral surfaces and blue action from the appearance reference', () => {
     expect(themes.dark).toMatchObject({
       canvas: '#202020', sidebarBg: '#28282B', chromeBg: '#2E2E2E', auxiliaryBg: '#282828', xtermBg: '#141414', surface: '#282828', composerBg: '#333333',
-      fieldBg: '#333333', selectionBg: '#183C57', accent: '#50C0FF', primaryAction: '#2C67C5',
+      fieldBg: '#3C3C3C', elevated: '#303030', selectionBg: '#484848', accent: '#50C0FF', primaryAction: '#2C67C5', shellZshAccent: '#F15A24',
     });
   });
   it.each(['dark', 'light'] as const)('%s reuses the neutral card and field colors for content blocks', mode => {
@@ -55,7 +64,7 @@ describe('default blue palette', () => {
   it.each(['dark', 'light'] as const)('%s uses one green family across status, icons, groups and terminal output', mode => {
     const palette = themes[mode];
     const green = mode === 'dark' ? '#30D158' : '#167C32';
-    for (const color of [palette.success, palette.shellConnected, palette.shellBashAccent, palette.groupGreen, palette.xtermGreen, palette.xtermBrightGreen, palette.cmdProgram]) expect(color).toBe(green);
+    for (const color of [palette.success, palette.shellConnected, palette.groupGreen, palette.xtermGreen, palette.xtermBrightGreen, palette.cmdProgram]) expect(color).toBe(green);
   });
   it.each(['dark', 'light'] as const)('%s primary actions use the unified action blue', mode => {
     expect(themes[mode].primaryAction).toBe('#2C67C5');
@@ -154,6 +163,13 @@ describe('default blue palette', () => {
       .toBeGreaterThan(parseInt(themes.dark.fieldBg.slice(1, 3), 16));
   });
 
+  it.each(['dark', 'light'] as const)('%s dropdown hover and expanded backgrounds remain neutral', mode => {
+    for (const color of [themes[mode].hover, themes[mode].buttonHover]) {
+      const channels = color.startsWith('#') ? [color.slice(1, 3), color.slice(3, 5), color.slice(5, 7)] : color.match(/\d+/g)!.slice(0, 3);
+      expect(new Set(channels).size).toBe(1);
+    }
+  });
+
   it('dark 语义色保留（成功/错误/警告）', () => {
     expect(themes.dark.success).toBe('#30D158');
     expect(themes.dark.error).toBe('#F14C4C');
@@ -184,11 +200,28 @@ describe('default blue palette', () => {
       return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
     };
     for (const text of [palette.textPrimary, palette.textSecondary, palette.textMuted]) {
-      for (const surface of [palette.chromeBg, palette.canvas, palette.surface, palette.fieldBg, palette.elevated, palette.selectionBg, palette.buttonHover]) {
+      for (const surface of [palette.chromeBg, palette.canvas, palette.surface, palette.cardBg, palette.fieldBg, palette.elevated, palette.selectionBg, palette.buttonHover]) {
         const values = [luminance(text), luminance(surface)];
         expect((Math.max(...values) + 0.05) / (Math.min(...values) + 0.05)).toBeGreaterThanOrEqual(4.5);
       }
     }
+  });
+  it.each(['dark', 'light'] as const)('%s gives borderless cards enough separation from the canvas', mode => {
+    const palette = themes[mode];
+    const luminance = (hex: string) => [1, 3, 5].map(offset => {
+      const channel = parseInt(hex.slice(offset, offset + 2), 16) / 255;
+      return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+    }).reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index], 0);
+    const values = [luminance(palette.cardBg), luminance(palette.canvas)];
+    expect((Math.max(...values) + 0.05) / (Math.min(...values) + 0.05)).toBeGreaterThanOrEqual(1.12);
+    expect(paletteToCssVars(palette)['--card-bg']).toBe(palette.cardBg);
+    expect(luminance(palette.fieldBg)).toBeGreaterThan(luminance(palette.cardBg));
+  });
+  it.each(['dark', 'light'] as const)('%s keeps row selection neutral without recoloring primary actions', mode => {
+    const palette = themes[mode];
+    const channels = [1, 3, 5].map(offset => parseInt(palette.selectionBg.slice(offset, offset + 2), 16));
+    expect(new Set(channels).size).toBe(1);
+    expect(palette.primaryAction).toBe('#2C67C5');
   });
 });
 

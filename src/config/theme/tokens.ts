@@ -11,12 +11,6 @@ export interface ThemePalette {
   iconColor: string;
   iconHoverColor: string;
   focusRing: string;
-  shellZshAccent: string;
-  shellBashAccent: string;
-  shellPowershellAccent: string;
-  shellCmdAccent: string;
-  shellSshAccent: string;
-  shellTileInk: string;
   /**
    * Model-vendor marks in the usage tables. They identify a vendor the way the terminal palette
    * identifies a token, so they carry their brand hue in both themes (a custom theme can still
@@ -37,6 +31,7 @@ export interface ThemePalette {
   groupCyan: string;
   groupRose: string;
   groupOrange: string;
+  shellZshAccent: string;
   groupCoral: string;
 
   /** Window titlebar surface. */
@@ -46,10 +41,13 @@ export interface ThemePalette {
   /** Auxiliary panels retain their own opaque resting surface. */
   auxiliaryBg: string;
   chromeField: string;
+  tabMenuBg: string;
   selectionBg: string;
   // 背景层（从深到浅）
   canvas: string;
   surface: string;
+  /** Borderless content cards stay distinct from the page canvas. */
+  cardBg: string;
   /** Editable fields sit above panel and floating surfaces. */
   fieldBg: string;
   /** Terminal and conversation inputs share this raised surface. */
@@ -99,6 +97,8 @@ export interface ThemePalette {
   successDim: string;
   error: string;
   errorText: string;
+  dangerAction: string;
+  dangerActionText: string;
   errorDim: string;
   errorLight: string;   // 失败命令文字等浅红
   warning: string;
@@ -178,7 +178,7 @@ export interface ThemePalette {
 // Structural colors have one source; component roles reuse these surface levels.
 const DARK_SURFACES = {
   content: '#141414', canvas: '#202020', sidebar: '#28282B', card: '#282828',
-  field: '#333333', elevated: '#303030', control: '#282828', hover: '#343638',
+  field: '#3C3C3C', elevated: '#303030', control: '#282828', hover: '#454545',
   border: '#38393B', borderStrong: '#4B4E52',
 } as const;
 
@@ -190,9 +190,9 @@ const LIGHT_SURFACES = {
 
 // Syntax, charts, group swatches and session icons share these accent families.
 const DARK_ACCENTS = {
-  blue: '#44A0FF', green: '#30D158', violet: '#C77DFF', amber: '#F5C400',
+  blue: '#52ACFF', green: '#30D158', violet: '#DF7FFF', amber: '#F5C400',
   cyan: '#00CFA5', rose: '#FF5CA8', orange: '#FF9F0A', coral: '#FF7066',
-  sky: '#32BFFF', magenta: '#E066FF',
+  sky: '#32BFFF', magenta: '#E97AFF',
 } as const;
 const LIGHT_ACCENTS = {
   blue: '#005DCA', green: '#167C32', violet: '#842FC7', amber: '#8B5800',
@@ -204,12 +204,6 @@ const dark: ThemePalette = {
   iconColor: '#B0B0B8',
   iconHoverColor: '#FFFFFF',
   focusRing: '#50C0FF',
-  shellZshAccent: DARK_ACCENTS.violet,
-  shellBashAccent: DARK_ACCENTS.green,
-  shellPowershellAccent: DARK_ACCENTS.blue,
-  shellCmdAccent: '#E4E8F1',
-  shellSshAccent: DARK_ACCENTS.cyan,
-  shellTileInk: '#15171D',
 
   brandAnthropic: '#D97757',
   brandOpenai: '#10A37F',
@@ -223,6 +217,7 @@ const dark: ThemePalette = {
   groupCyan: DARK_ACCENTS.cyan,
   groupRose: DARK_ACCENTS.rose,
   groupOrange: DARK_ACCENTS.orange,
+  shellZshAccent: '#F15A24',
   groupCoral: DARK_ACCENTS.coral,
 
   // Navigation keeps its tint while content and auxiliary panels retain separate levels.
@@ -230,9 +225,11 @@ const dark: ThemePalette = {
   sidebarBg: DARK_SURFACES.sidebar,
   auxiliaryBg: '#282828',
   chromeField: DARK_SURFACES.control,
-  selectionBg: '#183C57',
+  tabMenuBg: '#202020',
+  selectionBg: '#484848',
   canvas: DARK_SURFACES.canvas,
   surface: DARK_SURFACES.card,
+  cardBg: DARK_SURFACES.elevated,
   fieldBg: DARK_SURFACES.field,
   composerBg: '#333333',
   block: DARK_SURFACES.card,
@@ -248,7 +245,7 @@ const dark: ThemePalette = {
   // 文字
   textPrimary: '#EBEDF0',
   textSecondary: '#C9D0D6',
-  textMuted: '#A3ABB5',
+  textMuted: '#B5BDC6',
 
   // Blue accents distinguish active controls from descriptive text.
   accent: '#50C0FF',
@@ -273,6 +270,8 @@ const dark: ThemePalette = {
   successDim: 'rgba(48,209,88,0.15)',
   error: '#F14C4C',
   errorText: '#FFFFFF',
+  dangerAction: '#FF5A52',
+  dangerActionText: '#202020',
   errorDim: 'rgba(241,76,76,0.15)',
   errorLight: '#DF8A86',
   warning: '#D5AD54',
@@ -380,12 +379,6 @@ const light: ThemePalette = {
   iconColor: '#454545',
   iconHoverColor: '#111111',
   focusRing: '#3478D1',
-  shellZshAccent: DARK_ACCENTS.violet,
-  shellBashAccent: LIGHT_ACCENTS.green,
-  shellPowershellAccent: DARK_ACCENTS.blue,
-  shellCmdAccent: '#BBC3D4',
-  shellSshAccent: DARK_ACCENTS.cyan,
-  shellTileInk: '#15171D',
 
   // 浅色下沿用同一品牌色，色相可辨识、作为标记（非正文）对比度足够。
   brandAnthropic: '#C2643F',
@@ -400,15 +393,18 @@ const light: ThemePalette = {
   groupCyan: LIGHT_ACCENTS.cyan,
   groupRose: LIGHT_ACCENTS.rose,
   groupOrange: LIGHT_ACCENTS.orange,
+  shellZshAccent: '#F15A24',
   groupCoral: LIGHT_ACCENTS.coral,
 
   chromeBg: '#E9F0FA',
   sidebarBg: LIGHT_SURFACES.sidebar,
   auxiliaryBg: '#F0F2F3',
   chromeField: LIGHT_SURFACES.control,
-  selectionBg: '#DFEAF9',
+  tabMenuBg: '#E6E6E6',
+  selectionBg: '#FFFFFF',
   canvas: LIGHT_SURFACES.canvas,
   surface: LIGHT_SURFACES.card,
+  cardBg: '#E7E9EB',
   fieldBg: LIGHT_SURFACES.field,
   composerBg: LIGHT_SURFACES.field,
   block: LIGHT_SURFACES.card,
@@ -445,6 +441,8 @@ const light: ThemePalette = {
   successDim: 'rgba(48,209,88,0.12)',
   error: '#A31515',
   errorText: '#FFFFFF',
+  dangerAction: '#D92D20',
+  dangerActionText: '#FFFFFF',
   errorDim: 'rgba(163,21,21,0.1)',
   errorLight: '#C94F4F',
   warning: '#795E26',
@@ -551,12 +549,6 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--icon-color': p.iconColor,
     '--icon-hover-color': p.iconHoverColor,
     '--focus-ring': p.focusRing,
-    '--shell-zsh-accent': p.shellZshAccent,
-    '--shell-bash-accent': p.shellBashAccent,
-    '--shell-powershell-accent': p.shellPowershellAccent,
-    '--shell-cmd-accent': p.shellCmdAccent,
-    '--shell-ssh-accent': p.shellSshAccent,
-    '--shell-tile-ink': p.shellTileInk,
     '--brand-anthropic': p.brandAnthropic,
     '--brand-openai': p.brandOpenai,
     '--brand-gemini': p.brandGemini,
@@ -566,17 +558,21 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--group-green': p.groupGreen,
     '--group-violet': p.groupViolet,
     '--group-amber': p.groupAmber,
+    '--favorite-color': DARK_ACCENTS.amber,
     '--group-cyan': p.groupCyan,
     '--group-rose': p.groupRose,
     '--group-orange': p.groupOrange,
+    '--shell-zsh-accent': p.shellZshAccent,
     '--group-coral': p.groupCoral,
     '--chrome-bg': p.chromeBg,
     '--sidebar-bg': p.sidebarBg,
     '--auxiliary-bg': p.auxiliaryBg,
     '--chrome-field': p.chromeField,
+    '--tab-menu-bg': p.tabMenuBg,
     '--selection-bg': p.selectionBg,
     '--canvas': p.canvas,
     '--surface': p.surface,
+    '--card-bg': p.cardBg,
     '--field-bg': p.fieldBg,
     '--composer-bg': p.composerBg,
     '--block': p.block,
@@ -605,6 +601,8 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--success-dim': p.successDim,
     '--error': p.error,
     '--error-text': p.errorText,
+    '--danger-action': p.dangerAction,
+    '--danger-action-text': p.dangerActionText,
     '--error-dim': p.errorDim,
     '--error-light': p.errorLight,
     '--warning': p.warning,

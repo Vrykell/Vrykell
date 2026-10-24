@@ -2,6 +2,14 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { boundedFontSize, boundedTerminalRenderer, terminalFontFamily, useTypographyStore } from '../typography';
 
 describe('font preferences', () => {
+  it('persists and validates editor metrics independently of terminal and chat metrics', async () => {
+    useTypographyStore.getState().update({ editorFontSize: 18, editorFontPreset: 'Maple Mono', editorFontWeight: 550, editorLineHeight: 1.8 });
+    await useTypographyStore.persist.rehydrate();
+    expect(useTypographyStore.getState()).toMatchObject({ editorFontSize: 18, editorFontPreset: 'Maple Mono', editorFontWeight: 550, editorLineHeight: 1.8, terminalFontSize: 14, chatFontSize: 14 });
+    localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { editorFontSize: 999, editorFontPreset: 'missing', editorFontWeight: NaN, editorLineHeight: 99 } }));
+    await useTypographyStore.persist.rehydrate();
+    expect(useTypographyStore.getState()).toMatchObject({ editorFontSize: 24, editorFontPreset: 'system', editorFontWeight: 400, editorLineHeight: 2 });
+  });
   beforeEach(() => {
     useTypographyStore.getState().reset();
     useTypographyStore.getState().update({ commandHighlighting: false, commandTitleCollapsed: false });
@@ -10,6 +18,18 @@ describe('font preferences', () => {
   it('offers the installed CJK monospace presets in the family stack', () => {
     expect(terminalFontFamily('Sarasa Term SC')).toContain('"Sarasa Term SC"');
     expect(terminalFontFamily('NSimSun')).toContain('"NSimSun"');
+  });
+
+  it('defaults to steady cursors and persists both independent blink preferences', async () => {
+    expect(useTypographyStore.getState()).toMatchObject({ terminalCursorBlink: false, compositionCursorBlink: false });
+    expect(document.documentElement.style.getPropertyValue('--terminal-ime-cursor-animation')).toBe('none');
+    useTypographyStore.getState().update({ terminalCursorBlink: true, compositionCursorBlink: true });
+    await useTypographyStore.persist.rehydrate();
+    expect(useTypographyStore.getState()).toMatchObject({ terminalCursorBlink: true, compositionCursorBlink: true });
+    expect(document.documentElement.style.getPropertyValue('--terminal-ime-cursor-animation')).toBe('cursor-blink 1s step-end infinite');
+    useTypographyStore.getState().update({ compositionCursorBlink: false });
+    expect(useTypographyStore.getState().terminalCursorBlink).toBe(true);
+    expect(document.documentElement.style.getPropertyValue('--terminal-ime-cursor-animation')).toBe('none');
   });
 
   it('bounds and validates saved font sizes', () => {
