@@ -1,5 +1,6 @@
 ﻿/** Simplified Chinese messages for shared UI and feature namespaces. */
 const zh: Record<string, string> = {
+  'Manual order': '手动排序',
   'Notifications': '通知',
   'All workspace tabs': '全部工作区标签',
   'Close notification': '关闭通知',
@@ -2176,6 +2177,14 @@ const zh: Record<string, string> = {
   'Split right': '向右分屏',
   'Split below': '向下分屏',
   'New workspace tab': '新建工作区标签',
+  'Bring terminals, files and conversations into one workspace.': '让终端、文件与对话在同一空间协作。',
+  'Open workspace resources': '已打开的工作资源',
+  'Create a tab or open a file to get started.': '新建标签或打开文件，开始你的工作。',
+  'Choose a split position': '选择分屏位置',
+  'Start page': '开始页',
+  'Search workspace resources': '搜索工作区资源',
+  'No matching resources': '没有匹配的资源',
+  'Clear memory': '清空',
   'Choose a tab to split': '选择分屏标签',
   'Single pane': '仅保留当前分屏',
   'Remove pane': '移除此分屏',
