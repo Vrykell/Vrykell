@@ -15,9 +15,9 @@ export const TextInput = forwardRef<HTMLInputElement, ComponentPropsWithoutRef<'
   },
 );
 
-export const TextArea = forwardRef<HTMLTextAreaElement, ComponentPropsWithoutRef<'textarea'>>(
-  function TextArea(props, ref) {
-    return <textarea {...props} placeholder={localizeLabel(props.placeholder)} aria-label={localizeLabel(props['aria-label'])} {...literalInputProps} ref={ref} />;
+export const TextArea = forwardRef<HTMLTextAreaElement, ComponentPropsWithoutRef<'textarea'> & { variant?: 'plain' | 'field' }>(
+  function TextArea({ variant = 'plain', className, ...props }, ref) {
+    return <textarea {...props} placeholder={localizeLabel(props.placeholder)} aria-label={localizeLabel(props['aria-label'])} {...literalInputProps} ref={ref} className={variant === 'field' ? `text-input-field ${className ?? ''}` : className} />;
   },
 );
 

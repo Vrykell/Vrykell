@@ -5,8 +5,9 @@ import { MenuItem } from './UiBtn';
 import { hasOwnedListbox, useExclusiveMenu } from './hooks/useExclusiveMenu';
 import { useFloatingPanelPosition } from './hooks/useFloatingPanelPosition';
 import { t } from '@i18n';
+import { useListNavigationMode } from './hooks/useListNavigationMode';
 
-export interface MenuAnchor { x: number; y: number; trigger?: HTMLElement; above?: HTMLElement }
+export interface MenuAnchor { x: number; y: number; trigger?: HTMLElement; above?: HTMLElement; align?: 'start' | 'end' }
 export interface ContextMenuItem {
   label: string;
   onClick?: () => void;
@@ -74,9 +75,10 @@ function MenuSurface({ anchor, submenuOf, label, focus, children, onClose, onBac
   onClose: () => void; onBack?: () => void; id?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const navigation = useListNavigationMode(true);
   const position = useFloatingPanelPosition(ref, anchor, submenuOf);
   useLayoutEffect(() => { if (focus) ref.current?.querySelector<HTMLElement>('input:not(:disabled), button:not(:disabled)')?.focus(); }, [focus]);
-  return <div ref={ref} id={id} role="menu" aria-label={label} className="workspace-floating context-menu-surface"
+  return <div {...navigation.props} ref={ref} id={id} role="menu" aria-label={label} className="workspace-floating context-menu-surface"
     onContextMenu={event => { event.preventDefault(); event.stopPropagation(); }}
     onKeyDown={event => {
       if (event.ctrlKey || event.metaKey) return;
@@ -104,11 +106,10 @@ export function ContextMenuItems({ items, onClose, itemRole, onOpen, onHover, op
   onHover?: (item: ContextMenuItem, trigger: HTMLButtonElement) => void;
 }) {
   const ordered = orderMenuItems(items);
-  const indent = ordered.some(item => item.checked !== undefined);
   return <>{ordered.map((item, index) => <Fragment key={`${menuGroup(item)}-${item.label}`}>
     {index > 0 && menuGroup(item) !== menuGroup(ordered[index - 1]!) && <div role="separator" className="context-menu-separator" />}
     <MenuItem role={item.submenu ? 'menuitem' : itemRole} disabled={item.disabled} label={item.label} danger={item.danger ?? item.group === 'danger'}
-      shortcut={item.shortcut} checked={item.checked} indent={indent} submenu={!!item.submenu} expanded={openLabel === item.label} controls={submenuId}
+      shortcut={item.shortcut} checked={item.checked} submenu={!!item.submenu} expanded={openLabel === item.label} controls={submenuId}
       onPointerEnter={event => onHover?.(item, event.currentTarget)}
       onKeyDown={event => { if (event.key === 'ArrowRight' && item.submenu) { event.preventDefault(); event.stopPropagation(); onOpen?.(item, event.currentTarget); } }}
       onClick={event => { if (item.submenu) onOpen?.(item, event.currentTarget); else { item.onClick?.(); onClose(); } }} />

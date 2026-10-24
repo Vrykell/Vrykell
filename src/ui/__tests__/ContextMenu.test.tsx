@@ -88,8 +88,8 @@ describe('independent action menus', () => {
       { label: 'Close tab', group: 'danger', onClick: () => {} },
       { label: 'Copy', onClick: () => {} },
     ]} onClose={() => {}} />);
-    expect(screen.getByRole('button', { name: 'Delete record' })).toHaveStyle({ color: 'var(--error)' });
-    expect(screen.getByRole('button', { name: 'Close tab' })).toHaveStyle({ color: 'var(--error)' });
+    expect(screen.getByRole('button', { name: 'Delete record' })).toHaveStyle({ color: 'var(--control-danger-color)' });
+    expect(screen.getByRole('button', { name: 'Close tab' })).toHaveStyle({ color: 'var(--control-danger-color)' });
     expect(screen.getByRole('button', { name: 'Copy' })).toHaveStyle({ color: 'var(--text-primary)' });
   });
   it('replaces an existing menu even when opened without a pointer press', () => {
@@ -142,14 +142,16 @@ describe('independent action menus', () => {
     expect(screen.getByRole('menuitemradio', { name: 'Block mode' })).toHaveAttribute('aria-checked', 'false');
   });
 
-  it('keeps one mark column across radio and plain rows', () => {
+  it('places labels first and selection marks last without indenting plain rows', () => {
     render(<ContextMenu anchor={{ x: 0, y: 0 }} items={[
       { label: 'Edit', onClick: () => {} },
       { label: 'Classic mode', checked: true, onClick: () => {} },
     ]} onClose={() => {}} />);
     const rows = screen.getByRole('menu').querySelectorAll('.workspace-floating-row');
     expect(rows).toHaveLength(2);
-    for (const row of rows) expect(row.querySelector('[data-check-slot]')).not.toBeNull();
+    for (const row of rows) expect(row.firstElementChild).toHaveAttribute('data-menu-label');
+    expect(rows[0].querySelector('[data-check-slot]')).toBeNull();
+    expect(rows[1].lastElementChild).toHaveAttribute('data-check-slot');
   });
 
   it('adds no mark column to menus without radio rows', () => {

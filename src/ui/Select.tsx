@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties
 import { createPortal } from 'react-dom';
 import { iconSizes, Check, ChevronDown, Plus } from '@ui/icons';
 import './Select.css';
+import { useListNavigationMode } from './hooks/useListNavigationMode';
 
 export interface SelectOption<Value extends string | number> {
   value: Value;
@@ -51,6 +52,8 @@ export default function Select<Value extends string | number>({
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
   const search = useRef({ text: '', time: 0 });
+  const navigation = useListNavigationMode();
+  const wasExpanded = useRef(false);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const [position, setPosition] = useState<CSSProperties>({});
@@ -63,8 +66,9 @@ export default function Select<Value extends string | number>({
   const navigable = actionIndex >= 0 ? [...enabled, actionIndex] : enabled;
   const activeIndex = navigable.includes(active) ? active : enabled[0] ?? actionIndex;
 
-  const show = (last = false) => {
+  const show = (last = false, keyboard = false) => {
     if (unavailable) return;
+    navigation.setKeyboardNavigation(keyboard);
     search.current = { text: '', time: 0 };
     setActive(enabled.includes(selected) ? selected : last ? enabled[enabled.length - 1] : enabled[0]);
     setOpen(true);
@@ -126,8 +130,11 @@ export default function Select<Value extends string | number>({
   }, [expanded, options.length]);
 
   useLayoutEffect(() => {
-    if (expanded) document.getElementById(`${listId}-${activeIndex}`)?.scrollIntoView?.({ block: 'nearest' });
-  }, [expanded, activeIndex, listId]);
+    if (expanded && (!wasExpanded.current || navigation.keyboardNavigation)) {
+      document.getElementById(`${listId}-${activeIndex}`)?.scrollIntoView?.({ block: 'nearest' });
+    }
+    wasExpanded.current = expanded;
+  }, [expanded, activeIndex, listId, navigation.keyboardNavigation]);
 
   const onKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (unavailable) return;
@@ -141,10 +148,10 @@ export default function Select<Value extends string | number>({
     } else if (key === 'Enter' || key === ' ') {
       event.preventDefault();
       if (expanded) choose(activeIndex);
-      else show();
+      else show(false, true);
     } else if (['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(key)) {
       event.preventDefault();
-      if (!expanded) show(key === 'ArrowUp' || key === 'End');
+      if (!expanded) show(key === 'ArrowUp' || key === 'End', true);
       if (key === 'Home') setActive(enabled[0]);
       else if (key === 'End') setActive(enabled[enabled.length - 1]);
       else if (expanded) {
@@ -153,7 +160,7 @@ export default function Select<Value extends string | number>({
       }
     } else if (key.length === 1 && !event.ctrlKey && !event.metaKey && !event.altKey) {
       event.preventDefault();
-      if (!expanded) show();
+      if (!expanded) show(false, true);
       const now = Date.now();
       const text = (now - search.current.time < 700 ? search.current.text : '') + key.toLocaleLowerCase();
       search.current = { text, time: now };
@@ -165,7 +172,7 @@ export default function Select<Value extends string | number>({
   };
 
   return <>
-    <button ref={trigger} id={id} type="button" data-subtle data-testid={testId} data-tip={tip} data-tip-description={tipDescription} className={triggerClassName ? `ui-select ${triggerClassName}` : 'ui-select'} style={style}
+    <button {...navigation.props} ref={trigger} id={id} type="button" data-subtle data-testid={testId} data-tip={tip} data-tip-description={tipDescription} className={triggerClassName ? `ui-select ${triggerClassName}` : 'ui-select'} style={style}
       role="combobox" aria-label={label} aria-describedby={description} aria-haspopup="listbox"
       aria-expanded={expanded} aria-controls={expanded ? listId : undefined}
       aria-activedescendant={expanded ? `${listId}-${activeIndex}` : undefined} disabled={unavailable}
@@ -177,14 +184,14 @@ export default function Select<Value extends string | number>({
       {options[selected]?.badge && <span className="ui-select-badge">{options[selected]!.badge}</span>}
       <ChevronDown size={iconSizes.compact} aria-hidden="true" className="ui-select-chevron" />
     </button>
-    {expanded && createPortal(<div ref={menu}
+    {expanded && createPortal(<div {...navigation.props} ref={menu}
       className="workspace-floating ui-select-menu" style={position} data-placement={placement} data-floating-for={listId}
       onPointerDown={event => event.preventDefault()}>
       <div id={listId} role="listbox" aria-label={label} className="ui-select-options">
         {options.map((option, index) => <div key={option.value} id={`${listId}-${index}`} role="option"
           aria-selected={index === selected} aria-disabled={option.disabled || undefined}
-          className="ui-select-option" data-active={index === activeIndex}
-          onPointerMove={() => { if (!option.disabled) setActive(index); }} onClick={() => choose(index)}>
+          className="ui-select-option" data-active={navigation.keyboardNavigation && index === activeIndex}
+          onPointerMove={() => { if (navigation.pointerMoved.current && !option.disabled) setActive(index); }} onClick={() => choose(index)}>
           {option.icon && <span className="ui-select-icon" aria-hidden="true">{option.icon}</span>}
           {option.swatch && <span className="ui-select-swatch" aria-hidden="true" style={{ background: option.swatch }} />}
           <span className="ui-select-option-label">{option.label}</span>
@@ -193,8 +200,8 @@ export default function Select<Value extends string | number>({
         </div>)}
       </div>
       {action && <button type="button" id={`${listId}-${actionIndex}`} className="ui-select-action"
-        data-active={activeIndex === actionIndex}
-        onPointerMove={() => setActive(actionIndex)}
+        data-active={navigation.keyboardNavigation && activeIndex === actionIndex}
+        onPointerMove={() => { if (navigation.pointerMoved.current) setActive(actionIndex); }}
         onClick={() => choose(actionIndex)}>
         <Plus size={iconSizes.compact} aria-hidden="true" />
         <span>{action.label}</span>

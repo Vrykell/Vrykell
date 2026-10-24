@@ -9,5 +9,5 @@ export default function EditorActions({ items, label = t('More editor actions') 
   const [menu, setMenu] = useState<MenuAnchor | null>(null);
   return <><IconButton className="folder-more-button" aria-label={label} data-tip={label} aria-haspopup="menu" aria-expanded={!!menu}
     onClick={event => { const trigger = event.currentTarget; const rect = trigger.getBoundingClientRect(); setMenu(current => current ? null : { x: rect.left, y: rect.bottom, trigger }); }}><ChevronDown size={iconSizes.control} /></IconButton>
-    {menu && <ContextMenu anchor={menu} label={label} items={items} onClose={() => setMenu(null)} />}</>;
+    {menu && <ContextMenu itemRole="menuitem" anchor={menu} label={label} items={items} onClose={() => setMenu(null)} />}</>;
 }

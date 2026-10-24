@@ -1,5 +1,8 @@
-import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
+import { createPortal } from 'react-dom';
 import { Checkbox } from './Checkbox';
+import { Check } from './icons';
+import { useListNavigationMode } from './hooks/useListNavigationMode';
 
 /**
  * CheckboxMenu — a themed multi-select list used by floating filters.
@@ -30,12 +33,32 @@ export interface CheckboxMenuProps<Id extends string = string> {
   style?: CSSProperties;
   /** Compact shortcut menus omit the heading and use row selection as their check mark. */
   compact?: boolean;
+  checkmark?: boolean;
   footer?: ReactNode;
   triggerRef?: RefObject<HTMLElement | null>;
+  anchored?: boolean;
 }
 
-export default function CheckboxMenu<Id extends string>({ title, options, onToggle, onClose, style, compact = false, footer, triggerRef }: CheckboxMenuProps<Id>) {
+export default function CheckboxMenu<Id extends string>({ title, options, onToggle, onClose, style, compact = false, checkmark = false, footer, triggerRef, anchored = false }: CheckboxMenuProps<Id>) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<CSSProperties>({});
+  const navigation = useListNavigationMode(true);
+
+  useLayoutEffect(() => {
+    if (!anchored) return;
+    const place = () => {
+      const trigger = triggerRef?.current?.getBoundingClientRect();
+      const menu = menuRef.current;
+      if (!trigger || !menu) return;
+      const height = Math.min(menu.scrollHeight, window.innerHeight - 16);
+      const below = window.innerHeight - trigger.bottom - 8;
+      setPosition({ position: 'fixed', left: Math.max(8, Math.min(trigger.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 8)), top: below >= height ? trigger.bottom + 4 : Math.max(8, trigger.top - height - 4), maxWidth: window.innerWidth - 16, maxHeight: window.innerHeight - 16, overflowY: 'auto' });
+    };
+    place();
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
+  }, [anchored, triggerRef]);
 
   useEffect(() => {
     const outside = (event: PointerEvent) => {
@@ -54,13 +77,14 @@ export default function CheckboxMenu<Id extends string>({ title, options, onTogg
     };
   }, [onClose, triggerRef]);
 
-  return (
+  const content = (
     <div
+      {...navigation.props}
       ref={menuRef}
       role="menu"
       aria-label={title}
       className={`workspace-floating${compact ? ' checkbox-menu-compact' : ''}`}
-      style={{ position: 'absolute', padding: 4, zIndex: 200, minWidth: 180, ...style }}
+      style={{ position: 'absolute', padding: 4, zIndex: 200, minWidth: 180, ...style, ...position }}
       onKeyDown={event => {
         if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose(); return; }
         if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
@@ -97,7 +121,7 @@ export default function CheckboxMenu<Id extends string>({ title, options, onTogg
             cursor: 'pointer', fontSize: 'calc(12px * var(--ui-font-scale))', fontFamily: 'var(--font-ui)',
           }}
         >
-          {!compact && <Checkbox checked={option.checked} readOnly tabIndex={-1} aria-hidden="true" style={{ pointerEvents: 'none' }} />}
+          {!checkmark && !compact && <Checkbox checked={option.checked} readOnly tabIndex={-1} aria-hidden="true" style={{ pointerEvents: 'none' }} />}
           <span style={{ flex: 1, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
             {option.icon}{option.displayLabel ?? option.label}
           </span>
@@ -112,9 +136,11 @@ export default function CheckboxMenu<Id extends string>({ title, options, onTogg
               {option.count}
             </span>
           )}
+          {checkmark && option.checked && <Check size={16} aria-hidden="true" style={{ flexShrink: 0 }} />}
         </button>
       ))}
       {footer}
     </div>
   );
+  return anchored ? createPortal(content, document.body) : content;
 }

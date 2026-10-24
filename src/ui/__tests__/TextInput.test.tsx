@@ -6,6 +6,10 @@ import { TextInput, TextArea, configureLiteralInput } from '../TextInput';
 afterEach(cleanup);
 
 describe('literal text input', () => {
+  it.each([TextInput, TextArea])('applies the shared field presentation on request', Component => {
+    render(<Component variant="field" aria-label="Field" />);
+    expect(screen.getByRole('textbox')).toHaveClass('text-input-field');
+  });
   it.each([TextInput, TextArea])('disables native substitutions while retaining composition and changes', Component => {
     const change = vi.fn();
     const compose = vi.fn();

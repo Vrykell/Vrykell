@@ -1,0 +1,8 @@
+.tag-input { min-width: 0; }
+.tag-input-field { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; min-height: 32px; padding: 3px 6px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--field-bg); }
+.tag-input-field:focus-within { border-color: var(--border-strong); }
+.tag-input-field > input.text-input-field { flex: 1 1 60px; width: 60px; min-height: 24px; padding: 0 4px; border: 0; border-radius: 0; background: transparent; }
+.tag-input-chip { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 0 2px 0 6px; border-radius: 4px; background: var(--hover); color: var(--text-primary); font-size: var(--fs-caption); }
+.tag-input-chip > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag-input-chip button.icon-button { width: 20px; height: 22px; }
+.tag-input-dot { display: inline-block; flex: 0 0 7px; width: 7px; height: 7px; border-radius: 50%; }

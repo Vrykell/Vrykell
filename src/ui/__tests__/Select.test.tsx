@@ -11,6 +11,51 @@ const options = [
 ];
 
 describe('Select', () => {
+  it('does not scroll on pointer hover and resumes scrolling only for keyboard navigation', () => {
+    const change = vi.fn();
+    render(<Select aria-label="Level" value="low" options={options} onChange={change} />);
+    const trigger = screen.getByRole('combobox');
+    fireEvent.click(trigger);
+    const list = screen.getByRole('listbox');
+    const surface = list.parentElement!;
+    const high = screen.getByRole('option', { name: '高' });
+    const low = screen.getByRole('option', { name: '低' });
+    const scroll = vi.fn();
+    for (const option of screen.getAllByRole('option')) option.scrollIntoView = scroll;
+    fireEvent(high, new MouseEvent('pointermove', { bubbles: true, clientX: 10, clientY: 20 }));
+    expect(surface).toHaveAttribute('data-keyboard-navigation', 'false');
+    expect(high).toHaveAttribute('data-active', 'false');
+    expect(low).toHaveAttribute('data-active', 'false');
+    expect(scroll).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+    expect(surface).toHaveAttribute('data-keyboard-navigation', 'true');
+    expect(low).toHaveAttribute('data-active', 'true');
+    expect(scroll).toHaveBeenCalledOnce();
+    fireEvent(high, new MouseEvent('pointermove', { bubbles: true, clientX: 10, clientY: 20 }));
+    expect(low).toHaveAttribute('data-active', 'true');
+    expect(scroll).toHaveBeenCalledOnce();
+    fireEvent(high, new MouseEvent('pointermove', { bubbles: true, clientX: 10, clientY: 21 }));
+    expect(surface).toHaveAttribute('data-keyboard-navigation', 'false');
+    expect(low).toHaveAttribute('data-active', 'false');
+    expect(scroll).toHaveBeenCalledOnce();
+    expect(change).not.toHaveBeenCalled();
+  });
+
+  it('does not let disabled options or the footer retain another row highlight', () => {
+    render(<Select aria-label="Level" value="low" options={options} onChange={vi.fn()} action={{ label: 'Add', onSelect: vi.fn() }} />);
+    const trigger = screen.getByRole('combobox');
+    fireEvent.keyDown(trigger, { key: 'ArrowDown' });
+    expect(screen.getByRole('option', { name: '低' })).toHaveAttribute('data-active', 'true');
+    fireEvent(screen.getByRole('option', { name: '中' }), new MouseEvent('pointermove', { bubbles: true, clientX: 10, clientY: 20 }));
+    expect(screen.getAllByRole('option').every(option => option.getAttribute('data-active') === 'false')).toBe(true);
+    const footer = screen.getByRole('button', { name: 'Add' });
+    fireEvent(footer, new MouseEvent('pointermove', { bubbles: true, clientX: 10, clientY: 30 }));
+    expect(footer).toHaveAttribute('data-active', 'false');
+    fireEvent.keyDown(trigger, { key: 'ArrowUp' });
+    expect(screen.getByRole('option', { name: '高' })).toHaveAttribute('data-active', 'true');
+  });
+
   it('uses a concise trigger label while keeping full context in the menu', () => {
     render(<Select aria-label="Target" value="server" onChange={vi.fn()}
       options={[{ value: 'server', label: 'Production server · 10.21.76.61 · /srv/app', triggerLabel: '10.21.76.61' }]} />);

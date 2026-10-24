@@ -34,10 +34,8 @@ interface MenuItemProps {
   disabled?: boolean;
   /** Shortcut badge displayed at the end of the row. */
   shortcut?: string;
-  /** Radio/switch state; renders a leading mark and exposes menuitemradio semantics. */
+  /** Radio/switch state; renders a trailing mark and exposes menuitemradio semantics. */
   checked?: boolean;
-  /** Reserves the mark column on plain rows of a menu that also shows radio rows. */
-  indent?: boolean;
   submenu?: boolean;
   expanded?: boolean;
   controls?: string;
@@ -45,11 +43,8 @@ interface MenuItemProps {
   onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
 }
 
-export function MenuItem({ label, onClick, danger, shortcut, role, disabled, checked, indent, submenu, expanded, controls, onPointerEnter, onKeyDown }: MenuItemProps) {
-  const showSlot = checked !== undefined || indent === true;
-  const style: CSSProperties = shortcut || submenu
-    ? { ...menuItemStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }
-    : menuItemStyle;
+export function MenuItem({ label, onClick, danger, shortcut, role, disabled, checked, submenu, expanded, controls, onPointerEnter, onKeyDown }: MenuItemProps) {
+  const style: CSSProperties = { ...menuItemStyle, display: 'flex', alignItems: 'center', gap: 16 };
   return (
     <button
       onClick={onClick}
@@ -64,15 +59,11 @@ export function MenuItem({ label, onClick, danger, shortcut, role, disabled, che
       data-submenu-open={expanded || undefined}
       data-subtle
       className="workspace-floating-row"
-      style={danger ? { ...style, color: 'var(--error)' } : style}
+      style={danger ? { ...style, color: 'var(--control-danger-color)' } : style}
     >
-      {showSlot ? (
-        <span style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-          <span aria-hidden="true" data-check-slot style={checkSlotStyle}>{checked === true ? <Check size={12} /> : null}</span>
-          {label}
-        </span>
-      ) : label}
+      <span data-menu-label style={{ flex: 1, minWidth: 0 }}>{label}</span>
       {shortcut && <KeyHint shortcut={shortcut} />}
+      {checked === true && <span aria-hidden="true" data-check-slot style={checkSlotStyle}><Check size={12} /></span>}
       {submenu && <ChevronRight size={14} aria-hidden="true" style={{ flexShrink: 0 }} />}
     </button>
   );
@@ -84,7 +75,7 @@ const menuItemStyle: CSSProperties = {
   color: 'var(--text-primary)', cursor: 'pointer', fontSize: 'calc(12px * var(--ui-font-scale))',
 };
 
-/** Rows with a check state keep one mark column so labels stay aligned. */
+/** Selection marks trail the label without reserving a leading column. */
 const checkSlotStyle: CSSProperties = {
   width: 12, display: 'inline-flex', justifyContent: 'center',
   color: 'var(--accent)', flexShrink: 0,
