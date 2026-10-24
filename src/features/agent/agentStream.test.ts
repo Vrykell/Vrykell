@@ -156,6 +156,36 @@ describe('agentStream（mock IPC 边界）', () => {
     expect(bodies.join('\n')).not.toContain('"budgetTokens"');
   });
 
+  it('routed providers send the conversation session with the request', async () => {
+    let headers: [string, string][] = [];
+    mockInvoke.mockImplementation(async (cmd, args) => {
+      if (cmd === 'get_ai_config') {
+        return {
+          has_key: false, base_url: 'https://opencode.ai/zen/go/v1',
+          model: 'deepseek-v4.1-flash', provider: 'opencode',
+          has_anthropic_key: false, has_gemini_key: false, has_tavily_key: false,
+          provider_keys: ['opencode|https://opencode.ai/zen/go/v1'],
+          models: [{ id: 'default', name: 'OpenCode', provider: 'opencode', baseUrl: 'https://opencode.ai/zen/go/v1', model: 'deepseek-v4.1-flash' }],
+          active_model: 'default',
+        } as never;
+      }
+      if (cmd === 'mcp_list_all_tools') return [] as never;
+      if (cmd === 'llm_stream') {
+        headers = (args as { req: { headers: [string, string][] } }).req.headers;
+        const send = (args as { onEvent: Channel<unknown> }).onEvent.onmessage as (ev: unknown) => void;
+        send({ kind: 'started', status: 200, headers: [['content-type', 'text/event-stream']] });
+        const body = 'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n' +
+          'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n';
+        for (const c of toChunks(body, 9)) send({ kind: 'chunk', data: c });
+        send({ kind: 'done' });
+        return undefined as never;
+      }
+      throw new Error(`unexpected invoke: ${cmd}`);
+    });
+    await agentStream([{ role: 'user', content: 'hi' }], () => {}, { tabId: 'tab-9' });
+    expect(headers).toContainEqual(['x-opencode-session', 'vrykell-tab-9']);
+  });
+
   it('未配 key：抛中文提示', async () => {
     mockInvoke.mockImplementation(async (cmd) => {
       if (cmd === 'get_ai_config') {

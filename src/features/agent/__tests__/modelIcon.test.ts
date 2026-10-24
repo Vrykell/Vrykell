@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { modelVendor, modelVendorInfo } from '@features/agent/components/modelIcon';
-import { AnthropicMark, GroqMark, MoonshotMark, OllamaMark, QwenMark } from '@ui/brandMarks';
+import { AnthropicMark, GroqMark, MoonshotMark, OllamaMark, OpenCodeMark, QwenMark } from '@ui/brandMarks';
 import { Server } from '@ui/icons';
 
 describe('modelVendor', () => {
@@ -9,6 +9,7 @@ describe('modelVendor', () => {
     expect(modelVendor('openai-compatible', 'deepseek-ai/DeepSeek-V3', 'https://api.siliconflow.cn/v1')).toBe('siliconflow');
     expect(modelVendor('openai-compatible', 'gpt-4o-mini', 'https://api.openai.com/v1')).toBe('openai');
     expect(modelVendor('openai-compatible', 'moonshot-v1-128k', 'https://api.moonshot.cn/v1')).toBe('moonshot');
+    expect(modelVendor('opencode', 'deepseek-v4.1-flash', 'https://opencode.ai/zen/go/v1')).toBe('opencode');
   });
 
   it('recognises loopback and LAN endpoints as local servers', () => {
@@ -22,6 +23,8 @@ describe('modelVendor', () => {
     expect(modelVendorInfo('openai-compatible', 'claude-sonnet-4-5', '').mark).toBe(AnthropicMark);
     expect(modelVendorInfo('openai-compatible', 'kimi-k2', '').mark).toBe(MoonshotMark);
     expect(modelVendor('gemini', '', '')).toBe('gemini');
+    expect(modelVendor('opencode', '', '')).toBe('opencode');
+    expect(modelVendorInfo('opencode', '', '').mark).toBe(OpenCodeMark);
     expect(modelVendor('openai-compatible', 'mystery-model', '')).toBe('generic');
     expect(modelVendorInfo('openai-compatible', 'mystery-model', '').label).toBe('openai-compatible');
   });

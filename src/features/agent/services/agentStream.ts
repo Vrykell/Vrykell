@@ -12,7 +12,7 @@ import { stepCountIs, streamText, type ModelMessage, type ToolSet } from 'ai';
 import { getFocusedTerminalId } from '@features/terminal';
 import { invoke } from '@platform/diagnostics';
 import type { StreamFn } from '@features/chat';
-import { createChatModel, createNativeWebSearchTool, deepThinkProviderOptions, supportsThinkingPassback, type ProviderKind } from '@features/agent/services/provider';
+import { createChatModel, createNativeWebSearchTool, deepThinkProviderOptions, providerId, supportsThinkingPassback, type ProviderKind } from '@features/agent/services/provider';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import { estimateTokens, planContext, IMAGE_TOKEN_ESTIMATE, type SizedMessage } from '@features/agent/model/context';
 import { attachmentsForModel, supportsVision } from '@features/agent/model/attachments';
@@ -37,6 +37,8 @@ interface AiConfigInfoRust {
   has_anthropic_key: boolean;
   has_gemini_key: boolean;
   has_tavily_key: boolean;
+  /** Providers (endpoint ids) that hold their own API key. */
+  provider_keys?: string[];
   models: {
     id: string; name: string; provider: ProviderKind; baseUrl: string; model: string;
     capabilities?: { vision: boolean; reasoning: boolean; tools: boolean; search: boolean };
@@ -45,6 +47,8 @@ interface AiConfigInfoRust {
 }
 
 function hasKeyFor(info: AiConfigInfoRust): boolean {
+  // Keys are stored per endpoint, so the endpoint identity decides - not the API family.
+  if (info.provider_keys) return info.provider_keys.includes(providerId(info.provider, info.base_url));
   switch (info.provider) {
     case 'anthropic':
       return info.has_anthropic_key;
@@ -67,6 +71,8 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     provider: info.provider,
     baseUrl: info.base_url,
     model: info.model,
+    // The conversation (tab) is the session scope endpoints may route by.
+    sessionId: ctx?.tabId,
   });
   const settings = useAgentSettings.getState().resolve(info.active_model);
   const agentMode = settings.agentMode;

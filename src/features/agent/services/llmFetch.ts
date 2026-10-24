@@ -11,6 +11,7 @@
  * llm_abort，Rust 侧用 AbortHandle 取消 reqwest 请求。
  */
 import type { ProviderKind } from './provider';
+import { sessionHeaderFor } from '@config/providers';
 import { Channel } from '@tauri-apps/api/core';
 import { invoke } from '@platform/diagnostics';
 
@@ -30,6 +31,15 @@ function base64ToBytes(b64: string): Uint8Array {
   return out;
 }
 
+/** Stable token for requests that are not tied to a conversation (titles, summaries). */
+let fallbackSession: string | null = null;
+
+function sessionToken(sessionId?: string): string {
+  if (sessionId) return `vrykell-${sessionId}`;
+  fallbackSession ??= `vrykell-${crypto.randomUUID()}`;
+  return fallbackSession;
+}
+
 function normalizeHeaders(h?: HeadersInit): [string, string][] {
   if (!h) return [];
   if (h instanceof Headers) {
@@ -41,7 +51,7 @@ function normalizeHeaders(h?: HeadersInit): [string, string][] {
   return Object.entries(h).map(([k, v]) => [k, String(v)] as [string, string]);
 }
 
-export function createProxyFetch(provider?: ProviderKind): typeof fetch {
+export function createProxyFetch(provider?: ProviderKind, sessionId?: string): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const url =
       typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -49,6 +59,10 @@ export function createProxyFetch(provider?: ProviderKind): typeof fetch {
     const headers = normalizeHeaders(init?.headers);
     if (!headers.some(([k]) => k.toLowerCase() === 'content-type')) {
       headers.push(['content-type', 'application/json']);
+    }
+    const sessionHeader = sessionHeaderFor(url);
+    if (sessionHeader && !headers.some(([k]) => k.toLowerCase() === sessionHeader.toLowerCase())) {
+      headers.push([sessionHeader, sessionToken(sessionId)]);
     }
     const body = typeof init?.body === 'string' ? init.body : undefined;
     const id = crypto.randomUUID();

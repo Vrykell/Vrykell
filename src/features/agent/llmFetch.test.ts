@@ -43,6 +43,32 @@ describe('createProxyFetch', () => {
     }));
   });
 
+  it('routed endpoints carry a stable session header; other endpoints never do', async () => {
+    const sent: [string, string][][] = [];
+    invokeMock.mockImplementation((_cmd: string, args: { onEvent: { send: (ev: unknown) => void }; req: { headers: [string, string][] } }) => {
+      sent.push(args.req.headers);
+      args.onEvent.send({ kind: 'started', status: 200 });
+      args.onEvent.send({ kind: 'done' });
+      return Promise.resolve();
+    });
+    const conversation = createProxyFetch('opencode', 'tab-1');
+    await conversation('https://opencode.ai/zen/go/v1/chat/completions');
+    await conversation('https://opencode.ai/zen/go/v1/chat/completions');
+    expect(sent[0]).toContainEqual(['x-opencode-session', 'vrykell-tab-1']);
+    expect(sent[1]).toContainEqual(['x-opencode-session', 'vrykell-tab-1']);
+
+    const untied = createProxyFetch('opencode');
+    await untied('https://opencode.ai/zen/go/v1/chat/completions');
+    await untied('https://opencode.ai/zen/go/v1/chat/completions');
+    const first = sent[2].find(([name]) => name === 'x-opencode-session')?.[1];
+    const second = sent[3].find(([name]) => name === 'x-opencode-session')?.[1];
+    expect(first).toBeTruthy();
+    expect(second).toBe(first);
+
+    await fetchProxy('https://api.example.com/v1/chat');
+    expect(sent[4].some(([name]) => name === 'x-opencode-session')).toBe(false);
+  });
+
   it('URL/Request 输入与显式 method/body；已有 content-type 不重复添加', async () => {
     invokeMock.mockImplementation((_cmd: string, args: { req: { method: string; headers: [string, string][] }; onEvent: { send: (ev: unknown) => void } }) => {
       expect(args.req.method).toBe('GET');

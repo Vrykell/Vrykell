@@ -190,6 +190,15 @@ test.describe('模型配置页', () => {
     await expect(page.getByTestId('model-name')).toHaveText('DeepSeek');
   });
 
+  test('OpenCode 预设：端点预览与请求路径来自目录数据', async ({ page }) => {
+    await page.getByTestId('provider-switch').click();
+    await page.getByTestId('provider-dialog-add').click();
+    await page.getByTestId('model-preset-OpenCode Go').click();
+    await page.getByTestId('provider-dialog-close').click();
+    await expect(page.getByTestId('provider-switch').locator('.provider-switch-name')).toHaveText('OpenCode Go');
+    await expect(page.getByTestId('provider-endpoint-preview')).toContainText('https://opencode.ai/zen/go/v1/chat/completions');
+  });
+
   test('服务商选择跨重载保持（lastSelectedProvider）', async ({ page }) => {
     await page.getByTestId('provider-switch').click();
     await page.getByTestId(`provider-option-${LOCAL_ID}`).click();

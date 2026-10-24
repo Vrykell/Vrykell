@@ -444,7 +444,7 @@ Therefore:
 
 ```
 chat store send → agentStream (AI SDK streamText)
-  ├─ createChatModel (provider wrapper: Anthropic/Gemini/OpenAI compatible)
+  ├─ createChatModel (provider wrapper: Anthropic/Gemini/OpenAI compatible/OpenCode)
   ├─ buildSystemPrompt + buildSkillsContext + memory/agent lists (platform IPC)
   ├─ buildTools (terminal/runCommand/files/*/skill/subagent/memory/schedule/webSearch/webFetch/webCrawl)
   ├─ buildMcpTool (one tool per MCP server; mcp.rs on the Rust side starts/stops connections)
@@ -456,6 +456,7 @@ chat store send → agentStream (AI SDK streamText)
 - **Permission modes** (`permissions.ts`): standard (decided per tool per the settings page) / strict (ask every time) / allow (dangerous commands still ask every time); the Shield status-bar chip cycles through them.
 - **Context strategy** (`context.ts`): off (full) / window (token budget) / compact (budget + automatic summary compaction), with estimates from `estimateTokens`.
 - **Settings layering** (`agentSettings.ts`): global defaults + per-model overrides (merged by `resolve(modelId)`), persisted in localStorage; connection settings such as provider/model remain in the Rust `config.json`, while API keys join the SSH passwords in the platform secret store (`secret.rs`: DPAPI-sealed on Windows, the system keychain on macOS, a 0600 file elsewhere). `config.json` no longer carries keys, and older plaintext values migrate automatically.
+- **Provider catalog** (`src/config/providers.json` + `providers.ts`): family identifiers, labels, default endpoints and conversation-routing headers are data; preset models live in `modelPresets.json`, the real model list is synced from the endpoint's `/models`, and a unit test checks the endpoint mirror in `ai.rs` against the catalog.
 - **Terminal tab titles** (`agent/title.ts`): when a terminal has enough command activity, an LLM can generate its tab title (the App calls `initAutoTitle()` on startup). Independent conversation titles are managed in the AI panel.
 - **Backend**: `src-tauri/src/agent/` (`ai.rs` SSE streaming, `skills.rs`, `memory.rs`, `mcp.rs`, `schedules.rs`, `web.rs` scraping, `agents.rs` custom agents).
 

@@ -444,7 +444,7 @@ Dock 中的 `PanelChat` 管理独立 AI 对话。终端 `InputEditor` 提交命�
 
 ```
 chat store send → agentStream（AI SDK streamText）
-  ├─ createChatModel（provider 封装：Anthropic/Gemini/OpenAI 兼容）
+  ├─ createChatModel（provider 封装：Anthropic/Gemini/OpenAI 兼容/OpenCode）
   ├─ buildSystemPrompt + buildSkillsContext + 记忆/agent 列表（platform IPC）
   ├─ buildTools（terminal/runCommand/files/*/skill/subagent/memory/schedule/webSearch/webFetch/webCrawl）
   ├─ buildMcpTool（每 MCP server 一个工具，Rust 侧 mcp.rs 启停连接）
@@ -456,6 +456,7 @@ chat store send → agentStream（AI SDK streamText）
 - **权限模式**（`permissions.ts`）：标准（按设置页逐工具判定）/ 严格（逐次问）/ 放行（危险命令仍逐次问）；Shield 状态栏 chip 循环切换。
 - **上下文策略**（`context.ts`）：off（全量）/ window（token 预算）/ compact（预算 + 自动摘要压缩），估算用 `estimateTokens`。
 - **设置分层**（`agentSettings.ts`）：global 默认 + per-model overrides（`resolve(modelId)` 合并），localStorage 持久化；provider/模型等连接配置仍在 Rust `config.json`，而 API Key 与 SSH 密码一起放进平台密钥存储（`secret.rs`：Windows DPAPI 加密 / macOS 钥匙串 / 其它平台 0600 文件），`config.json` 不再包含 key，旧明文自动迁移。
+- **服务商目录**（`src/config/providers.json` + `providers.ts`）：家族标识、显示名、默认端点与会话路由头都来自数据；预设模型在 `modelPresets.json`，真实模型列表由端点 `/models` 同步；`ai.rs` 的默认端点镜像由单测对照目录校验。
 - **终端标签标题**（`agent/title.ts`）：终端命令活动足够时可调用 LLM 生成标签标题（App 启动 `initAutoTitle()`）；独立对话的标题在 AI 面板管理。
 - **后端**：`src-tauri/src/agent/`（`ai.rs` SSE 流式、`skills.rs`、`memory.rs`、`mcp.rs`、`schedules.rs`、`web.rs` 抓取、`agents.rs` 自定义 agent）。
 

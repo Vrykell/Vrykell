@@ -38,8 +38,8 @@ describe('deepThinkProviderOptions', () => {
       (high.google as { thinkingConfig: { thinkingBudget: number } }).thinkingConfig.thinkingBudget,
     );
   });
-  it('createChatModel 为三种 provider 返回模型', () => {
-    for (const provider of ['openai-compatible', 'anthropic', 'gemini'] as const) {
+  it('createChatModel 为每种 provider 返回模型', () => {
+    for (const provider of ['openai-compatible', 'anthropic', 'gemini', 'opencode'] as const) {
       const m = createChatModel({ provider, baseUrl: 'https://x', model: 'm' });
       expect(m).toBeTruthy();
     }
@@ -51,11 +51,13 @@ describe('configured provider endpoints', () => {
   it('updates official defaults when switching providers and preserves custom gateways', () => {
     expect(baseUrlForProvider('https://api.openai.com/v1/', 'anthropic')).toBe('https://api.anthropic.com/v1');
     expect(baseUrlForProvider('', 'gemini')).toBe('https://generativelanguage.googleapis.com/v1beta');
+    expect(baseUrlForProvider('', 'opencode')).toBe('https://opencode.ai/zen/go/v1');
     expect(baseUrlForProvider('https://gateway.example/v1', 'anthropic')).toBe('https://gateway.example/v1');
   });
   it('spells out the endpoint a request really reaches', () => {
     expect(effectiveEndpoint('anthropic', 'https://api.anthropic.com/v1/')).toBe('https://api.anthropic.com/v1/messages');
     expect(effectiveEndpoint('openai-compatible', 'https://gateway.example/v1')).toBe('https://gateway.example/v1/chat/completions');
+    expect(effectiveEndpoint('opencode', '')).toBe('https://opencode.ai/zen/go/v1/chat/completions');
     expect(effectiveEndpoint('gemini', 'https://gateway.example/v1beta', 'gemini-2.5-pro')).toBe('https://gateway.example/v1beta/models/gemini-2.5-pro:generateContent');
     expect(effectiveEndpoint('gemini', '')).toBe('https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent');
   });
@@ -63,6 +65,7 @@ describe('configured provider endpoints', () => {
     ['anthropic', 'https://gateway.example/v1/messages'],
     ['gemini', 'https://gateway.example/v1/models/m:generateContent'],
     ['openai-compatible', 'https://gateway.example/v1/chat/completions'],
+    ['opencode', 'https://gateway.example/v1/chat/completions'],
   ] as const)('uses the saved base URL for %s', async (provider, expectedUrl) => {
     proxy.mockClear();
     proxy.mockRejectedValue(new Error('test transport stopped'));

@@ -12,6 +12,7 @@ describe('effectiveBaseUrl', () => {
   it('空串解析为该 kind 的默认端点', () => {
     expect(effectiveBaseUrl('anthropic', '')).toBe('https://api.anthropic.com/v1');
     expect(effectiveBaseUrl('openai-compatible', '  ')).toBe('https://api.openai.com/v1');
+    expect(effectiveBaseUrl('opencode', '')).toBe('https://opencode.ai/zen/go/v1');
   });
 
   it('默认端点与带尾斜杠的写法归一到同一值', () => {
@@ -29,6 +30,8 @@ describe('providerName', () => {
     expect(providerName('anthropic', '')).toBe('Anthropic');
     expect(providerName('anthropic', 'https://api.anthropic.com/v1')).toBe('Anthropic');
     expect(providerName('openai-compatible', 'https://api.deepseek.com/v1')).toBe('DeepSeek');
+    expect(providerName('opencode', '')).toBe('OpenCode Go');
+    expect(providerName('opencode', 'https://opencode.ai/zen/v1')).toBe('OpenCode Zen');
   });
 
   it('未命中预设时退回主机名', () => {

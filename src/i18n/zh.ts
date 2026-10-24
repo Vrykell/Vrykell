@@ -468,6 +468,7 @@ const zh: Record<string, string> = {
   "Open the harness hub": "打开 Harness 中心",
   "Open the hub to add or connect": "在中心页添加或连接",
   "The vendor default endpoint": "厂商默认端点",
+  "OpenAI compatible": "OpenAI 兼容",
   "Official endpoint: paste a key from the vendor console.": "官方端点：在厂商控制台取 Key 填入。",
   "Aggregator: one key reaches many vendors.": "聚合站：一个 Key 可达多家厂商。",
   "Local server: usually runs without a key.": "本地服务：通常无需 Key。",

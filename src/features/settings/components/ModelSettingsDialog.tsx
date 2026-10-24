@@ -11,7 +11,8 @@ import Select from '@ui/Select';
 import { detectCapabilities } from '@features/agent/model/capabilities';
 import type { ModelProfile } from '@features/agent';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
-import { baseUrlForProvider, type ProviderKind } from '@features/agent/services/provider';
+import { baseUrlForProvider } from '@features/agent/services/provider';
+import { PROVIDERS } from '@config/providers';
 import { updateModel } from '@features/settings/model/modelWrites';
 import { ModelTextInput } from './ui';
 import AutoSaveInput from './AutoSaveInput';
@@ -19,7 +20,7 @@ import ModelThinkingSettings from './ModelThinkingSettings';
 import SettingsDialog from './SettingsDialog';
 
 /** API families a model row can use, in the order the select offers them. */
-const PROVIDER_KINDS: ProviderKind[] = ['openai-compatible', 'anthropic', 'gemini'];
+const PROVIDER_KINDS = PROVIDERS.map((provider) => provider.kind);
 
 export default function ModelSettingsDialog({ open, model, focusModelId = false, onClose }: {
   open: boolean;

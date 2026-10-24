@@ -143,6 +143,7 @@ export async function maybeAutoTitle(
       provider: active.provider,
       baseUrl: active.baseUrl,
       model: settings.titleModel || active.model,
+      sessionId: tabId,
     });
     const { text } = await generateText({
       model,

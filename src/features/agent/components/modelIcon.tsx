@@ -8,14 +8,16 @@
  */
 import {
   AnthropicMark, DeepSeekMark, GeminiMark, GroqMark, MistralMark, MoonshotMark, OllamaMark,
-  OpenAIMark, OpenRouterMark, QwenMark, SiliconFlowMark, XaiMark, ZhipuMark,
+  OpenAIMark, OpenCodeMark, OpenRouterMark, QwenMark, SiliconFlowMark, XaiMark, ZhipuMark,
 } from '@ui/brandMarks';
 import { Cpu, Server, type AppIcon } from '@ui/icons';
+import { providerDefinition } from '@config/providers';
+import { t, type I18nKey } from '@i18n';
 import type { ProviderKind } from '@features/agent/services/provider';
 
 export type ModelVendor =
   | 'anthropic' | 'openai' | 'gemini' | 'deepseek' | 'moonshot' | 'zhipu' | 'qwen' | 'siliconflow'
-  | 'openrouter' | 'groq' | 'xai' | 'mistral' | 'ollama' | 'local' | 'generic';
+  | 'openrouter' | 'groq' | 'xai' | 'mistral' | 'ollama' | 'opencode' | 'local' | 'generic';
 
 export interface VendorInfo {
   label: string;
@@ -40,6 +42,7 @@ const VENDORS: Record<Exclude<ModelVendor, 'generic'>, VendorInfo> = {
   xai: { label: 'xAI', hue: 'var(--text-secondary)', mark: XaiMark, branded: false },
   mistral: { label: 'Mistral', hue: 'var(--text-secondary)', mark: MistralMark, branded: false },
   ollama: { label: 'Ollama', hue: 'var(--text-secondary)', mark: OllamaMark, branded: false },
+  opencode: { label: 'OpenCode', hue: 'var(--text-secondary)', mark: OpenCodeMark, branded: false },
   local: { label: 'Local server', hue: 'var(--text-secondary)', mark: Server, branded: false },
 };
 
@@ -56,6 +59,7 @@ const HOST_RULES: [RegExp, ModelVendor][] = [
   [/groq\.com/, 'groq'],
   [/x\.ai/, 'xai'],
   [/mistral\.ai/, 'mistral'],
+  [/opencode\.ai/, 'opencode'],
 ];
 
 const MODEL_RULES: [RegExp, ModelVendor][] = [
@@ -100,6 +104,7 @@ export function modelVendor(kind: string, model: string, baseUrl = ''): ModelVen
   for (const [pattern, vendor] of MODEL_RULES) if (pattern.test(name)) return vendor;
   if (kind === 'anthropic') return 'anthropic';
   if (kind === 'gemini') return 'gemini';
+  if (kind === 'opencode') return 'opencode';
   return 'generic';
 }
 
@@ -119,12 +124,5 @@ export function modelHue(kind: string, model: string, baseUrl = ''): string {
 }
 
 export function providerLabel(provider: ProviderKind): string {
-  switch (provider) {
-    case 'anthropic':
-      return 'Anthropic';
-    case 'gemini':
-      return 'Gemini';
-    default:
-      return 'OpenAI 兼容';
-  }
+  return t(providerDefinition(provider).label as I18nKey);
 }

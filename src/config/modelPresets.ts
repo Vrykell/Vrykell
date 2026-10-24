@@ -8,8 +8,9 @@
  * they name, no key is bundled, and install and license what you use yourself.
  */
 import presetData from './modelPresets.json';
+import type { ProviderKind } from './providers';
 
-export type ModelPresetProvider = 'openai-compatible' | 'anthropic' | 'gemini';
+export type ModelPresetProvider = ProviderKind;
 
 export type ModelPresetHint =
   | 'Official endpoint: paste a key from the vendor console.'

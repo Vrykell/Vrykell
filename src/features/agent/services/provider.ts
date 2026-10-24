@@ -10,14 +10,9 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import type { Tool } from 'ai';
 import { createProxyFetch } from '@features/agent/services/llmFetch';
+import { DEFAULT_BASE_URLS, type ProviderKind } from '@config/providers';
 
-export type ProviderKind = 'openai-compatible' | 'anthropic' | 'gemini';
-
-const DEFAULT_BASE_URLS: Record<ProviderKind, string> = {
-  'openai-compatible': 'https://api.openai.com/v1',
-  anthropic: 'https://api.anthropic.com/v1',
-  gemini: 'https://generativelanguage.googleapis.com/v1beta',
-};
+export type { ProviderKind };
 
 export function baseUrlForProvider(baseUrl: string, provider: ProviderKind): string {
   const current = baseUrl.trim().replace(/\/+$/, '');
@@ -56,18 +51,21 @@ export interface ChatModelConfig {
   provider: ProviderKind;
   baseUrl: string;
   model: string;
+  /** Conversation scope for endpoints that route requests by a session header. */
+  sessionId?: string;
 }
 
-const proxyFetches = new Map<ProviderKind, typeof fetch>();
+const proxyFetches = new Map<string, typeof fetch>();
 
-function getProxyFetch(provider: ProviderKind): typeof fetch {
-  let proxy = proxyFetches.get(provider);
-  if (!proxy) { proxy = createProxyFetch(provider); proxyFetches.set(provider, proxy); }
+function getProxyFetch(provider: ProviderKind, sessionId?: string): typeof fetch {
+  const key = `${provider}|${sessionId ?? ''}`;
+  let proxy = proxyFetches.get(key);
+  if (!proxy) { proxy = createProxyFetch(provider, sessionId); proxyFetches.set(key, proxy); }
   return proxy;
 }
 
 export function createChatModel(cfg: ChatModelConfig) {
-  const fetchImpl = getProxyFetch(cfg.provider);
+  const fetchImpl = getProxyFetch(cfg.provider, cfg.sessionId);
   switch (cfg.provider) {
     case 'anthropic':
       return createAnthropic({ baseURL: cfg.baseUrl, apiKey: 'proxy-managed', fetch: fetchImpl })(cfg.model);

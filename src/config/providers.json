@@ -1,0 +1,26 @@
+[
+  {
+    "kind": "openai-compatible",
+    "label": "OpenAI compatible",
+    "defaultBaseUrl": "https://api.openai.com/v1"
+  },
+  {
+    "kind": "anthropic",
+    "label": "Anthropic",
+    "defaultBaseUrl": "https://api.anthropic.com/v1"
+  },
+  {
+    "kind": "gemini",
+    "label": "Gemini",
+    "defaultBaseUrl": "https://generativelanguage.googleapis.com/v1beta"
+  },
+  {
+    "kind": "opencode",
+    "label": "OpenCode",
+    "defaultBaseUrl": "https://opencode.ai/zen/go/v1",
+    "session": {
+      "header": "x-opencode-session",
+      "hosts": ["opencode.ai"]
+    }
+  }
+]

@@ -42,7 +42,7 @@ pub struct ModelProfile {
     pub id: String,
     #[serde(default)]
     pub name: String,
-    /// openai-compatible | anthropic | gemini
+    /// openai-compatible | anthropic | gemini | opencode
     #[serde(default = "default_provider")]
     pub provider: String,
     #[serde(default = "default_base_url")]
@@ -68,7 +68,7 @@ struct AiConfigInner {
     base_url: String,
     #[serde(default = "default_model")]
     model: String,
-    /// openai-compatible | anthropic | gemini
+    /// openai-compatible | anthropic | gemini | opencode
     #[serde(default = "default_provider")]
     provider: String,
     #[serde(default, skip_serializing)]
@@ -94,20 +94,25 @@ const SECRET_ANTHROPIC: &str = "ai.anthropic";
 const SECRET_GEMINI: &str = "ai.gemini";
 const SECRET_TAVILY: &str = "ai.tavily";
 
-/// 各家族的官方端点，与前端 `providerList` 的默认值一致：provider 身份由它们补齐。
+/// Official endpoint per API family; kept in sync with the frontend provider catalog.
 const DEFAULT_BASE_URL_ANTHROPIC: &str = "https://api.anthropic.com/v1";
 const DEFAULT_BASE_URL_GEMINI: &str = "https://generativelanguage.googleapis.com/v1beta";
+const DEFAULT_BASE_URL_OPENCODE: &str = "https://opencode.ai/zen/go/v1";
 
 fn default_base_url_for(kind: &str) -> &'static str {
     match kind {
         "anthropic" => DEFAULT_BASE_URL_ANTHROPIC,
         "gemini" => DEFAULT_BASE_URL_GEMINI,
+        "opencode" => DEFAULT_BASE_URL_OPENCODE,
         _ => DEFAULT_BASE_URL,
     }
 }
 
 fn is_default_base_url(url: &str) -> bool {
-    url == DEFAULT_BASE_URL || url == DEFAULT_BASE_URL_ANTHROPIC || url == DEFAULT_BASE_URL_GEMINI
+    url == DEFAULT_BASE_URL
+        || url == DEFAULT_BASE_URL_ANTHROPIC
+        || url == DEFAULT_BASE_URL_GEMINI
+        || url == DEFAULT_BASE_URL_OPENCODE
 }
 
 /// provider 身份（家族 + 生效端点），与前端 `providerList.providerId` 的算法一致；
@@ -398,7 +403,7 @@ pub fn set_ai_model(state: State<'_, AiConfig>, model: String) {
 #[tauri::command]
 pub fn set_ai_provider(state: State<'_, AiConfig>, provider: String) {
     let p = provider.trim().to_string();
-    if !matches!(p.as_str(), "openai-compatible" | "anthropic" | "gemini") {
+    if !matches!(p.as_str(), "openai-compatible" | "anthropic" | "gemini" | "opencode") {
         return;
     }
     set_field(&state, |c| {
@@ -777,6 +782,8 @@ enum ProviderAuth {
     OpenAI,
     Anthropic,
     Gemini,
+    /// Chat-completions gateway that also expects the client to identify itself.
+    Opencode,
 }
 
 // Match the configured origin and path, including local ports.
@@ -792,6 +799,7 @@ fn provider_auth(provider: &str) -> Result<ProviderAuth, String> {
         "anthropic" => Ok(ProviderAuth::Anthropic),
         "gemini" => Ok(ProviderAuth::Gemini),
         "openai-compatible" => Ok(ProviderAuth::OpenAI),
+        "opencode" => Ok(ProviderAuth::Opencode),
         _ => Err("未知 AI 服务商".to_string()),
     }
 }
@@ -863,19 +871,25 @@ async fn run_proxy(
         .map_err(|e| format!("初始化 HTTP 客户端失败：{e}"))?;
 
     let mut rb = client.request(method, url);
-    // 认证头不转发前端值（前端用的是占位 key），由下方统一附加真实 key
+    // The frontend sends a placeholder credential; the real one is attached below. The client
+    // identity is set by this side too, so a gateway never sees the HTTP library's default.
+    let identifies_client = auth == ProviderAuth::Opencode;
     for (k, v) in req.headers.unwrap_or_default() {
         let lk = k.to_ascii_lowercase();
         if matches!(
             lk.as_str(),
             "host" | "content-length" | "authorization" | "x-api-key" | "x-goog-api-key"
-        ) {
+        ) || (identifies_client && lk == "user-agent")
+        {
             continue;
         }
         rb = rb.header(k, v);
     }
     rb = match auth {
         ProviderAuth::OpenAI => rb.header("authorization", format!("Bearer {key}")),
+        ProviderAuth::Opencode => rb
+            .header("authorization", format!("Bearer {key}"))
+            .header("user-agent", concat!("Vrykell/", env!("CARGO_PKG_VERSION"))),
         ProviderAuth::Anthropic => rb.header("x-api-key", key),
         ProviderAuth::Gemini => rb.header("x-goog-api-key", key),
     };
@@ -996,7 +1010,12 @@ mod proxy_endpoint_tests {
 
     #[test]
     fn configured_gateways_use_their_provider_auth() {
-        for (provider, expected) in [("anthropic", ProviderAuth::Anthropic), ("gemini", ProviderAuth::Gemini), ("openai-compatible", ProviderAuth::OpenAI)] {
+        for (provider, expected) in [
+            ("anthropic", ProviderAuth::Anthropic),
+            ("gemini", ProviderAuth::Gemini),
+            ("openai-compatible", ProviderAuth::OpenAI),
+            ("opencode", ProviderAuth::Opencode),
+        ] {
             let mut cfg = AiConfigInner::default();
             cfg.provider = provider.into();
             cfg.base_url = "https://gateway.example/api/v1".into();
@@ -1053,6 +1072,21 @@ mod proxy_endpoint_tests {
     }
 
     #[test]
+    fn provider_defaults_match_the_frontend_catalog() {
+        let catalog: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../src/config/providers.json"
+        ))
+        .expect("provider catalog must be valid JSON");
+        for entry in catalog.as_array().expect("provider catalog must be a list") {
+            let kind = entry["kind"].as_str().expect("catalog entry needs a kind");
+            let endpoint = entry["defaultBaseUrl"]
+                .as_str()
+                .expect("catalog entry needs a default endpoint");
+            assert_eq!(default_base_url_for(kind), endpoint, "default endpoint drifted for {kind}");
+        }
+    }
+
+    #[test]
     fn provider_identity_matches_the_frontend_rule() {
         assert_eq!(provider_identity("anthropic", ""), "anthropic|https://api.anthropic.com/v1");
         assert_eq!(
@@ -1066,6 +1100,10 @@ mod proxy_endpoint_tests {
         assert_eq!(
             provider_identity("gemini", "https://generativelanguage.googleapis.com/v1beta"),
             "gemini|https://generativelanguage.googleapis.com/v1beta"
+        );
+        assert_eq!(
+            provider_identity("opencode", ""),
+            "opencode|https://opencode.ai/zen/go/v1"
         );
     }
 

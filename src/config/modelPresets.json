@@ -63,6 +63,20 @@
     "hint": "Aggregator: one key reaches many vendors."
   },
   {
+    "name": "OpenCode Go",
+    "provider": "opencode",
+    "baseUrl": "https://opencode.ai/zen/go/v1",
+    "model": "deepseek-v4.1-flash",
+    "hint": "Aggregator: one key reaches many vendors."
+  },
+  {
+    "name": "OpenCode Zen",
+    "provider": "opencode",
+    "baseUrl": "https://opencode.ai/zen/v1",
+    "model": "claude-sonnet-5-5",
+    "hint": "Aggregator: one key reaches many vendors."
+  },
+  {
     "name": "Groq",
     "provider": "openai-compatible",
     "baseUrl": "https://api.groq.com/openai/v1",

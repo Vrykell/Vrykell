@@ -70,6 +70,7 @@ export const GroqMark = GroqMono as unknown as AppIcon;
 export const XaiMark = XAIMono as unknown as AppIcon;
 export const MistralMark = MistralColor as unknown as AppIcon;
 export const OllamaMark = OllamaMono as unknown as AppIcon;
+export const OpenCodeMark = OpenCodeMono as unknown as AppIcon;
 
 /**
  * Marks of the ACP-capable agents, keyed by the normalised name a harness entry carries (lowercase,
@@ -80,7 +81,7 @@ export const AGENT_MARKS: Record<string, AppIcon> = {
   claudecode: ClaudeCodeColor as unknown as AppIcon,
   codex: CodexColor as unknown as AppIcon,
   geminicli: GeminiCLIColor as unknown as AppIcon,
-  opencode: OpenCodeMono as unknown as AppIcon,
+  opencode: OpenCodeMark,
   goose: GooseMono as unknown as AppIcon,
   cline: ClineMono as unknown as AppIcon,
   cursor: CursorMono as unknown as AppIcon,

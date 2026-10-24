@@ -53,7 +53,12 @@ export function buildSubagentTool(ctx: ToolContext) {
               if (!args.agent || !args.task?.trim()) return { ok: false, error: 'spawn 需要 agent 与 task' };
               const def = await getAgent(args.agent);
               const info = await invoke<AiConfigRust>('get_ai_config');
-              const model = createChatModel({ provider: info.provider, baseUrl: info.base_url, model: info.model });
+              const model = createChatModel({
+                provider: info.provider,
+                baseUrl: info.base_url,
+                model: info.model,
+                sessionId: ctx.tabId,
+              });
               const { text } = await generateText({
                 model,
                 system: def.prompt,
