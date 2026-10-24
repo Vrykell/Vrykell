@@ -22,11 +22,12 @@ export default defineConfig(async () => ({
     },
   }],
   // Embedded controls use the application catalog rather than a separate language setting.
-  optimizeDeps: { exclude: ["monaco-editor"] },
+  optimizeDeps: { exclude: ["monaco-editor", "monaco-vim"] },
 
   // Keep runtime imports aligned with tsconfig paths in Vite and Vitest.
   resolve: {
     alias: {
+      "monaco-vim": fileURLToPath(new URL("./node_modules/monaco-vim/dist/index.mjs", import.meta.url)),
       "@app": `${sourceRoot}/app`,
       "@config": `${sourceRoot}/config`,
       "@core": `${sourceRoot}/core`,

@@ -7,10 +7,29 @@
 .code-diff .monaco-editor .decorationsOverviewRuler { display: none; }
 .code-diff .monaco-editor .scroll-decoration, .code-editor .monaco-editor .scroll-decoration { display: none; }
 .code-diff-frame, .code-editor-frame { border: 0; box-shadow: none; }
-.code-editor { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.code-editor { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; container-type: inline-size; }
 .code-editor-frame { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: hidden; border-radius: var(--radius-block); clip-path: inset(0 round var(--radius-block)); background: var(--xterm-bg); }
 .code-editor .decorationsOverviewRuler, .code-editor .monaco-scrollable-element > .shadow { display: none; }
 .code-diff .current-line, .code-editor .current-line { border: 0 !important; }
 .code-diff-status { padding: 24px 16px; color: var(--text-muted); text-align: center; font-size: var(--fs-caption); line-height: 1.6; }
 .code-diff-labels { display: flex; align-items: center; gap: 8px; padding: 4px 12px 8px; color: var(--text-muted); font-size: var(--fs-caption); }
 .code-diff-labels > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.code-editor-status { display: flex; flex-shrink: 0; align-items: center; justify-content: flex-end; gap: 14px; height: 24px; min-height: 24px; box-sizing: border-box; padding: 0 12px; color: var(--text-muted); font-size: var(--fs-caption); white-space: nowrap; overflow: hidden; }
+.code-editor-status { flex-wrap: nowrap; max-height: 24px; }
+.code-editor-vim-status { flex: 0 1 auto; min-width: 0; max-height: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 24px; }
+.code-editor-vim-status > span { white-space: nowrap; }
+.code-editor-vim-status > span:last-child { margin-left: 8px; }
+.code-editor-vim-status .vim-notification { display: none; }
+.code-editor-status[data-vim-prompt="true"] > :not(.code-editor-vim-status) { display: none; }
+.code-editor-status[data-vim-prompt="true"] .code-editor-vim-status { flex: 1; }
+.code-editor-vim-status input { min-width: 0; width: min(560px, calc(100cqw - 150px)); height: 20px; box-sizing: border-box; border: 0; padding: 0 4px; background: transparent; color: var(--text-primary); font: inherit; }
+@container (max-width: 760px) { .code-editor-count { display: none; } }
+@container (max-width: 540px) { .code-editor-cursor { display: none; } }
+.code-editor-preview { flex: 1; min-height: 0; overflow: auto; padding: 18px 24px; user-select: text; }
+.code-editor .monaco-editor .find-widget { border: 1px solid var(--border); border-radius: var(--radius-inner); box-shadow: var(--shadow-sm); background: var(--field-bg); max-width: calc(100% - 24px); right: 12px !important; margin-top: 8px; }
+.code-editor .monaco-editor .find-widget > .button.codicon-widget-close { top: 50%; transform: translateY(-50%); }
+.editor-status-path { display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 60px; overflow: hidden; padding: 0; height: auto; background: transparent; }
+.editor-status-path > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.code-editor-status > button { padding: 2px 4px; min-height: 20px; background: transparent; color: var(--text-muted); font: inherit; white-space: nowrap; }
+.code-editor-status > button:hover { background: transparent; color: var(--text-primary); }
+@media (max-width: 580px) { .code-editor-status { gap: 8px; } .code-editor-status > span:nth-last-child(3) { display: none; } }
