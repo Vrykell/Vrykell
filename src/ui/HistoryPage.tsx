@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Search } from './icons';
+import { Search, X } from './icons';
+import { t } from '@i18n';
 import { TextInput } from './TextInput';
 import { IconButton } from './IconButton';
 
@@ -21,6 +22,7 @@ interface HistoryPageProps {
   overlays?: ReactNode;
   children: ReactNode;
   busy?: boolean;
+  onLoadMore?: () => void;
 }
 
 /** Shared workspace history shell, search field and list spacing. */
@@ -42,9 +44,14 @@ export default function HistoryPage({
   overlays,
   children,
   busy = false,
+  onLoadMore,
 }: HistoryPageProps) {
   const [searchOpen, setSearchOpen] = useState(query.length > 0);
   const searchRef = useRef<HTMLInputElement>(null);
+  const composing = useRef(false);
+  const [compositionDraft, setCompositionDraft] = useState('');
+  const requestedHeight = useRef(0);
+  useEffect(() => { requestedHeight.current = 0; }, [query, listLabel]);
   useEffect(() => { if (searchOpen) requestAnimationFrame(() => searchRef.current?.focus()); }, [searchOpen]);
   const closeSearch = () => { if (query) onQueryChange(''); setSearchOpen(false); };
   const collapseSearch = () => setSearchOpen(false);
@@ -60,11 +67,14 @@ export default function HistoryPage({
         {searchOpen && <div className="history-search">
           <Search size={12} aria-hidden="true" />
           <TextInput ref={searchRef} className="history-search-input" aria-label={searchLabel} placeholder={searchPlaceholder}
-            value={query} onChange={event => onQueryChange(event.target.value)} data-testid={searchTestId}
+            value={composing.current ? compositionDraft : query} onChange={event => { if (composing.current) setCompositionDraft(event.target.value); else onQueryChange(event.target.value); }} data-testid={searchTestId}
+            onCompositionStart={() => { composing.current = true; setCompositionDraft(query); }}
+            onCompositionEnd={event => { composing.current = false; onQueryChange(event.currentTarget.value); }}
             onBlur={event => {
               if (!event.relatedTarget || !event.currentTarget.parentElement?.contains(event.relatedTarget)) collapseSearch();
             }}
             onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); closeSearch(); } }} />
+          {query && <IconButton compact aria-label={t('Clear search')} data-tip={t('Clear search')} onClick={() => { onQueryChange(''); searchRef.current?.focus(); }}><X size={14} /></IconButton>}
         </div>}
         <div className="history-actions">
           {!searchOpen && <IconButton compact className="history-icon-button" aria-label={searchLabel}
@@ -76,7 +86,14 @@ export default function HistoryPage({
       </div>
     </div>
     {overlays}
-    <div className={`history-list scroll-region${listClassName ? ` ${listClassName}` : ''}`} aria-label={listLabel}>
+    <div className={`history-list scroll-region${listClassName ? ` ${listClassName}` : ''}`} aria-label={listLabel}
+      onScroll={event => {
+        const list = event.currentTarget;
+        if (list.scrollHeight - list.scrollTop - list.clientHeight < 160 && requestedHeight.current !== list.scrollHeight) {
+          requestedHeight.current = list.scrollHeight;
+          onLoadMore?.();
+        }
+      }}>
       {children}
     </div>
   </div>;

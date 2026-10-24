@@ -1,32 +1,19 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { useState } from 'react';
 import { expect, it, vi } from 'vitest';
 import HistoryPage from '../HistoryPage';
 
-function Harness({ change }: { change: (value: string) => void }) {
-  const [query, setQuery] = useState('');
-  return <HistoryPage pageTestId="history" listLabel="History" icon={null} title="History" count="2"
-    query={query} onQueryChange={value => { setQuery(value); change(value); }} searchLabel="Search history" searchPlaceholder="Search…"
-    searchTestId="history-search"><div>Rows</div></HistoryPage>;
-}
-
-it('uses a compact search action and clears the query when closed', () => {
-  const change = vi.fn();
-  render(<Harness change={change} />);
-  expect(screen.queryByTestId('history-search')).toBeNull();
-  const toggle = screen.getByTestId('history-search-toggle');
-  fireEvent.click(toggle);
-  const input = screen.getByTestId('history-search');
-  expect(input.closest('.history-search')?.nextElementSibling).toHaveClass('history-actions');
-  fireEvent.change(input, { target: { value: 'Deploy' } });
-  expect(change).toHaveBeenLastCalledWith('Deploy');
-  fireEvent.blur(input);
-  expect(change).toHaveBeenLastCalledWith('Deploy');
-  expect(screen.queryByTestId('history-search')).toBeNull();
-  fireEvent.click(screen.getByTestId('history-search-toggle'));
-  const reopened = screen.getByTestId('history-search');
-  expect(reopened).toHaveValue('Deploy');
-  fireEvent.keyDown(reopened, { key: 'Escape' });
-  expect(change).toHaveBeenLastCalledWith('');
-  expect(screen.queryByTestId('history-search')).toBeNull();
+it('requests only one page per bottom boundary and waits for composition before searching', () => {
+  const onLoadMore = vi.fn(); const onQueryChange = vi.fn();
+  const props = { pageTestId: 'history', listLabel: 'History', icon: null, title: 'History', count: '', query: 'a', onQueryChange, searchLabel: 'Search', searchPlaceholder: '', searchTestId: 'search', onLoadMore, children: null };
+  render(<HistoryPage {...props} />);
+  const list = screen.getByLabelText('History');
+  Object.defineProperties(list, { scrollHeight: { configurable: true, value: 1000 }, clientHeight: { value: 500 }, scrollTop: { configurable: true, value: 500 } });
+  fireEvent.scroll(list); fireEvent.scroll(list); expect(onLoadMore).toHaveBeenCalledTimes(1);
+  Object.defineProperties(list, { scrollHeight: { configurable: true, value: 1500 }, scrollTop: { configurable: true, value: 1000 } });
+  fireEvent.scroll(list); expect(onLoadMore).toHaveBeenCalledTimes(2);
+  const input = screen.getByTestId('search');
+  fireEvent.compositionStart(input); fireEvent.change(input, { target: { value: 'word' } });
+  expect(onQueryChange).not.toHaveBeenCalled(); expect(input).toHaveValue('word');
+  fireEvent.compositionEnd(input, { data: 'word' }); expect(onQueryChange).toHaveBeenCalledWith('word');
+  fireEvent.click(screen.getByRole('button', { name: '清空搜索' })); expect(onQueryChange).toHaveBeenLastCalledWith('');
 });

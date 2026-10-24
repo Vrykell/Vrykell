@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
-import { TextArea, TextInput } from './TextInput';
+import { TextArea } from './TextInput';
+import InlineRenameInput from './InlineRenameInput';
 import { OutlineButton } from './OutlineButton';
 import { useExclusiveMenu } from './hooks/useExclusiveMenu';
 import { useFloatingPanelPosition } from './hooks/useFloatingPanelPosition';
@@ -42,6 +43,7 @@ export default function HistoryTextPrompt({ anchor, label, placeholder, value, m
     close();
   };
   const onKeyDown = (event: ReactKeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
     if (event.key === 'Enter' && (!multiline || event.ctrlKey || event.metaKey)) {
       event.preventDefault();
       save();
@@ -53,7 +55,7 @@ export default function HistoryTextPrompt({ anchor, label, placeholder, value, m
     {multiline
       ? <TextArea autoFocus className="history-prompt-input" rows={3} aria-label={label} placeholder={placeholder}
         value={text} onChange={event => setText(event.target.value)} onKeyDown={onKeyDown} />
-      : <TextInput autoFocus className="history-prompt-input" aria-label={label} placeholder={placeholder}
+      : <InlineRenameInput autoFocus className="history-prompt-input" aria-label={label} placeholder={placeholder}
         value={text} onChange={event => setText(event.target.value)} onKeyDown={onKeyDown} />}
     <div className="history-prompt-actions">
       <OutlineButton className="history-prompt-action" data-testid={`${testId}-cancel`} onClick={close}>{t('Cancel')}</OutlineButton>

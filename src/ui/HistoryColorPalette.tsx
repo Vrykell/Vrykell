@@ -4,6 +4,7 @@ import { t } from '@i18n';
 import { Check } from './icons';
 import { GROUP_COLORS, type HistoryGroupColor } from './historyGroupColor';
 import { useExclusiveMenu } from './hooks/useExclusiveMenu';
+import { useListNavigationMode } from './hooks/useListNavigationMode';
 import { useFloatingPanelPosition } from './hooks/useFloatingPanelPosition';
 import type { MenuAnchor } from './ContextMenu';
 
@@ -28,6 +29,7 @@ export default function HistoryColorPalette({ anchor, value, onSelect, onClose, 
   testId: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const navigation = useListNavigationMode(true);
   useExclusiveMenu(ref, onClose);
   useLayoutEffect(() => {
     (ref.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]') ?? ref.current?.querySelector<HTMLButtonElement>('button'))?.focus();
@@ -45,7 +47,7 @@ export default function HistoryColorPalette({ anchor, value, onSelect, onClose, 
   const width = 208;
   const position = useFloatingPanelPosition(ref, anchor);
 
-  return createPortal(<div ref={ref} role="dialog" aria-label={t('Group color')} data-testid={testId} className="workspace-floating history-color-palette" style={{ ...position, width, maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}>
+  return createPortal(<div {...navigation.props} ref={ref} role="dialog" aria-label={t('Group color')} data-testid={testId} className="workspace-floating history-color-palette" style={{ ...position, width, maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}>
     <HistoryColorChoices value={value} onSelect={select} testId={testId} />
   </div>, document.body);
 }

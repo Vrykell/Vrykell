@@ -4,6 +4,7 @@ import { Check } from './icons';
 import { useExclusiveMenu } from './hooks/useExclusiveMenu';
 import { useFloatingPanelPosition } from './hooks/useFloatingPanelPosition';
 import type { MenuAnchor } from './ContextMenu';
+import { useListNavigationMode } from './hooks/useListNavigationMode';
 
 export interface HistoryMenuOption {
   label: string;
@@ -28,6 +29,7 @@ export default function HistoryOptionMenu({ anchor, testId, sections, onClose, w
   closeOnSelect?: boolean;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const navigation = useListNavigationMode(true);
   useExclusiveMenu(ref, onClose, anchor.trigger);
   const position = useFloatingPanelPosition(ref, { x: align === 'end' ? anchor.x - width : anchor.x, y: anchor.y });
   useLayoutEffect(() => {
@@ -44,7 +46,7 @@ export default function HistoryOptionMenu({ anchor, testId, sections, onClose, w
     };
   }, [onClose, anchor.trigger]);
 
-  return createPortal(<div ref={ref} data-testid={testId} className="workspace-floating history-option-menu"
+  return createPortal(<div {...navigation.props} ref={ref} data-testid={testId} className="workspace-floating history-option-menu"
     style={{ ...position, width, maxWidth: 'calc(100vw - 16px)', maxHeight: `min(${maxHeight}px, calc(100vh - 16px))` }}
     onKeyDown={event => {
       if (event.key === 'Tab') { anchor.trigger?.focus(); onClose(); return; }
