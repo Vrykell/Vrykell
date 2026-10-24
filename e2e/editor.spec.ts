@@ -54,7 +54,7 @@ test('identifies read-only files, blocks normal edits and offers explicit admini
   expect(await page.evaluate(() => (window as unknown as { __ELEVATED_FILE__?: unknown }).__ELEVATED_FILE__)).toMatchObject({ path: '/home/e2e/project/src/main.ts' });
   await page.evaluate(() => { (window as unknown as { __WRITABLE__: boolean }).__WRITABLE__ = true; });
   await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
-  await page.getByRole('menu').getByRole('button', { name: '重新加载文件', exact: true }).click();
+  await page.getByRole('menu').getByRole('menuitem', { name: '重新加载文件', exact: true }).click();
   await expect(editor.locator('.editor-readonly-label')).toHaveCount(0);
   await replaceText(page, 'allowed after reload');
   await expect(editor.locator('.view-lines')).toContainText('allowed after reload');
@@ -79,7 +79,7 @@ test('opens text in the built-in editor, saves it and guards unsaved closes', as
 test('retains drafts on disk conflicts and requires confirmation before reload', async ({ page }) => {
   await openWorking(page); const editor = page.getByTestId('file-editor'); await replaceText(page, 'local draft');
   await page.evaluate(() => localStorage.setItem('mock-editor-files', JSON.stringify({ '["","/home/e2e/project/src/main.ts"]': 'external text' })));
-  await page.keyboard.press('Control+s'); await expect(editor.getByRole('alert')).toBeVisible();
+  await page.keyboard.press('Control+s'); await expect(page.locator('#app-notifications').getByRole('alert')).toBeVisible();
   await expect(editor.locator('.view-lines')).toContainText('local draft');
   await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '重新加载文件' }).click(); await page.getByTestId('confirm-cancel').click();
   await expect(editor.locator('.view-lines')).toContainText('local draft');
@@ -95,11 +95,11 @@ test('keeps files in a single page despite a legacy preference and offers termin
   await openWorking(page, 'new file.ts', 'untracked');
   await expect(page.getByRole('tablist', { name: '已打开的文件与比较' }).getByRole('tab')).toHaveCount(2);
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await page.getByRole('button', { name: '本地编辑器', exact: true }).click();
+  await page.getByRole('button', { name: '本地文件打开方式', exact: true }).click();
   await expect(page.getByRole('combobox', { name: '编辑器页面' })).toHaveCount(0);
-  await page.getByRole('button', { name: '远程编辑器', exact: true }).click();
+  await page.getByRole('button', { name: '远程文件打开方式', exact: true }).click();
   await expect(page.getByRole('combobox', { name: '编辑器页面' })).toHaveCount(0);
-  await page.getByRole('button', { name: '本地编辑器', exact: true }).click();
+  await page.getByRole('button', { name: '本地文件打开方式', exact: true }).click();
   await page.getByRole('combobox', { name: '首选文件编辑器' }).click(); await page.getByRole('option', { name: '终端编辑器', exact: true }).click();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vrykell-editor-preferences')!).state.localOpenMode)).toBe('terminal');
   await page.evaluate(async () => {
@@ -117,7 +117,7 @@ test('returns from a comparison to its editor and explains binary files', async 
   await openWorking(page);
   await page.getByTestId('git-unstaged-src/main.ts').click();
   await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
-  await page.getByRole('button', { name: '返回编辑器', exact: true }).click();
+  await page.getByRole('menuitem', { name: '返回编辑器', exact: true }).click();
   await expect(page.getByTestId('file-editor')).toBeVisible();
   const image = page.getByTestId('git-unstaged-image.png'); await image.hover(); await image.getByRole('button', { name: '打开工作文件' }).click();
   await expect(page.getByTestId('file-editor').getByText('此文件是二进制或非 UTF-8 文本，请使用其他编辑器打开。')).toBeVisible();
@@ -142,7 +142,7 @@ test('reorders connected file tabs and keeps compact actions above the text', as
   const header = page.getByTestId('workspace-instance-bar').locator('.folder-header');
   expect((await header.boundingBox())!.height).toBeLessThanOrEqual(34);
   const first = strip.locator('.folder-tab').first();
-  expect((await first.boundingBox())!.x).toBe((await strip.boundingBox())!.x + 10);
+  expect((await first.boundingBox())!.x).toBe((await strip.boundingBox())!.x + 8);
   expect(await first.evaluate(element => getComputedStyle(element, '::before').content)).toBe('""');
   const inactive = strip.locator('.folder-tab').nth(1); await inactive.hover();
   const hover = (await inactive.locator('.folder-tab-content').boundingBox())!; const row = (await inactive.boundingBox())!;
@@ -153,14 +153,14 @@ test('reorders connected file tabs and keeps compact actions above the text', as
   for (const width of [1240, 760]) {
     await page.setViewportSize({ width, height: 800 });
     const path = (await editor.locator('.folder-path').boundingBox())!; const body = (await editor.locator('.code-editor-frame').boundingBox())!;
-    expect(path.height).toBeLessThanOrEqual(26); expect(path.y + path.height).toBeLessThanOrEqual(body.y + 1);
+    expect(path.height).toBeLessThanOrEqual(26); expect(path.y).toBeGreaterThanOrEqual(body.y + body.height - 1);
     expect(await strip.locator('.folder-tab[data-active="true"]').evaluate(element => getComputedStyle(element).backgroundColor)).toBe(await editor.locator('.code-editor-frame').evaluate(element => getComputedStyle(element).backgroundColor));
     await page.screenshot({ path: info.outputPath(`folder-tabs-${width}.png`) });
   }
   await page.setViewportSize({ width: 560, height: 800 });
   await expect(page.getByTestId('workspace-instance-bar').getByRole('button', { name: '在终端中打开', exact: true })).not.toBeVisible();
   await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
-  await expect(page.getByRole('menu').getByRole('button', { name: '在终端中打开', exact: true })).toBeVisible();
+  await expect(page.getByRole('menu').getByRole('menuitem', { name: '在终端中打开', exact: true })).toBeVisible();
 });
 
 test('dragging the selected first file leaves the remaining tabs visible in a narrow strip', async ({ page }, info) => {
@@ -221,21 +221,22 @@ for (const direction of ['left', 'right']) {
     const neighborName = direction === 'left' ? paths[0]! : paths[2]!;
     const neighbor = strip.getByRole('tab', { name: neighborName, exact: true });
     const neighborRow = await neighbor.evaluate(element => {
-      const bounds = element.closest('.folder-tab')!.getBoundingClientRect(); return { x: bounds.x, width: bounds.width };
+      const bounds = element.closest('.folder-tab')!.getBoundingClientRect(); return { x: bounds.x, width: bounds.width, scroll: element.closest('[data-reorder-list]')!.scrollLeft };
     });
     const offset = grabX - sourceRow.x;
     const destination = neighborRow.x + neighborRow.width / 2 + (direction === 'left' ? -4 : 4 - sourceRow.width) + offset;
+    const destinationAtScroll = async () => destination + neighborRow.scroll - await strip.evaluate(element => element.scrollLeft);
     await page.mouse.move(grabX + (direction === 'left' ? -8 : 8), y, { steps: 2 });
     const preview = page.locator('[data-reorder-preview="item"]');
     await expect(preview).toHaveCount(1);
     await expect(preview.locator('.folder-tab')).toHaveAttribute('data-active', 'true');
-    await page.mouse.move(destination, y, { steps: 6 });
-    const neighborX = () => neighbor.evaluate(element => element.closest('.folder-tab')!.getBoundingClientRect().x);
-    const shiftedX = neighborRow.x + (direction === 'left' ? sourceRow.width : -sourceRow.width);
+    await page.mouse.move(await destinationAtScroll(), y, { steps: 6 });
+    const neighborX = () => neighbor.evaluate(element => element.closest('.folder-tab')!.getBoundingClientRect().x + element.closest('[data-reorder-list]')!.scrollLeft);
+    const shiftedX = neighborRow.x + neighborRow.scroll + (direction === 'left' ? sourceRow.width : -sourceRow.width);
     await expect.poll(neighborX).toBeCloseTo(shiftedX, 1);
     await page.mouse.move(grabX, y, { steps: 6 });
-    await expect.poll(neighborX).toBeCloseTo(neighborRow.x, 1);
-    await page.mouse.move(destination, y, { steps: 6 });
+    await expect.poll(neighborX).toBeCloseTo(neighborRow.x + neighborRow.scroll, 1);
+    await page.mouse.move(await destinationAtScroll(), y, { steps: 6 });
     await expect.poll(neighborX).toBeCloseTo(shiftedX, 1);
     await page.screenshot({ path: info.outputPath(`half-overlap-${direction}.png`) });
     await page.mouse.up();

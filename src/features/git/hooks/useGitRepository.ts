@@ -16,7 +16,7 @@ export function useGitRepository(target: GitTarget | null, visible: boolean) {
     const load = async () => {
       if (busy || document.hidden) return;
       busy = true;
-      setState(previous => ({ key, snapshot: previous?.key === key ? previous.snapshot : null, error: '', loading: true }));
+      setState(previous => ({ key, snapshot: previous?.key === key ? previous.snapshot : null, error: previous?.key === key ? previous.error : '', loading: true }));
       try {
         const snapshot = await getGitSnapshot({ cwd, connectionId });
         if (!disposed) setState({ key, snapshot, error: '', loading: false });

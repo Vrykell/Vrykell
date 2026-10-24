@@ -8,6 +8,14 @@ vi.mock('@platform/diagnostics', () => ({ diagnostic: vi.fn() }));
 beforeEach(() => vi.resetAllMocks());
 
 describe('repository transport', () => {
+  it('normalizes local native prefixes on request and response but leaves remote paths unchanged', async () => {
+    vi.mocked(invoke).mockResolvedValue({ root: '\\\\?\\D:\\repo' });
+    expect(await getGitSnapshot({ cwd: '\\\\?\\D:\\repo' })).toEqual({ root: 'D:/repo' });
+    expect(invoke).toHaveBeenLastCalledWith('git_snapshot', { target: { cwd: 'D:/repo' } });
+    vi.mocked(invoke).mockResolvedValue({ root: '/remote/repo' });
+    await getGitSnapshot({ cwd: '/remote/repo', connectionId: 'remote' });
+    expect(invoke).toHaveBeenLastCalledWith('git_snapshot', { target: { cwd: '/remote/repo', connectionId: 'remote' } });
+  });
   it('keeps commit messages and patches out of operation diagnostics', async () => {
     vi.mocked(invoke).mockResolvedValue('private patch');
     await operateGit({ cwd: '/private' }, 'commit', { message: 'private message' });

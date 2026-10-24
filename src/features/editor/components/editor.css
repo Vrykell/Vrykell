@@ -7,3 +7,6 @@ button.editor-readonly-label { display: inline-flex; align-items: center; flex-s
 .editor-close-dialog p { margin: 0; color: var(--text-secondary); }
 .editor-file-list { display: flex; flex-direction: column; gap: 4px; overflow-wrap: anywhere; font: var(--fs-caption)/1.5 var(--font-mono); color: var(--text-muted); }
 .editor-close-dialog footer { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.editor-start-actions { display: flex; align-items: center; gap: 8px; }
+.editor-pane .folder-actions > .folder-action-secondary { align-items: center; }
+@container (max-width: 880px) { .editor-pane .folder-actions .folder-action-secondary { display: none; } }

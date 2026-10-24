@@ -243,7 +243,7 @@ test('keeps Git usable in settings and saves a prompt for the remembered workspa
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await expect(page.getByRole('combobox', { name: '差异页面' })).toHaveCount(0);
   await expect(panel.getByTestId('git-staged-src/main.ts')).toBeHidden();
-  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(panel.getByTestId('git-staged-src/main.ts')).toBeVisible();
   await panel.getByRole('button', { name: '更多版本控制操作' }).click();
   await page.getByRole('button', { name: '此工作区的 AI 提交提示词…' }).click();
@@ -285,7 +285,7 @@ test('forces one comparison page despite a saved multi-page preference', async (
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await expect(page.getByRole('combobox', { name: '差异页面' })).toHaveCount(0);
   await expect(page.locator('.settings-navigation').getByRole('button', { name: '版本控制', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await page.keyboard.press('Escape');
   await panel.getByTestId('git-staged-src/main.ts').click();
   await expect(page.getByRole('tablist', { name: '已打开的文件与比较' }).getByRole('tab')).toHaveCount(2);
 });
@@ -345,7 +345,7 @@ test('reorders comparison tabs and moves secondary actions into the compact menu
   await expect(page.getByTestId('workspace-instance-bar').getByRole('combobox', { name: '差异布局' })).not.toBeVisible();
   await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
   await expect(page.getByRole('menu').getByRole('menuitemradio', { name: '单栏对比', exact: true })).toBeVisible();
-  await page.getByRole('menu').getByRole('button', { name: '刷新差异', exact: true }).click();
+  await page.getByRole('menu').getByRole('menuitem', { name: '刷新差异', exact: true }).click();
 });
 
 test('moving the selected comparison backward keeps its editor hosts attached', async ({ page }) => {
@@ -416,7 +416,7 @@ test('uses reload feedback and dismisses operation errors from the heading', asy
   await page.evaluate(() => localStorage.setItem('mock-git-operation-error', 'Network unavailable'));
   await panel.getByRole('button', { name: '更多版本控制操作' }).click();
   await page.getByRole('button', { name: '获取', exact: true }).click();
-  const error = panel.getByRole('alert');
+  const error = page.locator('#app-notifications').getByRole('alert');
   await expect(error).toBeVisible();
   await error.getByRole('button', { name: '关闭错误提示' }).click();
   await expect(error).toHaveCount(0);
@@ -454,7 +454,7 @@ test('manages branches and tags and exposes conflict recovery', async ({ page })
   await page.evaluate(() => localStorage.setItem('mock-git-ref-error', 'Conflict in file.ts'));
   const merge = await open('分支', '合并分支');
   await merge.getByRole('button', { name: '合并分支', exact: true }).click();
-  await expect(merge.getByRole('alert')).toBeVisible();
+  await expect(page.locator('#app-notifications').getByRole('alert')).toBeVisible();
   await merge.getByRole('button', { name: '取消', exact: true }).click();
   await expect(panel.getByText('合并进行中', { exact: true })).toBeVisible();
   await page.evaluate(() => localStorage.removeItem('mock-git-ref-error'));

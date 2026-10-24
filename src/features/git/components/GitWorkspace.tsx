@@ -3,7 +3,7 @@ import { t } from '@i18n';
 import { gitComparisonKey, type GitDiff, type GitSelection } from '@core/git';
 import { getGitDiff } from '@platform/api/git';
 import { useGitReview, useGitSelection } from '../index';
-import { useSessionStore, terminalsOf, useWorkspaceNavigation } from '@features/workspace';
+import { useSessionStore, terminalsOf, useWorkspaceNavigation, WorkspaceResourceSwitcher } from '@features/workspace';
 import { fileIcon } from '@features/files';
 import CodeDiff from '@ui/CodeDiff';
 import ErrorBox from '@ui/ErrorBox';
@@ -12,10 +12,12 @@ import ReloadButton from '@ui/ReloadButton';
 import Select from '@ui/Select';
 import FolderTabs from '@ui/FolderTabs';
 import WorkspaceHeader from '@ui/WorkspaceHeader';
+import ResourceContent from '@ui/ResourceContent';
 import { useCodeWorkspaceTabs } from '@features/workspace/hooks/useCodeWorkspaceTabs';
 import { openWorkspaceFile } from '@features/workspace/services/workspaceActions';
 import { IconButton } from '@ui/IconButton';
-import { Plus, iconSizes } from '@ui/icons';
+import { FolderOpen, Plus, iconSizes } from '@ui/icons';
+import { newEditorFile } from '@features/editor/services/documentActions';
 import './git.css';
 
 export default function GitWorkspace({ children }: { children: ReactNode }) {
@@ -37,6 +39,10 @@ export default function GitWorkspace({ children }: { children: ReactNode }) {
 }
 
 function GitComparison({ selection, active, tabId }: { selection: GitSelection; active: boolean; tabId: string }) {
+  return <ResourceContent id={`diff:${tabId}`} active={active}>{state => <GitComparisonContent selection={selection} tabId={tabId} active={state.visible} />}</ResourceContent>;
+}
+
+function GitComparisonContent({ selection, active, tabId }: { selection: GitSelection; active: boolean; tabId: string }) {
   const codeTabs = useCodeWorkspaceTabs();
   const revision = useGitReview(state => state.revision);
   const [diff, setDiff] = useState<GitDiff | null>(null);
@@ -84,10 +90,12 @@ function GitComparison({ selection, active, tabId }: { selection: GitSelection; 
         { label: t('Previous change'), disabled: !navigate, onClick: () => navigate?.('previous') },
         { label: t('Next change'), disabled: !navigate, onClick: () => navigate?.('next') }, { label: t('Refresh comparison'), onClick: refresh },
       ]} toolbar={<>
-        <IconButton compact aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}><Plus size={iconSizes.control} /></IconButton>
+        <WorkspaceResourceSwitcher />
         <span className="folder-action-secondary"><Select aria-label={t('Comparison layout')} value={layout} onChange={setLayout} options={[{ value: 'split', label: t('Side by side') }, { value: 'inline', label: t('Inline comparison') }]} /></span>
         <span className="git-diff-navigation folder-action-secondary">{navigation}</span>
         <span className="folder-action-secondary"><ReloadButton compact label={t('Refresh comparison')} onReload={refresh} /></span>
+        <IconButton compact className="workspace-open-action" aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}><FolderOpen size={iconSizes.control} /></IconButton>
+        <IconButton compact className="workspace-create-action" aria-label={t('New file')} data-tip={t('New file')} onClick={newEditorFile}><Plus size={iconSizes.control} /></IconButton>
       </>} /></WorkspaceHeader>
     <div className="folder-path" data-tip={selection.path}><Icon size={12} /><span>{selection.path}</span><span className="folder-path-scope">{comparison[2]}</span></div>
   </>;
