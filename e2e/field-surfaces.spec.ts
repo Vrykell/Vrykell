@@ -121,6 +121,6 @@ for (const theme of ['深色', '浅色']) {
     await expect(host).toHaveCSS('outline-style', 'none');
     await expect(host).toHaveValue('example.invalid');
     await page.screenshot({ path: test.info().outputPath('ssh-fields.png') });
-    await page.getByRole('dialog', { name: 'SSH 连接' }).getByRole('button', { name: '取消', exact: true }).click();
+    await page.getByTestId('ssh-host-editor').getByRole('button', { name: '取消', exact: true }).click();
   });
 }

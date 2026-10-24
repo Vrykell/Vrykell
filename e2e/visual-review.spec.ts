@@ -37,7 +37,7 @@ test('visual review surfaces', async ({ page }, info) => {
   await page.getByTestId('workspace-settings').click();
   await expect(page.locator('.settings-view')).toBeVisible();
   await page.screenshot({ path: info.outputPath('06-settings.png'), animations: 'disabled' });
-  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await page.keyboard.press('Escape');
 
   // 6. Usage page cards.
   await page.getByTestId('workspace-area-ai').click();

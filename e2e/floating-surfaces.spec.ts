@@ -66,13 +66,18 @@ for (const theme of ['深色', '浅色']) {
     await assertSurface(palette, true);
     await palette.getByPlaceholder('搜索命令…').press('Escape');
 
-    await page.locator('[data-tip="选择类型分裂"]').click();
+    const splitTrigger = page.locator('[data-tip="选择类型分裂"]');
+    const triggerBounds = (await splitTrigger.boundingBox())!;
+    await splitTrigger.click();
     const newTab = page.getByRole('dialog', { name: '新建标签页' });
-    await assertSurface(newTab, true);
+    await assertSurface(newTab);
+    await expect(newTab).toHaveAttribute('aria-modal', 'false');
+    const menuBounds = (await newTab.boundingBox())!;
+    expect(menuBounds.y + menuBounds.height).toBeLessThanOrEqual(triggerBounds.y);
     await newTab.press('Escape');
 
     await page.locator('[data-dock-btn="ssh"]').click();
-    await page.getByTestId('ssh-new-btn').click();
+    await page.getByTestId('ssh-host-actions').click(); await page.getByRole('button', { name: '快速连接', exact: true }).click();
     const sshForm = page.getByRole('dialog', { name: 'SSH 连接' });
     await assertSurface(sshForm, true);
     await sshForm.getByRole('button', { name: '取消', exact: true }).click();
@@ -134,7 +139,7 @@ test('portaled menus and pickers mirror the application opacity', async ({ page 
 
   // A dropdown lives on the document body, so it mirrors the window opacity itself.
   await page.locator('aside').getByRole('button', { name: '字体与显示', exact: true }).click();
-  await page.locator('.ui-select').first().click();
+  await page.locator('.ui-select:visible').first().click();
   const picker = page.locator('.ui-select-menu');
   await expect(picker).toBeVisible();
   await expect(picker).toHaveCSS('opacity', '0.6');

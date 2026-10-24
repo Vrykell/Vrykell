@@ -35,6 +35,15 @@ test('compact AI cards keep their color on disclosure, react to hover and review
   await thinking.hover(); await expect(thinking).not.toHaveCSS('background-color', resting);
   await page.mouse.move(0, 0); await expect(thinking).toHaveCSS('background-color', resting);
   const tool = page.locator('.ai-tool-card[data-tool-state="done"]');
+  await expect(tool).toHaveCSS('border-width', '0px');
+  expect(await tool.evaluate(element => {
+    const probe = document.createElement('span');
+    probe.style.background = 'var(--card-bg)';
+    element.append(probe);
+    const matches = getComputedStyle(element).backgroundColor === getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return matches;
+  })).toBe(true);
   await expect(tool.locator('.ai-tool-state')).toHaveCSS('color', 'rgb(48, 209, 88)');
   const color = await tool.evaluate(element => getComputedStyle(element).backgroundColor);
   await tool.locator('.ai-tool-summary').click(); await page.mouse.move(0, 0);

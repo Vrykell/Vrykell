@@ -3,7 +3,7 @@ import { setupTauriMock, ensureTabsOpen } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 for (const theme of ['深色', '浅色']) {
-  test(`tab icon colors persist and follow execution targets in ${theme}`, async ({ page }, testInfo) => {
+  test(`shell icons retain their identity and action menus stay compact in ${theme}`, async ({ page }, testInfo) => {
     await setupTauriMock(page);
     await page.goto('/');
     await gotoSetting(page, '主题');
@@ -12,34 +12,20 @@ for (const theme of ['深色', '浅色']) {
     const row = page.locator('[data-tab-kind="session"]').first();
     const id = (await row.getAttribute('data-tab-row-id'))!;
     await row.click();
-    const original = await row.locator('[role="tab"] svg').evaluate(element => getComputedStyle(element).color);
+    const original = await row.locator('[data-shell-mark]').getAttribute('data-shell-mark');
     await row.click({ button: 'right' });
     const menu = page.getByRole('menu', { name: '操作菜单' });
     const close = menu.getByRole('button', { name: '关闭标签', exact: true });
     const danger = await close.evaluate(element => getComputedStyle(element).color);
     expect(danger).not.toBe(await menu.getByRole('button', { name: '复制会话', exact: true }).evaluate(element => getComputedStyle(element).color));
-    await expect(menu.getByRole('group', { name: '图标颜色' })).toBeVisible();
+    await expect(menu.getByRole('group', { name: '图标颜色' })).toHaveCount(0);
     await expect(menu.getByRole('menuitem', { name: '图标颜色', exact: true })).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('tab-color-footer.png') });
-    await page.getByRole('menuitemradio', { name: '蓝色', exact: true }).click();
-    const selected = await row.locator('[role="tab"] svg').evaluate(element => getComputedStyle(element).color);
-    expect(selected).not.toBe(original);
-    await page.locator('[data-dock-btn="chat"]').click();
-    await page.getByRole('button', { name: '会话设置', exact: true }).click();
-    const environment = page.getByTestId('chat-execution-target');
-    await environment.click();
-    const target = page.getByRole('option').filter({ has: page.locator('.ui-select-swatch') }).last();
-    await expect(target.locator('.ui-select-swatch')).toHaveCSS('background-color', selected);
-    await target.click();
-    await expect(environment.locator('.ui-select-swatch')).toHaveCSS('background-color', selected);
-    await page.screenshot({ path: testInfo.outputPath('linked-tab-color.png'), animations: 'disabled' });
+    await page.keyboard.press('Escape');
     await page.reload();
     await ensureTabsOpen(page);
     const restored = page.getByTestId(`tab-row-${id}`);
-    await expect(restored.locator('[role="tab"] svg')).toHaveCSS('color', selected);
-    await restored.click({ button: 'right' });
-    await page.getByTestId('tab-icon-color-auto').click();
-    await expect(restored.locator('[role="tab"] svg')).toHaveCSS('color', original);
+    await expect(restored.locator('[data-shell-mark]')).toHaveAttribute('data-shell-mark', original!);
     await page.getByTestId('tab-history-btn').click();
     await expect(page.locator('[data-testid="unified-history-page"]:visible')).toBeVisible();
     await expect(page.locator('[data-tab-kind="history"], [data-tab-kind="ai-history"]')).toHaveCount(1);
@@ -59,7 +45,7 @@ for (const theme of ['深色', '浅色']) {
     await page.mouse.move(0, 0);
     await navigation.getByRole('button', { name: '模型行为', exact: true }).hover();
     await expect(page.getByTestId('app-tooltip')).toHaveCSS('font-family', 'Arial, sans-serif');
-    for (const name of ['模型配置', '联网搜索', 'MCP 服务器', '内存', '子代理', '本地编辑器', '远程编辑器']) {
+    for (const name of ['模型配置', '联网搜索', 'MCP 服务器', '内存', '子代理', '本地文件打开方式', '远程文件打开方式']) {
       await navigation.getByRole('button', { name, exact: true }).click();
       const wrong = await page.locator('.settings-content input:not([type="checkbox"]), .settings-content textarea').evaluateAll(elements => elements
         // A URL field is deliberately monospace; the rule is about UI text.
