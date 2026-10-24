@@ -1,31 +1,29 @@
 .folder-header { display: flex; align-items: stretch; min-width: 0; flex-shrink: 0; min-height: 34px; background: var(--surface); container-type: inline-size; }
-.folder-tab-list { display: flex; align-items: stretch; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; scroll-padding-inline: 10px; padding-right: 10px; }
+.folder-tab-list { display: flex; align-items: stretch; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; scroll-padding-inline: 8px; padding-inline: 8px; }
 .folder-tab-list::-webkit-scrollbar { display: none; }
 .folder-tab-spacer { flex: 1; }
-.folder-more { display: flex; align-items: center; flex-shrink: 0; padding: 3px 5px; }
+.folder-more { display: flex; align-items: center; flex-shrink: 0; padding: 3px 0 3px 4px; background: var(--surface); }
 .folder-more > button.folder-more-button,
-.folder-more > button.folder-more-button:is(:hover, :focus-visible, :active, [aria-expanded="true"]) { width: 28px; height: 28px; border-radius: var(--radius-inner); background: var(--xterm-bg); }
+.folder-more > button.folder-more-button:is(:hover, :focus-visible, :active, [aria-expanded="true"]) { width: 28px; height: 28px; border-radius: var(--radius-inner); background: var(--tab-menu-bg); }
 .folder-more-button > svg { transition: transform var(--dur) var(--ease); }
 .folder-more-button[aria-expanded="true"] > svg { transform: rotate(180deg); }
 @media (prefers-reduced-motion: reduce) { .folder-more-button > svg { transition: none; } }
-/* Reserve the first corner inside the scroll viewport so it remains visible. */
-.folder-more + .folder-tab-list { margin-left: -10px; padding-left: 10px; }
 .folder-tab { position: relative; display: flex; align-items: center; flex-shrink: 0; box-sizing: border-box; max-width: 280px; padding: 3px 4px; color: var(--text-muted); border-radius: var(--radius-inner) var(--radius-inner) 0 0; }
 .folder-tab[data-active="true"], .folder-tab[data-tab-surface="true"] { background: var(--xterm-bg); color: var(--text-primary); }
 .folder-tab[data-active="true"], .folder-tab[data-tab-surface="true"] { z-index: 1; }
 .folder-tab[data-group-card="true"] { background: var(--xterm-bg); z-index: 1; }
 .folder-tab[data-reorder-dragging="true"] { position: absolute; }
 /* Overlap the tab by one pixel so fractional device scales cannot expose a seam. */
-.folder-tab:is([data-active="true"], [data-group-card="true"], [data-tab-surface="true"])::before, .folder-tab:is([data-active="true"], [data-group-card="true"], [data-tab-surface="true"])::after { content: ''; position: absolute; bottom: 0; width: 11px; height: 10px; pointer-events: none; background: var(--xterm-bg); }
-.folder-tab:is([data-active="true"], [data-group-card="true"], [data-tab-surface="true"])::before { left: -10px; mask-image: radial-gradient(circle at top left, transparent 9.5px, var(--xterm-bg) 10px); -webkit-mask-image: radial-gradient(circle at top left, transparent 9.5px, var(--xterm-bg) 10px); }
-.folder-tab:is([data-active="true"], [data-group-card="true"], [data-tab-surface="true"])::after { right: -10px; mask-image: radial-gradient(circle at top right, transparent 9.5px, var(--xterm-bg) 10px); -webkit-mask-image: radial-gradient(circle at top right, transparent 9.5px, var(--xterm-bg) 10px); }
+.folder-tab:is([data-active="true"], [data-group-card="true"], [data-tab-surface="true"])::before, .folder-tab:is([data-active="true"], [data-group-card="true"], [data-tab-surface="true"])::after { content: ''; position: absolute; bottom: 0; width: 9px; height: 8px; pointer-events: none; background: var(--xterm-bg); }
+.folder-tab:is([data-active="true"], [data-group-card="true"], [data-tab-surface="true"])::before { left: -8px; mask-image: radial-gradient(circle at top left, transparent 7.5px, var(--xterm-bg) 8px); -webkit-mask-image: radial-gradient(circle at top left, transparent 7.5px, var(--xterm-bg) 8px); }
+.folder-tab:is([data-active="true"], [data-group-card="true"], [data-tab-surface="true"])::after { right: -8px; mask-image: radial-gradient(circle at top right, transparent 7.5px, var(--xterm-bg) 8px); -webkit-mask-image: radial-gradient(circle at top right, transparent 7.5px, var(--xterm-bg) 8px); }
 /* System pages sit on the canvas, so their active tab merges with the content below it. */
 .folder-tab[data-tab-surface="canvas"][data-active="true"] { background: var(--canvas); }
 .folder-tab[data-tab-surface="canvas"]::before, .folder-tab[data-tab-surface="canvas"]::after { background: var(--canvas); }
-.folder-tab[data-tab-surface="canvas"]::before { mask-image: radial-gradient(circle at top left, transparent 9.5px, var(--canvas) 10px); -webkit-mask-image: radial-gradient(circle at top left, transparent 9.5px, var(--canvas) 10px); }
-.folder-tab[data-tab-surface="canvas"]::after { mask-image: radial-gradient(circle at top right, transparent 9.5px, var(--canvas) 10px); -webkit-mask-image: radial-gradient(circle at top right, transparent 9.5px, var(--canvas) 10px); }
+.folder-tab[data-tab-surface="canvas"]::before { mask-image: radial-gradient(circle at top left, transparent 7.5px, var(--canvas) 8px); -webkit-mask-image: radial-gradient(circle at top left, transparent 7.5px, var(--canvas) 8px); }
+.folder-tab[data-tab-surface="canvas"]::after { mask-image: radial-gradient(circle at top right, transparent 7.5px, var(--canvas) 8px); -webkit-mask-image: radial-gradient(circle at top right, transparent 7.5px, var(--canvas) 8px); }
 .folder-tab-content { display: flex; align-items: center; min-width: 0; border-radius: 6px; }
-.folder-tab .inline-rename-input { flex: 1 1 120px; width: min(160px, 30vw); min-width: 72px; }
+.folder-tab .inline-rename-input { flex: 1 1 120px; width: min(160px, 30vw); min-width: 72px; min-height: 24px; height: 24px; padding: 2px 6px; font-size: var(--fs-caption); }
 .folder-tab:not([data-active="true"]):hover > .folder-tab-content { background: var(--hover); }
 .folder-tab-content > button[role="tab"] { display: flex; align-items: center; gap: 8px; min-width: 0; height: 28px; padding: 0 6px; border: 0; border-radius: 0; background: transparent; color: inherit; font: var(--fs-caption)/1.5 var(--font-ui); cursor: pointer; touch-action: none; }
 .folder-tab-content > button[role="tab"] > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -34,6 +32,8 @@
 .folder-tab-preview:not([data-active="true"]) { background: var(--surface); }
 .folder-tab-preview:not([data-active="true"]) > .folder-tab-content { background: var(--hover); }
 .folder-actions { display: flex; align-items: center; gap: 2px; padding: 0 6px; flex-shrink: 0; }
+.folder-actions button.icon-button[aria-pressed="true"] { background: transparent; color: var(--icon-color); }
+.folder-actions button.icon-button[aria-pressed="true"]:is(:hover, :focus-visible) { background: var(--control-hover-bg); color: var(--icon-hover-color); }
 .folder-tab-list .sidebar-reorder-placeholder { position: relative; margin: 0; border: 0; border-radius: 0; background: transparent; }
 .folder-path { display: flex; align-items: center; gap: 6px; height: 24px; flex-shrink: 0; min-width: 0; padding: 0 12px; background: var(--xterm-bg); color: var(--text-muted); font: var(--fs-micro)/1.5 var(--font-ui); }
 .folder-path > span:first-of-type { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

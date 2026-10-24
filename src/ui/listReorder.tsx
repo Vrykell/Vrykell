@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createPortal } from 'react-dom';
-import { useEffect, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { closeActiveMenu } from './hooks/useExclusiveMenu';
 
 export interface ListReorderDrag {
@@ -23,6 +23,9 @@ export interface ListReorderTarget {
 }
 
 interface ListReorderState {
+  pending: boolean;
+  pendingScroll: { listId: string; scrollLeft: number } | null;
+  prepare: (scroll?: { listId: string; scrollLeft: number }) => void;
   drag: ListReorderDrag | null;
   target: ListReorderTarget | null;
   position: { x: number; y: number } | null;
@@ -52,6 +55,9 @@ function horizontalPreviewLeft(x: number, origin: NonNullable<ListReorderDrag['o
  * and a small preview follows the pointer.
  */
 export const useListReorder = create<ListReorderState>((set) => ({
+  pending: false,
+  pendingScroll: null,
+  prepare: scroll => set({ pending: true, pendingScroll: scroll ?? null }),
   drag: null,
   target: null,
   position: null,
@@ -60,7 +66,7 @@ export const useListReorder = create<ListReorderState>((set) => ({
   movePointer: (x, y) => set({ position: { x, y } }),
   hover: (target) => set((state) => (sameTarget(state.target, target) ? state : { target })),
   setDwell: (zoneId) => set((state) => (state.dwellZoneId === zoneId ? state : { dwellZoneId: zoneId })),
-  end: () => set({ drag: null, target: null, position: null, dwellZoneId: null }),
+  end: () => set({ pending: false, pendingScroll: null, drag: null, target: null, position: null, dwellZoneId: null }),
 }));
 
 /** Keep the destination stable while the pointer is over its placeholder. */
@@ -141,6 +147,7 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
     const sourceList = event.currentTarget.closest<HTMLElement>('[data-reorder-list]');
     const listBounds = sourceList?.getBoundingClientRect() ?? bounds;
     const scrollLeft = sourceList?.scrollLeft ?? 0;
+    useListReorder.getState().prepare({ listId, scrollLeft });
     // Captured now: React clears `currentTarget` once the pointerdown handler returns.
     const sourceZone = container ? undefined : event.currentTarget.closest<HTMLElement>('[data-reorder-zone]')?.dataset.reorderZone;
     const dimensions: Pick<ListReorderDrag, 'height' | 'width' | 'origin'> = bounds.height > 0 ? { height: bounds.height, ...(axis === 'horizontal' ? {
@@ -217,7 +224,7 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
       const list = findHorizontalList();
       if (axis === 'horizontal' && grouped && list && dimensions.origin && listBounds.width > 0) {
         const previewLeft = horizontalPreviewLeft(x, dimensions.origin);
-        const leading = previewLeft - listBounds.left + list.scrollLeft;
+        const leading = x - dimensions.origin.offsetX - listBounds.left + list.scrollLeft;
         const centerX = previewLeft + (dimensions.width ?? 0) / 2;
         // The empty tail of a grouped list keeps its own zone: dropping there leaves the group.
         const centerZone = document.elementFromPoint(centerX, y)?.closest<HTMLElement>('[data-reorder-zone]');
@@ -288,8 +295,7 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
         const bounds = list.getBoundingClientRect();
         if (dimensions.origin && sourceIndex >= 0 && listBounds.width > 0) {
           // Compare the moving edges against stable slots, independent of the pointer's grab offset and the rendered gap.
-          const previewLeft = horizontalPreviewLeft(x, dimensions.origin);
-          const left = previewLeft - bounds.left + list.scrollLeft;
+          const left = x - dimensions.origin.offsetX - bounds.left + list.scrollLeft;
           const right = left + slotWidth;
           while (insertionIndex > 0) {
             const previous = horizontalSlots[insertionIndex - 1]!;
@@ -318,9 +324,8 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
     const scrollVelocity = (list: HTMLElement) => {
       if (!dimensions.origin || !direction) return 0;
       const bounds = list.getBoundingClientRect();
-      const left = pointer.x - dimensions.origin.offsetX;
-      const distance = direction > 0 ? bounds.right - left - (dimensions.width ?? 0) : left - bounds.left;
-      return direction * 720 * Math.max(0, Math.min(1, (28 - distance) / 28));
+      const distance = direction > 0 ? bounds.right - pointer.x : pointer.x - bounds.left;
+      return direction * 720 * Math.max(0, Math.min(1, (24 - distance) / 24));
     };
     const scheduleScrolling = () => {
       const list = findHorizontalList();
@@ -378,7 +383,7 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
       window.removeEventListener('keydown', key, true);
       window.removeEventListener('blur', cancel);
       if (source.hasPointerCapture?.(pointerId)) source.releasePointerCapture(pointerId);
-      if (started) useListReorder.getState().end();
+      useListReorder.getState().end();
       // Pointerup produces a click synchronously; keep that click from activating the row.
       clickTimer = setTimeout(removeClick, 0);
       cleanupRef.current = () => {
@@ -439,11 +444,12 @@ export function ListReorderPreview({ listId, variant = 'icon', className = '', c
 }) {
   const drag = useListReorder(state => state.drag?.listId === listId ? state.drag : null);
   const position = useListReorder(state => state.position);
+  const content = useMemo(() => drag ? children(drag) : null, [drag, children]);
   if (!drag || !position) return null;
   const style = variant === 'item' && drag.origin ? {
-    left: horizontalPreviewLeft(position.x, drag.origin),
-    top: drag.origin.top, width: drag.width, height: drag.height,
-  } : { left: position.x, top: position.y };
+    left: 0, top: 0, transform: `translate3d(${horizontalPreviewLeft(position.x, drag.origin)}px, ${drag.origin.top}px, 0)`,
+    width: drag.width, height: drag.height,
+  } : { left: 0, top: 0, transform: `translate3d(${position.x}px, ${position.y}px, 0) translate(-50%, -50%)` };
   return createPortal(<div className={`${variant === 'item' ? 'list-reorder-item-preview' : 'sidebar-reorder-preview'}${className ? ` ${className}` : ''}`}
-    data-reorder-preview={variant} aria-hidden="true" inert style={style}>{children(drag)}</div>, document.body);
+    data-reorder-preview={variant} aria-hidden="true" inert style={style}>{content}</div>, document.body);
 }

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ResizeHandle from '../ResizeHandle';
 
@@ -18,7 +18,7 @@ describe('ResizeHandle', () => {
     expect(line.style.backgroundColor).toBe('var(--resize-divider)');
   });
 
-  it('keeps the active line during a drag and releases listeners on mouseup', () => {
+  it('keeps the active line during a drag and releases listeners on mouseup', async () => {
     const onDelta = vi.fn();
     const onUp = vi.fn();
     const { getByTestId } = render(<ResizeHandle axis="x" testId="handle" onDelta={onDelta} onUp={onUp} />);
@@ -27,6 +27,7 @@ describe('ResizeHandle', () => {
     fireEvent.mouseDown(handle, { clientX: 200, clientY: 50 });
     fireEvent.mouseLeave(handle);
     fireEvent.mouseMove(document, { clientX: 240, clientY: 70 });
+    await act(async () => { await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); });
     expect(line.style.backgroundColor).toBe('var(--border-strong)');
     expect(onDelta).toHaveBeenCalledWith(40);
     fireEvent.mouseUp(document);
@@ -49,5 +50,27 @@ describe('ResizeHandle', () => {
     fireEvent.keyDown(handle, { key: 'Home' });
     fireEvent.doubleClick(handle);
     expect(onReset).toHaveBeenCalledTimes(2);
+  });
+
+  it('coalesces pointer updates per frame and flushes the last delta before committing', () => {
+    const frames: FrameRequestCallback[] = [];
+    const request = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { frames.push(callback); return frames.length; });
+    const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
+    const onDelta = vi.fn();
+    const onUp = vi.fn(() => expect(onDelta).toHaveBeenLastCalledWith(7));
+    const { getByTestId } = render(<ResizeHandle axis="x" testId="handle" onDelta={onDelta} onUp={onUp} />);
+    fireEvent.mouseDown(getByTestId('handle'), { clientX: 200 });
+    fireEvent.mouseMove(document, { clientX: 210 });
+    fireEvent.mouseMove(document, { clientX: 230 });
+    expect(onDelta).not.toHaveBeenCalled();
+    expect(request).toHaveBeenCalledOnce();
+    act(() => frames[0](0));
+    expect(onDelta.mock.calls).toEqual([[30]]);
+    fireEvent.mouseMove(document, { clientX: 237 });
+    fireEvent.mouseUp(document);
+    expect(onDelta.mock.calls).toEqual([[30], [7]]);
+    expect(onUp).toHaveBeenCalledOnce();
+    expect(cancel).toHaveBeenCalledWith(2);
+    request.mockRestore(); cancel.mockRestore();
   });
 });

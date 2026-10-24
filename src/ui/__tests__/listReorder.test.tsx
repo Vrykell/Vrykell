@@ -156,7 +156,7 @@ function horizontalScrollHarness(direction: 'left' | 'right') {
     }
   });
   const source = rows[direction === 'left' ? 2 : 0]!;
-  const grab = direction === 'left' ? 70 : 10; const destination = direction === 'left' ? 20 : 90;
+  const grab = direction === 'left' ? 70 : 10; const destination = direction === 'left' ? 4 : 176;
   fireEvent.pointerDown(source, { pointerId: 1, button: 0, isPrimary: true, clientX: grab, clientY: 10 });
   fireEvent.pointerMove(window, { pointerId: 1, clientX: destination, clientY: 10 });
   return { ...view, onDrop, list, frames, advance, destination };
@@ -310,7 +310,7 @@ describe('list reorder', () => {
     const stopped = list.scrollLeft;
     advance(3);
     expect(list.scrollLeft).toBe(stopped); expect(frames.size).toBe(0);
-    fireEvent.pointerMove(window, { pointerId: 1, clientX: 90, clientY: 10 });
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 176, clientY: 10 });
     advance(3); expect(list.scrollLeft).toBeGreaterThan(stopped);
     fireEvent.pointerMove(window, { pointerId: 1, clientX: 10, clientY: 10 });
     advance(30); expect(list.scrollLeft).toBe(0); expect(frames.size).toBe(0);
@@ -387,6 +387,18 @@ describe('list reorder', () => {
 
     expect(screen.getByTestId('preview-demo').textContent).toBe('a');
     expect(screen.queryByTestId('preview-other')).toBeNull();
+  });
+
+  it('moves the preview on the compositor without rerendering its content for each pointer update', () => {
+    const content = vi.fn((drag: ListReorderDrag) => <span>{drag.id}</span>);
+    render(<ListReorderPreview listId="demo">{content}</ListReorderPreview>);
+    act(() => useListReorder.getState().start({ listId: 'demo', id: 'a', kind: 'demo' }, { x: 10, y: 20 }));
+    const preview = document.querySelector<HTMLElement>('[data-reorder-preview]')!;
+    for (let index = 0; index < 20; index += 1) act(() => useListReorder.getState().movePointer(index + 10, index + 20));
+    expect(content).toHaveBeenCalledOnce();
+    expect(preview.style.transform).toBe('translate3d(29px, 39px, 0) translate(-50%, -50%)');
+    act(() => useListReorder.getState().end());
+    expect(document.querySelector('[data-reorder-preview]')).toBeNull();
   });
 
   it('ignores pointer downs on opt-out nodes', () => {

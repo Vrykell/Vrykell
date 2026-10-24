@@ -80,7 +80,7 @@ export function FolderTabContent({ item, selected, onSelect, onClose, editing = 
   onStartRename?: () => void; onCommitRename?: () => void; onCancelRename?: () => void;
 }) {
   return <div className="folder-tab-content">
-    {editing ? <TextInput data-no-drag autoFocus aria-label={t('Tab title')} className="inline-rename-input" value={editTitle}
+    {editing ? <TextInput variant="field" data-no-drag autoFocus aria-label={t('Tab title')} className="inline-rename-input" value={editTitle}
       onChange={event => setEditTitle?.(event.target.value)} onFocus={event => event.currentTarget.select()}
       onClick={event => event.stopPropagation()} onBlur={onCommitRename} onKeyDown={event => {
         event.stopPropagation();

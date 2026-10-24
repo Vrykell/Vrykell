@@ -30,6 +30,7 @@ export default function SidebarItem({
   icon,
   tree,
   title,
+  titleAccessory,
   subtitle,
   titleFontFamily,
   subtitleFontFamily = 'var(--font-mono)',
@@ -58,6 +59,7 @@ export default function SidebarItem({
   icon?: ReactNode;
   tree?: { depth: number; expanded?: boolean; onToggle?: () => void };
   title: string;
+  titleAccessory?: ReactNode;
   titleFontFamily?: CSSProperties['fontFamily'];
   subtitle?: string;
   subtitleFontFamily?: CSSProperties['fontFamily'];
@@ -98,7 +100,7 @@ export default function SidebarItem({
   const command = variant === 'command';
   const resource = variant === 'resource';
   const dragging = useListReorder((state) => !!reorderItemId && state.drag?.id === reorderItemId && (!reorderListId || state.drag.listId === reorderListId));
-  const background = active ? 'var(--selection-bg)' : hovered ? 'var(--hover)' : 'transparent';
+  const background = active ? 'var(--selection-bg)' : 'var(--sidebar-row-hover, transparent)';
   const actionVisible = hovered || focused || (variant !== 'history' && !resource && active);
 
   return (
@@ -156,13 +158,13 @@ export default function SidebarItem({
         {icon && <span className="sidebar-row-icon" style={{ ...sidebarRowIcon, ...(tree ? { width: 20 } : {}), ...(historyCompact ? { width: 20, height: 'calc(22px * var(--ui-font-scale))' } : {}),
           ...(command ? { width: 14, height: 14 } : {}) }}>{icon}</span>}
         {renameInput ?? (
-          <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: resource ? 'row' : 'column', alignItems: resource ? 'center' : undefined, gap: resource ? 6 : 1 }}>
+          <span className="sidebar-row-text" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: resource ? 'row' : 'column', alignItems: resource ? 'center' : undefined, gap: resource ? 6 : 1 }}>
             <span className="sidebar-row-title" data-tip={variant === 'history' ? title : undefined}
               data-tip-description={historyCompact ? subtitle : undefined}
               style={{ ...sidebarRowTitle,
                 fontFamily: titleFontFamily ?? (command ? 'var(--font-mono)' : undefined),
                 ...(historyCompact ? { display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: 2, whiteSpace: 'normal', overflowWrap: 'anywhere', fontSize: 'var(--fs-body)', lineHeight: 'calc(22px * var(--ui-font-scale))' } : {}),
-                fontWeight: active && !command ? 'var(--fw-semibold)' : 'var(--fw-regular)' }}>{title}</span>
+                fontWeight: active && !command ? 'var(--fw-semibold)' : 'var(--fw-regular)' }}>{title}{titleAccessory}</span>
             {subtitle && (
               <span className="sidebar-row-subtitle" id={subtitleId}
                 data-tip={variant === 'history' ? subtitle : undefined} style={{

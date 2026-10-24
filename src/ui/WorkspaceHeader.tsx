@@ -1,4 +1,4 @@
-import { createContext, useContext, useLayoutEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 const HeaderTarget = createContext<{ target: HTMLElement | null; setTarget: (element: HTMLDivElement | null) => void } | undefined>(undefined);
@@ -6,12 +6,19 @@ const HeaderTarget = createContext<{ target: HTMLElement | null; setTarget: (ele
 /** Feature headers keep their existing actions while occupying one shared instance strip. */
 export function WorkspaceHeaderProvider({ children }: { children: ReactNode }) {
   const [target, setTarget] = useState<HTMLElement | null>(null);
-  return <HeaderTarget.Provider value={{ target, setTarget }}>{children}</HeaderTarget.Provider>;
+  const value = useMemo(() => ({ target, setTarget }), [target]);
+  return <HeaderTarget.Provider value={value}>{children}</HeaderTarget.Provider>;
 }
 
-export function WorkspaceHeaderSlot() {
+export function WorkspaceHeaderSlot({ visible = true }: { visible?: boolean }) {
   const context = useContext(HeaderTarget);
-  return <div className="workspace-instance-bar" data-testid="workspace-instance-bar" ref={context?.setTarget} />;
+  return <div className="workspace-instance-bar" data-testid="workspace-instance-bar" style={{ display: visible ? undefined : 'none' }} ref={context?.setTarget} />;
+}
+
+export function WorkspaceHeaderScope({ enabled, target, children }: { enabled: boolean; target: HTMLElement | null; children: ReactNode }) {
+  const parent = useContext(HeaderTarget);
+  const value = useMemo(() => enabled ? { target, setTarget: () => {} } : parent, [enabled, parent, target]);
+  return <HeaderTarget.Provider value={value}>{children}</HeaderTarget.Provider>;
 }
 
 export default function WorkspaceHeader({ active = true, children }: { active?: boolean; children: ReactNode }) {

@@ -97,7 +97,7 @@ it('opens document actions before the first tab without changing the selection',
   expect(trigger).toHaveAttribute('aria-expanded', 'false');
   expect(screen.queryByRole('menu')).toBeNull();
   fireEvent.click(trigger);
-  fireEvent.click(screen.getByRole('button', { name: 'Reload document' }));
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Reload document' }));
   expect(action).toHaveBeenCalledOnce();
   expect(onSelect).not.toHaveBeenCalled();
   expect(screen.getAllByRole('tab')[0]).toHaveAttribute('aria-selected', 'true');

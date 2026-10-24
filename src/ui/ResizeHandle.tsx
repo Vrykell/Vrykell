@@ -85,19 +85,34 @@ export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, test
         document.body.style.cursor = cursor;
         document.body.style.userSelect = 'none';
 
+        let pending = 0;
+        let frame: number | undefined;
+        const flush = () => {
+          frame = undefined;
+          const delta = pending;
+          pending = 0;
+          if (delta !== 0) onDeltaRef.current(delta);
+        };
+
         const onMove = (ev: MouseEvent) => {
           const s = startRef.current;
           if (!s) return;
           const d = isX ? ev.clientX - s.clientX : ev.clientY - s.clientY;
           s.clientX = ev.clientX;
           s.clientY = ev.clientY;
-          if (d !== 0) onDeltaRef.current(d);
+          pending += d;
+          if (pending !== 0 && frame === undefined) frame = requestAnimationFrame(flush);
         };
         const onUp = () => {
+          if (frame !== undefined) cancelAnimationFrame(frame);
+          flush();
           cleanupRef.current();
           onUpRef.current?.();
         };
         cleanupRef.current = () => {
+          if (frame !== undefined) cancelAnimationFrame(frame);
+          frame = undefined;
+          pending = 0;
           startRef.current = null;
           document.body.style.cursor = '';
           document.body.style.userSelect = '';
