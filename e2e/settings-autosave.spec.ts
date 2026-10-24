@@ -43,14 +43,14 @@ test('switching pages flushes pending text and scopes local and remote editors s
   await page.getByPlaceholder(/持久知识/).fill('切换页面前的内容');
   await page.locator('aside').getByRole('button', { name: '模型配置', exact: true }).click();
   await expect.poll(() => memoryFact(page)).toBe('切换页面前的内容');
-  await page.locator('aside').getByRole('button', { name: '本地编辑器', exact: true }).click();
+  await page.locator('aside').getByRole('button', { name: '本地文件打开方式', exact: true }).click();
   await page.getByTestId('editor-local-command').fill('code');
-  await page.locator('aside').getByRole('button', { name: '远程编辑器', exact: true }).click();
+  await page.locator('aside').getByRole('button', { name: '远程文件打开方式', exact: true }).click();
   await expect(page.getByTestId('editor-remote-command')).toHaveValue('vim');
   await page.getByTestId('editor-remote-command').fill('nvim');
-  await page.locator('aside').getByRole('button', { name: '本地编辑器', exact: true }).click();
+  await page.locator('aside').getByRole('button', { name: '本地文件打开方式', exact: true }).click();
   await expect(page.getByTestId('editor-local-command')).toHaveValue('code');
-  await page.locator('aside').getByRole('button', { name: '远程编辑器', exact: true }).click();
+  await page.locator('aside').getByRole('button', { name: '远程文件打开方式', exact: true }).click();
   await expect(page.getByTestId('editor-remote-command')).toHaveValue('nvim');
 });
 

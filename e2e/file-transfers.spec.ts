@@ -100,7 +100,7 @@ test('persists undo opt-outs and confirms deletion without claiming it can be un
   await page.getByRole('button', { name: '文件操作', exact: true }).click();
   await expect(page.getByRole('switch', { name: '本地文件撤销' })).toHaveAttribute('aria-checked', 'false');
   await expect(page.getByRole('switch', { name: '远程文件撤销' })).toHaveAttribute('aria-checked', 'false');
-  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await page.keyboard.press('Escape');
   await page.locator('[data-dock-btn="files"]').click();
   const row = page.getByTestId('local-file-tree').locator('[data-path="/home/e2e/notes.txt"]');
   await row.click({ button: 'right' });
@@ -160,7 +160,7 @@ for (const theme of ['dark', 'light'] as const) {
       await expect(active.getByRole('definition').nth(1)).toHaveText(direction === 'upload' ? '/srv/project/backups/release/production-backup.tar.gz' : '/local/project/backups/release/production-backup.tar.gz');
       await expect(active.getByText('1.0 MB/s')).toBeVisible();
       await expect(active.getByText('约剩余 5 秒')).toBeVisible();
-      await expect(manager.getByRole('alert')).toContainText('Permission denied');
+      await expect(page.locator('#app-notifications').getByRole('alert')).toContainText('Permission denied');
       for (const width of [420, 200]) {
         const handle = (await page.getByTestId('resize-handle-files').boundingBox())!;
         const before = (await manager.boundingBox())!;

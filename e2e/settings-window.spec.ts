@@ -29,18 +29,12 @@ test('settings cover the content card and toggle back to the unchanged workspace
     expect(await rail.evaluate(element => element.getBoundingClientRect().width)).toBe(sidebarWidth);
     await verifyButtonCenters();
     expect(await settings.boundingBox()).toEqual({ x: sidebarWidth, y: 42, width: width - sidebarWidth, height: 758 });
-    const close = settings.getByRole('button', { name: '关闭设置', exact: true });
-    await expect(close).toBeVisible();
-    await expect(close).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-    await close.hover();
-    await expect(close).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-    await close.focus();
-    await expect(close).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(settings.locator('.settings-close')).toHaveCount(0);
     await expect(settings.locator('.settings-navigation')).toBeVisible();
     await expect(settings.locator('.settings-navigation-toggle')).toHaveCount(0);
     await page.screenshot({ path: info.outputPath(`settings-${width}.png`) });
   }
-  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(settings).toHaveCount(0);
   await expect(input).toHaveValue('keep this command draft');
   await page.setViewportSize({ width: 1240, height: 800 });
@@ -51,7 +45,7 @@ test('settings cover the content card and toggle back to the unchanged workspace
     const style = getComputedStyle(element);
     return ['--canvas', '--sidebar-bg', '--xterm-bg', '--surface', '--field-bg', '--primary-action'].map(name => style.getPropertyValue(name).trim().toUpperCase());
   });
-  expect(sampledColors).toEqual(['#202020', '#28282B', '#141414', '#282828', '#333333', '#2C67C5']);
+  expect(sampledColors).toEqual(['#202020', '#28282B', '#141414', '#282828', '#3C3C3C', '#2C67C5']);
   const chrome = await page.locator('.application-chrome').evaluate(element => {
     const style = getComputedStyle(element);
     return {
@@ -67,7 +61,7 @@ test('settings cover the content card and toggle back to the unchanged workspace
   expect((await rail.boundingBox())!.width).toBe(railBefore!.width);
   await page.keyboard.press('Control+,');
   await expect(settings).toBeVisible();
-  await settings.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(input).toBeVisible();
   await page.keyboard.press('Control+,');
   await page.keyboard.press('Escape');
@@ -80,7 +74,7 @@ test('language and appearance choices apply immediately and persist', async ({ p
   await gotoSetting(page, '语言');
   await page.getByRole('combobox', { name: '界面语言', exact: true }).click();
   await page.getByRole('option', { name: 'English', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Close settings', exact: true })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Settings', exact: true })).toBeVisible();
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await page.locator('.settings-navigation').getByRole('button', { name: 'Theme', exact: true }).click();
   const modes = page.getByRole('radiogroup', { name: 'Theme mode', exact: true });

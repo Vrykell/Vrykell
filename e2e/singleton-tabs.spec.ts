@@ -11,7 +11,7 @@ test('settings stay outside the tab list while history opens one singleton tab p
   await expect(page.locator('[data-tab-kind="settings"]')).toHaveCount(0);
   await page.keyboard.press('Meta+,');
   await expect(page.locator('.settings-screen')).toBeVisible();
-  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(page.locator('[data-tab-row-id]')).toHaveCount(before);
   // The terminal history entry opens one singleton tab in the terminal strip.
   await page.getByTestId('tab-history-btn').click();
@@ -29,7 +29,7 @@ test('settings stay outside the tab list while history opens one singleton tab p
   await expect(page.locator('[data-tab-kind="history"]')).toHaveCount(1);
 });
 
-test('local and SSH tabs retain colored tiles before and after activation', async ({ page }) => {
+test('local and remote tabs retain profile identities before and after activation', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
@@ -40,13 +40,13 @@ test('local and SSH tabs retain colored tiles before and after activation', asyn
     useWorkspaceStore.getState().addTab({ shellType: 'bash', title: 'Local test' });
     useWorkspaceStore.getState().addTab({ kind: 'ssh', title: 'Remote test', ssh: { name: 'Remote test', host: 'example.invalid' } });
   });
-  for (const [label, mark] of [['Local test', 'bash'], ['Remote test', 'ssh']]) {
+  for (const [label, mark] of [['Local test', 'bash'], ['Remote test', 'linux']]) {
     const row = page.locator('[data-tab-row-id]').filter({ hasText: label });
     const icon = row.locator('svg').first();
     await expect(icon).toHaveAttribute('data-shell-mark', mark);
-    await expect(icon).toHaveCSS('width', '16px');
-    await expect(icon).toHaveCSS('height', '16px');
-    await expect(icon).toHaveAttribute('style', new RegExp(`color: var\\(--shell-${mark}-accent\\)`));
+    await expect(icon).toHaveCSS('width', '18px');
+    await expect(icon).toHaveCSS('height', '18px');
+    if (mark === 'bash') await expect(icon).toHaveAttribute('style', /color: var\(--group-green\)/);
     const color = await icon.evaluate(element => getComputedStyle(element).color);
     await row.click();
     await expect(icon).toHaveCSS('color', color);

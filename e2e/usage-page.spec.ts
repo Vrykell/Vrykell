@@ -67,17 +67,13 @@ test.describe('usage statistics page', () => {
     const laneWidth = Number(await page.getByTestId('usage-trend-hover').getAttribute('width'));
     expect(laneWidth).toBeLessThan(80);
 
-    // 来源选择条：默认「全部」，点本机来源后数据不变；本机来源 chip 用应用图标且真实加载
-    await expect(page.getByTestId('usage-source-all')).toHaveAttribute('aria-pressed', 'true');
-    const appIcon = page.getByTestId('usage-source-vrykell').locator('img');
-    await expect(appIcon).toHaveAttribute('src', '/app-icon.svg');
-    // 资源真实可达：图片加载完成后 naturalWidth 才会大于 0
-    await expect.poll(() => appIcon.evaluate((img: HTMLImageElement) => img.naturalWidth)).toBeGreaterThan(0);
-    await page.getByTestId('usage-source-vrykell').click();
-    await expect(page.getByTestId('usage-source-vrykell')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('usage-model-all')).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTestId('usage-filter-model')).toHaveCount(0);
+    await page.getByTestId('usage-model-gpt-4o-mini').click();
+    await expect(page.getByTestId('usage-model-gpt-4o-mini')).toHaveAttribute('aria-pressed', 'true');
     await expect(page.getByTestId('usage-total-requests')).toHaveText('1');
-    await page.getByTestId('usage-source-all').click();
-    await expect(page.getByTestId('usage-source-all')).toHaveAttribute('aria-pressed', 'true');
+    await page.getByTestId('usage-model-all').click();
+    await expect(page.getByTestId('usage-model-all')).toHaveAttribute('aria-pressed', 'true');
 
     // 刷新按钮：重读存储并给出刷新时间
     await expect(page.getByTestId('usage-refreshed-at')).toHaveCount(0);
@@ -96,9 +92,9 @@ test.describe('usage statistics page', () => {
     await page.getByTestId('usage-metric-requests').click();
     await expect(page.getByTestId('usage-metric-requests')).toHaveAttribute('aria-selected', 'true');
     await page.getByTestId('usage-tab-providers').click();
-    await expect(page.getByTestId('usage-provider-row')).toHaveAttribute('data-provider', 'openai-compatible');
+    await expect(page.locator('[data-testid="usage-provider-row"][data-provider="openai-compatible"]')).toBeVisible();
     await page.getByTestId('usage-tab-models').click();
-    await expect(page.getByTestId('usage-model-row')).toHaveAttribute('data-model', 'gpt-4o-mini');
+    await expect(page.locator('[data-testid="usage-model-row"][data-model="gpt-4o-mini"]')).toBeVisible();
     await page.getByTestId('usage-tab-logs').click();
     await expect(page.getByTestId('usage-log-row')).toHaveCount(1);
 
@@ -106,9 +102,17 @@ test.describe('usage statistics page', () => {
     await page.getByTestId('usage-range').click();
     await page.getByRole('option', { name: '全部时间' }).click();
     await expect(page.getByTestId('usage-total-requests')).toHaveText('1');
-    await page.getByTestId('usage-filter-model').click();
-    await page.getByRole('option', { name: 'gpt-4o-mini' }).click();
+    await page.getByTestId('usage-model-gpt-4o-mini').click();
     await expect(page.getByTestId('usage-total-tokens')).toHaveText('15');
+
+    await page.reload();
+    await page.evaluate(async () => {
+      const path = '/src/features/workspace/stores/workspace.ts';
+      const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+      useWorkspaceStore.getState().openUsageTab();
+    });
+    await expect(page.getByTestId('usage-total-tokens')).toHaveText('15');
+    await expect(page.getByTestId('usage-total-requests')).toHaveText('1');
 
     // Clearing returns the page to its empty state.
     await page.getByTestId('usage-clear').click();
@@ -116,7 +120,7 @@ test.describe('usage statistics page', () => {
     await expect(page.getByRole('status')).toContainText('已清空用量数据');
   });
 
-  test('shows only the ACP numbers when a server is the selected source', async ({ page }) => {
+  test('keeps session totals in the ACP details tab without a source selector', async ({ page }) => {
     await setupTauriMock(page, { schedulesSeed: [] });
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
@@ -136,24 +140,20 @@ test.describe('usage statistics page', () => {
     await emitAcpSession(page, { sessionId: session, kind: 'stop', payload: { stopReason: 'end_turn' } });
 
     await openUsagePage(page);
-    await page.getByTestId('usage-source-Fake ACP').click();
+    await expect(page.locator('[data-testid^="usage-source-"]')).toHaveCount(0);
+    await page.getByTestId('usage-tab-acp').click();
+    await expect(page.getByTestId('usage-acp-row')).toContainText('1.2万/20万');
+    await expect(page.getByTestId('usage-acp-row')).toContainText('0.0042 USD');
+    await expect(page.getByTestId('usage-metrics')).toBeVisible();
+    await expect(page.getByTestId('usage-range')).toBeVisible();
 
-    // 只显示协议带回来的数字：轮数、工具调用、上下文占用、累计费用
-    await expect(page.getByTestId('usage-acp-turns')).toHaveText('1');
-    await expect(page.getByTestId('usage-acp-tool-calls')).toHaveText('1');
-    await expect(page.getByTestId('usage-acp-context')).toHaveText('1.2万/20万');
-    await expect(page.getByTestId('usage-acp-cost')).toHaveText('0.0042');
-    await expect(page.getByTestId('usage-acp-updated')).toContainText('最近更新');
-    // token 卡片、趋势图、token 表格与只作用于 token 记录的筛选器都不出现
-    await expect(page.getByTestId('usage-metrics')).toHaveCount(0);
-    await expect(page.getByTestId('usage-trend-chart')).toHaveCount(0);
-    await expect(page.getByTestId('usage-tab-logs')).toHaveCount(0);
-    await expect(page.getByTestId('usage-filter-provider')).toHaveCount(0);
-    await expect(page.getByTestId('usage-range')).toHaveCount(0);
-    await expect(page.getByTestId('usage-record-count')).toHaveCount(0);
-
-    // 回到全部来源：token 视图回来，ACP 在记录卡片里占一个页签（不再是独立卡片）
-    await page.getByTestId('usage-source-all').click();
+    await page.reload();
+    await page.evaluate(async () => {
+      const path = '/src/features/workspace/stores/workspace.ts';
+      const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+      useWorkspaceStore.getState().openUsageTab();
+    });
+    await page.getByTestId('usage-model-all').click();
     await expect(page.getByTestId('usage-metrics')).toBeVisible();
     await expect(page.getByTestId('usage-acp-row')).toHaveCount(0);
     await page.getByTestId('usage-tab-acp').click();

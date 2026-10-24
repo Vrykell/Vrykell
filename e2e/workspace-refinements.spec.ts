@@ -30,12 +30,11 @@ test('prefix cards replace the scope picker and persist on recent searches', asy
 test('default terminal applies to new tabs and survives reload', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
-  await gotoSetting(page, '打开方式');
-  await page.getByRole('combobox', { name: '默认终端', exact: true }).click();
-  await page.getByRole('option', { name: 'Bash', exact: true }).click();
+  await gotoSetting(page, 'Bash');
+  await page.getByRole('switch', { name: '默认配置文件', exact: true }).click();
   await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vrykell-terminal-defaults') ?? '{}').state?.shell)).toBe('bash');
   await page.screenshot({ path: test.info().outputPath('default-terminal.png') });
-  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await page.keyboard.press('Escape');
   await page.keyboard.press('Meta+t');
   await expect.poll(() => page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
@@ -44,7 +43,7 @@ test('default terminal applies to new tabs and survives reload', async ({ page }
     const tab = state.tabs.find(tab => tab.id === state.activeId);
     return tab?.kind === 'session' && tab.layout.type === 'leaf' ? tab.layout.terminal.shellType : '';
   })).toBe('bash');
-  await expect(page.locator('[data-tab-row-id] [data-shell-mark="bash"]').first()).toHaveCSS('width', '16px');
+  await expect(page.locator('[data-tab-row-id] [data-shell-mark="bash"]').first()).toHaveCSS('width', '18px');
   await page.reload();
   await page.keyboard.press('Meta+t');
   await expect(page.getByPlaceholder(/输入命令/).last()).toBeVisible();
@@ -80,6 +79,7 @@ test('deleted SSH profiles recover without a connecting trap and classic history
     const session = { id: 'deleted-profile-history', title: 'Deleted SSH profile', status: 'historical', created_at: Date.now(), closed_at: Date.now(), block_count: 9, cwd: '', group_id: null, sort_order: 1, kind: 'session', payload: JSON.stringify({ layout: { type: 'leaf', terminal: { id: 'deleted-pane', kind: 'ssh', openMode: 'classic', ssh: { connectionId: 'gone', name: 'Saved SSH', host: 'saved.example.com', user: 'dev' } } } }) };
     target.__TAURI_INTERNALS__.invoke = async (cmd, args) => {
       if (cmd === 'list_sessions') return [...await original(cmd, args) as unknown[], session];
+      if (cmd === 'history_page') { const result = await original(cmd, args) as { sessions: unknown[] }; return { ...result, sessions: [...result.sessions, session] }; }
       if (cmd === 'get_session' && args.id === session.id) return session;
       return original(cmd, args);
     };

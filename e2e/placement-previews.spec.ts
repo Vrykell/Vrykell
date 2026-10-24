@@ -17,7 +17,7 @@ for (const theme of ['dark', 'light'] as const) for (const material of [true, fa
   if (!material) {
     await gotoSetting(page, '主题');
     await page.getByRole('switch', { name: '桌面材质', exact: true }).click();
-    await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+    await page.keyboard.press('Escape');
   }
   const button = (await page.locator('[data-dock-btn="files"]').boundingBox())!;
   const body = (await page.locator('.workspace-body').boundingBox())!;

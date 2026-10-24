@@ -513,18 +513,20 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
         metadata.currentWindow.label = windowLabel; metadata.currentWebview.label = windowLabel;
         switch (cmd) {
           case 'editor_read_file': {
-            const target = args.target as { path: string; connectionId?: string };
+            const target = args.target as { path: string; connectionId?: string; encoding?: string };
             const key = JSON.stringify([target.connectionId || '', target.path]);
             const files = JSON.parse(localStorage.getItem('mock-editor-files') || '{}') as Record<string, string>;
+            const missing = JSON.parse(localStorage.getItem('mock-editor-missing') || '[]') as string[];
+            if (missing.includes(target.path) && !(key in files)) throw new Error('File not found');
             const text = files[key] ?? 'export const value = "working";\n';
-            return { kind: target.path.endsWith('.png') ? 'binary' : target.path.endsWith('.large') ? 'tooLarge' : 'text', text, revision: `mock:${text}` };
+            return { kind: target.path.endsWith('.png') ? 'binary' : target.path.endsWith('.large') ? 'tooLarge' : 'text', text, revision: `mock:${text}`, encoding: target.encoding || 'utf8' };
           }
           case 'editor_save_file': {
             const target = args.target as { path: string; connectionId?: string };
             const key = JSON.stringify([target.connectionId || '', target.path]);
             const files = JSON.parse(localStorage.getItem('mock-editor-files') || '{}') as Record<string, string>;
             const before = files[key] ?? 'export const value = "working";\n';
-            if (localStorage.getItem('mock-editor-save-error') || args.expected !== `mock:${before}`) throw new Error('The file changed on disk. Reload it before saving; your unsaved text is kept.');
+            if (localStorage.getItem('mock-editor-save-error') || (args.expected === 'new' ? key in files : args.expected !== `mock:${before}`)) throw new Error('The file changed on disk. Reload it before saving; your unsaved text is kept.');
             files[key] = String(args.text); localStorage.setItem('mock-editor-files', JSON.stringify(files)); return `mock:${String(args.text)}`;
           }
           case 'git_snapshot': {
@@ -965,6 +967,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return [{ name: '导入技能', description: '从目录导入', source: 'local', trusted: false, enabled: false, hasScripts: false, modified: false, files: ['SKILL.md'], dir: args.path, prompt: '导入的正文' }];
           case 'find_skill_reference':
             return null;
+          case 'shell_complete': return [];
           case 'market_github_list':
             return [
               { name: 'github-skill-1', dir: 'skills/github-skill-1', description: 'GitHub 操作技能' },
@@ -1142,6 +1145,43 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'ssh_connections_list':
             // Real IPC serializes results; hand out copies so the UI never shares state with the mock.
             return sshConnections.map((c) => ({ ...c }));
+          case 'ssh_forwards_status':
+            return JSON.parse(localStorage.getItem('e2e-running-forwards') ?? '[]');
+          case 'ssh_forward_start': {
+            const statuses = JSON.parse(localStorage.getItem('e2e-running-forwards') ?? '[]') as { id: string; running: boolean; error: null }[];
+            const id = `${args.connectionId}/${args.ruleId}`;
+            if (!statuses.some(status => status.id === id)) statuses.push({ id, running: true, error: null });
+            localStorage.setItem('e2e-running-forwards', JSON.stringify(statuses));
+            return undefined;
+          }
+          case 'ssh_forward_stop': {
+            const statuses = JSON.parse(localStorage.getItem('e2e-running-forwards') ?? '[]') as { id: string }[];
+            localStorage.setItem('e2e-running-forwards', JSON.stringify(statuses.filter(status => status.id !== `${args.connectionId}/${args.ruleId}`)));
+            return undefined;
+          }
+          case 'ssh_proxy_configuration': {
+            const config = JSON.parse(localStorage.getItem('e2e-ssh-proxies') ?? '{"profiles":[],"defaultId":null}');
+            return config;
+          }
+          case 'ssh_proxy_save': {
+            const config = JSON.parse(localStorage.getItem('e2e-ssh-proxies') ?? '{"profiles":[],"defaultId":null}') as { profiles: Record<string, unknown>[] };
+            const index = config.profiles.findIndex(profile => profile.id === args.profile.id);
+            const profile = { ...args.profile, password: undefined, hasPassword: !!args.profile.password || config.profiles[index]?.hasPassword === true };
+            if (index >= 0) config.profiles[index] = profile; else config.profiles.push(profile);
+            localStorage.setItem('e2e-ssh-proxies', JSON.stringify(config));
+            return undefined;
+          }
+          case 'ssh_proxy_delete': {
+            const config = JSON.parse(localStorage.getItem('e2e-ssh-proxies') ?? '{"profiles":[],"defaultId":null}') as { profiles: Record<string, unknown>[]; defaultId: string | null };
+            config.profiles = config.profiles.filter(profile => profile.id !== args.id);
+            if (config.defaultId === args.id) config.defaultId = null;
+            localStorage.setItem('e2e-ssh-proxies', JSON.stringify(config));
+            return undefined;
+          }
+          case 'ssh_proxy_set_default': {
+            const config = JSON.parse(localStorage.getItem('e2e-ssh-proxies') ?? '{"profiles":[],"defaultId":null}');
+            config.defaultId = args.id; localStorage.setItem('e2e-ssh-proxies', JSON.stringify(config)); return undefined;
+          }
           case 'ssh_config_candidates':
             return [
               { name: 'web', host: '10.0.0.5', user: 'deploy', port: 2222, identityFile: '/keys/web', localForwards: ['8080:localhost:80'], remoteForwards: [], dynamicForwards: [] },
@@ -1191,6 +1231,9 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'ssh_system_status': {
             const globals = window as unknown as Record<string, unknown>;
             globals.__SSH_STATUS_CALLS__ = Number(globals.__SSH_STATUS_CALLS__ ?? 0) + 1;
+            const fixture = (globals.__SSH_STATUS_BY_HOST__ as Record<string, { error?: string; status?: unknown }> | undefined)?.[String(args.id)];
+            if (fixture?.error) throw new Error(fixture.error);
+            if (fixture?.status) return fixture.status;
             if (globals.__SSH_STATUS_ERROR__) throw new Error(String(globals.__SSH_STATUS_ERROR__));
             return { system: 'Linux 6.8', hostname: 'production-api', latencyMs: 42, uptimeSeconds: 1047600,
               load: '0.12 0.08 0.05', cpuTotal: Number(globals.__SSH_STATUS_CALLS__) * 1000,
@@ -1335,6 +1378,23 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           }
           case 'list_sessions':
             return mockSessions;
+          case 'history_page': {
+            const request = args.request as { limit: number; source: string; sort: string; cursor: { value: string; key: string } | null };
+            const descending = request.sort.endsWith('desc');
+            const entry = (source: string, row: Record<string, unknown>) => ({ source, row, key: `${source === 'terminal' ? 'session' : 'conversation'}:${row.id}`,
+              value: request.sort.startsWith('title') ? String(row.title).toLowerCase() : Number(request.sort.startsWith('created') ? row.created_at : source === 'terminal' ? row.closed_at ?? row.created_at : row.updated_at) });
+            const entries = [...mockSessions.filter(row => row.status === 'historical').map(row => entry('terminal', row)), ...mockConversations.map(row => entry('conversation', row))]
+              .filter(item => request.source === 'all' || request.source === item.source)
+              .sort((first, second) => { const order = first.value < second.value ? -1 : first.value > second.value ? 1 : 0; return order ? order * (descending ? -1 : 1) : first.key.localeCompare(second.key); })
+              .filter(item => {
+                if (!request.cursor) return true;
+                const cursor = request.sort.startsWith('title') ? request.cursor.value : Number(request.cursor.value);
+                return (descending ? item.value < cursor : item.value > cursor) || item.value === cursor && item.key > request.cursor.key;
+              });
+            const page = entries.slice(0, request.limit); const last = page[page.length - 1];
+            return { sessions: page.filter(item => item.source === 'terminal').map(item => item.row), conversations: page.filter(item => item.source === 'conversation').map(item => item.row),
+              nextCursor: entries.length > request.limit && last ? { value: String(last.value), key: last.key } : null };
+          }
           case 'diagnostics_auto_save':
             return false;
           case 'diagnostics_set_auto_save':

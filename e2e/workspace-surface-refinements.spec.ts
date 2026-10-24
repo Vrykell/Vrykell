@@ -5,7 +5,7 @@ import { gotoSetting } from './settings';
 for (const theme of ['深色', '浅色']) test(`acrylic is confined to navigation and region edges stay square in ${theme}`, async ({ page }, info) => {
   await setupTauriMock(page); await page.goto('/');
   await gotoSetting(page, '主题'); await page.getByRole('radio', { name: theme, exact: true }).click();
-  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await page.keyboard.press('Escape');
   await page.locator('[data-dock-btn="files"]').click();
   const sidebar = page.getByTestId('workspace-sidebar');
   const materialColor = await sidebar.evaluate(element => getComputedStyle(element).backgroundColor);
@@ -20,7 +20,7 @@ for (const theme of ['深色', '浅色']) test(`acrylic is confined to navigatio
   await page.screenshot({ path: info.outputPath(`refined-workspace-${theme}.png`), animations: 'disabled' });
   await gotoSetting(page, '主题');
   await page.getByRole('switch', { name: '桌面材质', exact: true }).click();
-  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await page.keyboard.press('Escape');
   expect(await sidebar.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe(materialColor);
 });
 

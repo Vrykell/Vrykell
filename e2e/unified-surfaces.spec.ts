@@ -14,7 +14,7 @@ for (const theme of ['dark', 'light']) test(`workspace chrome and cards share th
   const titlebar = page.locator('.workspace-titlebar');
   const colors = await page.evaluate(() => {
     const style = getComputedStyle(document.documentElement);
-    return { chrome: style.getPropertyValue('--chrome-bg'), auxiliary: style.getPropertyValue('--auxiliary-bg'), canvas: style.getPropertyValue('--canvas'), card: style.getPropertyValue('--chrome-field'), composer: style.getPropertyValue('--composer-bg') };
+    return { chrome: style.getPropertyValue('--chrome-bg'), auxiliary: style.getPropertyValue('--auxiliary-bg'), canvas: style.getPropertyValue('--canvas'), card: style.getPropertyValue('--card-bg'), composer: style.getPropertyValue('--composer-bg') };
   });
   const chrome = asRgb(colors.chrome);
   const auxiliary = asRgb(colors.auxiliary);
@@ -60,7 +60,7 @@ for (const theme of ['dark', 'light']) test(`workspace chrome and cards share th
   expect(await rgb(page, settingsCard)).toBe(card);
   expect(await settingsCard.evaluate(element => getComputedStyle(element).boxShadow)).toBe('none');
   expect(await settingsCard.evaluate(element => getComputedStyle(element).borderRadius)).toBe('8px');
-  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await page.keyboard.press('Escape');
 
   await page.getByTestId('workspace-history').click();
   const historyHeader = page.locator('.history-header');

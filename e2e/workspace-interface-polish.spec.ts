@@ -5,7 +5,7 @@ import { gotoSetting } from './settings';
 for (const theme of ['深色', '浅色']) test(`workspace colors and model controls remain consistent in ${theme}`, async ({ page }, info) => {
   await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
   await gotoSetting(page, '主题'); await page.getByRole('radio', { name: theme, exact: true }).click();
-  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await page.keyboard.press('Escape');
   const selected = page.getByTestId('workspace-area-terminal').locator('.sidebar-row-icon svg');
   const color = await selected.evaluate(element => getComputedStyle(element).color);
   const expectedIconColor = await page.evaluate(() => {
@@ -76,7 +76,7 @@ for (const platform of ['macos', 'linux']) test.describe(`${platform} settings a
       return getSettings().filter(setting => setting.page === 'context-menu').length;
     });
     expect(settings).toBe(0);
-    await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+    await page.keyboard.press('Escape');
     await expect(page.getByTestId('workspace-sidebar')).toBeVisible();
     await page.screenshot({ path: info.outputPath(`${platform}-material.png`), animations: 'disabled' });
   });

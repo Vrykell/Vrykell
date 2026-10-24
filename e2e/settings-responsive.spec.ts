@@ -10,10 +10,11 @@ for (const theme of ['深色', '浅色']) {
     await page.getByRole('radio', { name: theme, exact: true }).click();
     const nav = page.locator('.settings-navigation');
     await nav.getByRole('button', { name: '模型配置', exact: true }).click();
+    await expect(page.getByTestId('model-list-toolbar')).toHaveCSS('background-color', theme === '深色' ? 'rgb(60, 60, 60)' : 'rgb(255, 255, 255)');
     for (const width of [1240, 900, 720, 480]) {
       await page.setViewportSize({ width, height: 800 });
       await expect(nav).toBeVisible();
-      await expect(page.getByRole('button', { name: '关闭设置', exact: true })).toBeVisible();
+      await expect(page.locator('.settings-close')).toHaveCount(0);
       await expect(page.locator('.settings-navigation-toggle, .settings-navigation-backdrop')).toHaveCount(0);
       const settings = (await page.locator('.settings-screen').boundingBox())!;
       const sidebarWidth = width <= 900 ? 0 : 208;
@@ -40,7 +41,7 @@ test('settings cover the auxiliary panel and preserve the workspace layout', asy
     await expect(panel).toBeHidden(); await expect(panel).toHaveAttribute('inert', '');
   }
   expect((await page.locator('.settings-screen').boundingBox())!.width).toBe(1032);
-  await page.getByRole('button', { name: '关闭设置', exact: true }).click();
+  await page.keyboard.press('Escape');
   expect(await page.locator('.workspace-main').boundingBox()).toEqual(before);
   await expect(input).toHaveValue('preserved draft');
 });

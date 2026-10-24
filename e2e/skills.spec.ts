@@ -44,14 +44,14 @@ test.describe('技能设置页', () => {
 
   test('详情面板：文件树 + SKILL.md + 返回', async ({ page }) => {
     await page.getByText('写单测').click();
-    await expect(page.getByRole('button', { name: '← 返回' })).toBeVisible();
+    await expect(page.getByRole('button', { name: '返回', exact: true })).toBeVisible();
     await expect(page.getByText('已信任', { exact: true }).last()).toBeVisible();
     // SKILL.md 正文
     await expect(page.getByText('先看代码，再写 vitest 单测。')).toBeVisible();
     // 打开文件夹按钮
     await expect(page.getByRole('button', { name: '打开文件夹' })).toBeVisible();
     // 返回列表
-    await page.getByRole('button', { name: '← 返回' }).click();
+    await page.getByRole('button', { name: '返回', exact: true }).click();
     await expect(page.getByText('还没有技能')).toHaveCount(0);
   });
 
@@ -75,7 +75,7 @@ test.describe('技能设置页', () => {
     await page.getByRole('button', { name: /技能市场/ }).click();
     await expect(page.getByText('技能市场', { exact: true }).last()).toBeVisible();
     // 选预置仓库并浏览
-    await page.getByRole('combobox', { name: '技能市场仓库' }).click();
+    await page.getByRole('combobox', { name: '技能仓库' }).click();
     await page.getByRole('option', { name: 'anthropics/skills', exact: true }).click();
     await page.getByRole('button', { name: '浏览' }).click();
     await expect(page.getByText('github-skill-1')).toBeVisible({ timeout: 5000 });

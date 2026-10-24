@@ -70,7 +70,7 @@ test.describe('新建标签类型快捷配置', () => {
     await page.getByTestId('new-tab-option-shell:bash').click({ button: 'right' });
     await page.getByRole('menuitemradio', { name: '设为默认终端' }).click();
 
-    await expect(page.getByTestId('new-tab-option-shell:bash').getByText('默认终端')).toBeVisible();
+    await expect(page.getByTestId('new-tab-option-shell:bash').locator('[aria-label="默认终端"]')).toBeVisible();
     const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('vrykell-terminal-defaults') ?? '{}'));
     expect(stored.state.shell).toBe('bash');
   });
@@ -98,12 +98,12 @@ test.describe('新建标签类型快捷配置', () => {
     // 编辑连接打开 SSH 表单，关闭后回到选择器
     await row.click({ button: 'right' });
     await page.getByText('编辑连接').click();
-    const form = page.getByRole('dialog', { name: 'SSH 连接' });
+    const form = page.getByTestId('ssh-host-editor');
     await expect(form).toBeVisible();
-    await expect(form.getByText('编辑 SSH 连接')).toBeVisible();
-    await page.keyboard.press('Escape');
+    await expect(form.getByTestId('ssh-form-name')).toHaveValue('生产服务器');
+    await form.getByRole('button', { name: '取消', exact: true }).click();
     await expect(form).toHaveCount(0);
-    await expect(page.getByRole('dialog', { name: '新建标签页' })).toBeVisible();
+    await expect(page.getByTestId('ssh-workspace')).toBeVisible();
   });
 
   test('右击 SSH 连接删除需二次确认', async ({ page }) => {
