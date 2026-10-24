@@ -2,10 +2,12 @@ import { t } from '@i18n';
 import SidebarItem from '@ui/sidebarItem';
 import { iconSizes } from '@ui/icons';
 import type { useSettingsNavigation } from '../hooks/useSettingsNavigation';
+import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';
 
 /** The content-card settings directory stays visible at every supported window size. */
 export default function SettingsNavigation({ navigation }: { navigation: ReturnType<typeof useSettingsNavigation> }) {
-  return <aside id="settings-navigation" aria-label={t('Settings navigation')} className="settings-navigation">
+  const input = useListNavigationMode(true);
+  return <aside {...input.props} id="settings-navigation" aria-label={t('Settings navigation')} className="settings-navigation">
     <div className="settings-navigation-title">{t('Settings')}</div>
     <div className="settings-navigation-list scroll-region">
       {navigation.groups.map(group => <div key={group.id} className="settings-nav-group">

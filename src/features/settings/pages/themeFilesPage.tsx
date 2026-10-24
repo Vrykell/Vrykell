@@ -65,12 +65,12 @@ export function ThemeFilesPage() {
         <div style={{ display: 'flex', gap: 8 }}>
           <OutlineButton onClick={() => void doExport()} >
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <Download size={iconSizes.control} /> {t('Export theme')}
+              <Upload size={iconSizes.control} /> {t('Export theme')}
             </span>
           </OutlineButton>
           <OutlineButton onClick={() => void doImport()} >
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              <Upload size={iconSizes.control} /> {t('Import theme')}
+              <Download size={iconSizes.control} /> {t('Import theme')}
             </span>
           </OutlineButton>
         </div>

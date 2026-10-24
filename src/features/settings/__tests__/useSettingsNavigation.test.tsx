@@ -21,13 +21,14 @@ it('opens the globally indexed page before mounting and updates an existing sett
 
 it('keeps all pages available and clears field targets when choosing a page', () => {
   const { result } = renderHook(() => useSettingsNavigation());
-  expect(result.current.groups.flatMap(group => group.items)).toHaveLength(isWindows ? 24 : 23);
+  expect(result.current.groups.flatMap(group => group.items)).toHaveLength(isWindows ? 29 : 28);
   act(() => useSettingsNavigationStore.getState().openField('ai-perms', 'Permissions'));
-  act(() => result.current.setSelected('terminal-open'));
-  expect(result.current.selected).toBe('terminal-open');
-  expect(result.current.activeLabel).toBe('打开方式');
+  act(() => result.current.setSelected('profile:powershell'));
+  expect(result.current.selected).toBe('profile:powershell');
+  expect(result.current.activeLabel).toBe('Windows PowerShell');
   expect(useSettingsNavigationStore.getState().targetField).toBeNull();
-  expect(result.current.groups).toHaveLength(6);
+  expect(result.current.groups).toHaveLength(7);
+  expect(result.current.groups.flatMap(group => group.items).some(item => item.label === '终端默认行为')).toBe(false);
 });
 it('splits the appearance theme page into theme, blocks, typography and files', () => {
   const { result } = renderHook(() => useSettingsNavigation());

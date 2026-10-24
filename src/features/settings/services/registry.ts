@@ -1,4 +1,5 @@
 import { useTerminalDefaults } from '@config/terminalDefaults';
+import { useShellProfiles } from '@config/shellProfiles';
 import { useCommandHistorySettings } from '@config/commandHistory';
 import { useEditorPreferences } from '@config/editor';
 import { t, localizeLabel, useLanguagePreferences } from '@i18n';
@@ -47,10 +48,15 @@ registerField('local-file-undo', 'file-operations', 'Local file undo', 'File ope
 registerField('application-language', 'application-language', 'Application language', 'Choose the interface language. Changes apply immediately.', () => useLanguagePreferences.getState().preference);
 registerField('remote-file-undo', 'file-operations', 'Remote file undo', 'File operations');
 registerField('preferred-file-editor', 'editor-local', 'Preferred file editor', 'Opening files', () => useEditorPreferences.getState().localOpenMode);
+registerField('editor-vim-mode', 'editor-preferences', 'Vim mode', 'Use modal keybindings in the built-in editor. This applies to local and remote files.', () => String(useEditorPreferences.getState().vimMode));
+registerField('editor-line-numbers', 'editor-preferences', 'Show line numbers', 'Show line numbers in the built-in editor.', () => String(useEditorPreferences.getState().lineNumbers));
+registerField('editor-word-wrap', 'editor-preferences', 'Word wrap', 'Editor preferences', () => String(useEditorPreferences.getState().wordWrap));
 registerField("startup", "startup", "Restore history at startup", "Applies next launch. Restored sessions reconnect without restarting their commands.", () => useStartupSettings.getState().mode);
 registerField('history-run-target', 'command-history', 'Command execution target', 'Choose where commands run from the history panel.', () => useCommandHistorySettings.getState().runIn);
 registerField('history-double-click', 'command-history', 'Double-click command', 'Double-click inserts the command by default. Execution follows the selected target.', () => useCommandHistorySettings.getState().doubleClick);
 registerField('command-highlighting', 'appearance-typography', 'Command syntax highlighting', 'Color commands, arguments and shell operators.', () => String(useTypographyStore.getState().commandHighlighting));
+registerField('terminal-cursor-blink', 'appearance-typography', 'Terminal cursor blinking', 'Blink the classic terminal cursor. Turn off to keep it steady while typing.', () => String(useTypographyStore.getState().terminalCursorBlink));
+registerField('composition-cursor-blink', 'appearance-typography', 'Composition cursor blinking', 'Blink the simulated cursor while composing text with an input method.', () => String(useTypographyStore.getState().compositionCursorBlink));
 registerField("logs", "logs", "Save diagnostic logs automatically", "Diagnostic logging and errors");
 registerField('context-menu', 'context-menu', 'Windows context menu', 'Open in Vrykell', undefined, 'Open in Vrykell');
 registerField("export-logs", "logs", "Export logs", "Diagnostic archive");
@@ -90,19 +96,23 @@ registerField('chat-font', 'appearance-typography', 'AI chat font size', 'Adjust
 registerField('terminal-font-family', 'appearance-typography', 'Terminal font family', 'Use a font installed on your system; unavailable families use the fallback fonts.', () => useTypographyStore.getState().terminalFontPreset);
 registerField('terminal-font-weight', 'appearance-typography', 'Terminal font weight', 'Variable fonts support fine weight adjustments; static fonts use the nearest installed weight.', () => String(useTypographyStore.getState().terminalFontWeight));
 registerField('terminal-line-spacing', 'appearance-typography', 'Terminal line spacing', 'Adjust line spacing for terminal input, live output and command history.', () => String(useTypographyStore.getState().terminalLineHeight));
+registerField('editor-font-family', 'editor-preferences', 'Editor font family', 'Editor typography', () => useTypographyStore.getState().editorFontPreset);
+registerField('editor-font-size', 'editor-preferences', 'Editor font size', 'Editor typography', () => String(useTypographyStore.getState().editorFontSize));
+registerField('editor-font-weight', 'editor-preferences', 'Editor font weight', 'Editor typography', () => String(useTypographyStore.getState().editorFontWeight));
+registerField('editor-line-spacing', 'editor-preferences', 'Editor line spacing', 'Adjust the editor independently of terminal and chat typography.', () => String(useTypographyStore.getState().editorLineHeight));
 registerField("terminal-renderer", "appearance-typography", "settings.font.rendererTitle", "settings.font.rendererTitle", () => String(useTypographyStore.getState().terminalRenderer));
 
 function globalValue(key: keyof AgentSettings): string {
   const value = useAgentSettings.getState().global[key];
   return typeof value === 'boolean' ? t(value ? 'Enabled' : 'Disabled') : String(value ?? '');
 }
-registerField('default-terminal', 'terminal-open', 'Default terminal', 'Used for new tabs, startup and opening files in a terminal.', () => useTerminalDefaults.getState().shell);
 for (const shell of SHELL_TYPES) {
-  registerField(`open-mode-${shell}`, 'terminal-open', t('Open mode for {{shell}}', { shell: shellTypeLabel(shell) }), 'settings.openMode.description',
-    () => useAgentSettings.getState().global.openModeByShell[shell], 'settings.openMode.title', t('settings.openMode.aria', { shell: shellTypeLabel(shell) }));
+  registerField(`default-profile-${shell}`, `profile:${shell}`, 'Default profile', shellTypeLabel(shell), () => String(useTerminalDefaults.getState().shell === shell));
+  registerField(`profile-name-${shell}`, `profile:${shell}`, 'Profile name', shellTypeLabel(shell), () => useShellProfiles.getState().profiles[shell]?.name ?? '');
+  registerField(`profile-directory-${shell}`, `profile:${shell}`, 'Starting directory', shellTypeLabel(shell), () => useShellProfiles.getState().profiles[shell]?.cwd ?? '');
+  registerField(`open-mode-${shell}`, `profile:${shell}`, t('Open mode for {{shell}}', { shell: shellTypeLabel(shell) }), 'settings.openMode.description',
+    () => useAgentSettings.getState().global.openModeByShell[shell], 'Opening mode', 'Opening mode');
 }
-registerField('open-mode-ssh', 'terminal-open', 'SSH open mode', 'settings.openMode.description',
-  () => useAgentSettings.getState().global.sshOpenMode, 'settings.openMode.title', () => t('settings.openMode.sshAria'));
 
 const permissionLabels: Record<ToolName, string> = {
   "run_command": "Run terminal command",

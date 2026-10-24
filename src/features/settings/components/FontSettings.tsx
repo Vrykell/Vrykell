@@ -11,7 +11,7 @@ const weights = Array.from({ length: 17 }, (_, index) => ({ value: 100 + index *
 const lineHeights = Array.from({ length: 7 }, (_, index) => ({ value: Number((1 + index / 10).toFixed(1)), label: `${(1 + index / 10).toFixed(1)}×` }));
 
 export default function FontSettings() {
-  const { uiFontSize, terminalFontSize, chatFontSize, terminalRenderer, terminalFontPreset, terminalFontWeight, terminalLineHeight, commandHighlighting, update, reset } = useTypographyStore();
+  const { uiFontSize, terminalFontSize, chatFontSize, terminalRenderer, terminalFontPreset, terminalFontWeight, terminalLineHeight, commandHighlighting, terminalCursorBlink, compositionCursorBlink, update, reset } = useTypographyStore();
   const { save } = useSettingsSave();
   const rendererOptions = [
     { value: 'webgl' as const, label: t('settings.font.rendererWebgl') },
@@ -54,6 +54,14 @@ export default function FontSettings() {
       <Field title={t('Command syntax highlighting')} description={t('Color commands, arguments and shell operators.')}>
         <Toggle label={t('Command syntax highlighting')} on={commandHighlighting}
           onChange={commandHighlighting => { void save(() => update({ commandHighlighting })); }} />
+      </Field>
+    </SettingsGroup>
+    <SettingsGroup title={t('Cursor')}>
+      <Field title={t('Terminal cursor blinking')} description={t('Blink the classic terminal cursor. Turn off to keep it steady while typing.')}>
+        <Toggle label={t('Terminal cursor blinking')} on={terminalCursorBlink} onChange={terminalCursorBlink => { void save(() => update({ terminalCursorBlink })); }} />
+      </Field>
+      <Field title={t('Composition cursor blinking')} description={t('Blink the simulated cursor while composing text with an input method.')}>
+        <Toggle label={t('Composition cursor blinking')} on={compositionCursorBlink} onChange={compositionCursorBlink => { void save(() => update({ compositionCursorBlink })); }} />
       </Field>
     </SettingsGroup>
     <SettingsGroup title={t('Preview')}>

@@ -52,3 +52,10 @@ it('routes the split appearance settings to their owning pages', () => {
     expect(useSettingsNavigationStore.getState().selected, id).toBe(page);
   }
 });
+
+it('routes opening-mode settings to their owning shell profile', () => {
+  vi.spyOn(useSessionStore.getState(), 'openSettings').mockImplementation(() => {});
+  act(() => getSettings().find(setting => setting.id === 'open-mode-bash')!.onSelect());
+  expect(useSettingsNavigationStore.getState().selected).toBe('profile:bash');
+  expect(useSettingsNavigationStore.getState().targetField).toBe('打开方式');
+});

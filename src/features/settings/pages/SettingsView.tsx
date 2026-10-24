@@ -17,7 +17,6 @@ import { SettingsGroup, Field, TemplateListEditor } from '@features/settings/com
 import { AiModelPage } from '@features/settings/pages/aiModelPage';
 import { AiBehaviorPage } from '@features/settings/pages/aiBehaviorPage';
 import { McpPage } from '@features/settings/pages/mcpPage';
-import { TerminalOpenPage } from '@features/settings/pages/terminalOpenPage';
 import { CommandHistoryPage } from './commandHistoryPage';
 import { ThemePage } from '@features/settings/pages/themePage';
 import { BlockAppearancePage } from '@features/settings/pages/blockAppearancePage';
@@ -33,7 +32,11 @@ import { StartupPage } from './startupPage';
 import { LogsPage } from './logsPage';
 import { ContextMenuPage } from './contextMenuPage';
 import EditorOpeningPreferences from '../components/EditorOpeningPreferences';
+import EditorPreferences from '../components/EditorPreferences';
 import { LanguagePage } from './languagePage';
+import ShellProfilePage from './shellProfilePage';
+import { SHELL_TYPES, type ShellType } from '@platform/shells';
+import { TerminalProfileIcon } from '@ui/shellIcons';
 
 /** Permission tool labels use the shared translation catalog. */
 const PERM_TOOL_LABEL: Record<ToolName, string> = {
@@ -68,6 +71,7 @@ function SettingsContent() {
   const { save, status, retry } = useSettingsSave();
   const navigation = useSettingsNavigation();
   const { selected, activeLabel } = navigation;
+  const profileShell = selected.startsWith('profile:') ? selected.slice(8) as ShellType : undefined;
 
   // File opening preferences are stored locally.
   const [fileCfg, setFileCfg] = useState<FileOpenConfig>(() => loadConfig());
@@ -93,6 +97,10 @@ function SettingsContent() {
   }, []);
 
   const renderPage = (): ReactNode => {
+    if (selected.startsWith('profile:')) {
+      const shell = selected.slice(8) as ShellType;
+      if (SHELL_TYPES.includes(shell)) return <ShellProfilePage key={shell} shell={shell} />;
+    }
     switch (selected) {
       case 'application-language': return <LanguagePage />;
       case 'file-operations': return <FileOperationsPage />;
@@ -232,11 +240,10 @@ function SettingsContent() {
       case 'ai-harness':
         return <HarnessPage />;
 
-      case 'terminal-open':
-        return <TerminalOpenPage />;
       case 'command-history':
         return <CommandHistoryPage />;
 
+      case 'editor-preferences': return <EditorPreferences />;
       case 'editor-local':
         return (
           <SettingsGroup title={t('Opening files')}>
@@ -317,6 +324,7 @@ function SettingsContent() {
         <section className="settings-content">
           <header className="settings-page-header">
             <div className="settings-page-heading">
+              {profileShell && SHELL_TYPES.includes(profileShell) && <TerminalProfileIcon kind="local" shellType={profileShell} size={28} />}
               <h1>{activeLabel}</h1>
             </div>
             <div className="settings-save-hint">

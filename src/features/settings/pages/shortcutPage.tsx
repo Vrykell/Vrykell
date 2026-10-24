@@ -2,6 +2,7 @@ import { SettingsGroup } from '@features/settings/components/ui';
 import KeyHint from '@ui/KeyHint';
 import { isMacOS } from '@platform/runtime';
 import { t } from '@i18n';
+import { FILE_DIRECTORY_SHORTCUTS } from '@config/fileShortcuts';
 
 const SHORTCUTS: { keys: string[]; desc: string }[] = [
   { keys: ['Meta+T'], desc: 'New tab' },
@@ -16,6 +17,8 @@ const SHORTCUTS: { keys: string[]; desc: string }[] = [
   { keys: ['Meta+P'], desc: 'Command palette' },
   { keys: ['Meta+Shift+R'], desc: 'Redraw terminal' },
   { keys: ['Meta+,'], desc: 'Open settings' },
+  { keys: [FILE_DIRECTORY_SHORTCUTS.terminal], desc: 'Switch terminal to this directory' },
+  { keys: [FILE_DIRECTORY_SHORTCUTS.panel], desc: 'files.syncToCwd' },
   { keys: ['Escape'], desc: 'Focus command input' },
 ];
 

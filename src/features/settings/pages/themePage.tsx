@@ -3,7 +3,7 @@
  */
 import { OutlineButton } from '@ui/OutlineButton';
 import { t } from '@i18n';
-import { TextInput } from '@ui/TextInput';
+import { RangeInput } from '@ui/RangeInput';
 import type { ThemePreference } from '@config/theme/tokens';
 import { iconSizes, Image as ImageIcon, Trash2 } from '@ui/icons';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
@@ -86,14 +86,14 @@ export function ThemePage() {
 
       <Field title={t('Application opacity')} description={t('Lower opacity reveals more of the wallpaper.')}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <TextInput
-            type="range"
+          <RangeInput
+            aria-label={t('Application opacity')}
             min={0.5}
             max={1}
             step={0.05}
             value={config.opacity}
             onChange={(e) => { const opacity = Number(e.target.value); void save(() => themeUpdate({ opacity })); }}
-            style={{ flex: 1, accentColor: 'var(--accent-warm)' }}
+            style={{ flex: 1 }}
           />
           <span style={{
             fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)',

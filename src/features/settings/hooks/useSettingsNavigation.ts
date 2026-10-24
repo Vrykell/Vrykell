@@ -3,6 +3,8 @@ import type { PageId } from '../model/navigation';
 import { isSettingsPageAvailable } from '../model/navigation';
 import { t } from '@i18n';
 import { useSettingsNavigationStore } from '../stores/navigation';
+import { SHELL_TYPES, shellTypeLabel } from '@platform/shells';
+import { shellIconFor } from '@ui/shellIcons';
 export type { PageId } from '../model/navigation';
 
 export interface SettingItem {
@@ -45,13 +47,15 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
   },
   {
     id: 'terminal', label: 'Terminal',
-    items: [{ id: 'terminal-open', icon: SquareTerminal, label: 'Opening mode' }, { id: 'command-history', icon: SquareTerminal, label: 'Command history' }],
+    items: [{ id: 'command-history', icon: SquareTerminal, label: 'Command history' }],
   },
+  { id: 'profiles', label: 'Shell profiles', items: SHELL_TYPES.map(shell => ({ id: `profile:${shell}` as const, icon: shellIconFor(shell), label: shellTypeLabel(shell) })) },
   {
     id: 'editor', label: 'Editor',
     items: [
-      { id: 'editor-local', icon: FileCode, label: 'Local editor' },
-      { id: 'editor-remote', icon: FileCode, label: 'Remote editor' },
+      { id: 'editor-preferences', icon: FileCode, label: 'Editor preferences' },
+      { id: 'editor-local', icon: FileCode, label: 'Local file opening' },
+      { id: 'editor-remote', icon: FileCode, label: 'Remote file opening' },
     ],
   },
   {

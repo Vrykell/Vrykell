@@ -3,6 +3,7 @@ import { t, localizeLabel } from '@i18n';
 import { IconButton } from '@ui/IconButton';
 import { useSettingsNavigationStore } from '../stores/navigation';
 import { TextInput } from '@ui/TextInput';
+import ToggleControl from '@ui/Toggle';
 /**
  * Shared settings fields, controls and form styles.
  */
@@ -52,25 +53,7 @@ export function Field({ title, description, children, layout = 'row' }: {
 export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void | Promise<void>; label?: string }) {
   const { save } = useSettingsSave();
   return (
-    <span className="settings-toggle"><button
-      data-subtle
-      role="switch"
-      aria-checked={on}
-      aria-label={label}
-      onClick={() => { void save(() => onChange(!on)); }}
-      style={{
-        width: 38, height: 22, borderRadius: 10, border: 'none', cursor: 'pointer',
-        background: on ? 'var(--primary-button-bg)' : 'var(--hover)', position: 'relative', flexShrink: 0,
-      }}
-    >
-      <span
-        style={{
-          position: 'absolute', top: 3, left: on ? 19 : 3, width: 16, height: 16,
-          borderRadius: '50%', transition: 'left 0.16s var(--ease)',
-          background: on ? 'var(--primary-button-text)' : 'var(--text-muted)',
-        }}
-      />
-    </button><span aria-hidden="true">{t(on ? 'On' : 'Off')}</span></span>
+    <span className="settings-toggle"><ToggleControl on={on} label={label} onChange={value => { void save(() => onChange(value)); }} /><span aria-hidden="true">{t(on ? 'On' : 'Off')}</span></span>
   );
 }
 

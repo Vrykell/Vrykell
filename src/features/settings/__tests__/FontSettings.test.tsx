@@ -27,6 +27,19 @@ describe('theme font settings', () => {
     expect(useTypographyStore.getState().terminalRenderer).toBe('webgl');
   });
 
+  it('keeps terminal and composition cursor blinking independently configurable', async () => {
+    render(<FontSettings />);
+    const terminal = screen.getByRole('switch', { name: '终端光标闪烁' });
+    const composition = screen.getByRole('switch', { name: '输入法光标闪烁' });
+    expect(terminal).toHaveAttribute('aria-checked', 'false');
+    expect(composition).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(terminal);
+    await waitFor(() => expect(useTypographyStore.getState().terminalCursorBlink).toBe(true));
+    expect(useTypographyStore.getState().compositionCursorBlink).toBe(false);
+    fireEvent.click(composition);
+    await waitFor(() => expect(useTypographyStore.getState().compositionCursorBlink).toBe(true));
+  });
+
   it('toggles command syntax highlighting without the font reset clearing it', async () => {
     render(<FontSettings />);
     const toggle = screen.getByRole('switch', { name: '命令语法高亮' });

@@ -23,6 +23,7 @@ import { invoke } from '@platform/diagnostics';
 import { useSessionStore, useUiStore } from '@features/workspace';
 import { acpHandshake, acpHarnessSave, acpHarnesses, type AgentDescription } from '@platform/api/acp';
 import { HARNESS_PRESETS, harnessProblems, upsertPreset, type HarnessEntry } from '@config/harnessPresets';
+import { useUsageSources } from '@features/agent';
 
 export default function HarnessPage() {
   const [list, setList] = useState<HarnessEntry[] | null>(null);
@@ -42,9 +43,10 @@ export default function HarnessPage() {
   const reload = useCallback(() => {
     setLoadError('');
     void acpHarnesses()
-      .then((entries) => setList(entries.map((entry) => ({
-        name: entry.name, command: entry.command, args: entry.args, env: entry.env, cwd: entry.cwd, enabled: entry.enabled,
-      }))))
+      .then(entries => {
+        useUsageSources.getState().replace(entries.map(entry => entry.name));
+        setList(entries.map(entry => ({ ...entry })));
+      })
       .catch((error: unknown) => setLoadError(String(error)));
   }, []);
   useEffect(() => { reload(); }, [reload]);
@@ -75,6 +77,7 @@ export default function HarnessPage() {
     try {
       await saveSettings(async () => {
         await acpHarnessSave(next);
+        useUsageSources.getState().replace(next.map(entry => entry.name));
         setList(next);
         saved = true;
       });
@@ -173,19 +176,19 @@ export default function HarnessPage() {
                   color: harness.enabled ? 'var(--primary-button-text)' : 'var(--text-muted)',
                   font: `${'var(--fs-caption)'} var(--font-ui)`,
                 }}>{t('Connect')}</button>
-              <IconButton compact data-testid={`harness-test-${index}`}
+              <IconButton data-testid={`harness-test-${index}`}
                 aria-label={t('Test connection')} data-tip={t('Test connection')} onClick={() => void test(harness.name)}>
-                <RefreshCw size={14} />
+                <RefreshCw size={16} />
               </IconButton>
-              <IconButton compact data-testid={`harness-edit-${index}`}
+              <IconButton data-testid={`harness-edit-${index}`}
                 disabled={busy}
                 aria-label={t('Edit server')} data-tip={t('Edit server')} onClick={() => setEditing({ index })}>
-                <Settings size={14} />
+                <Settings size={16} />
               </IconButton>
-              <IconButton compact tone="danger" data-testid={`harness-remove-${index}`}
+              <IconButton tone="danger" data-testid={`harness-remove-${index}`}
                 disabled={busy}
                 aria-label={t('Remove')} data-tip={t('Remove')} onClick={() => setConfirmRemove(index)}>
-                <Minus size={14} />
+                <Minus size={16} />
               </IconButton>
             </div>
             {probeErrors[harness.name] && <ErrorBox title={t('Connection failed')} details={probeErrors[harness.name]}
@@ -200,7 +203,7 @@ export default function HarnessPage() {
           </OutlineButton>
           <span style={{ flex: 1 }} />
           <OutlineButton data-testid="harness-save" disabled={busy || list === null} onClick={() => list && void persist(list)}>{t('Save the list')}</OutlineButton>
-          <IconButton compact disabled={busy} aria-label={t('Reload')} data-tip={t('Reload')} onClick={reload}><RefreshCw size={14} /></IconButton>
+          <IconButton disabled={busy} aria-label={t('Reload')} data-tip={t('Reload')} onClick={reload}><RefreshCw size={16} /></IconButton>
         </div>
         {list?.some((entry) => installed[entry.command] === false) && (
           <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>

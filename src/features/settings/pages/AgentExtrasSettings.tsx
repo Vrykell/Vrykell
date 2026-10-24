@@ -94,6 +94,7 @@ export function MemorySettings() {
         <OutlineButton onClick={() => void organize()} disabled={organizing} style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           <Sparkles size={12} /> {organizing ? '整理中…' : '让 AI 整理'}
         </OutlineButton>
+          <OutlineButton onClick={() => void clear()} disabled={organizing} style={{ ...btnStyle, color: 'var(--control-danger-color)' }}>{t('Clear')}</OutlineButton>
       </div>
       <ConfigTextArea
         value={saving.value}
@@ -108,7 +109,6 @@ export function MemorySettings() {
       />
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
         <SaveStatus inline status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
-        <OutlineButton onClick={() => void clear()} disabled={organizing} style={{ ...btnStyle, color: 'var(--error-light)' }}>清空</OutlineButton>
       </div>
       {jlines.length > 0 && (
         <div style={{ marginTop: 12 }}>
