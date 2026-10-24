@@ -1,244 +1,227 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { t } from '@i18n';
 import Select from '@ui/Select';
 import CheckboxMenu from '@ui/CheckboxMenu';
-import { IconBtn, fmtSize } from '@ui/UiBtn';
+import { IconBtn } from '@ui/UiBtn';
 import SidebarToolbar from '@ui/SidebarToolbar';
-import { ArrowSort, Columns2, DataUsage, Grid, RefreshCw, Settings, iconSizes } from '@ui/icons';
-import { SshIcon } from '@ui/shellIcons';
-import { iconColorCss, iconColorKey, useIconColorStore } from '@config/iconColors';
+import SidebarItem from '@ui/sidebarItem';
+import { OutlineButton } from '@ui/OutlineButton';
+import { TextButton } from '@ui/TextButton';
+import Toggle from '@ui/Toggle';
+import ToolDialog from '@ui/ToolDialog';
+import SegmentedControl from '@ui/SegmentedControl';
+import { AlertCircle, ArrowDown, ArrowUp, ArrowLeftRight, ChevronDown, Columns2, EyeOff, Folder, Grid, Lock, MoreHorizontal, Plus, RefreshCw, Star, StarFilled, Tag, iconSizes } from '@ui/icons';
+import { isSshAuthenticationFailure } from '../model/fileServiceState';
+import { requestSshAuthentication, useSessionAuthenticationStore } from '../stores/sessionAuthentication';
+import ContextMenu, { type MenuAnchor } from '@ui/ContextMenu';
+import { TerminalProfileIcon } from '@ui/shellIcons';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
+import { EMPTY_HOST_METADATA, useHostLibrary } from '../stores/hostLibrary';
+import { groupHosts } from '../model/hostTags';
+import { hostLastConnected } from '../model/hostDisplay';
+import { useHostMetadataMenu } from './useHostMetadataMenu';
 import { ensureSshLoaded, useSshStore } from '../stores/store';
-import { sshSystemStatus, type SshConnection, type SshSystemStatus } from '../services/api';
+import type { SshConnection } from '../services/api';
+import { HOST_METRICS, resourcePercent, resourceRate, useHostResources, type HostMetric, type HostMetricSelection, type HostResourceState } from '../hooks/useHostResources';
 import { statusDuration } from './SshStatusPanel';
+import HostTag, { HostTagDot } from './HostTag';
 import './SshDashboard.css';
 
-type MetricId = 'status' | 'cpu' | 'memory' | 'disk' | 'network' | 'load' | 'uptime';
-type Layout = 'cards' | 'table';
-type Sort = 'status' | 'name' | 'recent';
-interface DashboardHostState {
-  data?: SshSystemStatus;
-  error?: string;
-  busy?: boolean;
-  cpu?: number | null;
-  download?: number | null;
-  upload?: number | null;
-  updatedAt?: number;
-}
-
-const METRIC_IDS: MetricId[] = ['status', 'cpu', 'memory', 'disk', 'network', 'load', 'uptime'];
-const METRIC_LABELS: Record<MetricId, string> = {
-  status: 'Status', cpu: 'CPU', memory: 'Memory', disk: 'Disk', network: 'Network', load: 'Load', uptime: 'Uptime',
-};
-const DEFAULT_METRICS = Object.fromEntries(METRIC_IDS.map(id => [id, true])) as Record<MetricId, boolean>;
-const PREFERENCES_KEY = 'vrykell-ssh-dashboard-v1';
-
-function readPreferences(): { metrics: Record<MetricId, boolean>; layout: Layout; sort: Sort } {
+const PREFERENCES_KEY = 'vrykell-host-view-v2';
+const METRIC_LABELS: Record<HostMetric, string> = { status: 'Status', cpu: 'CPU', memory: 'Memory', disk: 'Disk', network: 'Network', load: 'Load', uptime: 'Uptime' };
+type Sort = 'recent' | 'name' | 'cpu' | 'memory' | 'disk';
+function readPreferences() {
   const saved = safeJsonParse<Record<string, unknown>>(safeLocalStorageGet(PREFERENCES_KEY) ?? '{}');
-  const metrics = { ...DEFAULT_METRICS };
-  if (saved?.metrics && typeof saved.metrics === 'object') {
-    for (const id of METRIC_IDS) metrics[id] = (saved.metrics as Record<string, unknown>)[id] !== false;
-  }
-  return {
-    metrics,
-    layout: saved?.layout === 'table' ? 'table' : 'cards',
-    sort: saved?.sort === 'name' ? 'name' : saved?.sort === 'recent' ? 'recent' : 'status',
-  };
+  const metrics = Object.fromEntries(HOST_METRICS.map(id => [id, !(saved?.metrics && typeof saved.metrics === 'object' && (saved.metrics as Record<string, unknown>)[id] === false)])) as HostMetricSelection;
+  return { metrics, resources: saved?.resources === true, layout: saved?.layout === 'cards' ? 'cards' as const : 'table' as const,
+    sort: (saved?.resources === true ? ['name', 'cpu', 'memory', 'disk'] : ['name']).includes(String(saved?.sort)) ? saved!.sort as Sort : 'recent' as Sort };
 }
 
-const percent = (used?: number | null, total?: number | null) => used != null && total != null && total > 0 ? Math.round(used / total * 100) : null;
-const rate = (value?: number | null) => value == null ? null : `${value < 1024 ? value.toFixed(0) : (value / 1024).toFixed(1)} ${value < 1024 ? 'B/s' : 'KB/s'}`;
-
-function metricSummary(sample: SshSystemStatus | undefined, state: DashboardHostState): string {
-  if (state.error) return state.error;
-  if (!sample) return t(state.busy ? 'Collecting remote resources…' : 'No resource sample yet.');
-  return sample.system || t('Online');
-}
-
-/** The host workspace is an overview first; detailed management remains one explicit step away. */
-export default function SshDashboard({ active = true, onManage, onOpenTerminal }: {
+export default function SshDashboard({ active = true, onManage, onImport, onQuickConnect, onDelete, onOpenTerminal, onForwarding }: {
   active?: boolean;
   onManage: () => void;
+  onImport?: () => void;
+  onForwarding?: () => void;
+  onQuickConnect?: () => void;
+  onDelete?: (connection: SshConnection) => void;
   onOpenTerminal: (connection: SshConnection) => void;
 }) {
   const connections = useSshStore(state => state.connections);
   const loaded = useSshStore(state => state.loaded);
-  const iconColors = useIconColorStore(state => state.colors);
+  const metadata = useHostLibrary(state => state.hosts);
   const initial = useMemo(readPreferences, []);
+  const [layout, setLayout] = useState(initial.layout);
+  const [resources, setResources] = useState(initial.resources);
   const [metrics, setMetrics] = useState(initial.metrics);
-  const [layout, setLayout] = useState<Layout>(initial.layout);
-  const [sort, setSort] = useState<Sort>(initial.sort);
+  const [sort, setSort] = useState(initial.sort);
   const [query, setQuery] = useState('');
-  const [samples, setSamples] = useState<Record<string, DashboardHostState>>({});
-  const [selected, setSelected] = useState<SshConnection | null>(null);
-  const [metricMenu, setMetricMenu] = useState(false);
-  const [refresh, setRefresh] = useState(0);
+  const [starredOnly, setStarredOnly] = useState(false);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [groupFilter, setGroupFilter] = useState<string | null>(null);
+  const [groupBy, setGroupBy] = useState('none');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [details, setDetails] = useState<SshConnection | null>(null);
+  const [menu, setMenu] = useState<{ id: string; anchor: MenuAnchor } | null>(null);
+  const [tools, setTools] = useState<HTMLElement | null>(null);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const [metricsOpen, setMetricsOpen] = useState(false);
+  const tagTrigger = useRef<HTMLButtonElement>(null);
   const metricTrigger = useRef<HTMLButtonElement>(null);
-  const samplesRef = useRef<Record<string, DashboardHostState>>({});
-  const selectedMetrics = METRIC_IDS.filter(id => metrics[id]).length;
+  const search = useRef<HTMLDivElement>(null);
+  const collecting = useMemo(() => connections.filter(connection => !metadata[connection.id]?.resourceDisabled), [connections, metadata]);
+  const { samples, refresh } = useHostResources(collecting, metrics, active && loaded && resources);
+  const authenticationRevisions = useSessionAuthenticationStore(state => state.revisions);
+  useEffect(() => { if (resources) refresh(); }, [authenticationRevisions]);
+  const retryHost = (connection: SshConnection) => {
+    if (metadata[connection.id]?.resourceDisabled) useHostLibrary.getState().update(connection.id, { resourceDisabled: false });
+    setResources(true);
+    if (samples[connection.id]?.error && isSshAuthenticationFailure(samples[connection.id].error!)) requestSshAuthentication({ connectionId: connection.id, host: connection.host, port: connection.port, user: connection.user, identityFile: connection.identityFile });
+    else refresh();
+  };
+  const annotations = useHostMetadataMenu({ onConnect: onOpenTerminal, onRetry: retryHost });
+  const knownTags = [...new Set([...connections.flatMap(connection => metadata[connection.id]?.tags ?? []), ...tagFilter])].sort();
+  const groups = groupHosts(connections, metadata, 'group');
+  if (groupFilter !== null && !groups.some(group => group.name === groupFilter)) groups.push({ name: groupFilter, hosts: [] });
+  const toggleResources = (value: boolean) => {
+    setResources(value);
+    if (!value && !['recent', 'name'].includes(sort)) setSort('recent');
+  };
 
   useEffect(() => { ensureSshLoaded(); }, []);
+  useEffect(() => { safeLocalStorageSet(PREFERENCES_KEY, JSON.stringify({ layout, resources, metrics, sort })); }, [layout, resources, metrics, sort]);
   useEffect(() => {
-    safeLocalStorageSet(PREFERENCES_KEY, JSON.stringify({ metrics, layout, sort }));
-  }, [metrics, layout, sort]);
-
-  useEffect(() => {
-    if (!active || !loaded || selectedMetrics === 0 || connections.length === 0) return;
-    let disposed = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const collect = async () => {
-      if (document.hidden) {
-        timer = setTimeout(() => void collect(), 1000);
-        return;
-      }
-      const next = { ...samplesRef.current };
-      for (const connection of connections) next[connection.id] = { ...next[connection.id], busy: true, error: undefined };
-      if (!disposed) setSamples({ ...next });
-      for (let index = 0; index < connections.length; index += 3) {
-        await Promise.all(connections.slice(index, index + 3).map(async connection => {
-          const previous = samplesRef.current[connection.id];
-          const now = Date.now();
-          try {
-            const data = await sshSystemStatus(connection.id, connection.host, connection.port ?? 22, connection.user, {
-              status: metrics.status, cpu: metrics.cpu, memory: metrics.memory, disk: metrics.disk,
-              network: metrics.network, load: metrics.load, uptime: metrics.uptime,
-            });
-            const previousData = previous?.data;
-            const cpu = previousData?.cpuTotal != null && previousData.cpuIdle != null && data.cpuTotal != null && data.cpuIdle != null
-              ? (() => {
-                const total = data.cpuTotal - previousData.cpuTotal!;
-                const idle = data.cpuIdle - previousData.cpuIdle!;
-                return total > 0 && idle >= 0 && idle <= total ? Math.round(100 * (total - idle) / total) : null;
-              })() : null;
-            const elapsed = previous?.updatedAt ? Math.max(0.1, (now - previous.updatedAt) / 1000) : 1;
-            const download = previousData?.networkReceived != null && data.networkReceived != null
-              ? Math.max(0, (data.networkReceived - previousData.networkReceived) / elapsed) : null;
-            const upload = previousData?.networkTransmitted != null && data.networkTransmitted != null
-              ? Math.max(0, (data.networkTransmitted - previousData.networkTransmitted) / elapsed) : null;
-            next[connection.id] = { data, cpu, download, upload, updatedAt: now, busy: false };
-          } catch (error) {
-            next[connection.id] = { ...previous, busy: false, error: String((error as Error)?.message ?? error) };
-          }
-        }));
-        if (disposed) return;
-        samplesRef.current = { ...next };
-        setSamples({ ...next });
-      }
-      timer = setTimeout(() => void collect(), 10_000);
+    if (!active) return;
+    const focusSearch = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.key.toLowerCase() !== 'k') return;
+      event.preventDefault(); search.current?.querySelector('input')?.focus();
     };
-    void collect();
-    return () => { disposed = true; if (timer) clearTimeout(timer); };
-  }, [active, connections, loaded, metrics, refresh, selectedMetrics]);
-
+    window.addEventListener('keydown', focusSearch);
+    return () => window.removeEventListener('keydown', focusSearch);
+  }, [active]);
   const visible = useMemo(() => {
-    const value = query.trim().toLowerCase();
-    const filtered = value ? connections.filter(connection => [connection.name, connection.host, connection.user].some(part => part.toLowerCase().includes(value))) : [...connections];
-    return filtered.sort((a, b) => sort === 'name' ? a.name.localeCompare(b.name)
-      : sort === 'recent' ? (b.lastOpenedAt ?? 0) - (a.lastOpenedAt ?? 0)
-        : Number(Boolean(samples[a.id]?.data)) === Number(Boolean(samples[b.id]?.data))
-          ? a.name.localeCompare(b.name) : samples[b.id]?.data ? 1 : -1);
-  }, [connections, query, samples, sort]);
+    const value = query.trim().toLowerCase().replace(/^ssh\s+/, '');
+    const filtered = connections.filter(connection => {
+      const meta = metadata[connection.id] ?? EMPTY_HOST_METADATA;
+      return (!starredOnly || meta.starred) && (groupFilter === null || meta.group === groupFilter)
+        && tagFilter.every(tag => meta.tags.includes(tag))
+        && (!value || [connection.name, connection.host, connection.user, `${connection.user}@${connection.host}`, meta.group, ...meta.tags].some(part => part.toLowerCase().includes(value)));
+    });
+    const metric = (connection: SshConnection) => {
+      const state = samples[connection.id]; const sample = state?.data;
+      return sort === 'cpu' ? state?.cpu ?? -1 : sort === 'memory' ? resourcePercent(sample?.memoryTotal == null ? null : sample.memoryTotal - (sample.memoryAvailable ?? 0), sample?.memoryTotal) ?? -1 : resourcePercent(sample?.diskUsed, sample?.diskTotal) ?? -1;
+    };
+    return filtered.sort((first, second) => sort === 'name' ? first.name.localeCompare(second.name) : resources && ['cpu', 'memory', 'disk'].includes(sort) ? metric(second) - metric(first) : (second.lastOpenedAt ?? 0) - (first.lastOpenedAt ?? 0));
+  }, [connections, metadata, query, starredOnly, groupFilter, tagFilter, samples, sort, resources]);
+  const grouped = groupHosts(visible, metadata, groupBy);
+  const showMenu = (connection: SshConnection, trigger: HTMLElement, x: number, y: number) => { setSelectedId(connection.id); setMenu({ id: connection.id, anchor: { x, y, trigger } }); };
+  const address = (connection: SshConnection) => `${connection.user ? `${connection.user}@` : ''}${connection.host}:${connection.port ?? 22}`;
+  const lastConnected = (connection: SshConnection) => hostLastConnected(connection.lastOpenedAt);
+  const favorite = (connection: SshConnection) => metadata[connection.id]?.starred ? <StarFilled size={14} color="var(--favorite-color)" aria-label={t('Starred')} /> : null;
+  const icon = (connection: SshConnection) => <span className="ssh-dashboard-host-icon"><TerminalProfileIcon kind="ssh" connectionId={connection.id} size={iconSizes.row} /><i className="ssh-dashboard-status-dot" data-failure={samples[connection.id]?.error ? isSshAuthenticationFailure(samples[connection.id].error!) ? 'authentication' : samples[connection.id].data ? 'error' : undefined : undefined} data-online={samples[connection.id]?.data && !samples[connection.id]?.error ? 'true' : undefined} /></span>;
+  const tags = (connection: SshConnection) => <span className="ssh-host-tags">{metadata[connection.id]?.tags.map(tag => <HostTag key={tag} tag={tag} />)}</span>;
+  const connectButton = (connection: SshConnection) => <TextButton className="user-primary-action ssh-host-connect" aria-label={t('Connect to {{name}}', { name: connection.name })} onClick={event => { event.stopPropagation(); onOpenTerminal(connection); }}>{t('Connect')}</TextButton>;
+  const columns = resources ? `20px minmax(90px, 1.5fr) minmax(90px, 1.2fr) ${(['cpu', 'memory', 'disk'] as const).filter(metric => metrics[metric]).map(() => 'calc(96px * var(--ui-font-scale))').join(' ')} 60px`
+    : '20px minmax(120px, 1fr) minmax(140px, 1.4fr) minmax(90px, 1fr) 100px 60px';
 
-  const toggleMetric = (id: string) => setMetrics(previous => ({ ...previous, [id as MetricId]: !previous[id as MetricId] }));
-  const refreshHosts = () => { samplesRef.current = {}; setSamples({}); setRefresh(value => value + 1); };
-  const usable = (id: MetricId) => metrics[id];
-
-  return <div className="ssh-dashboard" data-testid="ssh-dashboard">
-    <SidebarToolbar search={{ value: query, onChange: event => setQuery(event.target.value), 'aria-label': t('Search SSH hosts'),
-      placeholder: t('Search SSH hosts…'), 'data-testid': 'ssh-dashboard-search' }}>
-      <IconBtn title={t('Refresh remote resources')} data-testid="ssh-dashboard-refresh" onClick={refreshHosts}><RefreshCw size={iconSizes.control} /></IconBtn>
-      <IconBtn title={t('All hosts')} data-testid="ssh-manage-hosts" onClick={onManage}><Settings size={iconSizes.control} /></IconBtn>
-    </SidebarToolbar>
-    <header className="ssh-dashboard-header">
-      <div><DataUsage size={iconSizes.navigation} /><h2>{t('Resource dashboard')}</h2><span>{t('{{count}} hosts', { count: connections.length })}</span></div>
-      <div className="ssh-dashboard-controls">
-        <Select aria-label={t('Host view')} value="dashboard" options={[{ value: 'dashboard', label: t('Resource dashboard') }, { value: 'manage', label: t('All hosts') }]}
-          onChange={value => { if (value === 'manage') onManage(); }} style={{ width: 128 }} />
-        <Select aria-label={t('Host list order')} value={sort} options={[
-          { value: 'status', label: t('Status') }, { value: 'name', label: t('Name') }, { value: 'recent', label: t('Last connected') },
-        ]} onChange={value => setSort(value as Sort)} style={{ width: 132 }} />
-        <IconBtn title={t('Card view')} data-active={layout === 'cards'} onClick={() => setLayout('cards')}><Grid size={iconSizes.control} /></IconBtn>
-        <IconBtn title={t('Table view')} data-active={layout === 'table'} onClick={() => setLayout('table')}><Columns2 size={iconSizes.control} /></IconBtn>
-        <span className="ssh-dashboard-metric-menu">
-          <IconBtn ref={metricTrigger} title={t('More metrics')} data-active={selectedMetrics > 0} data-testid="ssh-dashboard-metrics"
-            onClick={() => setMetricMenu(value => !value)}><ArrowSort size={iconSizes.control} /></IconBtn>
-          {metricMenu && <CheckboxMenu title={t('Collect and show')} triggerRef={metricTrigger}
-            style={{ right: 0, top: 'calc(100% + 4px)' }} onClose={() => setMetricMenu(false)}
-            options={METRIC_IDS.map(id => ({ id, label: t(METRIC_LABELS[id]), checked: metrics[id] }))} onToggle={toggleMetric} />}
-        </span>
+  return <div className="ssh-dashboard ssh-host-management" data-testid="ssh-dashboard" data-resources={resources} data-layout={layout} style={{ '--ssh-host-list-columns': columns } as CSSProperties}>
+    <header className="ssh-host-page-header ssh-management-header">
+      <div className="ssh-host-page-title"><h2>{t('Hosts')}</h2><span>{t('{{count}} hosts', { count: connections.length })}</span></div>
+      <div className="ssh-host-page-actions">
+        <div ref={search} className="ssh-host-search"><SidebarToolbar search={{ value: query, onChange: event => setQuery(event.target.value), placeholder: t('Search hosts…'), 'aria-label': t('Search hosts…'), 'data-testid': 'ssh-search' }} /></div>
+        <div className="ssh-host-primary-actions">
+          {onForwarding && <OutlineButton aria-label={t('Port forwarding')} data-testid="ssh-forwarding-entry" onClick={onForwarding}><ArrowLeftRight size={14} />{t('Port forwarding')}</OutlineButton>}
+          {onImport && <OutlineButton aria-label={t('ssh.import.open')} data-testid="ssh-import-btn" onClick={onImport}><ArrowDown size={14} />{t('Import')}</OutlineButton>}
+          <div className="ssh-host-new-actions"><OutlineButton className="primary-button" data-testid="ssh-new-btn" onClick={onManage}><Plus size={14} />{t('New host')}</OutlineButton>
+            <OutlineButton className="primary-button" aria-label={t('Host actions')} data-testid="ssh-host-actions" onClick={event => setTools(event.currentTarget)}><ChevronDown size={14} /></OutlineButton></div>
+        </div>
       </div>
     </header>
-
-    {selectedMetrics === 0 && <div className="ssh-dashboard-paused" role="status">{t('Metrics collection is paused. Turn on one or more metrics to collect host status.')}</div>}
-
-    {!connections.length ? <div className="ssh-dashboard-empty"><SshIcon size={32} />
-      <strong>{t('No hosts yet')}</strong><span>{t('Add a host or import an existing SSH configuration.')}</span>
-      <button type="button" className="outline-button" onClick={onManage}>{t('Manage hosts')}</button></div>
-      : layout === 'cards' ? <div className="ssh-dashboard-grid">
-        {visible.map(connection => {
-          const state = samples[connection.id] ?? {};
-          const sample = state.data;
-          return <article key={connection.id} className="ssh-dashboard-card" role="button" tabIndex={0} data-testid={`ssh-dashboard-host-${connection.id}`}
-            onClick={() => setSelected(connection)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); setSelected(connection); } }}>
-            <div className="ssh-dashboard-card-title">
-              <SshIcon size={iconSizes.row} style={{ color: iconColorCss(iconColors[iconColorKey('ssh', connection.id)]) }} />
-              <span><strong>{connection.name}</strong><small>{connection.user}@{connection.host}:{connection.port ?? 22}</small></span>
-              {usable('status') && <i className="ssh-dashboard-status-dot" data-online={sample ? 'true' : undefined}
-                data-tip={sample ? t('Online') : t('Offline')} />}
-            </div>
-            {usable('cpu') && <MetricBar label="CPU" value={state.cpu ?? percent(sample?.cpuTotal == null ? null : sample.cpuTotal - (sample.cpuIdle ?? 0), sample?.cpuTotal)} />}
-            {usable('memory') && <MetricBar label={t('Memory')} value={percent(sample?.memoryTotal == null ? null : sample.memoryTotal - (sample.memoryAvailable ?? 0), sample?.memoryTotal)} />}
-            {usable('disk') && <MetricBar label={t('Disk')} value={percent(sample?.diskUsed, sample?.diskTotal)} />}
-            {usable('network') && <div className="ssh-dashboard-kv"><span>{t('Network')}</span><strong>{rate(state.download) ?? '—'} ↓ · {rate(state.upload) ?? '—'} ↑</strong></div>}
-            {usable('load') && <div className="ssh-dashboard-kv"><span>{t('Load')}</span><strong>{sample?.load || '—'}</strong></div>}
-            {usable('uptime') && <div className="ssh-dashboard-kv"><span>{t('Uptime')}</span><strong>{sample?.uptimeSeconds != null ? statusDuration(sample.uptimeSeconds) : '—'}</strong></div>}
-            <footer><span>{metricSummary(sample, state)}</span><span>{state.updatedAt ? new Date(state.updatedAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : t('Collecting…')}</span></footer>
-          </article>;
-        })}
-        {!visible.length && <div className="ssh-dashboard-empty">{t('No matching hosts')}</div>}
-      </div> : <div className="ssh-dashboard-table-wrap">
-        <table className="ssh-dashboard-table"><thead><tr><th>{t('Host')}</th>{usable('status') && <th>{t('Status')}</th>}
-          {usable('cpu') && <th>CPU</th>}{usable('memory') && <th>{t('Memory')}</th>}{usable('disk') && <th>{t('Disk')}</th>}
-          {usable('network') && <th>{t('Network')}</th>}{usable('load') && <th>{t('Load')}</th>}{usable('uptime') && <th>{t('Uptime')}</th>}</tr></thead>
-          <tbody>{visible.map(connection => { const state = samples[connection.id] ?? {}; const sample = state.data; return <tr key={connection.id}
-            tabIndex={0} data-testid={`ssh-dashboard-host-${connection.id}`} onClick={() => setSelected(connection)}
-            onKeyDown={event => { if (event.key === 'Enter') setSelected(connection); }}>
-            <td><strong>{connection.name}</strong><small>{connection.user}@{connection.host}:{connection.port ?? 22}</small></td>
-            {usable('status') && <td><span className="ssh-dashboard-table-status" data-online={sample ? 'true' : undefined}>{sample ? t('Online') : state.error ? t('Offline') : t('Collecting…')}</span></td>}
-            {usable('cpu') && <td>{state.cpu != null ? `${state.cpu}%` : '—'}</td>}{usable('memory') && <td>{percent(sample?.memoryTotal == null ? null : sample.memoryTotal - (sample.memoryAvailable ?? 0), sample?.memoryTotal) ?? '—'}{sample?.memoryTotal ? '%' : ''}</td>}
-            {usable('disk') && <td>{percent(sample?.diskUsed, sample?.diskTotal) ?? '—'}{sample?.diskTotal ? '%' : ''}</td>}
-            {usable('network') && <td>{rate(state.download) ?? '—'} / {rate(state.upload) ?? '—'}</td>}
-            {usable('load') && <td>{sample?.load || '—'}</td>}{usable('uptime') && <td>{sample?.uptimeSeconds != null ? statusDuration(sample.uptimeSeconds) : '—'}</td>}
-          </tr>; })}</tbody></table>
-      </div>}
-
-    {selected && createPortal(<div className="new-tab-overlay" onClick={() => setSelected(null)}>
-      <section className="workspace-floating workspace-floating-dialog ssh-dashboard-detail" role="dialog" aria-modal="true"
-        aria-label={t('Host details')} onClick={event => event.stopPropagation()}>
-        <header><SshIcon size={28} /><div><h2>{selected.name}</h2><span>{selected.user}@{selected.host}:{selected.port ?? 22}</span></div></header>
-        <DashboardDetails sample={samples[selected.id]?.data} state={samples[selected.id] ?? {}} />
-        <footer><button type="button" className="outline-button" onClick={() => setSelected(null)}>{t('Close')}</button>
-          <button type="button" className="primary-button" onClick={() => { onOpenTerminal(selected); setSelected(null); }}>{t('Open terminal')}</button></footer>
-      </section>
-    </div>, document.body)}
+    <div className="ssh-host-browser scroll-region" data-testid="ssh-host-browser">
+    <div className="ssh-host-filter-toolbar">
+      <div className="ssh-host-filter-actions">
+        <TextButton className="ssh-host-filter" aria-pressed={starredOnly} data-testid="ssh-host-favorites" onClick={() => setStarredOnly(value => !value)}>{starredOnly ? <StarFilled size={16} color="var(--favorite-color)" /> : <Star size={16} />}{t('Favorites')}</TextButton>
+        <TextButton ref={tagTrigger} className="ssh-host-filter" aria-expanded={tagsOpen} disabled={!knownTags.length} data-tip={!knownTags.length ? t('Add tags when editing a host.') : undefined} data-testid="ssh-host-tag-filter" onClick={() => setTagsOpen(value => !value)}><Tag size={16} />{t('Tags')}{tagFilter.length > 0 && <span>{tagFilter.length}</span>}<ChevronDown size={12} /></TextButton>
+      </div>
+      <div className="ssh-host-view-actions">
+        <Select aria-label={t('Host list order')} value={sort} options={[{ value: 'recent', label: t('Last connected') }, { value: 'name', label: t('Name') }, ...(resources ? (['cpu', 'memory', 'disk'] as const).map(value => ({ value, label: t(METRIC_LABELS[value]) })) : [])]} onChange={value => setSort(value as Sort)} style={{ width: 118 }} />
+        <span className="ssh-host-resource-toggle"><Toggle compact on={resources} onChange={toggleResources} label={t('Resource usage')} /><span onClick={() => toggleResources(!resources)}>{t('Resource usage')}</span></span>
+        <SegmentedControl variant="buttons" label={t('Host view')} value={layout} onChange={setLayout} options={[{ value: 'table', label: t('List'), ariaLabel: t('Table view'), icon: <Columns2 size={14} /> }, { value: 'cards', label: t('Cards'), ariaLabel: t('Card view'), icon: <Grid size={14} /> }]} />
+        {resources && <span className="ssh-dashboard-metric-menu"><IconBtn ref={metricTrigger} title={t('More metrics')} data-testid="ssh-dashboard-metrics" onClick={() => setMetricsOpen(value => !value)}><MoreHorizontal size={16} /></IconBtn>
+          {metricsOpen && <CheckboxMenu anchored title={t('Collect and show')} triggerRef={metricTrigger} checkmark options={HOST_METRICS.map(id => ({ id, label: t(METRIC_LABELS[id]), checked: metrics[id] }))} onToggle={id => setMetrics(current => ({ ...current, [id]: !current[id] }))} onClose={() => setMetricsOpen(false)}
+            footer={<TextButton className="ssh-metrics-refresh" data-testid="ssh-dashboard-refresh" onClick={() => { refresh(); setMetricsOpen(false); }}><RefreshCw size={14} />{t('Refresh')}</TextButton>} />}
+        </span>}
+      </div>
+    </div>
+    {tagsOpen && <div className="ssh-host-tag-options"><CheckboxMenu title={t('Host tags')} triggerRef={tagTrigger} style={{ position: 'relative', width: 280, maxWidth: '100%', maxHeight: 200, overflowY: 'auto', zIndex: 'auto' }} options={knownTags.map(tag => ({ id: tag, label: tag, checked: tagFilter.includes(tag), icon: <HostTagDot tag={tag} /> }))} onToggle={tag => setTagFilter(current => current.includes(tag) ? current.filter(value => value !== tag) : [...current, tag])} onClose={() => setTagsOpen(false)} /></div>}
+    {groups.some(group => !!group.name) && <div className="ssh-host-group-filters" role="group" aria-label={t('Host groups')}>{groups.map(group => <TextButton key={group.name} aria-pressed={groupFilter === group.name} onClick={() => setGroupFilter(current => current === group.name ? null : group.name)}><Folder size={16} color="var(--primary-action)" />{group.name || t('Ungrouped')}<span>{group.hosts.length}</span></TextButton>)}</div>}
+    {resources && HOST_METRICS.every(id => !metrics[id]) && <div className="ssh-dashboard-paused" role="status">{t('Metrics collection is paused. Turn on one or more metrics to collect host status.')}</div>}
+    {layout === 'table' && <div className="ssh-host-columns"><span /><span>{t('Name')}</span>{resources ? <><span>{t('Status')}</span>{(['cpu', 'memory', 'disk'] as const).filter(metric => metrics[metric]).map(metric => <span key={metric}>{t(METRIC_LABELS[metric])}</span>)}</> : <><span>{t('Address')}</span><span>{t('Tags')}</span><span>{t('Last connected')}</span></>}<span /></div>}
+    <div className={layout === 'table' ? 'scroll-region ssh-host-list' : 'scroll-region ssh-dashboard-grid'}>
+      {!visible.length ? <div className="search-empty-state">{t(connections.length ? 'No matching connections' : 'No SSH connections yet. Select + to create one.')}</div> : grouped.map(group => <section key={group.name} className={layout === 'cards' ? 'ssh-dashboard-group-section' : undefined}>
+        {groupBy !== 'none' && <h3 className="ssh-dashboard-group"><Folder size={16} />{group.name || t(groupBy === 'tags' ? 'Untagged' : 'Ungrouped')}<span>{group.hosts.length}</span></h3>}
+        {group.hosts.map(connection => <Fragment key={connection.id}>{layout === 'table' ? <SidebarItem active={selectedId === connection.id} icon={icon(connection)} title={connection.name} titleAccessory={favorite(connection)} subtitle={resources ? undefined : address(connection)} tooltip={address(connection)} testId={`ssh-row-${connection.id}`} tabIndex={0}
+          badge={resources ? <HostResources state={samples[connection.id] ?? {}} disabled={metadata[connection.id]?.resourceDisabled} metrics={metrics} onRetry={() => retryHost(connection)} /> : <span className="ssh-host-row-metadata">{tags(connection)}<span className="ssh-host-row-last-connected">{lastConnected(connection)}</span></span>}
+          trailingActions={[{ label: t('Connect to {{name}}', { name: connection.name }), control: connectButton(connection) }]}
+          onClick={() => setSelectedId(connection.id)} onDoubleClick={() => onOpenTerminal(connection)}
+          onContextMenu={event => { event.preventDefault(); showMenu(connection, event.currentTarget, event.clientX, event.clientY); }}
+          onKeyDown={event => {
+            if (event.target !== event.currentTarget) return;
+            if (event.key === 'Enter') { event.preventDefault(); onOpenTerminal(connection); }
+            if (event.key === ' ') { event.preventDefault(); setSelectedId(connection.id); setDetails(connection); }
+            if (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10') { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); showMenu(connection, event.currentTarget, box.left, box.bottom); }
+          }} /> : <article className="ssh-dashboard-card" role="button" data-testid={`ssh-row-${connection.id}`} data-active={selectedId === connection.id} tabIndex={0} onClick={() => setSelectedId(connection.id)} onDoubleClick={() => onOpenTerminal(connection)}
+          onContextMenu={event => { event.preventDefault(); showMenu(connection, event.currentTarget, event.clientX, event.clientY); }} onKeyDown={event => {
+            if (event.target !== event.currentTarget) return;
+            if (event.key === 'Enter') { event.preventDefault(); onOpenTerminal(connection); }
+            if (event.key === ' ') { event.preventDefault(); setSelectedId(connection.id); setDetails(connection); }
+            if (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10') { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); showMenu(connection, event.currentTarget, box.left, box.bottom); }
+          }}>
+          <div className="ssh-dashboard-card-title">{icon(connection)}<strong>{connection.name}</strong>{favorite(connection)}{connectButton(connection)}</div>
+          <div className="ssh-dashboard-address">{address(connection)}</div>{tags(connection)}
+          {resources && <HostResources state={samples[connection.id] ?? {}} disabled={metadata[connection.id]?.resourceDisabled} metrics={metrics} compact onRetry={() => retryHost(connection)} />}
+          {!samples[connection.id]?.error && <span className="ssh-host-last-connected">{lastConnected(connection)}</span>}
+        </article>}</Fragment>)}
+      </section>)}
+    </div>
+    </div>
+    {details && <ToolDialog label={t('Host details')} onClose={() => setDetails(null)} closePlacement="footer"><div className="ssh-host-details"><strong>{details.name}</strong><code>{address(details)}</code>{tags(details)}<span>{lastConnected(details)}</span>{details.notes && <p>{details.notes}</p>}{resources && <HostResources state={samples[details.id] ?? {}} disabled={metadata[details.id]?.resourceDisabled} metrics={metrics} compact onRetry={() => retryHost(details)} />}</div></ToolDialog>}
+    {menu && <ContextMenu anchor={menu.anchor} items={[...annotations.items(menu.id, menu.anchor), ...(onDelete ? [{ label: t('Delete'), danger: true, onClick: () => { const connection = connections.find(value => value.id === menu.id); if (connection) onDelete(connection); } }] : [])]} onClose={() => setMenu(null)} />}
+    {tools && <ContextMenu anchor={{ x: tools.getBoundingClientRect().right, y: tools.getBoundingClientRect().bottom, trigger: tools }} onClose={() => setTools(null)} items={[
+      ...(onQuickConnect ? [{ label: t('ssh.quick.connect'), onClick: onQuickConnect }] : []),
+      { label: t('Group hosts by'), submenu: { items: [{ value: 'none', label: t('No grouping') }, { value: 'group', label: t('Host groups') }, { value: 'tags', label: t('Host tags') }].map(option => ({ label: option.label, checked: groupBy === option.value, onClick: () => setGroupBy(option.value) })) } },
+    ]} />}
   </div>;
+}
+
+export function HostResources({ state: collected, metrics, compact = false, disabled = false, onRetry }: { state: HostResourceState; metrics: HostMetricSelection; compact?: boolean; disabled?: boolean; onRetry: () => void }) {
+  const state = disabled ? {} : collected;
+  const sample = state.data;
+  const authentication = !!state.error && isSshAuthenticationFailure(state.error);
+  const offline = !!state.error && !sample && !authentication && /offline|refused|timed?\s?out|unreachable|network|disconnected|无法连接|连接.*断/i.test(state.error);
+  const retry = <TextButton className="ssh-resource-retry" aria-label={t('Retry host status')} disabled={state.busy} onClick={event => { event.stopPropagation(); onRetry(); }}>{compact ? t('Retry') : <RefreshCw size={14} />}</TextButton>;
+  const errorLabel = t(authentication ? 'Login failed' : offline ? 'Offline' : 'Read failed');
+  const detail = authentication ? t('The server rejected the username, password or private key.') : state.error ?? '';
+  return <span className="ssh-host-resource-summary" data-stale={!!state.error && !!sample || undefined}>
+    {!sample && state.error && compact ? <span className="ssh-resource-state" data-kind={authentication ? 'authentication' : 'offline'} role="status">
+      {authentication ? <Lock size={22} /> : offline ? <EyeOff size={22} /> : <AlertCircle size={22} />}<strong>{errorLabel}</strong>
+      {!offline && <span>{detail}</span>}{!offline && retry}
+    </span> : <>
+    {state.error && !compact && <span className="ssh-resource-inline-error" data-kind={authentication ? 'authentication' : offline ? 'offline' : 'error'}><span data-tip={detail} aria-label={`${errorLabel}: ${detail}`}>{errorLabel}{!offline && `: ${detail}`}</span>{!offline && retry}</span>}
+    {!state.error && !compact && <span className="ssh-dashboard-table-status" data-online={sample ? 'true' : undefined}>{disabled ? t('Not collected') : !metrics.status ? '—' : sample && !sample.system.toLowerCase().includes('linux') && sample.memoryTotal == null ? t('Online status only ({{system}})', { system: sample.system }) : t(sample ? 'Online' : state.busy ? 'Connecting…' : 'Offline')}</span>}
+    {metrics.cpu && <MetricBar label="CPU" value={state.cpu ?? null} />}
+    {metrics.memory && <MetricBar label={t('Memory')} value={resourcePercent(sample?.memoryTotal == null ? null : sample.memoryTotal - (sample.memoryAvailable ?? 0), sample?.memoryTotal)} />}
+    {metrics.disk && <MetricBar label={t('Disk')} value={resourcePercent(sample?.diskUsed, sample?.diskTotal)} />}
+    {compact && state.error && sample && <span className="ssh-resource-card-error" role="status"><AlertCircle size={13} /><span data-tip={detail}>{t('Read failed')}: {detail}</span></span>}
+    {(metrics.network || metrics.load || metrics.uptime) && <span className="ssh-host-resource-footer">
+      {metrics.network && <span className="ssh-dashboard-network"><ArrowDown size={12} />{resourceRate(state.download)}<ArrowUp size={12} />{resourceRate(state.upload)}</span>}
+      {metrics.load && <span>{t('Load')} {sample?.load || '—'}</span>}
+      {metrics.uptime && <span>{t('Uptime')} {sample?.uptimeSeconds != null ? statusDuration(sample.uptimeSeconds) : '—'}</span>}
+    </span>}
+    {compact && state.error && sample && <span className="ssh-resource-last-read"><span>{t('Last read {{time}}', { time: new Date(state.updatedAt ?? 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })}</span>{retry}</span>}
+    </>}
+  </span>;
 }
 
 function MetricBar({ label, value }: { label: string; value: number | null }) {
-  return <div className="ssh-dashboard-metric"><span>{label}</span><i><b style={{ width: `${Math.max(0, Math.min(100, value ?? 0))}%` }} /></i><strong>{value == null ? '—' : `${value}%`}</strong></div>;
-}
-
-function DashboardDetails({ sample, state }: { sample?: SshSystemStatus; state: DashboardHostState }) {
-  return <div className="ssh-dashboard-detail-body">
-    <p>{metricSummary(sample, state)}</p>
-    {sample && <>
-      <div className="ssh-dashboard-kv"><span>CPU</span><strong>{state.cpu == null ? '—' : `${state.cpu}%`}</strong></div>
-      <div className="ssh-dashboard-kv"><span>{t('Memory')}</span><strong>{sample.memoryTotal ? `${fmtSize(sample.memoryTotal - (sample.memoryAvailable ?? 0))} / ${fmtSize(sample.memoryTotal)}` : '—'}</strong></div>
-      <div className="ssh-dashboard-kv"><span>{t('Disk')}</span><strong>{sample.diskTotal ? `${fmtSize(sample.diskUsed ?? 0)} / ${fmtSize(sample.diskTotal)}` : '—'}</strong></div>
-      <div className="ssh-dashboard-kv"><span>{t('Network')}</span><strong>{rate(state.download) ?? '—'} ↓ · {rate(state.upload) ?? '—'} ↑</strong></div>
-      <div className="ssh-dashboard-kv"><span>{t('Load')}</span><strong>{sample.load || '—'}</strong></div>
-      <div className="ssh-dashboard-kv"><span>{t('Uptime')}</span><strong>{sample.uptimeSeconds != null ? statusDuration(sample.uptimeSeconds) : '—'}</strong></div>
-    </>}
-  </div>;
+  return <span className="ssh-dashboard-metric" data-empty={value == null || undefined} data-critical={value != null && value >= 90}><span>{label}</span>{value != null && <i><b style={{ width: `${Math.max(0, Math.min(100, value))}%` }} /></i>}<strong>{value == null ? '—' : `${value}%`}</strong></span>;
 }
