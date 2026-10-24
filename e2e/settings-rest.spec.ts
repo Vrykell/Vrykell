@@ -67,27 +67,20 @@ test.describe('主题文件设置页', () => {
 
 test.describe('打开方式设置页', () => {
   test('各 shell 默认块模式，切经典模式持久化', async ({ page }) => {
-    await gotoSetting(page, '打开方式');
-    // 5 行 shell
-    await expect(page.locator('section').getByText('Zsh', { exact: true })).toBeVisible();
-    await expect(page.locator('section').getByText('CMD', { exact: true })).toBeVisible();
-    // Zsh 行切经典
-    const zshRow = rowOf(page, 'Zsh');
-    await zshRow.getByRole('combobox', { name: 'Zsh 打开模式' }).click();
+    await gotoSetting(page, 'Zsh');
+    await page.getByRole('combobox', { name: '打开方式', exact: true }).click();
     await page.getByRole('option', { name: '经典模式', exact: true }).click();
     const saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
     expect(saved).toContain('"zsh":"classic"');
   });
 
   test('SSH 打开方式：默认经典，可切换块模式并持久化', async ({ page }) => {
-    await gotoSetting(page, '打开方式');
-    const sshRow = rowOf(page, 'SSH');
-    // 默认经典
-    await expect(sshRow.getByRole('combobox', { name: 'SSH 打开模式' })).toHaveText('经典模式');
-    await sshRow.getByRole('combobox', { name: 'SSH 打开模式' }).click();
+    await gotoSetting(page, 'SSH');
+    await expect(page.getByRole('combobox', { name: '打开方式', exact: true })).toHaveText('经典模式');
+    await page.getByRole('combobox', { name: '打开方式', exact: true }).click();
     await page.getByRole('option', { name: '块模式', exact: true }).click();
     const saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
-    expect(saved).toContain('"sshOpenMode":"block"');
+    expect(saved).toContain('"ssh":"block"');
   });
 });
 

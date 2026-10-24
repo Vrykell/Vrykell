@@ -183,7 +183,7 @@ test.describe('模型配置页', () => {
     await expect(page.getByTestId('model-preset-DeepSeek')).toHaveCount(0);
     await expect(dialog).toBeVisible();
     await expect(page.locator('[data-testid^="provider-option-"]')).toHaveCount(3);
-    await page.getByTestId('provider-dialog-close').click();
+    await page.getByTestId('dialog-close').click();
     await expect(dialog).toHaveCount(0);
     await expect(switcher.locator('.provider-switch-name')).toHaveText('DeepSeek');
     await expect(page.getByTestId('model-name')).toHaveCount(1);
@@ -194,7 +194,7 @@ test.describe('模型配置页', () => {
     await page.getByTestId('provider-switch').click();
     await page.getByTestId('provider-dialog-add').click();
     await page.getByTestId('model-preset-OpenCode Go').click();
-    await page.getByTestId('provider-dialog-close').click();
+    await page.getByTestId('dialog-close').click();
     await expect(page.getByTestId('provider-switch').locator('.provider-switch-name')).toHaveText('OpenCode Go');
     await expect(page.getByTestId('provider-endpoint-preview')).toContainText('https://opencode.ai/zen/go/v1/chat/completions');
   });
