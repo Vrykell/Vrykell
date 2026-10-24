@@ -49,6 +49,7 @@ typechecking, architecture checks, or dev mode as appropriate.
 5. Colors come from `theme.css` variables - no hardcoded colors (ANSI palette excepted).
    Animations are 100 ms or slower.
 6. Independent implementation: never copy third-party source code.
+7. Interface icons use shared icon components, never text glyphs or native disclosure markers. Keyboard labels and mathematical operators remain text.
 
 ## Shared components (reuse, never fork)
 
@@ -64,10 +65,11 @@ typechecking, architecture checks, or dev mode as appropriate.
   `ListReorderPlaceholder` / `ListReorderZonePlaceholder`. Do not add a second reorder look.
 - **Error surfaces** - `ErrorBox` (tone, title, message, actions, collapsible details) and
   `ErrorDetails` (collapsible raw text with copy) from `src/ui/`. A failure of something the
-  panel is displaying renders inline through ErrorBox; a transient action result uses Toast.
+  panel is displaying uses a persistent bottom-right notification through ErrorBox; a transient action result uses Toast in the same shared notification region. The global error page remains full-page. Keep retry, details, dismissal and modal keyboard access.
   Bare `role="alert"` blocks are not acceptable.
 - **Settings option groups** use the `Select` dropdown from `src/ui/fields/Select.tsx`, not
   segmented pill controls.
+- **Connection authentication** uses the shared `SegmentedControl` for its four explicit modes. Editable tag pills use `TagInput`; text fields use the shared field variant instead of local input styling.
 - **Hover hints** go through `data-tip` and `src/ui/feedback/TooltipLayer.tsx` (one themed bubble).
   Components do not set `title` - the OS tooltip cannot be styled - and icon-only
   controls keep an `aria-label` as their accessible name.
