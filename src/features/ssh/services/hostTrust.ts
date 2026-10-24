@@ -1,8 +1,9 @@
 import { ask } from '@tauri-apps/plugin-dialog';
 import { sshHostKeyInfo, sshTrustHostKey, type SshHostKeyInfo } from './api';
+import type { SshOptions } from '@core/ssh';
 
-export async function prepareSshHost(host: string, port?: number, signal?: AbortSignal): Promise<SshHostKeyInfo> {
-  const info = await sshHostKeyInfo(host, port);
+export async function prepareSshHost(host: string, port?: number, signal?: AbortSignal, options?: SshOptions): Promise<SshHostKeyInfo> {
+  const info = await (options ? sshHostKeyInfo(host, port, options) : sshHostKeyInfo(host, port));
   signal?.throwIfAborted();
   if (info.known) return info;
   const confirmed = await ask(
@@ -11,7 +12,7 @@ export async function prepareSshHost(host: string, port?: number, signal?: Abort
   );
   signal?.throwIfAborted();
   if (!confirmed) throw new Error('已取消 SSH 连接');
-  await sshTrustHostKey(host, port, info.fingerprint);
+  await (options ? sshTrustHostKey(host, port, info.fingerprint, options) : sshTrustHostKey(host, port, info.fingerprint));
   signal?.throwIfAborted();
   return info;
 }

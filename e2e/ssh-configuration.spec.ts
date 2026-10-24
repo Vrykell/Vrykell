@@ -10,7 +10,7 @@ test('GUI forwarding and text mode preserve rules, copy text, and save and conne
   await page.getByTestId('ssh-form-name').fill('Mapped server');
   await page.getByTestId('ssh-form-host').fill('server.example.com');
   await page.getByTestId('ssh-form-user').fill('tester');
-  await page.getByTestId('ssh-section-tab-forwarding').click();
+  await page.getByText('高级连接选项', { exact: true }).click();
   await page.getByTestId('ssh-forward-add').click();
   await page.getByTestId('ssh-forward-port-0').fill('8080');
   await page.getByTestId('ssh-forward-target-port-0').fill('80');
@@ -24,7 +24,6 @@ test('GUI forwarding and text mode preserve rules, copy text, and save and conne
   await page.getByRole('option', { name: '图形模式' }).click();
   await expect(page.getByTestId('ssh-forward-port-0')).toHaveValue('9090');
   await expect(page.getByTestId('ssh-forward-target-port-0')).toHaveValue('5432');
-  await page.getByTestId('ssh-section-tab-advanced').click();
   await page.getByTestId('ssh-form-auto-reconnect').check();
   await expect(page.getByTestId('ssh-form-auto-reconnect')).toHaveCSS('appearance', 'auto');
   await page.getByTestId('ssh-save-connect-btn').click();
@@ -65,10 +64,10 @@ test('pending automatic reconnect has a visible countdown and can be stopped', a
   await setupTauriMock(page, { sshHost: 'known', integration: false });
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
-  await page.getByTestId('ssh-quick-btn').click();
+  await page.getByTestId('ssh-host-actions').click(); await page.getByRole('button', { name: '快速连接', exact: true }).click();
   await expect(page.getByTestId('ssh-form-host')).toBeFocused();
   await page.getByTestId('ssh-form-host').fill('server.example.com');
-  await page.getByTestId('ssh-section-tab-advanced').click();
+  if (await page.getByTestId('ssh-section-tab-advanced').count()) await page.getByTestId('ssh-section-tab-advanced').click();
   await page.getByTestId('ssh-form-auto-reconnect').check();
   await page.getByTestId('ssh-connect-btn').click();
   await page.getByRole('button', { name: '断开连接', exact: true }).waitFor();

@@ -92,6 +92,7 @@ button.ssh-status-reconnect.text-control:not(:disabled):is(:hover, :focus-visibl
 .ssh-status-details > summary:is(:hover, :focus-visible) > svg { color: inherit; }
 .ssh-status-details[open] > summary > svg { transform: rotate(90deg); }
 .ssh-status-details-body { padding: 8px 14px 12px; }
+.ssh-status-details > h4 { margin: 0; padding: 12px 14px 4px; color: var(--text-secondary); font: var(--fw-medium) var(--fs-label) var(--font-ui); }
 .ssh-status-system-body { padding: 0 14px 14px; }
 .ssh-status-system { display: flex; flex-direction: column; gap: 2px; min-width: 0; margin: 10px 0 12px; overflow-wrap: anywhere; }
 .ssh-status-system strong { color: var(--text-primary); font-size: var(--fs-body); font-weight: var(--fw-semibold); }

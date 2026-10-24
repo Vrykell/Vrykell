@@ -1,4 +1,5 @@
 import { t } from '@i18n';
+import { useHostSystems } from '@config/hostSystems';
 import { Channel } from '@tauri-apps/api/core';
 import { invoke } from '@platform/diagnostics';
 import type { FsEntry, FileStat } from '@platform/api/types';
@@ -9,7 +10,7 @@ import type { SshAuthenticationTarget, SshOptions } from '@core/ssh';
  * 密码不回显：列表返回 hasPassword 标记，编辑时不回填明文。
  */
 
-export type SshAuthMethod = 'password' | 'key';
+export type SshAuthMethod = 'password' | 'key' | 'ask' | 'agent';
 
 export interface SshConnection extends SshOptions {
   id: string;
@@ -52,13 +53,17 @@ const DYNAMIC_FORWARD = new RegExp(`^(?:${FORWARD_HOST}:)?(\\d{1,5})$`);
 
 /** 表单校验：返回错误信息，合法返回 null。 */
 export function validateSshConnection(c: Partial<SshConnection>): string | null {
-  if (!c.name || !c.name.trim()) return '请输入连接名';
-  if (!c.host || !c.host.trim()) return '请输入主机 IP 或域名';
-  if (c.host.startsWith('-') || /\s/.test(c.host)) return '主机名不能包含空白或以 - 开头';
-  if (c.user?.startsWith('-') || /\s/.test(c.user ?? '')) return '账户名不能包含空白或以 - 开头';
-  if (c.serverAliveInterval !== undefined && (!Number.isInteger(c.serverAliveInterval) || c.serverAliveInterval < 0 || c.serverAliveInterval > 3600)) return '保活间隔需为 0-3600 秒的整数';
-  if (c.jumpHost && !c.jumpHost.split(',').every(value => /^(?:[\w.-]+@)?(?:\[[0-9a-fA-F:]+\]|[\w.][\w.-]*)(?::[0-9]{1,5})?$/.test(value) && Number(value.match(/:(\d+)$/)?.[1] ?? 22) > 0 && Number(value.match(/:(\d+)$/)?.[1] ?? 22) <= 65535)) return '跳板机格式为 用户@主机:端口，多个跳板机用逗号分隔';
-  if (/[\r\n\0]/.test(c.identityFile ?? '')) return '私钥路径不能包含控制字符';
+  if (!c.name || !c.name.trim()) return t('Enter a connection name.');
+  if (!c.host || !c.host.trim()) return t('Enter a host IP or domain.');
+  if (c.host.startsWith('-') || /\s/.test(c.host)) return t('The host cannot contain spaces or start with a dash.');
+  if (c.user?.startsWith('-') || /\s/.test(c.user ?? '')) return t('The account cannot contain spaces or start with a dash.');
+  if (c.serverAliveInterval !== undefined && (!Number.isInteger(c.serverAliveInterval) || c.serverAliveInterval < 0 || c.serverAliveInterval > 3600)) return t('Keepalive must be an integer from 0 to 3600 seconds.');
+  if (c.jumpHost && !c.jumpHost.split(',').every(value => /^(?:[\w.-]+@)?(?:\[[0-9a-fA-F:]+\]|[\w.][\w.-]*)(?::[0-9]{1,5})?$/.test(value) && Number(value.match(/:(\d+)$/)?.[1] ?? 22) > 0 && Number(value.match(/:(\d+)$/)?.[1] ?? 22) <= 65535)) return t('Use user@host:port for jump hosts, separated by commas.');
+  if (/[\r\n\0]/.test(c.identityFile ?? '')) return t('The private key path cannot contain control characters.');
+  if ([c.notes, c.aiNotes].some(value => new TextEncoder().encode(value ?? '').length > 16384)) return t('Host notes must not exceed 16,384 bytes.');
+  const variables = Object.entries(c.environment ?? {});
+  if (variables.length > 64 || variables.reduce((total, [name, value]) => total + new TextEncoder().encode(name + value).length, 0) > 32768
+    || variables.some(([name, value]) => !/^[A-Za-z_][A-Za-z0-9_]*$/.test(name) || name.length > 128 || new TextEncoder().encode(value).length > 8192 || /[\r\n\0]/.test(value))) return t('Invalid environment variable name, value or size.');
   for (const [specs, pattern, label] of [
     [c.localForwards, STATIC_FORWARD, 'Local forward'],
     [c.remoteForwards, STATIC_FORWARD, 'Remote forward'],
@@ -77,7 +82,7 @@ export function validateSshConnection(c: Partial<SshConnection>): string | null 
     c.port !== null &&
     (!Number.isInteger(c.port) || c.port < 1 || c.port > 65535)
   ) {
-    return '端口需为 1-65535 的整数';
+    return t('Port must be an integer from 1 to 65535.');
   }
   return null;
 }
@@ -113,7 +118,7 @@ export function sshTest(target: {
     options: { identityFile: target.identityFile, jumpHost: target.jumpHost,
       serverAliveInterval: target.serverAliveInterval, shellIntegration: target.shellIntegration,
       localForwards: target.localForwards, remoteForwards: target.remoteForwards,
-      dynamicForwards: target.dynamicForwards },
+      dynamicForwards: target.dynamicForwards, proxyId: target.proxyId, environment: target.environment, authenticationMode: target.authenticationMode },
   });
 }
 
@@ -134,16 +139,16 @@ export function connectionTarget(conn: SshConnection) {
     identityFile: conn.identityFile, jumpHost: conn.jumpHost, serverAliveInterval: conn.serverAliveInterval,
     shellIntegration: conn.shellIntegration, localForwards: conn.localForwards,
     remoteForwards: conn.remoteForwards, dynamicForwards: conn.dynamicForwards,
-    autoReconnect: conn.autoReconnect };
+    autoReconnect: conn.autoReconnect, proxyId: conn.proxyId, environment: conn.environment, notes: conn.notes, aiNotes: conn.aiNotes, authenticationMode: conn.authMethod };
 }
 
-export function sshHostKeyInfo(host: string, port?: number): Promise<SshHostKeyInfo> {
-  return invoke('ssh_host_key_info', { host, port: port ?? null });
+export function sshHostKeyInfo(host: string, port?: number, options?: SshOptions): Promise<SshHostKeyInfo> {
+  return invoke('ssh_host_key_info', { host, port: port ?? null, ...(options ? { options } : {}) });
 }
 
 /** 用户确认指纹后记录主机密钥到 known_hosts（幂等）。 */
-export function sshTrustHostKey(host: string, port: number | undefined, expectedFingerprint: string): Promise<void> {
-  return invoke('ssh_trust_host_key', { host, port: port ?? null, expectedFingerprint });
+export function sshTrustHostKey(host: string, port: number | undefined, expectedFingerprint: string, options?: SshOptions): Promise<void> {
+  return invoke('ssh_trust_host_key', { host, port: port ?? null, expectedFingerprint, ...(options ? { options } : {}) });
 }
 
 /** 列出远程目录（按连接 id，密码由后端解析）。返回条目 + 实际目录真实路径。 */
@@ -193,8 +198,10 @@ export interface SshStatusMetrics {
 }
 
 /** Omitted selections retain full collection for existing terminal status panels. */
-export function sshSystemStatus(id: string, host: string, port: number, user?: string, metrics?: SshStatusMetrics): Promise<SshSystemStatus> {
-  return invoke('ssh_system_status', { id, host, port, user: user ?? null, ...(metrics ? { metrics } : {}) });
+export async function sshSystemStatus(id: string, host: string, port: number, user?: string, metrics?: SshStatusMetrics): Promise<SshSystemStatus> {
+  const status = await invoke<SshSystemStatus>('ssh_system_status', { id, host, port, user: user ?? null, ...(metrics ? { metrics } : {}) });
+  if (status?.system) useHostSystems.getState().remember(id, status.system);
+  return status;
 }
 
 /** Submit secrets through redacted fields; neither profiles nor diagnostics retain them. */

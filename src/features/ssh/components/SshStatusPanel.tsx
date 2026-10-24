@@ -2,14 +2,14 @@ import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import type { SshOptions, SshSessionStatus } from '@core/ssh';
 import { t } from '@i18n';
-import { ChevronRight, Copy, RefreshCw, X, iconSizes } from '@ui/icons';
+import { Copy, RefreshCw, X, iconSizes } from '@ui/icons';
 import { IconBtn, fmtSize } from '@ui/UiBtn';
 import { TextButton } from '@ui/TextButton';
 import ErrorBox from '@ui/ErrorBox';
 import ResizeHandle from '@ui/ResizeHandle';
 import { writeClipboardText } from '@platform/clipboard';
 import { useToastStore } from '@ui/Toast';
-import { hideSshStatus, showSshStatus, useSshStatusDismissRequest } from '@features/workspace/hooks/useAuxiliarySidebar';
+import { hideSshStatus, showSshStatus, useSshStatusDismissRequest, useSshStatusOpenRequest } from '@features/workspace/hooks/useAuxiliarySidebar';
 import { sshSystemStatus, type SshSystemStatus } from '../services/api';
 import { isSshAuthenticationFailure } from '../model/fileServiceState';
 import SshResourceChart, { RESOURCE_HISTORY_MS, resourceHistoryWindow, type ResourceSample } from './SshResourceChart';
@@ -59,6 +59,8 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
   const authenticationRevision = useSshAuthenticationRevision(target.connectionId);
   const temporaryAuthentication = useHasTemporarySshAuthentication(target.connectionId);
   const [open, setOpen] = useState(false);
+  const globalRequest = useSshStatusOpenRequest(paneId);
+  useEffect(() => { if (globalRequest > 0) setOpen(true); }, [globalRequest]);
   const fallbackId = useId();
   const sidebarOwner = paneId ?? fallbackId;
   const displayOpen = open && active && focused;
@@ -321,8 +323,8 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
                     <Metric resource="disk" label={t('Root disk usage')} used={sample.diskUsed} total={sample.diskTotal} />
                   </dl>
                 </div>
-                <details className="ssh-status-system-section ssh-status-details">
-                  <summary>{t('System information')}<ChevronRight size={iconSizes.compact} /></summary>
+                <section className="ssh-status-system-section ssh-status-details">
+                  <h4>{t('System information')}</h4>
                   <div className="ssh-status-system-body">
                   <div className="ssh-status-system"><strong>{sample.hostname || t('Unavailable')}</strong><span>{sample.system || t('Unavailable')}</span></div>
                   <dl className="ssh-status-facts">
@@ -332,21 +334,21 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
                     </dd></div>
                   </dl>
                   </div>
-                </details>
+                </section>
               </div>}
             </>}
           </section>
           <section className="ssh-status-groups">
-            <details className="ssh-status-details ssh-status-connection">
-              <summary>{t('Connection details')}<ChevronRight size={iconSizes.compact} /></summary>
+            <section className="ssh-status-details ssh-status-connection">
+              <h4>{t('Connection details')}</h4>
               <dl className="ssh-status-facts">
                 <div className="ssh-status-row"><dt>{state.phase === 'interactive' ? t('Session duration') : t('Connected for')}</dt><dd>{connectedAt == null ? '—' : statusDuration((now - connectedAt) / 1000)}</dd></div>
                 <div className="ssh-status-row"><dt>{t('Reconnect attempts')}</dt><dd>{state.reconnectAttempt}</dd></div>
                 {sample && <div className="ssh-status-row" data-tip={t('Measured on a separate SSH connection.')}><dt>{t('Probe latency')}</dt><dd>{sample.latencyMs} ms</dd></div>}
               </dl>
-            </details>
-            <details className="ssh-status-details ssh-status-history">
-              <summary>{t('Connection log')}<ChevronRight size={iconSizes.compact} /></summary>
+            </section>
+            <section className="ssh-status-details ssh-status-history">
+              <h4>{t('Connection log')}</h4>
               <div className="ssh-status-details-body">
                 <div className="ssh-status-log scroll-region" ref={logRef}>
                   {state.log.length === 0
@@ -354,7 +356,7 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
                     : <ol className="ssh-status-events">{state.log.map((entry, index) => <li key={`${entry.time}-${index}`}><time>{new Date(entry.time).toLocaleTimeString()}</time><span>{entry.text}</span></li>)}</ol>}
                 </div>
               </div>
-            </details>
+            </section>
           </section>
         </div>
         <footer className="ssh-status-controls">

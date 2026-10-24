@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import SshFormModal from '@features/ssh/components/SshFormModal';
+vi.mock('@features/ssh/services/proxies', () => ({ getProxies: vi.fn().mockResolvedValue({ profiles: [], defaultId: null }) }));
 
 vi.mock('@features/ssh', () => ({
   useSshStore: (selector: (state: { save: () => Promise<void>; remove: () => Promise<void> }) => unknown) =>
@@ -13,10 +14,9 @@ describe('SSH form dismissal', () => {
     render(<SshFormModal open initial={null} onClose={vi.fn()} onConnect={onConnect} />);
     fireEvent.change(screen.getByTestId('ssh-form-host'), { target: { value: 'target' } });
     fireEvent.change(screen.getByTestId('ssh-form-user'), { target: { value: 'tester' } });
-    fireEvent.click(screen.getByRole('combobox', { name: '认证方式' }));
-    fireEvent.click(screen.getByRole('option', { name: '密钥 / SSH Agent' }));
+    fireEvent.click(screen.getByRole('radio', { name: '密钥' }));
     fireEvent.change(screen.getByTestId('ssh-form-identity'), { target: { value: 'C:/private/key' } });
-    fireEvent.click(screen.getByTestId('ssh-section-tab-advanced'));
+    expect(screen.queryByTestId('ssh-section-tab-advanced')).toBeNull();
     fireEvent.change(screen.getByTestId('ssh-form-jump'), { target: { value: 'user@jump:2222' } });
     fireEvent.change(screen.getByTestId('ssh-form-keepalive'), { target: { value: '45' } });
     fireEvent.click(screen.getByTestId('ssh-connect-btn'));
@@ -29,13 +29,13 @@ describe('SSH form dismissal', () => {
     const onConnect = vi.fn();
     render(<SshFormModal open initial={null} onClose={vi.fn()} onConnect={onConnect} />);
     fireEvent.change(screen.getByTestId('ssh-form-host'), { target: { value: 'target' } });
-    fireEvent.click(screen.getByTestId('ssh-section-tab-forwarding'));
+    expect(screen.queryByTestId('ssh-section-tab-forwarding')).toBeNull();
     fireEvent.click(screen.getByRole('combobox', { name: '转发编辑模式' }));
     fireEvent.click(screen.getByRole('option', { name: '文本模式' }));
     // Blank lines and surrounding spaces are dropped; one specification per line.
     fireEvent.change(screen.getByTestId('ssh-form-local-forward'), { target: { value: '8080:localhost:80\n\n  9090:db:5432  \n' } });
     fireEvent.change(screen.getByTestId('ssh-form-dynamic-forward'), { target: { value: '1080' } });
-    fireEvent.click(screen.getByTestId('ssh-section-tab-advanced'));
+    expect(screen.queryByTestId('ssh-section-tab-advanced')).toBeNull();
     fireEvent.click(screen.getByTestId('ssh-form-auto-reconnect'));
     fireEvent.click(screen.getByTestId('ssh-connect-btn'));
     await waitFor(() => expect(onConnect).toHaveBeenCalledWith(expect.objectContaining({
@@ -52,7 +52,7 @@ describe('SSH form dismissal', () => {
     await waitFor(() => expect(screen.getByTestId('ssh-form-host')).toHaveFocus());
     screen.getByTestId('ssh-connect-btn').focus();
     fireEvent.keyDown(document.activeElement!, { key: 'Tab' });
-    expect(screen.getByTestId('ssh-section-tab-connection')).toHaveFocus();
+    expect(screen.getByTestId('ssh-form-name')).toHaveFocus();
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' });
     expect(onClose).toHaveBeenCalledOnce();
   });
@@ -60,7 +60,7 @@ describe('SSH form dismissal', () => {
     const onConnect = vi.fn();
     render(<SshFormModal open initial={null} onClose={vi.fn()} onConnect={onConnect} />);
     fireEvent.change(screen.getByTestId('ssh-form-host'), { target: { value: 'target' } });
-    fireEvent.click(screen.getByTestId('ssh-section-tab-forwarding'));
+    expect(screen.queryByTestId('ssh-section-tab-forwarding')).toBeNull();
     fireEvent.click(screen.getByTestId('ssh-forward-add'));
     fireEvent.change(screen.getByTestId('ssh-forward-port-0'), { target: { value: '8080' } });
     fireEvent.change(screen.getByTestId('ssh-forward-target-port-0'), { target: { value: '80' } });

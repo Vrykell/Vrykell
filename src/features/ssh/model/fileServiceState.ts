@@ -8,7 +8,7 @@ export interface FileServiceFailure {
 
 /** Authentication errors apply to every service using the saved SSH profile. */
 export function isSshAuthenticationFailure(detail: string): boolean {
-  return /SSH_AUTH_FAILED:|认证失败|用户名不能为空|SFTP_AUTH_REQUIRED:|\[Session\(-18\)\]|Authentication failed \(username\/password\)|Username\/PublicKey combination invalid/.test(detail);
+  return /SSH_AUTH_FAILED:|认证失败|用户名不能为空|SFTP_AUTH_REQUIRED:|\[Session\(-18\)\]|Authentication failed|Username\/PublicKey combination invalid/i.test(detail);
 }
 
 /** Classify only explicit capability failures; transport and directory errors remain distinct. */

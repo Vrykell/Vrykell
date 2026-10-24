@@ -9,6 +9,7 @@
  */
 
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { useSessionStore, isSessionTab } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
 import { leaves } from '@features/workspace/model/windowLayout';
@@ -20,9 +21,17 @@ interface RemotePathState {
   set: (connId: string, p: string | null) => void;
 }
 
-export const useRemotePathStore = create<RemotePathState>((set) => ({
+export const useRemotePathStore = create<RemotePathState>()(persist((set) => ({
   path: {},
   set: (connId, p) => set((s) => ({ path: { ...s.path, [connId]: p } })),
+}), {
+  name: 'vrykell-remote-files-locations',
+  partialize: state => ({ path: state.path }),
+  merge: (saved, current) => {
+    const path = (saved as Partial<RemotePathState> | null)?.path;
+    return { ...current, path: path && typeof path === 'object' && !Array.isArray(path)
+      ? Object.fromEntries(Object.entries(path).filter(([connectionId, value]) => connectionId && (value === null || typeof value === 'string' && value.startsWith('/')))) : {} };
+  },
 }));
 
 /** 规范化远程绝对路径（POSIX 语义，实现见平台层）。 */

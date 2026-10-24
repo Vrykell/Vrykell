@@ -18,7 +18,7 @@ async function expectDockedStatus(page: Page) {
   expect(await pane.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
 }
 
-test('the docked status panel follows the light theme and keeps event history collapsible', async ({ page }) => {
+test('the docked status panel follows the light theme and shows event history directly', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await page.getByRole('button', { name: '设置', exact: true }).click();
@@ -32,9 +32,7 @@ test('the docked status panel follows the light theme and keeps event history co
   await expect(panel).toContainText('Linux 6.8');
   await expectDockedStatus(page);
   const history = panel.locator('.ssh-status-history');
-  await expect(history).not.toHaveAttribute('open');
-  await history.locator('summary').click();
-  await expect(history).toHaveAttribute('open');
+  await expect(history.locator('summary')).toHaveCount(0);
   await expect(history.locator('.ssh-status-log')).toContainText('Permanently added server');
   await page.screenshot({ path: 'test-results/ssh-status-light.png' });
 });
@@ -104,22 +102,8 @@ test('SSH status uses real session state and does not write probes into the term
   await expect(panel.getByRole('img', { name: '资源使用率趋势' })).toBeVisible();
   await expect(panel.getByTestId('ssh-resource-cpu')).toBeVisible();
   await page.screenshot({ path: 'test-results/ssh-status-dark.png' });
-  await expect(panel.locator('.ssh-status-connection')).not.toHaveAttribute('open');
-  const connectionSummary = panel.locator('.ssh-status-connection > summary');
-  await connectionSummary.hover();
-  const labelInset = await connectionSummary.evaluate(element => {
-    const text = element.firstChild;
-    if (!text) return 0;
-    const range = document.createRange();
-    range.selectNodeContents(text);
-    return range.getBoundingClientRect().left - element.getBoundingClientRect().left;
-  });
-  expect(labelInset).toBeGreaterThanOrEqual(8);
-  await page.screenshot({ path: 'test-results/ssh-status-connection-hover.png' });
-  await connectionSummary.click();
-  await expect(connectionSummary.locator('svg')).toHaveCSS('transform', 'matrix(0, 1, -1, 0, 0, 0)');
+  await expect(panel.locator('.ssh-status-connection > summary')).toHaveCount(0);
   await expect(panel.getByText('探测延迟', { exact: true })).toBeVisible();
-  await connectionSummary.click();
   await page.mouse.move(450, 250);
   await page.screenshot({ path: 'test-results/ssh-status-inspired.png' });
   expect(await ptyWrites(page)).toEqual(writes);
@@ -263,7 +247,7 @@ test('command password prompts preserve the connected state, duration and monito
   const panel = page.getByTestId('ssh-status-panel');
   await expect(panel).toContainText('Linux 6.8');
   const duration = panel.locator('.ssh-status-row').filter({ hasText: '连接时长' });
-  await panel.locator('.ssh-status-connection > summary').click();
+  await expect(panel.locator('.ssh-status-connection > summary')).toHaveCount(0);
   await expect(duration).not.toContainText('0 分 0 秒');
   await emitPtyOutput(page, '\x1b[2J\x1b[H[sudo] password for deploy:');
   await expect(page.getByLabel('SSH 认证响应')).toBeVisible();

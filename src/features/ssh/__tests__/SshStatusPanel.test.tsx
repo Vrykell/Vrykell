@@ -105,15 +105,13 @@ describe('SSH status panel', () => {
     render(<SshStatusPanel target={target} state={connected} active />);
     open(); await screen.findByText('Linux 6.8');
     expect(screen.getByText('node')).toBeInTheDocument();
-    const system = screen.getByText('系统信息').closest('details')!;
-    expect(system).not.toHaveAttribute('open');
-    fireEvent.click(system.querySelector('summary')!);
+    const system = screen.getByText('系统信息').closest('section')!;
+    expect(system.querySelector('summary')).toBeNull();
     expect(screen.getByText('1 分钟')).toBeInTheDocument();
     expect(screen.getByText('5 分钟')).toBeInTheDocument();
     expect(screen.getByText('15 分钟')).toBeInTheDocument();
-    const connection = screen.getByText('连接详情').closest('details')!;
-    expect(connection).not.toHaveAttribute('open');
-    fireEvent.click(connection.querySelector('summary')!);
+    const connection = screen.getByText('连接详情').closest('section')!;
+    expect(connection.querySelector('summary')).toBeNull();
     expect(screen.getByText('探测延迟')).toBeVisible();
   });
 
@@ -144,9 +142,8 @@ describe('SSH status panel', () => {
       expect(panel.parentElement?.parentElement).toBe(host);
       expect(screen.getByTestId('terminal-content')).toBeVisible();
       const history = panel.querySelector('.ssh-status-history')!;
-      expect(history).not.toHaveAttribute('open');
-      fireEvent.click(history.querySelector('summary')!);
-      expect(history).toHaveAttribute('open');
+      expect(history.querySelector('summary')).toBeNull();
+      expect(history).toBeVisible();
       expect(useAuxiliarySidebarStore.getState().sshStatusOwner).toBe('ssh-pane');
     } finally { view.unmount(); host.remove(); }
   });
@@ -168,7 +165,7 @@ describe('SSH status panel', () => {
       await waitFor(() => expect(host).toBeEmptyDOMElement());
     } finally { view.unmount(); host.remove(); }
   });
-  it('resizes with the shared handle, clamps width and retains it after reopening', () => {
+  it('resizes with the shared handle, clamps width and retains it after reopening', async () => {
     function ResizablePanel() {
       const [width, setWidth] = useState(300);
       return <SshStatusPanel target={{ ...target, connectionId: undefined }} state={connected} active width={width} onWidthChange={setWidth} />;
@@ -186,13 +183,14 @@ describe('SSH status panel', () => {
     expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '376');
     fireEvent.mouseDown(screen.getByTestId('ssh-status-resize-handle'), { clientX: 400 });
     fireEvent.mouseMove(document, { clientX: -1000 });
+    await act(async () => { await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); });
     expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '560');
     fireEvent.mouseUp(document);
     open(); open();
     expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '560');
   });
 
-  it('folds past the minimum while dragging, restores on drag back and closes when released there', () => {
+  it('folds past the minimum while dragging, restores on drag back and closes when released there', async () => {
     function ResizablePanel() {
       const [width, setWidth] = useState(300);
       return <SshStatusPanel target={{ ...target, connectionId: undefined }} state={connected} active width={width} onWidthChange={setWidth} />;
@@ -202,9 +200,11 @@ describe('SSH status panel', () => {
     const handle = screen.getByTestId('ssh-status-resize-handle');
     fireEvent.mouseDown(handle, { clientX: 400 });
     fireEvent.mouseMove(document, { clientX: 700 });
+    await act(async () => { await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); });
     expect(screen.getByTestId('ssh-status-panel')).not.toBeVisible();
     expect(screen.getByTestId('ssh-status-resize-handle')).toBeInTheDocument();
     fireEvent.mouseMove(document, { clientX: 640 });
+    await act(async () => { await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); });
     expect(screen.getByTestId('ssh-status-panel')).toBeVisible();
     expect(screen.getByRole('separator')).toHaveAttribute('aria-valuenow', '300');
     fireEvent.mouseUp(document);

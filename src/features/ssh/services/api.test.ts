@@ -22,8 +22,15 @@ import {
   sshSearchFiles,
 } from '@features/ssh/services/api';
 import { diagnosticSnapshot } from '@platform/diagnostics';
+import { useHostSystems } from '@config/hostSystems';
 
 describe('sshApi', () => {
+  it('records system identity from an existing authenticated status query', async () => {
+    invokeMock.mockResolvedValueOnce({ system: 'Linux' });
+    await sshSystemStatus('identity-test', 'host.test', 22);
+    expect(useHostSystems.getState().systems['identity-test']).toBe('Linux');
+    useHostSystems.setState({ systems: {} });
+  });
   it('streams file matches before completion and cancels stale requests', async () => {
     let finish!: (result: { entries: never[]; truncated: boolean; skipped: number }) => void;
     invokeMock.mockImplementation(command => command === 'ssh_search' ? new Promise(resolve => { finish = resolve; }) : Promise.resolve());
@@ -93,8 +100,8 @@ describe('sshApi', () => {
   });
 
   it('validateSshConnection 校验名称/主机/端口', () => {
-    expect(validateSshConnection({ name: '', host: 'h' })).toBe('请输入连接名');
-    expect(validateSshConnection({ name: 'n', host: '' })).toBe('请输入主机 IP 或域名');
+    expect(validateSshConnection({ name: '', host: 'h' })).toBe('请输入连接名。');
+    expect(validateSshConnection({ name: 'n', host: '' })).toBe('请输入主机 IP 或域名。');
     expect(validateSshConnection({ name: 'n', host: 'h', port: 0 })).toContain('端口');
     expect(validateSshConnection({ name: 'n', host: 'h', port: 70000 })).toContain('端口');
     expect(validateSshConnection({ name: 'n', host: 'h', port: 22 })).toBeNull();
