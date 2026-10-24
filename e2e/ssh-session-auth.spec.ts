@@ -36,7 +36,7 @@ test('temporary authentication recovers files and resources together without cha
   await page.screenshot({ path: 'test-results/ssh-auth-narrow.png' });
   await page.getByTestId('ssh-session-secret').fill('wrong-fixture-password');
   await dialog.getByRole('button', { name: '认证', exact: true }).click();
-  await expect(dialog).toContainText('请检查服务器密码或私钥解密口令后重试');
+  await expect(page.getByRole('alert')).toContainText('请检查服务器密码或私钥解密口令后重试');
   await expect(page.getByTestId('ssh-session-secret')).toHaveValue('');
   await page.getByTestId('ssh-session-secret').fill('fixture-server-password');
   await page.getByTestId('ssh-session-secret').press('Enter');
@@ -46,9 +46,9 @@ test('temporary authentication recovers files and resources together without cha
   await page.getByTestId('ssh-status-toggle').last().click();
   const status = page.getByTestId('ssh-status-panel');
   await expect(status).toContainText('Linux 6.8');
-  await status.locator('.ssh-status-connection > summary').click();
+  await expect(status.getByRole('heading', { name: '连接详情' })).toBeVisible();
   await status.getByRole('button', { name: '清除临时凭据' }).click();
-  await expect(status).toContainText('已保存的 SSH 认证信息被拒绝');
+  await expect(page.locator('#app-notifications').getByRole('alert')).toContainText('已保存的 SSH 认证信息被拒绝');
   expect(await ptyWrites(page)).toEqual(writes);
   const storage = await page.evaluate(() => JSON.stringify({ ...localStorage }));
   expect(storage).not.toContain('fixture-server-password');

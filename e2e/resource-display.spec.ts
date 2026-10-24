@@ -71,7 +71,7 @@ for (const theme of ['dark', 'light'] as const) {
     const system = panel.locator('.ssh-status-system-section');
     await expect(system).not.toHaveAttribute('open');
     await page.screenshot({ path: testInfo.outputPath(`resources-default-${theme}-300.png`) });
-    await system.locator('summary').click();
+    await expect(system.getByRole('heading', { name: '系统信息' })).toBeVisible();
     await expect(panel.getByText('1 分钟', { exact: true })).toBeVisible();
     await expect(panel.getByText('5 分钟', { exact: true })).toBeVisible();
     await expect(panel.getByText('15 分钟', { exact: true })).toBeVisible();
@@ -329,7 +329,7 @@ test('automatic probes respect pause and visibility and retain actionable failur
   await expect(result).toContainText('50%');
   await page.evaluate(() => { (window as unknown as Record<string, string>).__NETWORK_PROBE_ERROR__ = 'Address resolution failed'; });
   await panel.getByRole('button', { name: '重新探测', exact: true }).click();
-  await expect(panel).toContainText('网络探测失败');
+  await expect(page.getByRole('alert')).toContainText('网络探测失败');
   await expect(result).toContainText('上次探测结果');
   await page.screenshot({ path: testInfo.outputPath('network-error-retains-previous-result.png') });
   expect(await ptyWrites(page)).toEqual(writes);

@@ -11,8 +11,8 @@ test.beforeEach(async ({ page }) => {
 
 test.describe('SSH 远程连接管理侧栏', () => {
   test('Enter on an edit button opens the form without connecting', async ({ page }) => {
-    await page.getByTestId('ssh-row-ssh-1').click();
-    const edit = page.getByRole('button', { name: '编辑「生产服务器」', exact: true }).last();
+    await page.getByTestId('ssh-row-ssh-1').press('Shift+F10');
+    const edit = page.getByRole('button', { name: '编辑连接', exact: true });
     await edit.focus();
     await edit.press('Enter');
     await expect(page.getByTestId('ssh-form-name')).toHaveValue('生产服务器');
@@ -37,15 +37,15 @@ test.describe('SSH 远程连接管理侧栏', () => {
       return { outerPadding: getComputedStyle(el).padding, padding: style.padding, radius: style.borderRadius, height: inner.getBoundingClientRect().height, background: style.backgroundColor, gap: style.gap, icon: inner.querySelector('svg')?.getBoundingClientRect().width };
     });
     const sshStyle = await rowStyle('[data-testid="ssh-row-ssh-1"]');
-    expect(sshStyle).toMatchObject({ outerPadding: '2px 6px', padding: '8px 10px', radius: '8px', gap: '8px', icon: 20 });
+    expect(sshStyle).toMatchObject({ outerPadding: '0px', padding: '6px 14px', radius: '8px', gap: '12px', icon: 20 });
     await expect(row).toHaveAttribute('data-tip', /root@prod.example.com:22/);
     await ensureTabsOpen(page);
     await expect(page.locator('[data-tab-row-id]').first()).toHaveClass(/folder-tab/);
-    await expect(page.locator('[data-tab-row-id] [role="tab"] svg').first()).toHaveCSS('width', '16px');
+    await expect(page.locator('[data-tab-row-id] [role="tab"] svg').first()).toHaveCSS('width', '18px');
   });
   test('顶栏：搜索 + 编辑 + 新建按钮', async ({ page }) => {
     await expect(page.locator('[data-testid="ssh-search"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: '编辑「生产服务器」', exact: true })).toBeVisible();
+    await page.getByTestId('ssh-row-ssh-1').click({ button: 'right' }); await expect(page.getByRole('button', { name: '编辑连接', exact: true })).toBeVisible();
     await expect(page.locator('[data-testid="ssh-new-btn"]')).toBeVisible();
   });
 
@@ -79,7 +79,7 @@ test.describe('SSH 远程连接管理侧栏', () => {
 
   test('编辑选中连接并删除', async ({ page }) => {
     await page.getByText('生产服务器').click(); // 选中
-    await page.getByRole('button', { name: '编辑「生产服务器」', exact: true }).click();
+    await page.getByTestId('ssh-row-ssh-1').click({ button: 'right' }); await page.getByRole('button', { name: '编辑连接', exact: true }).click();
     await expect(page.locator('[data-testid="ssh-form-name"]')).toHaveValue('生产服务器');
     await page.locator('[data-testid="ssh-delete-btn"]').click();
     await page.getByTestId('confirm-ok').click();

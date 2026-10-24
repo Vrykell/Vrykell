@@ -52,7 +52,7 @@ test('partial import failures stay in place and retry only failed hosts', async 
   await page.getByTestId('ssh-import-db').waitFor();
   await page.getByTestId('ssh-import-confirm').click();
   const dialog = page.getByRole('dialog', { name: '导入 SSH 连接' });
-  await expect(dialog.getByText('Permission denied')).toBeVisible();
+  await expect(page.getByRole('alert').getByText('Permission denied')).toBeVisible();
   await expect(dialog.getByTestId('ssh-import-web')).toBeDisabled();
   await expect(dialog.getByTestId('ssh-import-db')).toBeChecked();
   await dialog.getByRole('button', { name: '重试失败项' }).click();

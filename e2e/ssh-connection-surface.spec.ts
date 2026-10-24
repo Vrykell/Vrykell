@@ -47,7 +47,7 @@ test('the authentication row uses a compact reveal toggle and the blue send acti
   await expect(reveal).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const accentUser = await page.evaluate(() => {
     const probe = document.createElement('div');
-    probe.style.backgroundColor = 'var(--accent-user)';
+    probe.style.backgroundColor = 'var(--primary-button-bg)';
     document.body.appendChild(probe);
     const value = getComputedStyle(probe).backgroundColor;
     probe.remove();

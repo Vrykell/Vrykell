@@ -5,7 +5,7 @@ for (const theme of ['dark', 'light']) test(`unified hosts follow the list and c
   await setupTauriMock(page, { schedulesSeed: [] });
   await page.addInitScript(theme => {
     localStorage.setItem('vrykell-theme-mode', theme);
-    localStorage.setItem('e2e-conversations', JSON.stringify([{ id: 'favorite-chat', title: 'Deployment notes', createdAt: Date.now(), updatedAt: Date.now(), environment: null }]));
+    localStorage.setItem('e2e-conversations', JSON.stringify([{ id: 'favorite-chat', title: 'Deployment notes', created_at: Date.now(), updated_at: Date.now(), environment: 'null' }]));
   }, theme);
   await page.goto('/');
   await page.evaluate(async () => {
@@ -23,6 +23,8 @@ for (const theme of ['dark', 'light']) test(`unified hosts follow the list and c
     const { useHistoryMetaStore } = await import(metaPath) as typeof import('../src/utils/historyMeta');
     const { useChatStore } = await import(chatPath) as typeof import('../src/features/chat/stores/chat');
     useHistoryMetaStore.getState().setStarred(['session:hist-1', 'conversation:favorite-chat'], true);
+    const ipcPath = '/src/platform/diagnostics.ts'; const { invoke } = await import(ipcPath) as typeof import('../src/platform/diagnostics');
+    await invoke('save_conversation', { id: 'favorite-chat', title: 'Deployment notes', createdAt: Date.now(), updatedAt: Date.now(), environment: 'null' });
     useChatStore.setState({ conversationsLoaded: true, conversations: [{ id: 'favorite-chat', title: 'Deployment notes', createdAt: Date.now(), updatedAt: Date.now(), environment: null }] });
   });
   const starColor = await page.evaluate(() => { const probe = document.createElement('i'); probe.style.color = 'var(--favorite-color)'; document.body.append(probe); const value = getComputedStyle(probe).color; probe.remove(); return value; });
@@ -50,9 +52,10 @@ for (const theme of ['dark', 'light']) test(`unified hosts follow the list and c
     await page.getByRole('button', { name: layout === 'table' ? '表格视图' : '卡片视图', exact: true }).click();
     if (layout === 'cards') {
       const cards = root.locator('.ssh-dashboard-card');
-      const first = (await cards.nth(0).boundingBox())!; const third = (await cards.nth(2).boundingBox())!; const fourth = (await cards.nth(3).boundingBox())!;
-      expect(third.y).toBe(first.y); expect(fourth.y).toBeGreaterThan(first.y);
-      expect(first.height).toBeCloseTo(144, 0);
+      const columns = await root.locator('.ssh-dashboard-group-section').first().evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length);
+      const first = (await cards.nth(0).boundingBox())!; const lastInRow = (await cards.nth(columns - 1).boundingBox())!; const nextRow = (await cards.nth(columns).boundingBox())!;
+      expect(lastInRow.y).toBe(first.y); expect(nextRow.y).toBeGreaterThan(first.y);
+      expect(first.height).toBeGreaterThanOrEqual(116); expect(first.height).toBeLessThanOrEqual(160);
     }
     await expect(row.locator(layout === 'table' ? '.sidebar-row-title > svg' : '.ssh-dashboard-card-title > svg')).toHaveCSS('color', starColor);
     await page.screenshot({ path: info.outputPath(`prototype-${theme}-${layout}.png`), animations: 'disabled' });

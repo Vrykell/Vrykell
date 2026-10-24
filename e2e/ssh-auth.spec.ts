@@ -129,7 +129,7 @@ test('first SSH connection confirms its fingerprint and accepts authentication i
   const dialogs = await ipcRecords(page, '__SSH_DIALOGS__');
   expect(dialogs).toHaveLength(1);
   expect(dialogs[0]?.message).toContain('SHA256:e2e-verified-key');
-  expect(await ipcRecords(page, '__SSH_TRUSTS__')).toEqual([{ host: 'prod.example.com', port: 22, expectedFingerprint: 'SHA256:e2e-verified-key' }]);
+  expect(await ipcRecords(page, '__SSH_TRUSTS__')).toMatchObject([{ host: 'prod.example.com', port: 22, expectedFingerprint: 'SHA256:e2e-verified-key', options: { host: 'prod.example.com', port: 22, user: 'root' } }]);
   const sshSpawns = (await ipcRecords(page, '__PTY_SPAWNS__')).filter(s => s.ssh);
   expect(sshSpawns).toHaveLength(1);
   expect(sshSpawns[0]?.ssh).toMatchObject({ hostKeyType: 'ed25519' });
