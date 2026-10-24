@@ -1,5 +1,15 @@
 /** Internal message identifiers retain explicit English labels. Other keys are their English copy. */
 const en: Record<string, string> = {
+  'Value': 'Value',
+  'Add tags…': 'Add tags…', 'Tags': 'Tags', 'Private key': 'Private key',
+  'Just now': 'Just now',
+  'Today {{time}}': 'Today {{time}}', 'Yesterday {{time}}': 'Yesterday {{time}}',
+  'Notes': 'Notes',
+  'List': 'List',
+  'Hosts': 'Hosts', 'Cards': 'Cards', 'Add tags when editing a host.': 'Add tags when editing a host.',
+  'Advanced connection options': 'Advanced connection options',
+  'Route the connection through a jump host (ProxyJump).': 'Route the connection through a jump host (ProxyJump).',
+  'workspace.nav.terminals': 'Terminal sessions', 'workspace.nav.files': 'Project files', 'workspace.nav.conversations': 'AI conversations', 'workspace.nav.hosts': 'Host management', 'workspace.nav.dashboard': 'Resource dashboard',
   'dock.git': 'Source control', 'dock.tabs': 'Tabs', 'dock.files': 'Files', 'dock.ssh': 'SSH', 'dock.chat': 'AI assistant', 'dock.settings': 'Settings',
   'dock.dragTip': 'Drag to reorder or change sides / click to {{action}}', 'dock.open': 'Open', 'dock.close': 'Close',
   'panel.newTab': 'New tab', 'panel.emptyDir': 'Empty directory', 'panel.goUp': 'Back', 'panel.enterDir': 'Open directory', 'panel.addToInput': 'Add path to AI input',
