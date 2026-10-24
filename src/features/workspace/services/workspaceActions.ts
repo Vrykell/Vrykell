@@ -1,4 +1,5 @@
 import { editorFileKey } from '@core/editor';
+import { newEditorFile } from '@features/editor/services/documentActions';
 import { t } from '@i18n';
 import { pickPath } from '@platform/api/fs';
 import { useToastStore } from '@ui/Toast';
@@ -6,6 +7,10 @@ import { useAiWorkspace, useChatStore } from '@features/chat';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { useWorkspaceStore } from '../stores/workspace';
 import { orderedWorkspaceIds, useWorkspaceNavigation, workspaceAreaForKind, type WorkspaceArea } from '../stores/navigation';
+import { useUnifiedWorkspace } from '../stores/unifiedWorkspace';
+import { workspacePaneCells } from '../model/workspaceResources';
+import { currentWorkspaceResources } from './workspaceResources';
+import { focusUnifiedResource } from './unifiedWorkspace';
 
 export function sideAiHasFocus(element: Element | null = document.activeElement): boolean {
   return useWorkspaceNavigation.getState().aiPlacement === 'side' && !!element?.closest('[data-testid="ai-surface-side"], [data-workspace-focus="ai"]');
@@ -24,8 +29,16 @@ export async function openWorkspaceFile() {
 
 export function newWorkspaceItem() {
   const area = focusedWorkspaceArea();
+  if (area === 'unified') {
+    const state = useUnifiedWorkspace.getState();
+    const id = state.layout && workspacePaneCells(state.layout).find(cell => cell.id === state.focused)?.resourceId;
+    if (id?.startsWith('chat:')) { useAiWorkspace.getState().openNative(useChatStore.getState().createConversation()); useWorkspaceStore.getState().openHarnessTab(); }
+    else if (id?.startsWith('terminal:')) useWorkspaceStore.getState().addTab();
+    else newEditorFile();
+    return;
+  }
   if (area === 'terminal') useWorkspaceStore.getState().addTab();
-  else if (area === 'code') void openWorkspaceFile();
+  else if (area === 'code') newEditorFile();
   else if (area === 'ai') {
     const side = sideAiHasFocus();
     const id = useChatStore.getState().createConversation();
@@ -40,6 +53,12 @@ export function activateWorkspaceInstance(index: number): boolean {
   const workspace = useWorkspaceStore.getState();
   const navigation = useWorkspaceNavigation.getState();
   const area = focusedWorkspaceArea();
+  if (area === 'unified') {
+    const ids = currentWorkspaceResources().filter(resource => resource.kind !== 'page').map(resource => resource.id);
+    const id = orderedWorkspaceIds(ids, useUnifiedWorkspace.getState().order)[index];
+    if (!id) return false;
+    focusUnifiedResource(id); return true;
+  }
   if (area === 'terminal') {
     const tabs = [...workspace.groups.flatMap(group => workspace.tabs.filter(tab => tab.kind === 'session' && tab.groupId === group.id)),
       ...workspace.tabs.filter(tab => workspaceAreaForKind(tab.kind) === 'terminal' && (tab.kind !== 'session' || !tab.groupId || !workspace.groups.some(group => group.id === tab.groupId)))];

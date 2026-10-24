@@ -11,6 +11,7 @@ export function selectWorkspaceArea(area: WorkspaceArea, historyPreset: HistoryT
     return;
   }
   navigation.selectArea(area);
+  if (area === 'ssh' || area === 'forwarding' || area === 'unified') return;
   if (area === 'ai') {
     navigation.setAiPlacement('main');
     workspace.openHarnessTab();
@@ -19,5 +20,5 @@ export function selectWorkspaceArea(area: WorkspaceArea, historyPreset: HistoryT
   const systemPage = (kind: string) => kind === 'history' || kind === 'ai-history' || kind === 'usage';
   const candidate = workspace.tabs.find(tab => tab.id === navigation.lastTabs[area] && workspaceAreaForKind(tab.kind) === area && !systemPage(tab.kind))
     ?? workspace.tabs.find(tab => workspaceAreaForKind(tab.kind) === area && !systemPage(tab.kind));
-  if (candidate && area !== 'ssh') workspace.activate(candidate.id);
+  if (candidate) workspace.activate(candidate.id);
 }

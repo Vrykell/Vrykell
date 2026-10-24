@@ -17,6 +17,7 @@ afterEach(() => {
 it('keeps history next to collapse, one footer destination, and no collapsed rail', () => {
   useWorkspaceNavigation.setState({ collapsed: false });
   const { container } = render(<WorkspaceSidebar />);
+  expect(screen.queryByTestId('workspace-resource-switcher')).toBeNull();
   expect(screen.getByTestId('workspace-history').nextElementSibling).toBe(screen.getByTestId('workspace-sidebar-toggle'));
   expect(screen.getByTestId('workspace-history')).not.toHaveAttribute('aria-pressed');
   act(() => useWorkspaceNavigation.getState().setHistoryLoading(true));
@@ -60,15 +61,17 @@ it('reorders workspace rows and renders them in the saved order', () => {
   expect(useWorkspaceNavigation.getState().workspaceOrder).toEqual(['ssh', 'terminal', 'code', 'ai']);
 });
 
-it('resizes through the shared separator, keeps a held collapsed drag reversible and supports keyboard reset', () => {
+it('resizes through the shared separator, keeps a held collapsed drag reversible and supports keyboard reset', async () => {
   useWorkspaceNavigation.setState({ collapsed: false, sidebarWidth: 208, sidebarDragWidth: null });
   render(<WorkspaceSidebar />);
   const handle = screen.getByRole('separator', { name: '调整工作区侧栏宽度' });
   expect(handle).toHaveAttribute('aria-valuenow', '208');
   fireEvent.mouseDown(handle, { clientX: 208 });
   fireEvent.mouseMove(document, { clientX: 150 });
+  await act(async () => { await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); });
   expect(screen.getByTestId('workspace-sidebar')).toHaveAttribute('inert');
   fireEvent.mouseMove(document, { clientX: 300 });
+  await act(async () => { await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); });
   expect(screen.getByTestId('workspace-sidebar')).not.toHaveAttribute('inert');
   fireEvent.mouseUp(document);
   expect(useWorkspaceNavigation.getState().sidebarWidth).toBe(300);

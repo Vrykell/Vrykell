@@ -25,6 +25,13 @@ it('opens a selected file in the code workspace and leaves a cancelled picker un
   expect(useWorkspaceStore.getState().tabs[0]).toMatchObject({ kind: 'editor', selected: { path: '/repo/file.ts' } });
   expect(useWorkspaceNavigation.getState().area).toBe('code');
 });
+
+it('creates an untitled document directly without opening a picker', () => {
+  useWorkspaceNavigation.setState({ area: 'code' }); newWorkspaceItem();
+  const page = useWorkspaceStore.getState().tabs[0];
+  expect(page).toMatchObject({ kind: 'editor', selected: { path: '未命名 1.txt', draftId: expect.any(String) } });
+  expect(pickPath).not.toHaveBeenCalled();
+});
 it('selects files and comparisons using their mixed strip order', () => {
   const state = useWorkspaceStore.getState();
   const file = { path: '/repo/file.ts' };

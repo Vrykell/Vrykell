@@ -4,11 +4,12 @@
  * The panel reads the configured servers from the backend, shows one row per server and reports
  * whether the program is on PATH; picking a row is a workspace action (a tab of its own).
  */
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import AcpLauncher from '@features/workspace/components/AcpLauncher';
 import { useSessionStore } from '@features/workspace';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
+import { useUsageStore } from '@features/agent';
 
 const invokeMock = vi.hoisted(() => vi.fn());
 
@@ -17,6 +18,7 @@ vi.mock('@platform/diagnostics', () => ({ invoke: invokeMock, diagnostic: vi.fn(
 const CONFIGURED = [{ name: 'Claude Code', command: 'claude', args: [], env: {}, cwd: '', enabled: true }];
 
 beforeEach(() => {
+  useUsageStore.getState().clear();
   useSessionStore.setState({ tabs: [], activeId: '' });
   useHarnessWorkspace.setState({ connections: [], selected: '' });
   invokeMock.mockReset();
@@ -28,6 +30,36 @@ beforeEach(() => {
 });
 
 describe('AcpLauncher', () => {
+  it('shows actual daily usage and persisted agent turns, including zero usage', async () => {
+    const view = render(<AcpLauncher embedded open onClose={() => {}} onNewConversation={() => {}} />);
+    expect(screen.getByText('今日请求').nextElementSibling).toHaveTextContent('0');
+    expect(screen.getByText('今日 Tokens').nextElementSibling).toHaveTextContent('0');
+    view.unmount();
+    useUsageStore.getState().recordTurn({ provider: 'provider', model: 'model', inputTokens: 120, outputTokens: 40 });
+    useUsageStore.getState().recordTurn({ provider: 'provider', model: 'model', inputTokens: 900, outputTokens: 200, at: Date.now() - 86_400_000 });
+    useUsageStore.getState().acpTurn('Claude Code');
+    await useUsageStore.persist.rehydrate();
+    render(<AcpLauncher embedded open onClose={() => {}} onNewConversation={() => {}} />);
+    expect(screen.getByText('今日请求').nextElementSibling).toHaveTextContent('1');
+    expect(screen.getByText('今日 Tokens').nextElementSibling).toHaveTextContent('160');
+    expect(await screen.findByTestId('acp-launcher-Claude Code')).toHaveTextContent('1 轮');
+  });
+  it('separates the native entry from configured agents without losing keyboard launch', async () => {
+    const onNewConversation = vi.fn();
+    const onPick = vi.fn();
+    render(<AcpLauncher embedded open onClose={() => {}} onNewConversation={onNewConversation} onPick={onPick} />);
+    const agents = screen.getByRole('region', { name: 'ACP 智能体' });
+    const native = screen.getByTestId('ai-start-new-conversation');
+    expect(within(agents).queryByTestId('ai-start-new-conversation')).toBeNull();
+    expect(native.querySelector('[data-app-mark="true"]')).not.toBeNull();
+    await within(agents).findByTestId('acp-launcher-Claude Code');
+    fireEvent.keyDown(screen.getByTestId('acp-launcher-search'), { key: 'ArrowDown' });
+    fireEvent.keyDown(screen.getByTestId('acp-launcher-search'), { key: 'Enter' });
+    expect(onPick).toHaveBeenCalledWith('Claude Code');
+    fireEvent.click(native);
+    expect(onNewConversation).toHaveBeenCalledOnce();
+  });
+
   it('lists the configured servers and marks one ready', async () => {
     render(<AcpLauncher open onClose={() => {}} />);
 

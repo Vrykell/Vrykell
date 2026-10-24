@@ -3,10 +3,16 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import NewTabModal from '../components/NewTabModal';
 import { DEFAULT_AGENT_SETTINGS, useAgentSettings } from '@features/agent';
 import { useTerminalDefaults } from '@config/terminalDefaults';
-import { useSshStore } from '@features/ssh';
+import { useShellProfiles } from '@config/shellProfiles';
+import { useSshStore, useHostEditor } from '@features/ssh';
+import { useWorkspaceNavigation } from '../stores/navigation';
 import { useSessionStore, useUiStore } from '@features/workspace';
 import type { SshConnection } from '@features/ssh/services/api';
 import { pickPath } from '@platform/api/fs';
+import { openAppWindow } from '@platform/appWindows';
+import { useSettingsNavigationStore } from '@features/settings';
+
+vi.mock('@platform/appWindows', () => ({ openAppWindow: vi.fn() }));
 
 vi.mock('@platform/shells', async importOriginal => ({
   ...(await importOriginal<typeof import('@platform/shells')>()),
@@ -17,10 +23,6 @@ vi.mock('@platform/shells', async importOriginal => ({
   ]),
 }));
 
-vi.mock('@features/ssh/components/SshFormModal', () => ({
-  default: ({ open, initial }: { open: boolean; initial: SshConnection | null }) =>
-    open ? <div data-testid="ssh-form-modal">{initial?.name}</div> : null,
-}));
 vi.mock('@platform/api/fs', async importOriginal => ({
   ...(await importOriginal<typeof import('@platform/api/fs')>()), pickPath: vi.fn().mockResolvedValue([]),
 }));
@@ -35,8 +37,10 @@ const agentSnapshot = useAgentSettings.getState();
 const defaultsSnapshot = useTerminalDefaults.getState();
 const workspaceSnapshot = useSessionStore.getState();
 const uiSnapshot = useUiStore.getState();
+const navigationSnapshot = useWorkspaceNavigation.getState();
 
 beforeEach(() => {
+  useShellProfiles.setState({ profiles: {} });
   useTerminalDefaults.setState({ shell: 'system' });
   useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS } });
   useSshStore.setState({ connections: [connection], loaded: true, loading: false, save, remove });
@@ -44,6 +48,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.mocked(openAppWindow).mockClear();
   cleanup();
   useSshStore.setState(sshSnapshot, true);
   useAgentSettings.setState(agentSnapshot, true);
@@ -53,6 +58,8 @@ afterEach(() => {
   vi.mocked(pickPath).mockReset().mockResolvedValue([]);
   useSessionStore.setState(workspaceSnapshot, true);
   useUiStore.setState(uiSnapshot, true);
+  useWorkspaceNavigation.setState(navigationSnapshot, true);
+  useHostEditor.getState().close();
 });
 
 const openPicker = () => render(<NewTabModal open onClose={vi.fn()} />);
@@ -118,7 +125,8 @@ it('opens the SSH editor from the connection row', async () => {
   await rightClick('new-tab-option-ssh:ssh-1');
   fireEvent.click(screen.getByText('编辑连接'));
 
-  expect(screen.getByTestId('ssh-form-modal')).toHaveTextContent('Prod');
+  expect(useHostEditor.getState().draft?.name).toBe('Prod');
+  expect(useWorkspaceNavigation.getState().area).toBe('ssh');
 });
 
 it('deletes a connection only after confirmation', async () => {
@@ -138,8 +146,8 @@ it('shows compact profile, location and advanced sections with shared row stylin
   expect(screen.getByRole('heading', { name: '打开位置' })).toBeVisible();
   expect(screen.getByRole('heading', { name: '高级' })).toBeVisible();
   expect(await screen.findByRole('button', { name: '拆分标签页' })).toHaveClass('workspace-floating-row');
-  expect(screen.queryByRole('button', { name: '更多配置文件…' })).toBeNull();
-  expect(screen.queryByRole('button', { name: /在新窗口中打开/ })).toBeNull();
+  expect(screen.getByRole('button', { name: '更多配置文件…' })).toBeVisible();
+  expect(screen.getByRole('button', { name: /在新窗口中打开/ })).toBeVisible();
   expect((await screen.findByTestId('new-tab-option-shell:zsh')).className).toContain('workspace-floating-row');
 });
 
@@ -148,8 +156,8 @@ it('uses the selected open location for the default profile', async () => {
   openPicker();
   fireEvent.click(await screen.findByRole('button', { name: /选择目录/ }));
   await vi.waitFor(() => expect(screen.getByRole('button', { name: /\/chosen\/project/ })).toHaveAttribute('data-active', 'true'));
-  await vi.waitFor(() => expect(screen.getByTestId('new-tab-default')).not.toBeDisabled());
-  fireEvent.click(screen.getByTestId('new-tab-default'));
+  await screen.findByTestId('new-tab-option-shell:zsh');
+  fireEvent.keyDown(screen.getByRole('dialog', { name: '新建标签页' }), { key: 't', ctrlKey: true, metaKey: true });
   const tabs = useSessionStore.getState().tabs;
   const tab = tabs[tabs.length - 1];
   expect(tab?.kind).toBe('session');
@@ -163,4 +171,68 @@ it('routes the advanced split action to the shared placement picker', () => {
   fireEvent.click(screen.getByRole('button', { name: '拆分标签页' }));
   expect(close).toHaveBeenCalledOnce();
   expect(useUiStore.getState().splitPlacement.open).toBe(true);
+});
+
+it('opens terminal configuration from the profile footer', async () => {
+  openPicker();
+  await screen.findByTestId('new-tab-option-shell:zsh');
+  fireEvent.click(screen.getByRole('button', { name: '更多配置文件…' }));
+  expect(useUiStore.getState().settingsOpen).toBe(true);
+  expect(useSettingsNavigationStore.getState().selected).toBe('profile:zsh');
+});
+
+it('opens another application window and closes the picker', async () => {
+  const close = vi.fn();
+  render(<NewTabModal open onClose={close} />);
+  await screen.findByTestId('new-tab-option-shell:zsh');
+  fireEvent.click(screen.getByRole('button', { name: /在新窗口中打开/ }));
+  expect(openAppWindow).toHaveBeenCalledOnce();
+  expect(close).toHaveBeenCalledOnce();
+});
+
+it('marks the default profile independently of the hovered profile', async () => {
+  openPicker();
+  const row = await screen.findByTestId('new-tab-option-shell:zsh');
+  fireEvent.mouseEnter(screen.getByTestId('new-tab-option-shell:bash'));
+  expect(row.querySelector('[aria-label="默认终端"]')).not.toBeNull();
+  expect(row.querySelector('kbd')).toBeNull();
+});
+
+it('keeps a hidden default profile available through the primary action', async () => {
+  useTerminalDefaults.setState({ shell: 'bash' });
+  useShellProfiles.getState().update('bash', { hidden: true });
+  const pick = vi.fn();
+  render(<NewTabModal open onClose={vi.fn()} onPick={pick} />);
+  await screen.findByTestId('new-tab-option-shell:zsh');
+  expect(screen.queryByTestId('new-tab-option-shell:bash')).toBeNull();
+  fireEvent.keyDown(screen.getByRole('dialog', { name: '新建标签页' }), { key: 't', ctrlKey: true, metaKey: true });
+  expect(pick).toHaveBeenCalledWith(expect.objectContaining({ shellType: 'bash' }));
+});
+
+it('creates a profile with its displayed number shortcut', async () => {
+  const pick = vi.fn();
+  render(<NewTabModal open onClose={vi.fn()} onPick={pick} />);
+  const row = await screen.findByTestId('new-tab-option-shell:bash');
+  const shortcut = row.querySelector('kbd')!.getAttribute('aria-label')!.split('+');
+  fireEvent.keyDown(screen.getByRole('dialog'), { key: shortcut[1], ctrlKey: true });
+  expect(pick).toHaveBeenCalledWith(expect.objectContaining({ shellType: 'bash' }));
+});
+
+it('lets a focused location button handle Enter without creating a profile', async () => {
+  const pick = vi.fn();
+  render(<NewTabModal open onClose={vi.fn()} onPick={pick} />);
+  await screen.findByTestId('new-tab-option-shell:zsh');
+  fireEvent.keyDown(screen.getByRole('button', { name: /在用户主目录打开/ }), { key: 'Enter' });
+  expect(pick).not.toHaveBeenCalled();
+});
+
+it('preserves the chosen directory when returning a split terminal specification', async () => {
+  vi.mocked(pickPath).mockResolvedValueOnce(['/split/project']);
+  const pick = vi.fn();
+  render(<NewTabModal open onClose={vi.fn()} onPick={pick} />);
+  fireEvent.click(screen.getByRole('button', { name: /选择目录/ }));
+  await screen.findByRole('button', { name: /\/split\/project/ });
+  fireEvent.click(await screen.findByTestId('new-tab-option-shell:zsh'));
+  expect(pick).toHaveBeenCalledWith(expect.objectContaining({ shellType: 'zsh', cwd: '/split/project' }));
+  expect(screen.queryByRole('button', { name: /在新窗口中打开/ })).toBeNull();
 });

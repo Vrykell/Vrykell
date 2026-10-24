@@ -25,6 +25,10 @@ vi.mock('@tauri-apps/api/window', () => ({
 }));
 
 import TopDock from '../components/TopDock';
+import SshResourcesAction from '../components/SshResourcesAction';
+import { useWorkspaceNavigation } from '../stores/navigation';
+import { useTerminalStore } from '@features/terminal';
+import { useAuxiliarySidebarStore } from '../stores/auxiliarySidebar';
 
 beforeEach(() => {
   native.macOS = true;
@@ -40,12 +44,32 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
 describe('desktop titlebar', () => {
+  it('keeps resources out of the titlebar and opens them from the focused terminal action', () => {
+    useWorkspaceNavigation.setState({ area: 'terminal' });
+    useUiStore.setState({ settingsOpen: false });
+    useSessionStore.getState().addTab({ kind: 'ssh', ssh: { connectionId: 'host', name: 'Host', host: 'test.local', user: 'ops' } });
+    const { container } = render(<><TopDock /><SshResourcesAction /></>);
+    const control = screen.getByRole('button', { name: 'SSH 资源面板' });
+    expect(container.querySelector('.workspace-titlebar')?.contains(control)).toBe(false);
+    fireEvent.click(control);
+    expect(useAuxiliarySidebarStore.getState().requestedPane).toBeDefined();
+    act(() => { useSessionStore.getState().addTab({ kind: 'local' }); useTerminalStore.setState({ focusedPaneId: undefined }); });
+    expect(screen.queryByRole('button', { name: 'SSH 资源面板' })).toBeNull();
+  });
+  it('never adds a connection-panel action to the titlebar', () => {
+    const previous = useWorkspaceNavigation.getState().area;
+    useWorkspaceNavigation.setState({ area: 'ssh' });
+    render(<TopDock />);
+    expect(screen.queryByTestId('ssh-quick-btn')).toBeNull();
+    expect(screen.queryByRole('button', { name: '连接面板' })).toBeNull();
+    useWorkspaceNavigation.setState({ area: previous });
+  });
   it('uses the native-control layout and keeps search clickable', async () => {
     const { container } = render(<TopDock />);
     const header = container.querySelector('header');
     expect(header).toHaveAttribute('data-platform', 'macos');
     expect(header).toHaveAttribute('data-fullscreen', 'false');
-    expect(screen.getByText('终端工作区')).toHaveAttribute('data-tauri-drag-region');
+    expect(screen.getByText('终端会话')).toHaveAttribute('data-tauri-drag-region');
     expect(screen.queryByTestId('window-controls')).not.toBeInTheDocument();
     fireEvent.click(screen.getByTestId('global-search-trigger'));
     expect(useUiStore.getState().globalSearchOpen).toBe(true);

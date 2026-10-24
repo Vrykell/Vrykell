@@ -5,6 +5,7 @@ import { ToolbarBtn } from '@ui/UiBtn';
 import SidebarItem from '@ui/sidebarItem';
 import type { PointerEvent } from 'react';
 import { isMacOS } from '@platform/runtime';
+import AiSessionIcon from '@features/chat/components/AiSessionIcon';
 
 interface DockButtonProps {
   panelId: string;
@@ -23,7 +24,7 @@ export default function DockButton({ panelId, active, side, fixed = false, onCli
 
   const label = t(`dock.${panelId}`);
   const action = active ? t('dock.close') : t('dock.open');
-  const Icon = def.icon;
+  const Icon = panelId === 'chat' ? AiSessionIcon : def.icon;
   const accessibleLabel = panelId === 'settings' ? t(active ? 'Close settings' : 'Open settings') : t('{{action}} {{panel}}', { action, panel: label });
 
   if (side === 'left') {

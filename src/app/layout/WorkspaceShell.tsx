@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react';
+import { memoLocalized } from '@ui/memoLocalized';
 import { selectActiveSessionTab, useSessionStore, useDockStore, useUiStore } from '@features/workspace';
 import SettingsScreen from '@features/settings/components/SettingsScreen';
 import { MIN_PANE_SIZE, minTerminalWidth } from '@features/workspace/model/windowLayout';
@@ -13,6 +14,7 @@ import { useWorkspaceNavigation, workspaceAreaForKind, workspaceSidebarWidth } f
 import { WorkspaceHeaderProvider, WorkspaceHeaderSlot } from '@ui/WorkspaceHeader';
 import { AiWorkspaceProvider } from '@features/chat/components/AiWorkspaceSurface';
 import PanelSsh from '@features/ssh/components/PanelSsh';
+import PortForwardingPage from '@features/ssh/components/PortForwardingPage';
 import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import './workspaceLayout.css';
@@ -23,6 +25,17 @@ import GitWorkspace from '@features/git/components/GitWorkspace';
 import { useGitContext } from '@features/git/hooks/useGitContext';
 import EditorWorkspace from '@features/editor/components/EditorWorkspace';
 import HistoryWorkspaceView from '@features/session-history/components/HistoryWorkspaceView';
+import { ResourceContentProvider } from '@ui/ResourceContent';
+import UnifiedWorkspace from '@features/workspace/components/UnifiedWorkspace';
+
+const StableTerminalView = memoLocalized(TerminalView);
+const StablePanelTabs = memoLocalized(PanelTabs);
+const StableTopDock = memoLocalized(TopDock);
+const StableHistoryWorkspace = memoLocalized(HistoryWorkspaceView);
+const StableHosts = memoLocalized(PanelSsh);
+const StablePortForwarding = memoLocalized(PortForwardingPage);
+const StableSettings = memoLocalized(SettingsScreen);
+const StableSidePanel = memoLocalized(SidePanel);
 
 /** Compose navigation, auxiliary panels and the terminal workspace. */
 export default function WorkspaceShell() {
@@ -39,7 +52,6 @@ export default function WorkspaceShell() {
   const contentVisible = !!activeTab && area === workspaceAreaForKind(activeTab.kind);
   const chatOpen = useDockStore(state => state.leftPanels.includes('chat') || state.rightPanels.includes('chat'));
   const chatOnLeft = useDockStore(state => state.leftPanels.includes('chat'));
-  const [sidebarWidth, setSidebarWidth] = useState(workspaceSidebarWidth);
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
   const sessionTabs = useSessionStore(state => state.tabs);
   const nativeTabs = useAiWorkspace(state => state.nativeTabs);
@@ -51,6 +63,7 @@ export default function WorkspaceShell() {
     return tab ? minTerminalWidth(tab.layout) : MIN_PANE_SIZE;
   });
   const mainMinWidth = Math.max(360, area === 'terminal' ? terminalMinWidth : MIN_PANE_SIZE);
+  const sidebarWidth = workspaceSidebarWidth(viewportWidth, mainMinWidth);
   const sidebarMaxWidth = sidebarOverlay ? Math.min(400, viewportWidth - 40) : Math.min(400, viewportWidth - mainMinWidth);
   const overlayWidth = Math.min(sidebarDragWidth ?? sidebarPreference, Math.max(160, sidebarMaxWidth));
 
@@ -58,7 +71,6 @@ export default function WorkspaceShell() {
     const reconcile = () => {
       setViewportWidth(window.innerWidth);
       const width = workspaceSidebarWidth(window.innerWidth, Math.max(360, area === 'terminal' ? terminalMinWidth : MIN_PANE_SIZE));
-      setSidebarWidth(width);
       const navigation = useWorkspaceNavigation.getState();
       if (!width && !navigation.collapsed && !navigation.sidebarOverlay) navigation.setCollapsed(true);
       useDockStore.getState().reconcilePanelSpace();
@@ -66,7 +78,7 @@ export default function WorkspaceShell() {
     reconcile();
     window.addEventListener('resize', reconcile);
     return () => window.removeEventListener('resize', reconcile);
-  }, [terminalMinWidth, sshStatusOwner, collapsed, sidebarOverlay, area, sidebarPreference, sidebarDragWidth]);
+  }, [terminalMinWidth, sshStatusOwner, collapsed, sidebarOverlay, area, sidebarPreference]);
   useEffect(() => {
     if (!sidebarOverlay || collapsed) return;
     const close = () => useWorkspaceNavigation.getState().setCollapsed(true);
@@ -91,29 +103,33 @@ export default function WorkspaceShell() {
   return (
     <div className="workspace-layout" data-area={area} data-sidebar-overlay={sidebarOverlay && !collapsed || undefined} data-settings-open={settingsOpen || undefined} style={{ '--workspace-sidebar-width': `${sidebarWidth}px`, '--workspace-sidebar-overlay-width': `${overlayWidth}px` } as CSSProperties}>
       <WorkspaceHeaderProvider>
+      <ResourceContentProvider>
       <AiWorkspaceProvider placement={aiPlacement} mainActive={contentVisible && area === 'ai' && (activeTab?.kind === 'harness' || activeTab?.kind === 'ai-history' || activeTab?.kind === 'usage' || activeTab?.kind === 'start-ai') && !settingsOpen} headerActive={area === 'ai' && !settingsOpen} sideActive={chatOpen && (chatOnLeft ? !collapsed : !sshStatusOwner) && !settingsOpen}>
       <PanelSurfaces>
       <WorkspaceSidebar maxWidth={Math.max(160, sidebarMaxWidth)} />
-      <TopDock sidebarOverlayRequired={viewportWidth - mainMinWidth < 160} />
+      <StableTopDock sidebarOverlayRequired={viewportWidth - mainMinWidth < 160} />
       <SshAuthenticationDialog />
-      <PanelTabs active={area === 'terminal' && !settingsOpen} />
+      <StablePanelTabs active={area === 'terminal' && !settingsOpen} />
       <div className="workspace-body" data-settings-open={settingsOpen || undefined} style={{ '--workspace-frame-width': `${frameWidth}px`, '--workspace-terminal-min-width': `${Math.max(360, area === 'terminal' ? terminalMinWidth : MIN_PANE_SIZE)}px`, '--workspace-left-panel-width': '0px', '--workspace-activity-width': `${sidebarWidth}px`, '--workspace-gap': `${WORKSPACE_GAP}px` } as CSSProperties}>
         <div className="workspace-primary" style={{ minWidth: area === 'terminal' ? terminalMinWidth : 0 }}>
-        <WorkspaceHeaderSlot />
+        <WorkspaceHeaderSlot visible={!settingsOpen && (area === 'terminal' || area === 'code' || area === 'ai' || area === 'unified')} />
         <main className="workspace-main" inert={settingsOpen} aria-hidden={settingsOpen || undefined} style={{ flex: 1, minWidth: area === 'terminal' ? terminalMinWidth : 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
           <div className="workspace-content-host" style={{ display: contentVisible ? 'flex' : 'none' }} inert={!contentVisible}>
-            <EditorWorkspace><GitWorkspace><TerminalView active={contentVisible && !settingsOpen} /></GitWorkspace></EditorWorkspace>
+            <EditorWorkspace><GitWorkspace><StableTerminalView active={contentVisible && !settingsOpen} /></GitWorkspace></EditorWorkspace>
           </div>
-          <div className="workspace-resource-page" data-testid="ssh-workspace" style={{ display: area === 'ssh' ? 'flex' : 'none' }} inert={area !== 'ssh'}><PanelSsh active={area === 'ssh' && !settingsOpen} /></div>
-          {area === 'history' && <HistoryWorkspaceView />}
+          <div className="workspace-resource-page" data-testid="ssh-workspace" style={{ display: area === 'ssh' ? 'flex' : 'none' }} inert={area !== 'ssh'}><StableHosts active={area === 'ssh' && !settingsOpen} /></div>
+          <div className="workspace-resource-page" data-testid="forwarding-workspace" style={{ display: area === 'forwarding' ? 'flex' : 'none' }} inert={area !== 'forwarding'}><StablePortForwarding active={area === 'forwarding' && !settingsOpen} /></div>
+          {area === 'history' && <StableHistoryWorkspace />}
+          <UnifiedWorkspace active={area === 'unified'} />
         </main>
         </div>
-        <SidePanel side="right" />
+        <StableSidePanel side="right" />
         <div id="ssh-status-sidebar-host" className="workspace-ssh-status-slot" inert={settingsOpen} aria-hidden={settingsOpen || undefined} />
-        {settingsOpen && <SettingsScreen />}
+        {settingsOpen && <StableSettings />}
       </div>
       </PanelSurfaces>
       </AiWorkspaceProvider>
+      </ResourceContentProvider>
       </WorkspaceHeaderProvider>
     </div>
   );

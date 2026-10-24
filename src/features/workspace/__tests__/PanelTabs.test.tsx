@@ -3,7 +3,6 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import PanelTabs from '../components/PanelTabs';
 import { useSessionStore } from '../model/session/store';
 import { useListReorder } from '@ui/listReorder';
-import { useIconColorStore } from '@config/iconColors';
 import { useTerminalDefaults } from '@config/terminalDefaults';
 import { getAvailableShells } from '@platform/shells';
 import { useWorkspaceNavigation } from '../stores/navigation';
@@ -20,7 +19,6 @@ vi.mock('../components/NewTabModal', () => ({
 const snapshot = useSessionStore.getState();
 beforeEach(() => {
   useTerminalDefaults.setState({ shell: 'system' });
-  useIconColorStore.setState({ colors: {} });
   useWorkspaceNavigation.setState({ groupColors: {} });
   useSessionStore.setState({
     tabs: [
@@ -49,23 +47,29 @@ it('colors a restored unspecified shell from the machine default and preserves e
   expect(spec?.kind === 'session' && spec.layout.type === 'leaf' && spec.layout.terminal.shellType).toBeUndefined();
 });
 
-it('colors terminal icons from their context menu without activating the tab', () => {
+it('uses shell identity and removes terminal icon color controls', () => {
   const id = 'local';
   render(<PanelTabs />);
   const row = screen.getByTestId(`tab-row-${id}`);
   fireEvent.contextMenu(row);
-  const palette = screen.getByRole('group', { name: '图标颜色' });
+  expect(screen.queryByRole('group', { name: '图标颜色' })).toBeNull();
   expect(screen.queryByRole('menuitem', { name: '图标颜色' })).toBeNull();
-  expect(palette.closest('.context-menu-footer')).not.toBeNull();
-  fireEvent.click(palette.querySelector('[data-color="violet"]')!);
-  expect(row.querySelector('svg')!.style.color).toBe('var(--group-violet)');
+  expect(row.querySelector('svg')).toHaveAttribute('data-shell-mark', 'bash');
   expect(useSessionStore.getState().activeId).toBe('ai-history');
-  fireEvent.contextMenu(row);
-  fireEvent.click(screen.getByTestId('tab-icon-color-auto'));
-  expect(row.querySelector('svg')!.style.color).toBe('var(--shell-bash-accent)');
 });
 
 afterEach(() => { cleanup(); useListReorder.getState().end(); useSessionStore.setState(snapshot, true); });
+
+it('keeps the start page canvas surface in its drag preview', () => {
+  useSessionStore.setState({ tabs: [{ id: 'start', kind: 'start', title: 'Start' }], activeId: 'start' });
+  render(<PanelTabs />);
+  act(() => useListReorder.getState().start({ listId: 'session-tabs', id: 'start', kind: 'page' }, { x: 100, y: 50 }));
+  const preview = document.querySelector('[data-reorder-preview="item"] .folder-tab');
+  expect(preview).toHaveAttribute('data-tab-surface', 'canvas');
+  expect(preview).toHaveAttribute('data-active', 'true');
+  expect(preview?.querySelector('[data-shell-mark="terminal"]')).not.toBeNull();
+  expect(screen.getByTestId('tab-row-start').querySelector('[data-shell-mark="terminal"]')).not.toBeNull();
+});
 
 it('leaves the tab list empty instead of showing an unmatched-search message when all tabs close', () => {
   useSessionStore.setState({ tabs: [], activeId: '' });
@@ -114,7 +118,7 @@ it('exposes terminal actions through the leading menu and styles the search as a
   fireEvent.click(screen.getByRole('button', { name: '更多终端操作' }));
   const menu = screen.getByRole('menu', { name: '更多终端操作' });
   expect(menu).toHaveTextContent('新建终端选项');
-  await act(async () => { fireEvent.click(within(menu).getByRole('button', { name: '搜索会话…' })); });
+  await act(async () => { fireEvent.click(within(menu).getByRole('menuitem', { name: '搜索会话…' })); });
   expect(screen.getByTestId('tab-search')).toHaveClass('text-input-field');
 });
 
@@ -143,7 +147,7 @@ it('filters singleton pages without hiding other rows', () => {
   expect(screen.queryByTestId('tab-row-ai-history')).toBeNull();
   expect(screen.getByTestId('tab-row-history')).toBeVisible();
   act(() => useSessionStore.getState().activate('local'));
-  expect(icon.style.color).toBe('var(--shell-bash-accent)');
+  expect(icon.style.color).toBe('var(--group-green)');
   fireEvent.click(screen.getByTestId('tab-search-toggle'));
   fireEvent.change(screen.getByTestId('tab-search'), { target: { value: 'History' } });
   // The system history page matches by title like any other row; AI pages never appear here.
@@ -200,7 +204,6 @@ it('keeps group actions and color controls keyboard-accessible without changing 
     groups: [{ id: 'group-a', title: 'Group', collapsed: false }],
   }));
   render(<PanelTabs />);
-  act(() => useIconColorStore.setState({ colors: { 'group:group-a': 'violet' } }));
   const header = screen.getByTestId('group-header-group-a');
   const member = screen.getByTestId('tab-row-local');
   fireEvent.keyDown(header, { key: 'F10', shiftKey: true });
@@ -208,15 +211,12 @@ it('keeps group actions and color controls keyboard-accessible without changing 
   expect(palette.closest('.context-menu-footer')).not.toBeNull();
   fireEvent.click(screen.getByRole('menuitemradio', { name: '紫色' }));
   expect(useWorkspaceNavigation.getState().groupColors['group-a']).toBe('violet');
-  expect(member.querySelector('svg')!.style.color).toBe('var(--shell-bash-accent)');
+  expect(member.querySelector('svg')).toHaveAttribute('data-shell-mark', 'bash');
   expect(useSessionStore.getState().groups[0].collapsed).toBe(false);
   expect(header).toHaveFocus();
   fireEvent.contextMenu(member);
-  fireEvent.click(screen.getByRole('menuitemradio', { name: '青色' }));
-  expect(member.querySelector('svg')!.style.color).toBe('var(--group-cyan)');
-  fireEvent.contextMenu(member);
-  fireEvent.click(screen.getByTestId('tab-icon-color-auto'));
-  expect(member.querySelector('svg')!.style.color).toBe('var(--shell-bash-accent)');
+  expect(screen.queryByRole('group', { name: '图标颜色' })).toBeNull();
+  expect(member.querySelector('svg')).toHaveAttribute('data-shell-mark', 'bash');
 });
 
 it('keeps a filtered nonempty group protected by the archive confirmation', () => {

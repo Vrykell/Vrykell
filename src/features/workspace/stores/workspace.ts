@@ -1,4 +1,5 @@
 import { useTerminalDefaults } from '@config/terminalDefaults';
+import { useShellProfiles } from '@config/shellProfiles';
 import { create } from 'zustand';
 import { useUiStore } from './ui';
 import { useWorkspaceNavigation, workspaceAreaForKind } from './navigation';
@@ -81,6 +82,7 @@ export interface TabGroup {
 
 export interface AddTabOptions {
   cwd?: string;
+  useProfileDirectory?: boolean;
   title?: string;
   /** Defaults to local; history and usage kinds create workspace pages. */
   kind?: 'local' | 'ssh' | 'history' | 'ai-history' | 'usage' | 'harness' | 'start' | 'start-code' | 'start-ai';
@@ -180,6 +182,7 @@ interface WorkspaceState {
   openGitDiff: (selection: GitSelection) => string;
   openEditorFile: (file: EditorFile) => string;
   closeEditorFile: (file: EditorFile, force?: boolean) => void;
+  replaceEditorFile: (file: EditorFile, target: EditorFile) => void;
   moveEditorFile: (key: string, over: string, after: boolean) => void;
   moveGitComparison: (id: string, over: string, after: boolean) => void;
   configureEditorTabs: () => void;
@@ -299,15 +302,17 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     } else {
       const preference = useTerminalDefaults.getState().shell;
       const shellType = o.shellType ?? (preference === 'system' ? undefined : preference);
+      const profile = shellType ? useShellProfiles.getState().profiles[shellType as ShellType] : undefined;
       const term: TerminalSpec = {
-        id: `${id}#0`, kind: 'local', cwd: o.cwd, shellType,
+        id: `${id}#0`, kind: 'local', cwd: o.cwd ?? (o.useProfileDirectory === false ? undefined : profile?.cwd || undefined), shellType,
+        useProfileDirectory: o.useProfileDirectory,
         openMode: defaultOpenModeForShell(shellType),
       };
       tab = {
         id,
-        title: o.title || (shellType ? shellTypeLabel(shellType) : DEFAULT_TITLE),
+        title: o.title || profile?.tabTitle || profile?.name || (shellType ? shellTypeLabel(shellType) : DEFAULT_TITLE),
         kind: 'session',
-        titleSource: o.title ? 'manual' : undefined,
+        titleSource: o.title || profile?.tabTitle ? 'manual' : undefined,
         groupId: o.groupId,
         layout: leaf(term),
       };
@@ -355,7 +360,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const directory = cwd ?? (spec ? state.terminalCwds[spec.id] ?? spec.cwd : undefined);
     if (name) useHarnessWorkspace.getState().connect(name, directory);
     useUiStore.getState().setSettingsOpen(false);
-    useWorkspaceNavigation.getState().selectArea('ai');
+    if (useWorkspaceNavigation.getState().area !== 'unified') useWorkspaceNavigation.getState().selectArea('ai');
     get().addTab({ kind: 'harness' });
   },
   openEditorFile: file => {
@@ -369,6 +374,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const id = nextTabId();
     set(state => ({ tabs: [...state.tabs, { id, kind: 'editor', title: t('File editor'), files: [file], selected: file }] }));
     get().activate(id); return id;
+  },
+  replaceEditorFile: (file, target) => {
+    const key = editorFileKey(file);
+    set(state => ({ tabs: state.tabs.map(tab => tab.kind === 'editor' ? { ...tab,
+      files: tab.files.map(item => editorFileKey(item) === key ? target : item),
+      selected: editorFileKey(tab.selected) === key ? target : tab.selected,
+    } : tab) }));
   },
   closeEditorFile: (file, force = false) => {
     if (!force && interceptEditorClose([file], () => get().closeEditorFile(file, true))) return;
@@ -552,7 +564,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const tab = get().tabs.find((t) => t.id === id);
     if (tab) {
       const area = workspaceAreaForKind(tab.kind);
-      useWorkspaceNavigation.getState().selectArea(area);
+      if (useWorkspaceNavigation.getState().area !== 'unified') useWorkspaceNavigation.getState().selectArea(area);
       useWorkspaceNavigation.getState().rememberTab(area, id);
     }
     const terminal = useTerminalStore.getState();
@@ -931,7 +943,7 @@ useWorkspaceStore.subscribe((state, previous) => {
   const tab = state.tabs.find(item => item.id === state.activeId);
   if (!tab) return;
   const area = workspaceAreaForKind(tab.kind);
-  useWorkspaceNavigation.getState().selectArea(area);
+  if (useWorkspaceNavigation.getState().area !== 'unified') useWorkspaceNavigation.getState().selectArea(area);
   useWorkspaceNavigation.getState().rememberTab(area, tab.id);
   const terminal = useTerminalStore.getState();
   const pane = isSessionTab(tab) ? layoutLeaves(tab.layout).find(item => terminal.manualFullscreen[item.id]) ?? firstLeaf(tab.layout) : null;

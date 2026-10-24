@@ -57,5 +57,5 @@ export {
 } from '@features/workspace/model/tabTypes';
 export { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 export { useTabDisplayTitle } from '@features/workspace/hooks/useTabDisplayTitle';
-export { tabIconKey, tabIconColor } from './model/tabAppearance';
+export { default as WorkspaceResourceSwitcher } from './components/WorkspaceResourceSwitcher';
 export { useWorkspaceNavigation, orderedWorkspaceIds, workspaceAreaForKind, type HistoryTypePreset } from './stores/navigation';

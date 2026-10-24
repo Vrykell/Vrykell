@@ -1,10 +1,10 @@
 import { TextInput } from '@ui/TextInput';
+import InlineRenameInput from '@ui/InlineRenameInput';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { iconSizes,
   Plus, History, Bot, Search, ChevronDown,
  } from '@ui/icons';
-import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, tabIconKey, tabIconColor, type Tab, type TabGroup } from '@features/workspace';
-import { useIconColorStore } from '@config/iconColors';
+import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, type Tab, type TabGroup } from '@features/workspace';
 import { HistoryColorChoices } from '@ui/HistoryColorPalette';
 import { regenerateTitle } from '@features/agent/services/title';
 import { useToastStore } from '@ui/Toast';
@@ -20,7 +20,7 @@ import { useActiveTabVisibility } from '@ui/hooks/useActiveTabVisibility';
 import { historyGroupColor } from '@ui/historyGroupColor';
 import { orderedWorkspaceIds, useWorkspaceNavigation } from '../stores/navigation';
 import WorkspaceHeader from '@ui/WorkspaceHeader';
-import { SshIcon, shellIconFor } from '@ui/shellIcons';
+import { TerminalProfileIcon } from '@ui/shellIcons';
 import {
   ListReorderPlaceholder, ListReorderPreview, ListReorderZonePlaceholder,
   useListReorder, useListReorderDrag, type ListReorderDrag, type ListReorderTarget,
@@ -29,6 +29,8 @@ import { t } from '@i18n';
 import type { GroupingProposal } from '@features/agent/services/autoGrouping';
 import { useToolWindow } from '@ui/hooks/useToolWindow';
 import { applySessionGrouping } from '../services/autoGrouping';
+import SshResourcesAction from './SshResourcesAction';
+import WorkspaceResourceSwitcher from './WorkspaceResourceSwitcher';
 
 /** Terminal navigation shares document tab styling and the common reorder placeholders. */
 
@@ -47,7 +49,6 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
   const [searchOpen, setSearchOpen] = useState(false);
   const defaultShellType = useDefaultShellType();
   const tabs = useSessionStore((s) => s.tabs);
-  const iconColors = useIconColorStore(state => state.colors);
   const activeId = useSessionStore((s) => s.activeId);
   const groups = useSessionStore((s) => s.groups);
   const sessionLayoutOrder = useWorkspaceNavigation(state => state.sessionLayoutOrder);
@@ -212,6 +213,8 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
         { label: t('AI auto-group'), disabled: !tabs.some(isSessionTab), onClick: openGrouping },
       ]} /></div>
       <div className="folder-actions terminal-tab-tools">
+        <WorkspaceResourceSwitcher />
+        <SshResourcesAction />
         <IconBtn title={t('Search session titles…')} data-testid="tab-search-toggle" onClick={() => { setSearchOpen(!searchOpen); setQuery(''); }}><Search size={iconSizes.control} /></IconBtn>
         {searchOpen && <TextInput variant="field" autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder={t('Search session titles…')} data-testid="tab-search" className="terminal-tab-search" />}
         <span className="folder-action-secondary terminal-secondary-actions"><IconBtn title={t('Session history')} data-testid="tab-history-btn" onClick={() => useSessionStore.getState().openHistoryTab()}>
@@ -301,7 +304,7 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
         </div>
 
         {filtered.length === 0 && query.trim().length > 0 && (
-          <div style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))' }}>{t('No matching terminal sessions')}</div>
+          <div className="search-empty-state">{t('No matching terminal sessions')}</div>
         )}
       </div>
 
@@ -310,13 +313,6 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
         <ContextMenu
           anchor={{ x: ctxMenu.x, y: ctxMenu.y }}
           items={ctxItems}
-          footer={ctxTab && isSessionTab(ctxTab) && <>
-            <div className="history-menu-color-label">{t('Icon color')}</div>
-            <HistoryColorChoices menu label={t('Icon color')} value={iconColors[tabIconKey(ctxTab)] ?? null}
-              testId="tab-icon-color" onSelect={color => {
-                useIconColorStore.getState().setColor(tabIconKey(ctxTab), color); setCtxMenu(null);
-              }} />
-          </>}
           onClose={() => setCtxMenu(null)}
         />
       )}
@@ -348,11 +344,9 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
 
 function TerminalTabPreview({ tab, active, defaultShellType }: { tab: Tab; active: boolean; defaultShellType?: ShellType }) {
   const title = useTabDisplayTitle(tab);
-  const colors = useIconColorStore(state => state.colors);
   const first = firstTerminalOf(tab);
-  const Icon = tab.kind === 'history' ? History : first?.kind === 'ssh' ? SshIcon : shellIconFor(first?.kind === 'local' ? first.shellType ?? defaultShellType : undefined);
-  return <div className="folder-tab folder-tab-preview terminal-instance-tab" data-active={active}>
-    <FolderTabContent selected={active} item={{ id: tab.id, label: title, tip: title, closeLabel: t('Close this tab'), icon: <Icon size={iconSizes.compact} style={{ color: tabIconColor(tab, colors) }} /> }} />
+  return <div className="folder-tab folder-tab-preview terminal-instance-tab" data-active={active} data-tab-surface={isSessionTab(tab) ? undefined : 'canvas'}>
+    <FolderTabContent selected={active} item={{ id: tab.id, label: title, tip: title, closeLabel: t('Close this tab'), icon: tab.kind === 'history' ? <History size={iconSizes.compact} /> : <TerminalProfileIcon colored kind={first?.kind} shellType={first?.shellType ?? (isSessionTab(tab) ? defaultShellType : undefined)} connectionId={first?.ssh?.connectionId} size={iconSizes.control} /> }} />
   </div>;
 }
 
@@ -459,8 +453,8 @@ function GroupSection(props: {
       {!collapsedForDisplay && last && <ListReorderPlaceholder listId={LIST_ID} itemId={last} after />}
     </div>
     {menu && <ContextMenu anchor={menu} label={t('Group actions')} onClose={closeMenu} onCancel={() => setMenu(null)}
-      header={<TextInput variant="field" aria-label={t('Group title')} value={name} onChange={event => setName(event.target.value)}
-        onFocus={event => event.currentTarget.select()} onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); closeMenu(); menu.trigger?.focus(); } }} />} items={[
+      header={<InlineRenameInput variant="field" aria-label={t('Group title')} value={name} onChange={event => setName(event.target.value)}
+        onFocus={event => event.currentTarget.select()} onKeyDown={event => { if (event.key === 'Enter' && !event.nativeEvent.isComposing && event.keyCode !== 229) { event.preventDefault(); closeMenu(); menu.trigger?.focus(); } }} />} items={[
       { label: t('AI auto-group'), onClick: props.onAutoGroup },
       { label: t('Add terminal to group'), onClick: props.onAddTab },
       { label: t(group.collapsed ? 'Expand group' : 'Collapse group'), group: 'view', onClick: toggleCollapse },
@@ -496,10 +490,6 @@ function TabRow({
   const first = firstTerminalOf(tab);
   const terms = terminalsOf(tab);
   const displayTitle = useTabDisplayTitle(tab);
-  const Icon = tab.kind === 'history' ? History
-    : first?.kind === 'ssh' ? SshIcon
-      : shellIconFor(first?.kind === 'local' ? first.shellType ?? defaultShellType : undefined);
-  const colors = useIconColorStore(state => state.colors);
   const dragging = useListReorder(state => state.drag?.listId === LIST_ID && state.drag.id === tab.id);
   return <div className="folder-tab terminal-instance-tab" data-active={active} data-testid={`tab-row-${tab.id}`}
     data-tab-row-id={tab.id} data-tab-kind={tab.kind} data-tab-group={isSessionTab(tab) ? tab.groupId ?? '' : ''}
@@ -514,13 +504,13 @@ function TabRow({
     }}
     onClick={event => { if (!(event.target as Element).closest('button, input')) onActivate(); }}
     onDoubleClick={onStartEdit} onContextMenu={onContextMenu}>
-    {editing ? <TextInput className="inline-rename-input" autoFocus value={editTitle}
+    {editing ? <TextInput variant="field" className="inline-rename-input" autoFocus value={editTitle}
       onChange={event => setEditTitle(event.target.value)} onFocus={event => event.currentTarget.select()}
       onBlur={onCommitEdit} onKeyDown={event => {
         if (event.key === 'Enter') onCommitEdit(); else if (event.key === 'Escape') onCancelEdit();
       }} onClick={event => event.stopPropagation()} /> : <FolderTabContent item={{
         id: tab.id, label: displayTitle, tip: displayTitle,
-        icon: <Icon size={iconSizes.compact} style={{ color: tabIconColor(tab, colors) ?? (isSessionTab(tab) ? undefined : active ? 'var(--text-primary)' : 'var(--text-secondary)') }} />,
+        icon: tab.kind === 'history' ? <History size={iconSizes.compact} /> : <TerminalProfileIcon colored kind={first?.kind} shellType={first?.shellType ?? (isSessionTab(tab) ? defaultShellType : undefined)} connectionId={first?.ssh?.connectionId} size={iconSizes.control} />,
         closeLabel: t('Close this tab'), closeTestId: `tab-close-${tab.id}`,
       }} selected={active} onSelect={onActivate} onClose={onClose} />}
     {tab.kind === 'session' && terms.length > 1 && <span className="terminal-split-count">{terms.length}</span>}

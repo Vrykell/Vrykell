@@ -20,6 +20,7 @@ export function useBalancedTitlebar(headerRef: RefObject<HTMLElement | null>, ac
       header.style.setProperty('--workspace-search-width', `${layout.width}px`);
       header.style.setProperty('--workspace-title-space', `${layout.titleSpace}px`);
       header.style.setProperty('--workspace-search-gap', `${layout.gap}px`);
+      header.dataset.searchCompact = String(layout.width < 112);
     };
     measure();
     const observer = new ResizeObserver(measure);

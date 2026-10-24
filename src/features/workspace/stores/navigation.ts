@@ -2,7 +2,8 @@ import { create } from 'zustand';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import { isHistoryGroupColor, type HistoryGroupColor } from '@ui/historyGroupColor';
 
-export type WorkspaceArea = 'terminal' | 'code' | 'ai' | 'ssh' | 'history';
+export type WorkspaceArea = 'terminal' | 'code' | 'ai' | 'ssh' | 'forwarding' | 'history' | 'unified';
+export const WORKSPACE_AREA_LABELS = { terminal: 'workspace.nav.terminals', code: 'workspace.nav.files', ai: 'workspace.nav.conversations', ssh: 'workspace.nav.hosts', forwarding: 'Port forwarding', history: 'All history', unified: 'Unified workspace' } as const;
 export type HistoryTypePreset = 'all' | 'terminal' | 'conversation';
 export const WORKSPACE_SIDEBAR_WIDTH = 208;
 export const WORKSPACE_SIDEBAR_MIN_WIDTH = 160;

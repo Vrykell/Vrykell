@@ -30,6 +30,14 @@ it('reorders files without changing the active document', () => {
   expect(useSessionStore.getState().tabs[0]).toMatchObject({ files: [second, first], selected: second });
 });
 
+it('replaces a saved draft in its existing slot without adding another page', () => {
+  const draft = { path: 'Untitled.txt', draftId: 'draft' };
+  const store = useSessionStore.getState(); store.openEditorFile(first); store.openEditorFile(draft);
+  store.replaceEditorFile(draft, second);
+  expect(useSessionStore.getState().tabs).toHaveLength(1);
+  expect(useSessionStore.getState().tabs[0]).toMatchObject({ files: [first, second], selected: second });
+});
+
 it('merges legacy pages without duplicating files or changing active settings', () => {
   useSessionStore.setState({ tabs: [
     { id: 'one', kind: 'editor', title: 'one.ts', files: [first], selected: first },

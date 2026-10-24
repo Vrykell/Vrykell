@@ -4,9 +4,10 @@ import SidebarItem from '@ui/sidebarItem';
 import { IconButton } from '@ui/IconButton';
 import ResizeHandle from '@ui/ResizeHandle';
 import { ListReorderPlaceholder, ListReorderPreview, useListReorderDrag } from '@ui/listReorder';
-import { TerminalPrompt, FileCode, Sparkles, Server, Settings, PanelLeft, History, iconSizes } from '@ui/icons';
+import { TerminalPrompt, FileCode, ServerStack, Settings, PanelLeft, History, iconSizes } from '@ui/icons';
+import AiSessionIcon from '@features/chat/components/AiSessionIcon';
 import { useUiStore } from '@features/workspace';
-import { useWorkspaceNavigation, WORKSPACE_COMPACT_BREAKPOINT, type WorkspaceArea } from '../stores/navigation';
+import { useWorkspaceNavigation, WORKSPACE_AREA_LABELS, WORKSPACE_COMPACT_BREAKPOINT, type WorkspaceArea } from '../stores/navigation';
 import { selectWorkspaceArea } from '../services/selectWorkspaceArea';
 import NavigationDragPreview from './NavigationDragPreview';
 import SidePanel from './SidePanel';
@@ -31,10 +32,10 @@ export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number
     window.addEventListener('resize', resize); return () => window.removeEventListener('resize', resize);
   }, []);
   const items = [
-    { id: 'terminal' as const, label: t('Terminal workspace'), Icon: TerminalPrompt },
-    { id: 'code' as const, label: t('Code workspace'), Icon: FileCode },
-    { id: 'ai' as const, label: t('AI workspace'), Icon: Sparkles },
-    { id: 'ssh' as const, label: t('SSH hosts'), Icon: Server },
+    { id: 'terminal' as const, label: t(WORKSPACE_AREA_LABELS.terminal), Icon: TerminalPrompt },
+    { id: 'code' as const, label: t(WORKSPACE_AREA_LABELS.code), Icon: FileCode },
+    { id: 'ai' as const, label: t(WORKSPACE_AREA_LABELS.ai), Icon: AiSessionIcon },
+    { id: 'ssh' as const, label: t(WORKSPACE_AREA_LABELS.ssh), Icon: ServerStack },
   ];
   const orderedItems = workspaceOrder.flatMap(id => {
     const item = items.find(candidate => candidate.id === id);
@@ -65,8 +66,8 @@ export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number
     <nav aria-label={t('Workspaces')} className="workspace-area-navigation" data-reorder-list="workspace-areas">
       {orderedItems.map(({ id, label, Icon }, index) => <Fragment key={id}>
         <ListReorderPlaceholder listId="workspace-areas" itemId={id} />
-        <SidebarItem compact title={label} icon={<Icon size={iconSizes.row} />} active={!settingsOpen && area === id}
-          testId={`workspace-area-${id}`} dataAttributes={{ role: 'button', 'aria-label': label, 'data-dock-btn': id === 'terminal' ? 'tabs' : id === 'ssh' ? 'ssh' : undefined, 'aria-current': !settingsOpen && area === id ? 'page' : undefined }}
+        <SidebarItem compact title={label} icon={<Icon size={iconSizes.row} />} active={!settingsOpen && (area === id || id === 'ssh' && area === 'forwarding')}
+          testId={`workspace-area-${id}`} dataAttributes={{ role: 'button', 'aria-label': label, 'data-dock-btn': id === 'terminal' ? 'tabs' : id === 'ssh' ? 'ssh' : undefined, 'aria-current': !settingsOpen && (area === id || id === 'ssh' && area === 'forwarding') ? 'page' : undefined }}
           tabIndex={0} reorderItemId={id} reorderListId="workspace-areas" reorderKind="workspace"
           onPointerDown={event => startWorkspaceDrag(event, { id, kind: 'workspace' })}
           onClick={() => selectWorkspaceArea(id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectWorkspaceArea(id); } }} />
