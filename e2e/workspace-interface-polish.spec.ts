@@ -9,7 +9,7 @@ for (const theme of ['深色', '浅色']) test(`workspace colors and model contr
   const selected = page.getByTestId('workspace-area-terminal').locator('.sidebar-row-icon svg');
   const color = await selected.evaluate(element => getComputedStyle(element).color);
   const expectedIconColor = await page.evaluate(() => {
-    const element = document.createElement('span'); element.style.color = 'var(--group-blue)'; document.body.append(element);
+    const element = document.createElement('span'); element.style.color = 'var(--primary-action)'; document.body.append(element);
     const color = getComputedStyle(element).color; element.remove(); return color;
   });
   await expect(selected).toHaveCSS('color', expectedIconColor);

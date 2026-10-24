@@ -157,18 +157,18 @@ test('workspace navigation rows reorder vertically and retain their order', asyn
   await page.mouse.up();
   const order = () => page.locator('[data-testid^="workspace-area-"]').evaluateAll(rows =>
     rows.map(row => row.getAttribute('data-testid')?.replace('workspace-area-', '')));
-  await expect.poll(order).toEqual(['ssh', 'terminal', 'code', 'ai']);
+  await expect.poll(order).toEqual(['ssh', 'terminal', 'code', 'ai', 'unified']);
   await page.reload();
-  await expect.poll(order).toEqual(['ssh', 'terminal', 'code', 'ai']);
+  await expect.poll(order).toEqual(['ssh', 'terminal', 'code', 'ai', 'unified']);
 
   // Dropping past the last row, in the empty sidebar area below the list, appends the row.
   const terminal = (await page.getByTestId('workspace-area-terminal').boundingBox())!;
-  const last = (await page.getByTestId('workspace-area-ai').boundingBox())!;
+  const last = (await page.getByTestId('workspace-area-unified').boundingBox())!;
   await page.mouse.move(terminal.x + terminal.width / 2, terminal.y + terminal.height / 2);
   await page.mouse.down();
   await page.mouse.move(last.x + last.width / 2, last.y + last.height + 40, { steps: 10 });
   await page.mouse.up();
-  await expect.poll(order).toEqual(['ssh', 'code', 'ai', 'terminal']);
+  await expect.poll(order).toEqual(['ssh', 'code', 'ai', 'unified', 'terminal']);
 });
 
 test('panel headings retain their appearance and offer the left middle and right edge', async ({ page }, info) => {

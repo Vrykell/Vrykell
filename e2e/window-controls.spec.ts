@@ -24,6 +24,8 @@ test('window controls drop the hover surface after a pointer click', async ({ pa
   const minimize = page.getByTestId('window-minimize');
   const hoverSurface = await themeColor(page, '--button-hover');
 
+  await expect(page.locator('[data-terminal-input]')).toBeFocused();
+
   await minimize.hover();
   await expect(minimize).toHaveCSS('background-color', hoverSurface);
 
