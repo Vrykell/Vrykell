@@ -246,7 +246,7 @@ export function createBlockTerm(
     rows: Math.max(rows || 24, 1),
     scrollback: 5000,
     ...getTerminalFontOptions(),
-    cursorBlink: true,
+    cursorBlink: useTypographyStore.getState().terminalCursorBlink,
     // Match the pane: keep a solid cursor when the command input holds focus.
     cursorInactiveStyle: 'block',
     theme: xtermTheme,
@@ -257,6 +257,7 @@ export function createBlockTerm(
   });
   themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'data-theme'] });
   const unsubscribeTypography = useTypographyStore.subscribe((state, previous) => {
+    if (state.terminalCursorBlink !== previous.terminalCursorBlink) term.options.cursorBlink = state.terminalCursorBlink;
     if (terminalTypographyChanged(state, previous)) Object.assign(term.options, getTerminalFontOptions());
   });
   return {

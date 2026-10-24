@@ -98,3 +98,18 @@ it('keeps the parent fixed outside the directory list and starts with neutral ro
   fireEvent.click(parent);
   await waitFor(() => expect(mocks.write).toHaveBeenCalledWith('pty', "cd -- '/'\n"));
 });
+
+it('clears keyboard emphasis on pointer movement without scrolling or changing the directory', async () => {
+  render(<DirectoryPicker paneId="pane" dir="/work" />);
+  fireEvent.click(screen.getByRole('button', { name: '切换工作目录' }));
+  const folder = await screen.findByRole('option', { name: 'Documents' });
+  const scroll = vi.fn();
+  folder.scrollIntoView = scroll;
+  fireEvent.keyDown(screen.getByRole('combobox'), { key: 'ArrowDown' });
+  expect(folder).toHaveAttribute('data-active', 'true');
+  expect(scroll).toHaveBeenCalledOnce();
+  fireEvent(folder, new MouseEvent('pointermove', { bubbles: true, clientX: 20, clientY: 30 }));
+  expect(folder).toHaveAttribute('data-active', 'false');
+  expect(scroll).toHaveBeenCalledOnce();
+  expect(mocks.write).not.toHaveBeenCalled();
+});

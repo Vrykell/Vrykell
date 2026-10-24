@@ -116,6 +116,7 @@ export function useCommandCompletion({
   }, [clearGhost, setText]);
 
   return {
+    isCyclingCompletion: () => completionRef.current !== null,
     ghost,
     ghostCandidates,
     clearGhost,

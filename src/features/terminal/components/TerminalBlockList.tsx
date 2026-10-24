@@ -13,7 +13,6 @@ import { configureTerminalInput } from '@features/terminal/model/terminalInput';
 import { memo, useState, useEffect, useRef } from 'react';
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import { Ellipsis } from '@ui/icons';
-import { useTerminalStore } from '@features/terminal';
 import AiBlock from '@features/chat/components/AiBlock';
 import { STATUS_ACTION_ICON_SIZE } from './TerminalStatusBar';
 import RunningCommandBar from './RunningCommandBar';
@@ -31,8 +30,8 @@ import { captureTerminalPaste, copyTerminalSelection, pasteClipboardIntoTerminal
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { measureRunningTerminalRows } from '../model/runningTerminalRows';
 import { repaintTerminal } from '../model/terminalResize';
-import { useSessionStore, useUiStore, useWorkspaceNavigation } from '@features/workspace';
-import { leaves } from '@features/workspace/model/windowLayout';
+import { useSessionStore } from '@features/workspace';
+import { useManualFullscreenVisible } from '../hooks/useManualFullscreenVisible';
 
 interface Props {
   tabId: string;
@@ -299,16 +298,7 @@ function RunningItem({
 function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const occupiedRowsRef = useRef(1);
-  const requested = useTerminalStore(state => !!state.manualFullscreen[tabId]);
-  const focused = useTerminalStore(state => state.focusedPaneId === tabId);
-  const activePane = useSessionStore(state => {
-    const tab = state.tabs.find(item => item.id === state.activeId);
-    return tab?.kind === 'session' && leaves(tab.layout).some(pane => pane.id === tabId);
-  });
-  const terminalArea = useWorkspaceNavigation(state => state.area === 'terminal');
-  const settingsOpen = useUiStore(state => state.settingsOpen);
-  // Inactive panes retain their presentation preference without claiming another pane's host.
-  const tuiFs = requested && focused && activePane && terminalArea && !settingsOpen;
+  const tuiFs = useManualFullscreenVisible(tabId);
 
   useEffect(() => {
     const handle = getExecutingTerm(tabId);

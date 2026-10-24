@@ -56,6 +56,7 @@ vi.mock('@xterm/xterm', () => ({
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { proposeDimensions() { return { cols: 80, rows: 24 }; } } }));
 vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: class {} }));
 vi.mock('@features/ssh/services/hostTrust', () => ({ prepareSshHost: vi.fn().mockResolvedValue({ known: true, fingerprint: 'SHA256:test', keyType: 'ed25519' }) }));
+vi.mock('@features/ssh/services/forwarding', () => ({ startAutomaticForwarding: vi.fn().mockResolvedValue(undefined) }));
 
 invokeMock.mockResolvedValue('sess-x');
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
@@ -97,6 +98,7 @@ import { leaf } from '@features/workspace/model/windowLayout';
 import { useTypographyStore } from '@config/typography';
 import { onPtyOutput as mockedOnPtyOutput, ptySpawn as mockedPtySpawn, ptyWrite, ptyClose } from '@platform/pty';
 import { prepareSshHost } from '@features/ssh/services/hostTrust';
+import { startAutomaticForwarding } from '@features/ssh/services/forwarding';
 import { diagnosticSnapshot } from '@platform/diagnostics';
 
 /** 设置一个本地终端 tab，指定打开模式（classic / block） */
@@ -128,6 +130,7 @@ describe('useTerminalSession', () => {
     vi.mocked(ptyClose).mockClear();
     vi.mocked(ptyWrite).mockClear();
     vi.mocked(prepareSshHost).mockClear();
+    vi.mocked(startAutomaticForwarding).mockClear();
     writeMock.mockClear();
     invokeMock.mockClear();
     onDataHandlers.length = 0;
@@ -186,10 +189,14 @@ describe('useTerminalSession', () => {
   it('keeps the shared block cursor for SSH sessions', () => {
     setSshTab(false);
     render(<TestHarness tabId="t1" onReady={() => {}} />);
-    // An SSH session renders through the same terminal setup, so the cursor stays the
-    // default blinking block instead of switching to a thin insertion bar.
     expect(terminalInitOptions[terminalInitOptions.length - 1]?.cursorStyle).toBeUndefined();
     expect(terminalInstances[terminalInstances.length - 1]?.options.cursorStyle).toBeUndefined();
+    expect(terminalInitOptions[terminalInitOptions.length - 1]?.cursorBlink).toBe(false);
+    const term = terminalInstances[terminalInstances.length - 1]!;
+    act(() => useTypographyStore.getState().update({ terminalCursorBlink: true }));
+    expect(term.options.cursorBlink).toBe(true);
+    act(() => useTypographyStore.getState().update({ terminalCursorBlink: false }));
+    expect(term.options.cursorBlink).toBe(false);
   });
 
   it('confirms SSH authentication only after a remote prompt marker and resets on reconnect', async () => {
@@ -210,6 +217,22 @@ describe('useTerminalSession', () => {
       await act(async () => { fireEvent.click(view.getByText('重连')); });
       expect(view.getByTestId('ssh-auth-state')).toHaveTextContent('unconfirmed');
     } finally { vi.useRealTimers(); }
+  });
+
+  it('starts saved automatic forwarding only once after authentication for each connection', async () => {
+    useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'classic', ssh: { name: 'server', host: 'server', connectionId: 'saved' } }) }], activeId: 't1' });
+    const view = render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
+    expect(startAutomaticForwarding).not.toHaveBeenCalled();
+    const ready = [{ kind: 'osc', code: '133;B', payload: '', raw: '\x1b]133;B\x07' }];
+    await act(async () => { ptyOutputHandlers[0]!('sess-x', ready); ptyOutputHandlers[0]!('sess-x', ready); });
+    expect(startAutomaticForwarding).toHaveBeenCalledExactlyOnceWith('saved');
+    view.rerender(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    expect(startAutomaticForwarding).toHaveBeenCalledTimes(1);
+    await act(async () => { fireEvent.click(view.getByText('重连')); });
+    await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalledTimes(2));
+    await act(async () => { ptyOutputHandlers[1]!('sess-x', ready); });
+    expect(startAutomaticForwarding).toHaveBeenCalledTimes(2);
   });
 
   it('logs real client output, shell readiness and the exit code', async () => {
@@ -294,7 +317,7 @@ describe('useTerminalSession', () => {
     useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', user: 'user' } }) }], activeId: 't1' });
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalled());
-    expect(prepareSshHost).toHaveBeenCalledWith('server', undefined, expect.any(AbortSignal));
+    expect(prepareSshHost).toHaveBeenCalledWith('server', undefined, expect.any(AbortSignal), expect.objectContaining({ host: 'server' }));
     expect(mockedPtySpawn).toHaveBeenCalledWith(80, 24, undefined, expect.objectContaining({ ssh: expect.objectContaining({ hostKeyType: 'ed25519' }), openMode: 'block' }));
     expect(useTerminalStore.getState().scenes.t1).toBe('classic');
     ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'Password: ' }]);
@@ -446,7 +469,7 @@ describe('useTerminalSession', () => {
     });
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalled());
-    expect(prepareSshHost).toHaveBeenCalledWith('direct', undefined, expect.any(AbortSignal));
+    expect(prepareSshHost).toHaveBeenCalledWith('direct', undefined, expect.any(AbortSignal), expect.objectContaining({ host: 'direct', jumpHost: 'none' }));
   });
 
   it('does not reopen an interrupted session when the connection has no automatic reconnect', async () => {

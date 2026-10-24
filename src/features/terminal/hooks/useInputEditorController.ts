@@ -9,6 +9,7 @@ import { engageFollow } from './useFollowBottom';
 import { useCommandHistoryNavigation } from './useCommandHistoryNavigation';
 import { useTerminalInputContext } from './useTerminalInputContext';
 import { useCommandCompletion } from './useCommandCompletion';
+import { usePathCompletion } from './usePathCompletion';
 import { appendTerminalBlankLines, setPendingTerminalCommand } from './useTerminalSession';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { useAutoSizeTextarea } from '@ui/hooks/useAutoSizeTextarea';
@@ -64,7 +65,8 @@ export function useInputEditorController({ paneId, focused, isLongRunning, onEnd
     wasFocused.current = isFocused;
   }, [isFocused, visible]);
   const resetHeight = useCallback(() => { if (inputRef.current) inputRef.current.style.height = 'auto'; }, []);
-  const { ghost, clearGhost, acceptCompletion, restoreCompletion } = useCommandCompletion({ text, aiMode: false, isFocused, visible, cwd: tabCwd, inputRef, setText });
+  const { acceptPathCompletion, restorePathCompletion, ownsCompletion, isCyclingPathCompletion } = usePathCompletion({ paneId, text, cwd: tabCwd, visible, isFocused, inputRef, setText });
+  const { ghost, clearGhost, acceptCompletion, restoreCompletion, isCyclingCompletion } = useCommandCompletion({ text, aiMode: false, isFocused, visible: visible && !ownsCompletion, cwd: tabCwd, inputRef, setText });
   const { reset: resetHistNav, navigate: navHistory } = useCommandHistoryNavigation({ paneId, text, setText, inputRef, onNavigate: clearGhost });
 
   const execute = useCallback(() => {
@@ -116,17 +118,31 @@ export function useInputEditorController({ paneId, focused, isLongRunning, onEnd
       event.preventDefault(); return;
     }
     const element = event.currentTarget;
+    if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.nativeEvent.isComposing && event.keyCode !== 229
+      && isCyclingPathCompletion() && acceptPathCompletion(event.shiftKey)) {
+      event.preventDefault(); event.stopPropagation(); resetHistNav(); return;
+    }
+    if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.nativeEvent.isComposing && event.keyCode !== 229
+      && (isCyclingCompletion?.() || acceptsCompletionKey(event, useCompletionPreferences.getState().shortcuts, element.selectionStart, element.selectionEnd, text.length))
+      && acceptCompletion(event.shiftKey)) {
+      event.preventDefault(); event.stopPropagation(); resetHistNav(); return;
+    }
+    if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.nativeEvent.isComposing && event.keyCode !== 229
+      && acceptPathCompletion(event.shiftKey)) {
+      event.preventDefault(); event.stopPropagation(); clearGhost(); resetHistNav(); return;
+    }
     if (completionShortcut(event) && !event.nativeEvent.isComposing && acceptsCompletionKey(event, useCompletionPreferences.getState().shortcuts,
       element.selectionStart, element.selectionEnd, text.length) && acceptCompletion(event.key === 'Tab' && event.shiftKey)) {
       event.preventDefault(); event.stopPropagation(); resetHistNav(); return;
     }
     if (event.key === 'Escape') {
+      if (restorePathCompletion()) { event.preventDefault(); event.stopPropagation(); return; }
       if (restoreCompletion()) return;
       if (ghost) { clearGhost(); return; }
       if (text) { setText(''); resetHeight(); }
     }
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); clearGhost(); execute(); }
-  }, [text, navHistory, acceptCompletion, resetHistNav, restoreCompletion, ghost, clearGhost, setText, resetHeight, execute]);
+  }, [text, navHistory, acceptPathCompletion, restorePathCompletion, isCyclingPathCompletion, acceptCompletion, isCyclingCompletion, resetHistNav, restoreCompletion, ghost, clearGhost, setText, resetHeight, execute]);
   const askAi = useCallback(() => { askAboutTerminal(paneId); }, [paneId]);
   return { ...context, inputRef, panelRef, text, ghost, execute, handleChange, handleKeyDown, askAi };
 }

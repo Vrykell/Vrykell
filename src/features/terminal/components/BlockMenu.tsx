@@ -10,6 +10,7 @@ import { askAboutTerminal } from '@features/chat/services/conversationContext';
 import { clearSessionBlocks } from '@features/terminal/hooks/useTerminalSession';
 import { fmtDuration } from '@ui/UiBtn';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
+import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';
 
 interface Props {
   block: TermBlock;
@@ -22,6 +23,7 @@ interface Props {
 
 export default function BlockMenu({ block, paneId, anchor, onClose, getOutputText }: Props) {
   const ref = useRef<HTMLDivElement>(null);
+  const navigation = useListNavigationMode(true);
   useExclusiveMenu(ref, onClose);
   const preferredPosition = anchor.kind === 'pointer'
     ? { left: anchor.x, top: anchor.y }
@@ -106,7 +108,7 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
 
   return createPortal(
     <div
-      ref={ref}
+      {...navigation.props} ref={ref}
       className="workspace-floating"
       role="menu"
       aria-label={t('Command block actions')}

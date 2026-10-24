@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   navigateHistory: vi.fn(),
   clearGhost: vi.fn(),
   acceptCompletion: vi.fn(),
+  isCyclingCompletion: vi.fn(),
   restoreCompletion: vi.fn(),
   addPastedText: vi.fn(),
   addBlobs: vi.fn(),
@@ -44,6 +45,7 @@ vi.mock('@features/terminal/hooks/useCommandCompletion', () => ({
     ghost: '',
     clearGhost: mocks.clearGhost,
     acceptCompletion: mocks.acceptCompletion,
+    isCyclingCompletion: mocks.isCyclingCompletion,
     restoreCompletion: mocks.restoreCompletion,
   }),
 }));
@@ -107,6 +109,7 @@ describe('useInputEditorController', () => {
     mocks.navigateHistory.mockReset().mockReturnValue(false);
     mocks.clearGhost.mockReset();
     mocks.acceptCompletion.mockReset().mockReturnValue(false);
+    mocks.isCyclingCompletion.mockReset().mockReturnValue(false);
     mocks.restoreCompletion.mockReset().mockReturnValue(false);
     mocks.clearAttachments.mockReset();
     mocks.sessions = { 'pane-1': 'pty-1' };
@@ -163,6 +166,16 @@ describe('useInputEditorController', () => {
 
     expect(preventDefault).toHaveBeenCalledOnce();
     expect(mocks.ptyWrite).toHaveBeenCalledWith('pty-1', 'git status\n');
+  });
+
+  it('keeps an accepted command cycle from being reinterpreted as filesystem completion', () => {
+    mocks.isCyclingCompletion.mockReturnValue(true); mocks.acceptCompletion.mockReturnValue(true);
+    const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
+    const preventDefault = vi.fn(); const stopPropagation = vi.fn();
+    act(() => result.current.handleKeyDown({ key: 'Tab', shiftKey: true, preventDefault, stopPropagation,
+      nativeEvent: { isComposing: false } } as unknown as React.KeyboardEvent<HTMLTextAreaElement>));
+    expect(mocks.acceptCompletion).toHaveBeenCalledWith(true); expect(preventDefault).toHaveBeenCalledOnce();
+    expect(mocks.clearGhost).not.toHaveBeenCalled(); expect(mocks.ptyWrite).not.toHaveBeenCalled();
   });
 
   it('keeps an AI draft out of the PTY when the chat panel opens', () => {

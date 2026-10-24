@@ -1,4 +1,5 @@
 import { preferredShell } from '@config/terminalDefaults';
+import { useShellProfiles } from '@config/shellProfiles';
 import { getAvailableShells, type ShellType } from '@platform/shells';
 import { createResizeQueue, fitTerminal, repaintTerminal } from '../model/terminalResize';
 import { configureTerminalInput } from '@features/terminal/model/terminalInput';
@@ -42,6 +43,8 @@ import { appendLogEntry, connectionLogLines, isSshClientNotice } from '../model/
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { getTerminalFontOptions, measureTerminalDomCellWidth } from '@features/terminal/model/terminalFont';
 import { prepareSshHost } from '@features/ssh/services/hostTrust';
+import { startAutomaticForwarding } from '@features/ssh';
+import { useToastStore } from '@ui/Toast';
 import { terminalTypographyChanged, useTypographyStore } from '@config/typography';
 import { isLayoutResizeDragActive, onLayoutResizeDragEnd } from '@ui/layoutResizeDrag';
 
@@ -175,7 +178,7 @@ export function useTerminalSession(
 
     const term = new Terminal({
       ...getTerminalFontOptions(),
-      cursorBlink: true,
+      cursorBlink: useTypographyStore.getState().terminalCursorBlink,
       // A solid inactive cursor stays visible when the command input takes focus;
       // the default hairline outline reads as a vanished cursor on Retina displays.
       cursorInactiveStyle: 'block',
@@ -264,6 +267,7 @@ export function useTerminalSession(
       ? layoutLeaves(tab.layout).find((t) => t.id === paneId)
       : undefined;
     const autoReconnect = spec?.kind === 'ssh' && spec.ssh?.autoReconnect === true;
+    let automaticForwardingStarted = false;
 
     /**
      * Open a fresh session after an unexpected drop. A clean exit (the remote shell ended on
@@ -344,14 +348,14 @@ export function useTerminalSession(
             terminalDebug('manual-fullscreen-cancelled', { paneId, reason: scene });
           }
         }
-        if (useSessionStore.getState().activeId !== tabId || useWorkspaceNavigation.getState().area !== 'terminal' || useUiStore.getState().settingsOpen) return;
+        if (useSessionStore.getState().activeId !== tabId || !['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) || useUiStore.getState().settingsOpen) return;
         if (scene === 'blockList') {
           term.reset(); // 清掉 classic 残留
           useTerminalStore.getState().setKeyboardTarget('input');
         } else {
           useTerminalStore.getState().setKeyboardTarget('terminal');
           focusTimer = setTimeout(() => {
-            if (disposed || currentScene !== scene || useSessionStore.getState().activeId !== tabId || useWorkspaceNavigation.getState().area !== 'terminal' || useUiStore.getState().settingsOpen || document.activeElement?.closest('.ai-workspace-surface')) return;
+            if (disposed || currentScene !== scene || useSessionStore.getState().activeId !== tabId || !['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) || useUiStore.getState().settingsOpen || document.activeElement?.closest('.ai-workspace-surface')) return;
             term.focus();
             const textarea = term.element?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
             if (isTerminalDebugEnabled()) {
@@ -475,6 +479,12 @@ export function useTerminalSession(
       if (events.some(event => event.kind === 'osc' && event.code === '133;B')) {
         promptReady = true;
         if (spec?.kind === 'ssh') setSshAuthenticated(true);
+        if (spec?.kind === 'ssh' && spec.ssh?.connectionId && !automaticForwardingStarted) {
+          automaticForwardingStarted = true;
+          void startAutomaticForwarding(spec.ssh.connectionId).catch(reason => {
+            useToastStore.getState().addToast(`${t('Port forwarding failed')}: ${String(reason)}`, 'error');
+          });
+        }
         if (spec?.kind === 'ssh') reconnectAttemptsRef.current = 0;
         if (spec?.kind === 'ssh') setSshLog(entries => appendLogEntry(entries, { time: Date.now(), text: t('Shell ready') }));
       }
@@ -550,13 +560,13 @@ export function useTerminalSession(
     // ── PTY 启动 ──
 
     // 类型/cwd 已在 controller 创建前取好（spec）
-    const tabCwd = spec?.cwd;
+    let tabCwd = spec?.cwd;
     const spawnOpts: PtySpawnOptions | undefined = spec?.kind === 'ssh'
       ? { ssh: { host: spec.ssh?.host ?? '', user: spec.ssh?.user, port: spec.ssh?.port,
         identityFile: spec.ssh?.identityFile, jumpHost: spec.ssh?.jumpHost,
         serverAliveInterval: spec.ssh?.serverAliveInterval, shellIntegration: spec.ssh?.shellIntegration,
         localForwards: spec.ssh?.localForwards, remoteForwards: spec.ssh?.remoteForwards,
-        dynamicForwards: spec.ssh?.dynamicForwards }, openMode }
+        dynamicForwards: spec.ssh?.dynamicForwards, proxyId: spec.ssh?.proxyId, environment: spec.ssh?.environment, authenticationMode: spec.ssh?.authenticationMode }, openMode }
       : spec?.kind === 'local'
         ? { shell: spec.shellType, openMode }
         : undefined;
@@ -568,13 +578,15 @@ export function useTerminalSession(
       terminalDebug('pty-spawn-request', { paneId, tabId, cols: spawnCols, rows: spawnRows, spawnOpts });
     }
     const startSession = async () => {
-      if (spec?.kind === 'local' && spec.shellType && spawnOpts) {
+      if (spec?.kind === 'local' && spawnOpts) {
         const shells = await getAvailableShells();
-        spawnOpts.shell = preferredShell(spec.shellType as ShellType, shells);
+        spawnOpts.shell = preferredShell(spec.shellType as ShellType ?? 'system', shells);
+        const profile = spawnOpts.shell ? useShellProfiles.getState().profiles[spawnOpts.shell as ShellType] : undefined;
+        if (spec.useProfileDirectory !== false) tabCwd ??= profile?.cwd || undefined;
       }
       if (spawnOpts?.ssh && (!spawnOpts.ssh.jumpHost || spawnOpts.ssh.jumpHost.toLowerCase() === 'none')) {
         try {
-          const info = await prepareSshHost(spawnOpts.ssh.host, spawnOpts.ssh.port, startupAbort.signal);
+          const info = await prepareSshHost(spawnOpts.ssh.host, spawnOpts.ssh.port, startupAbort.signal, spawnOpts.ssh);
           spawnOpts.ssh.hostKeyType = info.keyType;
         } catch (error) {
           const message = String((error as Error)?.message ?? error);
@@ -606,7 +618,7 @@ export function useTerminalSession(
         preSession = [];
         onReadyRef.current(id);
         setStatus('ready');
-        if (currentScene === 'classic' && useSessionStore.getState().activeId === tabId && useWorkspaceNavigation.getState().area === 'terminal' && !useUiStore.getState().settingsOpen && !document.activeElement?.closest('.ai-workspace-surface') && !(spec?.kind === 'ssh' && blockEnabled && connectionOutputRef.current)) {
+        if (currentScene === 'classic' && useSessionStore.getState().activeId === tabId && ['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) && !useUiStore.getState().settingsOpen && !document.activeElement?.closest('.ai-workspace-surface') && !(spec?.kind === 'ssh' && blockEnabled && connectionOutputRef.current)) {
           term.focus();
         }
         // PTY 就绪后按真实布局尺寸重校
@@ -744,13 +756,14 @@ export function useTerminalSession(
     /** PTY column count leaves room for browser fallback glyphs in completed snapshots. */
     const effectiveCols = (): number => {
       const scene = useTerminalStore.getState().scenes[paneId] ?? currentScene;
-      if (useTerminalStore.getState().manualFullscreen[paneId]) {
-        const fs = fullscreenHostSize();
+      const manualFullscreen = useTerminalStore.getState().manualFullscreen[paneId];
+      const fs = fullscreenHostSize();
+      if (fs) {
         const output = controller.executingTerm?.term ?? term;
-        if (fs && fs.w > 0) return Math.max(2, Math.floor(fs.w / getCellMetrics(output).width));
+        if (fs.w > 0) return Math.max(2, Math.floor(fs.w / getCellMetrics(output).width));
         return output.cols;
       }
-      if (scene !== 'blockList') return term.cols;
+      if (scene !== 'blockList' && !manualFullscreen) return term.cols;
       // Measure a mounted output host to account for its padding and scrollbars.
       // Before it mounts, estimate the content width from the main terminal container.
       const pane = document.querySelector<HTMLElement>(`[data-testid="pane-${paneId}"]`);
@@ -772,10 +785,10 @@ export function useTerminalSession(
 
     /** PTY row count for the current scene; manual fullscreen uses the host height. */
     const effectiveRows = (): number => {
-      if (useTerminalStore.getState().manualFullscreen[paneId]) {
-        const fs = fullscreenHostSize();
+      const fs = fullscreenHostSize();
+      if (fs) {
         const output = controller.executingTerm?.term ?? term;
-        if (fs && fs.h > 0) return Math.max(1, Math.floor(fs.h / getCellMetrics(output).height));
+        if (fs.h > 0) return Math.max(1, Math.floor(fs.h / getCellMetrics(output).height));
         return output.rows;
       }
       return term.rows;
@@ -812,9 +825,10 @@ export function useTerminalSession(
             cellWidth: getCellMetrics(term).width, devicePixelRatio: window.devicePixelRatio });
         }
         const scene = useTerminalStore.getState().scenes[paneId] ?? currentScene;
-        const manual = !!useTerminalStore.getState().manualFullscreen[paneId];
+        const manualRequested = !!useTerminalStore.getState().manualFullscreen[paneId];
+        const manual = manualRequested && fullscreenHostSize() !== null;
         if (!manual) useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
-        if (scene === 'altScreen' && !manual) {
+        if (scene === 'altScreen' && !manualRequested) {
           // A real alternate buffer uses the main terminal's measured grid.
           requestPtySize(term.cols, term.rows);
           controller.resize(term.cols, term.rows);
@@ -847,6 +861,7 @@ export function useTerminalSession(
       resizeQueue.request(size.cols, size.rows);
     });
     const unsubscribeTypography = useTypographyStore.subscribe((state, previous) => {
+      if (state.terminalCursorBlink !== previous.terminalCursorBlink) term.options.cursorBlink = state.terminalCursorBlink;
       if (!terminalTypographyChanged(state, previous)) return;
       Object.assign(term.options, getTerminalFontOptions());
       cachedDomCellWidth = 0;

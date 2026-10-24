@@ -4,11 +4,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useTerminalStore } from '../stores/terminal';
 import { ptyWrite } from '@platform/pty';
 import TerminalPanel from '../components/TerminalPanel';
+import { useWorkspaceNavigation } from '@features/workspace/stores/navigation';
+import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 
 const { closeSession, reconnect, stopReconnect, sessionView } = vi.hoisted(() => ({ closeSession: vi.fn(), reconnect: vi.fn(), stopReconnect: vi.fn(), sessionView: { sshAuthenticated: false, sshLog: [] as { time: number; text: string }[], retry: { phase: 'idle', attempt: 0, seconds: 0 }, status: 'ready', frame: { html: 'Password:', plainText: 'Password:', cols: 80, rows: 24 } } }));
 vi.mock('../hooks/useTerminalSession', () => ({ useTerminalSession: () => ({ ref: createRef<HTMLDivElement>(), closeSession, reconnect, stopReconnect, sshAuthenticated: sessionView.sshAuthenticated, sshLog: sessionView.sshLog, retry: sessionView.retry, status: sessionView.status, frame: sessionView.frame }) }));
 vi.mock('@platform/pty', () => ({ ptyWrite: vi.fn().mockResolvedValue(undefined) }));
-afterEach(cleanup);
+const workspace = useWorkspaceStore.getState(); const navigation = useWorkspaceNavigation.getState();
+afterEach(() => { cleanup(); useWorkspaceStore.setState(workspace, true); useWorkspaceNavigation.setState(navigation, true); });
 beforeEach(() => {
   vi.mocked(ptyWrite).mockClear();
   closeSession.mockReset().mockResolvedValue(undefined);
@@ -31,6 +34,14 @@ function chooseInputMode(mode: '密码输入' | '直接输入') {
 }
 
 describe('SSH connection input', () => {
+  it('focuses masked authentication in the unified workspace without changing its terminal owner', () => {
+    useWorkspaceStore.setState({ activeId: 't' });
+    useWorkspaceNavigation.setState({ area: 'unified' });
+    useTerminalStore.setState({ sessions: { p: 'session' } });
+    render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    expect(screen.getByLabelText('SSH 认证响应')).toHaveFocus();
+    expect(useWorkspaceNavigation.getState().area).toBe('unified');
+  });
   it('keeps the hidden sizing host laid out without exposing authentication controls in block mode', () => {
     useTerminalStore.setState({ sessions: { p: 'session' }, scenes: { p: 'blockList' } });
     const view = render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput showToolbar={false} />);

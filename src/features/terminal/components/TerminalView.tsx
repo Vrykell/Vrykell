@@ -13,7 +13,8 @@ import { showsPaneChatHistory } from '../model/paneHistory';
 import { useTypographyStore } from '@config/typography';
 import { useRef, useEffect, useLayoutEffect, useMemo, useState, useId, useCallback } from 'react';
 import OverlayScrollbar from '@ui/OverlayScrollbar';
-import { CircleX, Minimize2, Square, Terminal } from '@ui/icons';
+import { CircleX, Minimize2, Square } from '@ui/icons';
+import TerminalLauncher from '@features/workspace/components/TerminalLauncher';
 import { STATUS_ACTION_ICON_SIZE, StatusActionButton, TerminalStatusBar } from '@features/terminal/components/TerminalStatusBar';
 import { MoveDragLayer, PlacementOverlay } from './TerminalPlacementOverlay';
 import { useSessionStore, useWorkspaceNavigation, type Tab } from '@features/workspace';
@@ -40,7 +41,6 @@ import { UnifiedHistoryView } from '@features/session-history';
 import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
 import ErrorBox from '@ui/ErrorBox';
 import { TextButton } from '@ui/TextButton';
-import { OutlineButton } from '@ui/OutlineButton';
 import AiWorkspaceSurface from '@features/chat/components/AiWorkspaceSurface';
 import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
@@ -50,6 +50,8 @@ import { focusSessionInput } from '../services/terminalFocus';
 import { TerminalRedrawButton } from './TerminalRedrawButton';
 import SshStatusPanel from '@features/ssh/components/SshStatusPanel';
 import type { SshSessionStatus } from '@core/ssh';
+import { useManualFullscreenVisible } from '../hooks/useManualFullscreenVisible';
+import ResourceContent from '@ui/ResourceContent';
 
 export default function TerminalView({ active = true }: { active?: boolean }) {
   const tabs = useSessionStore((s) => s.tabs);
@@ -76,6 +78,7 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
   // A real alternate screen renders the TUI on the main terminal and shows its banner in
   // the pane, so those toolbar actions join the pane menu as well.
   const manualFullscreen = useTerminalStore(s => !!s.manualFullscreen[focusedTermId]);
+  const fullscreenVisible = useManualFullscreenVisible(focusedTermId);
   const tuiInPane = focusedScene === 'altScreen' && !manualFullscreen;
   const hasRunningCommand = (focusedScene === 'blockList' || tuiInPane) && focusedBlocks.some((block) => block.status === 'executing');
   const runningActions = useRunningCommandActions(focusedTermId, fullscreenMenu ? 'fullscreen' : tuiInPane ? 'altScreen' : 'block');
@@ -104,14 +107,19 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
       {tabs.map((tab) => {
         if (tab.kind === 'session') {
           return (
-            <SessionTabView
+            <ResourceContent
               key={tab.id}
-              tab={tab}
+              id={`terminal:${tab.id}`}
               active={active && tab.id === activeId}
+            >{state => <SessionTabView
+              tab={tab}
+              active={state.visible}
+              focused={state.focused}
+              placed={state.placed}
               setSession={setSession}
               setFocusedPane={setFocusedPane}
               onPaneContextMenu={(e, sshActions) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, sshActions }); }}
-            />
+            />}</ResourceContent>
           );
         }
         // One AI surface hosts the harness workspace for every AI page kind; it follows the active tab.
@@ -124,18 +132,13 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
         if (tab.id !== activeId) return null;
         if (tab.kind === 'git-diff' || tab.kind === 'editor') return null;
         // Placeholder start page: a system singleton that keeps the workspace toolbar visible.
-        if (tab.kind === 'start') return <div key={tab.id} className="workspace-empty workspace-start-page" data-testid="start-page">
-          <Terminal size={40} />
-          <h2>{t('Start')}</h2>
-          <p>{t('Open a local terminal or connect to an SSH host.')}</p>
-          <OutlineButton onClick={() => useSessionStore.getState().addTab()}>{t('New terminal')}</OutlineButton>
-        </div>;
+        if (tab.kind === 'start') return <TerminalLauncher key={tab.id} />;
         // The terminal workspace owns the terminal-history page; the persisted filter reopens its search.
         return tab.kind === 'history' ? <UnifiedHistoryView key={tab.id} preset="terminal" /> : null;
       })}
 
       {/* Manual fullscreen host for a running block, with room for the toolbar. */}
-      {active && manualFullscreen && (
+      {active && fullscreenVisible && (
         <div
           data-testid="tui-fullscreen"
           data-pane-id={focusedTermId}
@@ -169,11 +172,13 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
 function SessionTabView(props: {
   tab: Extract<Tab, { kind: 'session' }>;
   active: boolean;
+  focused: boolean;
+  placed: boolean;
   setSession: (id: string, sid: string) => void;
   setFocusedPane: (id: string) => void;
   onPaneContextMenu: (e: React.MouseEvent, sshActions?: ContextMenuItem[]) => void;
 }) {
-  const { tab, active, setSession, setFocusedPane, onPaneContextMenu } = props;
+  const { tab, active, focused, placed, setSession, setFocusedPane, onPaneContextMenu } = props;
   const windowId = tab.id;
   const layout = tab.layout;
   const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
@@ -187,10 +192,11 @@ function SessionTabView(props: {
   const scene = useTerminalStore((s) => s.scenes[focusedTermId] ?? 'classic');
   const focusBlocks = useBlockStore(selectBlocks(focusedTermId));
   const hasExecutingBlock = focusBlocks.some((b) => b.status === 'executing');
-  useTerminalFocus(active && scene === 'blockList' && hasExecutingBlock, focusedTermId);
+  const fullscreenVisible = useManualFullscreenVisible(focusedTermId);
+  useTerminalFocus(focused && scene === 'blockList' && hasExecutingBlock, focusedTermId);
   useLayoutEffect(() => {
-    if (active) focusSessionInput(focusedTermId);
-  }, [active, focusedTermId, scene, hasExecutingBlock, sessions[focusedTermId]]);
+    if (focused) focusSessionInput(focusedTermId);
+  }, [focused, focusedTermId, scene, hasExecutingBlock, sessions[focusedTermId]]);
 
   const {
     splitPlacement,
@@ -219,11 +225,13 @@ function SessionTabView(props: {
           layout={layout}
           windowId={windowId}
           focusedTermId={focusedTermId}
+          active={focused}
           setSession={setSession}
           setFocusedPane={setFocusedPane}
           setRatioNode={setRatioNode}
           onPaneContextMenu={onPaneContextMenu}
         />
+        {placed && active && fullscreenVisible && <div data-testid="tui-fullscreen" data-pane-id={focusedTermId} style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--xterm-bg)', paddingTop: 28 }}><TuiBanner tabId={focusedTermId} /></div>}
 
         {/* Split slot picker (anchored to the layout area so it mirrors the future regions). */}
         {active && splitPlacement.open && (
@@ -267,12 +275,13 @@ function PaneLayout(props: {
   layout: WindowLayout;
   windowId: string;
   focusedTermId: string;
+  active: boolean;
   setSession: (id: string, sid: string) => void;
   setFocusedPane: (id: string) => void;
   setRatioNode: (aId: string, bId: string, ratio: number) => void;
   onPaneContextMenu: (e: React.MouseEvent, sshActions?: ContextMenuItem[]) => void;
 }) {
-  const { layout: savedLayout, windowId, focusedTermId, setSession, setFocusedPane, setRatioNode, onPaneContextMenu } = props;
+  const { layout: savedLayout, windowId, focusedTermId, active, setSession, setFocusedPane, setRatioNode, onPaneContextMenu } = props;
   const layoutRef = useRef<HTMLDivElement>(null);
   const [layoutWidth, setLayoutWidth] = useState(0);
   useEffect(() => {
@@ -311,7 +320,7 @@ function PaneLayout(props: {
           <TerminalPane
             terminal={cell.terminal}
             windowId={windowId}
-            focused={cell.terminal.id === focusedTermId}
+            focused={active && cell.terminal.id === focusedTermId}
             setSession={setSession}
             setFocusedPane={setFocusedPane}
             onContextMenu={onPaneContextMenu}
@@ -425,19 +434,20 @@ function TerminalPane(props: {
   const registerDisconnect = useCallback((action: (() => Promise<void>) | null) => { disconnectAction.current = action; }, []);
   const registerReconnect = useCallback((action: (() => Promise<void>) | null) => { reconnectAction.current = action; }, []);
   const activeTabId = useSessionStore(s => s.activeId);
-  const terminalArea = useWorkspaceNavigation(state => state.area === 'terminal');
+  const terminalArea = useWorkspaceNavigation(state => state.area === 'terminal' || state.area === 'unified');
   const scene = useTerminalStore((s) => s.scenes[terminal.id] ?? 'classic');
   const [enteredBlockMode, setEnteredBlockMode] = useState(false);
   useEffect(() => { setEnteredBlockMode(false); }, [terminal.ssh?.connectionId, terminal.ssh?.host, terminal.openMode]);
   useEffect(() => { if (scene === 'blockList') setEnteredBlockMode(true); }, [scene]);
   const manualFullscreen = useTerminalStore(s => !!s.manualFullscreen[terminal.id]);
+  const fullscreenVisible = useManualFullscreenVisible(terminal.id);
   // An SSH pane's classic scene is its connection/auth surface; the pane's chat
   // history stays out of the way so that surface owns the pane.
   const showChatHistory = showsPaneChatHistory(scene, terminal.kind);
   // Real alternate buffers use the main xterm; manual fullscreen uses the live block terminal.
   const disconnectedBlock = terminal.kind === 'ssh' && terminal.openMode === 'block' && enteredBlockMode && sshState.phase === 'disconnected';
   const showXterm = !disconnectedBlock && (scene === 'classic' || (scene === 'altScreen' && !manualFullscreen));
-  const showBlocks = scene === 'blockList' || disconnectedBlock;
+  const showBlocks = scene === 'blockList' || disconnectedBlock || (manualFullscreen && !fullscreenVisible);
   const blockPresentation = terminal.kind === 'ssh' && terminal.openMode === 'block' && (scene === 'blockList' || (scene === 'altScreen' && enteredBlockMode) || disconnectedBlock);
   const reconnectSsh = async () => { await reconnectAction.current?.(); };
   const sshActions: ContextMenuItem[] = blockPresentation ? [

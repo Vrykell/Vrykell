@@ -57,7 +57,7 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
   const responseRef = useRef<HTMLInputElement>(null);
   const sessionId = useTerminalStore(s => s.sessions[paneId]);
   const activeTab = useSessionStore(state => state.activeId === tabId);
-  const terminalArea = useWorkspaceNavigation(state => state.area === 'terminal');
+  const terminalArea = useWorkspaceNavigation(state => state.area === 'terminal' || state.area === 'unified');
   const settingsOpen = useUiStore(state => state.settingsOpen);
   const scene = useTerminalStore(s => s.scenes[paneId] ?? 'classic');
   const interactive = connectionInput && (scene !== 'blockList' || cancellation !== 'idle');

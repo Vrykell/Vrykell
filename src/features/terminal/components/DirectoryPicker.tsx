@@ -16,6 +16,7 @@ import { engageFollow } from '../hooks/useFollowBottom';
 import { normalizeWorkingDirectory } from '../services/pipeline/workingDirectory';
 import { directoryCommand, directoryLabel } from '../model/directoryCommand';
 import type { FsEntry } from '@platform/api/types';
+import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';
 
 /** Browse the current pane's directory without changing its input draft. */
 export default function DirectoryPicker({ paneId, dir }: { paneId: string; dir?: string }) {
@@ -23,6 +24,7 @@ export default function DirectoryPicker({ paneId, dir }: { paneId: string; dir?:
   const menu = useRef<HTMLDivElement>(null);
   const search = useRef<HTMLInputElement>(null);
   const listId = useId();
+  const navigation = useListNavigationMode();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(-1);
@@ -79,7 +81,9 @@ export default function DirectoryPicker({ paneId, dir }: { paneId: string; dir?:
     return () => { window.removeEventListener('resize', update); document.removeEventListener('pointerdown', outside); };
   }, [open, loading, error, options.length]);
   useEffect(() => { setActive(-1); }, [query, entries]);
-  useEffect(() => { document.getElementById(`${listId}-${active}`)?.scrollIntoView?.({ block: 'nearest' }); }, [active, listId]);
+  useEffect(() => {
+    if (navigation.keyboardNavigation) document.getElementById(`${listId}-${active}`)?.scrollIntoView?.({ block: 'nearest' });
+  }, [active, listId, navigation.keyboardNavigation]);
 
   const choose = async (target: string) => {
     const currentSession = useTerminalStore.getState().sessions[paneId];
@@ -100,7 +104,7 @@ export default function DirectoryPicker({ paneId, dir }: { paneId: string; dir?:
       onClick={() => { setQuery(''); setActive(-1); setOpen(value => !value); }}>
       <Folder size={iconSizes.compact} /><span>{path ? directoryLabel(path) : t('Working directory unavailable')}</span>
     </button>
-    {open && createPortal(<div ref={menu} className="workspace-floating directory-picker" role="dialog" aria-label={t('Choose working directory')}
+    {open && createPortal(<div {...navigation.props} ref={menu} className="workspace-floating directory-picker" role="dialog" aria-label={t('Choose working directory')}
       style={{ position: 'fixed', zIndex: 10000, ...position }} onKeyDown={event => {
         if (event.nativeEvent.isComposing) return;
         if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); setOpen(false); trigger.current?.focus(); }
@@ -112,17 +116,17 @@ export default function DirectoryPicker({ paneId, dir }: { paneId: string; dir?:
       <TextInput ref={search} className="directory-picker-search" value={query} placeholder={t('Search directories…')}
         aria-label={t('Search directories')} role="combobox" aria-expanded="true" aria-controls={listId}
         aria-activedescendant={options[active] ? `${listId}-${active}` : undefined} onChange={event => setQuery(event.target.value)} />
-      {parent && <button className="directory-picker-parent" type="button" data-subtle onClick={() => void choose(parent)}>
+      {parent && <button className="directory-picker-parent workspace-floating-row" type="button" data-subtle onClick={() => void choose(parent)}>
         <ArrowUp size={iconSizes.compact} /><span>{t('Parent directory')}</span>
       </button>}
       {error ? <ErrorBox title={t('Unable to read directory')} actions={<button type="button" onClick={() => setRetry(value => value + 1)}>{t('Retry')}</button>}>{error}</ErrorBox>
         : loading ? <p role="status">{t('Loading directories…')}</p> : <div id={listId} role="listbox" aria-label={t('Directories')} className="directory-picker-list">
-          {options.map((option, index) => <button type="button" data-subtle role="option" aria-selected={active === index} tabIndex={-1}
-            id={`${listId}-${index}`} key={option.path} onPointerMove={() => setActive(-1)} onMouseDown={event => event.preventDefault()}
+          {options.map((option, index) => <button type="button" data-subtle role="option" className="workspace-floating-row" aria-selected={active === index} data-active={navigation.keyboardNavigation && active === index} tabIndex={-1}
+            id={`${listId}-${index}`} key={option.path} onPointerMove={() => { if (navigation.pointerMoved.current) setActive(-1); }} onMouseDown={event => event.preventDefault()}
             onClick={() => void choose(option.path)}>
             <Folder size={iconSizes.compact} /><span>{option.name}</span>
           </button>)}
-          {!options.length && <p>{t('No matching directories')}</p>}
+          {!options.length && <p className="search-empty-state">{t('No matching directories')}</p>}
         </div>}
     </div>, document.body)}
   </>;
