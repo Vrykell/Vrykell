@@ -1,5 +1,5 @@
 .folder-header { display: flex; align-items: stretch; min-width: 0; flex-shrink: 0; min-height: 34px; background: var(--surface); container-type: inline-size; }
-.folder-tab-list { display: flex; align-items: stretch; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; scroll-padding-inline: 8px; padding-inline: 8px; }
+.folder-tab-list { display: flex; align-items: stretch; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; scroll-padding-inline: 8px; padding-inline: 8px; container-type: inline-size; }
 .folder-tab-list::-webkit-scrollbar { display: none; }
 .folder-tab-spacer { flex: 1; }
 .folder-more { display: flex; align-items: center; flex-shrink: 0; padding: 3px 0 3px 4px; background: var(--surface); }
@@ -8,7 +8,8 @@
 .folder-more-button > svg { transition: transform var(--dur) var(--ease); }
 .folder-more-button[aria-expanded="true"] > svg { transform: rotate(180deg); }
 @media (prefers-reduced-motion: reduce) { .folder-more-button > svg { transition: none; } }
-.folder-tab { position: relative; display: flex; align-items: center; flex-shrink: 0; box-sizing: border-box; max-width: 280px; padding: 3px 4px; color: var(--text-muted); border-radius: var(--radius-inner) var(--radius-inner) 0 0; }
+.folder-tab { position: relative; display: flex; align-items: center; flex-shrink: 0; box-sizing: border-box; max-width: min(280px, max(96px, calc(100cqw - 88px))); padding: 3px 4px; color: var(--text-muted); border-radius: var(--radius-inner) var(--radius-inner) 0 0; }
+.folder-tab:only-child { max-width: 280px; }
 .folder-tab[data-active="true"], .folder-tab[data-tab-surface="true"] { background: var(--xterm-bg); color: var(--text-primary); }
 .folder-tab[data-active="true"], .folder-tab[data-tab-surface="true"] { z-index: 1; }
 .folder-tab[data-group-card="true"] { background: var(--xterm-bg); z-index: 1; }
@@ -41,3 +42,4 @@
 .folder-path > svg { flex-shrink: 0; }
 .folder-path-scope::before { content: '· '; }
 @container (max-width: 560px) { .folder-actions .folder-action-secondary { display: none; } }
+@container (max-width: 800px) { .editor-tabs + .folder-actions .folder-action-secondary { display: none; } }

@@ -219,7 +219,7 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
     };
     source.setPointerCapture?.(pointerId);
 
-    const findHorizontalList = () => axis === 'horizontal' ? Array.from(document.querySelectorAll<HTMLElement>('[data-reorder-list]')).find(element => element.dataset.reorderList === listId) : null;
+    const findHorizontalList = () => axis === 'horizontal' ? Array.from(document.querySelectorAll<HTMLElement>('[data-reorder-list]')).find(element => element.dataset.reorderList === listId && element.getBoundingClientRect().width > 0 && !element.closest('[hidden], [inert]')) : null;
     const updateTarget = (x: number, y: number) => {
       const list = findHorizontalList();
       if (axis === 'horizontal' && grouped && list && dimensions.origin && listBounds.width > 0) {

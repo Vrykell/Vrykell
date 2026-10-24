@@ -179,6 +179,7 @@ describe('list reorder', () => {
     expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }), { zoneId: 'empty' });
   });
   it('uses horizontal midpoints and preserves the dragged tab width', () => {
+    const parked = document.createElement('div'); parked.dataset.reorderList = 'demo'; parked.hidden = true; document.body.prepend(parked);
     const onDrop = vi.fn(); render(<Harness onDrop={onDrop} axis="horizontal" />);
     const rows = ['a', 'b', 'c'].map(id => screen.getByTestId(`row-${id}`));
     rows.forEach((row, index) => vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({ ...rowRect(0), x: index * 120, left: index * 120, right: (index + 1) * 120 }));
@@ -190,6 +191,7 @@ describe('list reorder', () => {
     expect(useListReorder.getState().drag).toMatchObject({ width: 120 });
     fireEvent.pointerUp(window, { pointerId: 1, clientX: 200, clientY: 10 });
     expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }), { itemId: 'c', after: true });
+    parked.remove();
   });
 
   it.each([['left', false], ['right', false], ['left', true], ['right', true]] as const)('exchanges unequal horizontal items toward the %s with grouped=%s while the pointer stays over the source gap', (direction, grouped) => {
