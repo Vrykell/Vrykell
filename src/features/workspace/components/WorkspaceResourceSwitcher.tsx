@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useWorkspaceResources } from '../hooks/useWorkspaceResources';
 import { activateWorkspaceResource } from '../services/workspaceResources';
-import { IconButton } from '@ui/IconButton';
-import ContextMenu, { type MenuAnchor } from '@ui/ContextMenu';
+import { IconButton } from '@ui/actions/IconButton';
+import ContextMenu, { type MenuAnchor } from '@ui/menus/ContextMenu';
 import { Grid, iconSizes } from '@ui/icons';
 import { t } from '@i18n';
 import { openUnifiedWorkspace } from '../services/unifiedWorkspace';

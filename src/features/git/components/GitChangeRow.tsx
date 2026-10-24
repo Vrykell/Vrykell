@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import type { GitEntry, GitScope } from '@core/git';
 import { fileIcon } from '@features/files';
-import SidebarItem from '@ui/sidebarItem';
-import ContextMenu, { type MenuAnchor } from '@ui/ContextMenu';
+import SidebarItem from '@ui/layout/sidebarItem';
+import ContextMenu, { type MenuAnchor } from '@ui/menus/ContextMenu';
 import { File, Plus, Minus, RotateCcw, Check, iconSizes } from '@ui/icons';
 import { t } from '@i18n';
 

@@ -57,6 +57,9 @@ const violations = [];
 const invokedCommands = new Map();
 for (const file of collectFiles(root)) {
   const relativeFile = path.relative(root, file).replaceAll(path.sep, '/');
+  if (/^ui\/[^/]+\.(ts|tsx)$/.test(relativeFile)) {
+    violations.push(`${relativeFile}: Shared interface sources must live in an owning package`);
+  }
   const topLevel = relativeFile.split('/')[0];
   if (!allowedTopLevel.has(topLevel)) {
     violations.push(`${path.relative(process.cwd(), file)}: 顶层目录 ${topLevel}/ 不属于目标架构`);

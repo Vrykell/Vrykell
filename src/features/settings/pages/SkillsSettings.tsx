@@ -1,7 +1,7 @@
-import { OutlineButton } from '@ui/OutlineButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import { t } from '@i18n';
-import { IconButton } from '@ui/IconButton';
-import { TextInput } from '@ui/TextInput';
+import { IconButton } from '@ui/actions/IconButton';
+import { TextInput } from '@ui/fields/TextInput';
 /**
  * SkillsSettings — 技能设置页（文件夹式技能 + 安全模型）。
  *
@@ -16,9 +16,9 @@ import {
   setSkillState, removeSkill,
   type SkillMeta, type SkillDetail,
 } from '@features/agent/services/skills';
-import { useToastStore } from '@ui/Toast';
-import Select from '@ui/Select';
-import ErrorBox from '@ui/ErrorBox';
+import { useToastStore } from '@ui/feedback/Toast';
+import Select from '@ui/fields/Select';
+import ErrorBox from '@ui/feedback/ErrorBox';
 import { useSkillsSettings } from '@features/settings/hooks/useSkillsSettings';
 import { useSkillMarketplace } from '@features/settings/hooks/useSkillMarketplace';
 import { useSkillFileBrowser } from '@features/settings/hooks/useSkillFileBrowser';

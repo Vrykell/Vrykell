@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import ErrorBox from '@ui/ErrorBox';
-import ToolDialog from '@ui/ToolDialog';
-import { fmtSize } from '@ui/UiBtn';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import ToolDialog from '@ui/feedback/ToolDialog';
+import { fmtSize } from '@ui/actions/UiBtn';
 import { t } from '@i18n';
 import type { FileStat, FsEntry } from '@platform/api/types';
 

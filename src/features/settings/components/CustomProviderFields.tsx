@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { t } from '@i18n';
-import { TextInput } from '@ui/TextInput';
-import Select from '@ui/Select';
-import ErrorBox from '@ui/ErrorBox';
-import { OutlineButton } from '@ui/OutlineButton';
+import { TextInput } from '@ui/fields/TextInput';
+import Select from '@ui/fields/Select';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import type { ProviderKind } from '@features/agent/services/provider';
 import { Field } from './ui';
 

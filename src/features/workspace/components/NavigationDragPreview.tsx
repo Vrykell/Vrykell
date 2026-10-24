@@ -3,7 +3,7 @@ import { t } from '@i18n';
 import { NAVIGATION_DEFS, useNavigationDrag } from '@features/workspace';
 import { iconSizes } from '@ui/icons';
 import { panelPlacementRegions } from '../services/panelPlacementRegions';
-import DropPlacementPreview from '@ui/DropPlacementPreview';
+import DropPlacementPreview from '@ui/layout/DropPlacementPreview';
 
 /** The dragged action follows the pointer without obscuring insertion hit testing. */
 export default function NavigationDragPreview() {

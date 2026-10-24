@@ -37,7 +37,7 @@
 
 这和正常点击 SSH 表单自身遮罩关闭是两个不同操作：关闭上层指纹确认时应回到已经填写的表单。
 
-源码：`src/ui/ConfirmDialog.tsx` 外层点击；`src/features/ssh/components/SshFormModal.tsx` 末尾嵌套确认。
+源码：`src/ui/feedback/ConfirmDialog.tsx` 外层点击；`src/features/ssh/components/SshFormModal.tsx` 末尾嵌套确认。
 
 ### 长名称确认窗口超出屏幕
 
@@ -47,7 +47,7 @@
 
 ![最大字号长名称确认窗口](../audit-evidence/2026-10-05/confirm-overflow.png)
 
-源码：`src/ui/ConfirmDialog.tsx`，仅限制宽度，没有最大高度或滚动区域。
+源码：`src/ui/feedback/ConfirmDialog.tsx`，仅限制宽度，没有最大高度或滚动区域。
 
 ## 用户提供的 SSH 操作：支持缺口
 

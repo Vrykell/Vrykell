@@ -1,7 +1,7 @@
 import { t } from '@i18n';
 import { isMacOS } from '@platform/runtime';
 import { RefreshCw } from '@ui/icons';
-import { useReloadFeedback } from '@ui/useReloadFeedback';
+import { useReloadFeedback } from '@ui/hooks/useReloadFeedback';
 import { redrawTerminal } from '../services/terminalRepaint';
 import { STATUS_ACTION_ICON_SIZE, StatusActionButton } from './TerminalStatusBar';
 

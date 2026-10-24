@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import type { GitTarget } from '@core/git';
 import { gitCommitPrompt, useGitPreferences } from '@config/git';
-import ToolDialog from '@ui/ToolDialog';
-import ConfigTextArea from '@ui/ConfigTextArea';
-import { OutlineButton } from '@ui/OutlineButton';
+import ToolDialog from '@ui/feedback/ToolDialog';
+import ConfigTextArea from '@ui/fields/ConfigTextArea';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import { t } from '@i18n';
 
 export default function GitCommitPrompt({ target, onClose }: { target: GitTarget; onClose: () => void }) {

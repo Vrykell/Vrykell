@@ -3,7 +3,7 @@ import { writeClipboardText, readClipboardText, hasClipboardImage } from '@platf
 import { termInstances, useTerminalStore } from '@features/terminal/stores/terminal';
 import { requestPasteConfirm, type PasteConfirmReason } from '@features/terminal/stores/pasteConfirm';
 import { t } from '@i18n';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { terminalDebug } from './terminalDebug';
 import { writeTerminalInput } from './terminalWriteQueue';
 import { useBlockStore } from '@features/terminal/stores/blocks';

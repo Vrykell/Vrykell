@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { modelVendor, modelVendorInfo } from '@features/agent/components/modelIcon';
-import { AnthropicMark, GroqMark, MoonshotMark, OllamaMark, OpenCodeMark, QwenMark } from '@ui/brandMarks';
+import { AnthropicMark, GroqMark, MoonshotMark, OllamaMark, OpenCodeMark, QwenMark } from '@ui/icons/brandMarks';
 import { Server } from '@ui/icons';
 
 describe('modelVendor', () => {

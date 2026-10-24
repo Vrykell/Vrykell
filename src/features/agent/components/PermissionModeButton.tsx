@@ -1,5 +1,5 @@
 import { t } from '@i18n';
-import { IconButton, type ControlTone } from '@ui/IconButton';
+import { IconButton, type ControlTone } from '@ui/actions/IconButton';
 import { ShieldAlert, ShieldCheck, ShieldOff, iconSizes, type AppIcon } from '@ui/icons';
 
 export type PermissionMode = 'standard' | 'strict' | 'relaxed';

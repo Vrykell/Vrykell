@@ -6,14 +6,14 @@
  * selection and the row filtering all derive from the model list itself (see providerList).
  */
 import { useMemo, useRef, useState } from 'react';
-import { IconButton } from '@ui/IconButton';
-import ContextMenu from '@ui/ContextMenu';
-import ConfirmDialog from '@ui/ConfirmDialog';
+import { IconButton } from '@ui/actions/IconButton';
+import ContextMenu from '@ui/menus/ContextMenu';
+import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import { Ellipsis, iconSizes } from '@ui/icons';
 import { t } from '@i18n';
 import { selectProvider, setProviderKey, useAiConfigStore, type ModelProfile } from '@features/agent';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { applyModelPreset, type ModelPreset } from '@config/modelPresets';
 import ProviderDialog from '@features/settings/components/ProviderDialog';
 import type { CustomProviderDraft } from '../components/CustomProviderFields';

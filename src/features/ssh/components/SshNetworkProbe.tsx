@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { t } from '@i18n';
-import ErrorBox from '@ui/ErrorBox';
-import { TextButton } from '@ui/TextButton';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import { TextButton } from '@ui/actions/TextButton';
 import { sshNetworkProbe, type NetworkProbe } from '../services/api';
 import { summarizeNetworkProbe } from '../model/networkProbe';
 

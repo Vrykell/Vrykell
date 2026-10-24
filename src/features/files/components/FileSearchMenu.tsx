@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import type { FsEntry } from '@platform/api/types';
 import type { FileOps } from '../model/fileOps';
 import { searchFiles, type FileSearchResult } from '../services/fileSearch';
-import { TextInput } from '@ui/TextInput';
-import ErrorBox from '@ui/ErrorBox';
+import { TextInput } from '@ui/fields/TextInput';
+import ErrorBox from '@ui/feedback/ErrorBox';
 import { t } from '@i18n';
 import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';
 

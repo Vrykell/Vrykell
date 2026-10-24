@@ -21,7 +21,7 @@ import { useSearchHistoryStore } from '@features/search/stores/searchHistory';
 import { useSearchHighlightStore } from '@features/search/stores/searchHighlight';
 import * as sessionManager from '@features/workspace/services/sessionManager';
 import { getSettings } from '@features/settings/services/registry';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 
 /** Restore failures are user-visible: log them and surface a toast. */
 function notifyRestoreFailure(context: string, error: unknown): void {

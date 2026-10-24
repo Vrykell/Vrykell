@@ -1,10 +1,10 @@
 import { Fragment, useEffect, useState } from 'react';
 import { t } from '@i18n';
 import { useDockStore, useUiStore, useNavigationDrag, useNavigationButtonDrag, type DockSide } from '@features/workspace';
-import ContextMenu, { type MenuAnchor } from '@ui/ContextMenu';
-import { IconButton } from '@ui/IconButton';
+import ContextMenu, { type MenuAnchor } from '@ui/menus/ContextMenu';
+import { IconButton } from '@ui/actions/IconButton';
 import { MoreHorizontal, iconSizes } from '@ui/icons';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { dismissSshStatus, useSshStatusOwner } from '../hooks/useAuxiliarySidebar';
 import DockButton from './DockButton';
 

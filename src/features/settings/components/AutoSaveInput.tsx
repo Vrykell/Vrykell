@@ -1,5 +1,5 @@
-import ConfigTextArea from '@ui/ConfigTextArea';
-import { TextInput } from '@ui/TextInput';
+import ConfigTextArea from '@ui/fields/ConfigTextArea';
+import { TextInput } from '@ui/fields/TextInput';
 import { useRef, type CSSProperties, type HTMLInputTypeAttribute } from 'react';
 import { useAutoSave } from '../hooks/useAutoSave';
 import SaveStatus from './SaveStatus';

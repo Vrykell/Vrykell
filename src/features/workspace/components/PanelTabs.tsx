@@ -1,30 +1,30 @@
-import { TextInput } from '@ui/TextInput';
-import InlineRenameInput from '@ui/InlineRenameInput';
+import { TextInput } from '@ui/fields/TextInput';
+import InlineRenameInput from '@ui/fields/InlineRenameInput';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { iconSizes,
   Plus, History, Bot, Search, ChevronDown,
  } from '@ui/icons';
 import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, type Tab, type TabGroup } from '@features/workspace';
-import { HistoryColorChoices } from '@ui/HistoryColorPalette';
+import { HistoryColorChoices } from '@ui/history/HistoryColorPalette';
 import { regenerateTitle } from '@features/agent/services/title';
-import { useToastStore } from '@ui/Toast';
-import { IconBtn } from '@ui/UiBtn';
+import { useToastStore } from '@ui/feedback/Toast';
+import { IconBtn } from '@ui/actions/UiBtn';
 import type { ShellType } from '@platform/shells';
 import { useDefaultShellType } from '../hooks/useDefaultShellType';
 import NewTabModal from '@features/workspace/components/NewTabModal';
-import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
-import { FolderTabContent } from '@ui/FolderTabs';
-import EditorActions from '@ui/EditorActions';
+import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/menus/ContextMenu';
+import { FolderTabContent } from '@ui/layout/FolderTabs';
+import EditorActions from '@ui/menus/EditorActions';
 import { useHorizontalWheel } from '@ui/hooks/useHorizontalWheel';
 import { useActiveTabVisibility } from '@ui/hooks/useActiveTabVisibility';
-import { historyGroupColor } from '@ui/historyGroupColor';
+import { historyGroupColor } from '@ui/history/historyGroupColor';
 import { orderedWorkspaceIds, useWorkspaceNavigation } from '../stores/navigation';
-import WorkspaceHeader from '@ui/WorkspaceHeader';
-import { TerminalProfileIcon } from '@ui/shellIcons';
+import WorkspaceHeader from '@ui/layout/WorkspaceHeader';
+import { TerminalProfileIcon } from '@ui/icons/shellIcons';
 import {
   ListReorderPlaceholder, ListReorderPreview, ListReorderZonePlaceholder,
   useListReorder, useListReorderDrag, type ListReorderDrag, type ListReorderTarget,
-} from '@ui/listReorder';
+} from '@ui/layout/listReorder';
 import { t } from '@i18n';
 import type { GroupingProposal } from '@features/agent/services/autoGrouping';
 import { useToolWindow } from '@ui/hooks/useToolWindow';

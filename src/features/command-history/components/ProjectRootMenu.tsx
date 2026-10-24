@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react';
 import { open } from '@tauri-apps/plugin-dialog';
 import { t } from '@i18n';
-import ToolDialog from '@ui/ToolDialog';
-import { TextInput } from '@ui/TextInput';
-import { OutlineButton } from '@ui/OutlineButton';
-import { TextButton } from '@ui/TextButton';
-import ErrorBox from '@ui/ErrorBox';
+import ToolDialog from '@ui/feedback/ToolDialog';
+import { TextInput } from '@ui/fields/TextInput';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import { TextButton } from '@ui/actions/TextButton';
+import ErrorBox from '@ui/feedback/ErrorBox';
 
 /** Change the current project's root in a focused directory editor. */
 export default function ProjectRootMenu({ initial, local, onSave, onClose }: {

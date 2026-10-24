@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { vendorMark } from '@features/agent/components/usage/vendorColor';
-import { AnthropicMark, DeepSeekMark, GeminiMark, MoonshotMark, OpenAIMark, QwenMark, MetaMark } from '@ui/brandMarks';
+import { AnthropicMark, DeepSeekMark, GeminiMark, MoonshotMark, OpenAIMark, QwenMark, MetaMark } from '@ui/icons/brandMarks';
 import { Cpu } from '@ui/icons';
 
 describe('vendorMark', () => {

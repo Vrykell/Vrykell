@@ -1,7 +1,7 @@
 import { writeClipboardText } from '@platform/clipboard';
 import { writeTerminalCommand } from './commandSubmission';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
 export async function copyBlockText(text: string): Promise<boolean> {

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { t } from '@i18n';
-import { TextInput } from '@ui/TextInput';
-import ConfigTextArea from '@ui/ConfigTextArea';
-import ToolWindow from '@ui/ToolWindow';
-import { OutlineButton } from '@ui/OutlineButton';
-import { TextButton } from '@ui/TextButton';
-import ErrorBox from '@ui/ErrorBox';
+import { TextInput } from '@ui/fields/TextInput';
+import ConfigTextArea from '@ui/fields/ConfigTextArea';
+import ToolWindow from '@ui/feedback/ToolWindow';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import { TextButton } from '@ui/actions/TextButton';
+import ErrorBox from '@ui/feedback/ErrorBox';
 import SafeMarkdown from '@features/chat/components/SafeMarkdown';
 import { composeHistoryCommand, type CommandDraft, type DraftMessage } from '../services/aiCommands';
 import type { ExecutionContext } from '../services/execution';

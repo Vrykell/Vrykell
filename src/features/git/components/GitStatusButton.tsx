@@ -6,10 +6,10 @@ import { useGitRepository } from '../hooks/useGitRepository';
 import { gitTargetKey, useGitOperations, useGitReview } from '../index';
 import { preferredGitRemote, runGitOperation } from '../services/operations';
 import { remoteGitMenuItems } from '../services/repositoryMenu';
-import { TextButton } from '@ui/TextButton';
+import { TextButton } from '@ui/actions/TextButton';
 import { GitBranch } from '@ui/icons';
-import ContextMenu, { type MenuAnchor } from '@ui/ContextMenu';
-import { useToastStore } from '@ui/Toast';
+import ContextMenu, { type MenuAnchor } from '@ui/menus/ContextMenu';
+import { useToastStore } from '@ui/feedback/Toast';
 import { t } from '@i18n';
 
 export default function GitStatusButton({ paneId, branch }: { paneId: string; branch: string }) {

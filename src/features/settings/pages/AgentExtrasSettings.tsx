@@ -1,8 +1,8 @@
-import { OutlineButton } from '@ui/OutlineButton';
-import ConfigTextArea from '@ui/ConfigTextArea';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import ConfigTextArea from '@ui/fields/ConfigTextArea';
 import { t } from '@i18n';
-import { IconButton } from '@ui/IconButton';
-import { TextInput } from '@ui/TextInput';
+import { IconButton } from '@ui/actions/IconButton';
+import { TextInput } from '@ui/fields/TextInput';
 /**
  * Persistent knowledge, assistant definitions and scheduled tasks.
  */
@@ -16,7 +16,7 @@ import {
   listAgents, saveAgent, removeAgent, type AgentDef,
   listSchedules, saveSchedule, removeSchedule, type Schedule,
 } from '@features/agent/services/platform';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { kickScheduleRunner } from '@features/agent/services/scheduleRunner';
 import { useAutoSave } from '../hooks/useAutoSave';
 import SaveStatus from '../components/SaveStatus';

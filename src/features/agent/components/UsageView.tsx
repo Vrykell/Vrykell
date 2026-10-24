@@ -8,11 +8,11 @@
  */
 import { useState } from 'react';
 import { t, type I18nKey } from '@i18n';
-import { useToastStore } from '@ui/Toast';
-import { IconButton } from '@ui/IconButton';
-import Select from '@ui/Select';
-import ErrorBox from '@ui/ErrorBox';
-import { OutlineButton } from '@ui/OutlineButton';
+import { useToastStore } from '@ui/feedback/Toast';
+import { IconButton } from '@ui/actions/IconButton';
+import Select from '@ui/fields/Select';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import { DataUsage, RefreshCw, Trash2, iconSizes } from '@ui/icons';
 import { formatLogTime, type UsageRange } from '@features/agent/model/usageStats';
 import { ALL_FILTER, useUsageStats } from '@features/agent/hooks/useUsageStats';

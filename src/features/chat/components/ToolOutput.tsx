@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { t } from '@i18n';
-import CopyButton from '@ui/CopyButton';
+import CopyButton from '@ui/actions/CopyButton';
 
 /** References and tool results share one output frame and copy target. */
 export default function ToolOutput({ framed, text, children, copyTestId = 'tool-output-copy' }: {

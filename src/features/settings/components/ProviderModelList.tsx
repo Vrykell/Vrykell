@@ -8,10 +8,10 @@
  */
 import { useMemo, useState } from 'react';
 import { t } from '@i18n';
-import { IconButton } from '@ui/IconButton';
-import ReloadButton from '@ui/ReloadButton';
-import { TextInput } from '@ui/TextInput';
-import ConfirmDialog from '@ui/ConfirmDialog';
+import { IconButton } from '@ui/actions/IconButton';
+import ReloadButton from '@ui/actions/ReloadButton';
+import { TextInput } from '@ui/fields/TextInput';
+import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import { ChevronDown, Eye, Filter, Globe, Lightbulb, Minus, Plus, Search, Settings, Wrench, X, iconSizes, type AppIcon } from '@ui/icons';
 import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
 import { modelHue, modelMark } from '@features/agent/components/modelIcon';

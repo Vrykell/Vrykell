@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import Select from '@ui/Select';
-import ErrorBox from '@ui/ErrorBox';
-import { TextInput } from '@ui/TextInput';
-import ConfigTextArea from '@ui/ConfigTextArea';
-import { IconButton } from '@ui/IconButton';
+import Select from '@ui/fields/Select';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import { TextInput } from '@ui/fields/TextInput';
+import ConfigTextArea from '@ui/fields/ConfigTextArea';
+import { IconButton } from '@ui/actions/IconButton';
 import { Plus, Trash2 } from '@ui/icons';
-import { TextButton } from '@ui/TextButton';
+import { TextButton } from '@ui/actions/TextButton';
 import { t } from '@i18n';
 import { formatForwardRules, parseForwardTexts, type ForwardKind, type ForwardRule, type ForwardTexts } from '../model/forwardRules';
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { LIMITS, makePasteAttachment } from '@features/agent/model/attachments';
 import { useAttachmentComposer } from '@features/agent/hooks/useAttachmentComposer';
 

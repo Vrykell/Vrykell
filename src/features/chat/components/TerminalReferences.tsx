@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { t } from '@i18n';
 import { ChevronDown, TerminalPrompt, X } from '@ui/icons';
-import { IconButton } from '@ui/IconButton';
+import { IconButton } from '@ui/actions/IconButton';
 import { useTerminalStore } from '@features/terminal';
 import BlockOutput from '@features/terminal/components/BlockOutput';
 import { showExecutionTerminal } from '../services/conversationContext';

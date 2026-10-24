@@ -1,9 +1,9 @@
 import { Fragment, useEffect } from 'react';
 import { t } from '@i18n';
-import SidebarItem from '@ui/sidebarItem';
-import { IconButton } from '@ui/IconButton';
-import ResizeHandle from '@ui/ResizeHandle';
-import { ListReorderPlaceholder, ListReorderPreview, useListReorderDrag } from '@ui/listReorder';
+import SidebarItem from '@ui/layout/sidebarItem';
+import { IconButton } from '@ui/actions/IconButton';
+import ResizeHandle from '@ui/layout/ResizeHandle';
+import { ListReorderPlaceholder, ListReorderPreview, useListReorderDrag } from '@ui/layout/listReorder';
 import { TerminalPrompt, FileCode, ServerStack, Settings, PanelLeft, History, iconSizes } from '@ui/icons';
 import AiSessionIcon from '@features/chat/components/AiSessionIcon';
 import { useUiStore } from '@features/workspace';

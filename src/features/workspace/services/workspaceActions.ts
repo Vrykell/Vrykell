@@ -2,7 +2,7 @@ import { editorFileKey } from '@core/editor';
 import { newEditorFile } from '@features/editor/services/documentActions';
 import { t } from '@i18n';
 import { pickPath } from '@platform/api/fs';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { useAiWorkspace, useChatStore } from '@features/chat';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { useWorkspaceStore } from '../stores/workspace';

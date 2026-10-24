@@ -5,24 +5,24 @@ import {
   Ellipsis, Filter, Grid, History, LockSmall as Lock,
   StarSmall, Undo2, X, ArrowSort, Bot, iconSizes,
 } from '@ui/icons';
-import { IconButton } from '@ui/IconButton';
-import ReloadButton from '@ui/ReloadButton';
-import { OutlineButton } from '@ui/OutlineButton';
-import HistoryPage from '@ui/HistoryPage';
-import HistoryGroupCard from '@ui/HistoryGroupCard';
-import HistoryOptionMenu, { type HistoryMenuSection } from '@ui/HistoryOptionMenu';
-import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
-import ErrorBox from '@ui/ErrorBox';
-import FilterChip from '@ui/FilterChip';
-import HistoryTextPrompt from '@ui/HistoryTextPrompt';
-import SidebarItem from '@ui/sidebarItem';
+import { IconButton } from '@ui/actions/IconButton';
+import ReloadButton from '@ui/actions/ReloadButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import HistoryPage from '@ui/history/HistoryPage';
+import HistoryGroupCard from '@ui/history/HistoryGroupCard';
+import HistoryOptionMenu, { type HistoryMenuSection } from '@ui/history/HistoryOptionMenu';
+import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/menus/ContextMenu';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import FilterChip from '@ui/menus/FilterChip';
+import HistoryTextPrompt from '@ui/history/HistoryTextPrompt';
+import SidebarItem from '@ui/layout/sidebarItem';
 import { useChatStore } from '@features/chat';
 import { useWorkspaceNavigation, type HistoryTypePreset } from '@features/workspace';
 import HistoryTerminalIcon from './HistoryTerminalIcon';
-import AppMark from '@ui/AppMark';
+import AppMark from '@ui/icons/AppMark';
 import { harnessMark } from '@features/agent/components/HarnessBadge';
 import { historyGroupKey, scopedGroupIds, useHistoryMetaStore } from '@utils/historyMeta';
-import { isHistoryGroupColor } from '@ui/historyGroupColor';
+import { isHistoryGroupColor } from '@ui/history/historyGroupColor';
 import { useUnifiedHistory } from '../hooks/useUnifiedHistory';
 import { SESSION_DATE_OPTIONS, SESSION_MODE_OPTIONS } from '../model/sessionHistoryModel';
 import {
@@ -33,7 +33,7 @@ import { sessionSummaryText } from '../model/sessionHistoryModel';
 import { conversationMarkdown } from '@features/chat/model/conversationHistory';
 import * as conversationApi from '@platform/api/conversation';
 import { writeClipboardText } from '@platform/clipboard';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 
 const TYPE_LABELS = { all: 'All', terminal: 'Terminal history', conversation: 'AI conversations' } as const;
 const DATE_FIELD_LABELS = { activity: 'Latest activity', created: 'Created date' } as const;

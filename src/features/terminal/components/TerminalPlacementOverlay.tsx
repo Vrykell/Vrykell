@@ -7,8 +7,8 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import DropPlacementPreview from '@ui/DropPlacementPreview';
-import { useToastStore } from '@ui/Toast';
+import DropPlacementPreview from '@ui/layout/DropPlacementPreview';
+import { useToastStore } from '@ui/feedback/Toast';
 import { useDockDragStore } from '@features/workspace';
 import {
   moveTargets,

@@ -1,5 +1,5 @@
 import { useAgentSettings } from '@features/agent';
-import Select from '@ui/Select';
+import Select from '@ui/fields/Select';
 import { Toggle } from './ui';
 import { useSettingsSave } from './SettingsSaveProvider';
 

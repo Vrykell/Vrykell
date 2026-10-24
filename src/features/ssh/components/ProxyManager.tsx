@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
-import { TextInput } from '@ui/TextInput';
-import { TextButton } from '@ui/TextButton';
-import Select from '@ui/Select';
-import ErrorBox from '@ui/ErrorBox';
-import ConfirmDialog from '@ui/ConfirmDialog';
-import { useDialogKeyboard } from '@ui/useDialogKeyboard';
+import { TextInput } from '@ui/fields/TextInput';
+import { TextButton } from '@ui/actions/TextButton';
+import Select from '@ui/fields/Select';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import ConfirmDialog from '@ui/feedback/ConfirmDialog';
+import { useDialogKeyboard } from '@ui/hooks/useDialogKeyboard';
 import { deleteProxy, getProxies, saveProxy, setDefaultProxy, type ProxyConfiguration, type ProxyProfile } from '../services/proxies';
 
 const emptyProfile = (): ProxyProfile => ({ id: `proxy-${crypto.randomUUID()}`, name: '', kind: 'socks5', host: '', port: 1080, username: '', password: '' });

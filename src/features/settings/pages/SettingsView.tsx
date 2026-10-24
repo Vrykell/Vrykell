@@ -1,5 +1,5 @@
 import { FileOperationsPage } from './fileOperationsPage';
-import { OutlineButton } from '@ui/OutlineButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import { t } from '@i18n';
 import { useEffect, useState, type ReactNode } from 'react';
 import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/services/fileOpen';
@@ -7,8 +7,8 @@ import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from 
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
 import { MemorySettings, AgentsSettings, SchedulesSettings } from '@features/settings/pages/AgentExtrasSettings';
 import HarnessPage from '@features/settings/pages/harnessPage';
-import Select from '@ui/Select';
-import { useToastStore } from '@ui/Toast';
+import Select from '@ui/fields/Select';
+import { useToastStore } from '@ui/feedback/Toast';
 import {
   usePermissions, clearSessionGrants, TOOL_NAMES,
   type ToolLevel, type ToolName,
@@ -36,7 +36,7 @@ import EditorPreferences from '../components/EditorPreferences';
 import { LanguagePage } from './languagePage';
 import ShellProfilePage from './shellProfilePage';
 import { SHELL_TYPES, type ShellType } from '@platform/shells';
-import { TerminalProfileIcon } from '@ui/shellIcons';
+import { TerminalProfileIcon } from '@ui/icons/shellIcons';
 
 /** Permission tool labels use the shared translation catalog. */
 const PERM_TOOL_LABEL: Record<ToolName, string> = {

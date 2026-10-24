@@ -15,9 +15,9 @@ import { useDockStore, useSessionStore } from '@features/workspace';
 import { ptyWrite } from '@platform/pty';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { getPaneTerminal } from '@features/terminal/services/terminalClipboard';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { t } from '@i18n';
-import ErrorBox from '@ui/ErrorBox';
+import ErrorBox from '@ui/feedback/ErrorBox';
 import { requestSshAuthentication, useSshAuthenticationRevision } from '../hooks/useSessionAuthentication';
 
 /**

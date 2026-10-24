@@ -1,5 +1,5 @@
 import { t } from '@i18n';
-import { fmtSize } from '@ui/UiBtn';
+import { fmtSize } from '@ui/actions/UiBtn';
 import type { NetworkRateSample } from '../model/networkRates';
 import SshResourceChart from './SshResourceChart';
 

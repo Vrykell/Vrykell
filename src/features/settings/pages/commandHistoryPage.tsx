@@ -1,5 +1,5 @@
 import { t } from '@i18n';
-import Select from '@ui/Select';
+import Select from '@ui/fields/Select';
 import { useCommandHistorySettings } from '@config/commandHistory';
 import { Field, SettingsGroup } from '../components/ui';
 

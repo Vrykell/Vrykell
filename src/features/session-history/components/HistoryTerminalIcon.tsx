@@ -1,5 +1,5 @@
 import type { BackendSessionEntry } from '@platform/api/types';
-import { TerminalProfileIcon } from '@ui/shellIcons';
+import { TerminalProfileIcon } from '@ui/icons/shellIcons';
 import { sessionHistoryTerminals } from '../model/sessionMetadata';
 
 export default function HistoryTerminalIcon({ session, size = 18 }: { session: BackendSessionEntry; size?: number }) {

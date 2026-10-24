@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { t } from '@i18n';
 import type { HistoryCommandPreferences } from '@core/commandHistory';
-import ToolDialog from '@ui/ToolDialog';
-import { TextInput } from '@ui/TextInput';
-import { TextButton } from '@ui/TextButton';
-import { OutlineButton } from '@ui/OutlineButton';
-import Select from '@ui/Select';
-import ErrorBox from '@ui/ErrorBox';
+import ToolDialog from '@ui/feedback/ToolDialog';
+import { TextInput } from '@ui/fields/TextInput';
+import { TextButton } from '@ui/actions/TextButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import Select from '@ui/fields/Select';
+import ErrorBox from '@ui/feedback/ErrorBox';
 
 /** Manage hidden entries and exclusions within the current project. */
 export default function CommandRulesDialog({ preferences, initialRule, onChange, onClose }: {

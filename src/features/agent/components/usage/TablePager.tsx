@@ -5,7 +5,7 @@
  * nothing when a single page covers everything.
  */
 import { t } from '@i18n';
-import { IconButton } from '@ui/IconButton';
+import { IconButton } from '@ui/actions/IconButton';
 import { ArrowLeft, ArrowRight, iconSizes } from '@ui/icons';
 import type { UsagePage } from '@features/agent/model/usageStats';
 

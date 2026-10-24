@@ -5,7 +5,7 @@ import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
 import type { TerminalSpec } from '@features/workspace/model/windowLayout';
 import WorkspaceShell from '@app/layout/WorkspaceShell';
 import ApplicationOverlays from '@app/layout/ApplicationOverlays';
-import OverlayScrollbars from '@ui/OverlayScrollbars';
+import OverlayScrollbars from '@ui/layout/OverlayScrollbars';
 import { useTheme } from '@app/providers/ThemeProvider';
 import { syncWindowMaterial } from '@platform/windowChrome';
 

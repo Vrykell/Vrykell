@@ -10,7 +10,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from
 import { createPortal } from 'react-dom';
 import { Check, ChevronDown, iconSizes } from '@ui/icons';
 import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';
-import { TextInput } from '@ui/TextInput';
+import { TextInput } from '@ui/fields/TextInput';
 import { t } from '@i18n';
 import { modelMark } from '@features/agent/components/modelIcon';
 

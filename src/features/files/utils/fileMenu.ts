@@ -1,8 +1,8 @@
-import { orderMenuItems, type MenuGroup } from '@ui/menuGroups';
+import { orderMenuItems, type MenuGroup } from '@ui/menus/menuGroups';
 import { FILE_DIRECTORY_SHORTCUTS } from '@config/fileShortcuts';
 import type { FsEntry } from '@platform/api/types';
 import { t } from '@i18n';
-import type { ContextMenuItem } from '@ui/ContextMenu';
+import type { ContextMenuItem } from '@ui/menus/ContextMenu';
 import type { FileClipboard } from '@features/files/hooks/useFileBrowser';
 import type { FileMenuItemKey } from '@features/files/model/filePanelConfig';
 

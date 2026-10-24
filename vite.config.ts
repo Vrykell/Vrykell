@@ -17,7 +17,7 @@ export default defineConfig(async () => ({
     enforce: "pre",
     resolveId(source, importer) {
       if (importer?.replaceAll("\\", "/").includes("/node_modules/monaco-editor/esm/") && /(?:^|\/)nls\.js$/.test(source)) {
-        return `${sourceRoot}/ui/code/localize.ts`;
+        return `${sourceRoot}/ui/editor/code/localize.ts`;
       }
     },
   }],

@@ -1,14 +1,14 @@
-import { ContextMenuItems } from '@ui/ContextMenu';
+import { ContextMenuItems } from '@ui/menus/ContextMenu';
 import { t } from '@i18n';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { clampMenuPosition } from '@ui/menuPosition';
+import { clampMenuPosition } from '@ui/menus/menuPosition';
 import { useExclusiveMenu } from '@ui/hooks/useExclusiveMenu';
 import type { BlockMenuAnchor } from '@features/terminal/hooks/useTerminalBlockFlow';
 import { copyBlockText, rerunBlockCommand } from '@features/terminal/services/blockActions';
 import { askAboutTerminal } from '@features/chat/services/conversationContext';
 import { clearSessionBlocks } from '@features/terminal/hooks/useTerminalSession';
-import { fmtDuration } from '@ui/UiBtn';
+import { fmtDuration } from '@ui/actions/UiBtn';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';
 

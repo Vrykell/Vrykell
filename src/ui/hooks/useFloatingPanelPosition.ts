@@ -1,5 +1,5 @@
 import { useLayoutEffect, useState, type RefObject } from 'react';
-import { clampMenuPosition } from '../menuPosition';
+import { clampMenuPosition } from '@ui/menus/menuPosition';
 
 /** Measure floating content so font changes and narrow windows keep it on screen. */
 export function useFloatingPanelPosition(ref: RefObject<HTMLElement | null>, anchor: { x: number; y: number; above?: HTMLElement; trigger?: HTMLElement; align?: 'start' | 'end' }, submenuOf?: HTMLElement, enabled = true) {

@@ -1,5 +1,5 @@
 import { SettingsGroup } from '@features/settings/components/ui';
-import KeyHint from '@ui/KeyHint';
+import KeyHint from '@ui/feedback/KeyHint';
 import { isMacOS } from '@platform/runtime';
 import { t } from '@i18n';
 import { FILE_DIRECTORY_SHORTCUTS } from '@config/fileShortcuts';

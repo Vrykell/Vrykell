@@ -3,14 +3,14 @@ import { ask } from '@tauri-apps/plugin-dialog';
 import { sessionCommandCount, sessionHistoryDateField, sessionHistoryDirectories, sessionHistoryTimestamp, sessionSummaryText } from '../model/sessionHistoryModel';
 import { useCallback, useMemo, useState } from 'react';
 import { Monitor, History, Ellipsis, Filter, ArrowSort, Grid, LockSmall as Lock, StarSmall as Star, Undo2, X } from '@ui/icons';
-import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
-import { IconButton } from '@ui/IconButton';
-import HistoryOptionMenu, { type HistoryMenuSection } from '@ui/HistoryOptionMenu';
-import HistoryGroupCard from '@ui/HistoryGroupCard';
-import HistoryPage from '@ui/HistoryPage';
-import HistoryTextPrompt from '@ui/HistoryTextPrompt';
-import FilterChip from '@ui/FilterChip';
-import SidebarItem from '@ui/sidebarItem';
+import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/menus/ContextMenu';
+import { IconButton } from '@ui/actions/IconButton';
+import HistoryOptionMenu, { type HistoryMenuSection } from '@ui/history/HistoryOptionMenu';
+import HistoryGroupCard from '@ui/history/HistoryGroupCard';
+import HistoryPage from '@ui/history/HistoryPage';
+import HistoryTextPrompt from '@ui/history/HistoryTextPrompt';
+import FilterChip from '@ui/menus/FilterChip';
+import SidebarItem from '@ui/layout/sidebarItem';
 import HistoryTerminalIcon from './HistoryTerminalIcon';
 import type { BackendSessionEntry } from '@platform/api/types';
 import {
@@ -22,8 +22,8 @@ import {
   groupHistoricalSessions,
   useSessionHistory,
 } from '@features/session-history';
-import { useToastStore } from '@ui/Toast';
-import ErrorBox from '@ui/ErrorBox';
+import { useToastStore } from '@ui/feedback/Toast';
+import ErrorBox from '@ui/feedback/ErrorBox';
 import { writeClipboardText } from '@platform/clipboard';
 import { historyGroupKey, historyRecordKey, useHistoryMetaStore } from '@utils/historyMeta';
 import { useHistoryGroupActions } from '@ui/hooks/useHistoryGroupActions';

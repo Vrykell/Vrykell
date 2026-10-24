@@ -16,7 +16,7 @@ import {
 } from '@platform/api/acp';
 import { useUsageStore } from '@features/agent/stores/usage';
 import { useHarnessSessionRefs } from './harnessSessions';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 
 /** One step of the plan an agent publishes while it works. */
 export interface HarnessPlanEntry {

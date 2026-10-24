@@ -6,9 +6,9 @@
  */
 import { useEffect, useState, type CSSProperties } from 'react';
 import { t } from '@i18n';
-import { OutlineButton } from '@ui/OutlineButton';
-import { TextArea, TextInput } from '@ui/TextInput';
-import ErrorBox from '@ui/ErrorBox';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import { TextArea, TextInput } from '@ui/fields/TextInput';
+import ErrorBox from '@ui/feedback/ErrorBox';
 import type { HarnessEntry } from '@config/harnessPresets';
 import { inputStyle } from './formStyles';
 import SettingsDialog from './SettingsDialog';

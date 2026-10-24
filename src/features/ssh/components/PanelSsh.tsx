@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { t } from '@i18n';
-import ConfirmDialog from '@ui/ConfirmDialog';
+import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import { useSessionStore, terminalsOf, useWorkspaceNavigation } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
 import { useSshStore } from '../stores/store';

@@ -1,8 +1,8 @@
-import { OutlineButton } from '@ui/OutlineButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import { useEffect, useRef, useState } from 'react';
 import { useT } from '@i18n';
 import { getContextMenuStatus, manageContextMenu, type ContextMenuAction, type ContextMenuStatus } from '@platform/contextMenu';
-import ErrorBox from '@ui/ErrorBox';
+import ErrorBox from '@ui/feedback/ErrorBox';
 import { Field, SettingsGroup } from '../components/ui';
 
 /** Manage the per-user shell registration and its explicit certificate trust step. */

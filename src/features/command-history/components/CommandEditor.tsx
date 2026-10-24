@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react';
 import { t } from '@i18n';
 import type { HistoryCommandDraft } from '@core/commandHistory';
-import { TextInput } from '@ui/TextInput';
-import ConfigTextArea from '@ui/ConfigTextArea';
-import { OutlineButton } from '@ui/OutlineButton';
-import ErrorBox from '@ui/ErrorBox';
-import ToolDialog from '@ui/ToolDialog';
+import { TextInput } from '@ui/fields/TextInput';
+import ConfigTextArea from '@ui/fields/ConfigTextArea';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import ToolDialog from '@ui/feedback/ToolDialog';
 import { isWithin } from '../model/commands';
 
 /** Edit reusable command text and its directory without submitting terminal input. */

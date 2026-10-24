@@ -2,8 +2,8 @@ import CommandPalette from '@app/overlays/CommandPalette';
 import GlobalSearch from '@features/search/components/GlobalSearch';
 import PasteConfirmHost from '@features/terminal/components/PasteConfirmHost';
 import NewTabModal from '@features/workspace/components/NewTabModal';
-import ToastContainer from '@ui/Toast';
-import TooltipLayer from '@ui/TooltipLayer';
+import ToastContainer from '@ui/feedback/Toast';
+import TooltipLayer from '@ui/feedback/TooltipLayer';
 import { useUiStore } from '@features/workspace';
 import type { TerminalSpec } from '@features/workspace/model/windowLayout';
 

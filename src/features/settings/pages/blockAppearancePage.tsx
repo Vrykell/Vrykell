@@ -3,8 +3,8 @@
  */
 import { t } from '@i18n';
 import { themes } from '@config/theme/tokens';
-import { OutlineButton } from '@ui/OutlineButton';
-import Select from '@ui/Select';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import Select from '@ui/fields/Select';
 import { useTheme } from '@app/providers/ThemeProvider';
 import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
 import { blockBackgroundValue, blockColorOptions, type BlockColorGroup } from '../model/blockColors';

@@ -1,5 +1,5 @@
 import { t } from '@i18n';
-import SidebarItem from '@ui/sidebarItem';
+import SidebarItem from '@ui/layout/sidebarItem';
 import { iconSizes } from '@ui/icons';
 import type { useSettingsNavigation } from '../hooks/useSettingsNavigation';
 import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';

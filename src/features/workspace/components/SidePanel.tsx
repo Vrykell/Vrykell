@@ -1,10 +1,10 @@
 import { useCallback, useContext, type FC } from 'react';
 import { iconSizes, X, ArrowLeft } from '@ui/icons';
-import { IconButton } from '@ui/IconButton';
+import { IconButton } from '@ui/actions/IconButton';
 import { useAiWorkspace, useChatStore } from '@features/chat';
 import { selectWorkspaceArea } from '../services/selectWorkspaceArea';
 import { useDockStore, useUiStore, PANEL_DEFS, MIN_PANEL_WIDTH, useNavigationButtonDrag, useNavigationDrag, type DockSide } from '@features/workspace';
-import ResizeHandle from '@ui/ResizeHandle';
+import ResizeHandle from '@ui/layout/ResizeHandle';
 import PanelFiles from '@features/files/components/PanelFiles';
 import AiWorkspaceSurface from '@features/chat/components/AiWorkspaceSurface';
 import PanelCommandHistory from '@features/command-history/components/PanelCommandHistory';

@@ -7,9 +7,9 @@
  */
 import { useEffect, useState } from 'react';
 import { t } from '@i18n';
-import { OutlineButton } from '@ui/OutlineButton';
-import { TextInput } from '@ui/TextInput';
-import { IconButton } from '@ui/IconButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import { TextInput } from '@ui/fields/TextInput';
+import { IconButton } from '@ui/actions/IconButton';
 import { Eye, EyeOff } from '@ui/icons';
 import { setProviderKey, type ModelProfile } from '@features/agent';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';

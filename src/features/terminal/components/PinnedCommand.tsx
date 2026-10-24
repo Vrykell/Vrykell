@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
 import { t } from '@i18n';
-import { IconButton } from '@ui/IconButton';
+import { IconButton } from '@ui/actions/IconButton';
 import { ChevronDown, Ellipsis } from '@ui/icons';
 import { useTypographyStore } from '@config/typography';
 import type { TermBlock } from '../services/pipeline/termBlock';

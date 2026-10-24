@@ -1,10 +1,10 @@
-import { OutlineButton } from '@ui/OutlineButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import { t } from '@i18n';
 import { useState } from 'react';
 import { save } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { diagnosticsLogDirectory, exportDiagnostics, setDiagnosticAutoSave, useDiagnosticSettings } from '@platform/diagnostics';
-import ErrorBox from '@ui/ErrorBox';
+import ErrorBox from '@ui/feedback/ErrorBox';
 import { SettingsGroup, Field } from '../components/ui';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
 

@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import type { GitReference, GitReferenceAction, GitSnapshot, GitTarget } from '@core/git';
 import { editGitReference, getGitReferences } from '@platform/api/git';
 import { gitTargetKey, useGitOperations } from '../stores/operations';
-import ToolDialog from '@ui/ToolDialog';
-import Select from '@ui/Select';
-import { TextInput } from '@ui/TextInput';
-import ConfigTextArea from '@ui/ConfigTextArea';
-import { OutlineButton } from '@ui/OutlineButton';
-import ErrorBox from '@ui/ErrorBox';
+import ToolDialog from '@ui/feedback/ToolDialog';
+import Select from '@ui/fields/Select';
+import { TextInput } from '@ui/fields/TextInput';
+import ConfigTextArea from '@ui/fields/ConfigTextArea';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import ErrorBox from '@ui/feedback/ErrorBox';
 import { t } from '@i18n';
 
 export const referenceActionLabel = (action: GitReferenceAction) => t({ switchBranch: 'Switch branch', createBranch: 'Create branch', renameBranch: 'Rename branch', deleteBranch: 'Delete branch', merge: 'Merge branch', rebase: 'Rebase branch',

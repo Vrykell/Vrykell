@@ -2,7 +2,7 @@ import type { GitOperation, GitSnapshot, GitTarget } from '@core/git';
 import { operateGit } from '@platform/api/git';
 import { gitTargetKey, useGitOperations } from '../stores/operations';
 import { useGitReview } from '../stores/review';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { t } from '@i18n';
 
 export function preferredGitRemote(snapshot: GitSnapshot): string | undefined {

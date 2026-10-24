@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { t } from '@i18n';
 import { ArrowRight, ChevronRight, Search, MoreHorizontal } from '@ui/icons';
-import { IconBtn } from '@ui/UiBtn';
-import { OutlineButton } from '@ui/OutlineButton';
-import { TextInput } from '@ui/TextInput';
-import { TerminalIcon, TerminalProfileIcon } from '@ui/shellIcons';
+import { IconBtn } from '@ui/actions/UiBtn';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import { TextInput } from '@ui/fields/TextInput';
+import { TerminalIcon, TerminalProfileIcon } from '@ui/icons/shellIcons';
 import { getAvailableShells, type ShellOption } from '@platform/shells';
 import { isMacOS } from '@platform/runtime';
 import { useShellProfiles } from '@config/shellProfiles';

@@ -5,7 +5,7 @@ import {
   DEFAULT_DIR_NAME, DEFAULT_FILE_NAME, fileOpsFor, resolveTargetDir,
 } from '@features/files/model/fileOps';
 import type { FileListResult, FileOpPair, FileOps, FileOpsTarget } from '@features/files/model/fileOps';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { writeClipboardFiles } from '@platform/clipboard';
 import { t, type I18nKey } from '@i18n';

@@ -95,8 +95,8 @@ for (const density of [1, 1.25]) test.describe(`running layout at ${density}x`, 
         expect(size.available - size.width).toBeLessThan(size.cell + 1);
       }).toPass();
       expect(await page.evaluate(async () => {
-        const path = '/src/ui/layoutResizeDrag.ts';
-        const { isLayoutResizeDragActive } = await import(path) as typeof import('../src/ui/layoutResizeDrag');
+        const path = '/src/ui/layout/layoutResizeDrag.ts';
+        const { isLayoutResizeDragActive } = await import(path) as typeof import('@ui/layout/layoutResizeDrag');
         return isLayoutResizeDragActive();
       })).toBe(true);
     } finally { await page.mouse.up(); }

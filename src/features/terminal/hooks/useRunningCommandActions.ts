@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { t } from '@i18n';
 import { isMacOS } from '@platform/runtime';
-import type { ContextMenuItem } from '@ui/ContextMenu';
+import type { ContextMenuItem } from '@ui/menus/ContextMenu';
 import { redrawTerminal } from '../services/terminalRepaint';
 import { useTuiControls } from './useTuiControls';
 

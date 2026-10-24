@@ -1,5 +1,5 @@
 import { useEditorPreferences } from '@config/editor';
-import Select from '@ui/Select';
+import Select from '@ui/fields/Select';
 import { t } from '@i18n';
 import { Field } from './ui';
 import { useSettingsSave } from './SettingsSaveProvider';

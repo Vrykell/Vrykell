@@ -10,8 +10,8 @@
  */
 import { useEffect, useState } from 'react';
 import { t } from '@i18n';
-import { IconButton } from '@ui/IconButton';
-import { OutlineButton } from '@ui/OutlineButton';
+import { IconButton } from '@ui/actions/IconButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import { Copy, Eye, EyeOff, Key, Pencil, Trash2, iconSizes } from '@ui/icons';
 import { writeClipboardText } from '@platform/clipboard';
 import {

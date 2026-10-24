@@ -19,7 +19,7 @@ vi.mock('@features/ssh', () => ({
     { getState: () => ({ connections: mocks.connections }) },
   ),
 }));
-vi.mock('@ui/Toast', () => ({
+vi.mock('@ui/feedback/Toast', () => ({
   useToastStore: {
     getState: () => ({
       addToast: (message: string, kind: string) => mocks.toasts.push({ message, kind }),

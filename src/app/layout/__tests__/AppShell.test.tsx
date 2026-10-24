@@ -6,7 +6,7 @@ import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
 vi.mock('@platform/runtime', () => ({ isMacOS: true, isWindows: false }));
 vi.mock('@app/layout/WorkspaceShell', () => ({ default: () => <main>Workspace</main> }));
 vi.mock('@app/layout/ApplicationOverlays', () => ({ default: () => null }));
-vi.mock('@ui/OverlayScrollbars', () => ({ default: () => null }));
+vi.mock('@ui/layout/OverlayScrollbars', () => ({ default: () => null }));
 afterEach(() => {
   cleanup();
   useTerminalThemeStore.setState({ config: { opacity: 1, backgroundImage: null, vars: {} }, loaded: false, wallpaperDataUrl: null });

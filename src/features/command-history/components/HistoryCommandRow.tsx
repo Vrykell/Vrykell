@@ -1,8 +1,8 @@
 import { t } from '@i18n';
-import SidebarItem from '@ui/sidebarItem';
+import SidebarItem from '@ui/layout/sidebarItem';
 import { Ellipsis } from '@ui/icons';
-import CopyButton from '@ui/CopyButton';
-import { ListReorderPlaceholder } from '@ui/listReorder';
+import CopyButton from '@ui/actions/CopyButton';
+import { ListReorderPlaceholder } from '@ui/layout/listReorder';
 import type { CommandItem } from '../model/commands';
 import type { MouseEvent, PointerEvent } from 'react';
 

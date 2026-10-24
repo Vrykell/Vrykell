@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import PanelTabs from '../components/PanelTabs';
 import { useSessionStore } from '../model/session/store';
-import { useListReorder } from '@ui/listReorder';
+import { useListReorder } from '@ui/layout/listReorder';
 import { useTerminalDefaults } from '@config/terminalDefaults';
 import { getAvailableShells } from '@platform/shells';
 import { useWorkspaceNavigation } from '../stores/navigation';

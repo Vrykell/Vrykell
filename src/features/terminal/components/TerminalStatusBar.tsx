@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties, type ReactNode } from 'react';
-import { IconButton } from '@ui/IconButton';
+import { IconButton } from '@ui/actions/IconButton';
 import { t } from '@i18n';
 import { formatCommandDuration } from '../model/commandDuration';
 

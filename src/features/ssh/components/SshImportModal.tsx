@@ -1,6 +1,6 @@
-import { OutlineButton } from '@ui/OutlineButton';
-import { Checkbox } from '@ui/Checkbox';
-import { useDialogKeyboard } from '@ui/useDialogKeyboard';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import { Checkbox } from '@ui/fields/Checkbox';
+import { useDialogKeyboard } from '@ui/hooks/useDialogKeyboard';
 import './SshConnection.css';
 import { useEffect, useRef, useState } from 'react';
 import { t } from '@i18n';
@@ -12,8 +12,8 @@ import {
   type SshConfigCandidate,
   type SshConnection,
 } from '@features/ssh/services/api';
-import ErrorBox from '@ui/ErrorBox';
-import { useToastStore } from '@ui/Toast';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import { useToastStore } from '@ui/feedback/Toast';
 
 interface Props {
   open: boolean;

@@ -1,8 +1,8 @@
-import { OutlineButton } from '@ui/OutlineButton';
-import ConfigTextArea from '@ui/ConfigTextArea';
-import { IconButton } from '@ui/IconButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import ConfigTextArea from '@ui/fields/ConfigTextArea';
+import { IconButton } from '@ui/actions/IconButton';
 import { t } from '@i18n';
-import { TextInput } from '@ui/TextInput';
+import { TextInput } from '@ui/fields/TextInput';
 /**
  * External tool server settings.
  * New server drafts are persisted automatically after required fields are valid.
@@ -13,8 +13,8 @@ import {
   listMcpServers, saveMcpServer, removeMcpServer, toggleMcpServer,
   connectMcp, disconnectMcp, type McpServer,
 } from '@features/agent/services/mcp';
-import { useToastStore } from '@ui/Toast';
-import ErrorBox from '@ui/ErrorBox';
+import { useToastStore } from '@ui/feedback/Toast';
+import ErrorBox from '@ui/feedback/ErrorBox';
 import { SettingsGroup, Field, Toggle, inputStyle } from '@features/settings/components/ui';
 import { useAutoSave } from '../hooks/useAutoSave';
 import SaveStatus from '../components/SaveStatus';

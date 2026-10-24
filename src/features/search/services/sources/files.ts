@@ -2,7 +2,7 @@ import { FileText } from '@ui/icons';
 import { registerSource } from '@features/search/services/registry';
 import { searchFiles as backendSearchFiles } from '@platform/api/search';
 import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
-import { fmtSize } from '@ui/UiBtn';
+import { fmtSize } from '@ui/actions/UiBtn';
 import type { SearchResult, FileResultData } from '@features/search/types';
 import type { BackendFileMatch } from '@platform/api/types';
 

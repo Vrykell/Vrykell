@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { t } from '@i18n';
-import ErrorBox from '@ui/ErrorBox';
-import Select from '@ui/Select';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import Select from '@ui/fields/Select';
 import { useSessionStore } from '@features/workspace';
 import { findLeaf, replaceLeaf } from '@features/workspace/model/windowLayout';
 import { connectionTarget, listSshConnections, type SshConnection } from '@features/ssh/services/api';

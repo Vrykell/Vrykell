@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { marketGithubInstall, marketGithubList, type MarketSkill } from '@features/agent/services/skills';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { t } from '@i18n';
 
 const pendingLists = new Map<string, Promise<MarketSkill[]>>();

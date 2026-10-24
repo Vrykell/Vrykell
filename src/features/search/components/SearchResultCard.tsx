@@ -1,9 +1,9 @@
-import { OutlineButton } from '@ui/OutlineButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import {
   Command, History, Monitor, Settings, SquareTerminal, Undo2, type AppIcon,
 } from '@ui/icons';
 import { fileIcon } from '@features/files/utils/fileIcon';
-import KeyHint from '@ui/KeyHint';
+import KeyHint from '@ui/feedback/KeyHint';
 import type {
   SearchResult,
   BlockResultData,

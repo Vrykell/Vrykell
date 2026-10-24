@@ -1,8 +1,8 @@
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
-import CheckboxMenu from '@ui/CheckboxMenu';
-import KeyHint from '@ui/KeyHint';
+import CheckboxMenu from '@ui/menus/CheckboxMenu';
+import KeyHint from '@ui/feedback/KeyHint';
 import { ChevronDown } from '@ui/icons';
 import { COMPLETION_SHORTCUTS, completionShortcut, useCompletionPreferences, validCustomCompletionShortcut } from '@config/completion';
 

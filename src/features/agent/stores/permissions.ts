@@ -14,7 +14,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { t } from '@i18n';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import type { ToolRunState } from '@features/agent/model/messageParts';
 import { untrustedSkillFor, setSkillState } from '@features/agent/services/skills';
 import { reasonText } from '@features/agent/model/toolReasonTexts';

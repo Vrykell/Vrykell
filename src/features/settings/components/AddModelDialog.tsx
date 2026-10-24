@@ -8,8 +8,8 @@
  */
 import { useEffect, useState } from 'react';
 import { t } from '@i18n';
-import { OutlineButton } from '@ui/OutlineButton';
-import { TextInput } from '@ui/TextInput';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import { TextInput } from '@ui/fields/TextInput';
 import { detectCapabilities } from '@features/agent/model/capabilities';
 import type { ModelProfile } from '@features/agent';
 import { newModelId } from '@features/settings/model/modelWrites';

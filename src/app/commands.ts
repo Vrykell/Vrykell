@@ -4,7 +4,7 @@ import { diagnosticsLogPath } from '@platform/diagnostics';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { clearSessionBlocks } from '@features/terminal/hooks/useTerminalSession';
 import { isTerminalDebugEnabled, setTerminalDebugEnabled } from '@features/terminal/services/terminalDebug';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { redrawTerminal } from '@features/terminal/services/terminalRepaint';
 import { t } from '@i18n';
 import { isMacOS } from '@platform/runtime';

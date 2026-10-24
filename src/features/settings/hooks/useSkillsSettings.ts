@@ -5,7 +5,7 @@ import {
   setSkillState,
   type SkillMeta, type SkillDetail,
 } from '@features/agent/services/skills';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 
 /** 管理技能设置页的列表、详情、导入和信任状态。 */
 export function useSkillsSettings() {

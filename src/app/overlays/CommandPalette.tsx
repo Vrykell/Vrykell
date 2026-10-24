@@ -1,5 +1,5 @@
-import KeyHint from '@ui/KeyHint';
-import { TextInput } from '@ui/TextInput';
+import KeyHint from '@ui/feedback/KeyHint';
+import { TextInput } from '@ui/fields/TextInput';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { getCommands } from '@app/commands';
 import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';

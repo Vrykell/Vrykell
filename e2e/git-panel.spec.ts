@@ -357,8 +357,8 @@ test('moving the selected comparison backward keeps its editor hosts attached', 
   const strip = page.getByRole('tablist', { name: '已打开的文件与比较' });
   await strip.getByRole('tab').first().click();
   const continuity = await page.getByTestId('git-diff-review').evaluateHandle(async element => {
-    const path = '/src/ui/code/runtime.ts';
-    const { editorApi } = await import(path) as typeof import('../src/ui/code/runtime');
+    const path = '/src/ui/editor/code/runtime.ts';
+    const { editorApi } = await import(path) as typeof import('@ui/editor/code/runtime');
     const state = { detached: 0 };
     const observer = new MutationObserver(records => {
       for (const record of records) for (const node of record.removedNodes) if (node === element) state.detached += 1;

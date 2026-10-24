@@ -4,7 +4,7 @@ import { isSettingsPageAvailable } from '../model/navigation';
 import { t } from '@i18n';
 import { useSettingsNavigationStore } from '../stores/navigation';
 import { SHELL_TYPES, shellTypeLabel } from '@platform/shells';
-import { shellIconFor } from '@ui/shellIcons';
+import { shellIconFor } from '@ui/icons/shellIcons';
 export type { PageId } from '../model/navigation';
 
 export interface SettingItem {

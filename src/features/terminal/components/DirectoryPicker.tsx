@@ -2,10 +2,10 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, useId } from 're
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
 import { Folder, ArrowUp, iconSizes } from '@ui/icons';
-import { TextInput } from '@ui/TextInput';
-import { useToastStore } from '@ui/Toast';
-import ErrorBox from '@ui/ErrorBox';
-import { clampMenuPosition } from '@ui/menuPosition';
+import { TextInput } from '@ui/fields/TextInput';
+import { useToastStore } from '@ui/feedback/Toast';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import { clampMenuPosition } from '@ui/menus/menuPosition';
 import { fileOpsFor, type FileOpsTarget } from '@features/files';
 import { useSessionStore } from '@features/workspace';
 import { leaves } from '@features/workspace/model/windowLayout';

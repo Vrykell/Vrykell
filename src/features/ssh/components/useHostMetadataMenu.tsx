@@ -1,7 +1,7 @@
 import { t } from '@i18n';
-import type { ContextMenuItem, MenuAnchor } from '@ui/ContextMenu';
+import type { ContextMenuItem, MenuAnchor } from '@ui/menus/ContextMenu';
 import { writeClipboardText } from '@platform/clipboard';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { useWorkspaceNavigation } from '@features/workspace';
 import { useHostLibrary } from '../stores/hostLibrary';
 import { useHostEditor } from '../stores/hostEditor';

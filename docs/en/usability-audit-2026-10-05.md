@@ -37,7 +37,7 @@ Reproduction: create SSH → enter name and host → test connection returns an 
 
 This is a different operation from normally clicking the SSH form's own overlay to close it: closing the upper fingerprint confirmation should return to the already-filled form.
 
-Source: the outside click in `src/ui/ConfirmDialog.tsx`; the nested confirmation at the end of `src/features/ssh/components/SshFormModal.tsx`.
+Source: the outside click in `src/ui/feedback/ConfirmDialog.tsx`; the nested confirmation at the end of `src/features/ssh/components/SshFormModal.tsx`.
 
 ### The Long-Name Confirmation Window Extends Off-Screen
 
@@ -47,7 +47,7 @@ This is a long-name boundary scenario. Overflow was not reproduced at the defaul
 
 ![Long-name confirmation window at the maximum font size](../audit-evidence/2026-10-05/confirm-overflow.png)
 
-Source: `src/ui/ConfirmDialog.tsx` only constrains width and has no max height or scroll area.
+Source: `src/ui/feedback/ConfirmDialog.tsx` only constrains width and has no max height or scroll area.
 
 ## SSH Operations Provided by the User: Support Gaps
 

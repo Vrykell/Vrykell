@@ -3,10 +3,10 @@
  *
  * Configured agents use their own identity; unrecognized entries use the application mark.
  */
-import { AGENT_MARKS } from '@ui/brandMarks';
+import { AGENT_MARKS } from '@ui/icons/brandMarks';
 import type { AppIcon } from '@ui/icons';
 import { modelVendorInfo } from '@features/agent/components/modelIcon';
-import AppMark from '@ui/AppMark';
+import AppMark from '@ui/icons/AppMark';
 
 /** Lowercase letters and digits only, so 'Claude Code' and 'claudecode' resolve alike. */
 const agentKey = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '');

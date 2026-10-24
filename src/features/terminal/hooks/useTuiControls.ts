@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { writeTerminalInput } from '@features/terminal/services/terminalWriteQueue';
 import { killForeground, ESCALATE_WINDOW_MS } from '@utils/killForeground';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { useBlockStore, useTerminalStore, selectBlocks } from '@features/terminal';
 
 /** Keep toolbar actions and manual presentation state scoped to their owning pane. */

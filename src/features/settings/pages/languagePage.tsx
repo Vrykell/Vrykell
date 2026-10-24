@@ -1,5 +1,5 @@
 import { t, useLanguagePreferences } from '@i18n';
-import Select from '@ui/Select';
+import Select from '@ui/fields/Select';
 import { Field, SettingsGroup } from '../components/ui';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
 

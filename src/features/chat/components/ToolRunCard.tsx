@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { t, type I18nKey } from '@i18n';
 import { Brain, Check, ChevronRight, FileText, Folder, Globe, Pencil, RefreshCw, Search, TerminalPrompt, Wrench, X } from '@ui/icons';
-import ErrorBox from '@ui/ErrorBox';
+import ErrorBox from '@ui/feedback/ErrorBox';
 import ToolOutput from './ToolOutput';
 import BlockOutput from '@features/terminal/components/BlockOutput';
 import { useBlockStore, useTerminalStore } from '@features/terminal';

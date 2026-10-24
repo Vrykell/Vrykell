@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react';
 import type { EditorFile } from '@core/editor';
 import { openInTerminal } from '@features/files';
 import { isWindows } from '@platform/runtime';
-import ContextMenu, { type MenuAnchor } from '@ui/ContextMenu';
-import { TextButton } from '@ui/TextButton';
+import ContextMenu, { type MenuAnchor } from '@ui/menus/ContextMenu';
+import { TextButton } from '@ui/actions/TextButton';
 import { Lock } from '@ui/icons';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { t } from '@i18n';
 
 /** File access stays read-only until the user explicitly requests the existing elevation flow. */

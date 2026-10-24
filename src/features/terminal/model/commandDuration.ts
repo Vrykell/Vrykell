@@ -1,4 +1,4 @@
-import { fmtDuration } from '@ui/UiBtn';
+import { fmtDuration } from '@ui/actions/UiBtn';
 
 /** Keep sub-minute durations precise without dominating the command context. */
 export function formatCommandDuration(milliseconds: number): string {

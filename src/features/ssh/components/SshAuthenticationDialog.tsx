@@ -1,11 +1,11 @@
 import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
-import { TextInput } from '@ui/TextInput';
-import { TextButton } from '@ui/TextButton';
-import Select from '@ui/Select';
-import ErrorBox from '@ui/ErrorBox';
-import { useDialogKeyboard } from '@ui/useDialogKeyboard';
+import { TextInput } from '@ui/fields/TextInput';
+import { TextButton } from '@ui/actions/TextButton';
+import Select from '@ui/fields/Select';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import { useDialogKeyboard } from '@ui/hooks/useDialogKeyboard';
 import { sshAuthenticateSession } from '../services/api';
 import { forgetSshAuthentication, useHasTemporarySshAuthentication } from '../hooks/useSessionAuthentication';
 import { finishSshAuthentication, useSessionAuthenticationStore } from '@features/ssh';

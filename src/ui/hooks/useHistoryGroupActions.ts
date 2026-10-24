@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { t } from '@i18n';
 import { historyGroupKey, historyRecordKey, scopedGroupIds, useHistoryMetaStore } from '@utils/historyMeta';
-import { isHistoryGroupColor } from '../historyGroupColor';
-import type { ContextMenuItem } from '../ContextMenu';
+import { isHistoryGroupColor } from '@ui/history/historyGroupColor';
+import type { ContextMenuItem } from '@ui/menus/ContextMenu';
 
 /** Group preferences never change automatic membership or the active record filters. */
 export function useHistoryGroupActions(scope: 'session' | 'conversation', groupBy: string) {

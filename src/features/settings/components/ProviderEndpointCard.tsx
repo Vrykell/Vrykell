@@ -6,7 +6,7 @@
  * guess it.
  */
 import { t } from '@i18n';
-import CopyButton from '@ui/CopyButton';
+import CopyButton from '@ui/actions/CopyButton';
 import { providerLabel } from '@features/agent/components/modelIcon';
 import { effectiveEndpoint } from '@features/agent/services/provider';
 import type { ModelProfile } from '@features/agent';
@@ -15,7 +15,7 @@ import { commitModels } from '@features/settings/model/modelWrites';
 import { SettingsGroup, Field } from './ui';
 import AutoSaveInput from './AutoSaveInput';
 import { useEffect, useRef, useState } from 'react';
-import ConfirmDialog from '@ui/ConfirmDialog';
+import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import { setProviderKey, selectProvider, useAiConfigStore } from '@features/agent';
 
 export default function ProviderEndpointCard({ row }: { row: ProviderRow<ModelProfile> }) {

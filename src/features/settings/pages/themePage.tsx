@@ -1,15 +1,15 @@
 /**
  * Base appearance: theme mode, application opacity and wallpaper.
  */
-import { OutlineButton } from '@ui/OutlineButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import { t } from '@i18n';
-import { RangeInput } from '@ui/RangeInput';
+import { RangeInput } from '@ui/fields/RangeInput';
 import type { ThemePreference } from '@config/theme/tokens';
 import { iconSizes, Image as ImageIcon, Trash2 } from '@ui/icons';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { useTheme } from '@app/providers/ThemeProvider';
 import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { SettingsGroup, Field, Toggle } from '@features/settings/components/ui';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
 import { isWallpaperImage, wallpaperExtensions } from '../services/wallpaper';

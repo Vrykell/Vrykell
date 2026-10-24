@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import UsageView from '../components/UsageView';
 import { useUsageStore } from '../stores/usage';
 import { useAiConfigStore } from '../stores/aiConfig';

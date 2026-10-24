@@ -54,9 +54,9 @@ typechecking, architecture checks, or dev mode as appropriate.
 
 - **Existing design first** — Before changing a surface, inspect its closest existing counterpart and reuse its component, spacing, input, menu, hover, and focus patterns. Extend or extract the existing implementation when needed. Do not invent a new visual treatment for an interaction the app already has. Review the result in the running UI at its actual narrow and wide sizes.
 
-- **Sidebar rows** - `src/ui/sidebarItem.tsx`. Session tab rows and SSH rows render through
+- **Sidebar rows** - `src/ui/layout/sidebarItem.tsx`. Session tab rows and SSH rows render through
   `SidebarItem`; a new list that looks like them must use it instead of hand-rolling markup.
-- **List reordering** - `src/ui/listReorder.tsx`. The mechanic matches the titlebar buttons:
+- **List reordering** - `src/ui/layout/listReorder.tsx`. The mechanic matches the titlebar buttons:
   the dragged row leaves its slot, a dashed placeholder marks the drop slot, an icon preview
   follows the pointer, Escape cancels and the post-drag click is suppressed. Lists opt in with
   `data-reorder-list` on the container and `data-reorder-item` (+ `data-reorder-kind`) on rows;
@@ -66,12 +66,12 @@ typechecking, architecture checks, or dev mode as appropriate.
   `ErrorDetails` (collapsible raw text with copy) from `src/ui/`. A failure of something the
   panel is displaying renders inline through ErrorBox; a transient action result uses Toast.
   Bare `role="alert"` blocks are not acceptable.
-- **Settings option groups** use the `Select` dropdown from `src/ui/Select.tsx`, not
+- **Settings option groups** use the `Select` dropdown from `src/ui/fields/Select.tsx`, not
   segmented pill controls.
-- **Hover hints** go through `data-tip` and `src/ui/TooltipLayer.tsx` (one themed bubble).
+- **Hover hints** go through `data-tip` and `src/ui/feedback/TooltipLayer.tsx` (one themed bubble).
   Components do not set `title` - the OS tooltip cannot be styled - and icon-only
   controls keep an `aria-label` as their accessible name.
-- **Multi-select menus** use `src/ui/CheckboxMenu.tsx`: toggling keeps the menu open and
+- **Multi-select menus** use `src/ui/menus/CheckboxMenu.tsx`: toggling keeps the menu open and
   it closes only when it loses focus (outside press or Escape).
 - **Menu hierarchy and colors** - color palettes in action menus always appear directly below the actions
   in the shared footer, never in a submenu. Use a meaningful submenu for multiple related

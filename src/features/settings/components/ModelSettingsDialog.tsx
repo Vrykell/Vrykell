@@ -7,7 +7,7 @@
  * cannot work without.
  */
 import { t } from '@i18n';
-import Select from '@ui/Select';
+import Select from '@ui/fields/Select';
 import { detectCapabilities } from '@features/agent/model/capabilities';
 import type { ModelProfile } from '@features/agent';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';

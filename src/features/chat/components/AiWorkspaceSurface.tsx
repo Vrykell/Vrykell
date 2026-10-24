@@ -1,7 +1,7 @@
 import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
-import { memoLocalized } from '@ui/memoLocalized';
+import { memoLocalized } from '@ui/hooks/memoLocalized';
 import { createPortal } from 'react-dom';
-import ResourceContent from '@ui/ResourceContent';
+import ResourceContent from '@ui/layout/ResourceContent';
 import HarnessWorkspace from './HarnessWorkspace';
 import PanelChat from './PanelChat';
 import { useAiWorkspace } from '../stores/aiWorkspace';

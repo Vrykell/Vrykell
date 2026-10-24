@@ -7,9 +7,9 @@
  */
 import { useRef, type ReactNode } from 'react';
 import { t } from '@i18n';
-import { IconButton } from '@ui/IconButton';
+import { IconButton } from '@ui/actions/IconButton';
 import { ArrowLeft, X } from '@ui/icons';
-import { useDialogKeyboard } from '@ui/useDialogKeyboard';
+import { useDialogKeyboard } from '@ui/hooks/useDialogKeyboard';
 
 export default function SettingsDialog({ open, title, icon, width = 440, initialFocus, onBack, onClose, children, footer, testId }: {
   open: boolean;

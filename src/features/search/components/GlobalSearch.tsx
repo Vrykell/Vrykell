@@ -1,16 +1,16 @@
-import KeyHint from '@ui/KeyHint';
-import { IconButton } from '@ui/IconButton';
-import { TextButton } from '@ui/TextButton';
+import KeyHint from '@ui/feedback/KeyHint';
+import { IconButton } from '@ui/actions/IconButton';
+import { TextButton } from '@ui/actions/TextButton';
 import { parseSearchQuery, SEARCH_PREFIXES } from '../model/searchQuery';
-import { TextInput } from '@ui/TextInput';
+import { TextInput } from '@ui/fields/TextInput';
 import { ChevronDown, History, Search, SlidersHorizontal, X } from '@ui/icons';
 import { t } from '@i18n';
 import { useGlobalSearch } from '@features/search/hooks/useGlobalSearch';
 import { getSources } from '@features/search/services/registry';
 import FilterPopover from './FilterPopover';
 import SearchResultCard from './SearchResultCard';
-import ErrorBox from '@ui/ErrorBox';
-import FilterChip from '@ui/FilterChip';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import FilterChip from '@ui/menus/FilterChip';
 
 interface Props {
   open: boolean;

@@ -9,12 +9,12 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import { t } from '@i18n';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { SettingsGroup, Field } from '@features/settings/components/ui';
-import { IconButton } from '@ui/IconButton';
-import { OutlineButton } from '@ui/OutlineButton';
-import ConfirmDialog from '@ui/ConfirmDialog';
-import ErrorBox from '@ui/ErrorBox';
+import { IconButton } from '@ui/actions/IconButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import ConfirmDialog from '@ui/feedback/ConfirmDialog';
+import ErrorBox from '@ui/feedback/ErrorBox';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
 import { Minus, Plus, RefreshCw, Settings } from '@ui/icons';
 import HarnessBadge from '@features/agent/components/HarnessBadge';

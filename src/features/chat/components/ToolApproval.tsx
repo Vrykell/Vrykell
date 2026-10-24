@@ -1,11 +1,11 @@
 import { useState } from 'react';
 import { t } from '@i18n';
 import { ChevronDown, Pencil, Play, Server, TerminalPrompt } from '@ui/icons';
-import { TextButton } from '@ui/TextButton';
-import { OutlineButton } from '@ui/OutlineButton';
-import { TextArea } from '@ui/TextInput';
-import { IconButton } from '@ui/IconButton';
-import ContextMenu from '@ui/ContextMenu';
+import { TextButton } from '@ui/actions/TextButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import { TextArea } from '@ui/fields/TextInput';
+import { IconButton } from '@ui/actions/IconButton';
+import ContextMenu from '@ui/menus/ContextMenu';
 import { resolveApproval } from '@features/agent';
 import { DEFAULT_TOOL_COMMAND_TIMEOUT_MS, type ToolRun } from '@features/agent/model/messageParts';
 import { useComposerDrafts } from '../stores/composerDrafts';

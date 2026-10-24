@@ -8,11 +8,11 @@
  */
 
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
-import { beginLayoutResizeDrag, endLayoutResizeDrag } from '@ui/layoutResizeDrag';
+import { beginLayoutResizeDrag, endLayoutResizeDrag } from '@ui/layout/layoutResizeDrag';
 import { showsPaneChatHistory } from '../model/paneHistory';
 import { useTypographyStore } from '@config/typography';
 import { useRef, useEffect, useLayoutEffect, useMemo, useState, useId, useCallback } from 'react';
-import OverlayScrollbar from '@ui/OverlayScrollbar';
+import OverlayScrollbar from '@ui/layout/OverlayScrollbar';
 import { CircleX, Minimize2, Square } from '@ui/icons';
 import TerminalLauncher from '@features/workspace/components/TerminalLauncher';
 import { STATUS_ACTION_ICON_SIZE, StatusActionButton, TerminalStatusBar } from '@features/terminal/components/TerminalStatusBar';
@@ -23,7 +23,7 @@ import { useUiStore, useDockDragStore } from '@features/workspace';
 import { useBlockStore, selectBlocks } from '@features/terminal';
 import { usePaneMessages } from '@features/chat';
 import PaneChatHistory from '@features/chat/components/PaneChatHistory';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { useFollowBottom, registerFollowEngager, engageFollow } from '@features/terminal/hooks/useFollowBottom';
 import { useTerminalFocus } from '@features/terminal/hooks/useTerminalFocus';
 import { useTerminalPaneDrag } from '@features/terminal/hooks/useTerminalPaneDrag';
@@ -38,9 +38,9 @@ import PinnedCommand from './PinnedCommand';
 import { usePinnedCommand } from '../hooks/usePinnedCommand';
 import TerminalPanel from '@features/terminal/components/TerminalPanel';
 import { UnifiedHistoryView } from '@features/session-history';
-import ContextMenu, { type ContextMenuItem } from '@ui/ContextMenu';
-import ErrorBox from '@ui/ErrorBox';
-import { TextButton } from '@ui/TextButton';
+import ContextMenu, { type ContextMenuItem } from '@ui/menus/ContextMenu';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import { TextButton } from '@ui/actions/TextButton';
 import AiWorkspaceSurface from '@features/chat/components/AiWorkspaceSurface';
 import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
@@ -51,7 +51,7 @@ import { TerminalRedrawButton } from './TerminalRedrawButton';
 import SshStatusPanel from '@features/ssh/components/SshStatusPanel';
 import type { SshSessionStatus } from '@core/ssh';
 import { useManualFullscreenVisible } from '../hooks/useManualFullscreenVisible';
-import ResourceContent from '@ui/ResourceContent';
+import ResourceContent from '@ui/layout/ResourceContent';
 
 export default function TerminalView({ active = true }: { active?: boolean }) {
   const tabs = useSessionStore((s) => s.tabs);

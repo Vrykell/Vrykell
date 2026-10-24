@@ -3,7 +3,7 @@ import { registerSource } from '@features/search/services/registry';
 import type { BackendBlockEntry } from '@platform/api/types';
 import type { SearchResult, BlockResultData } from '@features/search/types';
 import { searchBlocks } from '@platform/api/search';
-import { fmtDuration } from '@ui/UiBtn';
+import { fmtDuration } from '@ui/actions/UiBtn';
 
 /** 去除 ANSI 转义序列，提取纯文本 */
 function stripAnsi(s: string): string {

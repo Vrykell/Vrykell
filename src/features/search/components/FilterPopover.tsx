@@ -1,4 +1,4 @@
-import CheckboxMenu from '@ui/CheckboxMenu';
+import CheckboxMenu from '@ui/menus/CheckboxMenu';
 import { t } from '@i18n';
 import type { ResultType } from '@features/search/types';
 import { getSources, useEnabledSourcesStore, toggleSource } from '@features/search/services/registry';

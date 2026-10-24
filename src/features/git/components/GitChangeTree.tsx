@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import type { GitEntry } from '@core/git';
-import SidebarItem from '@ui/sidebarItem';
+import SidebarItem from '@ui/layout/sidebarItem';
 import { Folder } from '@ui/icons';
 import { changeTree, type ChangeTreeNode } from '../model/tree';
 

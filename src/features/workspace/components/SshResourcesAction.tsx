@@ -2,7 +2,7 @@ import { useSessionStore } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
 import { leaves } from '../model/windowLayout';
 import { useAuxiliarySidebarStore } from '../stores/auxiliarySidebar';
-import { IconBtn } from '@ui/UiBtn';
+import { IconBtn } from '@ui/actions/UiBtn';
 import { DataUsage, iconSizes } from '@ui/icons';
 import { t } from '@i18n';
 

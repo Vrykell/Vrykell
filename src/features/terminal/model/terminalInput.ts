@@ -1,5 +1,5 @@
 import type { Terminal } from '@xterm/xterm';
-import { configureLiteralInput } from '@ui/TextInput';
+import { configureLiteralInput } from '@ui/fields/TextInput';
 import { terminalDebug } from '../services/terminalDebug';
 
 const configured = new WeakSet<HTMLTextAreaElement>();

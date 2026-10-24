@@ -1,10 +1,10 @@
 import { isValidElement, useState, type ReactNode, type ReactElement } from 'react';
 import { t } from '@i18n';
-import { useToastStore } from '@ui/Toast';
-import { TextButton } from '@ui/TextButton';
+import { useToastStore } from '@ui/feedback/Toast';
+import { TextButton } from '@ui/actions/TextButton';
 import { Play, Copy, Check, iconSizes } from '@ui/icons';
 import { useTerminalStore } from '@features/terminal';
-import CodeSyntax from '@ui/CodeSyntax';
+import CodeSyntax from '@ui/editor/CodeSyntax';
 
 const SHELL_LANGS = new Set(['bash', 'sh', 'zsh', 'shell']);
 

@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import type { GitTarget, GitWorktree } from '@core/git';
 import { getGitWorktrees } from '@platform/api/git';
-import SidebarItem from '@ui/sidebarItem';
-import ErrorBox from '@ui/ErrorBox';
-import { TextButton } from '@ui/TextButton';
+import SidebarItem from '@ui/layout/sidebarItem';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import { TextButton } from '@ui/actions/TextButton';
 import { GitBranch, Check } from '@ui/icons';
 import { t } from '@i18n';
 

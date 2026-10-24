@@ -44,9 +44,9 @@ import type { UnlistenFn } from '@tauri-apps/api/event';
 import { getTerminalFontOptions, measureTerminalDomCellWidth } from '@features/terminal/model/terminalFont';
 import { prepareSshHost } from '@features/ssh/services/hostTrust';
 import { startAutomaticForwarding } from '@features/ssh';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { terminalTypographyChanged, useTypographyStore } from '@config/typography';
-import { isLayoutResizeDragActive, onLayoutResizeDragEnd } from '@ui/layoutResizeDrag';
+import { isLayoutResizeDragActive, onLayoutResizeDragEnd } from '@ui/layout/layoutResizeDrag';
 
 /** Live session references shared across development reloads. */
 interface SessionRegistry {

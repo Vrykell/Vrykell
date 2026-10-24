@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 import { writeTerminalCommand } from '../services/commandSubmission';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { t } from '@i18n';
 import { askAboutTerminal } from '@features/chat/services/conversationContext';
 import { useInputStore, useTerminalStore, selectPaneInput } from '@features/terminal';

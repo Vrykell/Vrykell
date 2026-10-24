@@ -1,15 +1,15 @@
 /**
  * Theme files: JSON import/export, the theme config file and reloading it.
  */
-import { OutlineButton } from '@ui/OutlineButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import { t } from '@i18n';
-import { useReloadFeedback } from '@ui/useReloadFeedback';
+import { useReloadFeedback } from '@ui/hooks/useReloadFeedback';
 import { useEffect, useState } from 'react';
 import { iconSizes, Download, Upload, RefreshCw, FileText } from '@ui/icons';
 import { open as openDialog, save as saveDialog } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { getThemePath, useTerminalThemeStore } from '@features/settings/model/terminalTheme';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { SettingsGroup, Field } from '@features/settings/components/ui';
 
 export function ThemeFilesPage() {

@@ -5,7 +5,7 @@ import type FilePanel from '@features/files/components/FilePanel';
 
 const mocks = vi.hoisted(() => ({ write: vi.fn(), toast: vi.fn(), focus: vi.fn(), debug: vi.fn(), upload: vi.fn(), download: vi.fn() }));
 vi.mock('@platform/pty', () => ({ ptyWrite: mocks.write }));
-vi.mock('@ui/Toast', () => ({ useToastStore: { getState: () => ({ addToast: mocks.toast }) } }));
+vi.mock('@ui/feedback/Toast', () => ({ useToastStore: { getState: () => ({ addToast: mocks.toast }) } }));
 vi.mock('@features/terminal/services/terminalDebug', () => ({ terminalDebug: mocks.debug }));
 vi.mock('@features/terminal/services/terminalClipboard', () => ({ getPaneTerminal: (id: string) => ({ focus: () => mocks.focus(id) }) }));
 vi.mock('@features/files/model/fileOps', () => ({ fileOpsFor: () => ({ upload: mocks.upload, download: mocks.download }) }));

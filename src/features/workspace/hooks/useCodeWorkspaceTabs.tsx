@@ -3,7 +3,7 @@ import { t } from '@i18n';
 import { fileIcon } from '@features/files';
 import { isDocumentDirty, useEditorDocuments } from '@features/editor/stores/documents';
 import { useSessionStore } from '@features/workspace';
-import type { FolderTab } from '@ui/FolderTabs';
+import type { FolderTab } from '@ui/layout/FolderTabs';
 import { iconSizes } from '@ui/icons';
 import { orderedWorkspaceIds, useWorkspaceNavigation } from '../stores/navigation';
 

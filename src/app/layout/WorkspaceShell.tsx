@@ -1,5 +1,5 @@
 import { useEffect, useState, type CSSProperties } from 'react';
-import { memoLocalized } from '@ui/memoLocalized';
+import { memoLocalized } from '@ui/hooks/memoLocalized';
 import { selectActiveSessionTab, useSessionStore, useDockStore, useUiStore } from '@features/workspace';
 import SettingsScreen from '@features/settings/components/SettingsScreen';
 import { MIN_PANE_SIZE, minTerminalWidth } from '@features/workspace/model/windowLayout';
@@ -11,7 +11,7 @@ import WorkspaceSidebar from '@features/workspace/components/WorkspaceSidebar';
 import PanelTabs from '@features/workspace/components/PanelTabs';
 import { WORKSPACE_GAP, workspaceFrameWidth } from '@features/workspace/stores/dock';
 import { useWorkspaceNavigation, workspaceAreaForKind, workspaceSidebarWidth } from '@features/workspace/stores/navigation';
-import { WorkspaceHeaderProvider, WorkspaceHeaderSlot } from '@ui/WorkspaceHeader';
+import { WorkspaceHeaderProvider, WorkspaceHeaderSlot } from '@ui/layout/WorkspaceHeader';
 import { AiWorkspaceProvider } from '@features/chat/components/AiWorkspaceSurface';
 import PanelSsh from '@features/ssh/components/PanelSsh';
 import PortForwardingPage from '@features/ssh/components/PortForwardingPage';
@@ -25,7 +25,7 @@ import GitWorkspace from '@features/git/components/GitWorkspace';
 import { useGitContext } from '@features/git/hooks/useGitContext';
 import EditorWorkspace from '@features/editor/components/EditorWorkspace';
 import HistoryWorkspaceView from '@features/session-history/components/HistoryWorkspaceView';
-import { ResourceContentProvider } from '@ui/ResourceContent';
+import { ResourceContentProvider } from '@ui/layout/ResourceContent';
 import UnifiedWorkspace from '@features/workspace/components/UnifiedWorkspace';
 
 const StableTerminalView = memoLocalized(TerminalView);

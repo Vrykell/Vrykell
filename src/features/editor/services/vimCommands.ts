@@ -1,7 +1,7 @@
 import { editorFileKey, type EditorFile, type EditorVimCommand } from '@core/editor';
 import { useSessionStore } from '@features/workspace';
 import { orderedWorkspaceIds, useWorkspaceNavigation } from '@features/workspace/stores/navigation';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { t } from '@i18n';
 import { isDocumentDirty, useEditorDocuments } from '../stores/documents';
 import { saveDocument } from './documentActions';

@@ -10,7 +10,7 @@ import {
   AnthropicMark, DeepSeekMark, GeminiMark, GroqMark, MistralMark, MoonshotMark, OllamaMark,
   OpenAIMark, OpenCodeMark, OpenRouterMark, QwenMark, SiliconFlowMark, XaiMark, ZhipuMark,
   HunyuanMark, MinimaxMark, LongCatMark, StepfunMark, MiMoMark, MetaMark,
-} from '@ui/brandMarks';
+} from '@ui/icons/brandMarks';
 import { Cpu, Server, type AppIcon } from '@ui/icons';
 import { providerDefinition } from '@config/providers';
 import { t, type I18nKey } from '@i18n';

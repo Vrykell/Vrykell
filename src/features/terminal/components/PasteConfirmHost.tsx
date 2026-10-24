@@ -1,4 +1,4 @@
-import ConfirmDialog from '@ui/ConfirmDialog';
+import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import { t } from '@i18n';
 import { usePasteConfirm } from '@features/terminal/hooks/usePasteConfirm';
 

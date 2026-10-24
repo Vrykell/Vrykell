@@ -15,7 +15,7 @@ vi.mock('@platform/clipboard', () => ({
 }));
 vi.mock('@platform/pty', () => ({ ptyWrite: ptyWriteMock }));
 vi.mock('@features/terminal/stores/pasteConfirm', () => ({ requestPasteConfirm: requestConfirmMock }));
-vi.mock('@ui/Toast', () => ({
+vi.mock('@ui/feedback/Toast', () => ({
   useToastStore: {
     getState: () => ({
       addToast: (message: string, kind: string) => toasts.push({ message, kind }),

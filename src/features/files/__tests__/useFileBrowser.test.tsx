@@ -1,5 +1,5 @@
 import { useFileUndoSettings } from '@config/fileUndo';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { useFileBrowser } from '@features/files/hooks/useFileBrowser';

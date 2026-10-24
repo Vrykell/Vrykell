@@ -1,5 +1,5 @@
 import { useLayoutEffect, type RefObject } from 'react';
-import { useListReorder } from '../listReorder';
+import { useListReorder } from '@ui/layout/listReorder';
 
 /** Retain the whole active tab and its close control when the strip changes width. */
 export function useActiveTabVisibility(ref: RefObject<HTMLElement | null>, selector: string, revision: string) {

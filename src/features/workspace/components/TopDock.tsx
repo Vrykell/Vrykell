@@ -1,7 +1,7 @@
-import KeyHint from '@ui/KeyHint';
+import KeyHint from '@ui/feedback/KeyHint';
 import { useEffect, useRef, useState } from 'react';
 import { iconSizes, Search, PanelLeft } from '@ui/icons';
-import { IconButton } from '@ui/IconButton';
+import { IconButton } from '@ui/actions/IconButton';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useUiStore, useWorkspaceNavigation } from '@features/workspace';
 import { WORKSPACE_AREA_LABELS } from '../stores/navigation';

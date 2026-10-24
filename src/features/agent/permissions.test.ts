@@ -6,7 +6,7 @@
  * covered by cargo tests in src-tauri/src/agent/permissions.rs.
  */
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import {
   DEFAULT_APPROVAL_TIMEOUT_SECONDS,
   DEFAULT_LEVELS,

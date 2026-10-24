@@ -6,7 +6,7 @@ import { useWorkspaceNavigation, workspaceAreaForKind } from './navigation';
 import { gitComparisonKey, type GitSelection, type GitComparison } from '@core/git';
 import { editorFileKey, interceptEditorClose, type EditorFile } from '@core/editor';
 import type { SshOptions } from '@core/ssh';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { t } from '@i18n';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';

@@ -1,6 +1,6 @@
-import { OutlineButton } from '@ui/OutlineButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import { TERMINAL_FONT_PRESETS, useTypographyStore } from '@config/typography';
-import Select from '@ui/Select';
+import Select from '@ui/fields/Select';
 import { t } from '@i18n';
 import { SettingsGroup, Field, Toggle } from './ui';
 import { useSettingsSave } from './SettingsSaveProvider';

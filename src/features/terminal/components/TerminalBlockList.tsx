@@ -1,5 +1,5 @@
 import CommandSyntax from './CommandSyntax';
-import { IconButton } from '@ui/IconButton';
+import { IconButton } from '@ui/actions/IconButton';
 import { t } from '@i18n';
 import CommandStatus from './CommandStatus';
 import { applyTerminalRenderer } from '../model/xtermRenderer';

@@ -7,9 +7,9 @@ import AutoGroupDialog from '@features/agent/components/AutoGroupDialog';
 import type { GroupingItem } from '@features/agent/services/autoGrouping';
 import CommandComposer from '@features/command-history/components/CommandComposer';
 import type { ExecutionContext } from '@features/command-history/services/execution';
-import ErrorBox from '@ui/ErrorBox';
-import TooltipLayer from '@ui/TooltipLayer';
-import ToolWindow from '@ui/ToolWindow';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import TooltipLayer from '@ui/feedback/TooltipLayer';
+import ToolWindow from '@ui/feedback/ToolWindow';
 
 type Input = { kind: 'grouping'; input: { items: GroupingItem[]; kind: string } }
   | { kind: 'command'; input: { context: ExecutionContext; recent: string[] } };

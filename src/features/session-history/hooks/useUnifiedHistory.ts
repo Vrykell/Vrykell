@@ -6,7 +6,7 @@ import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { useHarnessSessionRefs } from '@features/chat/stores/harnessSessions';
 import { historyGroupKey, useHistoryMetaStore } from '@utils/historyMeta';
 import { safeJsonParse } from '@utils/errorHandler';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { SESSION_DATE_OPTIONS } from '../model/sessionHistoryModel';
 import {
   DEFAULT_UNIFIED_FILTER, HISTORY_TYPES, UNIFIED_GROUP_BY_OPTIONS, UNIFIED_SORT_OPTIONS,

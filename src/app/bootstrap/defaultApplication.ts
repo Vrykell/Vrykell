@@ -7,7 +7,7 @@ import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
 import { useHistoryStore } from '@features/terminal/stores/history';
 import { initForwardedLaunch, restoreWorkspace } from '@features/workspace';
 import { createApplicationBootstrap } from '@app/bootstrap/applicationBootstrap';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { getShellLaunchDirectory } from '@platform/contextMenu';
 import { ptyCloseAll } from '@platform/pty';
 import { t } from '@i18n';

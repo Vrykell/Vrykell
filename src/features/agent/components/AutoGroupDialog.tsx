@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { t } from '@i18n';
-import ToolWindow from '@ui/ToolWindow';
-import { OutlineButton } from '@ui/OutlineButton';
-import { TextButton } from '@ui/TextButton';
-import ErrorBox from '@ui/ErrorBox';
+import ToolWindow from '@ui/feedback/ToolWindow';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import { TextButton } from '@ui/actions/TextButton';
+import ErrorBox from '@ui/feedback/ErrorBox';
 import { GROUPING_LIMIT, suggestGrouping, type GroupingItem, type GroupingProposal } from '../services/autoGrouping';
 
 export default function AutoGroupDialog({ items, kind, onApply, onClose }: {

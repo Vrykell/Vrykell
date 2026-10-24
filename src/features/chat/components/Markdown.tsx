@@ -2,7 +2,7 @@ import ReactMarkdown, { type ExtraProps } from 'react-markdown';
 import type { ComponentPropsWithoutRef } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { t } from '@i18n';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import remarkGfmSafe from '@features/chat/model/remarkGfmSafe';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';

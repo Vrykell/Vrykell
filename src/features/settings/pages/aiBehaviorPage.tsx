@@ -1,13 +1,13 @@
-import { OutlineButton } from '@ui/OutlineButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import { useSettingsNavigationStore } from '../stores/navigation';
 import { t } from '@i18n';
-import KeyHint from '@ui/KeyHint';
+import KeyHint from '@ui/feedback/KeyHint';
 /**
  * Global behavior defaults and per-model overrides.
  */
 import { useState } from 'react';
 import { useAiConfigStore, useAgentSettings, type AgentSettings, type ModelBehaviorSettings } from '@features/agent';
-import Select from '@ui/Select';
+import Select from '@ui/fields/Select';
 import { ModelScopeBar } from '@features/chat/components/ModelPicker';
 import { SettingsGroup, Field, Toggle, NumberInput, inputStyle } from '@features/settings/components/ui';
 import AutoSaveInput from '../components/AutoSaveInput';

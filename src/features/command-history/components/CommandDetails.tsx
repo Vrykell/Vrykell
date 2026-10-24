@@ -1,12 +1,12 @@
 import { t } from '@i18n';
-import CopyButton from '@ui/CopyButton';
-import { OutlineButton } from '@ui/OutlineButton';
-import { IconBtn } from '@ui/UiBtn';
+import CopyButton from '@ui/actions/CopyButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import { IconBtn } from '@ui/actions/UiBtn';
 import { ChevronRight, Play, X } from '@ui/icons';
-import { TextButton } from '@ui/TextButton';
+import { TextButton } from '@ui/actions/TextButton';
 import type { CommandItem } from '../model/commands';
 import { useRef, useState } from 'react';
-import ResizeHandle from '@ui/ResizeHandle';
+import ResizeHandle from '@ui/layout/ResizeHandle';
 import { safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 
 const HEIGHT_KEY = 'command-history-detail-height';

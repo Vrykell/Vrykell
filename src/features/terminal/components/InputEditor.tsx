@@ -1,8 +1,8 @@
 import { t } from '@i18n';
-import { TextArea } from '@ui/TextInput';
-import KeyHint from '@ui/KeyHint';
-import { IconButton } from '@ui/IconButton';
-import { TextButton } from '@ui/TextButton';
+import { TextArea } from '@ui/fields/TextInput';
+import KeyHint from '@ui/feedback/KeyHint';
+import { IconButton } from '@ui/actions/IconButton';
+import { TextButton } from '@ui/actions/TextButton';
 /** Pane-scoped composer with separate input and context-chip rows. */
 
 import { iconSizes,

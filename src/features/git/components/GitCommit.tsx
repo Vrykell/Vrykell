@@ -3,13 +3,13 @@ import type { GitOperation, GitSnapshot, GitTarget } from '@core/git';
 import { useGitOperations, gitTargetKey } from '../index';
 import { preferredGitRemote, runGitOperation } from '../services/operations';
 import { generateCommitMessage } from '../services/commitMessage';
-import { TextArea } from '@ui/TextInput';
-import { IconButton } from '@ui/IconButton';
-import { useReloadFeedback } from '@ui/useReloadFeedback';
+import { TextArea } from '@ui/fields/TextInput';
+import { IconButton } from '@ui/actions/IconButton';
+import { useReloadFeedback } from '@ui/hooks/useReloadFeedback';
 import { Check, ChevronDown, Sparkles, RefreshCw, Upload, iconSizes } from '@ui/icons';
 import { primaryGitAction } from '../model/primaryAction';
-import ErrorBox from '@ui/ErrorBox';
-import ContextMenu, { type MenuAnchor } from '@ui/ContextMenu';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import ContextMenu, { type MenuAnchor } from '@ui/menus/ContextMenu';
 import { t } from '@i18n';
 
 export default function GitCommit({ target, snapshot, refresh }: { target: GitTarget; snapshot: GitSnapshot; refresh: () => void }) {

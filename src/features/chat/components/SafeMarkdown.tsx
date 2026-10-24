@@ -1,6 +1,6 @@
 import { Component } from 'react';
 import Markdown from '@features/chat/components/Markdown';
-import ErrorDetails from '@ui/ErrorDetails';
+import ErrorDetails from '@ui/feedback/ErrorDetails';
 
 /**
  * 单条消息的 Markdown 渲染保护。

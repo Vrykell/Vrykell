@@ -1,8 +1,8 @@
 import { iconSizes } from '@ui/icons';
 import { useT } from '@i18n';
 import { NAVIGATION_DEFS, type DockSide } from '@features/workspace';
-import { ToolbarBtn } from '@ui/UiBtn';
-import SidebarItem from '@ui/sidebarItem';
+import { ToolbarBtn } from '@ui/actions/UiBtn';
+import SidebarItem from '@ui/layout/sidebarItem';
 import type { PointerEvent } from 'react';
 import { isMacOS } from '@platform/runtime';
 import AiSessionIcon from '@features/chat/components/AiSessionIcon';

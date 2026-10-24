@@ -1,10 +1,10 @@
 import { useFileUndoSettings } from '@config/fileUndo';
 import { useFileDirectoryShortcuts } from '../hooks/useFileDirectoryShortcuts';
-import { TextInput } from '@ui/TextInput';
+import { TextInput } from '@ui/fields/TextInput';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ChevronRight, Search, MoreHorizontal, iconSizes } from '@ui/icons';
-import { IconBtn } from '@ui/UiBtn';
+import { IconBtn } from '@ui/actions/UiBtn';
 import type { DiskEntry, FsEntry, FileStat } from '@platform/api/types';
 import { flattenVisible, type VisibleRow } from '@features/files/utils/fileTree';
 import { fileIcon } from '@features/files/utils/fileIcon';
@@ -19,10 +19,10 @@ import { useFileDragStore } from '@features/files';
 import FileDragPreview from '@features/files/components/FileDragPreview';
 import FilePropertiesDialog from '@features/files/components/FilePropertiesDialog';
 import FileSearchMenu from './FileSearchMenu';
-import ContextMenu from '@ui/ContextMenu';
-import ConfirmDialog from '@ui/ConfirmDialog';
-import ErrorBox from '@ui/ErrorBox';
-import { useToastStore } from '@ui/Toast';
+import ContextMenu from '@ui/menus/ContextMenu';
+import ConfirmDialog from '@ui/feedback/ConfirmDialog';
+import ErrorBox from '@ui/feedback/ErrorBox';
+import { useToastStore } from '@ui/feedback/Toast';
 import { downloadsDiscard } from '@features/files/services/downloads';
 import { t } from '@i18n';
 

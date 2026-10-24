@@ -1,5 +1,5 @@
-import { OutlineButton } from '@ui/OutlineButton';
-import { TextInput } from '@ui/TextInput';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import { TextInput } from '@ui/fields/TextInput';
 /**
  * ModelPicker — 页面化模型选择窗口。
  *
@@ -20,8 +20,8 @@ import {
   type ModelCapability,
 } from '@features/agent/model/capabilities';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
-import { useToastStore } from '@ui/Toast';
-import Select from '@ui/Select';
+import { useToastStore } from '@ui/feedback/Toast';
+import Select from '@ui/fields/Select';
 
 const CAP_ORDER: ModelCapability[] = ['vision', 'reasoning', 'tools', 'search'];
 

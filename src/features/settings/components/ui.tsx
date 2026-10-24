@@ -1,9 +1,9 @@
-import { OutlineButton } from '@ui/OutlineButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import { t, localizeLabel } from '@i18n';
-import { IconButton } from '@ui/IconButton';
+import { IconButton } from '@ui/actions/IconButton';
 import { useSettingsNavigationStore } from '../stores/navigation';
-import { TextInput } from '@ui/TextInput';
-import ToggleControl from '@ui/Toggle';
+import { TextInput } from '@ui/fields/TextInput';
+import ToggleControl from '@ui/fields/Toggle';
 /**
  * Shared settings fields, controls and form styles.
  */

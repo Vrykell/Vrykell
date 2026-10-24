@@ -1,5 +1,5 @@
 import type { GitOperation, GitSnapshot, GitTarget } from '@core/git';
-import type { ContextMenuItem } from '@ui/ContextMenu';
+import type { ContextMenuItem } from '@ui/menus/ContextMenu';
 import { groupChanges } from '../model/changes';
 import { preferredGitRemote, runGitOperation } from './operations';
 import { t } from '@i18n';

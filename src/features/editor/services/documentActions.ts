@@ -2,7 +2,7 @@ import { editorFileKey, type EditorFile } from '@core/editor';
 import { t } from '@i18n';
 import { pickPath } from '@platform/api/fs';
 import { useSessionStore } from '@features/workspace';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { useEditorDocuments } from '../stores/documents';
 const pendingDestinations = new Set<string>();
 

@@ -1,13 +1,13 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react';
 import { t } from '@i18n';
-import { TextButton } from '@ui/TextButton';
-import { TextInput } from '@ui/TextInput';
-import { IconBtn } from '@ui/UiBtn';
+import { TextButton } from '@ui/actions/TextButton';
+import { TextInput } from '@ui/fields/TextInput';
+import { IconBtn } from '@ui/actions/UiBtn';
 import { ChevronRight, Ellipsis } from '@ui/icons';
-import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
-import HistoryColorPalette, { HistoryColorChoices } from '@ui/HistoryColorPalette';
-import { historyGroupColor, isHistoryGroupColor, type HistoryGroupColor } from '@ui/historyGroupColor';
-import { ListReorderPlaceholder, ListReorderZonePlaceholder, useListReorder } from '@ui/listReorder';
+import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/menus/ContextMenu';
+import HistoryColorPalette, { HistoryColorChoices } from '@ui/history/HistoryColorPalette';
+import { historyGroupColor, isHistoryGroupColor, type HistoryGroupColor } from '@ui/history/historyGroupColor';
+import { ListReorderPlaceholder, ListReorderZonePlaceholder, useListReorder } from '@ui/layout/listReorder';
 import type { PointerEvent } from 'react';
 
 /** Compact command groups reuse the shared color palette and action menus. */

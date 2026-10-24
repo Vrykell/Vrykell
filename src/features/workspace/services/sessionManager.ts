@@ -26,7 +26,7 @@ import {
   getSessionBlocks,
   listChatMessages,
 } from '@platform/api/session';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import type { BackendBlockEntry, BackendSessionEntry } from '@platform/api/types';
 

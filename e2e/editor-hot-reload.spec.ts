@@ -41,7 +41,7 @@ test('localization hot updates retain editor registrations, buffers and modal bi
       document.documentElement.dataset.editorHotUpdated = 'true';
     });
   });
-  server.watcher.emit('change', resolve('src/ui/code/localize.ts'));
+  server.watcher.emit('change', resolve('src/ui/editor/code/localize.ts'));
   await expect(page.locator('html')).toHaveAttribute('data-editor-hot-updated', 'true', { timeout: 20_000 });
   await expect(editor.getByRole('alert')).toHaveCount(0);
   await expect(editor.locator('.view-lines')).toContainText('Keep this unsaved note');

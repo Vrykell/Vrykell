@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MoveDragLayer, PlacementOverlay } from '../components/TerminalPlacementOverlay';
-import { useToastStore } from '@ui/Toast';
+import { useToastStore } from '@ui/feedback/Toast';
 import { useDockDragStore } from '@features/workspace';
 import { leaf, type DropTarget, type TerminalSpec, type WindowLayout } from '@features/workspace/model/windowLayout';
 
