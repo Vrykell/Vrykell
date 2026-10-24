@@ -122,8 +122,12 @@ export function summarize(records: UsageRecord[]): UsageTotals {
 }
 
 /** Per-model split, heaviest first; ties keep a stable name order. */
-export function modelBreakdown(records: UsageRecord[]): ModelUsageRow[] {
+export function modelBreakdown(records: UsageRecord[], configured: Pick<UsageRecord, 'provider' | 'model'>[] = []): ModelUsageRow[] {
   const rows = new Map<string, ModelUsageRow>();
+  for (const profile of configured) {
+    const key = `${profile.provider}:${profile.model}`;
+    rows.set(key, { key, provider: profile.provider, model: profile.model, turns: 0, inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, totalTokens: 0 });
+  }
   for (const record of records) {
     const key = `${record.provider}:${record.model}`;
     const row = rows.get(key) ?? {
@@ -234,8 +238,9 @@ export interface ProviderUsageRow {
 }
 
 /** Per-provider split, heaviest first; ties keep a stable name order. */
-export function providerBreakdown(records: UsageRecord[]): ProviderUsageRow[] {
+export function providerBreakdown(records: UsageRecord[], configured: string[] = []): ProviderUsageRow[] {
   const rows = new Map<string, ProviderUsageRow>();
+  for (const provider of configured) rows.set(provider, { provider, turns: 0, inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, totalTokens: 0, steps: 0, toolCalls: 0 });
   for (const record of records) {
     const row = rows.get(record.provider) ?? {
       provider: record.provider,

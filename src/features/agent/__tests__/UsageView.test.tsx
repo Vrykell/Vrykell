@@ -1,13 +1,24 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useToastStore } from '@ui/Toast';
 import UsageView from '../components/UsageView';
 import { useUsageStore } from '../stores/usage';
+import { useAiConfigStore } from '../stores/aiConfig';
+import { useUsageSources } from '../stores/usageSources';
+import type { HarnessConfig } from '@platform/api/acp';
+
+const { acpHarnesses } = vi.hoisted(() => ({ acpHarnesses: vi.fn<() => Promise<HarnessConfig[]>>() }));
+vi.mock('@platform/api/acp', async importOriginal => ({
+  ...await importOriginal<typeof import('@platform/api/acp')>(), acpHarnesses,
+}));
 
 const DAY = 24 * 60 * 60 * 1000;
 
 beforeEach(() => {
   useUsageStore.setState({ records: [], acp: {} });
+  useAiConfigStore.setState({ models: [] });
+  useUsageSources.getState().replace([]);
+  acpHarnesses.mockReset().mockResolvedValue([]);
   useToastStore.setState({ toasts: [], timers: {} });
 });
 
@@ -21,6 +32,80 @@ function seedSonnetTurn(at = Date.now()) {
 }
 
 describe('UsageView', () => {
+  it('shows configured sources before use without persisting placeholder reports', async () => {
+    acpHarnesses.mockResolvedValue([
+      { name: 'Unused agent', enabled: true, command: 'agent', args: [], env: {}, cwd: '' },
+      { name: 'Disabled agent', enabled: false, command: 'agent', args: [], env: {}, cwd: '' },
+    ]);
+    render(<UsageView />);
+    expect(screen.getByTestId('usage-model-all')).toBeInTheDocument();
+    await waitFor(() => expect(useUsageSources.getState().configured).toContain('Disabled agent'));
+    expect(screen.queryByTestId('usage-source-Unused agent')).toBeNull();
+    fireEvent.click(screen.getByTestId('usage-tab-acp'));
+    expect(screen.getAllByText('尚未上报用量')).toHaveLength(2);
+    expect(screen.getByTestId('usage-clear')).toBeDisabled();
+    expect(useUsageStore.getState()).toMatchObject({ records: [], acp: {} });
+
+    fireEvent.click(screen.getByTestId('usage-range'));
+    fireEvent.click(screen.getByRole('option', { name: '全部时间' }));
+    expect(screen.getAllByTestId('usage-acp-row')).toHaveLength(2);
+    expect(screen.queryByText(/1970/)).toBeNull();
+  });
+
+  it('keeps unused native model configurations visible in breakdowns and filters', async () => {
+    useAiConfigStore.setState({ models: [
+      { id: 'unused', name: 'Unused model', provider: 'anthropic', baseUrl: '', model: 'claude-sonnet-4' },
+      { id: 'other', name: 'Other model', provider: 'openai-compatible', baseUrl: '', model: 'local-model' },
+    ] });
+    render(<UsageView />);
+    fireEvent.click(screen.getByTestId('usage-tab-models'));
+    expect(screen.getAllByTestId('usage-model-row')).toHaveLength(2);
+    for (const row of screen.getAllByTestId('usage-model-row')) expect(within(row).getAllByRole('cell')[2]).toHaveTextContent('0');
+    fireEvent.click(screen.getByTestId('usage-filter-provider'));
+    fireEvent.click(screen.getByRole('option', { name: 'anthropic' }));
+    expect(screen.getByTestId('usage-model-row')).toHaveAttribute('data-model', 'claude-sonnet-4');
+    fireEvent.click(screen.getByTestId('usage-tab-providers'));
+    expect(screen.getByTestId('usage-provider-row')).toHaveAttribute('data-provider', 'anthropic');
+    expect(screen.getByTestId('usage-total-tokens')).toHaveTextContent('0');
+    await act(async () => {});
+  });
+
+  it('updates configured sources after saving and retains them after clearing usage', async () => {
+    render(<UsageView />);
+    await waitFor(() => expect(acpHarnesses).toHaveBeenCalledOnce());
+    await act(async () => {});
+    act(() => {
+      useUsageSources.getState().replace(['New agent']);
+      useUsageStore.getState().acpTurn('New agent');
+    });
+    fireEvent.click(screen.getByTestId('usage-tab-acp'));
+    expect(screen.getByTestId('usage-acp-row')).toHaveTextContent('New agent');
+    fireEvent.click(screen.getByTestId('usage-clear'));
+    expect(screen.getByTestId('usage-acp-row')).toHaveTextContent('尚未上报用量');
+    expect(screen.getByTestId('usage-clear')).toBeDisabled();
+  });
+
+  it('shows source loading failures inline without hiding saved usage and supports retry', async () => {
+    seedSonnetTurn();
+    acpHarnesses.mockRejectedValueOnce(new Error('Offline')).mockResolvedValueOnce([]);
+    render(<UsageView />);
+    await screen.findByText('无法加载用量来源');
+    expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('1');
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    await waitFor(() => expect(screen.queryByText('无法加载用量来源')).toBeNull());
+  });
+
+  it('restores usage when another window changes persisted storage', () => {
+    render(<UsageView />);
+    localStorage.setItem('vrykell-usage', JSON.stringify({ version: 3, state: {
+      records: [{ id: 'external', source: 'vrykell', provider: 'anthropic', model: 'claude-sonnet-4', at: Date.now(), inputTokens: 10, outputTokens: 5, cachedInputTokens: 0, reasoningTokens: 0, steps: 1, toolCalls: 0 }],
+      acp: {},
+    } }));
+    fireEvent(window, new StorageEvent('storage', { key: 'vrykell-usage' }));
+    expect(screen.getByTestId('usage-total-tokens')).toHaveTextContent('15');
+    expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('1');
+  });
+
   it('shows zeroed metrics and an empty log before the first turn', () => {
     render(<UsageView />);
     expect(screen.getByTestId('usage-page')).toBeInTheDocument();
@@ -208,7 +293,7 @@ describe('UsageView', () => {
     expect(screen.getByTestId('usage-refreshed-at')).toHaveTextContent('刷新于');
   });
 
-  it('groups records by source and narrows to one harness from the chip bar', () => {
+  it('filters models across reporting sources from the left chip bar', () => {
     seedSonnetTurn();
     // 未来的 ACP harness（这里用 opencode 代指）报上来的一轮
     useUsageStore.getState().recordTurn({
@@ -216,23 +301,21 @@ describe('UsageView', () => {
     });
     render(<UsageView />);
 
-    expect(screen.getByTestId('usage-source-all')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByTestId('usage-source-vrykell')).toHaveAttribute('aria-label', 'Vrykell');
-    expect(screen.getByTestId('usage-source-vrykell')).toHaveAttribute('aria-pressed', 'false');
-    // 本机来源用应用图标，而不是通用 glyph
-    expect(screen.getByTestId('usage-source-vrykell').querySelector('img')).toHaveAttribute('src', '/app-icon.svg');
+    expect(screen.getByTestId('usage-model-all')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByTestId('usage-filter-model')).toBeNull();
     expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('2');
 
-    fireEvent.click(screen.getByTestId('usage-source-opencode'));
-    expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('1');
-    expect(screen.getByTestId('usage-total-tokens')).toHaveTextContent('110');
+    fireEvent.click(screen.getByTestId('usage-model-claude-sonnet-4'));
+    expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('2');
+    expect(screen.getByTestId('usage-total-tokens')).toHaveTextContent('1610');
 
     // 再点一次回到全部来源
-    fireEvent.click(screen.getByTestId('usage-source-opencode'));
+    fireEvent.click(screen.getByTestId('usage-model-claude-sonnet-4'));
     expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('2');
+    expect(screen.getByTestId('usage-model-all')).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('shows only what an ACP server reports while it is the selected source', () => {
+  it('keeps agent session totals in the details tab without replacing model usage', () => {
     seedSonnetTurn();
     const usage = useUsageStore.getState();
     usage.acpUsage('Claude Code', { used: 12_000, size: 200_000, cost: 0.0042, currency: 'USD' });
@@ -240,25 +323,17 @@ describe('UsageView', () => {
     usage.acpToolCall('Claude Code');
     render(<UsageView />);
 
-    fireEvent.click(screen.getByTestId('usage-source-Claude Code'));
-
-    // 只显示协议真正带回来的数字：轮数、工具调用、上下文占用与累计费用
-    expect(screen.getByTestId('usage-acp-turns')).toHaveTextContent('1');
-    expect(screen.getByTestId('usage-acp-tool-calls')).toHaveTextContent('1');
-    expect(screen.getByTestId('usage-acp-context')).toHaveTextContent('1.2万/20万');
-    expect(screen.getByTestId('usage-acp-cost')).toHaveTextContent('0.0042');
-    // token 卡片、趋势图、token 表格与只作用于 token 记录的筛选器整块不出现
-    expect(screen.queryByTestId('usage-metrics')).toBeNull();
-    expect(screen.queryByTestId('usage-trend-chart')).toBeNull();
-    expect(screen.queryByTestId('usage-tab-logs')).toBeNull();
-    expect(screen.queryByTestId('usage-filter-provider')).toBeNull();
-    expect(screen.queryByTestId('usage-range')).toBeNull();
-    expect(screen.queryByTestId('usage-record-count')).toBeNull();
-    // 有 ACP 数据时清空按钮可用（清空同样会清掉 ACP 记录）
+    fireEvent.click(screen.getByTestId('usage-tab-acp'));
+    expect(screen.getByTestId('usage-acp-row')).toHaveTextContent('1.2万/20万');
+    expect(screen.getByTestId('usage-acp-row')).toHaveTextContent('0.0042 USD');
+    expect(screen.getByTestId('usage-metrics')).toBeInTheDocument();
+    expect(screen.getByTestId('usage-trend-chart')).toBeInTheDocument();
+    expect(screen.getByTestId('usage-filter-provider')).toBeInTheDocument();
+    expect(screen.getByTestId('usage-range')).toBeInTheDocument();
     expect(screen.getByTestId('usage-clear')).toBeEnabled();
 
     // 回到全部来源，token 视图恢复
-    fireEvent.click(screen.getByTestId('usage-source-all'));
+    fireEvent.click(screen.getByTestId('usage-model-all'));
     expect(screen.getByTestId('usage-metrics')).toBeInTheDocument();
     expect(screen.getByTestId('usage-record-count')).toBeInTheDocument();
   });
@@ -285,16 +360,16 @@ describe('UsageView', () => {
     expect(cells[4]).toHaveTextContent('0.0042 USD');
   });
 
-  it('falls back to all sources when the selected one disappears', () => {
-    useUsageStore.getState().acpTurn('Claude Code');
+  it('falls back to all models when the selected model has no configuration or retained record', () => {
+    seedSonnetTurn();
     render(<UsageView />);
 
-    fireEvent.click(screen.getByTestId('usage-source-Claude Code'));
-    expect(screen.getByTestId('usage-acp-turns')).toHaveTextContent('1');
+    fireEvent.click(screen.getByTestId('usage-model-claude-sonnet-4'));
+    expect(screen.getByTestId('usage-model-claude-sonnet-4')).toHaveAttribute('aria-pressed', 'true');
 
     // Clearing removes the server's record, so the selected source no longer exists.
     fireEvent.click(screen.getByTestId('usage-clear'));
-    expect(screen.getByTestId('usage-source-all')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByTestId('usage-model-all')).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByTestId('usage-metrics')).toBeInTheDocument();
   });
 

@@ -13,9 +13,13 @@ import {
   recordsInRange,
   summarize,
   tokensSeries,
+  DEFAULT_USAGE_SOURCE,
+  type AcpUsageRecord,
   type UsageRange,
 } from '@features/agent/model/usageStats';
 import { useUsageStore } from '@features/agent/stores/usage';
+import { useAiConfigStore } from '../stores/aiConfig';
+import { useUsageSources } from '../stores/usageSources';
 
 /** Filter value meaning "everything". */
 export const ALL_FILTER = '';
@@ -23,6 +27,9 @@ export const ALL_FILTER = '';
 export function useUsageStats() {
   const records = useUsageStore((state) => state.records);
   const acp = useUsageStore((state) => state.acp);
+  const configured = useUsageSources(state => state.configured);
+  const sourcesError = useUsageSources(state => state.error);
+  const models = useAiConfigStore(state => state.models);
   const [range, setRange] = useState<UsageRange>('today');
   const [source, setSource] = useState<string>(ALL_FILTER);
   const [provider, setProvider] = useState<string>(ALL_FILTER);
@@ -40,24 +47,32 @@ export function useUsageStats() {
     [inRange, source, provider, model],
   );
   const totals = useMemo(() => summarize(filtered), [filtered]);
-  // Options come from the range, so a filter never offers a choice with no rows behind it; ACP
-  // servers count as sources too, even though their usage is reported per session.
+  useEffect(() => {
+    void useUsageSources.getState().refresh();
+    const storage = (event: StorageEvent) => {
+      if (event.key === 'vrykell-usage' || event.key === null) void useUsageStore.persist.rehydrate();
+    };
+    const focus = () => { void useUsageSources.getState().refresh(); };
+    window.addEventListener('storage', storage);
+    window.addEventListener('focus', focus);
+    return () => { window.removeEventListener('storage', storage); window.removeEventListener('focus', focus); };
+  }, []);
+
+  // Configured sources remain selectable even before their first report or outside the range.
   const sourceOptions = useMemo(
-    () => [...new Set([...inRange.map((record) => record.source), ...Object.keys(acp)])]
-      .sort((a, b) => a.localeCompare(b)),
-    [inRange, acp],
+    () => [DEFAULT_USAGE_SOURCE, ...[...new Set([...configured, ...records.map(record => record.source), ...Object.keys(acp)])]
+      .filter(name => name !== DEFAULT_USAGE_SOURCE).sort((first, second) => first.localeCompare(second))],
+    [configured, records, acp],
   );
   const providerOptions = useMemo(
-    () => [...new Set(inRange.map((record) => record.provider))].sort((a, b) => a.localeCompare(b)),
-    [inRange],
+    () => [...new Set([...models.map(profile => profile.provider), ...records.map(record => record.provider)])].sort((first, second) => first.localeCompare(second)),
+    [models, records],
   );
   const modelOptions = useMemo(
-    () => [...new Set(inRange.map((record) => record.model))].sort((a, b) => a.localeCompare(b)),
-    [inRange],
+    () => [...new Set([...models.map(profile => profile.model).filter(Boolean), ...records.map(record => record.model)])].sort((first, second) => first.localeCompare(second)),
+    [models, records],
   );
-  // A filter whose value no longer exists — every record cleared, or the range moved past it — would
-  // otherwise leave the page showing nothing with no visible way back. Falling back to "all" keeps
-  // the control and the view in step.
+  // Removed configurations without retained reports fall back to the full source list.
   useEffect(() => {
     if (source && !sourceOptions.includes(source)) setSource(ALL_FILTER);
   }, [source, sourceOptions]);
@@ -67,14 +82,18 @@ export function useUsageStats() {
   useEffect(() => {
     if (model && !modelOptions.includes(model)) setModel(ALL_FILTER);
   }, [model, modelOptions]);
-  const providerRows = useMemo(() => providerBreakdown(filtered), [filtered]);
-  const modelRows = useMemo(() => modelBreakdown(filtered), [filtered]);
+  const visibleProfiles = useMemo(() => source && source !== DEFAULT_USAGE_SOURCE ? []
+    : models.filter(profile => profile.model && (!provider || profile.provider === provider) && (!model || profile.model === model)), [models, source, provider, model]);
+  const providerRows = useMemo(() => providerBreakdown(filtered, visibleProfiles.map(profile => profile.provider)), [filtered, visibleProfiles]);
+  const modelRows = useMemo(() => modelBreakdown(filtered, visibleProfiles), [filtered, visibleProfiles]);
   /** Request log: newest first. */
   const logRows = useMemo(() => [...filtered].reverse(), [filtered]);
   /** ACP servers, most recently active first; the source filter narrows them like the records. */
   const acpRows = useMemo(
-    () => Object.values(acp).filter((row) => !source || row.source === source).sort((a, b) => b.at - a.at),
-    [acp, source],
+    () => [...new Set([...configured, ...Object.keys(acp)])].filter(name => !source || name === source)
+      .map((name): AcpUsageRecord => acp[name] ?? { source: name, at: 0, turns: 0, toolCalls: 0, contextUsed: 0, contextSize: 0, cost: null, currency: '' })
+      .sort((first, second) => second.at - first.at || first.source.localeCompare(second.source)),
+    [configured, acp, source],
   );
   const series = useMemo(() => tokensSeries(filtered, range, Date.now()), [filtered, range, revision]);
   /** Whether any ACP server has reported at all — the clear button clears those too. */
@@ -84,9 +103,9 @@ export function useUsageStats() {
     [records],
   );
   const clear = useCallback(() => useUsageStore.getState().clear(), []);
-  /** Re-read what the store persisted and re-derive the view; cheap and side-effect free. */
-  const refresh = useCallback(() => {
-    void useUsageStore.persist.rehydrate();
+  /** Re-read saved usage and configured sources before deriving a fresh view. */
+  const refresh = useCallback(async () => {
+    await Promise.all([useUsageStore.persist.rehydrate(), useUsageSources.getState().refresh()]);
     setRevision((value) => value + 1);
     setRefreshedAt(Date.now());
   }, []);
@@ -94,7 +113,7 @@ export function useUsageStats() {
   return {
     records, range, setRange, source, setSource, provider, setProvider, model, setModel,
     sourceOptions, providerOptions, modelOptions, totals, providerRows, modelRows, logRows, series, latestAt,
-    acpRows, hasAcp,
+    acpRows, hasAcp, sourcesError,
     clear, refresh, refreshedAt,
   };
 }

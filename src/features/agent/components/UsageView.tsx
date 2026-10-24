@@ -1,7 +1,7 @@
 /**
  * UsageView — the usage statistics workspace page.
  *
- * Follows the reference dashboard's shape: page header, a filter row (provider / model / range),
+ * Follows the reference dashboard's shape: model chips, provider and range filters,
  * the metric cards, the trend chart, then the request log / providers / models tables. Counts are
  * tokens and requests only, never money, and every number comes from the provider's own usage
  * report (see `agentStream`); auxiliary calls are not counted yet.
@@ -11,13 +11,14 @@ import { t, type I18nKey } from '@i18n';
 import { useToastStore } from '@ui/Toast';
 import { IconButton } from '@ui/IconButton';
 import Select from '@ui/Select';
+import ErrorBox from '@ui/ErrorBox';
+import { OutlineButton } from '@ui/OutlineButton';
 import { DataUsage, RefreshCw, Trash2, iconSizes } from '@ui/icons';
 import { formatLogTime, type UsageRange } from '@features/agent/model/usageStats';
 import { ALL_FILTER, useUsageStats } from '@features/agent/hooks/useUsageStats';
 import MetricsRow from './usage/MetricsRow';
 import AcpSessionsTable from './usage/AcpSessionsTable';
-import AcpUsageView from './usage/AcpUsageView';
-import SourceFilter from './usage/SourceFilter';
+import ModelFilter from './usage/ModelFilter';
 import TrendChart from './usage/TrendChart';
 import RequestLogTable from './usage/RequestLogTable';
 import { ModelStatsTable, ProviderStatsTable } from './usage/StatsTables';
@@ -59,10 +60,6 @@ export default function UsageView() {
   const [tab, setTab] = useState<UsageTab>('logs');
   const [spinning, setSpinning] = useState(false);
   const rangeLabel = t(RANGE_OPTIONS.find((option) => option.value === stats.range)!.label);
-  // One ACP server as the source: it reports sessions, not tokens, so the page drops the token
-  // cards, the trend and the token tables instead of showing them all at zero.
-  const acpRow = stats.source === ALL_FILTER ? undefined : stats.acpRows.find((row) => row.source === stats.source);
-  const acpOnly = acpRow !== undefined;
 
   const clearUsage = () => {
     stats.clear();
@@ -84,16 +81,13 @@ export default function UsageView() {
       <header style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
         <DataUsage size={iconSizes.row} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
         <strong data-tip={t('Usage statistics')}
-          data-tip-description={acpOnly
-            ? t('What the selected ACP server reported about its sessions.')
-            : t('Requests and token usage the provider reported on this machine.')}
+          data-tip-description={t('Requests and token usage the provider reported on this machine.')}
           style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-subtitle)', fontWeight: 'var(--fw-semibold)' }}>
           {t('Usage statistics')}
         </strong>
         <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
-          {/* The record count and the latest time describe the token log, which this view does not show. */}
-          {!acpOnly && <span data-testid="usage-record-count">{t('{{count}} records', { count: stats.records.length })}</span>}
-          {!acpOnly && stats.latestAt > 0 && <span>· {t('Latest {{time}}', { time: formatLogTime(stats.latestAt) })}</span>}
+          <span data-testid="usage-record-count">{t('{{count}} records', { count: stats.records.length })}</span>
+          {stats.latestAt > 0 && <span>· {t('Latest {{time}}', { time: formatLogTime(stats.latestAt) })}</span>}
           {stats.refreshedAt > 0 && (
             <span data-testid="usage-refreshed-at">· {t('Refreshed at {{time}}', { time: formatLogTime(stats.refreshedAt) })}</span>
           )}
@@ -109,29 +103,21 @@ export default function UsageView() {
         </span>
       </header>
 
+      {stats.sourcesError && <ErrorBox title={t('Could not load usage sources')} details={stats.sourcesError}
+        actions={<OutlineButton onClick={() => void stats.refresh()}>{t('Retry')}</OutlineButton>} />}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <SourceFilter value={stats.source} options={stats.sourceOptions} onChange={stats.setSource} />
-        {/* Provider, model and range narrow the token records; an ACP server reports cumulative
-            session totals, so none of the three applies while it is the selected source. */}
-        {!acpOnly && (
+        <ModelFilter value={stats.model} options={stats.modelOptions} onChange={stats.setModel} />
           <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             <FilterSelect label={t('Provider')} testId="usage-filter-provider" width={132}
               value={stats.provider} tip={stats.provider || t('All')}
               options={[{ value: ALL_FILTER, label: t('All') }, ...stats.providerOptions.map((option) => ({ value: option, label: option }))]}
               onChange={stats.setProvider} />
-            <FilterSelect label={t('Model')} testId="usage-filter-model" width={140}
-              value={stats.model} tip={stats.model || t('All')}
-              options={[{ value: ALL_FILTER, label: t('All') }, ...stats.modelOptions.map((option) => ({ value: option, label: option }))]}
-              onChange={stats.setModel} />
             <FilterSelect label={t('Usage range')} testId="usage-range" width={104} value={stats.range}
               options={RANGE_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))}
               onChange={(next) => stats.setRange(next as UsageRange)} />
           </span>
-        )}
       </div>
 
-      {acpRow ? <AcpUsageView row={acpRow} /> : (
-        <>
           <MetricsRow totals={stats.totals} />
 
           <TrendChart buckets={stats.series.buckets} unit={stats.series.unit} rangeLabel={rangeLabel} />
@@ -158,8 +144,6 @@ export default function UsageView() {
             {tab === 'models' && <ModelStatsTable rows={stats.modelRows} />}
             {tab === 'acp' && <AcpSessionsTable rows={stats.acpRows} />}
           </section>
-        </>
-      )}
     </div>
   );
 }

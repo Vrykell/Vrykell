@@ -91,6 +91,14 @@ describe('summarize', () => {
 });
 
 describe('modelBreakdown', () => {
+  it('includes unused configured models without duplicate or invented usage', () => {
+    const configured = [{ provider: 'anthropic', model: 'claude-sonnet-4' }, { provider: 'local', model: 'unused' }];
+    const rows = modelBreakdown([record()], [...configured, ...configured]);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ model: 'claude-sonnet-4', turns: 1, totalTokens: 120 });
+    expect(rows[1]).toMatchObject({ model: 'unused', turns: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0 });
+  });
+
   it('groups per provider and model, heaviest first', () => {
     const rows = modelBreakdown([
       record({ provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 100, outputTokens: 10, cachedInputTokens: 60 }),
@@ -152,6 +160,13 @@ describe('derived metrics', () => {
 });
 
 describe('providerBreakdown', () => {
+  it('includes unused configured providers without duplicate or invented usage', () => {
+    const rows = providerBreakdown([record()], ['anthropic', 'local', 'local']);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ provider: 'anthropic', turns: 1, totalTokens: 120 });
+    expect(rows[1]).toMatchObject({ provider: 'local', turns: 0, totalTokens: 0, steps: 0, toolCalls: 0 });
+  });
+
   it('groups per provider, heaviest first, with steps and tool calls', () => {
     const rows = providerBreakdown([
       record({ provider: 'anthropic', inputTokens: 100, outputTokens: 10, cachedInputTokens: 40, steps: 2, toolCalls: 1 }),

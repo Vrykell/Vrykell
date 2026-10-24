@@ -60,8 +60,8 @@ export default function AcpSessionsTable({ rows }: { rows: AcpUsageRecord[] }) {
                 <td style={usageTable.td} title={row.cost !== null ? `${row.cost.toFixed(4)} ${row.currency}`.trim() : undefined}>
                   {row.cost !== null ? `${row.cost.toFixed(4)}${row.currency ? ` ${row.currency}` : ''}` : '—'}
                 </td>
-                <td style={{ ...usageTable.td, ...usageTable.mono }} title={formatLogFullTime(row.at)}>
-                  {formatLogTime(row.at)}
+                <td style={{ ...usageTable.td, ...usageTable.mono }} title={row.at > 0 ? formatLogFullTime(row.at) : undefined}>
+                  {row.at > 0 ? formatLogTime(row.at) : t('No usage reported yet')}
                 </td>
               </tr>
             ))}

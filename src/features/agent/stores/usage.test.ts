@@ -3,7 +3,7 @@ import { DEFAULT_USAGE_SOURCE } from '@features/agent/model/usageStats';
 import { MAX_USAGE_RECORDS, useUsageStore } from './usage';
 
 beforeEach(() => {
-  useUsageStore.setState({ records: [] });
+  useUsageStore.setState({ records: [], acp: {} });
 });
 
 describe('recordTurn', () => {
@@ -76,6 +76,34 @@ describe('clear', () => {
     expect(useUsageStore.getState().records).toHaveLength(1);
     useUsageStore.getState().clear();
     expect(useUsageStore.getState().records).toEqual([]);
+  });
+});
+
+describe('persistence', () => {
+  it('restores token records and protocol totals from saved storage', async () => {
+    const usage = useUsageStore.getState();
+    usage.recordTurn({ provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 123, outputTokens: 45, cachedInputTokens: 12, steps: 2, toolCalls: 3 });
+    usage.acpUsage('Saved agent', { used: 12000, size: 200000, cost: 0.0042, currency: 'USD' });
+    usage.acpTurn('Saved agent');
+    usage.acpToolCall('Saved agent');
+    const expected = { records: useUsageStore.getState().records, acp: useUsageStore.getState().acp };
+    const saved = localStorage.getItem('vrykell-usage');
+    expect(saved).not.toBeNull();
+
+    useUsageStore.setState({ records: [], acp: {} });
+    localStorage.setItem('vrykell-usage', saved!);
+    await useUsageStore.persist.rehydrate();
+
+    expect(useUsageStore.getState()).toMatchObject(expected);
+  });
+
+  it('persists clearing both kinds of usage without resurrecting old reports', async () => {
+    useUsageStore.getState().recordTurn({ provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 10 });
+    useUsageStore.getState().acpTurn('Saved agent');
+    useUsageStore.getState().clear();
+    await useUsageStore.persist.rehydrate();
+    expect(useUsageStore.getState()).toMatchObject({ records: [], acp: {} });
+    expect(JSON.parse(localStorage.getItem('vrykell-usage')!)).toMatchObject({ state: { records: [], acp: {} } });
   });
 });
 
