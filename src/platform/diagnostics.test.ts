@@ -18,6 +18,11 @@ describe('diagnostics', () => {
     const detail = sanitizeDiagnostic({ error: new Error('SFTP handshake failed'), columns: 132, password: 'do-not-save', data: 'secret terminal screen' });
     expect(detail).toMatchObject({ error: { name: 'Error', message: 'SFTP handshake failed' }, columns: 132, password: '[redacted]', data: { redacted: true, length: 22 } });
     expect(JSON.stringify(detail)).not.toContain('do-not-save');
+    const profile = sanitizeDiagnostic({ environment: { LANG: 'private-value' }, notes: 'private-note', aiNotes: 'private-instructions' });
+    expect(JSON.stringify(profile)).not.toMatch(/private-value|private-note|private-instructions/);
+    const page = sanitizeDiagnostic({ request: { limit: 40, cursor: { value: 'private-history-title', key: 'private-record-id' } } });
+    expect(page).toMatchObject({ request: { limit: 40, cursor: { redacted: true } } });
+    expect(JSON.stringify(page)).not.toMatch(/private-history-title|private-record-id/);
   });
 
   it('records invocation durations and failures while excluding request secrets', async () => {

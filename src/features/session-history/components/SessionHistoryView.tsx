@@ -2,7 +2,7 @@ import { t } from '@i18n';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { sessionCommandCount, sessionHistoryDateField, sessionHistoryDirectories, sessionHistoryTimestamp, sessionSummaryText } from '../model/sessionHistoryModel';
 import { useCallback, useMemo, useState } from 'react';
-import { Monitor, MonitorSmall, History, HistorySmall, ServerSmall, Ellipsis, Filter, ArrowSort, Grid, LockSmall as Lock, StarSmall as Star, Undo2, X } from '@ui/icons';
+import { Monitor, History, Ellipsis, Filter, ArrowSort, Grid, LockSmall as Lock, StarSmall as Star, Undo2, X } from '@ui/icons';
 import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/ContextMenu';
 import { IconButton } from '@ui/IconButton';
 import HistoryOptionMenu, { type HistoryMenuSection } from '@ui/HistoryOptionMenu';
@@ -11,10 +11,9 @@ import HistoryPage from '@ui/HistoryPage';
 import HistoryTextPrompt from '@ui/HistoryTextPrompt';
 import FilterChip from '@ui/FilterChip';
 import SidebarItem from '@ui/sidebarItem';
-import { iconColorCss, iconColorKey, useIconColorStore } from '@config/iconColors';
+import HistoryTerminalIcon from './HistoryTerminalIcon';
 import type { BackendSessionEntry } from '@platform/api/types';
 import {
-  isSshSession,
   SESSION_DATE_OPTIONS,
   SESSION_TYPE_OPTIONS,
   SESSION_MODE_OPTIONS,
@@ -321,7 +320,6 @@ function SessionRow({ s, starred, note, locked, onOpen, onDelete, busy, onMenu }
   busy: boolean;
   onMenu: (anchor: MenuAnchor) => void;
 }) {
-  const iconColor = useIconColorStore(state => iconColorCss(state.colors[iconColorKey('session', s.id)]));
   const historical = s.status === 'historical';
   const closedDate = historical && s.closed_at ? new Date(s.closed_at).toLocaleString(undefined,
     { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : null;
@@ -332,11 +330,10 @@ function SessionRow({ s, starred, note, locked, onOpen, onDelete, busy, onMenu }
     closedDate ? t('Closed {{date}}', { date: closedDate }) : t('Active'),
     note ? t('Note: {{note}}', { note }) : null,
   ].filter(Boolean).join(' · ');
-  const icon = isSshSession(s) ? <ServerSmall size={16} aria-hidden="true" />
-    : historical ? <HistorySmall size={16} aria-hidden="true" /> : <MonitorSmall size={16} aria-hidden="true" />;
+  const icon = <HistoryTerminalIcon session={s} />;
 
   return <SidebarItem
-    icon={<span className="history-row-icon" style={{ color: iconColor }}>{icon}</span>}
+    icon={<span className="history-row-icon">{icon}</span>}
     title={s.title || t('Untitled session')}
     subtitle={subtitle}
     subtitleFontFamily="var(--font-ui)"
@@ -344,7 +341,7 @@ function SessionRow({ s, starred, note, locked, onOpen, onDelete, busy, onMenu }
     compact
     badge={starred || locked ? <span className="history-row-flags">
       {locked && <span className="history-row-lock" data-tip={t('Locked record')}><Lock size={16} aria-hidden="true" /></span>}
-      {starred && <span className="history-row-star" data-tip={t('Starred')} data-testid={`session-star-${s.id}`}><Star size={16} aria-hidden="true" /></span>}
+      {starred && <span className="history-row-star" data-tip={t('Starred')} data-testid={`session-star-${s.id}`}><Star size={16} color="var(--favorite-color)" aria-hidden="true" /></span>}
     </span> : undefined}
     active={false}
     tabIndex={0}

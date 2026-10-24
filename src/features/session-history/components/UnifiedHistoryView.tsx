@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { t } from '@i18n';
 import {
-  Ellipsis, Filter, Grid, History, HistorySmall, LockSmall as Lock, ServerSmall, SparklesSmall,
-  StarSmall, Undo2, X, ArrowSort, iconSizes,
+  Ellipsis, Filter, Grid, History, LockSmall as Lock,
+  StarSmall, Undo2, X, ArrowSort, Bot, iconSizes,
 } from '@ui/icons';
 import { IconButton } from '@ui/IconButton';
 import ReloadButton from '@ui/ReloadButton';
@@ -18,14 +18,16 @@ import HistoryTextPrompt from '@ui/HistoryTextPrompt';
 import SidebarItem from '@ui/sidebarItem';
 import { useChatStore } from '@features/chat';
 import { useWorkspaceNavigation, type HistoryTypePreset } from '@features/workspace';
-import { iconColorCss, iconColorKey, useIconColorStore } from '@config/iconColors';
+import HistoryTerminalIcon from './HistoryTerminalIcon';
+import AppMark from '@ui/AppMark';
+import { harnessMark } from '@features/agent/components/HarnessBadge';
 import { historyGroupKey, scopedGroupIds, useHistoryMetaStore } from '@utils/historyMeta';
 import { isHistoryGroupColor } from '@ui/historyGroupColor';
 import { useUnifiedHistory } from '../hooks/useUnifiedHistory';
 import { SESSION_DATE_OPTIONS, SESSION_MODE_OPTIONS } from '../model/sessionHistoryModel';
 import {
   HISTORY_TYPES, UNIFIED_GROUP_BY_OPTIONS, UNIFIED_SORT_OPTIONS,
-  groupUnifiedHistory, type UnifiedHistoryFilter, type UnifiedHistoryGroup, type UnifiedHistoryRecord,
+  groupUnifiedHistory, unifiedHistoryGroupIdentity, type UnifiedHistoryFilter, type UnifiedHistoryGroup, type UnifiedHistoryRecord,
 } from '../model/unifiedHistory';
 import { sessionSummaryText } from '../model/sessionHistoryModel';
 import { conversationMarkdown } from '@features/chat/model/conversationHistory';
@@ -35,6 +37,8 @@ import { useToastStore } from '@ui/Toast';
 
 const TYPE_LABELS = { all: 'All', terminal: 'Terminal history', conversation: 'AI conversations' } as const;
 const DATE_FIELD_LABELS = { activity: 'Latest activity', created: 'Created date' } as const;
+const openLabel = (record: UnifiedHistoryRecord) => t(record.kind === 'terminal' ? 'Restore session' : record.kind === 'agent' ? 'Resume ACP session' : 'Open conversation');
+const deleteLabel = (record: UnifiedHistoryRecord) => t(record.kind === 'terminal' ? 'Delete this session' : record.kind === 'agent' ? 'Forget ACP session reference' : 'Delete conversation');
 const anchorFrom = (trigger: HTMLButtonElement, align: 'start' | 'end' = 'start'): MenuAnchor => {
   const rect = trigger.getBoundingClientRect();
   return { x: align === 'end' ? rect.right : rect.left, y: rect.bottom + 4, trigger };
@@ -42,7 +46,7 @@ const anchorFrom = (trigger: HTMLButtonElement, align: 'start' | 'end' = 'start'
 
 /** Complete chronological history surface with the same organization model for every record type. */
 export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePreset } = {}) {
-  const history = useUnifiedHistory();
+  const history = useUnifiedHistory(preset);
   const historyPreset = useWorkspaceNavigation(state => state.historyPreset);
   const historyPresetRevision = useWorkspaceNavigation(state => state.historyPresetRevision);
   const [filterMenu, setFilterMenu] = useState<MenuAnchor | null>(null);
@@ -95,7 +99,8 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
 
   const recordText = async (record: UnifiedHistoryRecord) => record.kind === 'terminal'
     ? sessionSummaryText(record.session)
-    : conversationMarkdown(record.conversation, await conversationApi.listConversationMessages(record.conversation.id));
+    : record.kind === 'agent' ? JSON.stringify(record.agent, null, 2)
+      : conversationMarkdown(record.conversation, await conversationApi.listConversationMessages(record.conversation.id));
   const copyRecords = async (records: readonly UnifiedHistoryRecord[]) => {
     try {
       const entries = await Promise.all(records.map(recordText));
@@ -110,19 +115,32 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
   const deleteRecords = async (records: readonly UnifiedHistoryRecord[]) => {
     const targets = deletable(records);
     if (!targets.length || batchBusy) return;
-    const ok = await ask(t('Delete {{count}} matching records and their history? Locked and working records are excluded.', {
+    const ok = await ask(t(targets.some(record => record.kind === 'agent')
+      ? 'Delete {{count}} matching records? ACP references are only forgotten; their agent-owned history is kept. Locked and working records are excluded.'
+      : 'Delete {{count}} matching records and their history? Locked and working records are excluded.', {
       count: targets.length,
     }), { title: t('Delete history records'), kind: 'warning' });
     if (!ok) return;
     setBatchBusy(true);
     try {
-      for (const record of targets) await history.remove(record);
+      await history.removeMany(targets);
     } finally {
       setBatchBusy(false);
     }
   };
   const openRecords = (records: readonly UnifiedHistoryRecord[]) => {
-    for (const record of records) history.open(record);
+    void history.openMany(records);
+  };
+  const completeGroup = async (id: string | null, original: boolean, matching: boolean, apply: (records: UnifiedHistoryRecord[]) => unknown) => {
+    if (batchBusy) return;
+    setBatchBusy(true);
+    try {
+      const all = await history.collect(matching);
+      const targets = id === null ? all : all.filter(record => original ? record.kind === 'terminal' && record.session.group_id === id : unifiedHistoryGroupIdentity(record, history.filter.groupBy).id === id);
+      setBatchBusy(false);
+      await apply(targets);
+    } catch (reason) { useToastStore.getState().addToast(String(reason), 'error'); }
+    finally { setBatchBusy(false); }
   };
   const toggleGroups = (value: boolean) => {
     const keys = groups.map(group => historyGroupKey('session', `unified-${history.filter.groupBy}`, group.id));
@@ -130,9 +148,9 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
   };
   const groupKey = (group: UnifiedHistoryGroup) => historyGroupKey('session', `unified-${history.filter.groupBy}`, group.id);
   const groupItems = (group: UnifiedHistoryGroup): ContextMenuItem[] => [
-    { label: t('Open matching records'), disabled: batchBusy || !group.records.length, onClick: () => openRecords(group.records) },
-    { label: t('Copy matching records'), group: 'clipboard', disabled: !group.records.length, onClick: () => void copyRecords(group.records) },
-    { label: t('Delete matching records…'), danger: true, disabled: batchBusy || !deletable(group.records).length, onClick: () => void deleteRecords(group.records) },
+    { label: t('Open matching records'), disabled: batchBusy || !group.records.length, onClick: () => void completeGroup(group.id, false, true, openRecords) },
+    { label: t('Copy matching records'), group: 'clipboard', disabled: !group.records.length, onClick: () => void completeGroup(group.id, false, true, copyRecords) },
+    { label: t('Delete matching records…'), danger: true, disabled: batchBusy || !deletable(group.records).length, onClick: () => void completeGroup(group.id, false, true, deleteRecords) },
   ];
   const pageGroupItems: ContextMenuItem[] = [
     { label: t('Expand all groups'), group: 'view', disabled: !groups.some(group => collapsedGroups[groupKey(group)]), onClick: () => toggleGroups(false) },
@@ -170,8 +188,8 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
   })) }];
 
   const rowMenuItems: ContextMenuItem[] = rowMenu ? [
-    { label: t(rowMenu.record.kind === 'terminal' ? 'Restore session' : 'Open conversation'), onClick: () => history.open(rowMenu.record) },
-    { label: t(rowMenu.record.kind === 'terminal' ? 'Copy summary' : 'Copy as Markdown'), group: 'clipboard',
+    { label: openLabel(rowMenu.record), onClick: () => history.open(rowMenu.record) },
+    { label: t(rowMenu.record.kind === 'terminal' ? 'Copy summary' : rowMenu.record.kind === 'agent' ? 'Copy session reference' : 'Copy as Markdown'), group: 'clipboard',
       onClick: () => void copyRecords([rowMenu.record]) },
     { label: t(notes[rowMenu.record.key] ? 'Edit note…' : 'Add note…'), group: 'edit',
       onClick: () => { setNotePrompt({ record: rowMenu.record, anchor: rowMenu.anchor }); setRowMenu(null); } },
@@ -179,7 +197,7 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
       onClick: () => meta.toggleStar(rowMenu.record.key) },
     { label: t(lockedRecords[rowMenu.record.key] ? 'Unlock record' : 'Lock record'), group: 'organize',
       onClick: () => meta.setLocked([rowMenu.record.key], !lockedRecords[rowMenu.record.key]) },
-    { label: t(rowMenu.record.kind === 'terminal' ? 'Delete this session' : 'Delete conversation'), danger: true,
+    { label: deleteLabel(rowMenu.record), danger: true,
       disabled: Boolean(lockedRecords[rowMenu.record.key]) || rowMenu.record.kind === 'conversation' && sendingId === rowMenu.record.conversation.id,
       onClick: () => void deleteRecords([rowMenu.record]) },
   ] : [];
@@ -194,7 +212,8 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
     : history.filter.type === 'conversation' ? 'Search conversations…' : 'Search terminals and AI conversations…';
 
   return <HistoryPage pageTestId="unified-history-page" listLabel={t(pageTitle)} icon={<History size={iconSizes.control} />}
-    title={t(pageTitle)} count={t('{{count}} records', { count: history.visible.length })} busy={history.loading || batchBusy}
+    title={t(pageTitle)} count={t(history.hasMore ? '{{count}} loaded records' : '{{count}} records', { count: history.visible.length })} busy={history.loading || batchBusy}
+    onLoadMore={() => { if (history.hasMore && !history.loadingMore && !history.loading && !history.conversationError) void history.loadMore(); }}
     query={history.filter.query} onQueryChange={query => setFilter({ query })}
     searchLabel={t(searchLabel)} searchPlaceholder={t(searchPlaceholder)} searchTestId="unified-history-search"
     filterChips={activeFilterCards ? <>
@@ -256,16 +275,16 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
         { label: t('Sort history'), onClick: () => setSortMenu(anchorFrom(document.querySelector<HTMLButtonElement>('[data-testid="unified-history-sort"]')!, 'end')) },
         { label: t('Group by'), onClick: () => setGroupMenu(anchorFrom(document.querySelector<HTMLButtonElement>('[data-testid="unified-history-group-by"]')!, 'end')) },
         { label: t('Refresh history'), disabled: history.loading || batchBusy, onClick: () => void history.refresh() },
-        { label: t('Open matching records'), disabled: !history.visible.length, onClick: () => openRecords(history.visible) },
-        { label: t('Copy matching records'), group: 'clipboard', disabled: !history.visible.length, onClick: () => void copyRecords(history.visible) },
+        { label: t('Open matching records'), disabled: batchBusy || !history.visible.length, onClick: () => void completeGroup(null, false, true, openRecords) },
+        { label: t('Copy matching records'), group: 'clipboard', disabled: batchBusy || !history.visible.length, onClick: () => void completeGroup(null, false, true, copyRecords) },
         { label: t('Delete matching records…'), danger: true, disabled: batchBusy || !deletable(history.visible).length,
-          onClick: () => void deleteRecords(history.visible) },
+          onClick: () => void completeGroup(null, false, true, deleteRecords) },
         ...pageGroupItems,
         { label: t('Clear filters'), group: 'view', disabled: !filtered, onClick: () => history.resetFilter() },
       ]} />}
     </>}>
-    {history.terminalError && <ErrorBox title={t('Terminal history')} actions={<OutlineButton onClick={() => void history.refresh()}>{t('Retry')}</OutlineButton>}>{history.terminalError}</ErrorBox>}
-    {history.conversationError && <ErrorBox title={t('AI conversation history')} actions={<OutlineButton onClick={() => void history.refresh()}>{t('Retry')}</OutlineButton>}>{history.conversationError}</ErrorBox>}
+    {history.terminalError && <ErrorBox title={t(pageTitle)} actions={<OutlineButton onClick={() => void history.refresh()}>{t('Retry')}</OutlineButton>}>{history.terminalError}</ErrorBox>}
+    {history.conversationError && history.conversationError !== history.terminalError && <ErrorBox title={t('AI conversation history')} actions={<OutlineButton onClick={() => void history.refresh()}>{t('Retry')}</OutlineButton>}>{history.conversationError}</ErrorBox>}
     {!history.visible.length && !history.loading && !history.terminalError && !history.conversationError && <div className="history-empty"><History size={24} />
       <span>{t(history.filter.query || hasNarrowingFilter ? 'No matching history' : 'No history yet')}</span></div>}
     {originalCards.map(({ group, all, visible }) => {
@@ -279,7 +298,7 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
         title={groupTitles[key] ?? group.title} originalTitle={group.title}
         subtitle={history.filter.groupBy === 'cwd' && workingDirectories.size > 1
           ? `${t('Original tab group')} · ${t('Multiple working directories')}` : t('Original tab group')}
-        count={t('{{matching}} of {{total}} sessions', { matching: visible.length, total: all.length })}
+        count={history.hasMore ? t('{{count}} loaded records', { count: all.length }) : t('{{matching}} of {{total}} sessions', { matching: visible.length, total: all.length })}
         timestamp={Math.max(...visible.map(record => record.timestamp))}
         pinned={originalPinnedIds.has(group.id)} color={isHistoryGroupColor(groupColors[key]) ? groupColors[key] : undefined}
         collapsed={Boolean(collapsedGroups[key])} onCollapsedChange={value => meta.setGroupsCollapsed([key], value)}
@@ -289,21 +308,21 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
           else void history.renameOriginalGroup(group.id, value);
         }} onNote={value => meta.setGroupNote(key, value)} lockedCount={lockedCount}
         actions={[
-          { label: t('Restore matching'), disabled: batchBusy || history.busy || !visible.length, onClick: () => openRecords(visible) },
-          { label: t('Restore group'), disabled: batchBusy || history.busy || !all.length, onClick: () => openRecords(all) },
-          { label: t('Restore original group ({{count}} sessions)', { count: all.length }), disabled: batchBusy || history.busy || !all.length,
-            onClick: () => openRecords(all) },
-          { label: t('Copy matching records'), group: 'clipboard', disabled: !visible.length, onClick: () => void copyRecords(visible) },
+          { label: t('Restore matching'), disabled: batchBusy || history.busy || !visible.length, onClick: () => void completeGroup(group.id, true, true, openRecords) },
+          { label: t('Restore group'), disabled: batchBusy || history.busy || !all.length, onClick: () => void completeGroup(group.id, true, false, openRecords) },
+          { label: history.hasMore ? t('Restore original group') : t('Restore original group ({{count}} sessions)', { count: all.length }), disabled: batchBusy || history.busy || !all.length,
+            onClick: () => void completeGroup(group.id, true, false, openRecords) },
+          { label: t('Copy matching records'), group: 'clipboard', disabled: !visible.length, onClick: () => void completeGroup(group.id, true, true, copyRecords) },
           { label: t('Delete matching records…'), danger: true, disabled: batchBusy || history.busy || !deletable(visible).length,
-            onClick: () => void deleteRecords(visible) },
+            onClick: () => void completeGroup(group.id, true, true, deleteRecords) },
         ]}
         recordActions={[
           { label: t(allStarred ? 'Unstar matching records' : 'Star matching records'), group: 'view', disabled: !keys.length,
-            onClick: () => meta.setStarred(keys, !allStarred) },
+            onClick: () => void completeGroup(group.id, true, true, records => meta.setStarred(records.map(record => record.key), !allStarred)) },
           { label: t('Lock matching records'), group: 'organize', disabled: !keys.length || allLocked,
-            onClick: () => meta.setLocked(keys, true) },
+            onClick: () => void completeGroup(group.id, true, true, records => meta.setLocked(records.map(record => record.key), true)) },
           { label: t('Unlock matching records'), group: 'organize', disabled: !lockedCount,
-            onClick: () => meta.setLocked(keys, false) },
+            onClick: () => void completeGroup(group.id, true, true, records => meta.setLocked(records.map(record => record.key), false)) },
         ]}>
         {visible.map(record => <UnifiedHistoryRow key={record.key} record={record} active={false}
           locked={Boolean(lockedRecords[record.key])} busy={history.busy || batchBusy}
@@ -319,7 +338,7 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
       const allLocked = keys.length > 0 && lockedCount === keys.length;
       return <HistoryGroupCard key={group.id} id={`${history.filter.groupBy}:${group.id}`}
         title={group.title} originalTitle={group.originalTitle} subtitle={group.subtitle}
-        count={t('{{count}} records', { count: group.records.length })} timestamp={group.timestamp}
+        count={t(history.hasMore ? '{{count}} loaded records' : '{{count}} records', { count: group.records.length })} timestamp={group.timestamp}
         pinned={pinnedIds.has(group.id)} color={isHistoryGroupColor(groupColors[key]) ? groupColors[key] : undefined}
         collapsed={Boolean(collapsedGroups[key])} onCollapsedChange={value => meta.setGroupsCollapsed([key], value)}
         onTogglePin={() => meta.togglePinnedGroup(key)} onSelectColor={value => meta.setGroupColor(key, value)}
@@ -327,11 +346,11 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
         onNote={value => meta.setGroupNote(key, value)} lockedCount={lockedCount}
         actions={groupItems(group)} recordActions={[
           { label: t(allStarred ? 'Unstar matching records' : 'Star matching records'), group: 'view', disabled: !keys.length,
-            onClick: () => meta.setStarred(keys, !allStarred) },
+            onClick: () => void completeGroup(group.id, false, true, records => meta.setStarred(records.map(record => record.key), !allStarred)) },
           { label: t('Lock matching records'), group: 'organize', disabled: !keys.length || allLocked,
-            onClick: () => meta.setLocked(keys, true) },
+            onClick: () => void completeGroup(group.id, false, true, records => meta.setLocked(records.map(record => record.key), true)) },
           { label: t('Unlock matching records'), group: 'organize', disabled: !lockedCount,
-            onClick: () => meta.setLocked(keys, false) },
+            onClick: () => void completeGroup(group.id, false, true, records => meta.setLocked(records.map(record => record.key), false)) },
         ]}>
         {group.records.map(record => <UnifiedHistoryRow key={record.key} record={record}
           active={record.kind === 'conversation' && readingActive(record, activeConversationId)}
@@ -341,6 +360,7 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
           onMenu={anchor => setRowMenu({ record, anchor })} />)}
       </HistoryGroupCard>;
     })}
+    {history.hasMore && <div className="history-pagination"><OutlineButton disabled={history.loadingMore} onClick={() => void history.loadMore()}>{t(history.loadingMore ? 'Loading more history…' : 'Load more history')}</OutlineButton></div>}
   </HistoryPage>;
 }
 
@@ -352,29 +372,28 @@ function UnifiedHistoryRow({ record, active, locked, busy, onOpen, onDelete, onM
   record: UnifiedHistoryRecord; active: boolean; locked: boolean; busy: boolean;
   onOpen: () => void; onDelete: () => void; onMenu: (anchor: MenuAnchor) => void;
 }) {
-  const color = useIconColorStore(state => record.kind === 'terminal' ? iconColorCss(state.colors[iconColorKey('session', record.session.id)]) : undefined);
-  const label = t(record.kind === 'conversation' ? 'AI conversation' : record.local && record.ssh ? 'Mixed connections' : record.ssh ? 'SSH terminal' : 'Local terminal');
-  const Icon = record.kind === 'conversation' ? SparklesSmall : record.ssh ? ServerSmall : HistorySmall;
-  const activity = t(record.kind === 'conversation' ? 'Updated {{date}}' : 'Closed {{date}}', {
+  const label = t(record.kind === 'conversation' ? 'AI conversation' : record.kind === 'agent' ? 'ACP session reference' : record.local && record.ssh ? 'Mixed connections' : record.ssh ? 'SSH terminal' : 'Local terminal');
+  const AgentMark = record.kind === 'agent' ? harnessMark(record.agent.harness, Bot) : Bot;
+  const activity = t(record.kind === 'conversation' ? 'Updated {{date}}' : record.kind === 'agent' ? 'Last opened {{date}}' : 'Closed {{date}}', {
     date: new Date(record.timestamp).toLocaleString(undefined, {
       year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
     }),
   });
   return <SidebarItem variant="history" compact active={active} title={record.title || t(record.kind === 'conversation' ? 'New conversation' : 'Untitled session')}
-    icon={<span className="history-row-icon" style={{ color }}><Icon size={iconSizes.compact} /></span>}
+    icon={<span className="history-row-icon">{record.kind === 'conversation' ? <AppMark size={iconSizes.control} /> : record.kind === 'agent' ? <AgentMark size={iconSizes.control} /> : <HistoryTerminalIcon session={record.session} size={iconSizes.control} />}</span>}
     subtitle={[label, record.cwd || record.description, activity, record.note]
       .filter(Boolean).join(' · ')} subtitleFontFamily="var(--font-ui)"
     badge={record.starred || locked ? <span className="history-row-flags">
       {locked && <span className="history-row-lock" data-tip={t('Locked record')}><Lock size={16} aria-hidden="true" /></span>}
       {record.starred && <span className="history-row-star" data-tip={t('Starred')}>
-        <StarSmall size={iconSizes.compact} aria-hidden="true" />
+        <StarSmall size={iconSizes.compact} color="var(--favorite-color)" aria-hidden="true" />
       </span>}
     </span> : undefined}
     leadingActions={[
-      { icon: <X size={iconSizes.compact} />, label: t(record.kind === 'terminal' ? 'Delete this session' : 'Delete conversation'),
-        title: t(locked ? 'Locked record' : record.kind === 'terminal' ? 'Delete this session' : 'Delete conversation'),
+      { icon: <X size={iconSizes.compact} />, label: deleteLabel(record),
+        title: locked ? t('Locked record') : deleteLabel(record),
         disabled: locked || busy, onClick: onDelete, testId: `unified-history-delete-${record.key}` },
-      { icon: <Undo2 size={iconSizes.compact} />, label: t(record.kind === 'terminal' ? 'Restore session' : 'Open conversation'),
+      { icon: <Undo2 size={iconSizes.compact} />, label: openLabel(record),
         disabled: busy, onClick: onOpen, testId: `unified-history-open-${record.key}` },
     ]}
     testId={`unified-history-${record.key}`} dataAttributes={{ role: 'button', 'data-history-kind': record.kind }} tabIndex={0}

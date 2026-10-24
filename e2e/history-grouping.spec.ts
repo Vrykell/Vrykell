@@ -36,7 +36,11 @@ async function seedSessionHistory(page: Page) {
       { id: 'remote-b', title: 'Deploy Beta', cwd: '', payload: remote('beta.test') },
       { id: 'remote-unknown', title: 'Missing directory', cwd: '', payload: '{"ssh":{"host":"unknown.test"}}' },
     ].map((item, index) => ({ status: 'historical', kind: 'local', created_at: now, closed_at: now - index * 1000, block_count: 1, sort_order: index, group_id: 'old-group', ...item }));
-    internal.invoke = async (command, args) => command === 'list_sessions' ? items : original(command, args);
+    internal.invoke = async (command, args) => {
+      if (command === 'list_sessions') return items;
+      if (command === 'history_page') return { ...await original(command, args) as Record<string, unknown>, sessions: (args.request as { source: string }).source === 'conversation' ? [] : items, nextCursor: null };
+      return original(command, args);
+    };
   });
 }
 

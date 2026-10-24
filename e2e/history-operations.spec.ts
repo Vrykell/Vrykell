@@ -22,6 +22,7 @@ async function seedSessions(page: Page) {
     probe.__HISTORY_CALLS__ = [];
     probe.__TAURI_INTERNALS__.invoke = async (command, args) => {
       if (command === 'list_sessions') return [...items];
+      if (command === 'history_page') return { ...await original(command, args) as Record<string, unknown>, sessions: (args.request as { source: string }).source === 'conversation' ? [] : items.filter(item => item.status === 'historical'), nextCursor: null };
       if (command === 'get_session' && items.some(item => item.id === args.id)) return items.find(item => item.id === args.id);
       if (command === 'delete_session' || command === 'restore_session') {
         probe.__HISTORY_CALLS__.push({ command, id: String(args.id) });

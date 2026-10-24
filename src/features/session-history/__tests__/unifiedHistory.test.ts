@@ -9,6 +9,13 @@ const session = (id: string, kind: 'local' | 'ssh', time: number): BackendSessio
 });
 
 describe('unified history', () => {
+  it('keeps agent-owned references distinct from native conversations and terminal sessions', () => {
+    const records = unifiedHistoryRecords([], [], { notes: {}, starred: {} }, [{ harness: 'Agent', sessionId: 'external', cwd: '/agent', at: 1000 }]);
+    expect(records[0]).toMatchObject({ kind: 'agent', terminalType: 'ACP', title: 'Agent', cwd: '/agent' });
+    expect(filterUnifiedHistory(records, { ...DEFAULT_UNIFIED_FILTER, type: 'conversation', query: 'ACP' })).toHaveLength(1);
+    expect(filterUnifiedHistory(records, { ...DEFAULT_UNIFIED_FILTER, type: 'terminal' })).toHaveLength(0);
+    expect(groupUnifiedHistory(records, 'terminal', new Set(), { groupTitles: {}, groupNotes: {}, collapsedGroups: {} })[0]?.title).toBe('ACP 会话');
+  });
   it('merges terminal and AI records chronologically and keeps both search sources', () => {
     const records = unifiedHistoryRecords([session('local', 'local', 1000), session('remote', 'ssh', 3000)], [{
       id: 'chat', title: 'Explain deploy', createdAt: 500, updatedAt: 4000, environment: null,

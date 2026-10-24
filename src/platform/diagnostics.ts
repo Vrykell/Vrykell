@@ -39,8 +39,8 @@ export function flushDiagnostics(): Promise<void> {
   }
   return writeQueue;
 }
-const privateKeys = /^(password|passphrase|key|apiKey|accessToken|refreshToken|token|secret|authorization|cookie|privateKey|privateKeyContent|env)$/i;
-const contentKeys = /^(data|raw|output|content|text|payload|prompt|command|question|messages)$/i;
+const privateKeys = /^(password|passphrase|key|apiKey|accessToken|refreshToken|token|secret|authorization|cookie|privateKey|privateKeyContent|env|environment)$/i;
+const contentKeys = /^(data|raw|output|content|text|payload|prompt|command|question|messages|notes|aiNotes|cursor)$/i;
 
 export function redactText(value: string): string {
   return value

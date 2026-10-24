@@ -59,15 +59,16 @@ interface HistoryRecordBase {
   note: string;
   starred: boolean;
 }
+export interface UnifiedAgentReference { harness: string; sessionId: string; cwd: string; at: number }
 export type UnifiedHistoryRecord = HistoryRecordBase & (
-  { kind: 'terminal'; session: BackendSessionEntry } | { kind: 'conversation'; conversation: Conversation }
+  { kind: 'terminal'; session: BackendSessionEntry } | { kind: 'conversation'; conversation: Conversation } | { kind: 'agent'; agent: UnifiedAgentReference }
 );
 
 const timestamp = (value: number, fallback: number) => Number.isFinite(value) ? value : Number.isFinite(fallback) ? fallback : 0;
 
 /** Read both sources without applying either original page's saved filters or changing ownership. */
 export function unifiedHistoryRecords(sessions: readonly BackendSessionEntry[], conversations: readonly Conversation[],
-  meta: Pick<HistoryMetaState, 'notes' | 'starred'>): UnifiedHistoryRecord[] {
+  meta: Pick<HistoryMetaState, 'notes' | 'starred'>, agents: readonly UnifiedAgentReference[] = []): UnifiedHistoryRecord[] {
   const terminals: UnifiedHistoryRecord[] = sessions.filter(session => session.status === 'historical').map(session => {
     const panes = sessionHistoryTerminals(session);
     const cwd = [...new Set(panes.map(pane => pane.cwd).filter(Boolean))].join(', ');
@@ -97,7 +98,13 @@ export function unifiedHistoryRecords(sessions: readonly BackendSessionEntry[], 
       local: environment?.kind === 'local', ssh: environment?.kind === 'ssh', note, starred: !!meta.starred[key],
       searchText: [conversation.title, description, note, environment?.kind ?? 'discussion'].join(' ').toLocaleLowerCase() };
   });
-  return [...terminals, ...chats].sort((a, b) => b.timestamp - a.timestamp || a.key.localeCompare(b.key));
+  const external: UnifiedHistoryRecord[] = agents.map(agent => {
+    const key = historyRecordKey('conversation', `acp:${JSON.stringify([agent.harness, agent.sessionId])}`); const note = meta.notes[key] ?? '';
+    return { kind: 'agent', agent, key, title: agent.harness, timestamp: agent.at, createdAt: agent.at, description: t('ACP session reference'),
+      cwd: agent.cwd, connectionTarget: '', connection: 'local', terminalType: 'ACP', modes: [], local: true, ssh: false,
+      note, starred: !!meta.starred[key], searchText: [agent.harness, agent.cwd, note, 'ACP'].join(' ').toLocaleLowerCase() };
+  });
+  return [...terminals, ...chats, ...external].sort((a, b) => b.timestamp - a.timestamp || a.key.localeCompare(b.key));
 }
 
 export function filterUnifiedHistory(records: readonly UnifiedHistoryRecord[], filter: UnifiedHistoryFilter, now = Date.now()): UnifiedHistoryRecord[] {
@@ -112,7 +119,7 @@ export function filterUnifiedHistory(records: readonly UnifiedHistoryRecord[], f
     && (filter.connection === 'all' || filter.connection === 'local' && record.local
       || filter.connection === 'ssh' && record.ssh || filter.connection === 'discussion' && record.connection === 'discussion')
     && (filter.type === 'all' || filter.type === 'terminal' && record.kind === 'terminal'
-      || filter.type === 'conversation' && record.kind === 'conversation'));
+      || filter.type === 'conversation' && record.kind !== 'terminal'));
   return [...visible].sort((left, right) => {
     if (filter.sort === 'title-asc' || filter.sort === 'title-desc') {
       const order = left.title.localeCompare(right.title, undefined, { numeric: true });
@@ -159,7 +166,7 @@ export function unifiedHistoryGroupIdentity(record: UnifiedHistoryRecord, groupB
     id = record.connection; title = t(CONNECTION_LABELS[record.connection]);
   } else if (groupBy === 'terminal') {
     id = record.kind === 'conversation' ? 'ai' : record.terminalType.toLocaleLowerCase() || 'terminal';
-    title = record.kind === 'conversation' ? t('AI conversations')
+    title = record.kind === 'agent' ? t('ACP sessions') : record.kind === 'conversation' ? t('AI conversations')
       : record.terminalType === 'ssh' ? t('SSH terminals')
         : record.terminalType === 'terminal' ? t('Terminal sessions') : `${record.terminalType.toLocaleUpperCase()} terminals`;
   }

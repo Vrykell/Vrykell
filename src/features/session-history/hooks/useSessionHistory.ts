@@ -25,6 +25,7 @@ export type SessionHistoryNotification = (message: string, kind: 'success' | 'er
 
 export interface UseSessionHistoryOptions {
   notify?: SessionHistoryNotification;
+  source?: { sessions: BackendSessionEntry[]; groups: BackendGroupEntry[]; loading: boolean; error: string; refresh: () => Promise<void> };
 }
 
 export interface SessionHistoryController {
@@ -86,10 +87,14 @@ function saveFilter(filter: SessionHistoryFilter): void {
 
 export function useSessionHistory(options: UseSessionHistoryOptions = {}): SessionHistoryController {
   const notify = options.notify ?? noopNotify;
-  const [sessions, setSessions] = useState<BackendSessionEntry[]>([]);
-  const [originalGroups, setOriginalGroups] = useState<BackendGroupEntry[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState('');
+  const [ownSessions, setSessions] = useState<BackendSessionEntry[]>([]);
+  const [ownGroups, setOriginalGroups] = useState<BackendGroupEntry[]>([]);
+  const [ownLoading, setLoading] = useState(true);
+  const [ownLoadError, setLoadError] = useState('');
+  const sessions = options.source?.sessions ?? ownSessions;
+  const originalGroups = options.source?.groups ?? ownGroups;
+  const loading = options.source?.loading ?? ownLoading;
+  const loadError = options.source?.error ?? ownLoadError;
   const [batchBusy, setBatchBusy] = useState(false);
   const batchBusyRef = useRef(false);
   const [filter, setFilterState] = useState<SessionHistoryFilter>(loadFilter);
@@ -115,6 +120,7 @@ export function useSessionHistory(options: UseSessionHistoryOptions = {}): Sessi
   }, []);
 
   const load = useCallback(() => {
+    if (options.source) return options.source.refresh();
     const requestId = ++loadRequestRef.current;
     setLoading(true);
     setLoadError('');
@@ -134,11 +140,11 @@ export function useSessionHistory(options: UseSessionHistoryOptions = {}): Sessi
       .finally(() => {
         if (requestId === loadRequestRef.current) setLoading(false);
       });
-  }, []);
+  }, [options.source?.refresh]);
 
   useEffect(() => {
-    void load();
-  }, [load, activeGroups]);
+    if (!options.source) void load();
+  }, [load, activeGroups, !!options.source]);
 
   const openSession = useCallback((session: BackendSessionEntry) => {
     if (batchBusyRef.current) return;
