@@ -32,7 +32,7 @@ test.describe('标签页管理侧栏', () => {
   test('点击新建直接弹出紧凑的类型选择面板并创建', async ({ page }) => {
     await page.locator('[data-testid="tab-new-btn"]').click();
     // 无中间菜单，直接弹出类型选择弹窗
-    await expect(page.getByText('新建标签页')).toBeVisible();
+    await expect(page.getByRole('dialog', { name: '新建标签页' })).toBeVisible();
     await expect(page.getByText('Zsh', { exact: true })).toBeVisible();
     await expect(page.getByText('Bash', { exact: true })).toBeVisible();
 
@@ -40,7 +40,7 @@ test.describe('标签页管理侧栏', () => {
     await page.getByText('Bash', { exact: true }).click();
     await expect(page.locator('[data-testid^="tab-row-"]')).toHaveCount(2);
     // 弹窗关闭
-    await expect(page.getByText('新建标签页')).toHaveCount(0);
+    await expect(page.getByRole('dialog', { name: '新建标签页' })).toHaveCount(0);
   });
 
   test('历史按钮打开统一的会话历史工作区', async ({ page }) => {

@@ -100,7 +100,7 @@ test('an active preedit keeps a caret after the composition text', async ({ page
   // The caret cell is reserved after the text, not painted over it.
   expect(caret.reserved).toBeGreaterThanOrEqual(caret.width);
   expect(caret.background).toBe(cursorColor);
-  expect(caret.animation).toBe('cursor-blink');
+  expect(caret.animation).toBe('none');
   // The caret is actually painted: its cell differs from untouched cells beside it.
   const caretCell = {
     x: caret.box.right - caret.width / 2 - 1,

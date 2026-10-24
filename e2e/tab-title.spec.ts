@@ -10,7 +10,7 @@ test.describe('终端标题', () => {
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
-    const title = page.locator('.workspace-title');
+    const title = page.getByTestId('tab-row-t1').getByRole('tab');
     await expect(title).toHaveText('终端');
 
     // Start a foreground command: a title set now belongs to the program, not the shell.
@@ -42,9 +42,9 @@ test.describe('终端标题', () => {
     await page.getByText('复制会话', { exact: true }).click();
 
     await expect(rows).toHaveCount(2);
-    await expect(page.locator('.workspace-title')).toHaveText('终端 副本');
+    await expect(rows.last().getByRole('tab')).toHaveText('终端 副本');
     await emitPtyOutput(page, '\x1b]133;A\x07\x1b]133;C\x07');
     await emitPtyOutput(page, '\x1b]2;copied process\x07');
-    await expect(page.locator('.workspace-title')).toHaveText('copied process');
+    await expect(rows.last().getByRole('tab')).toHaveText('copied process');
   });
 });

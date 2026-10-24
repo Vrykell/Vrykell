@@ -1,0 +1,48 @@
+import { expect, test } from '@playwright/test';
+import { setupTauriMock } from './tauri-mock';
+
+for (const theme of ['dark', 'light'] as const) for (const density of [1, 1.25, 2]) {
+  test(`colored shell identities at ${density}x in ${theme}`, async ({ browser }, info) => {
+    const context = await browser.newContext({ viewport: { width: 1240, height: 800 }, deviceScaleFactor: density });
+    const page = await context.newPage();
+    await setupTauriMock(page, { schedulesSeed: [] });
+    await page.addInitScript(theme => {
+      localStorage.setItem('vrykell-theme-mode', theme);
+      localStorage.setItem('vrykell-startup-mode', 'empty');
+      const runtime = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__;
+      const original = runtime.invoke;
+      runtime.invoke = (command, args) => command === 'list_shells' ? Promise.resolve([
+        { id: 'zsh', label: 'Zsh', default: true },
+        { id: 'bash', label: 'Bash', default: false },
+        { id: 'powershell', label: 'Windows PowerShell', default: false },
+      ]) : original(command, args);
+    }, theme);
+    await page.goto('/');
+    await page.getByTestId('tab-new-btn').click();
+    for (const shell of ['zsh', 'bash', 'powershell']) {
+      const mark = page.getByTestId(`new-tab-option-shell:${shell}`).locator(`[data-shell-mark="${shell}"]`);
+      await expect(mark).toHaveAttribute('width', '20');
+      await expect(mark).toHaveAttribute('height', '20');
+      await expect(mark).toHaveCSS('filter', 'none');
+    }
+    const powerShell = page.getByTestId('new-tab-option-shell:powershell');
+    const powerShellMark = powerShell.locator('[data-shell-mark="powershell"]');
+    await expect(powerShellMark).toHaveAttribute('viewBox', '2 2 28 28');
+    await expect(powerShell.locator('linearGradient').first()).toBeAttached();
+    const powerShellGeometry = await powerShellMark.evaluate(element => {
+      const mark = element as SVGSVGElement;
+      return { width: mark.getBBox().width / mark.viewBox.baseVal.width, height: mark.getBBox().height / mark.viewBox.baseVal.height };
+    });
+    expect(powerShellGeometry.width).toBeGreaterThan(.98);
+    expect(powerShellGeometry.height).toBeGreaterThan(.75);
+    await page.screenshot({ path: info.outputPath(`shell-menu-${theme}-${density}.png`), animations: 'disabled' });
+    await page.setViewportSize({ width: 700, height: 800 });
+    await page.screenshot({ path: info.outputPath(`shell-menu-narrow-${theme}-${density}.png`), animations: 'disabled' });
+    await powerShell.click();
+    const tabMark = page.locator('[data-tab-row-id]').last().locator('[data-shell-mark="powershell"]');
+    await expect(tabMark).toHaveAttribute('width', '18');
+    await expect(tabMark).toHaveAttribute('height', '18');
+    await page.screenshot({ path: info.outputPath(`shell-tab-${theme}-${density}.png`), animations: 'disabled' });
+    await context.close();
+  });
+}

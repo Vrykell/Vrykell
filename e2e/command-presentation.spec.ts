@@ -22,10 +22,10 @@ test('command coloring is optional, persists and leaves native input editing int
   await expect(overlay.locator('[data-kind="variable"]')).toHaveText(['LANG=zh_CN', '$HOME']);
   await expect(overlay.locator('[data-kind="path"]')).toHaveText('./配置.json');
   await expect(overlay.locator('[data-kind="command"]').first()).toHaveCSS('color', 'rgb(48, 209, 88)');
-  await expect(overlay.locator('[data-kind="argument"]').first()).toHaveCSS('color', 'rgb(68, 160, 255)');
+  await expect(overlay.locator('[data-kind="argument"]').first()).toHaveCSS('color', 'rgb(82, 172, 255)');
   await expect(overlay.locator('[data-kind="flag"]').first()).toHaveCSS('color', 'rgb(50, 191, 255)');
   await expect(overlay.locator('[data-kind="number"]').first()).toHaveCSS('color', 'rgb(245, 196, 0)');
-  await expect(overlay.locator('[data-kind="variable"]').first()).toHaveCSS('color', 'rgb(224, 102, 255)');
+  await expect(overlay.locator('[data-kind="variable"]').first()).toHaveCSS('color', 'rgb(233, 122, 255)');
   await expect(overlay.locator('[data-kind="path"]').first()).toHaveCSS('color', 'rgb(0, 207, 165)');
   await page.screenshot({ path: test.info().outputPath('vivid-command-syntax.png') });
   await input.fill('echo "hello 中文" --flag | cat ./file');

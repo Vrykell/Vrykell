@@ -16,10 +16,10 @@ test('an AI multiline script enters its terminal draft and runs only after an ex
   await page.getByRole('listbox', { name: '选择执行终端' }).getByRole('option').filter({ hasText: 'Bash' }).click();
   await page.locator('[data-chat-composer]').fill('Show the script');
   await page.locator('[data-chat-composer]').press('Enter');
-  const run = page.locator('.chat-exchange').last().getByRole('button', { name: '在终端运行', exact: true });
+  const run = page.locator('.chat-exchange:visible').last().getByRole('button', { name: '在终端运行', exact: true });
   await expect(run).toBeVisible();
   const before = (await ptyWrites(page)).length;
-  await run.click();
+  await page.keyboard.press('Escape'); await run.click();
   const input = page.locator('[data-terminal-input]:visible');
   await expect(input).toHaveValue(script);
   await expect(input).toBeFocused();

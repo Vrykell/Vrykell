@@ -39,8 +39,8 @@ for (const theme of ['dark', 'light']) test(`terminal split creation and group m
     await page.setViewportSize({ width, height: 800 });
     await page.getByRole('button', { name: '更多终端操作', exact: true }).click();
     const menu = page.getByRole('menu', { name: '更多终端操作' });
-    await expect(menu.getByRole('button', { name: '会话历史', exact: true })).toBeVisible();
-    await menu.getByRole('button', { name: '搜索会话…', exact: true }).click();
+    await expect(menu.getByRole('menuitem', { name: '会话历史', exact: true })).toBeVisible();
+    await menu.getByRole('menuitem', { name: '搜索会话…', exact: true }).click();
     const search = page.getByTestId('tab-search');
     await expect(search).toHaveClass(/text-input-field/);
     await expect(search).toHaveCSS('border-radius', '8px');

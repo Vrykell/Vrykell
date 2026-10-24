@@ -72,14 +72,14 @@ for (const theme of ['深色', '浅色']) {
       await expect(sent.locator('.ai-tool-output > [data-selectable]')).toHaveCSS(property,
         await tool.locator('.ai-tool-output > [data-selectable]').evaluate((element, key) => getComputedStyle(element).getPropertyValue(key), property));
     }
-    await expect.poll(() => page.locator('.ai-chat-panel').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
-    await page.locator('.ai-chat-panel').screenshot({ path: testInfo.outputPath('terminal-references-narrow.png'), animations: 'disabled' });
+    await expect.poll(() => page.locator('.ai-chat-panel:visible').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+    await page.locator('.ai-chat-panel:visible').screenshot({ path: testInfo.outputPath('terminal-references-narrow.png'), animations: 'disabled' });
     await page.evaluate(async () => {
       const path = '/src/features/workspace/stores/dock.ts';
       const { useDockStore } = await import(path) as typeof import('../src/features/workspace/stores/dock');
       useDockStore.getState().setPanelWidth('chat', 520);
     });
-    await page.locator('.ai-chat-panel').screenshot({ path: testInfo.outputPath('terminal-references-wide.png'), animations: 'disabled' });
+    await page.locator('.ai-chat-panel:visible').screenshot({ path: testInfo.outputPath('terminal-references-wide.png'), animations: 'disabled' });
     await sent.locator('.chat-reference-toggle').click();
     await expect(sent.locator('.chat-reference-body')).toHaveCount(0);
     await expect(draft.locator('.chat-reference-body')).toBeVisible();

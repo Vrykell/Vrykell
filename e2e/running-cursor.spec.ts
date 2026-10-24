@@ -9,7 +9,7 @@ import { setupTauriMock, emitPtyOutput } from './tauri-mock';
  */
 test('运行中块在命令输入框获得焦点后仍保持实心光标', async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { terminalRenderer: 'dom' } }));
+    localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { terminalRenderer: 'dom', terminalCursorBlink: true } }));
   });
   await setupTauriMock(page);
   await page.goto('/');

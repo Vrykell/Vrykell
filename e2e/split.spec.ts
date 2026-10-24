@@ -83,7 +83,7 @@ test.describe('窗口分裂（二叉分裂树 + 落点选择）', () => {
 
   test('⌥⌘D 选类型后进入落点选择，分裂出混搭终端', async ({ page }) => {
     await page.keyboard.press('Meta+Alt+d');
-    await expect(page.getByText('新建标签页')).toBeVisible();
+    await expect(page.getByRole('dialog', { name: '新建标签页' })).toBeVisible();
     await page.getByTestId('new-tab-option-ssh:ssh-1').click();
     // 进入落点选择
     await expect(page.getByTestId('placement-overlay')).toBeVisible();
