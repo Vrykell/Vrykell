@@ -1505,7 +1505,7 @@ textarea.config-text-input[data-font="ui"] { font-family: var(--font-ui) !import
 .launch-stats dt { color: var(--text-muted); font-size: var(--fs-caption); }
 .launch-stats dd { margin: 6px 0 0; color: var(--text-primary); font: var(--fw-semibold) var(--fs-subtitle) var(--font-mono); }
 .ai-launch-usage { margin-left: auto; color: var(--text-secondary); }
-.terminal-launchpad .ai-launch-agents + .ai-launch-agents { margin-top: 18px; }
+.ai-launch-body > .ai-launch-agents + .ai-launch-agents, .ai-launch-body > .ai-launch-grid + .ai-launch-agents { margin-top: 18px; }
 .terminal-launchpad button.ai-launch-option:not(.ai-launch-native) { min-height: 88px; padding: 14px 16px; }
 .ai-launch-section-actions { display: flex; align-items: center; gap: 6px; }
 @container ai-launchpad (max-width: 560px) { .ai-launch-grid { grid-template-columns: minmax(0, 1fr); } }
