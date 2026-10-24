@@ -52,7 +52,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(row.getByRole('button')).toHaveCount(3);
     await expect(row.getByText('恢复', { exact: true })).toHaveCount(0);
     const quick = row.locator('.history-row-quick-actions');
-    await expect(quick).toHaveCSS('background-color', await card.evaluate(element => getComputedStyle(element).backgroundColor));
+    await expect(quick).toHaveCSS('background-color', await card.evaluate(element => { const probe = document.createElement('span'); probe.style.backgroundColor = 'var(--chrome-field)'; element.append(probe); const color = getComputedStyle(probe).backgroundColor; probe.remove(); return color; }));
     const quickBox = (await quick.boundingBox())!;
     const listBox = (await page.locator('.history-list').boundingBox())!;
     expect(quickBox.x).toBeGreaterThanOrEqual(listBox.x);
@@ -70,7 +70,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(row.locator('.sidebar-row-title')).toHaveCSS('text-decoration-line', 'underline');
     const channels = await row.locator('.sidebar-row-title').evaluate(element => getComputedStyle(element).color.match(/[0-9.]+/g)!.slice(0, 3).map(Number));
     expect(channels[2]!).toBeGreaterThan(channels[0]!);
-    await expect(row.locator('.history-row-icon svg')).toHaveCSS('width', '16px');
+    await expect(row.locator('.history-row-icon svg')).toHaveCSS('width', '18px');
     await expect(row.locator('.sidebar-row-content')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await row.click({ button: 'right' });
     await expect(page.getByRole('menu', { name: '分组操作' })).toHaveCount(0);

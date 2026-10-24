@@ -164,7 +164,8 @@ test('filters history, generates and revises AI drafts, and offers a choice of e
   await page.getByTestId('command-history-tests').hover();
   await page.getByTestId('command-history-tests').click();
   await panel.getByRole('region', { name: '命令详情', exact: true }).getByRole('button', { name: '运行命令' }).click();
-  await expect(panel.getByText('终端目录与命令目录不同，请选择新终端。', { exact: false })).toBeVisible();
+  await expect(page.getByRole('alert').getByText('终端目录与命令目录不同，请选择新终端。', { exact: false })).toBeVisible();
+  await page.getByRole('button', { name: '关闭错误提示', exact: true }).click();
   await page.evaluate(async () => { const { useCommandHistorySettings } = await import('/src/config/commandHistory.ts'); useCommandHistorySettings.getState().update({ runIn: 'new' }); });
   await panel.getByRole('region', { name: '命令详情', exact: true }).getByRole('button', { name: '运行命令' }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: { cwd?: string }[] }).__PTY_SPAWNS__.some(spawn => spawn.cwd === '/home/e2e/project/src-tauri'))).toBe(true);
@@ -386,7 +387,7 @@ test('drags commands and groups, filters collected commands and remembers inspec
   await dragTo(page, checks.getByRole('button', { name: 'Checks', exact: true }), release.locator('.command-history-section'));
   await expect(panel.locator('.command-history-group').filter({ has: page.locator('[data-reorder-handle]') }).first()).toContainText('Checks');
   await page.getByTestId('command-history-build').hover();
-  await page.getByTestId('command-history-build').getByRole('button', { name: '命令操作', exact: true }).click();
+  await page.getByTestId('command-history-build').click({ button: 'right' });
   await expect(page.getByRole('button', { name: '移动到命令分组…', exact: true })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await page.getByTestId('command-history-build').click();
@@ -476,7 +477,7 @@ test('keeps favorite-only commands when dragged into history and fits collected 
   const moved = page.getByTestId('command-group-history').locator('[data-command-history]').filter({ hasText: 'Preview draft' });
   await expect(moved).toBeVisible();
   await page.reload(); await expect(moved).toBeVisible();
-  await page.getByTestId('command-history-build').getByRole('button', { name: '命令操作', exact: true }).click();
+  await page.getByTestId('command-history-build').click({ button: 'right' });
   await page.getByRole('button', { name: '保存到收藏', exact: true }).click();
   await panel.getByRole('button', { name: '筛选命令', exact: true }).click();
   await page.getByTestId('command-history-filter-menu').getByRole('button', { name: '仅星标或已分组', exact: true }).click();
@@ -743,7 +744,7 @@ test('keeps native AI window actions visible in small layouts and reports malfor
   await expect(dialog).toBeVisible();
   await tool.evaluate(() => { (window as unknown as { __AI_REPLY__: string }).__AI_REPLY__ = '{"groups":['; });
   await dialog.getByRole('button', { name: '生成分组建议' }).click();
-  await expect(dialog.getByText('自动重试后模型仍未返回有效结果，请重试或更换模型。', { exact: true })).toBeVisible();
+  await expect(tool.getByRole('alert').getByText('自动重试后模型仍未返回有效结果，请重试或更换模型。', { exact: true })).toBeVisible();
   await expect(dialog.getByRole('button', { name: '应用分组' })).toBeDisabled();
   expect(await tool.evaluate(() => (window as unknown as { __SEARCH_CALLS__: { cmd: string }[] }).__SEARCH_CALLS__?.filter(call => call.cmd === 'llm_stream').length)).toBe(2);
   await expect(page.getByTestId('command-history-build')).toBeVisible();
@@ -755,6 +756,7 @@ test('keeps native AI window actions visible in small layouts and reports malfor
     expect((await footer.boundingBox())!.y + (await footer.boundingBox())!.height).toBeLessThanOrEqual(280);
     await tool.screenshot({ path: test.info().outputPath(`native-group-small-${theme}.png`) });
   }
+  await tool.getByRole('button', { name: '关闭错误提示', exact: true }).click();
   await tool.evaluate(() => { (window as unknown as { __AI_REPLY__: string }).__AI_REPLY__ = 'Here is the plan:\n```json\n{"groups":[{"name":"Build tools","itemIds":["i1"]}]}\n```'; });
   await dialog.getByRole('button', { name: '生成分组建议' }).click();
   await expect(dialog.getByRole('heading', { name: 'Build tools 1' })).toBeVisible();

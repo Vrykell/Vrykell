@@ -30,7 +30,7 @@ for (const theme of ['dark', 'light'] as const) {
       const panel = document.querySelector('.settings-group-panel')!;
       // The floating surface carries the background; the listbox inside only scrolls.
       const surface = element.closest('.ui-select-menu') ?? element;
-      return getComputedStyle(surface).backgroundColor !== getComputedStyle(panel).backgroundColor;
+      const probe = document.createElement('span'); probe.style.backgroundColor = 'var(--menu-bg)'; panel.append(probe); const expected = getComputedStyle(probe).backgroundColor; probe.remove(); return getComputedStyle(surface).backgroundColor === expected;
     })).toBe(true);
     await page.screenshot({ path: testInfo.outputPath(`settings-clean-edges-${theme}.png`), animations: 'disabled' });
     await page.keyboard.press('Escape');

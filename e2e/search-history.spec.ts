@@ -16,7 +16,7 @@ test.describe('重新生成标题（标签右键菜单）', () => {
     const input = page.getByPlaceholder(/自然语言描述/);
     await input.fill('帮我部署服务');
     await input.press('Enter');
-    await expect(page.getByText('部署服务').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.chat-conversation-title:visible')).toHaveText('帮我部署服务', { timeout: 10000 });
     // Terminal title generation uses terminal activity rather than the independent conversation.
     await page.locator('[data-terminal-input]').fill('echo deploy-service');
     await page.locator('[data-terminal-input]').press('Enter');
@@ -38,7 +38,7 @@ test.describe('全局搜索（Cmd+F）', () => {
   test('setting results open their matching page on first and subsequent visits', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
-    for (const [query, target, label] of [['主题', '主题', '主题'], ['文件打开方式', '本地编辑器', '默认编辑命令']]) {
+    for (const [query, target, label] of [['主题', '主题', '主题'], ['文件打开方式', '本地文件打开方式', '默认编辑命令']]) {
       await page.getByTestId('global-search-trigger').click();
       const dialog = page.getByRole('dialog', { name: '全局搜索' });
       await dialog.getByPlaceholder('搜索文件、命令、设置…').fill(query);
