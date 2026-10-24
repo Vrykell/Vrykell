@@ -57,8 +57,18 @@ it('reorders workspace rows and renders them in the saved order', () => {
   render(<WorkspaceSidebar />);
   const rows = Array.from(document.querySelectorAll('[data-testid^="workspace-area-"]'))
     .map(row => row.getAttribute('data-testid'));
-  expect(rows).toEqual(['workspace-area-ssh', 'workspace-area-terminal', 'workspace-area-code', 'workspace-area-ai']);
-  expect(useWorkspaceNavigation.getState().workspaceOrder).toEqual(['ssh', 'terminal', 'code', 'ai']);
+  expect(rows).toEqual(['workspace-area-ssh', 'workspace-area-terminal', 'workspace-area-code', 'workspace-area-ai', 'workspace-area-unified']);
+  expect(useWorkspaceNavigation.getState().workspaceOrder).toEqual(['ssh', 'terminal', 'code', 'ai', 'unified']);
+});
+
+it('opens the mixed workspace through a full-width sidebar row with keyboard navigation', () => {
+  useWorkspaceNavigation.setState({ collapsed: false, area: 'terminal' });
+  render(<WorkspaceSidebar />);
+  const row = screen.getByRole('button', { name: '聚合工作区' });
+  expect(row).toHaveClass('sidebar-row');
+  fireEvent.keyDown(row, { key: 'Enter' });
+  expect(useWorkspaceNavigation.getState().area).toBe('unified');
+  expect(row).toHaveAttribute('aria-current', 'page');
 });
 
 it('resizes through the shared separator, keeps a held collapsed drag reversible and supports keyboard reset', async () => {

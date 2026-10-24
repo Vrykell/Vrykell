@@ -10,7 +10,7 @@ export const WORKSPACE_SIDEBAR_MIN_WIDTH = 160;
 export const WORKSPACE_SIDEBAR_MAX_WIDTH = 400;
 export const WORKSPACE_COMPACT_BREAKPOINT = 900;
 const STORAGE_KEY = 'workspace-navigation-v1';
-const DEFAULT_WORKSPACE_ORDER: WorkspaceArea[] = ['terminal', 'code', 'ai', 'ssh'];
+const DEFAULT_WORKSPACE_ORDER: WorkspaceArea[] = ['terminal', 'code', 'ai', 'ssh', 'unified'];
 
 export function workspaceAreaForKind(kind: string): WorkspaceArea {
   if (kind === 'editor' || kind === 'git-diff' || kind === 'start-code') return 'code';

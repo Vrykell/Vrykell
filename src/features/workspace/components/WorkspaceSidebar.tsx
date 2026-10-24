@@ -4,11 +4,12 @@ import SidebarItem from '@ui/layout/sidebarItem';
 import { IconButton } from '@ui/actions/IconButton';
 import ResizeHandle from '@ui/layout/ResizeHandle';
 import { ListReorderPlaceholder, ListReorderPreview, useListReorderDrag } from '@ui/layout/listReorder';
-import { TerminalPrompt, FileCode, ServerStack, Settings, PanelLeft, History, iconSizes } from '@ui/icons';
+import { TerminalPrompt, FileCode, ServerStack, Settings, PanelLeft, History, Grid, iconSizes } from '@ui/icons';
 import AiSessionIcon from '@features/chat/components/AiSessionIcon';
 import { useUiStore } from '@features/workspace';
 import { useWorkspaceNavigation, WORKSPACE_AREA_LABELS, WORKSPACE_COMPACT_BREAKPOINT, type WorkspaceArea } from '../stores/navigation';
 import { selectWorkspaceArea } from '../services/selectWorkspaceArea';
+import { openUnifiedWorkspace } from '../services/unifiedWorkspace';
 import NavigationDragPreview from './NavigationDragPreview';
 import SidePanel from './SidePanel';
 import { isMacOS } from '@platform/runtime';
@@ -36,7 +37,9 @@ export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number
     { id: 'code' as const, label: t(WORKSPACE_AREA_LABELS.code), Icon: FileCode },
     { id: 'ai' as const, label: t(WORKSPACE_AREA_LABELS.ai), Icon: AiSessionIcon },
     { id: 'ssh' as const, label: t(WORKSPACE_AREA_LABELS.ssh), Icon: ServerStack },
+    { id: 'unified' as const, label: t(WORKSPACE_AREA_LABELS.unified), Icon: Grid },
   ];
+  const open = (id: WorkspaceArea) => id === 'unified' ? openUnifiedWorkspace() : selectWorkspaceArea(id);
   const orderedItems = workspaceOrder.flatMap(id => {
     const item = items.find(candidate => candidate.id === id);
     return item ? [item] : [];
@@ -70,7 +73,7 @@ export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number
           testId={`workspace-area-${id}`} dataAttributes={{ role: 'button', 'aria-label': label, 'data-dock-btn': id === 'terminal' ? 'tabs' : id === 'ssh' ? 'ssh' : undefined, 'aria-current': !settingsOpen && (area === id || id === 'ssh' && area === 'forwarding') ? 'page' : undefined }}
           tabIndex={0} reorderItemId={id} reorderListId="workspace-areas" reorderKind="workspace"
           onPointerDown={event => startWorkspaceDrag(event, { id, kind: 'workspace' })}
-          onClick={() => selectWorkspaceArea(id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); selectWorkspaceArea(id); } }} />
+          onClick={() => open(id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(id); } }} />
         {index === orderedItems.length - 1 && <ListReorderPlaceholder listId="workspace-areas" itemId={id} after />}
       </Fragment>)}
     </nav>

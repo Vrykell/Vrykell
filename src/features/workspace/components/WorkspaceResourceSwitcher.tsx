@@ -5,7 +5,6 @@ import { IconButton } from '@ui/actions/IconButton';
 import ContextMenu, { type MenuAnchor } from '@ui/menus/ContextMenu';
 import { Grid, iconSizes } from '@ui/icons';
 import { t } from '@i18n';
-import { openUnifiedWorkspace } from '../services/unifiedWorkspace';
 
 export default function WorkspaceResourceSwitcher() {
   const resources = useWorkspaceResources();
@@ -15,7 +14,7 @@ export default function WorkspaceResourceSwitcher() {
       const trigger = event.currentTarget; const bounds = trigger.getBoundingClientRect();
       setMenu(current => current ? null : { x: bounds.right, y: bounds.bottom + 4, trigger, align: 'end' });
     }}><Grid size={iconSizes.control} /></IconButton>
-    {menu && <ContextMenu anchor={menu} label={t('All workspace tabs')} itemRole="menuitem" onClose={() => setMenu(null)} items={[{ label: t('Unified workspace'), onClick: openUnifiedWorkspace }, ...resources.map(resource => ({
+    {menu && <ContextMenu anchor={menu} label={t('All workspace tabs')} itemRole="menuitem" onClose={() => setMenu(null)} items={resources.map(resource => ({
       label: resource.title, onClick: () => activateWorkspaceResource(resource),
-    }))]} />}</>;
+    }))} />}</>;
 }
