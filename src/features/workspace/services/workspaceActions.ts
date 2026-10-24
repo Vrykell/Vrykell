@@ -55,7 +55,9 @@ export function activateWorkspaceInstance(index: number): boolean {
   const area = focusedWorkspaceArea();
   if (area === 'unified') {
     const ids = currentWorkspaceResources().filter(resource => resource.kind !== 'page').map(resource => resource.id);
-    const id = orderedWorkspaceIds(ids, useUnifiedWorkspace.getState().order)[index];
+    const unified = useUnifiedWorkspace.getState();
+    if (unified.startOpen && index === 0) { unified.openStart(); return true; }
+    const id = orderedWorkspaceIds(ids, unified.order)[index - (unified.startOpen ? 1 : 0)];
     if (!id) return false;
     focusUnifiedResource(id); return true;
   }
@@ -89,7 +91,12 @@ export function activateWorkspaceInstance(index: number): boolean {
     if (id.startsWith('page:')) workspace.activate(id.slice(5));
     else {
       if (!side) ai.select(id);
-      if (id.startsWith('chat:')) void useChatStore.getState().selectConversation(id.slice(5)); else connections.select(id.slice(4));
+      if (id.startsWith('chat:')) void useChatStore.getState().selectConversation(id.slice(5)).then(() => {
+        if (side) requestAnimationFrame(() => {
+          if (useChatStore.getState().activeConversationId !== id.slice(5)) return;
+          [...document.querySelectorAll<HTMLTextAreaElement>('[data-testid="ai-surface-side"] [data-chat-composer]')].find(element => element.getClientRects().length > 0 && !element.closest('[inert]'))?.focus({ preventScroll: true });
+        });
+      }); else connections.select(id.slice(4));
       if (!side) workspace.openHarnessTab();
     }
     return true;

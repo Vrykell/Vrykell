@@ -4,7 +4,7 @@ import { t } from '@i18n';
 import FolderTabs from '@ui/layout/FolderTabs';
 import { IconButton } from '@ui/actions/IconButton';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
-import { Plus, DataUsage, Folder, Columns2, History, Sparkles } from '@ui/icons';
+import { Plus, DataUsage, Folder, PanelRight, History, Sparkles } from '@ui/icons';
 import AppMark from '@ui/icons/AppMark';
 import WorkspaceHeader from '@ui/layout/WorkspaceHeader';
 import ResourceContent from '@ui/layout/ResourceContent';
@@ -13,7 +13,7 @@ import { registerHarnessCloseGuard } from '@core/harness';
 import { pickPath } from '@platform/api/fs';
 import { useToastStore } from '@ui/feedback/Toast';
 import AcpLauncher from '@features/workspace/components/AcpLauncher';
-import { useSessionStore, useUiStore, WorkspaceResourceSwitcher } from '@features/workspace';
+import { useSessionStore, useUiStore, WorkspaceResourceSwitcher, WorkspaceSplitAction } from '@features/workspace';
 import { UnifiedHistoryView } from '@features/session-history';
 import UsageView from '@features/agent/components/UsageView';
 import { harnessMark } from '@features/agent/components/HarnessBadge';
@@ -136,12 +136,13 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
         ...(selected.startsWith('chat:') ? [{ label: t('Dock AI to side'), onClick: relocate }] : []),
       ]} toolbar={<>
         <WorkspaceResourceSwitcher />
+        {!activeSystemPage && selected && <WorkspaceSplitAction resourceId={selected} />}
         <IconButton compact aria-label={t('AI conversation history')} data-tip={t('AI conversation history')} onClick={() => useSessionStore.getState().openAiHistoryTab()}><History size={16} /></IconButton>
         <div ref={surface?.toolbar} className="ai-conversation-toolbar" style={{ display: placement === 'main' && selected.startsWith('chat:') && activePage?.kind === 'harness' ? 'flex' : 'none' }} />
         <span className="folder-action-secondary ai-secondary-actions">
         <IconButton compact aria-label={t('Choose project folder')} data-tip={t('Choose project folder')} onClick={() => void chooseDirectory()}><Folder size={16} /></IconButton>
         <IconButton compact aria-label={t('Usage statistics')} data-tip={t('Usage statistics')} onClick={() => useSessionStore.getState().openUsageTab()}><DataUsage size={16} /></IconButton>
-        {selected.startsWith('chat:') && <IconButton compact data-testid="ai-relocate" aria-label={t('Dock AI to side')} data-tip={t('Dock AI to side')} onClick={relocate}><Columns2 size={16} /></IconButton>}
+        {selected.startsWith('chat:') && <IconButton compact data-testid="ai-relocate" aria-label={t('Dock AI to side')} data-tip={t('Dock AI to side')} onClick={relocate}><PanelRight size={16} /></IconButton>}
         </span>
         <IconButton compact data-testid="ai-new-conversation" aria-label={t('New conversation')} data-tip={t('New conversation')} onClick={() => void newConversation()}><Sparkles size={16} /></IconButton>
         <IconButton compact data-testid="harness-add-session" aria-label={t('Connect a server')} data-tip={t('Connect a server')} onClick={() => { setDirectory(undefined); setLauncherOpen(true); }}><Plus size={16} /></IconButton>

@@ -58,4 +58,5 @@ export {
 export { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 export { useTabDisplayTitle } from '@features/workspace/hooks/useTabDisplayTitle';
 export { default as WorkspaceResourceSwitcher } from './components/WorkspaceResourceSwitcher';
+export { default as WorkspaceSplitAction } from './components/WorkspaceSplitAction';
 export { useWorkspaceNavigation, orderedWorkspaceIds, workspaceAreaForKind, type HistoryTypePreset } from './stores/navigation';

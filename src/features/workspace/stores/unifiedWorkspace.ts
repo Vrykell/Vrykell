@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import { orderedWorkspaceIds } from './navigation';
 import { mapWorkspacePane, parseWorkspacePaneLayout, pruneWorkspacePanes, splitWorkspacePane, workspacePaneCells, type WorkspacePaneLayout } from '../model/workspaceResources';
+import type { PaneTarget } from '@core/paneLayout';
 
 const STORAGE_KEY = 'unified-workspace-v1';
 const saved = safeJsonParse<{ layout?: unknown; order?: unknown; focused?: unknown }>(safeLocalStorageGet(STORAGE_KEY) ?? '{}');
@@ -10,9 +11,12 @@ const pane = (resourceId: string): Extract<WorkspacePaneLayout, { type: 'pane' }
 
 interface UnifiedWorkspaceState {
   layout: WorkspacePaneLayout | null; focused: string; order: string[];
+  startOpen: boolean; startActive: boolean; choosingSplit: boolean;
+  openStart: () => void; closeStart: () => void;
   reconcile: (ids: string[]) => void;
   show: (id: string) => void;
   split: (id: string, direction: 'row' | 'col') => void;
+  place: (id: string, target: PaneTarget) => void;
   removePane: (id: string) => void;
   single: () => void;
   move: (ids: string[], id: string, over: string, after: boolean) => void;
@@ -20,6 +24,9 @@ interface UnifiedWorkspaceState {
 }
 
 export const useUnifiedWorkspace = create<UnifiedWorkspaceState>((set) => ({
+  startOpen: true, startActive: true, choosingSplit: false,
+  openStart: () => set({ startOpen: true, startActive: true }),
+  closeStart: () => set(state => state.layout ? { startOpen: false, startActive: false } : state),
   layout: parseWorkspacePaneLayout(saved?.layout), focused: typeof saved?.focused === 'string' ? saved.focused : '',
   order: Array.isArray(saved?.order) ? saved.order.filter((id): id is string => typeof id === 'string') : [],
   reconcile: ids => set(state => {
@@ -28,19 +35,25 @@ export const useUnifiedWorkspace = create<UnifiedWorkspaceState>((set) => ({
     const cells = layout ? workspacePaneCells(layout) : [];
     const focused = cells.some(cell => cell.id === state.focused) ? state.focused : cells[0]?.id ?? '';
     const order = orderedWorkspaceIds(ids, state.order);
-    if (JSON.stringify(layout) === JSON.stringify(state.layout) && focused === state.focused && JSON.stringify(order) === JSON.stringify(state.order)) return state;
-    return { layout, focused, order };
+    const startActive = !layout || state.startActive; const startOpen = !layout || state.startOpen;
+    if (JSON.stringify(layout) === JSON.stringify(state.layout) && focused === state.focused && JSON.stringify(order) === JSON.stringify(state.order) && startActive === state.startActive && startOpen === state.startOpen) return state;
+    return { layout, focused, order, startActive, startOpen };
   }),
   show: id => set(state => {
     const existing = state.layout && workspacePaneCells(state.layout).find(cell => cell.resourceId === id);
-    if (existing) return { focused: existing.id };
-    if (!state.layout) { const next = pane(id); return { layout: next, focused: next.id }; }
-    return { layout: mapWorkspacePane(state.layout, state.focused, node => node.type === 'pane' ? { ...node, resourceId: id } : node) };
+    if (existing) return { focused: existing.id, startActive: false };
+    if (!state.layout) { const next = pane(id); return { layout: next, focused: next.id, startActive: false }; }
+    return { layout: mapWorkspacePane(state.layout, state.focused, node => node.type === 'pane' ? { ...node, resourceId: id } : node), startActive: false };
   }),
   split: (id, direction) => set(state => {
     if (!state.layout) { const next = pane(id); return { layout: next, focused: next.id }; }
     const next = pane(id); const layout = splitWorkspacePane(state.layout, state.focused, next, direction);
     return layout === state.layout ? state : { layout, focused: next.id };
+  }),
+  place: (id, target) => set(state => {
+    if (!state.layout) return state;
+    const next = pane(id); const layout = splitWorkspacePane(state.layout, target.leafId, next, target.dir, target.position);
+    return layout === state.layout ? state : { layout, focused: next.id, startActive: false };
   }),
   removePane: id => set(state => {
     if (!state.layout) return state;

@@ -32,3 +32,8 @@ export function closeWorkspaceResource(resource: WorkspaceResource) {
   else if (resource.kind === 'comparison') workspace.closeGitComparison(resource.comparisonId);
   else closeAiWorkspaceSession(`${resource.kind === 'agent' ? 'acp' : 'chat'}:${resource.sessionId}`);
 }
+
+export function renameWorkspaceResource(resource: WorkspaceResource, title: string) {
+  if (resource.kind === 'terminal') useWorkspaceStore.getState().renameTab(resource.tabId, title);
+  else if (resource.kind === 'conversation') useChatStore.getState().renameConversation(resource.sessionId, title);
+}

@@ -20,6 +20,7 @@ export function closeWorkspaceItem() {
   const navigation = useWorkspaceNavigation.getState();
   if (navigation.area === 'unified') {
     const state = useUnifiedWorkspace.getState();
+    if (state.startActive) { state.closeStart(); return; }
     const id = state.layout && workspacePaneCells(state.layout).find(cell => cell.id === state.focused)?.resourceId;
     const resource = currentWorkspaceResources().find(item => item.id === id);
     if (resource) closeWorkspaceResource(resource);

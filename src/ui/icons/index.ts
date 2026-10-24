@@ -46,6 +46,7 @@ import { History16Regular, History24Regular } from '@fluentui/react-icons/headle
 import { Save24Regular } from '@fluentui/react-icons/headless/svg/save';
 import { Navigation24Regular } from '@fluentui/react-icons/headless/svg/navigation';
 import { PanelLeft24Regular } from '@fluentui/react-icons/headless/svg/panel-left';
+import { PanelRight24Regular } from '@fluentui/react-icons/headless/svg/panel-right';
 import { Image24Regular } from '@fluentui/react-icons/headless/svg/image';
 import { Info24Regular } from '@fluentui/react-icons/headless/svg/info';
 import { Keyboard24Regular } from '@fluentui/react-icons/headless/svg/keyboard';
@@ -142,6 +143,7 @@ export const ChevronRight = createAppIcon(ChevronRight24Regular);
 export const ClipboardPaste = createAppIcon(ClipboardPaste24Regular);
 export const Columns2 = createAppIcon(SplitVertical24Regular);
 export const PanelLeft = createAppIcon(PanelLeft24Regular);
+export const PanelRight = createAppIcon(PanelRight24Regular);
 export const Command = createAppIcon(KeyCommand24Regular);
 export const Copy = createAppIcon(Copy24Regular);
 export const Cpu = createAppIcon(DeveloperBoard24Regular);

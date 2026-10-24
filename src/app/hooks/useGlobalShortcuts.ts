@@ -6,6 +6,7 @@ import { useUiStore } from '@features/workspace';
 import { redrawTerminal } from '@features/terminal/services/terminalRepaint';
 import { closeWorkspaceItem } from '@features/workspace/services/closeWorkspaceItem';
 import { activateWorkspaceInstance, focusedWorkspaceArea, newWorkspaceItem } from '@features/workspace/services/workspaceActions';
+import { requestWorkspaceSplit } from '@features/workspace/services/unifiedWorkspace';
 
 /**
  * 全局快捷键：
@@ -127,6 +128,8 @@ export function useGlobalShortcuts() {
         // Cmd+Shift+D：直接上下分裂（跳过落点选择）
         e.preventDefault();
         ws.splitFocusedDirect('col');
+      } else if (e.key.toLowerCase() === 'd' && ['code', 'ai', 'unified'].includes(focusedWorkspaceArea())) {
+        e.preventDefault(); requestWorkspaceSplit();
       } else if (e.key === 'w') {
         e.preventDefault();
         closeWorkspaceItem();

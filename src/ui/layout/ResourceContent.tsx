@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useLayoutEffect, useMemo, useSt
 import { createPortal } from 'react-dom';
 import { WorkspaceHeaderScope } from '@ui/layout/WorkspaceHeader';
 
-interface Placement { target: HTMLElement; visible: boolean; focused: boolean }
+interface Placement { target: HTMLElement; visible: boolean; focused: boolean; toolbarTarget?: HTMLElement | null }
 const ContentContext = createContext<{ slots: Map<string, Placement>; register: (id: string, placement: Placement | null) => void } | null>(null);
 
 export function ResourceContentProvider({ children }: { children: ReactNode }) {
@@ -16,14 +16,14 @@ export function ResourceContentProvider({ children }: { children: ReactNode }) {
   return <ContentContext.Provider value={context}>{children}</ContentContext.Provider>;
 }
 
-export function ResourceContentSlot({ id, visible, focused }: { id: string; visible: boolean; focused: boolean }) {
+export function ResourceContentSlot({ id, visible, focused, toolbarTarget }: { id: string; visible: boolean; focused: boolean; toolbarTarget?: HTMLElement | null }) {
   const register = useContext(ContentContext)?.register;
   const [target, setTarget] = useState<HTMLDivElement | null>(null);
   useLayoutEffect(() => {
     if (!register || !target) return;
-    register(id, { target, visible, focused });
+    register(id, { target, visible, focused, toolbarTarget });
     return () => register(id, null);
-  }, [id, register, target, visible, focused]);
+  }, [id, register, target, visible, focused, toolbarTarget]);
   return <div className="resource-content-slot" ref={setTarget} />;
 }
 
@@ -37,7 +37,7 @@ export default function ResourceContent({ id, active, fallbackTarget, children }
   const visible = placed || active;
   const focused = placed ? !!slot?.focused : active;
   const [parking, setParking] = useState<HTMLDivElement | null>(null);
-  const [header, setHeader] = useState<HTMLDivElement | null>(null);
+  const header = placed && focused ? slot.toolbarTarget ?? null : null;
   const [host] = useState(() => { const element = document.createElement('div'); element.className = 'resource-content-host'; return element; });
   const target = placed ? slot.target : fallbackTarget ?? parking;
   useLayoutEffect(() => {
@@ -46,7 +46,6 @@ export default function ResourceContent({ id, active, fallbackTarget, children }
   }, [host, target]);
   useLayoutEffect(() => { host.style.display = visible ? 'flex' : 'none'; host.inert = !visible; }, [host, visible]);
   return <><div className="resource-content-parking" ref={setParking} />{createPortal(<WorkspaceHeaderScope enabled={placed} target={header}>
-    <div className="resource-content-header" ref={setHeader} hidden={!placed} />
-    {children({ visible, focused, placed, header: placed ? header : null })}
+    {children({ visible, focused, placed, header })}
   </WorkspaceHeaderScope>, host)}</>;
 }

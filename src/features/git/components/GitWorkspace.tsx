@@ -3,7 +3,7 @@ import { t } from '@i18n';
 import { gitComparisonKey, type GitDiff, type GitSelection } from '@core/git';
 import { getGitDiff } from '@platform/api/git';
 import { useGitReview, useGitSelection } from '../index';
-import { useSessionStore, terminalsOf, useWorkspaceNavigation, WorkspaceResourceSwitcher } from '@features/workspace';
+import { useSessionStore, terminalsOf, useWorkspaceNavigation, WorkspaceResourceSwitcher, WorkspaceSplitAction } from '@features/workspace';
 import { fileIcon } from '@features/files';
 import CodeDiff from '@ui/editor/CodeDiff';
 import ErrorBox from '@ui/feedback/ErrorBox';
@@ -94,6 +94,7 @@ function GitComparisonContent({ selection, active, tabId }: { selection: GitSele
         <span className="folder-action-secondary"><Select aria-label={t('Comparison layout')} value={layout} onChange={setLayout} options={[{ value: 'split', label: t('Side by side') }, { value: 'inline', label: t('Inline comparison') }]} /></span>
         <span className="git-diff-navigation folder-action-secondary">{navigation}</span>
         <span className="folder-action-secondary"><ReloadButton compact label={t('Refresh comparison')} onReload={refresh} /></span>
+        <WorkspaceSplitAction resourceId={`diff:${tabId}`} />
         <IconButton compact className="workspace-open-action" aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}><FolderOpen size={iconSizes.control} /></IconButton>
         <IconButton compact className="workspace-create-action" aria-label={t('New file')} data-tip={t('New file')} onClick={newEditorFile}><Plus size={iconSizes.control} /></IconButton>
       </>} /></WorkspaceHeader>
