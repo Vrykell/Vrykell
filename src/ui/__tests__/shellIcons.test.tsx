@@ -1,59 +1,48 @@
 import { cleanup, render } from '@testing-library/react';
 import { createElement } from 'react';
-import { afterEach, describe, expect, it } from 'vitest';
-import { Terminal } from '@ui/icons';
-import { BashIcon, CmdIcon, PowerShellIcon, SshIcon, ZshIcon, shellIconFor } from '../shellIcons';
+import { act } from '@testing-library/react';
+import { afterEach, expect, it } from 'vitest';
+import { hostIconFor, shellIconFor, SshIcon, TerminalIcon, TerminalProfileIcon } from '../shellIcons';
+import { useHostSystems } from '@config/hostSystems';
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); useHostSystems.setState({ systems: {} }); });
 
-describe('shellIconFor', () => {
-  it('restores the colored terminal tile at its original 20px row size', () => {
-    const { container } = render(createElement(ZshIcon));
-    expect(container.querySelector('svg')).toHaveAttribute('width', '20');
-    expect(container.querySelector('svg')).toHaveAttribute('height', '20');
-    expect(container.querySelector('svg')).toHaveAttribute('data-shell-mark', 'zsh');
-    expect(container.querySelector('rect')).toHaveAttribute('width', '22');
-    expect(container.querySelector('rect')).toHaveAttribute('height', '18');
-    expect(container.querySelector('rect')).toHaveAttribute('rx', '3.5');
-    expect(container.querySelector('path')).toHaveAttribute('d', 'm6 8 4 4-4 4M12 16h6');
-    expect(container.querySelector('path')).toHaveAttribute('stroke', 'var(--shell-tile-ink)');
-  });
-  it('maps every supported shell to its brand mark and falls back to the terminal icon', () => {
-    expect(shellIconFor('powershell')).toBe(PowerShellIcon);
-    expect(shellIconFor('pwsh')).toBe(PowerShellIcon);
-    expect(shellIconFor('zsh')).toBe(ZshIcon);
-    expect(shellIconFor('bash')).toBe(BashIcon);
-    expect(shellIconFor('cmd')).toBe(CmdIcon);
-    expect(shellIconFor(undefined)).toBe(Terminal);
-    expect(shellIconFor(null)).toBe(Terminal);
-    expect(shellIconFor('fish')).toBe(Terminal);
-  });
+it.each([undefined, '', 'unrecognized'])('uses the dark terminal identity as the fallback for %s', shell => {
+  expect(shellIconFor(shell)).toBe(TerminalIcon);
+});
 
-  it('renders a shell mark at the requested size with its shell data attribute', () => {
-    const { container } = render(createElement(shellIconFor('bash'), { size: 20 }));
-    const svg = container.querySelector('svg');
-    expect(svg).not.toBeNull();
-    expect(svg).toHaveAttribute('data-shell-mark', 'bash');
-    expect(svg).toHaveAttribute('width', '20');
-  });
+it('distinguishes the blue shell identity from the dark terminal fallback', () => {
+  const { container } = render(<><TerminalProfileIcon shellType="powershell" /><TerminalProfileIcon /></>);
+  expect(container.querySelector('[data-shell-mark="powershell"]')).toHaveStyle({ color: 'var(--chart-blue)' });
+  expect(container.querySelector('[data-shell-mark="powershell"]')).toHaveAttribute('viewBox', '2 2 28 28');
+  expect(container.querySelector('[data-shell-mark="powershell"] linearGradient')).not.toBeNull();
+  expect(container.querySelector('[data-shell-mark="terminal"] linearGradient')).not.toBeNull();
+});
 
-  it('allows an explicit color while keeping the SSH mark geometry', () => {
-    const { container } = render(createElement(SshIcon, { size: 20, style: { color: 'var(--group-rose)' } }));
-    const svg = container.querySelector('svg') as SVGElement;
-    expect(svg).toHaveAttribute('data-shell-mark', 'ssh');
-    expect(svg.style.color).toBe('var(--group-rose)');
-  });
+it('uses orange and green for the two command shell identities', () => {
+  const { container } = render(<><TerminalProfileIcon shellType="zsh" /><TerminalProfileIcon shellType="bash" /></>);
+  expect(container.querySelector('[data-shell-mark="zsh"]')).toHaveStyle({ color: 'var(--shell-zsh-accent)' });
+  expect(container.querySelector('[data-shell-mark="bash"]')).toHaveStyle({ color: 'var(--group-green)' });
+});
 
-  it.each(['zsh', 'bash'])('keeps the %s mark readable through the theme color', (shell) => {
-    const { container } = render(createElement(shellIconFor(shell), { size: 20 }));
-    const svg = container.querySelector('svg') as SVGElement;
-    expect(svg.style.color).toBe(`var(--shell-${shell}-accent)`);
-    expect(svg).toHaveAttribute('data-shell-mark', shell);
-    expect(svg).toHaveAttribute('height', '20');
-    const fills = [...svg.querySelectorAll('[fill]')].map(element => element.getAttribute('fill'));
-    expect(fills.length).toBeGreaterThan(0);
-    expect(fills.every(fill => fill === 'currentColor' || fill === 'none' || fill === 'var(--shell-tile-ink)')).toBe(true);
-    expect(svg.querySelector('text')).toBeNull();
-    expect(svg).toHaveAttribute('aria-hidden', 'true');
-  });
+it.each(['zsh', 'bash', 'cmd', 'powershell', 'fish', 'git-bash', 'python', 'node'])('renders the %s identity at the requested size', shell => {
+  const { container } = render(createElement(shellIconFor(shell), { size: 18 }));
+  expect(container.querySelector('svg')).toHaveAttribute('data-shell-mark', shell);
+  expect(container.querySelector('svg')).toHaveAttribute('width', '18');
+  expect(container.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+});
+
+it.each([undefined, '', 'unknown', 'Linux', 'Linux aarch64'])('uses the default remote system icon for %s', system => {
+  expect(hostIconFor(system)).toBe(SshIcon);
+});
+
+it.each(['Ubuntu', 'Debian', 'Fedora', 'CentOS', 'Arch', 'Darwin', 'Windows'])('distinguishes a known %s host', system => {
+  expect(hostIconFor(system)).not.toBe(SshIcon);
+});
+
+it('updates remote icons when authenticated system metadata arrives', () => {
+  const { container } = render(<TerminalProfileIcon kind="ssh" connectionId="remote" />);
+  expect(container.querySelector('svg')).toHaveAttribute('data-shell-mark', 'linux');
+  act(() => useHostSystems.getState().remember('remote', 'Ubuntu'));
+  expect(container.querySelector('svg')).toHaveAttribute('data-shell-mark', 'ubuntu');
 });

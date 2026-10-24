@@ -8,6 +8,7 @@ import { ArrowRight24Regular } from '@fluentui/react-icons/headless/svg/arrow-ri
 import { ArrowUp24Regular } from '@fluentui/react-icons/headless/svg/arrow-up';
 import { ArrowDown24Regular } from '@fluentui/react-icons/headless/svg/arrow-down';
 import { ArrowSort24Regular } from '@fluentui/react-icons/headless/svg/arrow-sort';
+import { ArrowSwap24Regular } from '@fluentui/react-icons/headless/svg/arrow-swap';
 import { Bot24Regular } from '@fluentui/react-icons/headless/svg/bot';
 import { Brain24Regular } from '@fluentui/react-icons/headless/svg/brain';
 import { BrainCircuit24Regular } from '@fluentui/react-icons/headless/svg/brain-circuit';
@@ -76,7 +77,8 @@ import { Options24Regular } from '@fluentui/react-icons/headless/svg/options';
 import { Sparkle16Regular, Sparkle24Regular } from '@fluentui/react-icons/headless/svg/sparkle';
 import { Square24Regular } from '@fluentui/react-icons/headless/svg/square';
 import { TabDesktopMultiple24Regular } from '@fluentui/react-icons/headless/svg/tab-desktop-multiple';
-import { Star16Regular, Star24Regular } from '@fluentui/react-icons/headless/svg/star';
+import { Star16Filled, Star24Filled, Star24Regular } from '@fluentui/react-icons/headless/svg/star';
+import { Tag24Regular } from '@fluentui/react-icons/headless/svg/tag';
 import { Pin24Regular } from '@fluentui/react-icons/headless/svg/pin';
 import { PinOff24Regular } from '@fluentui/react-icons/headless/svg/pin-off';
 import { BuildingShop24Regular } from '@fluentui/react-icons/headless/svg/building-shop';
@@ -116,6 +118,13 @@ export const ArrowRight = createAppIcon(ArrowRight24Regular);
 export const ArrowUp = createAppIcon(ArrowUp24Regular);
 export const ArrowDown = createAppIcon(ArrowDown24Regular);
 export const ArrowSort = createAppIcon(ArrowSort24Regular);
+export const ArrowLeftRight = createAppIcon(ArrowSwap24Regular);
+export const ServerStack: AppIcon = forwardRef<SVGSVGElement, AppIconProps>(function ServerStack({ size = 24, color = 'currentColor', style, ...props }, ref) {
+  return createElement('svg', { ...props, ref, viewBox: '0 0 24 24', fill: 'none', focusable: false, style: { width: size, height: size, color, flexShrink: 0, ...style } },
+    createElement('rect', { x: 3, y: 4, width: 18, height: 6, rx: 1, stroke: 'currentColor', strokeWidth: 1.6 }),
+    createElement('rect', { x: 3, y: 14, width: 18, height: 6, rx: 1, stroke: 'currentColor', strokeWidth: 1.6 }),
+    createElement('path', { d: 'M16 7h2M16 17h2', stroke: 'currentColor', strokeWidth: 1.6, strokeLinecap: 'round' }));
+});
 export const DollarSign: AppIcon = forwardRef<SVGSVGElement, AppIconProps>(function DollarSign({ size = 24, style, ...props }, ref) {
   return createElement('svg', { ...props, ref, viewBox: '0 0 24 24', fill: 'none',
     style: { width: size, height: size, flexShrink: 0, ...style } }, createElement('path', {
@@ -198,7 +207,9 @@ export const SparklesSmall = createAppIcon(Sparkle16Regular);
 export const Square = createAppIcon(Square24Regular);
 export const SquareStack = createAppIcon(TabDesktopMultiple24Regular);
 export const Star = createAppIcon(Star24Regular);
-export const StarSmall = createAppIcon(Star16Regular);
+export const Tag = createAppIcon(Tag24Regular);
+export const StarFilled = createAppIcon(Star24Filled);
+export const StarSmall = createAppIcon(Star16Filled);
 export const Pin = createAppIcon(Pin24Regular);
 export const PinOff = createAppIcon(PinOff24Regular);
 export const Store = createAppIcon(BuildingShop24Regular);

@@ -56,6 +56,12 @@ import QoderColor from '@lobehub/icons/es/Qoder/components/Color.js';
 import TraeColor from '@lobehub/icons/es/Trae/components/Color.js';
 import ZencoderColor from '@lobehub/icons/es/Zencoder/components/Color.js';
 import type { AppIcon } from './icons';
+import HunyuanColor from '@lobehub/icons/es/Hunyuan/components/Color.js';
+import MinimaxColor from '@lobehub/icons/es/Minimax/components/Color.js';
+import LongCatColor from '@lobehub/icons/es/LongCat/components/Color.js';
+import StepfunColor from '@lobehub/icons/es/Stepfun/components/Mono.js';
+import XiaomiMiMoMono from '@lobehub/icons/es/XiaomiMiMo/components/Mono.js';
+import MetaColor from '@lobehub/icons/es/Meta/components/Color.js';
 
 export const AnthropicMark = AnthropicMono as unknown as AppIcon;
 export const OpenAIMark = OpenAIMono as unknown as AppIcon;
@@ -71,6 +77,12 @@ export const XaiMark = XAIMono as unknown as AppIcon;
 export const MistralMark = MistralColor as unknown as AppIcon;
 export const OllamaMark = OllamaMono as unknown as AppIcon;
 export const OpenCodeMark = OpenCodeMono as unknown as AppIcon;
+export const HunyuanMark = HunyuanColor as unknown as AppIcon;
+export const MinimaxMark = MinimaxColor as unknown as AppIcon;
+export const LongCatMark = LongCatColor as unknown as AppIcon;
+export const StepfunMark = StepfunColor as unknown as AppIcon;
+export const MiMoMark = XiaomiMiMoMono as unknown as AppIcon;
+export const MetaMark = MetaColor as unknown as AppIcon;
 
 /**
  * Marks of the ACP-capable agents, keyed by the normalised name a harness entry carries (lowercase,
