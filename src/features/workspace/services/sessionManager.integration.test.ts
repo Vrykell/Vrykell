@@ -140,7 +140,7 @@ describe('sessionManager.restore（窗口布局）', () => {
 });
 
 describe('addTab 持久化 kind + payload', () => {
-  it('SSH 终端落库时 payload 含 ssh 终端（不含密码）', () => {
+  it('persists a remote terminal layout without credentials when content starts', async () => {
     const calls: Array<{ cmd: string; args: Record<string, unknown> }> = [];
     mockedInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
       calls.push({ cmd, args: (args ?? {}) as Record<string, unknown> });
@@ -148,6 +148,8 @@ describe('addTab 持久化 kind + payload', () => {
     });
 
     useWorkspaceStore.getState().addTab({ kind: 'ssh', ssh: { name: 'prod', host: 'prod.example.com', user: 'root', port: 22, connectionId: 'c1' } });
+    expect(calls.find(call => call.cmd === 'create_session')).toBeUndefined();
+    await sessionManager.ensureContentSession(useWorkspaceStore.getState().activeId);
     const create = calls.find((c) => c.cmd === 'create_session');
     expect(create).toBeTruthy();
     expect(create!.args.kind).toBe('session');
@@ -156,13 +158,14 @@ describe('addTab 持久化 kind + payload', () => {
     expect('password' in payload.layout.terminal.ssh).toBe(false);
   });
 
-  it('本地终端落库时 payload 含 shellType', () => {
+  it('persists a local terminal layout when content starts', async () => {
     const calls: Array<{ cmd: string; args: Record<string, unknown> }> = [];
     mockedInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
       calls.push({ cmd, args: (args ?? {}) as Record<string, unknown> });
       return undefined;
     });
     useWorkspaceStore.getState().addTab({ shellType: 'zsh' });
+    await sessionManager.ensureContentSession(useWorkspaceStore.getState().activeId);
     const create = calls.find((c) => c.cmd === 'create_session');
     expect(create!.args.kind).toBe('session');
     const payload = JSON.parse(create!.args.payload as string) as { layout: { terminal: { shellType: string } } };

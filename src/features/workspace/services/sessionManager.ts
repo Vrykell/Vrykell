@@ -83,11 +83,31 @@ export async function create(
   kind = 'session',
   payload = '{}',
 ): Promise<void> {
-  try {
-    await createSession(tabId, title, Date.now(), cwd, kind, payload);
-  } catch (e) {
-    console.warn('sessionManager.create failed:', e);
-  }
+  pendingSessions.set(tabId, { title, timestamp: Date.now(), cwd, kind, payload });
+}
+
+const pendingSessions = new Map<string, { title: string; timestamp: number; cwd?: string; kind: string; payload: string }>();
+const sessionWrites = new Map<string, Promise<void>>();
+export function ensureContentSession(tabId: string): Promise<void> {
+  const pending = pendingSessions.get(tabId); if (!pending) return Promise.resolve();
+  const existing = sessionWrites.get(tabId); if (existing) return existing;
+  const tab = useSessionStore.getState().tabs.find(tab => tab.id === tabId);
+  const write = createSession(tabId, tab?.title ?? pending.title, pending.timestamp, pending.cwd, pending.kind,
+    tab?.kind === 'session' ? JSON.stringify({ layout: tab.layout }) : pending.payload)
+    .then(async () => {
+      const latest = pendingSessions.get(tabId);
+      if (latest && latest !== pending) {
+        if (latest.title !== pending.title) await updateSessionTitle(tabId, latest.title);
+        if (latest.cwd !== pending.cwd) await updateSessionCwd(tabId, latest.cwd ?? '');
+        if (latest.payload !== pending.payload) await updateSessionPayload(tabId, latest.payload);
+      }
+      const owner = useSessionStore.getState().tabs.find(item => item.id === tabId);
+      if (owner?.kind === 'session' && owner.groupId) await sessionSetGroup(tabId, owner.groupId);
+      pendingSessions.delete(tabId);
+    })
+    .finally(() => { sessionWrites.delete(tabId); });
+  sessionWrites.set(tabId, write);
+  return write;
 }
 
 /** 布局持久化的去抖计时器（分隔线拖拽会高频调整 ratio）。 */
@@ -95,6 +115,8 @@ const layoutTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 /** 持久化窗口布局到会话 payload（去抖）。 */
 export function saveLayout(tabId: string, layout: WindowLayout): void {
+  const draft = pendingSessions.get(tabId);
+  if (draft) { pendingSessions.set(tabId, { ...draft, payload: JSON.stringify({ layout }) }); return; }
   const pending = layoutTimers.get(tabId);
   if (pending) clearTimeout(pending);
   layoutTimers.set(
@@ -110,6 +132,8 @@ export function saveLayout(tabId: string, layout: WindowLayout): void {
 
 /** 更新会话当前工作目录（cd 后 OSC 7 上报） */
 export async function setCwd(tabId: string, cwd: string): Promise<void> {
+  const draft = pendingSessions.get(tabId);
+  if (draft) { pendingSessions.set(tabId, { ...draft, cwd }); return; }
   try {
     await updateSessionCwd(tabId, cwd);
   } catch (e) {
@@ -124,6 +148,8 @@ export async function close(tabId: string): Promise<void> {
     clearTimeout(pending);
     layoutTimers.delete(tabId);
   }
+  if (pendingSessions.has(tabId) && !sessionWrites.has(tabId)) { pendingSessions.delete(tabId); return; }
+  await sessionWrites.get(tabId)?.catch(() => {});
   try {
     await archiveSession(tabId, Date.now());
   } catch (e) {
@@ -308,6 +334,8 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
 
 /** 重命名会话 */
 export async function rename(tabId: string, title: string): Promise<void> {
+  const draft = pendingSessions.get(tabId);
+  if (draft) { pendingSessions.set(tabId, { ...draft, title }); return; }
   try {
     await updateSessionTitle(tabId, title);
   } catch (e) {
@@ -336,7 +364,9 @@ export async function record(
   block: TermBlock,
   phase: 'start' | 'complete',
 ): Promise<void> {
+  if (!block.command.trim() && !block.outputText.trim() && !block.outputRaw.trim()) return;
   try {
+    await ensureContentSession(tabId);
     await recordBlock(
       block.id,
       tabId,

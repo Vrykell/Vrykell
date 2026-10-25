@@ -22,13 +22,48 @@ beforeEach(() => {
 });
 
 describe('sessionManager 生命周期', () => {
-  it('create：透传并失败静默', async () => {
+  it('retains metadata changes made while the first insert is in flight', async () => {
+    let finish!: () => void;
+    invokeMock.mockResolvedValue(undefined);
+    invokeMock.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    await sessionManager.create('late-metadata', 'Draft', '/first');
+    const saving = sessionManager.ensureContentSession('late-metadata');
+    await sessionManager.rename('late-metadata', 'Updated title');
+    await sessionManager.setCwd('late-metadata', '/updated');
+    finish(); await saving;
+    expect(invokeMock).toHaveBeenCalledWith('update_session_title', { id: 'late-metadata', title: 'Updated title' });
+    expect(invokeMock).toHaveBeenCalledWith('update_session_cwd', { id: 'late-metadata', cwd: '/updated' });
+  });
+  it('skips empty blocks and writes the session once for concurrent first records', async () => {
+    invokeMock.mockResolvedValue(undefined);
+    await sessionManager.create('lazy-record', 'Draft', '/project');
+    const block = { id: 'lazy-block', command: '', status: 'done', exitCode: 0, startedAt: 1, endedAt: 2,
+      outputHtml: '', outputText: '', outputRaw: '', wasLongRunning: false, linesTruncated: 0 } as const;
+    await sessionManager.record('lazy-record', 'lazy-record#0', block, 'complete');
+    expect(invokeMock).not.toHaveBeenCalled();
+    await Promise.all([
+      sessionManager.record('lazy-record', 'lazy-record#0', { ...block, command: 'pwd' }, 'start'),
+      sessionManager.record('lazy-record', 'lazy-record#0', { ...block, command: 'pwd', outputText: '/project' }, 'complete'),
+    ]);
+    expect(invokeMock.mock.calls.filter(([command]) => command === 'create_session')).toHaveLength(1);
+    expect(invokeMock.mock.calls.filter(([command]) => command === 'record_block')).toHaveLength(2);
+    await sessionManager.close('lazy-record');
+    expect(invokeMock).toHaveBeenLastCalledWith('archive_session', expect.objectContaining({ id: 'lazy-record' }));
+  });
+  it('defers a session row until it has content', async () => {
     invokeMock.mockResolvedValueOnce(undefined);
     await sessionManager.create('t1', '标题', '/cwd', 'session', '{}');
+    expect(invokeMock).not.toHaveBeenCalled();
+    await sessionManager.ensureContentSession('t1');
     expect(invokeMock).toHaveBeenCalledWith('create_session', {
       id: 't1', title: '标题', timestamp: expect.any(Number), cwd: '/cwd', kind: 'session', payload: '{}',
     });
-    await sessionManager.create('t2', 'x'); // 失败静默
+    await sessionManager.create('empty-session', 'Empty');
+    invokeMock.mockClear();
+    await sessionManager.rename('empty-session', 'Renamed');
+    await sessionManager.setCwd('empty-session', '/other');
+    await sessionManager.close('empty-session');
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 
   it('close / rename / remove：透传与失败静默', async () => {
