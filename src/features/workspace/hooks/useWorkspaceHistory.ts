@@ -27,7 +27,8 @@ export function useWorkspaceHistory(resources: WorkspaceResource[], store = useU
           });
           writers.set(tab.id, write);
         }
-        void write(captureWorkspaceHistory(tab.paneLayout, tab.focusedPane, currentWorkspaceResources()), tab.historyIdentity);
+        void write(captureWorkspaceHistory(tab.paneLayout, tab.focusedPane, currentWorkspaceResources()), tab.historyIdentity,
+          tab.titleSource === 'manual' ? tab.title : undefined);
       };
       compositionSave.current = save;
       for (const tab of compositionTabs()) save(tab);

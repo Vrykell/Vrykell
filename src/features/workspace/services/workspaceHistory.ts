@@ -57,24 +57,43 @@ export function createWorkspaceHistoryWriter(onError: (error: unknown) => void, 
   let id = '';
   let createdAt = 0;
   let lastPayload = '';
+  let lastTitle = '';
   let queue = Promise.resolve();
-  return (snapshot: WorkspaceHistorySnapshot | null, identity?: WorkspaceHistoryIdentity) => {
+  return (snapshot: WorkspaceHistorySnapshot | null, identity?: WorkspaceHistoryIdentity, titleOverride?: string) => {
     if (!snapshot) { signature = ''; return queue; }
     const nextSignature = JSON.stringify(snapshot.members.map(member => member.id).sort());
     if (identity && identity.id !== id) {
-      id = identity.id; createdAt = identity.createdAt; signature = nextSignature; lastPayload = '';
+      id = identity.id; createdAt = identity.createdAt; signature = nextSignature; lastPayload = ''; lastTitle = '';
     } else if (!identity && signature !== nextSignature) {
       signature = nextSignature;
       createdAt = Date.now();
       id = `workspace:${crypto.randomUUID()}`;
-      lastPayload = '';
+      lastPayload = ''; lastTitle = '';
     }
+    if (suppressedHistoryIds.has(id)) return queue;
     if (!identity || identity.id !== id) onIdentity?.({ id, createdAt });
     const payload = JSON.stringify(snapshot);
-    if (payload === lastPayload) return queue;
-    const request = { id, createdAt, timestamp: Date.now(), title: snapshot.members.map(member => member.title).join(' + ').slice(0, 320), payload };
+    const title = (titleOverride?.trim() || snapshot.members.map(member => member.title).join(' + ')).slice(0, 320);
+    if (payload === lastPayload && title === lastTitle) return queue;
+    const request = { id, createdAt, timestamp: Date.now(), title, payload };
     lastPayload = payload;
-    queue = queue.then(() => saveWorkspaceHistory(request)).catch(error => { lastPayload = ''; onError(error); });
+    lastTitle = title;
+    queue = queue.then(() => {
+      if (suppressedHistoryIds.has(id)) return;
+      return saveWorkspaceHistory(request);
+    }).catch(error => { lastPayload = ''; lastTitle = ''; onError(error); });
     return queue;
   };
+}
+
+const suppressedHistoryIds = new Set<string>();
+
+/** Keep a deleted live composition from being written back by its pending writer. */
+export function suppressWorkspaceHistory(id: string) {
+  suppressedHistoryIds.add(id);
+}
+
+/** A restored composition may legitimately create its record again. */
+export function clearWorkspaceHistorySuppression(id: string) {
+  suppressedHistoryIds.delete(id);
 }

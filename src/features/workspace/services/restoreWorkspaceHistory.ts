@@ -3,6 +3,7 @@ import { useWorkspaceNavigation } from '../stores/navigation';
 import { useUnifiedWorkspace } from '../stores/unifiedWorkspace';
 import { activateWorkspaceResource, currentWorkspaceResources } from './workspaceResources';
 import { focusUnifiedResource } from './unifiedWorkspace';
+import { clearWorkspaceHistorySuppression } from './workspaceHistory';
 import * as sessionManager from './sessionManager';
 import { getSession } from '@platform/api/session';
 import { getConversation } from '@platform/api/conversation';
@@ -11,6 +12,7 @@ import { useChatStore } from '@features/chat/stores/chat';
 import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { editorFileKey } from '@core/editor';
+import { gitComparisonKey } from '@core/git';
 import { useEditorDocuments } from '@features/editor/stores/documents';
 import { parseWorkspaceHistory, remapWorkspaceHistory, type WorkspaceHistoryIdentity, type WorkspaceHistoryMember, type WorkspaceHistorySnapshot } from '../model/workspaceHistory';
 import { t } from '@i18n';
@@ -69,11 +71,17 @@ async function restoreMemberResource(member: WorkspaceHistoryMember): Promise<st
     return `file:${editorFileKey(file)}`;
   }
   if (!member.scope || !member.cwd) throw new Error(t('The saved comparison is no longer available.'));
-  const id = workspace.openGitDiff({ target: { cwd: member.cwd, connectionId: member.connectionId }, path: member.reference, paneId: '', scope: member.scope });
-  return `diff:${id}`;
+  const selection = { target: { cwd: member.cwd, connectionId: member.connectionId }, path: member.reference, paneId: '', scope: member.scope };
+  workspace.openGitDiff(selection);
+  const comparison = useWorkspaceStore.getState().tabs
+    .flatMap(tab => tab.kind === 'git-diff' ? tab.comparisons ?? [{ id: tab.id, selection: tab.selection }] : [])
+    .find(item => gitComparisonKey(item.selection) === gitComparisonKey(selection));
+  if (!comparison) throw new Error(t('The saved comparison is no longer available.'));
+  return `diff:${comparison.id}`;
 }
 
 export async function restoreWorkspaceComposition(snapshot: WorkspaceHistorySnapshot, identity?: WorkspaceHistoryIdentity, destination: 'unified' | 'code' | 'ai' = 'unified') {
+  if (identity) clearWorkspaceHistorySuppression(identity.id);
   const parsed = parseWorkspaceHistory(JSON.stringify(snapshot));
   if (!parsed) throw new Error(t('The saved workspace layout is invalid.'));
   const references = new Map<string, string>();

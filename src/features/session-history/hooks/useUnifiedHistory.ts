@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useChatStore } from '@features/chat';
 import { useWorkspaceNavigation, type HistoryTypePreset } from '@features/workspace';
+import { suppressWorkspaceHistory } from '@features/workspace/services/workspaceHistory';
 import { useHarnessSessionRefs } from '@features/chat/stores/harnessSessions';
 import { historyGroupKey, useHistoryMetaStore } from '@utils/historyMeta';
 import { safeJsonParse } from '@utils/errorHandler';
@@ -124,7 +125,10 @@ export function useUnifiedHistory(preset?: HistoryTypePreset, destinationOverrid
     removeMany: async (targets: readonly UnifiedHistoryRecord[]) => {
       const sessions = targets.flatMap(record => record.kind === 'terminal' ? [record.session] : []);
       if (sessions.length) await terminal.deleteSessions(sessions);
-      for (const record of targets) if (record.kind === 'workspace') await deleteSession(record.session.id);
+      for (const record of targets) if (record.kind === 'workspace') {
+        suppressWorkspaceHistory(record.session.id);
+        await deleteSession(record.session.id);
+      }
       for (const record of targets) if (record.kind === 'conversation') await useChatStore.getState().deleteConversation(record.conversation.id);
       for (const record of targets) if (record.kind === 'agent') {
         useHarnessSessionRefs.getState().forget(record.agent.harness, record.agent.sessionId);
