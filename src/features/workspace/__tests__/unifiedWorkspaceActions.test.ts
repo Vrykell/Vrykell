@@ -1,13 +1,13 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { useWorkspaceStore } from '../stores/workspace';
 import { useWorkspaceNavigation } from '../stores/navigation';
-import { useUnifiedWorkspace } from '../stores/unifiedWorkspace';
+import { compositionTabs, useUnifiedWorkspace } from '../stores/unifiedWorkspace';
 import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useChatStore } from '@features/chat/stores/chat';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
-import { closeTerminalPane, connectUnifiedAgent, createUnifiedResource, createUnifiedTerminal, requestTerminalSplit, requestWorkspaceSplit, showUnifiedTerminalGroup } from '../services/unifiedWorkspace';
+import { addUnifiedResource, closeTerminalPane, connectUnifiedAgent, createUnifiedResource, createUnifiedTerminal, requestTerminalSplit, requestWorkspaceSplit, showUnifiedTerminalGroup } from '../services/unifiedWorkspace';
 import { renameWorkspaceResource } from '../services/workspaceResources';
-import { workspacePaneIds } from '../model/workspaceResources';
+import { workspacePaneCells, workspacePaneIds } from '../model/workspaceResources';
 import { leaf } from '../model/windowLayout';
 import { scopedPaneStores } from '../stores/scopedPanes';
 import { useUiStore } from '../stores/ui';
@@ -126,4 +126,29 @@ it('keeps editor, conversation and terminal split requests in their original wor
   requestWorkspaceSplit();
   expect(useUiStore.getState().splitPlacement.open).toBe(true);
   expect(useWorkspaceNavigation.getState().area).toBe('terminal');
+});
+
+it('never adds a fifth pane when a switcher selection arrives at a full composition', () => {
+  useWorkspaceStore.setState({
+    tabs: [
+      { id: 'one', kind: 'session', title: 'One', layout: leaf({ id: 'one#0', kind: 'local' }) },
+      { id: 'two', kind: 'session', title: 'Two', layout: leaf({ id: 'two#0', kind: 'local' }) },
+      { id: 'history', kind: 'history', title: 'History' },
+    ],
+  });
+  const panes = ['a', 'b', 'c', 'd'].map((key, index) => ({ type: 'pane' as const, id: `pane-${index}`, resourceId: `terminal:${key}` }));
+  useUnifiedWorkspace.setState({ activeTabId: '', focused: 'pane-0', layout: {
+    type: 'split', direction: 'row', ratio: 0.5,
+    first: { type: 'split', direction: 'row', ratio: 0.5, first: panes[0]!, second: panes[1]! },
+    second: { type: 'split', direction: 'row', ratio: 0.5, first: panes[2]!, second: panes[3]! },
+  } });
+
+  addUnifiedResource('terminal:two#0');
+  expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toEqual(['terminal:two#0']);
+  expect(compositionTabs().some(tab => tab.paneLayout && workspacePaneCells(tab.paneLayout).length === 4)).toBe(true);
+  expect(compositionTabs().every(tab => !tab.paneLayout || workspacePaneCells(tab.paneLayout).length <= 4)).toBe(true);
+
+  const current = useUnifiedWorkspace.getState().layout;
+  addUnifiedResource('page:history');
+  expect(useUnifiedWorkspace.getState().layout).toBe(current);
 });

@@ -1,6 +1,6 @@
 # Unified workspace proposal
 
-Status: implemented as a sidebar destination. The common strip references existing terminals, documents, comparisons, native conversations and external sessions. The all-workspace dropdown remains a resource switcher, not its entry point. Up to four mixed panes share a reference-only layout. Existing tab models and stores remain authoritative for activation, reordering, saving, process ownership and guarded closure; moving a mounted host does not recreate its resource.
+Status: implemented as a sidebar destination. The common strip references existing terminals, documents, comparisons, native conversations and external sessions. The all-workspace dropdown still switches resources in other workspaces; inside the common workspace it places the chosen reference into the active composition, and it is not the entry point to the common workspace. Up to four mixed panes share a reference-only layout. Existing tab models and stores remain authoritative for activation, reordering, saving, process ownership and guarded closure; moving a mounted host does not recreate its resource.
 
 ## Decision
 

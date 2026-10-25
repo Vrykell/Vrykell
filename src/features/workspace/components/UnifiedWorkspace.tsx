@@ -117,7 +117,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
         ...(tabs.some(tab => tab.id !== state.activeTabId && tab.paneLayout && workspacePaneCells(tab.paneLayout).length + cells.length <= 4) && cells.length ? [{ label: t('Merge tab into this tab'), submenu: { items: tabs.filter(tab => tab.id !== state.activeTabId && tab.paneLayout && workspacePaneCells(tab.paneLayout).length + cells.length <= 4).map(tab => ({ label: items.find(item => item.id === tab.id)!.tip, onClick: () => beginPlacement({ kind: 'tab', id: tab.id }) })) } }] : []),
         ...(cells.length > 1 ? [{ label: t('Remove pane'), onClick: remove }] : []),
       ]} toolbar={<>
-        <WorkspaceResourceSwitcher />
+        <WorkspaceResourceSwitcher destination="unified" />
         {!state.startActive && resources.find(resource => resource.id === focused?.resourceId)?.kind === 'terminal' && <SshResourcesAction />}
         <IconButton compact aria-label={t('All history')} data-tip={t('All history')} onClick={history}><History size={16} /></IconButton>
         <span ref={setResourceToolbar} className="unified-resource-actions" />

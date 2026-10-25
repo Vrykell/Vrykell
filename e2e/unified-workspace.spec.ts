@@ -96,3 +96,32 @@ test('shares mixed tabs and split panes without restarting terminals or discardi
   expect(await page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: unknown[] }).__PTY_SPAWNS__.length)).toBe(spawns);
   expect(await page.evaluate(() => (window as unknown as { __PTY_CLOSES__: unknown[] }).__PTY_CLOSES__.length)).toBe(0);
 });
+
+test('adds a resource to the active composition from the unified switcher and keeps native navigation', async ({ page }) => {
+  await setupTauriMock(page, { schedulesSeed: [] });
+  await page.goto('/');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  await page.evaluate(async () => {
+    const path = '/src/features/workspace/stores/workspace.ts';
+    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+    useWorkspaceStore.getState().renameTab(useWorkspaceStore.getState().activeId, 'Stable shell');
+    useWorkspaceStore.getState().openEditorFile({ path: '/home/e2e/project/notes.txt' });
+  });
+  await page.getByTestId('workspace-area-terminal').click();
+
+  // A regular workspace keeps navigating to the resource's native pane.
+  await page.getByTestId('workspace-instance-bar').getByTestId('workspace-resource-switcher').click();
+  await page.getByRole('menuitem', { name: 'notes.txt', exact: true }).click();
+  await expect(page.getByTestId('workspace-area-code')).toHaveAttribute('aria-current', 'page');
+
+  // The common workspace adds the selected pane reference to its active composition.
+  await page.getByTestId('workspace-area-unified').click();
+  const mixed = page.getByTestId('unified-workspace');
+  const bar = page.getByTestId('workspace-instance-bar');
+  await bar.getByRole('tab').nth(0).click();
+  await expect(mixed.locator('.unified-pane')).toHaveCount(1);
+  await bar.getByTestId('workspace-resource-switcher').click();
+  await page.getByRole('menuitem', { name: 'notes.txt', exact: true }).click();
+  await expect(mixed.locator('.unified-pane')).toHaveCount(2);
+  await expect(page.getByTestId('workspace-area-unified')).toHaveAttribute('aria-current', 'page');
+});

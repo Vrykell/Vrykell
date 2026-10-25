@@ -89,6 +89,21 @@ export function focusUnifiedResource(id: string) {
   useWorkspaceNavigation.getState().selectArea('unified');
 }
 
+/** Add a resource reference to the active composition, keeping one owner per pane. */
+export function addUnifiedResource(id: string) {
+  const resource = resolveWorkspaceResource(id, currentWorkspaceResources());
+  if (!resource || resource.kind === 'page') return;
+  useUnifiedWorkspace.setState({ zoomed: null });
+  const state = useUnifiedWorkspace.getState();
+  const cells = state.layout ? workspacePaneCells(state.layout) : [];
+  if (state.layout && cells.length >= 4 && !cells.some(cell => cell.resourceId === resource.id)) {
+    focusUnifiedResource(resource.id);
+    return;
+  }
+  state.split(resource.id, 'row');
+  focusUnifiedResource(resource.id);
+}
+
 export function showUnifiedTerminalGroup(tabId: string) {
   const tab = useWorkspaceStore.getState().tabs.find(tab => tab.id === tabId);
   if (tab?.kind !== 'session') return;
