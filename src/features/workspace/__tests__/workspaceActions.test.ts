@@ -61,9 +61,11 @@ it('creates AI conversations in the focused side surface without replacing the m
   const surface = document.createElement('div'); surface.dataset.testid = 'ai-surface-side';
   const input = document.createElement('input'); surface.appendChild(input); document.body.appendChild(surface); input.focus();
   expect(focusedWorkspaceArea()).toBe('ai');
+  const previous = useChatStore.getState().activeConversationId;
   newWorkspaceItem();
   expect(useWorkspaceNavigation.getState().area).toBe('terminal');
-  expect(useAiWorkspace.getState().nativeTabs).toEqual([useChatStore.getState().activeConversationId]);
+  expect(useAiWorkspace.getState().nativeTabs).toEqual([useAiWorkspace.getState().sideSelected.slice(5)]);
+  expect(useChatStore.getState().activeConversationId).toBe(previous);
   expect(useWorkspaceStore.getState().tabs).toEqual([]);
 });
 

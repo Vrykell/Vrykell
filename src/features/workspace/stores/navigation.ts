@@ -13,6 +13,7 @@ const STORAGE_KEY = 'workspace-navigation-v1';
 const DEFAULT_WORKSPACE_ORDER: WorkspaceArea[] = ['terminal', 'code', 'ai', 'ssh', 'unified'];
 
 export function workspaceAreaForKind(kind: string): WorkspaceArea {
+  if (kind === 'workspace') return 'unified';
   if (kind === 'editor' || kind === 'git-diff' || kind === 'start-code') return 'code';
   if (kind === 'harness' || kind === 'ai-history' || kind === 'usage' || kind === 'start-ai') return 'ai';
   return 'terminal';
@@ -35,6 +36,7 @@ interface NavigationState {
   historyPreset: HistoryTypePreset;
   historyPresetRevision: number;
   historyLoading: boolean;
+  historyDestination: 'native' | 'unified';
   selectArea: (area: WorkspaceArea) => void;
   selectHistory: (preset: HistoryTypePreset) => void;
   setHistoryLoading: (loading: boolean) => void;
@@ -74,10 +76,11 @@ export const useWorkspaceNavigation = create<NavigationState>((set) => ({
   sidebarWidth: normalizeSidebarWidth(saved?.sidebarWidth), sidebarDragWidth: null, sidebarOverlay: false,
   lastTabs: {}, groupColors, workspaceOrder, codeOrder: [], sessionLayoutOrder: Array.isArray(saved?.sessionLayoutOrder)
     ? saved.sessionLayoutOrder.filter((id): id is string => typeof id === 'string' && !id.startsWith('page:')) : [], aiPlacement: 'main',
-  historyPreset: 'all', historyPresetRevision: 0, historyLoading: false,
+  historyPreset: 'all', historyPresetRevision: 0, historyLoading: false, historyDestination: 'native',
   selectArea: area => set(state => ({ area, previousArea: state.area !== 'ai' ? state.area : state.previousArea,
     ...(state.sidebarOverlay && area !== state.area ? { collapsed: true, sidebarOverlay: false, sidebarDragWidth: null } : {}) })),
   selectHistory: preset => set(state => ({ area: 'history', previousArea: state.area !== 'ai' ? state.area : state.previousArea,
+    historyDestination: state.area === 'history' ? state.historyDestination : state.area === 'unified' ? 'unified' : 'native',
     historyPreset: preset, historyPresetRevision: state.historyPresetRevision + 1,
     ...(state.sidebarOverlay && state.area !== 'history' ? { collapsed: true, sidebarOverlay: false, sidebarDragWidth: null } : {}) })),
   setHistoryLoading: historyLoading => set({ historyLoading }),

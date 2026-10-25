@@ -1,9 +1,10 @@
 import { editorFileKey, type EditorFile } from '@core/editor';
 import type { Tab } from '../stores/workspace';
 import { measurePaneTree } from '@core/paneLayout';
+import { leaves, type WindowLayout } from './windowLayout';
 
 type ResourceOwner =
-  | { kind: 'terminal'; tabId: string }
+  | { kind: 'terminal'; tabId: string; paneId?: string }
   | { kind: 'page'; tabId: string }
   | { kind: 'document'; file: EditorFile }
   | { kind: 'comparison'; comparisonId: string }
@@ -16,8 +17,8 @@ export function workspaceResources(tabs: Tab[], nativeIds: string[], conversatio
   for (const tab of tabs) {
     if (tab.kind === 'editor') for (const file of tab.files) resources.push({ id: `file:${editorFileKey(file)}`, title: file.path.split(/[\\/]/).pop() || file.path, kind: 'document', file });
     else if (tab.kind === 'git-diff') for (const comparison of tab.comparisons ?? [{ id: tab.id, selection: tab.selection }]) resources.push({ id: `diff:${comparison.id}`, title: comparison.selection.path, kind: 'comparison', comparisonId: comparison.id });
-    else if (tab.kind === 'session') resources.push({ id: `terminal:${tab.id}`, title: tab.title, kind: 'terminal', tabId: tab.id });
-    else if (tab.kind !== 'harness' && !tab.kind.startsWith('start')) resources.push({ id: `page:${tab.id}`, title: tab.title, kind: 'page', tabId: tab.id });
+    else if (tab.kind === 'session') leaves(tab.layout).forEach((terminal, index) => resources.push({ id: `terminal:${terminal.id}`, title: index === 0 ? tab.title : `${tab.title} · ${index + 1}`, kind: 'terminal', tabId: tab.id, paneId: terminal.id }));
+    else if (tab.kind !== 'workspace' && tab.kind !== 'harness' && !tab.kind.startsWith('start')) resources.push({ id: `page:${tab.id}`, title: tab.title, kind: 'page', tabId: tab.id });
   }
   for (const id of nativeIds) {
     const conversation = conversations.find(item => item.id === id);
@@ -31,6 +32,24 @@ export type WorkspacePaneLayout =
   | { type: 'pane'; id: string; resourceId: string }
   | { type: 'split'; direction: 'row' | 'col'; ratio: number; first: WorkspacePaneLayout; second: WorkspacePaneLayout };
 
+export function terminalWorkspaceLayout(layout: WindowLayout): WorkspacePaneLayout {
+  return layout.type === 'leaf' ? { type: 'pane', id: layout.terminal.id, resourceId: `terminal:${layout.terminal.id}` }
+    : { type: 'split', direction: layout.dir, ratio: layout.ratio, first: terminalWorkspaceLayout(layout.first), second: terminalWorkspaceLayout(layout.second) };
+}
+
+export function resolveWorkspaceResource(id: string, resources: WorkspaceResource[]) {
+  return resources.find(resource => resource.id === id) ?? resources.find(resource => resource.kind === 'terminal' && id === `terminal:${resource.tabId}`);
+}
+
+export function rebindWorkspaceResources(layout: WorkspacePaneLayout, resources: WorkspaceResource[]): WorkspacePaneLayout {
+  if (layout.type === 'pane') {
+    const resource = resolveWorkspaceResource(layout.resourceId, resources);
+    return resource && resource.id !== layout.resourceId ? { ...layout, resourceId: resource.id } : layout;
+  }
+  const first = rebindWorkspaceResources(layout.first, resources); const second = rebindWorkspaceResources(layout.second, resources);
+  return first === layout.first && second === layout.second ? layout : { ...layout, first, second };
+}
+
 export const measureWorkspacePanes = (layout: WorkspacePaneLayout) => measurePaneTree(layout, node => node.type === 'pane' ? { id: node.id } : { ...node, dir: node.direction });
 
 export function workspacePaneIds(layout: WorkspacePaneLayout): string[] {
@@ -41,7 +60,7 @@ export function pruneWorkspacePanes(layout: WorkspacePaneLayout | null, resource
   if (!layout) return null;
   if (layout.type === 'pane') return resources.has(layout.resourceId) ? layout : null;
   const first = pruneWorkspacePanes(layout.first, resources); const second = pruneWorkspacePanes(layout.second, resources);
-  return first && second ? { ...layout, first, second } : first ?? second;
+  return first && second ? first === layout.first && second === layout.second ? layout : { ...layout, first, second } : first ?? second;
 }
 
 export function mapWorkspacePane(layout: WorkspacePaneLayout, id: string, apply: (node: WorkspacePaneLayout) => WorkspacePaneLayout): WorkspacePaneLayout {

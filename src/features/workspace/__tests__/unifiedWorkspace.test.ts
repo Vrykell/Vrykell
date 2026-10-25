@@ -1,34 +1,42 @@
-import { afterEach, expect, it } from 'vitest';
-import { useUnifiedWorkspace } from '../stores/unifiedWorkspace';
+import { beforeEach, expect, it } from 'vitest';
+import { compositionTabs, selectCompositionTab, useUnifiedWorkspace } from '../stores/unifiedWorkspace';
+import { useWorkspaceStore } from '../stores/workspace';
 import { fitWorkspacePanes, parseWorkspacePaneLayout, workspacePaneCells, workspacePaneIds } from '../model/workspaceResources';
-const initial = useUnifiedWorkspace.getState();
-afterEach(() => useUnifiedWorkspace.setState(initial, true));
+beforeEach(() => { useWorkspaceStore.setState({ tabs: [], activeId: '' }); useUnifiedWorkspace.setState({ activeTabId: '', layout: null, focused: '', historyIdentity: undefined }); });
 
-it('shares one ordered strip and mixed layout while retaining live identities through replacement and missing resources', () => {
+it('retains each tab layout while switching resources and pruning missing content', () => {
   const state = useUnifiedWorkspace.getState(); state.reconcile(['terminal:one', 'file:two', 'chat:three', 'acp:four', 'file:five']);
+  state.show('terminal:one');
   state.split('file:two', 'row'); state.split('chat:three', 'col'); state.split('acp:four', 'row');
   expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toEqual(['terminal:one', 'file:two', 'chat:three', 'acp:four']);
   state.split('file:five', 'row'); expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toHaveLength(4);
   const first = workspacePaneCells(useUnifiedWorkspace.getState().layout!)[0]!;
+  const original = useUnifiedWorkspace.getState().layout;
+  const tabId = useUnifiedWorkspace.getState().activeTabId;
   state.show(first.resourceId); expect(useUnifiedWorkspace.getState().focused).toBe(first.id);
-  state.show('file:five'); expect(workspacePaneCells(useUnifiedWorkspace.getState().layout!)[0]).toMatchObject({ id: first.id, resourceId: 'file:five' });
+  state.show('file:five'); expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toEqual(['file:five']);
+  selectCompositionTab(tabId); expect(useUnifiedWorkspace.getState().layout).toBe(original);
   state.reconcile(['file:two', 'chat:three']); expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toEqual(['file:two', 'chat:three']);
-  state.single(); expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toHaveLength(1);
+  state.single(); expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toHaveLength(2);
+  expect(useUnifiedWorkspace.getState().zoomed).toBe(useUnifiedWorkspace.getState().focused);
 });
 
 it('validates restored layouts, rejects duplicate owners and clamps resize ratios', () => {
-  const state = useUnifiedWorkspace.getState(); state.reconcile(['file:one', 'chat:two']); state.split('chat:two', 'row');
+  const state = useUnifiedWorkspace.getState(); state.reconcile(['file:one', 'chat:two']); state.show('file:one'); state.split('chat:two', 'row');
   const layout = useUnifiedWorkspace.getState().layout!;
   const cells = workspacePaneCells(layout); state.ratio(cells[0]!.id, cells[1]!.id, 5);
   expect(workspacePaneCells(useUnifiedWorkspace.getState().layout!)[0]!.rect.w).toBe(0.8);
   expect(parseWorkspacePaneLayout(JSON.parse(JSON.stringify(layout)))).toEqual(layout);
   expect(parseWorkspacePaneLayout({ type: 'split', direction: 'row', ratio: 0.5, first: cells[0], second: cells[0] })).toBeNull();
-  state.move(['file:one', 'chat:two'], 'chat:two', 'file:one', false);
-  expect(useUnifiedWorkspace.getState().order).toEqual(['chat:two', 'file:one']);
+  state.show('file:third');
+  const [one, two] = compositionTabs().map(tab => tab.id);
+  state.move([one!, two!], two!, one!, false);
+  expect(compositionTabs().map(tab => tab.id)).toEqual([two, one]);
 });
 
 it('keeps controls usable at extreme split ratios and stacks narrow panes with an owned scroller', () => {
   const state = useUnifiedWorkspace.getState(); state.reconcile(['file:one', 'terminal:two', 'chat:three', 'acp:four']);
+  state.show('file:one');
   state.split('terminal:two', 'row'); state.split('chat:three', 'col'); state.split('acp:four', 'col');
   const layout = useUnifiedWorkspace.getState().layout!;
   const cells = workspacePaneCells(layout); state.ratio(cells[0]!.id, cells[1]!.id, 0.8);

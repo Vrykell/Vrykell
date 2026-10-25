@@ -1,4 +1,6 @@
 import { useTerminalDefaults } from '@config/terminalDefaults';
+import type { WorkspacePaneLayout } from '../model/workspaceResources';
+import type { WorkspaceHistoryIdentity, WorkspaceHistorySnapshot } from '../model/workspaceHistory';
 import { useShellProfiles } from '@config/shellProfiles';
 import { create } from 'zustand';
 import { useUiStore } from './ui';
@@ -37,7 +39,7 @@ import {
 
 export type { TitleSource };
 
-export type TabKind = 'session' | 'history' | 'ai-history' | 'git-diff' | 'editor' | 'usage' | 'harness'
+export type TabKind = 'workspace' | 'session' | 'history' | 'ai-history' | 'git-diff' | 'editor' | 'usage' | 'harness'
   | 'start' | 'start-code' | 'start-ai';
 
 /** SSH 会话目标（终端类型=ssh 时的专属字段） */
@@ -63,6 +65,7 @@ interface TabBase {
  *  - Non-session pages have no backend sessions or groups; comparisons can have multiple tabs.
  */
 export type Tab =
+  | (TabBase & { kind: 'workspace'; paneLayout: WorkspacePaneLayout | null; focusedPane: string; zoomedPane?: string | null; historyIdentity?: WorkspaceHistoryIdentity; historySnapshot?: WorkspaceHistorySnapshot })
   | (TabBase & { kind: 'session'; groupId?: string; layout: WindowLayout })
   | (TabBase & { kind: 'history' })
   | (TabBase & { kind: 'ai-history' })
@@ -164,6 +167,7 @@ const USAGE_TITLE = t('Usage statistics');
 const START_TITLE = t('Start');
 
 interface WorkspaceState {
+  openCompositionTab: (layout: WorkspacePaneLayout | null, focused: string, historyIdentity?: WorkspaceHistoryIdentity) => string;
   tabs: Tab[];
   activeId: string;
   /** 最近关闭的标签（撤销关闭用，不参与 UI 渲染） */
@@ -247,6 +251,12 @@ interface WorkspaceState {
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
+  openCompositionTab: (paneLayout, focusedPane, historyIdentity) => {
+    const id = nextTabId();
+    set(state => ({ tabs: [...state.tabs, { id, kind: 'workspace', title: t('Start'), paneLayout, focusedPane, historyIdentity }] }));
+    useWorkspaceNavigation.getState().rememberTab('unified', id);
+    return id;
+  },
   // 初始无标签：默认终端由 App 启动逻辑创建（优先恢复上次会话，无恢复才创建默认）
   tabs: [],
   activeId: '',
@@ -335,10 +345,16 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     return id;
   },
   openHistoryTab: () => {
+    const navigation = useWorkspaceNavigation.getState();
+    if (navigation.area === 'unified') { navigation.selectHistory('terminal'); return; }
+    useWorkspaceNavigation.setState({ historyDestination: 'native' });
     const existing = get().tabs.find((t) => t.kind === 'history');
     get().activate(existing ? existing.id : get().addTab({ kind: 'history' }));
   },
   openAiHistoryTab: () => {
+    const navigation = useWorkspaceNavigation.getState();
+    if (navigation.area === 'unified') { navigation.selectHistory('conversation'); return; }
+    useWorkspaceNavigation.setState({ historyDestination: 'native' });
     useWorkspaceNavigation.getState().setAiPlacement('main');
     const existing = get().tabs.find((t) => t.kind === 'ai-history');
     get().activate(existing ? existing.id : get().addTab({ kind: 'ai-history' }));
@@ -350,7 +366,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     get().activate(existing ? existing.id : get().addTab({ kind: 'usage' }));
   },
   openHarnessTab: (name, cwd) => {
-    useWorkspaceNavigation.getState().setAiPlacement('main');
+    if (useWorkspaceNavigation.getState().area !== 'unified') useWorkspaceNavigation.getState().setAiPlacement('main');
     // Capture the focused local context before switching to the singleton page.
     const state = get();
     const active = state.tabs.find((tab) => tab.id === state.activeId);
@@ -488,6 +504,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const idx = tabs.findIndex((t) => t.id === id);
     if (idx === -1) return;
     const closed = tabs[idx]!;
+    if (closed.kind === 'workspace' && !force) {
+      void import('../services/compositionTabs').then(module => module.closeCompositionTab(id));
+      return;
+    }
     if (closed.kind === 'harness' && !force && interceptHarnessClose(useHarnessWorkspace.getState().connections.map(item => item.id), () => get().closeTab(id, true))) {
       get().activate(id);
       return;
@@ -497,7 +517,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const neighbor = [...tabs.slice(0, idx).reverse(), ...tabs.slice(idx + 1)].find(tab => workspaceAreaForKind(tab.kind) === workspaceAreaForKind(closed.kind));
     const nextActiveId = activeId === id ? neighbor?.id ?? '' : activeId;
     // System pages are singletons that never enter the reopen history.
-    const reopenable = closed.kind !== 'history' && closed.kind !== 'ai-history' && closed.kind !== 'usage' && !isStartTab(closed);
+    const reopenable = closed.kind !== 'history' && closed.kind !== 'ai-history' && closed.kind !== 'usage' && !isStartTab(closed) && (closed.kind !== 'workspace' || !!closed.paneLayout);
     set({
       tabs: next,
       activeId: nextActiveId,
@@ -532,7 +552,18 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (!closed) return;
     set({ lastClosed: null });
     // Restore a session from storage; rebuild singleton pages directly.
-    if (closed.kind === 'harness') {
+    if (closed.kind === 'workspace') {
+      if (closed.historySnapshot) {
+        void import('../services/restoreWorkspaceHistory').then(module => module.restoreWorkspaceComposition(closed.historySnapshot!, closed.historyIdentity)).catch((error: unknown) => {
+          set(state => ({ lastClosed: state.lastClosed ?? closed }));
+          useToastStore.getState().addToast(t('Could not restore session: {{error}}', { error: String(error) }), 'error');
+        });
+      } else {
+        set(state => ({ tabs: [...state.tabs, closed] }));
+        useWorkspaceNavigation.getState().rememberTab('unified', closed.id);
+        useWorkspaceNavigation.getState().selectArea('unified');
+      }
+    } else if (closed.kind === 'harness') {
       get().openHarnessTab();
     } else if (closed.kind === 'git-diff') {
       for (const item of closed.comparisons ?? [{ selection: closed.selection }]) get().openGitDiff(item.selection);
@@ -714,7 +745,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   closeTerminal: (terminalId) => {
     const ws = get();
-    const tab = ws.tabs.find((t) => t.id === ws.activeId);
+    const tab = ws.tabs.find(tab => isSessionTab(tab) && layoutLeaves(tab.layout).some(terminal => terminal.id === terminalId));
     if (!tab || !isSessionTab(tab)) return;
     if (!layoutLeaves(tab.layout).some((t) => t.id === terminalId)) return;
     if (countLeaves(tab.layout) <= 1) {

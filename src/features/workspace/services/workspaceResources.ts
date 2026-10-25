@@ -5,6 +5,7 @@ import { useChatStore } from '@features/chat/stores/chat';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { closeAiWorkspaceSession } from '@features/chat/services/aiWorkspace';
 import { workspaceResources } from '../model/workspaceResources';
+import { useTerminalStore } from '@features/terminal/stores/terminal';
 
 export function currentWorkspaceResources() {
   return workspaceResources(useWorkspaceStore.getState().tabs, useAiWorkspace.getState().nativeTabs,
@@ -13,7 +14,10 @@ export function currentWorkspaceResources() {
 
 export function activateWorkspaceResource(resource: WorkspaceResource) {
   const workspace = useWorkspaceStore.getState();
-  if (resource.kind === 'terminal' || resource.kind === 'page') workspace.activate(resource.tabId);
+  if (resource.kind === 'terminal') {
+    workspace.activate(resource.tabId);
+    if (resource.paneId) useTerminalStore.getState().setFocusedPane(resource.paneId);
+  } else if (resource.kind === 'page') workspace.activate(resource.tabId);
   else if (resource.kind === 'document') workspace.openEditorFile(resource.file);
   else if (resource.kind === 'comparison') workspace.activateGitComparison(resource.comparisonId);
   else {
@@ -25,12 +29,13 @@ export function activateWorkspaceResource(resource: WorkspaceResource) {
   }
 }
 
-export function closeWorkspaceResource(resource: WorkspaceResource) {
+export function closeWorkspaceResource(resource: WorkspaceResource, force = false) {
   const workspace = useWorkspaceStore.getState();
-  if (resource.kind === 'terminal' || resource.kind === 'page') workspace.closeTab(resource.tabId);
-  else if (resource.kind === 'document') workspace.closeEditorFile(resource.file);
+  if (resource.kind === 'terminal' && resource.paneId) workspace.closeTerminal(resource.paneId);
+  else if (resource.kind === 'terminal' || resource.kind === 'page') workspace.closeTab(resource.tabId, force);
+  else if (resource.kind === 'document') workspace.closeEditorFile(resource.file, force);
   else if (resource.kind === 'comparison') workspace.closeGitComparison(resource.comparisonId);
-  else closeAiWorkspaceSession(`${resource.kind === 'agent' ? 'acp' : 'chat'}:${resource.sessionId}`);
+  else closeAiWorkspaceSession(`${resource.kind === 'agent' ? 'acp' : 'chat'}:${resource.sessionId}`, force);
 }
 
 export function renameWorkspaceResource(resource: WorkspaceResource, title: string) {

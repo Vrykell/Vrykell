@@ -7,10 +7,10 @@ import { useAiWorkspace, useChatStore } from '@features/chat';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { useWorkspaceStore } from '../stores/workspace';
 import { orderedWorkspaceIds, useWorkspaceNavigation, workspaceAreaForKind, type WorkspaceArea } from '../stores/navigation';
-import { useUnifiedWorkspace } from '../stores/unifiedWorkspace';
+import { compositionTabs, useUnifiedWorkspace } from '../stores/unifiedWorkspace';
+import { activateCompositionTab } from './compositionTabs';
 import { workspacePaneCells } from '../model/workspaceResources';
-import { currentWorkspaceResources } from './workspaceResources';
-import { focusUnifiedResource } from './unifiedWorkspace';
+import { createUnifiedResource, createUnifiedTerminal, focusUnifiedResource } from './unifiedWorkspace';
 
 export function sideAiHasFocus(element: Element | null = document.activeElement): boolean {
   return useWorkspaceNavigation.getState().aiPlacement === 'side' && !!element?.closest('[data-testid="ai-surface-side"], [data-workspace-focus="ai"]');
@@ -20,11 +20,20 @@ export function focusedWorkspaceArea(): WorkspaceArea {
   return sideAiHasFocus() ? 'ai' : useWorkspaceNavigation.getState().area;
 }
 
-export async function openWorkspaceFile() {
+export async function pickWorkspaceFile() {
   try {
     const [path] = await pickPath('file');
-    if (path) useWorkspaceStore.getState().openEditorFile({ path });
+    return path ? { path } : null;
   } catch (reason) { useToastStore.getState().addToast(t('Could not open file: {{error}}', { error: String(reason) }), 'error'); }
+  return null;
+}
+
+export async function openWorkspaceFile() {
+  const unified = focusedWorkspaceArea() === 'unified';
+  const file = await pickWorkspaceFile();
+  if (!file) return;
+  useWorkspaceStore.getState().openEditorFile(file);
+  if (unified) focusUnifiedResource(`file:${editorFileKey(file)}`);
 }
 
 export function newWorkspaceItem() {
@@ -32,17 +41,17 @@ export function newWorkspaceItem() {
   if (area === 'unified') {
     const state = useUnifiedWorkspace.getState();
     const id = state.layout && workspacePaneCells(state.layout).find(cell => cell.id === state.focused)?.resourceId;
-    if (id?.startsWith('chat:')) { useAiWorkspace.getState().openNative(useChatStore.getState().createConversation()); useWorkspaceStore.getState().openHarnessTab(); }
-    else if (id?.startsWith('terminal:')) useWorkspaceStore.getState().addTab();
-    else newEditorFile();
+    if (id?.startsWith('chat:') || id?.startsWith('acp:')) createUnifiedResource('conversation');
+    else if (id?.startsWith('terminal:') || !id) createUnifiedTerminal();
+    else createUnifiedResource('document');
     return;
   }
   if (area === 'terminal') useWorkspaceStore.getState().addTab();
   else if (area === 'code') newEditorFile();
   else if (area === 'ai') {
     const side = sideAiHasFocus();
-    const id = useChatStore.getState().createConversation();
-    if (side) useAiWorkspace.getState().ensureNative(id);
+    const id = useChatStore.getState().createConversation(null, { activate: !side });
+    if (side) useAiWorkspace.getState().selectSide(`chat:${id}`);
     else useAiWorkspace.getState().openNative(id);
     if (!side) useWorkspaceStore.getState().openHarnessTab();
   }
@@ -54,12 +63,9 @@ export function activateWorkspaceInstance(index: number): boolean {
   const navigation = useWorkspaceNavigation.getState();
   const area = focusedWorkspaceArea();
   if (area === 'unified') {
-    const ids = currentWorkspaceResources().filter(resource => resource.kind !== 'page').map(resource => resource.id);
-    const unified = useUnifiedWorkspace.getState();
-    if (unified.startOpen && index === 0) { unified.openStart(); return true; }
-    const id = orderedWorkspaceIds(ids, unified.order)[index - (unified.startOpen ? 1 : 0)];
-    if (!id) return false;
-    focusUnifiedResource(id); return true;
+    const tab = compositionTabs()[index];
+    if (!tab) return false;
+    activateCompositionTab(tab.id); return true;
   }
   if (area === 'terminal') {
     const tabs = [...workspace.groups.flatMap(group => workspace.tabs.filter(tab => tab.kind === 'session' && tab.groupId === group.id)),
@@ -85,9 +91,10 @@ export function activateWorkspaceInstance(index: number): boolean {
     const connections = useHarnessWorkspace.getState();
     const side = sideAiHasFocus();
     const ids = [...ai.nativeTabs.filter(id => useChatStore.getState().conversations.some(item => item.id === id)).map(id => `chat:${id}`),
-      ...(!side ? connections.connections.map(item => `acp:${item.id}`) : [])];
+      ...connections.connections.map(item => `acp:${item.id}`)];
     const id = orderedWorkspaceIds(ids, ai.order)[index];
     if (!id) return false;
+    if (side) { ai.selectSide(id); return true; }
     if (id.startsWith('page:')) workspace.activate(id.slice(5));
     else {
       if (!side) ai.select(id);

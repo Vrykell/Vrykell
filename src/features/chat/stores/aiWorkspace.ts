@@ -4,21 +4,24 @@ import { orderedWorkspaceIds } from '@features/workspace/stores/navigation';
 interface AiWorkspaceState {
   nativeTabs: string[];
   selected: string;
+  sideSelected: string;
   order: string[];
   openNative: (id: string) => void;
   ensureNative: (id: string) => void;
   select: (id: string) => void;
+  selectSide: (id: string) => void;
   closeNative: (id: string) => void;
   move: (ids: string[], id: string, over: string, after: boolean) => void;
 }
 
 /** Opening and closing navigation tabs never deletes a saved conversation. */
 export const useAiWorkspace = create<AiWorkspaceState>((set) => ({
-  nativeTabs: [], selected: '', order: [],
+  nativeTabs: [], selected: '', sideSelected: '', order: [],
   openNative: id => set(state => ({ nativeTabs: state.nativeTabs.includes(id) ? state.nativeTabs : [...state.nativeTabs, id], selected: `chat:${id}` })),
   ensureNative: id => set(state => state.nativeTabs.includes(id) ? state : ({ nativeTabs: [...state.nativeTabs, id] })),
   select: selected => set({ selected }),
-  closeNative: id => set(state => ({ nativeTabs: state.nativeTabs.filter(item => item !== id), selected: state.selected === `chat:${id}` ? '' : state.selected })),
+  selectSide: sideSelected => set(state => ({ sideSelected, ...(sideSelected.startsWith('chat:') && !state.nativeTabs.includes(sideSelected.slice(5)) ? { nativeTabs: [...state.nativeTabs, sideSelected.slice(5)] } : {}) })),
+  closeNative: id => set(state => ({ nativeTabs: state.nativeTabs.filter(item => item !== id), selected: state.selected === `chat:${id}` ? '' : state.selected, sideSelected: state.sideSelected === `chat:${id}` ? '' : state.sideSelected })),
   move: (ids, id, over, after) => set(state => {
     if (id === over || !ids.includes(id) || !ids.includes(over)) return state;
     const order = orderedWorkspaceIds(ids, state.order).filter(item => item !== id);
