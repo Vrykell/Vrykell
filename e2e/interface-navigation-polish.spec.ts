@@ -128,7 +128,8 @@ for (const layout of ['cards', 'table']) test(`hosts change fixed groups through
   }, layout);
   await page.goto('/'); await page.getByTestId('workspace-area-ssh').click();
   const row = page.getByTestId('ssh-row-ssh-1');
-  await expect(row).not.toHaveAttribute('data-reorder-item');
+  if (layout === 'table') await expect(row).toHaveAttribute('data-reorder-item', 'ssh-1');
+  else await expect(row).not.toHaveAttribute('data-reorder-item');
   await row.click({ button: 'right' });
   await page.getByRole('button', { name: '编辑连接', exact: true }).click();
   await page.getByRole('combobox', { name: '已有分组' }).click(); await page.getByRole('option', { name: 'Beta', exact: true }).click();
