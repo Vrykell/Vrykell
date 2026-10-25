@@ -9,7 +9,7 @@ function mergeRows<T extends { id: string }>(previous: T[], next: T[]) {
   return [...new Map([...previous, ...next].map(row => [row.id, row])).values()];
 }
 
-export function useHistoryPages(source: HistoryPageRequest['source'], sort: HistoryPageRequest['sort'], revision: string) {
+export function useHistoryPages(source: HistoryPageRequest['source'], sort: HistoryPageRequest['sort'], revision: string, layout: HistoryPageRequest['layout'] = 'all') {
   const [sessions, setSessions] = useState<BackendSessionEntry[]>([]);
   const [conversations, setConversations] = useState<BackendConversation[]>([]);
   const [groups, setGroups] = useState<BackendGroupEntry[]>([]);
@@ -31,7 +31,7 @@ export function useHistoryPages(source: HistoryPageRequest['source'], sort: Hist
     setError('');
     try {
       const [page, nextGroups] = await Promise.all([
-        readHistoryPage({ source, sort, limit: HISTORY_PAGE_SIZE, cursor: reset ? null : cursor.current }),
+        readHistoryPage({ source, sort, layout, limit: HISTORY_PAGE_SIZE, cursor: reset ? null : cursor.current }),
         reset && !groupsLoaded.current ? groupsList() : Promise.resolve(null),
       ]);
       if (requestId !== generation.current) return;
@@ -46,7 +46,7 @@ export function useHistoryPages(source: HistoryPageRequest['source'], sort: Hist
     } finally {
       if (requestId === generation.current) { pending.current = false; setLoading(false); setLoadingMore(false); }
     }
-  }, [source, sort, revision]);
+  }, [source, sort, revision, layout]);
   const refresh = useCallback(() => { groupsLoaded.current = false; return load(true); }, [load]);
   useEffect(() => { void load(true); return () => { generation.current += 1; pending.current = false; }; }, [load]);
   return { sessions, conversations, groups, loading, loadingMore, hasMore, error, refresh, loadMore: useCallback(() => load(false), [load]) };

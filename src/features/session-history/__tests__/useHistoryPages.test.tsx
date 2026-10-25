@@ -16,7 +16,7 @@ it('requests a bounded first page and serializes scroll requests without duplica
   read.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
   const { result } = renderHook(() => useHistoryPages('all', 'activity-desc', ''));
   await waitFor(() => expect(result.current.loading).toBe(false));
-  expect(read).toHaveBeenCalledWith({ source: 'all', sort: 'activity-desc', limit: 40, cursor: null });
+  expect(read).toHaveBeenCalledWith({ source: 'all', sort: 'activity-desc', layout: 'all', limit: 40, cursor: null });
   act(() => { void result.current.loadMore(); void result.current.loadMore(); });
   expect(read).toHaveBeenCalledTimes(2);
   await act(async () => { resolve({ sessions: [], conversations: [row('first'), row('second')], nextCursor: null }); });

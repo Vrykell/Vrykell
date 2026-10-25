@@ -4,6 +4,7 @@ import { historyRecordKey, type HistoryMetaState } from '@utils/historyMeta';
 import { t } from '@i18n';
 import { sessionHistoryTerminals } from './sessionMetadata';
 import { sessionTerminalModes, sshTargetOf, type SessionDateFilter, type SessionModeFilter } from './filter';
+import { parseWorkspaceHistory, type WorkspaceHistorySnapshot } from '@features/workspace/model/workspaceHistory';
 
 export const HISTORY_TYPES = ['all', 'terminal', 'conversation'] as const;
 export type UnifiedHistoryType = typeof HISTORY_TYPES[number];
@@ -37,9 +38,10 @@ export interface UnifiedHistoryFilter {
   groupBy: UnifiedHistoryGroupBy;
   dateField: 'activity' | 'created';
   starredOnly: boolean;
+  layout?: 'all' | 'single' | 'split';
 }
 export const DEFAULT_UNIFIED_FILTER: UnifiedHistoryFilter = {
-  query: '', type: 'all', connection: 'all', date: 'all', mode: 'all', sort: 'activity-desc', groupBy: 'day', dateField: 'activity', starredOnly: false,
+  query: '', type: 'all', connection: 'all', date: 'all', mode: 'all', sort: 'activity-desc', groupBy: 'day', dateField: 'activity', starredOnly: false, layout: 'all',
 };
 
 interface HistoryRecordBase {
@@ -58,10 +60,13 @@ interface HistoryRecordBase {
   ssh: boolean;
   note: string;
   starred: boolean;
+  paneCount: number;
+  types: readonly ('terminal' | 'conversation')[];
 }
 export interface UnifiedAgentReference { harness: string; sessionId: string; cwd: string; at: number }
 export type UnifiedHistoryRecord = HistoryRecordBase & (
   { kind: 'terminal'; session: BackendSessionEntry } | { kind: 'conversation'; conversation: Conversation } | { kind: 'agent'; agent: UnifiedAgentReference }
+  | { kind: 'workspace'; session: BackendSessionEntry; snapshot: WorkspaceHistorySnapshot }
 );
 
 const timestamp = (value: number, fallback: number) => Number.isFinite(value) ? value : Number.isFinite(fallback) ? fallback : 0;
@@ -69,13 +74,13 @@ const timestamp = (value: number, fallback: number) => Number.isFinite(value) ? 
 /** Read both sources without applying either original page's saved filters or changing ownership. */
 export function unifiedHistoryRecords(sessions: readonly BackendSessionEntry[], conversations: readonly Conversation[],
   meta: Pick<HistoryMetaState, 'notes' | 'starred'>, agents: readonly UnifiedAgentReference[] = []): UnifiedHistoryRecord[] {
-  const terminals: UnifiedHistoryRecord[] = sessions.filter(session => session.status === 'historical').map(session => {
+  const terminals: UnifiedHistoryRecord[] = sessions.filter(session => session.status === 'historical' && session.kind !== 'workspace').map(session => {
     const panes = sessionHistoryTerminals(session);
     const cwd = [...new Set(panes.map(pane => pane.cwd).filter(Boolean))].join(', ');
     const description = [...new Set([sshTargetOf(session), cwd].filter(Boolean))].join(' · ');
     const key = historyRecordKey('session', session.id);
     const note = meta.notes[key] ?? '';
-    return { kind: 'terminal', session, key, title: session.title, timestamp: timestamp(session.closed_at ?? session.created_at, session.created_at),
+    return { kind: 'terminal', session, key, title: session.title, paneCount: panes.length, types: ['terminal'], timestamp: timestamp(session.closed_at ?? session.created_at, session.created_at),
       description, cwd, connection: panes.some(pane => pane.kind === 'local') && panes.some(pane => pane.kind === 'ssh') ? 'mixed'
         : panes.some(pane => pane.kind === 'ssh') ? 'ssh' : 'local',
       terminalType: panes.some(pane => pane.kind === 'ssh') && !panes.some(pane => pane.kind === 'local') ? 'ssh'
@@ -90,7 +95,7 @@ export function unifiedHistoryRecords(sessions: readonly BackendSessionEntry[], 
     const description = [environment?.label, environment?.ssh?.host, environment?.cwd].filter(Boolean).join(' · ');
     const key = historyRecordKey('conversation', conversation.id);
     const note = meta.notes[key] ?? '';
-    return { kind: 'conversation', conversation, key, title: conversation.title, timestamp: timestamp(conversation.updatedAt, conversation.createdAt),
+    return { kind: 'conversation', conversation, key, title: conversation.title, paneCount: 1, types: ['conversation'], timestamp: timestamp(conversation.updatedAt, conversation.createdAt),
       description, cwd: environment?.cwd ?? '', connectionTarget: environment?.ssh
         ? `${environment.ssh.user ? `${environment.ssh.user}@` : ''}${environment.ssh.host}${environment.ssh.port && environment.ssh.port !== 22 ? `:${environment.ssh.port}` : ''}` : '',
       connection: !environment ? 'discussion' : environment.kind,
@@ -100,11 +105,38 @@ export function unifiedHistoryRecords(sessions: readonly BackendSessionEntry[], 
   });
   const external: UnifiedHistoryRecord[] = agents.map(agent => {
     const key = historyRecordKey('conversation', `acp:${JSON.stringify([agent.harness, agent.sessionId])}`); const note = meta.notes[key] ?? '';
-    return { kind: 'agent', agent, key, title: agent.harness, timestamp: agent.at, createdAt: agent.at, description: t('ACP session reference'),
+    return { kind: 'agent', agent, key, title: agent.harness, paneCount: 1, types: ['conversation'], timestamp: agent.at, createdAt: agent.at, description: t('ACP session reference'),
       cwd: agent.cwd, connectionTarget: '', connection: 'local', terminalType: 'ACP', modes: [], local: true, ssh: false,
       note, starred: !!meta.starred[key], searchText: [agent.harness, agent.cwd, note, 'ACP'].join(' ').toLocaleLowerCase() };
   });
-  return [...terminals, ...chats, ...external].sort((a, b) => b.timestamp - a.timestamp || a.key.localeCompare(b.key));
+  const terminalMetadata = new Map(sessions.filter(session => session.kind !== 'workspace').map(session => [session.id, sessionHistoryTerminals(session)]));
+  const workspaces: UnifiedHistoryRecord[] = sessions.flatMap(session => {
+    if (session.kind !== 'workspace' || session.status !== 'historical') return [];
+    const snapshot = parseWorkspaceHistory(session.payload);
+    if (!snapshot) return [];
+    snapshot.members = snapshot.members.map(member => {
+      if (member.kind !== 'terminal' || member.shellType) return member;
+      const candidates = terminalMetadata.get(member.reference);
+      if (!candidates) return member;
+      const terminal = candidates.find(item => item.paneId === member.paneId) ?? candidates[0];
+      return terminal ? { ...member, shellType: terminal.shellType, connectionId: member.ssh ? terminal.remoteId : member.connectionId } : member;
+    });
+    const key = historyRecordKey('session', session.id);
+    const note = meta.notes[key] ?? '';
+    const local = snapshot.members.some(member => member.local);
+    const ssh = snapshot.members.some(member => member.ssh);
+    const cwd = [...new Set(snapshot.members.map(member => member.cwd).filter(Boolean))].join(', ');
+    const types: ('terminal' | 'conversation')[] = [];
+    if (snapshot.members.some(member => member.kind === 'terminal')) types.push('terminal');
+    if (snapshot.members.some(member => member.kind === 'conversation' || member.kind === 'agent')) types.push('conversation');
+    const description = snapshot.members.map(member => member.title).join(' + ');
+    return [{ kind: 'workspace' as const, session, snapshot, key, title: session.title, timestamp: timestamp(session.closed_at ?? session.created_at, session.created_at),
+      createdAt: session.created_at, description, cwd, connectionTarget: '', connection: local && ssh ? 'mixed' as const : ssh ? 'ssh' as const : local ? 'local' as const : 'discussion' as const,
+      terminalType: 'workspace', modes: [...new Set(snapshot.members.flatMap(member => member.modes ?? []))], local, ssh, note, starred: !!meta.starred[key],
+      paneCount: snapshot.members.reduce((count, member) => count + member.paneCount, 0), types,
+      searchText: [session.title, description, cwd, note, ...snapshot.members.map(member => member.kind)].join(' ').toLocaleLowerCase() }];
+  });
+  return [...terminals, ...chats, ...external, ...workspaces].sort((a, b) => b.timestamp - a.timestamp || a.key.localeCompare(b.key));
 }
 
 export function filterUnifiedHistory(records: readonly UnifiedHistoryRecord[], filter: UnifiedHistoryFilter, now = Date.now()): UnifiedHistoryRecord[] {
@@ -118,8 +150,8 @@ export function filterUnifiedHistory(records: readonly UnifiedHistoryRecord[], f
     && (filter.mode === 'all' || record.modes.includes(filter.mode))
     && (filter.connection === 'all' || filter.connection === 'local' && record.local
       || filter.connection === 'ssh' && record.ssh || filter.connection === 'discussion' && record.connection === 'discussion')
-    && (filter.type === 'all' || filter.type === 'terminal' && record.kind === 'terminal'
-      || filter.type === 'conversation' && record.kind !== 'terminal'));
+    && (filter.type === 'all' || record.types.includes(filter.type))
+    && (!filter.layout || filter.layout === 'all' || (filter.layout === 'split' ? record.paneCount > 1 : record.paneCount === 1)));
   return [...visible].sort((left, right) => {
     if (filter.sort === 'title-asc' || filter.sort === 'title-desc') {
       const order = left.title.localeCompare(right.title, undefined, { numeric: true });
@@ -166,7 +198,7 @@ export function unifiedHistoryGroupIdentity(record: UnifiedHistoryRecord, groupB
     id = record.connection; title = t(CONNECTION_LABELS[record.connection]);
   } else if (groupBy === 'terminal') {
     id = record.kind === 'conversation' ? 'ai' : record.terminalType.toLocaleLowerCase() || 'terminal';
-    title = record.kind === 'agent' ? t('ACP sessions') : record.kind === 'conversation' ? t('AI conversations')
+    title = record.kind === 'workspace' ? t('Workspace combinations') : record.kind === 'agent' ? t('ACP sessions') : record.kind === 'conversation' ? t('AI conversations')
       : record.terminalType === 'ssh' ? t('SSH terminals')
         : record.terminalType === 'terminal' ? t('Terminal sessions') : `${record.terminalType.toLocaleUpperCase()} terminals`;
   }

@@ -3,7 +3,7 @@ import { ask } from '@tauri-apps/plugin-dialog';
 import { t } from '@i18n';
 import {
   Ellipsis, Filter, Grid, History, LockSmall as Lock,
-  StarSmall, Undo2, X, ArrowSort, Bot, iconSizes,
+  StarSmall, Undo2, X, ArrowSort, Bot, ChevronDown, iconSizes,
 } from '@ui/icons';
 import { IconButton } from '@ui/actions/IconButton';
 import ReloadButton from '@ui/actions/ReloadButton';
@@ -20,6 +20,8 @@ import { useChatStore } from '@features/chat';
 import { useWorkspaceNavigation, type HistoryTypePreset } from '@features/workspace';
 import HistoryTerminalIcon from './HistoryTerminalIcon';
 import AppMark from '@ui/icons/AppMark';
+import IconCountBadge from '@ui/feedback/IconCountBadge';
+import HistoryMemberIcon from './HistoryMemberIcon';
 import { harnessMark } from '@features/agent/components/HarnessBadge';
 import { historyGroupKey, scopedGroupIds, useHistoryMetaStore } from '@utils/historyMeta';
 import { isHistoryGroupColor } from '@ui/history/historyGroupColor';
@@ -34,19 +36,20 @@ import { conversationMarkdown } from '@features/chat/model/conversationHistory';
 import * as conversationApi from '@platform/api/conversation';
 import { writeClipboardText } from '@platform/clipboard';
 import { useToastStore } from '@ui/feedback/Toast';
+import type { WorkspaceHistoryMember } from '@features/workspace/model/workspaceHistory';
 
 const TYPE_LABELS = { all: 'All', terminal: 'Terminal history', conversation: 'AI conversations' } as const;
 const DATE_FIELD_LABELS = { activity: 'Latest activity', created: 'Created date' } as const;
-const openLabel = (record: UnifiedHistoryRecord) => t(record.kind === 'terminal' ? 'Restore session' : record.kind === 'agent' ? 'Resume ACP session' : 'Open conversation');
-const deleteLabel = (record: UnifiedHistoryRecord) => t(record.kind === 'terminal' ? 'Delete this session' : record.kind === 'agent' ? 'Forget ACP session reference' : 'Delete conversation');
+const openLabel = (record: UnifiedHistoryRecord) => t(record.kind === 'workspace' ? 'Restore workspace combination' : record.kind === 'terminal' ? 'Restore session' : record.kind === 'agent' ? 'Resume ACP session' : 'Open conversation');
+const deleteLabel = (record: UnifiedHistoryRecord) => t(record.kind === 'workspace' ? 'Forget workspace combination' : record.kind === 'terminal' ? 'Delete this session' : record.kind === 'agent' ? 'Forget ACP session reference' : 'Delete conversation');
 const anchorFrom = (trigger: HTMLButtonElement, align: 'start' | 'end' = 'start'): MenuAnchor => {
   const rect = trigger.getBoundingClientRect();
   return { x: align === 'end' ? rect.right : rect.left, y: rect.bottom + 4, trigger };
 };
 
 /** Complete chronological history surface with the same organization model for every record type. */
-export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePreset } = {}) {
-  const history = useUnifiedHistory(preset);
+export default function UnifiedHistoryView({ preset, destination }: { preset?: HistoryTypePreset; destination?: 'native' | 'unified' } = {}) {
+  const history = useUnifiedHistory(preset, destination);
   const historyPreset = useWorkspaceNavigation(state => state.historyPreset);
   const historyPresetRevision = useWorkspaceNavigation(state => state.historyPresetRevision);
   const [filterMenu, setFilterMenu] = useState<MenuAnchor | null>(null);
@@ -87,9 +90,9 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
   }).filter(card => card.visible.length > 0), [history.filter.type, history.originalGroups, history.records, history.visible]);
 
   const filtered = history.filter.type !== 'all' || history.filter.connection !== 'all' || history.filter.date !== 'all' || history.filter.mode !== 'all'
-    || history.filter.starredOnly || history.filter.groupBy !== 'day' || history.filter.sort !== 'activity-desc';
+    || history.filter.starredOnly || history.filter.groupBy !== 'day' || history.filter.sort !== 'activity-desc' || history.filter.layout && history.filter.layout !== 'all';
   const hasNarrowingFilter = history.filter.connection !== 'all' || history.filter.date !== 'all' || history.filter.mode !== 'all'
-    || history.filter.starredOnly;
+    || history.filter.starredOnly || history.filter.layout && history.filter.layout !== 'all';
   const closeSharedMenus = () => { setFilterMenu(null); setSortMenu(null); setGroupMenu(null); setActionsMenu(null); };
   const setFilter = (patch: Partial<UnifiedHistoryFilter>) => {
     const dateField = patch.sort && !patch.sort.startsWith('title')
@@ -99,7 +102,7 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
 
   const recordText = async (record: UnifiedHistoryRecord) => record.kind === 'terminal'
     ? sessionSummaryText(record.session)
-    : record.kind === 'agent' ? JSON.stringify(record.agent, null, 2)
+    : record.kind === 'workspace' ? JSON.stringify(record.snapshot, null, 2) : record.kind === 'agent' ? JSON.stringify(record.agent, null, 2)
       : conversationMarkdown(record.conversation, await conversationApi.listConversationMessages(record.conversation.id));
   const copyRecords = async (records: readonly UnifiedHistoryRecord[]) => {
     try {
@@ -115,7 +118,8 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
   const deleteRecords = async (records: readonly UnifiedHistoryRecord[]) => {
     const targets = deletable(records);
     if (!targets.length || batchBusy) return;
-    const ok = await ask(t(targets.some(record => record.kind === 'agent')
+    const ok = await ask(t(targets.every(record => record.kind === 'workspace')
+      ? 'Forget {{count}} workspace combinations? Their sessions and documents are kept.' : targets.some(record => record.kind === 'agent')
       ? 'Delete {{count}} matching records? ACP references are only forgotten; their agent-owned history is kept. Locked and working records are excluded.'
       : 'Delete {{count}} matching records and their history? Locked and working records are excluded.', {
       count: targets.length,
@@ -168,6 +172,10 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
       { label: t('Discussion only'), active: history.filter.connection === 'discussion',
         onSelect: () => setFilter({ connection: 'discussion' }) },
     ] },
+    { label: t('Layout'), options: (['all', 'single', 'split'] as const).map(layout => ({
+      label: t(layout === 'all' ? 'All layouts' : layout === 'split' ? 'Split layouts' : 'Single pane'),
+      active: (history.filter.layout ?? 'all') === layout, onSelect: () => setFilter({ layout }),
+    })) },
     { label: t('Terminal startup mode'), options: SESSION_MODE_OPTIONS.map(option => ({
       label: t(option.label), active: history.filter.mode === option.value, onSelect: () => setFilter({ mode: option.value }),
     })) },
@@ -189,7 +197,7 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
 
   const rowMenuItems: ContextMenuItem[] = rowMenu ? [
     { label: openLabel(rowMenu.record), onClick: () => history.open(rowMenu.record) },
-    { label: t(rowMenu.record.kind === 'terminal' ? 'Copy summary' : rowMenu.record.kind === 'agent' ? 'Copy session reference' : 'Copy as Markdown'), group: 'clipboard',
+    { label: t(rowMenu.record.kind === 'terminal' || rowMenu.record.kind === 'workspace' ? 'Copy summary' : rowMenu.record.kind === 'agent' ? 'Copy session reference' : 'Copy as Markdown'), group: 'clipboard',
       onClick: () => void copyRecords([rowMenu.record]) },
     { label: t(notes[rowMenu.record.key] ? 'Edit note…' : 'Add note…'), group: 'edit',
       onClick: () => { setNotePrompt({ record: rowMenu.record, anchor: rowMenu.anchor }); setRowMenu(null); } },
@@ -203,7 +211,7 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
   ] : [];
 
   const activeFilterCards = history.filter.type !== 'all' || history.filter.connection !== 'all' || history.filter.mode !== 'all'
-    || history.filter.date !== 'all' || history.filter.starredOnly;
+    || history.filter.date !== 'all' || history.filter.starredOnly || history.filter.layout && history.filter.layout !== 'all';
   const pageTitle = history.filter.type === 'terminal' ? 'Session history'
     : history.filter.type === 'conversation' ? 'AI conversation history' : 'All history';
   const searchLabel = history.filter.type === 'terminal' ? 'Search sessions'
@@ -217,6 +225,8 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
     query={history.filter.query} onQueryChange={query => setFilter({ query })}
     searchLabel={t(searchLabel)} searchPlaceholder={t(searchPlaceholder)} searchTestId="unified-history-search"
     filterChips={activeFilterCards ? <>
+      {history.filter.layout && history.filter.layout !== 'all' && <FilterChip removeLabel={t('Remove layout filter')}
+        onRemove={() => setFilter({ layout: 'all' })}>{t(history.filter.layout === 'split' ? 'Split layouts' : 'Single pane')}</FilterChip>}
       {history.filter.type !== 'all' && <FilterChip testId="unified-history-filter-card-type" removeLabel={t('Remove filter: {{filter}}', {
         filter: t(TYPE_LABELS[history.filter.type]),
       })} onRemove={() => setFilter({ type: 'all' })}>{t(TYPE_LABELS[history.filter.type])}</FilterChip>}
@@ -327,7 +337,7 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
         {visible.map(record => <UnifiedHistoryRow key={record.key} record={record} active={false}
           locked={Boolean(lockedRecords[record.key])} busy={history.busy || batchBusy}
           onOpen={() => history.open(record)} onDelete={() => void deleteRecords([record])}
-          onMenu={anchor => setRowMenu({ record, anchor })} />)}
+          onMenu={anchor => setRowMenu({ record, anchor })} onOpenMember={history.openMember} />)}
       </HistoryGroupCard>;
     })}
     {groups.map(group => {
@@ -357,7 +367,7 @@ export default function UnifiedHistoryView({ preset }: { preset?: HistoryTypePre
           locked={Boolean(lockedRecords[record.key])}
           busy={history.busy || batchBusy || record.kind === 'conversation' && sendingId === record.conversation.id}
           onOpen={() => history.open(record)} onDelete={() => void deleteRecords([record])}
-          onMenu={anchor => setRowMenu({ record, anchor })} />)}
+          onMenu={anchor => setRowMenu({ record, anchor })} onOpenMember={history.openMember} />)}
       </HistoryGroupCard>;
     })}
     {history.hasMore && <div className="history-pagination"><OutlineButton disabled={history.loadingMore} onClick={() => void history.loadMore()}>{t(history.loadingMore ? 'Loading more history…' : 'Load more history')}</OutlineButton></div>}
@@ -368,21 +378,26 @@ function readingActive(record: UnifiedHistoryRecord, activeId: string | null) {
   return record.kind === 'conversation' && record.conversation.id === activeId;
 }
 
-function UnifiedHistoryRow({ record, active, locked, busy, onOpen, onDelete, onMenu }: {
+function UnifiedHistoryRow({ record, active, locked, busy, onOpen, onDelete, onMenu, onOpenMember }: {
   record: UnifiedHistoryRecord; active: boolean; locked: boolean; busy: boolean;
   onOpen: () => void; onDelete: () => void; onMenu: (anchor: MenuAnchor) => void;
+  onOpenMember: (member: WorkspaceHistoryMember) => Promise<void>;
 }) {
-  const label = t(record.kind === 'conversation' ? 'AI conversation' : record.kind === 'agent' ? 'ACP session reference' : record.local && record.ssh ? 'Mixed connections' : record.ssh ? 'SSH terminal' : 'Local terminal');
+  const [expanded, setExpanded] = useState(false);
+  const label = t(record.kind === 'workspace' ? 'Workspace combination' : record.kind === 'conversation' ? 'AI conversation' : record.kind === 'agent' ? 'ACP session reference' : record.local && record.ssh ? 'Mixed connections' : record.ssh ? 'SSH terminal' : 'Local terminal');
   const AgentMark = record.kind === 'agent' ? harnessMark(record.agent.harness, Bot) : Bot;
   const activity = t(record.kind === 'conversation' ? 'Updated {{date}}' : record.kind === 'agent' ? 'Last opened {{date}}' : 'Closed {{date}}', {
     date: new Date(record.timestamp).toLocaleString(undefined, {
       year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
     }),
   });
-  return <SidebarItem variant="history" compact active={active} title={record.title || t(record.kind === 'conversation' ? 'New conversation' : 'Untitled session')}
-    icon={<span className="history-row-icon">{record.kind === 'conversation' ? <AppMark size={iconSizes.control} /> : record.kind === 'agent' ? <AgentMark size={iconSizes.control} /> : <HistoryTerminalIcon session={record.session} size={iconSizes.control} />}</span>}
-    subtitle={[label, record.cwd || record.description, activity, record.note]
+  return <><SidebarItem variant="history" compact active={active} title={record.title || t(record.kind === 'conversation' ? 'New conversation' : 'Untitled session')}
+    icon={<span className="history-row-icon"><IconCountBadge count={record.paneCount}>{record.kind === 'workspace' ? <HistoryMemberIcon member={record.snapshot.members[0]!} size={iconSizes.control} /> : record.kind === 'conversation' ? <AppMark size={iconSizes.control} /> : record.kind === 'agent' ? <AgentMark size={iconSizes.control} /> : <HistoryTerminalIcon session={record.session} size={iconSizes.control} />}</IconCountBadge></span>}
+    subtitle={[label, record.paneCount > 1 && t('{{count}} panes', { count: record.paneCount }), record.kind === 'workspace' && record.types.map(type => t(TYPE_LABELS[type])).join(' + '), record.cwd || record.description, activity, record.note]
       .filter(Boolean).join(' · ')} subtitleFontFamily="var(--font-ui)"
+    trailingActions={record.kind === 'workspace' ? [{ label: t(expanded ? 'Hide panes' : 'Show panes'), control: <IconButton compact
+      aria-label={t(expanded ? 'Hide panes' : 'Show panes')} aria-expanded={expanded} aria-controls={`history-panes-${record.key}`} onClick={event => { event.stopPropagation(); setExpanded(value => !value); }}>
+      <ChevronDown size={16} style={{ transform: expanded ? 'rotate(180deg)' : undefined }} /></IconButton> }] : undefined}
     badge={record.starred || locked ? <span className="history-row-flags">
       {locked && <span className="history-row-lock" data-tip={t('Locked record')}><Lock size={16} aria-hidden="true" /></span>}
       {record.starred && <span className="history-row-star" data-tip={t('Starred')}>
@@ -403,5 +418,13 @@ function UnifiedHistoryRow({ record, active, locked, busy, onOpen, onDelete, onM
       testId: `unified-history-menu-${record.key}`, onClick: event => {
         const rect = event.currentTarget.getBoundingClientRect();
         onMenu({ x: rect.right - 180, y: rect.bottom + 4, trigger: event.currentTarget });
-      } }} />;
+      } }} />
+    {record.kind === 'workspace' && expanded && <div className="history-combination-members" id={`history-panes-${record.key}`} role="group" aria-label={t('Workspace panes')}>{record.snapshot.members.map(member => {
+      return <SidebarItem
+      key={member.id} variant="history" compact active={false} title={member.title} subtitle={t(member.kind === 'terminal' ? 'Terminal session' : member.kind === 'agent' ? 'ACP session reference' : member.kind === 'conversation' ? 'AI conversation' : 'File')}
+      icon={<IconCountBadge count={member.paneCount}><HistoryMemberIcon member={member} /></IconCountBadge>}
+      action={{ icon: <Undo2 size={16} />, label: t('Open this pane'), onClick: () => {
+        void onOpenMember(member);
+      } }} />; })}</div>}
+  </>;
 }

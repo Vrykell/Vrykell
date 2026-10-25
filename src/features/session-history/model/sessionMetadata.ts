@@ -2,6 +2,7 @@ import type { BackendSessionEntry } from '@platform/api/types';
 import type { HistoryDirectoryTarget } from '@utils/historyDirectory';
 
 export interface SavedHistoryTerminal extends HistoryDirectoryTarget {
+  paneId?: string;
   shellType?: string;
   openMode?: 'block' | 'classic';
 }
@@ -31,6 +32,7 @@ export function sessionHistoryTerminals(session: BackendSessionEntry): SavedHist
     const cwd = typeof terminal.cwd === 'string' && terminal.cwd.trim() ? terminal.cwd
       : index === 0 ? session.cwd || (typeof payload.cwd === 'string' ? payload.cwd : '') : '';
     return {
+      ...(typeof terminal.id === 'string' ? { paneId: terminal.id } : {}),
       kind, cwd,
       shellType: typeof terminal.shellType === 'string' ? terminal.shellType : undefined,
       openMode: terminal.openMode === 'block' || terminal.openMode === 'classic' ? terminal.openMode : undefined,

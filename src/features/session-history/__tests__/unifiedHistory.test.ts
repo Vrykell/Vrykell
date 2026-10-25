@@ -8,6 +8,32 @@ const session = (id: string, kind: 'local' | 'ssh', time: number): BackendSessio
   payload: kind === 'ssh' ? JSON.stringify({ ssh: { host: 'prod.example.com', user: 'deploy' } }) : JSON.stringify({ cwd: '/repo' }),
 });
 
+it('matches every member type of a mixed combination without splitting the history record', () => {
+  const mixed = { ...session('workspace:test', 'local', 100), kind: 'workspace', payload: JSON.stringify({ version: 1, focused: 'one',
+    layout: { type: 'split', direction: 'row', ratio: 0.5, first: { type: 'pane', id: 'one', resourceId: 'terminal:one' }, second: { type: 'pane', id: 'two', resourceId: 'chat:two' } },
+    members: [{ id: 'terminal:one', title: 'Shell', reference: 'one', kind: 'terminal', local: true, ssh: false, paneCount: 1 },
+      { id: 'chat:two', title: 'Chat', reference: 'two', kind: 'conversation', local: false, ssh: false, paneCount: 1 }] }) };
+  const records = unifiedHistoryRecords([mixed, session('single', 'local', 90)], [], { notes: {}, starred: {} });
+  for (const type of ['terminal', 'conversation'] as const) {
+    const visible = filterUnifiedHistory(records, { ...DEFAULT_UNIFIED_FILTER, type, layout: 'split' });
+    expect(visible).toHaveLength(1);
+    expect(visible[0]).toMatchObject({ kind: 'workspace', paneCount: 2, types: ['terminal', 'conversation'] });
+  }
+  expect(filterUnifiedHistory(records, { ...DEFAULT_UNIFIED_FILTER, layout: 'single' }).map(record => record.kind)).toEqual(['terminal']);
+});
+
+it('recovers profile icons for old composition metadata from the matching parent pane', () => {
+  const parent = { ...session('owner', 'local', 100), payload: JSON.stringify({ layout: { type: 'split',
+    first: { type: 'leaf', terminal: { id: 'one', kind: 'local', shellType: 'powershell' } },
+    second: { type: 'leaf', terminal: { id: 'two', kind: 'local', shellType: 'bash' } } } }) };
+  const mixed = { ...session('workspace:test', 'local', 200), kind: 'workspace', payload: JSON.stringify({ version: 1, focused: 'one',
+    layout: { type: 'split', direction: 'row', ratio: 0.5, first: { type: 'pane', id: 'one', resourceId: 'terminal:two' }, second: { type: 'pane', id: 'chat', resourceId: 'chat:chat' } },
+    members: [{ id: 'terminal:two', title: 'Shell', reference: 'owner', paneId: 'two', kind: 'terminal', local: true, ssh: false, paneCount: 1 },
+      { id: 'chat:chat', title: 'Chat', reference: 'chat', kind: 'conversation', local: false, ssh: false, paneCount: 1 }] }) };
+  const record = unifiedHistoryRecords([mixed, parent], [], { notes: {}, starred: {} })[0]!;
+  expect(record.kind === 'workspace' && record.snapshot.members[0]?.shellType).toBe('bash');
+});
+
 describe('unified history', () => {
   it('keeps agent-owned references distinct from native conversations and terminal sessions', () => {
     const records = unifiedHistoryRecords([], [], { notes: {}, starred: {} }, [{ harness: 'Agent', sessionId: 'external', cwd: '/agent', at: 1000 }]);
