@@ -5,7 +5,9 @@ import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
 import { useUiStore } from '@features/workspace/stores/ui';
 import { useWorkspaceNavigation } from '@features/workspace/stores/navigation';
+import { useUnifiedWorkspace } from '@features/workspace/stores/unifiedWorkspace';
 import { leaf, removeLeaf, splitLeaf } from '@features/workspace/model/windowLayout';
+import { ResourceContentProvider, ResourceContentSlot } from '@ui/layout/ResourceContent';
 import TerminalView from '../components/TerminalView';
 
 const { mounts, disposals } = vi.hoisted(() => ({ mounts: vi.fn(), disposals: vi.fn() }));
@@ -27,6 +29,7 @@ beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   useUiStore.setState({ settingsOpen: false, splitPlacement: { open: false, spec: null }, movePlacement: { open: false, terminalId: null }, splitPickerOpen: false });
   useWorkspaceNavigation.setState({ area: 'terminal' });
+  useUnifiedWorkspace.setState({ activeTabId: '', layout: null, focused: '', zoomed: null, startActive: true });
   useWorkspaceStore.setState({ tabs: [{ id: 'window', title: 'Terminal', kind: 'session', layout: leaf({ id: 'pane-a', kind: 'local', openMode: 'block' }) }], activeId: 'window' });
   useTerminalStore.setState({ sessions: { 'pane-a': 'session-a' }, scenes: { 'pane-a': 'altScreen' }, focusedPaneId: 'pane-a', manualFullscreen: {} });
 });
@@ -78,4 +81,18 @@ it('suspends fullscreen for layout placement and restores it after cancellation 
   expect(screen.getByTestId('tui-fullscreen')).toBeVisible();
   expect(screen.getByTestId('session-pane-a')).toBe(original);
   expect(disposals).not.toHaveBeenCalled();
+});
+
+it('hosts a manually fullscreened block inside its pane when the unified workspace displays it', () => {
+  useWorkspaceNavigation.setState({ area: 'unified' });
+  useUnifiedWorkspace.setState({ layout: { type: 'pane', id: 'cell-a', resourceId: 'terminal:pane-a' }, startActive: false });
+  useTerminalStore.setState({ manualFullscreen: { 'pane-a': true } });
+  render(<ResourceContentProvider>
+    <section data-testid="placed"><ResourceContentSlot id="terminal:pane-a" visible focused /></section>
+    <TerminalView active={false} />
+  </ResourceContentProvider>);
+  const fullscreen = screen.getByTestId('tui-fullscreen');
+  expect(screen.getByTestId('placed')).toContainElement(fullscreen);
+  expect(screen.getByTestId('pane-pane-a')).toContainElement(fullscreen);
+  expect(screen.getByTestId('session-pane-a')).toBeInTheDocument();
 });

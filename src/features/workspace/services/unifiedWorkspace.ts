@@ -9,6 +9,7 @@ import { useWorkspaceStore } from '../stores/workspace';
 import { rebindWorkspaceResources, resolveWorkspaceResource, terminalWorkspaceLayout, workspacePaneCells } from '../model/workspaceResources';
 import type { PaneTarget } from '@core/paneLayout';
 import { editorFileKey } from '@core/editor';
+import { gitComparisonKey } from '@core/git';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { firstLeaf, leaves, type TerminalSpec } from '../model/windowLayout';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
@@ -114,7 +115,10 @@ export function requestWorkspaceSplit(resourceId?: string, anchor?: { x: number;
   if (navigation.area === 'code' || navigation.area === 'ai') {
     const area = navigation.area;
     const tab = workspace.tabs.find(tab => tab.id === workspace.activeId);
-    const id = resourceId ?? (area === 'ai' ? useAiWorkspace.getState().selected : tab?.kind === 'editor' ? `file:${editorFileKey(tab.selected)}` : tab?.kind === 'git-diff' ? `diff:${tab.id}` : undefined);
+    const comparisonId = tab?.kind === 'git-diff'
+      ? tab.comparisons?.find(item => gitComparisonKey(item.selection) === gitComparisonKey(tab.selection))?.id ?? tab.id
+      : undefined;
+    const id = resourceId ?? (area === 'ai' ? useAiWorkspace.getState().selected : tab?.kind === 'editor' ? `file:${editorFileKey(tab.selected)}` : tab?.kind === 'git-diff' ? `diff:${comparisonId}` : undefined);
     const resource = currentWorkspaceResources().find(resource => resource.id === id);
     if (!resource || (area === 'code' ? resource.kind !== 'document' && resource.kind !== 'comparison' : resource.kind !== 'conversation' && resource.kind !== 'agent')) return;
     const store = scopedPaneStores[area];
@@ -126,7 +130,7 @@ export function requestWorkspaceSplit(resourceId?: string, anchor?: { x: number;
   if (navigation.area !== 'unified') return;
   openUnifiedWorkspace();
   if (resourceId) focusUnifiedResource(resourceId);
-  useUnifiedWorkspace.setState({ choosingSplit: true, startActive: false });
+  useUnifiedWorkspace.setState({ choosingSplit: true, startActive: false, zoomed: null });
 }
 
 export function connectUnifiedAgent(harness: string, target?: PaneTarget, directory?: string) {

@@ -130,7 +130,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
       onConnect={() => setTerminalPicker({ source: 'ssh', split: false })} onAgent={() => setLauncher({ split: false })} onHistory={history} />}
     <WorkspacePaneCanvas layout={state.layout} focused={state.focused} zoomed={state.zoomed} resources={resources} visible={visible && !state.startActive} toolbarTarget={resourceToolbar}
       onFocus={focusUnifiedResource} onRatio={state.ratio} placing={!!placement} onPlace={commit} onCancel={() => setPlacement(null)}
-      onSplit={id => { focusUnifiedResource(id); useUnifiedWorkspace.setState({ choosingSplit: true }); }}
+      onSplit={id => { useUnifiedWorkspace.setState({ zoomed: null }); focusUnifiedResource(id); useUnifiedWorkspace.setState({ choosingSplit: true }); }}
       onRemove={removeUnifiedPane} onDetach={detachCompositionPane} onZoom={state.single} />
     {menu && <ContextMenu anchor={menu.anchor} label={t(menu.split ? 'Choose a tab to split' : 'New workspace tab')} itemRole="menuitem" onClose={() => setMenu(null)} items={flattenSingleSubmenu<ContextMenuItem>(menu.split
       ? [...resources.filter(resource => !placed.has(resource.id)).map(resource => ({ label: resource.title, onClick: () => beginPlacement({ kind: 'existing', id: resource.id }) })), { label: t('New workspace tab'), group: 'edit', submenu: { items: creation } }]

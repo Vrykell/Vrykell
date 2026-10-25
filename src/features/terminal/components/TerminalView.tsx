@@ -57,7 +57,9 @@ import { closeTerminalPane, requestTerminalSplit } from '@features/workspace/ser
 import { detachCompositionPane, useUnifiedWorkspace } from '@features/workspace';
 
 export default function TerminalView({ active = true }: { active?: boolean }) {
-  const unified = useWorkspaceNavigation(state => state.area === 'unified');
+  const area = useWorkspaceNavigation(state => state.area);
+  const unified = area === 'unified';
+  const nativeTerminal = area === 'terminal';
   const canRemovePane = useCanRemoveWorkspacePane();
   const tabs = useSessionStore((s) => s.tabs);
   const activeId = useSessionStore((s) => s.activeId);
@@ -120,8 +122,6 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
               key={tab.id}
               tab={tab}
               active={active && tab.id === activeId}
-              focused={active && tab.id === activeId}
-              placed={false}
               setSession={setSession}
               setFocusedPane={setFocusedPane}
               onPaneContextMenu={(e, sshActions) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, sshActions }); }}
@@ -144,7 +144,7 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
       })}
 
       {/* Manual fullscreen host for a running block, with room for the toolbar. */}
-      {active && fullscreenVisible && (
+      {nativeTerminal && active && fullscreenVisible && (
         <div
           data-testid="tui-fullscreen"
           data-pane-id={focusedTermId}
@@ -178,13 +178,11 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
 function SessionTabView(props: {
   tab: Extract<Tab, { kind: 'session' }>;
   active: boolean;
-  focused: boolean;
-  placed: boolean;
   setSession: (id: string, sid: string) => void;
   setFocusedPane: (id: string) => void;
   onPaneContextMenu: (e: React.MouseEvent, sshActions?: ContextMenuItem[]) => void;
 }) {
-  const { tab, active, focused, placed, setSession, setFocusedPane, onPaneContextMenu } = props;
+  const { tab, active, setSession, setFocusedPane, onPaneContextMenu } = props;
   const windowId = tab.id;
   const layout = tab.layout;
   const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
@@ -194,18 +192,6 @@ function SessionTabView(props: {
   const focusedTermId = focusedPaneId && sessions[focusedPaneId] && layoutLeaves(layout).some((t) => t.id === focusedPaneId)
     ? focusedPaneId
     : firstLeaf(layout).id;
-
-  const scene = useTerminalStore((s) => s.scenes[focusedTermId] ?? 'classic');
-  const focusBlocks = useBlockStore(selectBlocks(focusedTermId));
-  const hasExecutingBlock = focusBlocks.some((b) => b.status === 'executing');
-  const fullscreenVisible = useManualFullscreenVisible(focusedTermId);
-  useTerminalFocus(focused && scene === 'blockList' && hasExecutingBlock, focusedTermId);
-  useLayoutEffect(() => {
-    if (!focused) return;
-    focusSessionInput(focusedTermId);
-    const frame = requestAnimationFrame(() => focusSessionInput(focusedTermId));
-    return () => cancelAnimationFrame(frame);
-  }, [focused, focusedTermId, scene, hasExecutingBlock, sessions[focusedTermId]]);
 
   const {
     splitPlacement,
@@ -234,13 +220,12 @@ function SessionTabView(props: {
           layout={layout}
           windowId={windowId}
           focusedTermId={focusedTermId}
-          active={focused}
+          active={active}
           setSession={setSession}
           setFocusedPane={setFocusedPane}
           setRatioNode={setRatioNode}
           onPaneContextMenu={onPaneContextMenu}
         />
-        {placed && active && fullscreenVisible && <div data-testid="tui-fullscreen" data-pane-id={focusedTermId} style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--xterm-bg)', paddingTop: 28 }}><TuiBanner tabId={focusedTermId} /></div>}
 
         {/* Split slot picker (anchored to the layout area so it mirrors the future regions). */}
         {active && splitPlacement.open && (
@@ -343,13 +328,23 @@ function TerminalPane(props: {
   const registerDisconnect = useCallback((action: (() => Promise<void>) | null) => { disconnectAction.current = action; }, []);
   const registerReconnect = useCallback((action: (() => Promise<void>) | null) => { reconnectAction.current = action; }, []);
   const activeTabId = useSessionStore(s => s.activeId);
-  const terminalArea = useWorkspaceNavigation(state => state.area === 'terminal' || state.area === 'unified');
+  const area = useWorkspaceNavigation(state => state.area);
+  const terminalArea = area === 'terminal' || area === 'unified';
   const scene = useTerminalStore((s) => s.scenes[terminal.id] ?? 'classic');
+  const sessionId = useTerminalStore((s) => s.sessions[terminal.id]);
   const [enteredBlockMode, setEnteredBlockMode] = useState(false);
   useEffect(() => { setEnteredBlockMode(false); }, [terminal.ssh?.connectionId, terminal.ssh?.host, terminal.openMode]);
   useEffect(() => { if (scene === 'blockList') setEnteredBlockMode(true); }, [scene]);
   const manualFullscreen = useTerminalStore(s => !!s.manualFullscreen[terminal.id]);
   const fullscreenVisible = useManualFullscreenVisible(terminal.id);
+  const hasExecutingBlock = useBlockStore(state => (state.byTab[terminal.id] ?? []).some(block => block.status === 'executing'));
+  useTerminalFocus(focused && scene === 'blockList' && hasExecutingBlock, terminal.id);
+  useLayoutEffect(() => {
+    if (!focused) return;
+    focusSessionInput(terminal.id);
+    const frame = requestAnimationFrame(() => focusSessionInput(terminal.id));
+    return () => cancelAnimationFrame(frame);
+  }, [focused, terminal.id, scene, hasExecutingBlock, sessionId]);
   // An SSH pane's classic scene is its connection/auth surface; the pane's chat
   // history stays out of the way so that surface owns the pane.
   const showChatHistory = showsPaneChatHistory(scene, terminal.kind);
@@ -423,7 +418,11 @@ function TerminalPane(props: {
       data-focused={focused ? 'true' : 'false'}
       onClick={() => setFocusedPane(terminal.id)}
       onMouseDown={onPaneMouseDown}
-      onContextMenu={(e) => { setFocusedPane(terminal.id); onContextMenu(e, sshActions); }}
+      onContextMenu={(e) => {
+        if (useSessionStore.getState().activeId !== windowId) useSessionStore.getState().activate(windowId);
+        setFocusedPane(terminal.id);
+        onContextMenu(e, sshActions);
+      }}
     >
       {terminal.kind === 'ssh' && terminal.ssh ? <SshStatusPanel
         key={`${terminal.ssh.connectionId ?? ''}:${terminal.ssh.host}:${terminal.ssh.port ?? 22}`}
@@ -434,7 +433,18 @@ function TerminalPane(props: {
         toggleRequest={sshStatusToggleRequest} onOpenChange={setSshPanelOpen}
         onReconnect={reconnectSsh}
       >{paneContent}</SshStatusPanel> : paneContent}
-      {placed && fullscreenVisible && <TuiBanner tabId={terminal.id} />}
+      {placed && area === 'unified' && fullscreenVisible && (
+        <div data-testid="tui-fullscreen" data-pane-id={terminal.id}
+          onContextMenu={(event) => {
+            event.preventDefault(); event.stopPropagation();
+            if (useSessionStore.getState().activeId !== windowId) useSessionStore.getState().activate(windowId);
+            setFocusedPane(terminal.id);
+            onContextMenu(event, sshActions);
+          }}
+          style={{ position: 'absolute', inset: 0, zIndex: 100, background: 'var(--xterm-bg)', paddingTop: 28 }}>
+          <TuiBanner tabId={terminal.id} />
+        </div>
+      )}
     </SplitPaneSurface>
   );
 }

@@ -30,7 +30,7 @@ import { captureTerminalPaste, copyTerminalSelection, pasteClipboardIntoTerminal
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { measureRunningTerminalRows } from '../model/runningTerminalRows';
 import { repaintTerminal } from '../model/terminalResize';
-import { useSessionStore } from '@features/workspace';
+import { useSessionStore, useUnifiedWorkspace, useWorkspaceNavigation } from '@features/workspace';
 import { useManualFullscreenVisible } from '../hooks/useManualFullscreenVisible';
 
 interface Props {
@@ -299,6 +299,8 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
   const hostRef = useRef<HTMLDivElement>(null);
   const occupiedRowsRef = useRef(1);
   const tuiFs = useManualFullscreenVisible(tabId);
+  const area = useWorkspaceNavigation(state => state.area);
+  const unifiedTabId = useUnifiedWorkspace(state => state.activeTabId);
 
   useEffect(() => {
     const handle = getExecutingTerm(tabId);
@@ -499,7 +501,7 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
       visibilityRo.disconnect();
       document.removeEventListener('visibilitychange', onVisibilityChange);
     };
-  }, [tabId, blockId, tuiFs]);
+  }, [tabId, blockId, tuiFs, area, unifiedTabId]);
 
   return (
     <div

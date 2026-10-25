@@ -52,7 +52,7 @@ export default function WorkspaceShell() {
   const sidebarDragWidth = useWorkspaceNavigation(state => state.sidebarDragWidth);
   const aiPlacement = useWorkspaceNavigation(state => state.aiPlacement);
   const activeTab = useSessionStore(state => state.tabs.find(tab => tab.id === state.activeId));
-  const contentVisible = !!activeTab && area === workspaceAreaForKind(activeTab.kind);
+  const contentVisible = !!activeTab && activeTab.kind !== 'workspace' && area === workspaceAreaForKind(activeTab.kind);
   const codeSplit = useScopedSplitActive('code');
   const gitSelection = useGitSelection();
   const codeResourceId = activeTab?.kind === 'editor' ? `file:${editorFileKey(activeTab.selected)}` : activeTab?.kind === 'git-diff'
