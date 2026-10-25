@@ -14,8 +14,8 @@ import type { ChatEnvironment } from '../model/conversation';
 import { environmentForPane, showExecutionTerminal } from '../services/conversationContext';
 
 /** Review and edit a pending command without changing its captured execution target. */
-export default function ToolApproval({ run, paneId, conversationId, environment }: {
-  run: ToolRun; paneId?: string; conversationId?: string; environment?: ChatEnvironment;
+export default function ToolApproval({ run, paneId, conversationId, environment, onAskAboutTool }: {
+  run: ToolRun; paneId?: string; conversationId?: string; environment?: ChatEnvironment; onAskAboutTool?: (question: string) => void;
 }) {
   const isCommand = run.toolName === 'run_command';
   const original = typeof run.input.command === 'string' ? run.input.command : '';
@@ -29,12 +29,13 @@ export default function ToolApproval({ run, paneId, conversationId, environment 
   const warning = run.danger;
   const approve = (session = false) => resolveApproval(run.toolCallId, session ? 'session' : 'once', isCommand && command !== original ? command : undefined);
   const ask = () => {
+    const question = t('Explain this action before running it: {{action}}', { action: isCommand ? command : JSON.stringify(run.input) });
+    if (onAskAboutTool) { onAskAboutTool(question); resolveApproval(run.toolCallId, 'deny'); return; }
     const owner = conversationId ?? Object.entries(useChatStore.getState().byTab)
       .find(([, messages]) => messages.some(message => message.parts?.some(part => part.kind === 'tool' && part.tool.toolCallId === run.toolCallId)))?.[0];
     if (!owner) return;
     const drafts = useComposerDrafts.getState();
     const previous = drafts.byTab[owner]?.text;
-    const question = t('Explain this action before running it: {{action}}', { action: isCommand ? command : JSON.stringify(run.input) });
     drafts.setText(owner, previous ? `${previous}\n${question}` : question);
     resolveApproval(run.toolCallId, 'deny');
     requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('[data-chat-composer]')?.focus());

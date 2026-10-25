@@ -10,7 +10,7 @@ import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import { writeClipboardText } from '@platform/clipboard';
 import { formatMessageTime } from '@utils/formatTime';
 import { partsToHistoryText } from '@features/agent/model/messageParts';
-import { hasLeakedToolCallMarkup } from '../model/providerMarkup';
+import { hasLeakedToolCallMarkup, visibleAssistantText } from '../model/providerMarkup';
 import { useChatStore } from '../stores/chat';
 import { useComposerDrafts } from '../stores/composerDrafts';
 import SafeMarkdown from './SafeMarkdown';
@@ -20,8 +20,8 @@ import TerminalReferences from './TerminalReferences';
 import type { ChatExchange } from '../model/exchanges';
 
 /** Shared message content supports conversation flow and terminal block presentation. */
-export default function AiBlock({ exchange, conversationId, presentation = 'block', dividerBefore = false, style }: {
-  exchange: ChatExchange; conversationId?: string; presentation?: 'block' | 'conversation'; dividerBefore?: boolean; style?: CSSProperties;
+export default function AiBlock({ exchange, conversationId, toolContextId, onAskAboutTool, allowExchangeActions = true, presentation = 'block', dividerBefore = false, style }: {
+  exchange: ChatExchange; conversationId?: string; toolContextId?: string; onAskAboutTool?: (question: string) => void; allowExchangeActions?: boolean; presentation?: 'block' | 'conversation'; dividerBefore?: boolean; style?: CSSProperties;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
@@ -61,10 +61,10 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
   const parts = answer?.parts;
   // A stopped (or still tool-running) reply can have no answer text yet: fall back to the
   // one-line tool log so the copy target is never an empty string.
-  const answerCopyText = answer ? answer.content || partsToHistoryText(parts).trim() : '';
+  const answerCopyText = answer ? visibleAssistantText(answer.content) || visibleAssistantText(partsToHistoryText(parts)).trim() : '';
   const actions: ContextMenuItem[] = [
-    ...(!sending && question && answer ? [{ label: t('Regenerate'), onClick: regenerate }] : []),
-    ...(!sending && question ? [
+    ...(allowExchangeActions && !sending && question && answer ? [{ label: t('Regenerate'), onClick: regenerate }] : []),
+    ...(allowExchangeActions && !sending && question ? [
       { label: t('Edit and resend'), onClick: () => setConfirmation('edit') },
       { label: t('Delete'), danger: true, onClick: () => setConfirmation('delete') },
     ] : []),
@@ -100,12 +100,12 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
     {answer && expanded && <div className={plain ? 'ai-block-answer' : 'command-block-output ai-block-answer'} data-selectable>
       {answer.reasoning && <ThinkingBlock text={answer.reasoning} streaming={answer.pending ?? false} />}
       {parts ? parts.map((part, index) => part.kind === 'tool'
-        ? <ToolRunCard key={part.tool.toolCallId} run={part.tool} paneId={answer.paneId ?? exchange.paneId} framed={plain} conversationId={ownerConversation} environment={answer.environment ?? question?.environment ?? undefined} />
-        : part.text ? <div key={index} className="md"><SafeMarkdown content={part.text} paneId={executionPane} />
+        ? <ToolRunCard key={part.tool.toolCallId} run={part.tool} paneId={answer.paneId ?? exchange.paneId} framed={plain} conversationId={toolContextId ?? ownerConversation} onAskAboutTool={onAskAboutTool} environment={answer.environment ?? question?.environment ?? undefined} />
+        : part.text ? <div key={index} className="md"><SafeMarkdown content={visibleAssistantText(part.text)} paneId={executionPane} />
           {answer.pending && index === parts.length - 1 && <PendingCursor />}</div> : null)
-        : answer.content ? <div className="md"><SafeMarkdown content={answer.content} paneId={executionPane} />{answer.pending && <PendingCursor />}</div> : null}
+        : answer.content ? <div className="md"><SafeMarkdown content={visibleAssistantText(answer.content)} paneId={executionPane} />{answer.pending && <PendingCursor />}</div> : null}
       {answer.pending && (!answer.content || parts?.[parts.length - 1]?.kind === 'tool') && <div className="ai-block-working"><PendingCursor />{t('Working')}</div>}
-      {answer.error && <ErrorBox title={t('The reply could not be completed')} details={answer.errorText}
+      {answer.error && <ErrorBox placement="inline" dismissible={false} title={t('The reply could not be completed')} details={answer.errorText}
         actions={question && !sending ? <button type="button" onClick={regenerate}>{t('Retry')}</button> : undefined} />}
       {answer.content && hasLeakedToolCallMarkup(answer.content) && (
         <div className="chat-environment-note" data-testid="chat-leaked-tool-call">
@@ -116,13 +116,13 @@ export default function AiBlock({ exchange, conversationId, presentation = 'bloc
     </div>}
     {plain && answer && !answer.pending && <div className="chat-answer-actions">
       <CopyButton testId="chat-answer-copy" text={answerCopyText} label={t('Copy')} iconSize={16} style={{ width: 24, height: 24 }} />
-      {!sending && question && <IconButton compact style={{ width: 24, height: 24 }} aria-label={t('Regenerate')} data-tip={t('Regenerate')} onClick={regenerate}>
+      {allowExchangeActions && !sending && question && <IconButton compact style={{ width: 24, height: 24 }} aria-label={t('Regenerate')} data-tip={t('Regenerate')} onClick={regenerate}>
         <RefreshCw size={16} />
       </IconButton>}
-      {!sending && question && <IconButton compact style={{ width: 24, height: 24 }} aria-label={t('Edit and resend')} data-tip={t('Edit and resend')} onClick={() => setConfirmation('edit')}>
+      {allowExchangeActions && !sending && question && <IconButton compact style={{ width: 24, height: 24 }} aria-label={t('Edit and resend')} data-tip={t('Edit and resend')} onClick={() => setConfirmation('edit')}>
         <Pencil size={16} />
       </IconButton>}
-      {!sending && question && <IconButton compact style={{ width: 24, height: 24 }} tone="danger" aria-label={t('Delete')} data-tip={t('Delete')} onClick={() => setConfirmation('delete')}>
+      {allowExchangeActions && !sending && question && <IconButton compact style={{ width: 24, height: 24 }} tone="danger" aria-label={t('Delete')} data-tip={t('Delete')} onClick={() => setConfirmation('delete')}>
         <Trash2 size={16} />
       </IconButton>}
     </div>}

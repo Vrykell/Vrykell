@@ -47,6 +47,17 @@ beforeEach(() => {
 });
 
 describe('read_terminal 工具', () => {
+  it('reports busy and unknown states without inferring completion from a quiet snapshot', async () => {
+    termMock.state.sessions = { p1: 's1' };
+    termMock.state.scenes = { p1: 'classic' };
+    termMock.screen = { text: 'quiet output' };
+    const read = execOf(buildTerminalTools(CTX).read_terminal);
+    expect(await read({})).toMatchObject({ executionState: 'unknown' });
+    termMock.state.scenes = { p1: 'blockList' };
+    expect(await read({})).toMatchObject({ executionState: 'ready' });
+    useBlockStore.setState({ byTab: { p1: [{ id: 'running', command: 'sleep 10', status: 'executing', outputText: '', outputHtml: '', outputRaw: '', startedAt: 1, endedAt: null, exitCode: null, wasLongRunning: false, linesTruncated: 0 }] } });
+    expect(await read({})).toMatchObject({ executionState: 'busy' });
+  });
   it('无会话：结构化错误', async () => {
     const r = await execOf(buildTerminalTools(CTX).read_terminal)({});
     expect(r).toEqual({ ok: false, error: '没有可用的终端会话（请先打开一个终端）' });

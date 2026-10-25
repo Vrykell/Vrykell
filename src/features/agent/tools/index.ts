@@ -24,6 +24,8 @@ import { buildMemoryTool } from '@features/agent/tools/memory';
 import { buildScheduleTool } from '@features/agent/tools/schedule';
 import { buildSubagentTool } from '@features/agent/tools/subagent';
 import { gate, levelOf, ensureSkillAccess, TOOL_NAMES, type ToolContext } from '@features/agent/stores/permissions';
+import { createCommandQueue } from '../services/commandQueue';
+import { buildAskUserTool } from './askUser';
 
 export type { ToolContext } from '@features/agent/stores/permissions';
 
@@ -50,13 +52,14 @@ export function buildTools(ctx: ToolContext) {
   const pane = executionPaneSpec(paneId);
   const shellType = ctx.shellType ?? shellFamilyForPane(pane);
   ctx = { ...ctx, paneId, remote: ctx.remote || pane?.kind === 'ssh', shellType };
+  const queueCommand = createCommandQueue();
   const all = {
     run_command: tool({
       description: DESC_RUN_COMMAND,
       inputSchema: z.object({
         command: z.string().describe('要执行的完整 shell 命令（单行）'),
       }),
-      execute: async (input, { abortSignal, toolCallId }) => {
+      execute: (input, { abortSignal, toolCallId }) => queueCommand(async () => {
         const g = await gate('run_command', input, toolCallId, ctx);
         if (!g.proceed) return g.result;
         const command = g.command ?? input.command;
@@ -64,7 +67,7 @@ export function buildTools(ctx: ToolContext) {
         if (!t.proceed) return { ok: false, denied: true, error: t.error };
         const result = await runCommandAndWait(command, { signal: abortSignal ?? ctx.signal, toolCallId, paneId: ctx.paneId });
         return g.command === undefined ? result : { ...result, command };
-      },
+      }, abortSignal ?? ctx.signal),
     }),
     ...buildFileTools(ctx),
     ...buildSearchTools(ctx),
@@ -83,5 +86,6 @@ export function buildTools(ctx: ToolContext) {
     const t = all[name];
     if (t && levelOf(name) !== 'deny') out[name] = t as ToolSet[string];
   }
+  if (ctx.tabId && ctx.setToolState) out.ask_user = buildAskUserTool(ctx);
   return out;
 }

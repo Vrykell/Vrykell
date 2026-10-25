@@ -299,14 +299,14 @@ export const useChatStore = create<ChatState>((set, get) => {
                 // 失败/中止时，未完结的工具动作落 error 终态（节点转红）
                 parts = parts.map((p) =>
                   p.kind === 'tool' &&
-                  (p.tool.state === 'running' || p.tool.state === 'approval-pending')
+                  (p.tool.state === 'running' || p.tool.state === 'approval-pending' || p.tool.state === 'input-pending')
                     ? {
                         kind: 'tool' as const,
                         tool: {
                           ...p.tool,
                           state: 'error' as const,
                           endedAt: p.tool.endedAt ?? Date.now(),
-                          error: p.tool.error ?? t(failed ? 'Conversation interrupted' : 'Stopped waiting; the terminal command may still be running'),
+                          error: p.tool.error ?? t(p.tool.toolName === 'ask_user' ? 'Question cancelled' : failed ? 'Conversation interrupted' : 'Stopped waiting; the terminal command may still be running'),
                         },
                       }
                     : p,
@@ -497,7 +497,7 @@ export const useChatStore = create<ChatState>((set, get) => {
   abortStream: (tabId) => {
     abortControllers.get(tabId)?.abort();
     // M3：挂起的审批 Promise 一律按拒绝放行，防工具 execute 悬挂卡死步进
-    denyAllPending();
+    denyAllPending(tabId);
   },
   send: async (text, opts) => {
     const tabId = opts?.conversationId ?? useWorkspaceStore.getState().activeId;
@@ -612,7 +612,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     if (get().draftTabId === tabId) set({ draft: '', draftTabId: null });
     abortControllers.get(tabId)?.abort();
     abortControllers.delete(tabId);
-    if (get().sendingTab === tabId) denyAllPending();
+    if (get().sendingTab === tabId) denyAllPending(tabId);
     clearCompactionCache(tabId); // 清理该 tab 的上下文摘要缓存
     clearSessionGrants(tabId);
     set((s) => {

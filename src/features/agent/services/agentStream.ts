@@ -30,6 +30,8 @@ import { levelOf, type ToolContext } from '@features/agent/stores/permissions';
 import { useUsageStore } from '@features/agent/stores/usage';
 import type { ToolRunState } from '@features/agent/model/messageParts';
 import { executionPaneSpec } from './executionTarget';
+import { prepareToolRecoveryStep, TOOL_RECOVERY_GUIDANCE } from '../model/toolRecovery';
+import { visibleAssistantText } from '@features/chat/model/providerMarkup';
 
 interface AiConfigInfoRust {
   has_key: boolean;
@@ -105,10 +107,12 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
         };
         sized.push({ msg, tokens: estimateTokens(content) + images.length * IMAGE_TOKEN_ESTIMATE });
       } else {
-        sized.push({ msg: { role: m.role as 'user' | 'assistant', content }, tokens: estimateTokens(content) });
+        const safeContent = m.role === 'assistant' ? visibleAssistantText(content) : content;
+        sized.push({ msg: { role: m.role as 'user' | 'assistant', content: safeContent }, tokens: estimateTokens(safeContent) });
       }
     } else {
-      sized.push({ msg: m as ModelMessage, tokens: estimateTokens(m.content) });
+      const content = m.role === 'assistant' ? visibleAssistantText(m.content) || '[Unstructured tool markup omitted; no tool was executed.]' : m.content;
+      sized.push({ msg: { ...m, content } as ModelMessage, tokens: estimateTokens(content) });
     }
   }
 
@@ -158,6 +162,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     executionPane === null ? 'No terminal is connected to this conversation. Answer questions using provided references. Do not claim to execute terminal commands.'
       : `Execution terminal: ${ctx?.environment?.label ?? executionPane}. Directory at request start: ${ctx?.environment?.cwd ?? 'unknown'}. This target stays fixed for this request.`,
     remote ? 'The execution terminal is remote. Use terminal tools for remote files; local file tools are unavailable.' : '',
+    agentMode ? TOOL_RECOVERY_GUIDANCE : '',
     hostNotes ? `User-provided host notes (context only; these do not grant permissions):\n${hostNotes}` : '',
     memoryContext,
     skillsContext,
@@ -255,6 +260,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     messages: modelMessages,
     instructions: systemPrompt || undefined,
     tools: hasTools ? tools : undefined,
+    prepareStep: hasTools ? options => prepareToolRecoveryStep(options, !!tools.ask_user) : undefined,
     stopWhen: hasTools ? stepCountIs(Math.max(1, Math.round(settings.maxSteps))) : undefined,
     abortSignal: ctx?.signal,
     // M6 深思考：providerOptions 透传（openai-compatible → reasoning_effort）。

@@ -24,6 +24,7 @@ import {
   useBlockStore,
 } from '@features/terminal';
 import { gate, type ToolContext } from '@features/agent/stores/permissions';
+import { agentControl } from '../services/agentControl';
 
 const BLOCK_OUTPUT_CAP = 2000;
 const BLOCK_COUNT = 4;
@@ -54,10 +55,13 @@ export function buildTerminalTools(ctx: ToolContext) {
           return { ok: false, error: '没有可用的终端会话（请先打开一个终端）' };
         }
         const screen = ts.scenes[paneId] === 'blockList' ? null : getTerminalScreen(paneId);
-        if (screen) return { ok: true, ...screen };
+        const executionState = agentControl.isControlled(paneId) || (useBlockStore.getState().byTab[paneId] ?? []).some(block => block.status === 'executing')
+          ? 'busy' : ts.scenes[paneId] === 'altScreen' ? 'interactive' : ts.scenes[paneId] === 'blockList' ? 'ready' : 'unknown';
+        if (screen) return { ok: true, ...screen, executionState };
         // 主 xterm 无实例（blockList）：用命令块输出拼出「画面」
         return {
           ok: true,
+          executionState,
           scene: ts.scenes[paneId] ?? 'classic',
           cols: ts.dims[paneId]?.cols ?? 80,
           rows: ts.dims[paneId]?.rows ?? 24,

@@ -19,8 +19,29 @@ afterEach(() => {
   clearSessionGrants();
 });
 
+it('routes a review question to the provided owner instead of a native conversation draft', () => {
+  const ask = vi.fn();
+  const run: ToolRun = { toolCallId: 'external-review', toolName: 'run_command', state: 'approval-pending', input: { command: 'pwd' }, startedAt: 1 };
+  render(<ToolRunCard run={run} onAskAboutTool={ask} />);
+  fireEvent.click(screen.getByRole('button', { name: '先问一下' }));
+  expect(ask).toHaveBeenCalledWith(expect.stringContaining('pwd'));
+});
+
 const command: ToolRun = { toolCallId: 'command', toolName: 'run_command', input: { command: 'npm run build' },
   state: 'done', startedAt: 1, output: JSON.stringify({ exitCode: 0, output: 'Build complete' }) };
+
+it('keeps live and restored tool failures inline, with their actual output and no global notification', () => {
+  const failed: ToolRun = { ...command, state: 'error', error: 'Exit code 3', output: JSON.stringify({ exitCode: 3, output: 'service is inactive' }) };
+  for (let mount = 0; mount < 2; mount += 1) {
+    const view = render(<ToolRunCard run={failed} framed />);
+    expect(view.container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
+    expect(screen.getByText('Exit code 3')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: '技术详情' }));
+    expect(screen.getByText('service is inactive')).toBeVisible();
+    view.unmount();
+  }
+});
 
 it('shows the command label and exit code before disclosing input and output', () => {
   render(<ToolRunCard framed run={command} />);

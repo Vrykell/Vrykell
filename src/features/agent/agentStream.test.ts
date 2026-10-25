@@ -25,6 +25,7 @@ import { diagnostic } from '@platform/diagnostics';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import { agentStream } from '@features/agent/services/agentStream';
 import { useUsageStore } from '@features/agent/stores/usage';
+import { setToolAuthorizer } from './stores/permissions';
 
 const mockInvoke = vi.mocked(invoke);
 
@@ -70,6 +71,37 @@ function setupInvoke(sseBody: string, status = 200) {
 }
 
 describe('agentStream（mock IPC 边界）', () => {
+  it('hands a denied tool back to the user with a text-only model step', async () => {
+    const initial = useAgentSettings.getState().global;
+    useAgentSettings.setState({ global: { ...initial, agentMode: true, maxSteps: 4 } });
+    setToolAuthorizer(async () => ({ decision: 'deny', reason: 'policy.denied' }));
+    setupInvoke('');
+    const fallback = mockInvoke.getMockImplementation()!;
+    const requests: Record<string, unknown>[] = [];
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command !== 'llm_stream') return fallback(command, args);
+      const request = args as { req: { body: string }; onEvent: Channel<unknown> };
+      requests.push(JSON.parse(request.req.body) as Record<string, unknown>);
+      const send = request.onEvent.onmessage!;
+      send({ kind: 'started', status: 200, headers: [['content-type', 'text/event-stream']] });
+      const response = requests.length === 1
+        ? 'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"blocked","type":"function","function":{"name":"run_command","arguments":"{\\"command\\":\\"echo check\\"}"}}]}}]}\n\ndata: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\ndata: [DONE]\n\n'
+        : 'data: {"choices":[{"delta":{"content":"Waiting for authorization"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n';
+      for (const chunk of toChunks(response, 11)) send({ kind: 'chunk', data: chunk });
+      send({ kind: 'done' });
+      return undefined as never;
+    });
+    try {
+      let text = '';
+      await agentStream([{ role: 'user', content: 'Inspect the service' }], chunk => { text += chunk; }, { paneId: 'fixed', tabId: 'owner' });
+      expect(requests).toHaveLength(2);
+      expect(requests[1]!.tools).toEqual([expect.objectContaining({ function: expect.objectContaining({ name: 'ask_user' }) })]);
+      expect(text).toBe('Waiting for authorization');
+    } finally {
+      useAgentSettings.setState({ global: initial });
+      setToolAuthorizer(null);
+    }
+  });
   // 注意：beforeEach 的箭头函数必须带花括号 —— `() => mock.mockClear()` 会把
   // mock 自身作为返回值，vitest 会把返回值当 cleanup 钩子在测试后零参调用。
   beforeEach(() => {

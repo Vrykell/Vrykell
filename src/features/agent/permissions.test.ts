@@ -37,6 +37,41 @@ function reset() {
 
 afterEach(() => reset());
 
+it('refuses a late authorization after the owning turn was cancelled', async () => {
+  const controller = new AbortController();
+  let finish!: (decision: ToolDecision) => void;
+  setToolAuthorizer(() => new Promise(resolve => { finish = resolve; }));
+  const result = gate('write_file', { path: '/file', content: 'draft' }, 'cancelled', { tabId: 'first', signal: controller.signal });
+  controller.abort(); finish(allow());
+  expect(await result).toMatchObject({ proceed: false, result: { denied: true } });
+});
+
+it('stopping a native conversation does not deny an external session approval', async () => {
+  setToolAuthorizer(async () => ASK); setToolApprover(async () => allow());
+  const firstState = vi.fn(); const secondState = vi.fn();
+  const first = gate('write_file', {}, 'native', { tabId: 'native', setToolState: firstState });
+  const second = gate('write_file', {}, 'external', { tabId: 'external', setToolState: secondState });
+  await vi.waitFor(() => expect(firstState).toHaveBeenCalled());
+  await vi.waitFor(() => expect(secondState).toHaveBeenCalled());
+  denyAllPending('native');
+  expect(await first).toMatchObject({ proceed: false });
+  resolveApproval('external', 'once');
+  expect(await second).toMatchObject({ proceed: true });
+});
+
+it('removes only the cancelled turn approval and leaves another conversation pending', async () => {
+  setToolAuthorizer(async () => ASK); setToolApprover(async () => allow());
+  const controller = new AbortController();
+  const first = gate('write_file', {}, 'first', { tabId: 'first', signal: controller.signal, setToolState: vi.fn() });
+  const secondState = vi.fn();
+  const second = gate('write_file', {}, 'second', { tabId: 'second', setToolState: secondState });
+  await vi.waitFor(() => expect(secondState).toHaveBeenCalled());
+  controller.abort();
+  expect(await first).toMatchObject({ proceed: false });
+  resolveApproval('first', 'once'); resolveApproval('second', 'once');
+  expect(await second).toMatchObject({ proceed: true });
+});
+
 interface StateRecord {
   states: Array<{ id: string; state: string; extra?: { danger?: string } }>;
 }
@@ -53,6 +88,15 @@ function mkCtx(tabId = 't1'): ToolContext & StateRecord {
 }
 
 describe('gate', () => {
+  it('rejects local filesystem calls on a captured remote target before authorization or execution', async () => {
+    const authorize = vi.fn(async () => allow());
+    setToolAuthorizer(authorize);
+    for (const name of ['read_file', 'write_file', 'edit_file', 'list_dir', 'search_files'] as const) {
+      expect(await gate(name, { path: '/remote/file' }, 'remote', { ...mkCtx(), remote: true }))
+        .toMatchObject({ proceed: false, result: { denied: true, error: expect.stringContaining('远程执行主机') } });
+    }
+    expect(authorize).not.toHaveBeenCalled();
+  });
   it('allow：带回租约且不打扰用户', async () => {
     reset();
     setToolAuthorizer(async () => allow('lease-x'));
@@ -187,7 +231,7 @@ describe('gate', () => {
 });
 
 describe('审批超时（无人应答）', () => {
-  it('到期自动拒绝：卡片留原因、提示条说明、轮次继续', async () => {
+  it('keeps an unanswered approval reason in the transcript without a notification', async () => {
     vi.useFakeTimers();
     try {
       reset();
@@ -208,8 +252,7 @@ describe('审批超时（无人应答）', () => {
       }
       expect(ctx.states.map((s) => s.state)).toEqual(['approval-pending', 'denied']);
       expect(ctx.states[1]?.extra?.danger).toContain('已自动拒绝本次操作');
-      expect(useToastStore.getState().toasts.map((toast) => toast.message))
-        .toEqual(['等待 1 分钟无人应答，已自动拒绝本次操作。']);
+      expect(useToastStore.getState().toasts).toEqual([]);
     } finally {
       vi.useRealTimers();
     }

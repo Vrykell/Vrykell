@@ -21,6 +21,26 @@ const exchange: ChatExchange = { id: 'question', createdAt: 1,
   answer: { id: 'answer', role: 'assistant', content: 'Check the **configuration**.', createdAt: 2 },
 };
 
+it('shows one copy action without unsupported native mutations for external replies', () => {
+  const view = render(<AiBlock exchange={exchange} allowExchangeActions={false} presentation="conversation" />);
+  expect(view.container.querySelectorAll('.chat-answer-actions')).toHaveLength(1);
+  expect(screen.getByTestId('chat-answer-copy')).toBeVisible();
+  expect(screen.queryByRole('button', { name: '重新生成' })).toBeNull();
+  expect(screen.queryByRole('button', { name: '编辑并重发' })).toBeNull();
+  expect(screen.queryByRole('button', { name: '删除' })).toBeNull();
+});
+
+it('keeps failed replies in their exchange when restored instead of replaying notifications', () => {
+  const failed = { ...exchange, answer: { ...exchange.answer!, error: true, errorText: 'Provider offline' } };
+  for (let mount = 0; mount < 2; mount += 1) {
+    const view = render(<AiBlock exchange={failed} conversationId="conversation" presentation="conversation" />);
+    expect(view.container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
+    expect(screen.getByRole('button', { name: '重试' })).toBeVisible();
+    view.unmount();
+  }
+});
+
 it('uses the tool summary treatment for reasoning and keeps its disclosure usable', () => {
   const reasoning = 'Inspect the build configuration first.\n\nThen check the dependencies.';
   const { container } = render(<AiBlock exchange={{ ...exchange, answer: { ...exchange.answer!, reasoning } }}
@@ -213,7 +233,7 @@ it('explains a reply whose provider sent its tool call as plain text', () => {
   const { container, rerender } = render(view(leaked));
   expect(screen.getByTestId('chat-leaked-tool-call')).toHaveTextContent('本次没有执行任何工具');
   // The raw text stays readable — the note explains it instead of hiding it.
-  expect(container.textContent).toContain('DSML');
+  expect(container.textContent).not.toContain('DSML');
 
   rerender(view('I ran `dir` and it lists four files.'));
   expect(screen.queryByTestId('chat-leaked-tool-call')).toBeNull();
@@ -260,7 +280,7 @@ it('explains a reply whose provider sent its tool call as plain text', () => {
   const { container, rerender } = render(view(leaked));
   expect(screen.getByTestId('chat-leaked-tool-call')).toHaveTextContent('本次没有执行任何工具');
   // The raw text stays readable — the note explains it instead of hiding it.
-  expect(container.textContent).toContain('DSML');
+  expect(container.textContent).not.toContain('DSML');
 
   rerender(view('I ran `dir` and it lists four files.'));
   expect(screen.queryByTestId('chat-leaked-tool-call')).toBeNull();

@@ -1,3 +1,5 @@
+import { t } from '@i18n';
+
 /**
  * messageParts — 助手消息的 parts 模型（M1 数据基座）。
  *
@@ -12,7 +14,7 @@
  * 持久化：parts JSON 序列化进 DB chat_messages.parts 列，'' 表示无。
  */
 
-export type ToolRunState = 'approval-pending' | 'running' | 'done' | 'error' | 'denied';
+export type ToolRunState = 'approval-pending' | 'input-pending' | 'running' | 'done' | 'error' | 'denied';
 
 export const DEFAULT_TOOL_COMMAND_TIMEOUT_MS = 120_000;
 
@@ -74,6 +76,7 @@ const TOOL_LABEL: Record<string, string> = {
 };
 
 const STATE_LABEL: Record<ToolRunState, string> = {
+  'input-pending': 'Awaiting answer',
   'approval-pending': '等待批准',
   running: '执行中',
   done: '成功',
@@ -92,6 +95,14 @@ export function partsToHistoryText(parts?: MessagePart[]): string {
   for (const p of parts) {
     if (p.kind !== 'tool') continue;
     const label = TOOL_LABEL[p.tool.toolName] ?? p.tool.toolName;
+    if (p.tool.toolName === 'ask_user') {
+      lines.push(`[${t('Ask the user')}: ${String(p.tool.input.question ?? '').slice(0, 2000)} → ${STATE_LABEL[p.tool.state]}]`);
+      try {
+        const result: unknown = JSON.parse(p.tool.output ?? '{}');
+        if (result && typeof result === 'object' && 'answer' in result && typeof result.answer === 'string') lines.push(`${t('Your answer')}: ${result.answer.slice(0, 4000)}`);
+      } catch { continue; }
+      continue;
+    }
     const target =
       typeof p.tool.input.command === 'string'
         ? p.tool.input.command

@@ -1,17 +1,19 @@
 import { useState } from 'react';
 import { t, type I18nKey } from '@i18n';
-import { Brain, Check, ChevronRight, FileText, Folder, Globe, Pencil, RefreshCw, Search, TerminalPrompt, Wrench, X } from '@ui/icons';
+import { AskQuestion, Brain, Check, ChevronRight, FileText, Folder, Globe, Pencil, RefreshCw, Search, TerminalPrompt, Wrench, X } from '@ui/icons';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import ToolOutput from './ToolOutput';
 import BlockOutput from '@features/terminal/components/BlockOutput';
 import { useBlockStore, useTerminalStore } from '@features/terminal';
 import { agentControl } from '@features/agent/services/agentControl';
 import ToolApproval from './ToolApproval';
+import ToolQuestion from './ToolQuestion';
 import type { ChatEnvironment } from '../model/conversation';
 import { showExecutionTerminal } from '../services/conversationContext';
 import type { ToolRun, ToolRunState } from '@features/agent/model/messageParts';
 
 const STATE_LABEL: Record<ToolRunState, I18nKey> = {
+  'input-pending': 'Awaiting answer',
   running: 'Running',
   'approval-pending': 'Awaiting approval',
   done: 'Completed',
@@ -25,6 +27,7 @@ function summarize(run: ToolRun): { icon: React.ReactNode; label: string; text: 
   const input = run.input;
   const size = { size: 15 };
   switch (run.toolName) {
+    case 'ask_user': return { icon: <AskQuestion {...size} />, label: t('Ask the user'), text: str(input.question) };
     case 'run_command': return { icon: <TerminalPrompt {...size} />, label: t('Run command'), text: str(input.command) };
     case 'terminal_keys': return { icon: <TerminalPrompt {...size} />, label: t('Send terminal input'), text: str(input.text) || str(input.keys) };
     case 'read_terminal': return { icon: <TerminalPrompt {...size} />, label: t('Read terminal'), text: '' };
@@ -53,7 +56,7 @@ function commandExitCode(run: ToolRun): number | undefined {
 
 /** Output body shown when a row is expanded; a structured command result carries its own field. */
 function expandBody(run: ToolRun): string {
-  if (run.toolName === 'run_command' && run.output && !run.error) {
+  if (run.toolName === 'run_command' && run.output) {
     try {
       const value: unknown = JSON.parse(run.output);
       if (typeof value === 'object' && value !== null) {
@@ -87,7 +90,7 @@ function CommandOutputBlock({ run, paneId, framed }: { run: ToolRun; paneId?: st
  * `framed` marks the chat panel presentation, where expanded output sits inside the
  * shared code-block frame and therefore drops its own terminal surface.
  */
-export default function ToolRunCard({ run, paneId, framed = false, conversationId, environment }: { run: ToolRun; paneId?: string; framed?: boolean; conversationId?: string; environment?: ChatEnvironment }) {
+export default function ToolRunCard({ run, paneId, framed = false, conversationId, environment, onAskAboutTool }: { run: ToolRun; paneId?: string; framed?: boolean; conversationId?: string; environment?: ChatEnvironment; onAskAboutTool?: (question: string) => void }) {
   // A failure starts expanded so a broken call is readable at a glance; an explicit toggle
   // wins from then on, which also lets the row be collapsed again. The toggle is recorded with
   // the state it was made in, so a run that fails after being collapsed reopens its error.
@@ -99,11 +102,11 @@ export default function ToolRunCard({ run, paneId, framed = false, conversationI
     ? t('Exit code {{code}}', { code: exitCode }) : t(STATE_LABEL[run.state]);
   const body = expandBody(run);
   const isCommand = run.toolName === 'run_command';
-  const pending = run.state === 'approval-pending';
+  const pending = run.state === 'approval-pending' || run.state === 'input-pending';
   const failed = run.state === 'error';
   const open = toggled?.state === run.state ? toggled.open : failed;
   const input = JSON.stringify(run.input, null, 2);
-  const expandable = isCommand || Object.keys(run.input).length > 0 || body.length > 0 || failed;
+  const expandable = run.toolName !== 'ask_user' && (isCommand || Object.keys(run.input).length > 0 || body.length > 0 || failed);
   const truncated = body.length > 6000;
   return <div className="ai-tool-card" data-tool-state={run.state} data-open={open}>
     <button type="button" data-subtle className="ai-tool-summary" aria-label={[label, text, status].filter(Boolean).join(' ')} aria-expanded={open} disabled={!expandable || pending}
@@ -115,7 +118,8 @@ export default function ToolRunCard({ run, paneId, framed = false, conversationI
       </span>
       {expandable && !pending && <ChevronRight size={14} style={{ transform: open ? 'rotate(90deg)' : undefined }} />}
     </button>
-    {pending && <ToolApproval run={run} paneId={paneId} conversationId={conversationId} environment={environment} />}
+    {run.toolName === 'ask_user' && <ToolQuestion run={run} conversationId={conversationId} />}
+    {run.state === 'approval-pending' && <ToolApproval run={run} paneId={paneId} conversationId={conversationId} environment={environment} onAskAboutTool={onAskAboutTool} />}
     {/* A refusal keeps its reason once the buttons are gone — the deadline, or what was blocked. */}
     {run.state === 'denied' && run.danger && (
       <div className="ai-tool-verdict" data-testid="tool-denied-reason">{run.danger}</div>
@@ -124,7 +128,7 @@ export default function ToolRunCard({ run, paneId, framed = false, conversationI
       <div className="ai-tool-section-label">{t('Tool input')}</div>
       <pre className="ai-tool-input" data-selectable>{input}</pre>
       <div className="ai-tool-section-label">{t('Tool output')}</div>
-      {failed ? <ErrorBox compact details={body || undefined}>{run.error || t('Tool execution failed')}</ErrorBox>
+      {failed ? <ErrorBox placement="inline" dismissible={false} details={body || undefined}>{run.error || t('Tool execution failed')}</ErrorBox>
         : isCommand ? <CommandOutputBlock run={run} paneId={paneId} framed={framed} />
           : <ToolOutput framed={framed} text={body}>
             <pre className="ai-tool-output" data-selectable>{truncated ? `${t('Only the end of the output is shown')}\n` : ''}{body.slice(-6000) || t('No output')}</pre>

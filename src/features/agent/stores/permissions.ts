@@ -14,7 +14,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { t } from '@i18n';
-import { useToastStore } from '@ui/feedback/Toast';
 import type { ToolRunState } from '@features/agent/model/messageParts';
 import { untrustedSkillFor, setSkillState } from '@features/agent/services/skills';
 import { reasonText } from '@features/agent/model/toolReasonTexts';
@@ -194,42 +193,46 @@ export function levelOf(tool: string): ToolLevel {
 // ── 审批桥 ──
 
 type ApprovalResolution = { decision: ApprovalDecision; command?: string };
-const pending = new Map<string, (result: ApprovalResolution) => void>();
+const pending = new Map<string, { resolve: (result: ApprovalResolution) => void; owner?: string }>();
 
 /**
  * Waits for the card's answer, but not forever: nobody may be in front of the app (a scheduled
  * turn, a locked screen), and a promise that never settles would hold the turn — and with it the
  * single send slot — for good. The deadline denies the call and says so in the transcript.
  */
-function requestApproval(toolCallId: string): Promise<ApprovalResolution> {
+function requestApproval(toolCallId: string, signal?: AbortSignal, owner?: string): Promise<ApprovalResolution> {
+  if (signal?.aborted) return Promise.resolve({ decision: 'deny' });
   return new Promise((resolve) => {
-    const minutes = Math.max(1, Math.round(approvalTimeoutMs() / 60_000));
+    const cancel = () => resolveApproval(toolCallId, 'deny');
     const timer = window.setTimeout(() => {
       if (!pending.has(toolCallId)) return;
       pending.delete(toolCallId);
-      useToastStore.getState().addToast(
-        t('No answer within {{minutes}} minutes, so the request was denied automatically.', { minutes }),
-        'warning',
-      );
+      signal?.removeEventListener('abort', cancel);
       resolve({ decision: 'timeout' });
     }, approvalTimeoutMs());
-    pending.set(toolCallId, (result) => {
+    pending.set(toolCallId, { owner, resolve: (result) => {
       window.clearTimeout(timer);
+      signal?.removeEventListener('abort', cancel);
       resolve(result);
-    });
+    } });
+    signal?.addEventListener('abort', cancel, { once: true });
+    if (signal?.aborted) cancel();
   });
 }
 
 /** 审批卡按钮入口。unknown toolCallId 静默忽略（可能已被 stop 兜底清掉） */
 export function resolveApproval(toolCallId: string, decision: ApprovalDecision, command?: string) {
-  pending.get(toolCallId)?.({ decision, command });
+  pending.get(toolCallId)?.resolve({ decision, command });
   pending.delete(toolCallId);
 }
 
 /** 中止/断流时兜底：所有挂起审批一律按拒绝放行，防 execute 悬挂 */
-export function denyAllPending() {
-  for (const resolve of pending.values()) resolve({ decision: 'deny' });
-  pending.clear();
+export function denyAllPending(conversationId?: string) {
+  for (const [id, entry] of pending) {
+    if (conversationId && entry.owner !== conversationId) continue;
+    entry.resolve({ decision: 'deny' });
+    pending.delete(id);
+  }
 }
 
 /** Revoke one conversation, or all temporary approvals from settings. */
@@ -260,7 +263,7 @@ export async function ensureTrustedSkill(
   ctx.setToolState(toolCallId, 'approval-pending', {
     danger: `信任技能「${skillName}」后可访问其文件与脚本`,
   });
-  const { decision } = await requestApproval(toolCallId);
+  const { decision } = await requestApproval(toolCallId, ctx.signal, ctx.tabId);
   if (decision === 'timeout') {
     ctx.setToolState(toolCallId, 'denied');
     return {
@@ -289,10 +292,13 @@ export async function ensureSkillAccess(
   ctx: ToolContext,
 ): Promise<{ proceed: boolean; error?: string }> {
   const name = await untrustedSkillFor(text);
+  if (ctx.signal?.aborted) return { proceed: false, error: t('Tool call cancelled.') };
   if (!name) return { proceed: true };
   const r = await ensureTrustedSkill(name, toolCallId, ctx);
   if (!r.proceed) return r;
+  if (ctx.signal?.aborted) return { proceed: false, error: t('Tool call cancelled.') };
   await setSkillState(name, true, undefined).catch(() => {});
+  if (ctx.signal?.aborted) return { proceed: false, error: t('Tool call cancelled.') };
   return { proceed: true };
 }
 
@@ -346,6 +352,10 @@ export async function gate(
   ctx: ToolContext,
   command?: string,
 ): Promise<GateOutcome> {
+  if (ctx.signal?.aborted) return denied(undefined, t('Tool call cancelled.'));
+  if (ctx.remote && ['read_file', 'write_file', 'edit_file', 'list_dir', 'search_files'].includes(toolName)) {
+    return denied(undefined, t('Local file tools cannot access the remote execution host. Use terminal tools on the selected host.'));
+  }
   const mode = usePermissions.getState().mode;
   let decision: ToolDecision;
   try {
@@ -366,6 +376,7 @@ export async function gate(
     return denied(undefined, '无法获取授权（后端不可用），操作已拒绝');
   }
 
+  if (ctx.signal?.aborted) return denied(undefined, t('Tool call cancelled.'));
   const reason = reasonText(decision.reason);
   if (decision.decision === 'deny') {
     if (toolCallId) ctx.setToolState?.(toolCallId, 'denied', reason ? { danger: reason } : undefined);
@@ -383,7 +394,7 @@ export async function gate(
   const shape = decision.shape ?? undefined;
   const cardExtra = { ...(reason ? { danger: reason } : {}), ...(shape ? { shape } : {}) };
   ctx.setToolState(toolCallId, 'approval-pending', Object.keys(cardExtra).length > 0 ? cardExtra : undefined);
-  const choice = await requestApproval(toolCallId);
+  const choice = await requestApproval(toolCallId, ctx.signal, ctx.tabId);
   if (choice.decision === 'timeout') {
     // Nobody answered: deny and say why, so the transcript explains the step that never ran.
     const note = t('No answer within {{minutes}} minutes, so the request was denied automatically.', {
@@ -430,6 +441,7 @@ export async function gate(
       return denied(undefined, '无法获取授权（后端不可用），操作已拒绝');
     }
   }
+  if (ctx.signal?.aborted) return denied(undefined, t('Tool call cancelled.'));
   const approved = await approver(
     toolName,
     command,
@@ -442,6 +454,7 @@ export async function gate(
     console.warn('[permissions] Could not record the approval:', error);
     return { decision: 'deny' } as ToolDecision;
   });
+  if (ctx.signal?.aborted) return denied(undefined, t('Tool call cancelled.'));
   if (approved.decision !== 'allow') {
     ctx.setToolState(toolCallId, 'denied', reason ? { danger: reason } : undefined);
     return denied(reason, '审批未能完成，操作已拒绝');

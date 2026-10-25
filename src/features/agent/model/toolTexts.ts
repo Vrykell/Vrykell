@@ -33,6 +33,7 @@ export const DESC_EDIT_FILE =
 // ── 终端读写（terminal.ts） ──
 
 export const DESC_READ_TERMINAL =
+  'Inspect the captured execution terminal. executionState is busy, ready, interactive, or unknown; unknown never confirms shell readiness. ' +
   '读取当前聚焦终端的实时可见画面（含 vim/less/htop 等全屏 TUI 的 alt buffer 画面）。' +
   '返回画面文本（带行号）、场景（classic/blockList/altScreen）、尺寸与光标位置。' +
   '用于：查看终端当前状态、阅读 vim 里的文件内容、确认上一次按键后的效果。' +
