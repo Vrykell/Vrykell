@@ -1,6 +1,12 @@
 use crate::db::{ConversationEntry, ConversationMessageEntry, HistoryState};
 
 #[tauri::command]
+pub fn get_conversation(state: tauri::State<'_, HistoryState>, id: String) -> Result<ConversationEntry, String> {
+    if id.is_empty() || id.len() > 2048 { return Err("Invalid conversation identifier".into()); }
+    state.0.lock().map_err(|error| error.to_string())?.get_conversation(&id)
+}
+
+#[tauri::command]
 pub fn list_conversations(
     state: tauri::State<'_, HistoryState>,
 ) -> Result<Vec<ConversationEntry>, String> {

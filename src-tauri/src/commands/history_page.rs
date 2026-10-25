@@ -1,5 +1,11 @@
 use crate::db::{history_page::{HistoryPage, HistoryPageRequest}, HistoryState};
 use std::time::Instant;
+use crate::db::workspace_history::WorkspaceHistorySave;
+
+#[tauri::command]
+pub fn save_workspace_history(state: tauri::State<'_, HistoryState>, request: WorkspaceHistorySave) -> Result<(), String> {
+    state.0.lock().map_err(|error| error.to_string())?.save_workspace_history(&request)
+}
 
 #[tauri::command]
 pub fn history_page(state: tauri::State<'_, HistoryState>, request: HistoryPageRequest) -> Result<HistoryPage, String> {

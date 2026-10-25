@@ -60,6 +60,12 @@ pub(super) fn init_conversations(conn: &Connection) -> Result<(), String> {
 }
 
 impl HistoryDb {
+    pub fn get_conversation(&self, id: &str) -> Result<ConversationEntry, String> {
+        self.conn().query_row("SELECT id,title,created_at,updated_at,environment FROM ai_conversations WHERE id=?1", [id], |row| {
+            Ok(ConversationEntry { id: row.get(0)?, title: row.get(1)?, created_at: row.get(2)?, updated_at: row.get(3)?, environment: row.get(4)? })
+        }).map_err(|error| error.to_string())
+    }
+
     pub fn list_conversations(&self) -> Result<Vec<ConversationEntry>, String> {
         let mut stmt = self.conn().prepare(
             "SELECT id, title, created_at, updated_at, environment FROM ai_conversations ORDER BY updated_at DESC, rowid DESC"
@@ -234,5 +240,18 @@ mod tests {
         init_conversations(db.conn()).unwrap();
         assert!(db.list_conversations().unwrap().is_empty());
         assert_eq!(db.get_chat_messages("terminal").unwrap().len(), 2);
+    }
+
+    #[test]
+    fn retrieves_one_conversation_without_loading_other_records_or_messages() {
+        let db = HistoryDb::open_in_memory();
+        db.save_conversation("one", "First", 1, 2, "{}").unwrap();
+        db.save_conversation("two", "Second", 3, 4, "{}").unwrap();
+        let saved = db.get_conversation("one").unwrap();
+        assert_eq!(saved.id, "one");
+        assert_eq!(saved.title, "First");
+        assert_eq!(saved.updated_at, 2);
+        assert!(db.get_conversation("missing").is_err());
+        assert!(db.get_conversation("one' OR 1=1 --").is_err());
     }
 }

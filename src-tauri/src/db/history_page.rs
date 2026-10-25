@@ -13,6 +13,7 @@ pub struct HistoryPageRequest {
     pub sort: String,
     pub source: String,
     pub cursor: Option<HistoryCursor>,
+    pub layout: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -26,6 +27,7 @@ pub struct HistoryPage {
 impl HistoryDb {
     pub fn history_page(&self, request: &HistoryPageRequest) -> Result<HistoryPage, String> {
         if !(1..=100).contains(&request.limit) || !matches!(request.source.as_str(), "all" | "terminal" | "conversation")
+            || request.layout.as_ref().is_some_and(|layout| !matches!(layout.as_str(), "all" | "single" | "split"))
             || request.cursor.as_ref().is_some_and(|cursor| cursor.key.len() > 512 || cursor.value.len() > 1024) {
             return Err("Invalid history page request".into());
         }
@@ -40,14 +42,18 @@ impl HistoryDb {
         let cursor_value = if numeric { "CAST(?1 AS INTEGER)" } else { "?1" };
         let sql = format!("WITH entries AS (
             SELECT 'session:' || id AS record_key, 'terminal' AS source, id, title,
-                COALESCE(closed_at, created_at) AS activity, created_at AS created FROM sessions WHERE status='historical'
-            UNION ALL SELECT 'conversation:' || id, 'conversation', id, title, updated_at, created_at FROM ai_conversations
-        ), ordered AS (SELECT *, {column} AS sort_value FROM entries WHERE ?4='all' OR source=?4)
+                COALESCE(closed_at, created_at) AS activity, created_at AS created,
+                (history_flags & 1)!=0 AS has_terminal, (history_flags & 2)!=0 AS has_conversation, (history_flags & 4)!=0 AS is_split
+                FROM sessions WHERE status='historical'
+            UNION ALL SELECT 'conversation:' || id, 'conversation', id, title, updated_at, created_at,0,1,0 FROM ai_conversations
+        ), ordered AS (SELECT *, {column} AS sort_value FROM entries
+            WHERE (?4='all' OR (?4='terminal' AND has_terminal=1) OR (?4='conversation' AND has_conversation=1))
+            AND (?5='all' OR (?5='split' AND is_split=1) OR (?5='single' AND is_split=0)))
         SELECT source, id, CAST(sort_value AS TEXT), record_key FROM ordered
         WHERE ?1 IS NULL OR sort_value {comparison} {cursor_value} OR (sort_value={cursor_value} AND record_key>?2)
         ORDER BY sort_value {direction}, record_key ASC LIMIT ?3");
         let mut statement = self.conn().prepare(&sql).map_err(|error| error.to_string())?;
-        let keys = statement.query_map(params![request.cursor.as_ref().map(|cursor| &cursor.value), request.cursor.as_ref().map(|cursor| &cursor.key), request.limit + 1, request.source], |row| {
+        let keys = statement.query_map(params![request.cursor.as_ref().map(|cursor| &cursor.value), request.cursor.as_ref().map(|cursor| &cursor.key), request.limit + 1, request.source, request.layout.as_deref().unwrap_or("all")], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, HistoryCursor { value: row.get(2)?, key: row.get(3)? }))
         }).map_err(|error| error.to_string())?.collect::<Result<Vec<_>, _>>().map_err(|error| error.to_string())?;
         let next_cursor = if keys.len() > request.limit { keys.get(request.limit - 1).map(|entry| entry.2.clone()) } else { None };
@@ -67,7 +73,7 @@ impl HistoryDb {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn request(sort: &str) -> HistoryPageRequest { HistoryPageRequest { limit: 2, sort: sort.into(), source: "all".into(), cursor: None } }
+    fn request(sort: &str) -> HistoryPageRequest { HistoryPageRequest { limit: 2, sort: sort.into(), source: "all".into(), cursor: None, layout: None } }
     #[test]
     fn paginates_both_sources_with_stable_ties_and_never_reads_message_bodies() {
         let db = HistoryDb::open_in_memory();
@@ -93,5 +99,20 @@ mod tests {
         input.source = "terminal".into(); input.cursor = None; assert!(db.history_page(&input).unwrap().sessions.is_empty());
         for limit in [0, 101] { input.limit = limit; assert!(db.history_page(&input).is_err()); }
         input.limit = 2; input.sort = "untrusted SQL".into(); assert!(db.history_page(&input).is_err());
+    }
+
+    #[test]
+    fn mixed_combinations_match_each_member_type_and_an_independent_split_filter() {
+        let db = HistoryDb::open_in_memory();
+        let payload = serde_json::json!({"layout":{"type":"split"},"members":[{"kind":"terminal"},{"kind":"conversation"}]}).to_string();
+        db.create_session("mixed", "Mixed", 10, "", "workspace", &payload).unwrap(); db.archive_session("mixed", 20).unwrap();
+        db.create_session("single", "Shell", 10, "", "session", "{}").unwrap(); db.archive_session("single", 20).unwrap();
+        for source in ["terminal", "conversation"] {
+            let mut input = request("activity-desc"); input.source = source.into(); input.layout = Some("split".into());
+            let page = db.history_page(&input).unwrap();
+            assert_eq!(page.sessions.len(), 1); assert_eq!(page.sessions[0].id, "mixed");
+            input.layout = Some("single".into());
+            assert!(!db.history_page(&input).unwrap().sessions.iter().any(|session| session.id == "mixed"));
+        }
     }
 }
