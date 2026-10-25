@@ -8,6 +8,7 @@ import { useAiWorkspace } from '../stores/aiWorkspace';
 import { useChatStore } from '../stores/chat';
 import { AiSurfaceContext as SurfaceContext } from './NativeConversationSurface';
 import AiSidebar from './AiSidebar';
+import { SidebarSettingsContext } from './SidebarSettingsContext';
 
 const StableHarnessWorkspace = memoLocalized(HarnessWorkspace);
 const StablePanelChat = memoLocalized(PanelChat);
@@ -23,11 +24,14 @@ export function AiWorkspaceProvider({ placement, mainActive, headerActive, sideA
   const [native, setNative] = useState<HTMLDivElement | null>(null);
   const [parking, setParking] = useState<HTMLDivElement | null>(null);
   const [toolbar, setToolbar] = useState<HTMLDivElement | null>(null);
+  const [sidebarSettingsTarget, setSidebarSettingsTarget] = useState<HTMLDivElement | null>(null);
+  const [settingsSuspended, setSettingsSuspended] = useState(false);
   const [host] = useState(() => { const element = document.createElement('div'); element.className = 'ai-workspace-host'; return element; });
   const context = useMemo(() => ({ main: setMain, side: setSide, native: setNative, toolbar: setToolbar }), []);
   const nativeTabs = useAiWorkspace(state => state.nativeTabs);
   const selected = useAiWorkspace(state => state.selected);
   const sideSelected = useAiWorkspace(state => state.sideSelected);
+  const sidebarSettings = useMemo(() => ({ resourceId: placement === 'side' && sideActive ? sideSelected : '', target: sidebarSettingsTarget, suspend: setSettingsSuspended }), [placement, sideActive, sideSelected, sidebarSettingsTarget]);
   const nativeSelected = useChatStore(state => state.activeConversationId);
   const [visited, setVisited] = useState(nativeTabs.length > 0 || sideActive);
   useEffect(() => { if (nativeTabs.length || sideActive) setVisited(true); }, [nativeTabs.length, sideActive]);
@@ -40,15 +44,15 @@ export function AiWorkspaceProvider({ placement, mainActive, headerActive, sideA
   const target = native;
   const nativeActive = placement === 'main' && mainActive && selected === `chat:${nativeSelected}`;
   const mountedNativeIds = [...new Set([...nativeTabs, ...(visited && nativeSelected ? [nativeSelected] : []), ...(sideSelected.startsWith('chat:') ? [sideSelected.slice(5)] : [])])].sort();
-  return <SurfaceContext.Provider value={context}>
+  return <SidebarSettingsContext.Provider value={sidebarSettings}><SurfaceContext.Provider value={context}>
     {children}
     <div hidden ref={setParking} />
     {createPortal(<StableHarnessWorkspace active={mainActive} headerActive={headerActive} />, host)}
-    {side && createPortal(<AiSidebar active={placement === 'side' && sideActive} />, side)}
+    {side && createPortal(<AiSidebar active={placement === 'side' && sideActive} onSettingsTarget={setSidebarSettingsTarget} settingsSuspended={settingsSuspended} />, side)}
     {mountedNativeIds.map(id => <ResourceContent key={id} id={`chat:${id}`} active={nativeActive && id === nativeSelected} fallbackTarget={id === nativeSelected ? target ?? parking : parking}>
       {state => <StablePanelChat conversationId={id} active={state.visible} workspace={state.placed || placement === 'main'} toolbarTarget={state.placed ? state.header ?? (state.retainsHeader && state.focused ? toolbar : null) : id === nativeSelected ? toolbar : null} />}
     </ResourceContent>)}
-  </SurfaceContext.Provider>;
+  </SurfaceContext.Provider></SidebarSettingsContext.Provider>;
 }
 
 export default function AiWorkspaceSurface({ placement }: { placement: Placement }) {

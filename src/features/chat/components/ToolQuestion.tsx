@@ -14,7 +14,7 @@ export default function ToolQuestion({ run, conversationId }: { run: ToolRun; co
   let result: UserAnswer | undefined;
   try { result = run.output ? JSON.parse(run.output) as UserAnswer : undefined; } catch { result = undefined; }
   if (!pending) return <div className="ai-tool-verdict" data-testid="tool-question-result">{result?.answered && typeof result.answer === 'string' ? result.answer : result?.error ?? run.error ?? t(run.state === 'input-pending' ? 'This question is no longer active. Send a message to continue.' : 'Question skipped')}</div>;
-  return <div className="ai-tool-approval" role="group" aria-label={t('Answer the question')}>
+  return <div className="ai-tool-approval ai-user-question" role="group" aria-label={t('Answer the question')}>
     <div data-selectable>{pending.question}</div>
     {!!pending.options?.length && <div className="ai-question-options">{pending.options.map(option => <OutlineButton key={option} onClick={() => answerUserQuestion(key, option)}>{option}</OutlineButton>)}</div>}
     <TextArea variant="field" style={{ resize: 'vertical', minHeight: 68, maxHeight: 200 }} aria-label={t('Your answer')} placeholder={t('Type your answer…')} value={answer} maxLength={4000} rows={2}

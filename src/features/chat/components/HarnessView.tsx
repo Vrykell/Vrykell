@@ -6,9 +6,10 @@
  * something (approvals, the process, the protocol) happens in Rust; this page sends the user's
  * intent and renders what comes back.
  */
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { t } from '@i18n';
-import { ArrowDown, ArrowUp, Bot, Plus, Square, iconSizes } from '@ui/icons';
+import { ArrowDown, ArrowUp, Plus, Square, iconSizes } from '@ui/icons';
 import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';
 import { IconButton } from '@ui/actions/IconButton';
 import ErrorBox from '@ui/feedback/ErrorBox';
@@ -30,11 +31,13 @@ import NewTabModal from '@features/workspace/components/NewTabModal';
 import type { DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import AiBlock from '@features/chat/components/AiBlock';
 import ChatComposerShell from './ChatComposerShell';
+import QueuedMessages from './QueuedMessages';
 import HarnessSelector, { type HarnessSelectorOption } from './HarnessSelector';
 import { useHarnessStore, type HarnessSession } from '../stores/harness';
 import type { AcpConfigGroup, AcpConfigValue } from '@platform/api/acp';
 import { useExecutionTerminalOptions } from '../hooks/useExecutionTerminalOptions';
 import { environmentForPane } from '../services/conversationContext';
+import { SidebarSettingsContext } from './SidebarSettingsContext';
 
 /** One control in the composer's status row. */
 interface SessionSelector {
@@ -126,6 +129,8 @@ function contextLabel(context: { used: number; size: number }): string {
  */
 export default function HarnessView({ tabId, harness, cwd, fresh = false, active = true, resumeSessionId }: { tabId: string; harness: string; cwd?: string; fresh?: boolean; active?: boolean; resumeSessionId?: string }) {
   const session = useHarnessStore((state) => state.byTab[tabId]);
+  const sidebarSettings = useContext(SidebarSettingsContext);
+  const inSidebar = sidebarSettings?.resourceId === `acp:${tabId}`;
   const executionOptions = useExecutionTerminalOptions(session?.executionPaneId ? environmentForPane(session.executionPaneId) ?? { paneId: session.executionPaneId, kind: 'local', label: t('Disconnected') } : null);
   const text = useComposerDrafts(state => state.byTab[tabId]?.text ?? '');
   const setText = (value: string) => useComposerDrafts.getState().setText(tabId, value);
@@ -133,6 +138,11 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const [terminalPicker, setTerminalPicker] = useState<{ anchor?: DropdownAnchor } | null>(null);
   useEffect(() => { if (!active) setTerminalPicker(null); }, [active]);
+  useEffect(() => {
+    if (!inSidebar) return;
+    sidebarSettings?.suspend(!!terminalPicker);
+    return () => sidebarSettings?.suspend(false);
+  }, [inSidebar, !!terminalPicker, sidebarSettings?.suspend]);
   /** Escape hides the command list for the current text without touching what was typed. */
   const [commandDismissed, setCommandDismissed] = useState(false);
   const [commandIndex, setCommandIndex] = useState(0);
@@ -146,8 +156,12 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
 
   const agent = session?.agent?.agentInfo;
   const exchanges = toExchanges(groupHarnessMessages(session?.messages ?? []));
-  const canSend = Boolean(session?.sessionId) && !session?.pending && text.trim().length > 0;
+  const canSend = Boolean(session) && text.trim().length > 0;
   const selectors = session ? sessionSelectors(session, tabId) : [];
+  const executionSelector = session?.appToolsConnected && <Select aria-label={t('Application execution terminal')} data-testid="harness-execution-target"
+    triggerClassName={inSidebar ? undefined : 'harness-selector'} style={inSidebar ? undefined : { width: 'auto', maxWidth: 180 }} value={session.executionPaneId ?? ''} options={executionOptions}
+    disabled={session.pending || session.opening} onChange={paneId => useHarnessStore.getState().setExecutionPane(tabId, paneId || null)}
+    action={{ label: t('New terminal'), onSelect: bounds => setTerminalPicker({ anchor: bounds ? { x: bounds.left, y: bounds.bottom + 4, aboveY: bounds.top } : undefined }) }} />;
   const hints = authHints(session?.agent ?? null);
   const plan = session?.plan ?? [];
 
@@ -175,6 +189,9 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
 
   return (
     <div data-testid="harness-page" className="ai-chat-panel harness-chat-panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      {inSidebar && sidebarSettings?.target && createPortal(<div className="chat-conversation-settings">
+        {executionSelector && <div className="chat-setting-row"><span>{t('Execution terminal')}</span>{executionSelector}</div>}
+      </div>, sidebarSettings.target)}
       <NewTabModal open={!!terminalPicker} anchor={terminalPicker?.anchor} onClose={() => setTerminalPicker(null)} onPick={spec => {
         const paneId = createExecutionTerminal(spec);
         if (paneId) useHarnessStore.getState().setExecutionPane(tabId, paneId);
@@ -252,12 +269,12 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
       </div>
 
       <ChatComposerShell
-        heading={<span data-tip={session?.cwd || cwd || undefined} data-tip-description={t('The harness works in this directory.')}
+        heading={inSidebar ? t('AI chat') : <span data-tip={session?.cwd || cwd || undefined} data-tip-description={t('The harness works in this directory.')}
           style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           {harness}{agent ? ` · ${agent.title || agent.name || ''}` : ''}
         </span>}
         hints={<><KeyHint shortcut="Enter" />{t('Send')}</>}
-        tray={matches.length > 0 ? (
+        tray={<><QueuedMessages messages={session?.queuedInputs ?? []} onCancel={id => useHarnessStore.getState().cancelQueuedInput(tabId, id)} />{matches.length > 0 ? (
           <div {...commandNavigation.props} data-testid="harness-commands" role="listbox" aria-label={t('Slash commands')} className="harness-commands">
             {matches.map((command, index) => (
               <button key={command.name} type="button" data-subtle role="option"
@@ -273,9 +290,9 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
               </button>
             ))}
           </div>
-        ) : undefined}
+        ) : null}</>}
         status={<>
-          <IconButton compact aria-label={t('New session')} data-tip={t('New session')} data-testid="harness-new-session"
+          <IconButton aria-label={t('New session')} data-tip={t('New session')} data-testid="harness-new-session"
             disabled={!session?.sessionId || session.pending}
             onClick={() => {
               if (useWorkspaceNavigation.getState().aiPlacement === 'side' && useAiWorkspace.getState().sideSelected === `acp:${tabId}`) createSideAgent(harness, session?.cwd || cwd);
@@ -283,14 +300,11 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
             }}>
             <Plus size={iconSizes.compact} />
           </IconButton>
-          {selectors.map((selector) => (
+          {selectors.filter(selector => !selector.model).map((selector) => (
             <HarnessSelector key={selector.key} testId={`harness-selector-${selector.key}`} label={selector.label} model={selector.model}
               value={selector.value} options={selector.options} onChange={selector.apply} />
           ))}
-          {session?.appToolsConnected && <Select aria-label={t('Application execution terminal')} data-testid="harness-execution-target"
-            triggerClassName="harness-selector" style={{ width: 'auto', maxWidth: 180 }} value={session.executionPaneId ?? ''} options={executionOptions}
-            disabled={session.pending || session.opening} onChange={paneId => useHarnessStore.getState().setExecutionPane(tabId, paneId || null)}
-            action={{ label: t('New terminal'), onSelect: bounds => setTerminalPicker({ anchor: bounds ? { x: bounds.left, y: bounds.bottom + 4, aboveY: bounds.top } : undefined }) }} />}
+          {!inSidebar && executionSelector}
           {session?.context && (session.context.used > 0 || session.context.size > 0) && (
             <span data-testid="harness-context" className="harness-context" data-tip={t('Context window in use')}>
               {contextLabel(session.context)}
@@ -300,6 +314,9 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
             {t('Connecting…')}
           </span>}
           <span className="chat-footer-space" />
+          {selectors.filter(selector => selector.model).map(selector => <HarnessSelector key={selector.key} testId={`harness-selector-${selector.key}`} label={selector.label} model
+            value={selector.value} options={selector.options} onChange={selector.apply} />)}
+          {session?.pending && canSend && <IconButton aria-label={t('Queue message')} data-tip={t('Queue message')} onClick={submit}><ArrowUp size={18} /></IconButton>}
           {session?.pending
             ? <IconButton className="chat-send-button" tone="accent" aria-label={t('Stop the harness turn')}
               data-tip={t('Stop the harness turn')} onClick={() => void useHarnessStore.getState().cancel(tabId)}>
@@ -311,7 +328,6 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
             </IconButton>}
         </>}
       >
-        <Bot size={20} aria-hidden="true" className="chat-composer-lead" />
         <TextArea ref={composerRef} data-testid="harness-composer" data-chat-composer={active || undefined} value={text}
           placeholder={t('Describe what you want to do…')} rows={1}
           onChange={(event) => { setText(event.target.value); setCommandDismissed(false); setCommandIndex(0); commandNavigation.setKeyboardNavigation(true); }}

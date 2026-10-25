@@ -1,15 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
 import { TextArea } from '@ui/fields/TextInput';
-import InlineRenameInput from '@ui/fields/InlineRenameInput';
 import KeyHint from '@ui/feedback/KeyHint';
 import Select from '@ui/fields/Select';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import { IconButton } from '@ui/actions/IconButton';
 import type { MenuAnchor } from '@ui/menus/ContextMenu';
 import SettingsPopover from '@ui/menus/SettingsPopover';
-import { ArrowDown, ArrowUp, History, Plus, SlidersHorizontal, Sparkles, Square, Zap } from '@ui/icons';
+import { ArrowDown, ArrowUp, Plus, SlidersHorizontal, Sparkles, Square } from '@ui/icons';
 import { useAttachmentComposer } from '@features/agent';
 import { useSessionStore } from '@features/workspace';
 import { type TerminalSpec } from '@features/workspace/model/windowLayout';
@@ -31,16 +30,22 @@ import { useTranscriptFollow } from '../hooks/useTranscriptFollow';
 import ChatComposerShell from './ChatComposerShell';
 import type { DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import { useExecutionTerminalOptions } from '../hooks/useExecutionTerminalOptions';
+import ConversationHeading from './ConversationHeading';
+import { SidebarSettingsContext } from './SidebarSettingsContext';
+import QueuedMessages from './QueuedMessages';
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
 
 /** Conversation navigation, references and execution stay independent of terminal focus. */
 export default function PanelChat({ active = true, workspace = false, toolbarTarget, conversationId }: { active?: boolean; workspace?: boolean; toolbarTarget?: HTMLElement | null; conversationId?: string }) {
   const activeId = useChatStore(state => conversationId ?? state.activeConversationId);
+  const sidebarSettings = useContext(SidebarSettingsContext);
+  const inSidebar = sidebarSettings?.resourceId === `chat:${activeId}`;
   const conversations = useChatStore(state => state.conversations);
   const messages = useChatStore(state => state.byTab[activeId] ?? EMPTY_MESSAGES);
   const ready = useChatStore(state => !!activeId && activeId in state.byTab);
   const sendingTab = useChatStore(state => state.sendingTab);
+  const queuedSends = useChatStore(state => state.queuedSends).filter(item => item.ownerId === activeId);
   const loading = useChatStore(state => state.conversationsLoading);
   const storeLoadError = useChatStore(state => state.conversationError);
   const [scopeLoadError, setScopeLoadError] = useState('');
@@ -49,10 +54,8 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
   const conversation = conversations.find(item => item.id === activeId);
   const environment = conversation?.environment;
   const sessions = useTerminalStore(state => state.sessions);
-  const [renaming, setRenaming] = useState(false);
   const [newTabOpen, setNewTabOpen] = useState(false);
   const [newTabAnchor, setNewTabAnchor] = useState<DropdownAnchor>();
-  const [title, setTitle] = useState('');
   const [settingsMenu, setSettingsMenu] = useState<MenuAnchor | null>(null);
   const settingsOpen = !!settingsMenu;
   const { scrollRef, following, pauseFollow, jumpToLatest, onScroll, onWheel, onTouchMove } = useTranscriptFollow(activeId, messages, active);
@@ -70,7 +73,7 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
   const questions = useMemo(() => exchanges.map(exchange => exchange.question?.content).filter((content): content is string => !!content).reverse(), [exchanges]);
   const composer = useChatComposer({
     questions, draft, setDraft: useChatStore.getState().setDraft, send: useChatStore.getState().send,
-    sending: sendingTab !== null, isSession: ready && !loadError, attachments, clearAttachments,
+    sending: sendingTab !== null, queueWhileSending: true, isSession: ready && !loadError, attachments, clearAttachments,
     conversationId: activeId, references, clearReferences, value: composerDraft.text, onTextChange: setText, scopeKey: activeId,
   });
   const environmentOptions = useExecutionTerminalOptions(environment);
@@ -88,45 +91,27 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
     void useChatStore.getState().ensureConversationMessages(conversationId).catch(reason => { if (!disposed) setScopeLoadError(String(reason)); });
     return () => { disposed = true; };
   }, [conversationId]);
-  useEffect(() => { setRenaming(false); }, [activeId]);
   useEffect(() => { setSettingsMenu(null); }, [active, workspace, activeId]);
+  useEffect(() => { if (!active) setNewTabOpen(false); }, [active]);
+  useEffect(() => {
+    if (!inSidebar) return;
+    sidebarSettings?.suspend(newTabOpen);
+    return () => sidebarSettings?.suspend(false);
+  }, [inSidebar, newTabOpen, sidebarSettings?.suspend]);
   const submit = () => {
     if (!composer.canSend) return;
     jumpToLatest();
     composer.submit();
   };
-  const commitTitle = () => {
-    useChatStore.getState().renameConversation(activeId, title);
-    setRenaming(false);
-  };
   const actions = <>
-    {!workspace && <IconButton compact aria-label={t('AI conversation history')} data-tip={t('AI conversation history')}
-      onClick={() => useSessionStore.getState().openAiHistoryTab()}><History size={16} /></IconButton>}
-    {!workspace && <IconButton compact aria-label={t('New conversation')} data-tip={t('New conversation')}
-      onClick={() => useChatStore.getState().createConversation()}><Plus size={16} /></IconButton>}
     <IconButton compact aria-label={t('Conversation settings')} data-tip={t('Conversation settings')}
       aria-haspopup="dialog" aria-expanded={settingsOpen} aria-controls={settingsOpen ? 'chat-conversation-settings' : undefined} onClick={event => {
         const trigger = event.currentTarget; const bounds = trigger.getBoundingClientRect();
         setSettingsMenu(current => current ? null : { x: bounds.right - 320, y: bounds.bottom + 4, trigger });
       }}><SlidersHorizontal size={16} /></IconButton>
   </>;
-  return <div ref={panelRef} className="ai-chat-panel">
-    {workspace ? toolbarTarget && createPortal(actions, toolbarTarget) : <div className="chat-conversation-heading">
-      {renaming ? <InlineRenameInput autoFocus aria-label={t('Conversation title')} value={title} onChange={event => setTitle(event.target.value)}
-        onFocus={event => event.currentTarget.select()} onClick={event => event.stopPropagation()}
-        onBlur={commitTitle} onKeyDown={event => {
-          if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-          if (event.key === 'Enter') commitTitle();
-          if (event.key === 'Escape') setRenaming(false);
-        }} /> : <button type="button" data-subtle className="chat-conversation-title" data-tip={t('Rename conversation')} aria-label={t('Rename conversation')}
-          onClick={() => { setTitle(conversation?.title ?? ''); setRenaming(true); }} disabled={!conversation}>
-          {conversation?.title ?? t('AI chat')}
-        </button>}
-      <div className="chat-conversation-actions">{actions}</div>
-    </div>}
-    {settingsMenu && <SettingsPopover anchor={settingsMenu} label={t('Conversation settings')} onClose={() => setSettingsMenu(null)} suspended={newTabOpen}>
-    <section id="chat-conversation-settings" className="chat-conversation-settings" aria-label={t('Conversation settings')} data-workspace-focus="ai">
-      {!workspace && <div className="chat-setting-row"><span>{t('Recent conversations')}</span>
+  const settingsContents = <section id="chat-conversation-settings" className="chat-conversation-settings" aria-label={inSidebar ? undefined : t('Conversation settings')} data-workspace-focus="ai">
+      {!workspace && !inSidebar && <div className="chat-setting-row"><span>{t('Recent conversations')}</span>
         <Select aria-label={t('Restore recent conversation')} value={activeId} disabled={loading}
           options={[...conversations].sort((first, second) => second.updatedAt - first.updatedAt).filter((item, index) => index < 20 || item.id === activeId).map(item => ({ value: item.id, label: item.title || t('Untitled') }))}
           onChange={id => { void useChatStore.getState().selectConversation(id); setSettingsMenu(null); }} />
@@ -143,7 +128,13 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
         <button type="button" data-subtle data-testid="chat-usage-entry" onClick={() => { setSettingsMenu(null); useSessionStore.getState().openUsageTab(); }}>{t('Usage statistics')}</button>
         <button type="button" data-subtle onClick={() => { setSettingsMenu(null); useSessionStore.getState().openSettings(); }}>{t('Open settings')}</button>
       </div>
-    </section></SettingsPopover>}
+    </section>;
+  return <div ref={panelRef} className="ai-chat-panel">
+    {!inSidebar && (workspace ? toolbarTarget && createPortal(actions, toolbarTarget) : <ConversationHeading title={conversation?.title ?? t('AI chat')}
+      onRename={conversation ? title => useChatStore.getState().renameConversation(activeId, title) : undefined}
+      onHistory={() => useSessionStore.getState().openAiHistoryTab()} onNew={() => useChatStore.getState().createConversation()} settings={actions} />)}
+    {inSidebar ? sidebarSettings?.target && createPortal(settingsContents, sidebarSettings.target)
+      : settingsMenu && <SettingsPopover anchor={settingsMenu} label={t('Conversation settings')} onClose={() => setSettingsMenu(null)} suspended={newTabOpen}>{settingsContents}</SettingsPopover>}
     {environment && !sessions[environment.paneId] && <div className="chat-environment-note">{t('Terminal disconnected. Select a terminal to continue execution.')}</div>}
     {loadError && <ErrorBox compact actions={<button onClick={() => {
       if (!useChatStore.getState().conversationsLoaded) void useChatStore.getState().loadConversations();
@@ -167,7 +158,7 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
       onClickCapture={event => { if ((event.target as Element).closest('button[aria-expanded]')) pauseFollow(); }}>
       <div>
         {exchanges.length ? exchanges.map(exchange => <AiBlock key={exchange.id} exchange={exchange} conversationId={activeId} presentation="conversation" />)
-          : !workspace && <div className="chat-empty"><Sparkles size={26} /><strong>{t('What would you like to work on?')}</strong>
+          : (!workspace || inSidebar) && <div className="chat-empty"><Sparkles size={26} /><strong>{t('What would you like to work on?')}</strong>
             <span>{loading ? t('Loading conversations…') : t('Ask a question, attach a file, or bring in terminal output.')}</span></div>}
       </div>
     </div>
@@ -180,22 +171,23 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
     </div>
     </div>
     <ChatComposerShell heading={t('AI chat')} hints={<><KeyHint shortcut="Enter" />{t('Send')}</>}
-      tray={(references.length > 0 || attachments.length > 0) && <div className="chat-context-tray" aria-label={t('Conversation context')}>
+      tray={<><QueuedMessages messages={queuedSends} onCancel={id => useChatStore.getState().cancelQueuedSend(id)} />
+        {(references.length > 0 || attachments.length > 0) && <div className="chat-context-tray" aria-label={t('Conversation context')}>
           {attachments.length > 0 && <AttachmentChips atts={attachments} previewId={previewId} onPreview={togglePreview} onRemove={removeAttachment} />}
           {references.length > 0 && <TerminalReferences references={references} onRemove={id => {
             useComposerDrafts.getState().setReferences(activeId, references.filter(reference => reference.id !== id));
           }} />}
-        </div>}
+        </div>}</>}
       status={<>
           <IconButton aria-label={t('Add attachment')} data-tip={t('Add attachment')} onClick={() => void pickFiles()}><Plus size={18} /></IconButton>
           <ChatModeSelect />
           <span className="chat-footer-space" />
           <ModelPill showThinking={false} />
-          {sendingTab === activeId ? <IconButton className="chat-send-button" tone="accent" aria-label={t('Stop generating')} data-tip={t('Stop generating')}
+          {sendingTab === activeId && composer.canSend && <IconButton compact aria-label={t('Queue message')} data-tip={t('Queue message')} onClick={submit}><ArrowUp size={18} /></IconButton>}
+          {sendingTab === activeId ? <IconButton className="chat-send-button" tone="accent" aria-label={t('Stop generating')} data-tip={t('Stop generating')} data-tip-description={t('Stopping also cancels queued messages for this conversation.')}
             onClick={() => useChatStore.getState().abortStream(activeId)}><Square size={15} fill="currentColor" /></IconButton>
-            : <IconButton className="chat-send-button" tone="accent" aria-label={t('Send')} data-tip={t('Send')} data-tip-shortcut="Enter" onClick={submit} disabled={!composer.canSend}><ArrowUp size={18} /></IconButton>}
+            : <IconButton className="chat-send-button" tone="accent" aria-label={t(sendingTab ? 'Queue message' : 'Send')} data-tip={t(sendingTab ? 'Queue message' : 'Send')} data-tip-shortcut="Enter" onClick={submit} disabled={!composer.canSend}><ArrowUp size={18} /></IconButton>}
       </>}>
-          <Zap size={20} aria-hidden="true" className="chat-composer-lead" />
           <TextArea ref={composer.inputRef} data-chat-composer value={composer.text} placeholder={t('Describe what you want to do…')} rows={1}
             onChange={composer.handleChange} onKeyDown={event => {
               if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); submit(); }

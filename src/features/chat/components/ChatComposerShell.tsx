@@ -10,6 +10,7 @@
  * decision (which model, which approval mode, whether sending) stays in the caller.
  */
 import type { ReactNode } from 'react';
+import { Zap } from '@ui/icons';
 
 export default function ChatComposerShell({ heading, hints, tray, children, status }: {
   /** Left side of the heading row: what this conversation is. */
@@ -31,7 +32,7 @@ export default function ChatComposerShell({ heading, hints, tray, children, stat
           <span className="composer-key-hints">{hints}</span>
         </div>
         {tray}
-        <div className="chat-composer-input">{children}</div>
+        <div className="chat-composer-input"><Zap size={20} aria-hidden="true" className="chat-composer-lead" />{children}</div>
         <div className="chat-input-status">{status}</div>
       </div>
     </div>

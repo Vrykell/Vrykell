@@ -11,6 +11,7 @@ interface UseChatComposerOptions {
   setDraft: (text: string) => void;
   send: (text: string, options?: SendOptions) => Promise<void>;
   sending: boolean;
+  queueWhileSending?: boolean;
   isSession: boolean;
   targetPane?: string;
   attachments: AttachmentMeta[];
@@ -30,6 +31,7 @@ export function useChatComposer({
   setDraft,
   send,
   sending,
+  queueWhileSending = false,
   isSession,
   targetPane,
   attachments,
@@ -85,7 +87,7 @@ export function useChatComposer({
 
   const submit = useCallback(() => {
     const question = text.trim();
-    if ((!question && attachments.length === 0 && !references?.length) || sending || !isSession) return;
+    if ((!question && attachments.length === 0 && !references?.length) || (sending && !queueWhileSending) || !isSession) return;
     terminalDebug('chat-composer-submit', { paneId: targetPane, characters: question.length, attachmentCount: attachments.length });
 
     setText('');
@@ -94,7 +96,7 @@ export function useChatComposer({
     clearAttachments();
     clearReferences?.();
     void send(question, { paneId: targetPane, attachments: payload, ...(conversationId ? { conversationId, references } : {}) });
-  }, [attachments, clearAttachments, clearReferences, conversationId, references, isSession, resetHistory, send, sending, targetPane, text, setText]);
+  }, [attachments, clearAttachments, clearReferences, conversationId, references, isSession, queueWhileSending, resetHistory, send, sending, targetPane, text, setText]);
 
   const handleChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
     resetHistory();
@@ -118,7 +120,7 @@ export function useChatComposer({
   return {
     text,
     inputRef,
-    canSend: (!!text.trim() || attachments.length > 0 || !!references?.length) && !sending && isSession,
+    canSend: (!!text.trim() || attachments.length > 0 || !!references?.length) && (!sending || queueWhileSending) && isSession,
     submit,
     handleChange,
     handleKeyDown,

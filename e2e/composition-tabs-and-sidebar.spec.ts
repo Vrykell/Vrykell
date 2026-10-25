@@ -55,8 +55,8 @@ test('starts ACP in the side panel and moves the same connection back to the wor
   const originalSpawns = await page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: unknown[] }).__PTY_SPAWNS__.length);
   await page.locator('[data-dock-btn="chat"]').click();
   const sidebar = page.getByTestId('ai-sidebar-content');
-  await sidebar.getByRole('button', { name: '新建对话或智能体', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'ACP 智能体', exact: true }).click();
+  await sidebar.getByRole('button', { name: '会话设置', exact: true }).click();
+  await page.getByRole('button', { name: '选择智能体', exact: true }).click();
   const launcher = page.getByRole('dialog', { name: 'ACP', exact: true });
   const folder = (await launcher.getByTestId('acp-launcher-directory').boundingBox())!;
   const browse = (await launcher.getByRole('button', { name: '选择项目文件夹', exact: true }).boundingBox())!;
@@ -67,13 +67,13 @@ test('starts ACP in the side panel and moves the same connection back to the wor
   await expect(input).toBeVisible(); await input.fill('side agent draft');
   const host = await input.elementHandle();
   await expect(page.getByTestId('workspace-area-terminal')).toHaveAttribute('aria-current', 'page');
-  await expect(sidebar.getByTestId('harness-execution-target')).toBeVisible();
+  await expect(page.getByTestId('harness-execution-target')).toBeVisible();
   const lead = (await sidebar.locator('.chat-composer-lead').boundingBox())!;
   const newSession = (await sidebar.getByTestId('harness-new-session').boundingBox())!;
   expect(Math.abs(lead.x + lead.width / 2 - newSession.x - newSession.width / 2)).toBeLessThan(1);
   await expect(sidebar.getByTestId('harness-note')).toHaveCount(0);
   await page.screenshot({ path: info.outputPath('sidebar-agent.png') });
-  await sidebar.getByRole('button', { name: '移回 AI 工作区', exact: true }).click();
+  await page.getByTestId('ai-return-to-workspace').click();
   await expect(page.getByTestId('workspace-area-ai')).toHaveAttribute('aria-current', 'page');
   await expect(page.locator('[data-chat-composer]:visible')).toHaveValue('side agent draft');
   expect(await host!.evaluate(element => element.isConnected)).toBe(true);
@@ -112,7 +112,8 @@ for (const placement of ['main', 'side']) test(`creates and binds an execution t
   await page.getByTestId('acp-launcher-Fake ACP').click();
   if (placement === 'side') await page.getByTestId('ai-relocate').click();
   const scope = placement === 'side' ? page.getByTestId('ai-sidebar-content') : page.locator('[data-testid="harness-page"]:visible');
-  const target = scope.getByTestId('harness-execution-target');
+  if (placement === 'side') await scope.getByRole('button', { name: '会话设置', exact: true }).click();
+  const target = page.getByTestId('harness-execution-target');
   const before = await page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: unknown[] }).__PTY_SPAWNS__.length);
   await target.click(); await page.getByRole('button', { name: '新终端', exact: true }).click();
   const picker = page.getByRole('dialog', { name: '新建标签页', exact: true });
