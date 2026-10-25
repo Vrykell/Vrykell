@@ -31,9 +31,9 @@ test.describe('approval timeout', () => {
     // The card asks, and nothing answers it.
     await expect(page.getByRole('button', { name: '允许一次' })).toBeVisible({ timeout: 10000 });
 
-    // Waiting past the deadline denies the call, keeps the reason on the row and says so in a toast.
     await expect(page.getByTestId('tool-denied-reason')).toContainText('已自动拒绝', { timeout: 15000 });
-    await expect(page.getByRole('status')).toContainText('无人应答');
+    await expect(page.getByTestId('tool-denied-reason')).toContainText('无人应答');
+    await expect(page.locator('#app-notifications [role="status"]')).toHaveCount(0);
     await expect(page.getByRole('button', { name: '允许一次' })).toHaveCount(0);
 
     // The turn continued with the reply, so the model learns why its step never ran ...

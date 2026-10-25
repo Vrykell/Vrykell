@@ -15,6 +15,22 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
 });
 
+test('renders thoughts, tool actions and final text as one reply without a directory strip', async ({ page }, info) => {
+  await connect(page);
+  const send = async (update: Record<string, unknown>) => emitAcpSession(page, acpUpdate('sess_e2e', update));
+  await send({ sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'Inspect the terminal' } });
+  await send({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Checking the target' } });
+  await send({ sessionUpdate: 'tool_call', toolCallId: 'inspect', kind: 'execute', title: 'Inspect terminal', status: 'in_progress' });
+  await send({ sessionUpdate: 'tool_call_update', toolCallId: 'inspect', status: 'completed' });
+  await send({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Terminal is ready.' } });
+  const surface = current(page);
+  await expect(surface.locator('.chat-exchange')).toHaveCount(1);
+  await expect(surface.locator('.chat-answer-actions')).toHaveCount(1);
+  await expect(surface.getByTestId('harness-directory')).toHaveCount(0);
+  await expect(surface).toContainText('Terminal is ready.');
+  await page.screenshot({ path: info.outputPath('grouped-agent-turn.png') });
+});
+
 test('retains drafts and reading positions across workspace and internal session switches', async ({ page }) => {
   await connect(page);
   await current(page).getByTestId('harness-composer').fill('unfinished draft');
@@ -93,7 +109,8 @@ test('opens the focused pane directory instead of the first split pane', async (
     useTerminalStore.setState({ focusedPaneId: 'audit-right' });
     useWorkspaceStore.getState().openHarnessTab('Fake ACP');
   });
-  await expect(current(page).getByTestId('harness-directory')).toHaveText('D:/project-right');
+  await expect(current(page).getByTestId('harness-directory')).toHaveCount(0);
+  await expect(current(page).locator('[data-tip="D:/project-right"]')).toHaveCount(1);
 });
 
 test('asks another conversation even after a matching command shape was approved', async ({ page }) => {

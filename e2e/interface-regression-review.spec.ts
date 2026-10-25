@@ -51,7 +51,8 @@ for (const theme of ['dark', 'light']) test(`compact creation, opacity and long 
       { id: 'review-answer', role: 'assistant', content: '', createdAt: Date.now(), error: true, errorText: `Service refused request. ${'LongDiagnosticWithoutSpaces'.repeat(100)}` },
     ] } }));
   });
-  const error = page.locator('#app-notifications').getByRole('alert');
+  const error = chat.getByRole('alert');
+  await expect(page.locator('#app-notifications [role="alert"]')).toHaveCount(0);
   await expect(error.getByRole('button', { name: '重试', exact: true })).toBeVisible();
   const details = error.getByRole('button', { name: '技术详情', exact: true });
   await details.click();

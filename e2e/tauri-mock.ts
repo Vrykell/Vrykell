@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 const mainCapability = JSON.parse(readFileSync(new URL('../src-tauri/capabilities/default.json', import.meta.url), 'utf8')) as { permissions: (string | Record<string, unknown>)[] };
 
 export interface TauriMockOptions {
+  shells?: { id: string; label: string; default: boolean }[];
   /** Use each terminal's requested directory for its initial prompt. */
   terminalDirectories?: boolean;
   launchDirectory?: string;
@@ -65,7 +66,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     { name: '旧脚本技能', description: '遗留技能，含脚本', source: 'market', trusted: false, enabled: false, hasScripts: true, modified: true, files: ['SKILL.md', 'scripts/run.sh', 'references/说明.md'], dir: '/home/e2e/.vrykell/skills/旧脚本技能', prompt: '运行 scripts/run.sh 完成工作。' },
   ];
   await page.addInitScript(
-    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, scheduleSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, pendingDirs, menuSeed, terminalDirectories, mainPermissions, sshWorkspaceView }) => {
+    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, scheduleSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, pendingDirs, menuSeed, terminalDirectories, mainPermissions, sshWorkspaceView, shells }) => {
     const menu = { supported: true, available: true, enabled: false, stale: false, certificateTrusted: false, certificateThumbprint: 'E2E-CERTIFICATE', ...menuSeed };
     localStorage.setItem('vrykell-ssh-workspace-view', sshWorkspaceView ?? 'manage');
     const menuActions: string[] = [];
@@ -1139,7 +1140,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'fs_home':
             return '/home/e2e';
           case 'list_shells':
-            return [
+            return shells ?? [
               { id: 'zsh', label: 'Zsh', default: true },
               { id: 'bash', label: 'Bash', default: false },
             ];
@@ -1324,6 +1325,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return {
               sessionId,
               harness: 'Fake ACP',
+              appToolsConnected: Array.isArray(args.appTools) && args.appTools.length > 0,
               cwd: String(args.cwd ?? ''),
               agent: {
                 protocolVersion: 1,
@@ -1368,6 +1370,11 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'acp_answer_permission':
             answered.push({ toolCallId: String(args.toolCallId ?? ''), optionId: (args.optionId ?? null) as string | null });
             return undefined;
+          case 'acp_app_tool_result': {
+            const memory = window as unknown as { __APP_MCP_RESULTS__?: unknown[] };
+            (memory.__APP_MCP_RESULTS__ ??= []).push(args);
+            return undefined;
+          }
           case 'pick_path': {
             // The real command opens a native picker and records the choice. The mock answers with
             // a scripted path (or an empty list when a spec never configures one) and replays the
@@ -1380,12 +1387,20 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'list_sessions':
             return mockSessions;
           case 'history_page': {
-            const request = args.request as { limit: number; source: string; sort: string; cursor: { value: string; key: string } | null };
+            const request = args.request as { limit: number; source: string; sort: string; layout?: string; cursor: { value: string; key: string } | null };
             const descending = request.sort.endsWith('desc');
             const entry = (source: string, row: Record<string, unknown>) => ({ source, row, key: `${source === 'terminal' ? 'session' : 'conversation'}:${row.id}`,
               value: request.sort.startsWith('title') ? String(row.title).toLowerCase() : Number(request.sort.startsWith('created') ? row.created_at : source === 'terminal' ? row.closed_at ?? row.created_at : row.updated_at) });
-            const entries = [...mockSessions.filter(row => row.status === 'historical').map(row => entry('terminal', row)), ...mockConversations.map(row => entry('conversation', row))]
-              .filter(item => request.source === 'all' || request.source === item.source)
+            const sessions = [...new Map([...mockSessions, ...createdSessions.values()].map(row => [row.id, row])).values()];
+            const entries = [...sessions.filter(row => row.status === 'historical').map(row => entry('terminal', row)), ...mockConversations.map(row => entry('conversation', row))]
+              .filter(item => {
+                const payload = item.source === 'terminal' ? JSON.parse(String(item.row.payload || '{}')) as { layout?: { type?: string }; members?: { kind: string }[] } : {};
+                const split = payload.layout?.type === 'split';
+                const matchesType = request.source === 'all' || (item.row.kind === 'workspace'
+                  ? payload.members?.some(member => request.source === 'terminal' ? member.kind === 'terminal' : member.kind === 'conversation' || member.kind === 'agent')
+                  : request.source === item.source);
+                return matchesType && (!request.layout || request.layout === 'all' || (request.layout === 'split' ? split : !split));
+              })
               .sort((first, second) => { const order = first.value < second.value ? -1 : first.value > second.value ? 1 : 0; return order ? order * (descending ? -1 : 1) : first.key.localeCompare(second.key); })
               .filter(item => {
                 if (!request.cursor) return true;
@@ -1396,6 +1411,8 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return { sessions: page.filter(item => item.source === 'terminal').map(item => item.row), conversations: page.filter(item => item.source === 'conversation').map(item => item.row),
               nextCursor: entries.length > request.limit && last ? { value: String(last.value), key: last.key } : null };
           }
+          case 'get_conversation':
+            return mockConversations.find(row => row.id === args.id) ?? null;
           case 'diagnostics_auto_save':
             return false;
           case 'diagnostics_set_auto_save':
@@ -1413,8 +1430,15 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'plugin:dialog|save':
             return (args.options as Record<string, unknown> | undefined)?.defaultPath ?? '/home/e2e/vrykell-diagnostics.jsonl';
           case 'archive_session':
-            { const session = mockSessions.find(item => item.id === args.id); if (session) { session.status = 'historical'; session.closed_at = args.timestamp as number; } }
+            { const session = mockSessions.find(item => item.id === args.id) ?? createdSessions.get(args.id); if (session) { session.status = 'historical'; session.closed_at = args.timestamp as number; } }
             return undefined;
+          case 'save_workspace_history': {
+            const request = args.request as { id: string; title: string; createdAt: number; timestamp: number; payload: string };
+            const existing = mockSessions.find(row => row.id === request.id);
+            if (existing) Object.assign(existing, { title: request.title, payload: request.payload, closed_at: request.timestamp });
+            else mockSessions.push({ id: request.id, title: request.title, status: 'historical', created_at: request.createdAt, closed_at: request.timestamp, block_count: 0, cwd: '', group_id: null, sort_order: 0, kind: 'workspace', payload: request.payload });
+            return undefined;
+          }
           case 'create_session':
             createdSessions.set(args.id, { id: args.id, title: args.title, status: 'active', created_at: args.timestamp, closed_at: null, block_count: 0, cwd: args.cwd ?? '', group_id: null, sort_order: 0, kind: args.kind, payload: args.payload });
             return undefined;
@@ -1428,7 +1452,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return undefined;
           }
           case 'get_session':
-            return mockSessions.find((s) => s.id === args.id) ?? null;
+            return mockSessions.find((s) => s.id === args.id) ?? createdSessions.get(args.id) ?? null;
           case 'groups_list':
             return mockGroups.map(group => ({ ...group, session_count: mockSessions.filter(session => session.group_id === group.id && session.status === 'active').length }));
           case 'groups_apply_plan': {
@@ -1755,7 +1779,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       },
     };
     localStorage.setItem('vrykell-api-key', 'sk-e2e-fake');
-  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, scheduleSeed: seedSchedules, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, pendingDirs: opts.pendingLaunchDirectories ?? [], menuSeed: opts.contextMenu, terminalDirectories: opts.terminalDirectories ?? false, mainPermissions: mainCapability.permissions.filter((permission): permission is string => typeof permission === 'string'), sshWorkspaceView: opts.sshWorkspaceView ?? 'manage' });
+  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, scheduleSeed: seedSchedules, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, pendingDirs: opts.pendingLaunchDirectories ?? [], menuSeed: opts.contextMenu, terminalDirectories: opts.terminalDirectories ?? false, mainPermissions: mainCapability.permissions.filter((permission): permission is string => typeof permission === 'string'), sshWorkspaceView: opts.sshWorkspaceView ?? 'manage', shells: opts.shells });
 }
 
 /** 预置 AI 回复文本：mock 的 ai_stream 会按 chunk 流式 emit ai-chunk 事件。

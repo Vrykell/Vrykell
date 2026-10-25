@@ -16,6 +16,9 @@ test('model focus background leaves space around its name and arrow', async ({ p
   await setupTauriMock(page); await page.goto('/');
   await page.locator('[data-dock-btn="chat"]').click();
   await resizeChat(page, 480);
+  const lead = (await page.locator('.chat-composer-lead:visible').boundingBox())!;
+  const add = (await page.getByRole('button', { name: '添加附件', exact: true }).boundingBox())!;
+  expect(Math.abs(lead.x + lead.width / 2 - add.x - add.width / 2)).toBeLessThan(1);
   const button = page.getByTestId('pill-name');
   await page.keyboard.press('Tab');
   await button.focus();
@@ -246,7 +249,7 @@ for (const theme of ['深色', '浅色'] as const) {
     const composer = page.locator('.chat-composer');
     const input = (await page.locator('.chat-composer-input').boundingBox())!;
     expect(input.height).toBeGreaterThanOrEqual(32);
-    await expect(page.getByTestId('chat-conversation-context')).toHaveText('10.21.76.61');
+    await expect(page.getByTestId('chat-conversation-context')).toHaveCount(0);
     await expect(page.locator('.chat-input-status button')).toHaveCount(4);
     expect(await page.locator('.chat-input-status').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
     await composer.screenshot({ path: `.cache/chat-composer-reference-${theme === '深色' ? 'dark' : 'light'}.png` });

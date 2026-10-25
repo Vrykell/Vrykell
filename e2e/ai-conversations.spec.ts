@@ -34,7 +34,8 @@ test('history owns separate drafts and messages and restores them after reload',
   await composer.fill('Fix the build');
   await composer.press('Enter');
   await expect(page.getByText('The build is fixed.', { exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '新对话', exact: true }).click();
+  await page.getByRole('button', { name: '新建对话或智能体', exact: true }).click();
+  await page.getByRole('menuitem', { name: '新对话', exact: true }).click();
   await expect(composer).toHaveValue('');
   await composer.fill('Second draft');
   await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
@@ -88,17 +89,19 @@ test('the picker opens the new-tab panel and binds the terminal it creates', asy
   await expect(page.locator('[data-tab-kind="session"]')).toHaveCount(tabsBefore + 1);
   await ensureChatSettingsOpen(page);
   await expect(target).not.toContainText('仅讨论');
-  await expect(page.getByTestId('chat-conversation-context')).toBeVisible();
+  await expect(page.getByTestId('chat-conversation-context')).toHaveCount(0);
 });
 
 test('rename and delete manage conversation history independently of terminals', async ({ page }) => {
   await boot(page);
+  await page.getByRole('combobox', { name: '侧栏对话', exact: true }).click();
   await page.getByRole('button', { name: '重命名对话' }).click();
   const title = page.getByRole('textbox', { name: '对话标题' });
   await title.fill('Build investigation');
   await title.press('Enter');
   await expect(page.locator('.chat-conversation-title')).toHaveText('Build investigation');
-  await page.getByRole('button', { name: '新对话', exact: true }).click();
+  await page.getByRole('button', { name: '新建对话或智能体', exact: true }).click();
+  await page.getByRole('menuitem', { name: '新对话', exact: true }).click();
   await page.getByRole('button', { name: 'AI 对话历史' }).click();
   const history = page.getByTestId('unified-history-page');
   await expect(page.locator('[data-tab-kind="ai-history"]')).toHaveCount(1);

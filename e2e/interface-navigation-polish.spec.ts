@@ -89,20 +89,27 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(page.getByRole('combobox', { name: '终端字号' })).toHaveCSS('background-color', theme === 'dark' ? 'rgb(60, 60, 60)' : 'rgb(255, 255, 255)');
   });
 
-  test(`file rename fits its text in ${theme}`, async ({ page }, info) => {
+  test(`file rename uses the shared fixed-width field in ${theme}`, async ({ page }, info) => {
     await setupTauriMock(page, { schedulesSeed: [] });
     await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
     await page.goto('/'); await page.locator('[data-dock-btn="files"]').click();
     const row = page.getByTestId('local-file-tree').locator('[data-path="/home/e2e/notes.txt"]');
     await row.click({ button: 'right' }); await page.getByRole('button', { name: '重命名', exact: true }).click();
     const input = page.getByTestId('rename-input');
+    await expect(input).toHaveClass(/text-input-field/);
+    await expect(input).toHaveClass(/inline-rename-input/);
     await input.fill('test');
     const short = (await input.boundingBox())!;
-    expect(short.width).toBeGreaterThan(28); expect(short.width).toBeLessThan(70);
+    expect(short.width).toBeGreaterThan(120); expect(short.width).toBeLessThanOrEqual(176);
     await input.fill('中文文件名称.md');
-    expect((await input.boundingBox())!.width).toBeGreaterThan(short.width);
+    expect((await input.boundingBox())!.width).toBeCloseTo(short.width, 0);
     await input.fill('long-file-name'.repeat(40));
+    expect((await input.boundingBox())!.width).toBeCloseTo(short.width, 0);
     expect((await input.boundingBox())!.width).toBeLessThan((await row.boundingBox())!.width);
+    await page.setViewportSize({ width: 680, height: 640 });
+    const narrow = (await input.boundingBox())!;
+    const bounds = (await row.boundingBox())!;
+    expect(narrow.x + narrow.width).toBeLessThan(bounds.x + bounds.width);
     await input.fill('test');
     await page.screenshot({ path: info.outputPath(`rename-${theme}.png`), animations: 'disabled' });
     await input.press('Escape'); await expect(input).toHaveCount(0);
