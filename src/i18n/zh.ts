@@ -874,7 +874,7 @@ const zh: Record<string, string> = {
   'Run with npx; answers a whole turn.': '用 npx 运行；可完成一整轮对话。',
   'Run with npx; answers a whole turn, the first one may take a while.': '用 npx 运行；可完成一整轮对话，首轮可能较慢。',
   'Run with npx; needs a Google account or an API key.': '用 npx 运行；需要 Google 账号或 API key。',
-  'Run with npx; configure pi in a terminal first.': '用 npx 运行；先在终端里配置好 pi。',
+  'Requires pi (npm i -g @earendil-works/pi-coding-agent) and a one-time provider setup; run with npx.': '需要先安装 pi（npm i -g @earendil-works/pi-coding-agent）并配置一次模型提供方，再用 npx 运行。',
   'Requires opencode (npm i -g opencode-ai) and a one-time opencode auth login.': '需要先安装 opencode（npm i -g opencode-ai），并先执行一次 opencode auth login。',
   'Requires qwen (npm i -g @qwen-code/qwen-code); answers a whole turn.': '需要先安装 qwen（npm i -g @qwen-code/qwen-code）；可完成一整轮对话。',
   'Requires cursor-agent.': '需要先安装 cursor-agent。',

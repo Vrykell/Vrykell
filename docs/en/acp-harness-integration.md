@@ -227,3 +227,9 @@ Following the checklist in `security-model.md`, these are hard requirements when
 4. **A separate `~/.vrykell/harnesses.json`**, same shape as `mcp.json` and hand-editable.
 5. **The entry point is the sidebar ACP button and its launcher**; the settings group is called
    "ACP", not "External harnesses".
+
+## 12. Troubleshooting
+
+| Symptom | Cause | Fix |
+| --- | --- | --- |
+| "Test connection" passes, but opening a session reports `harness could not open a session: agent error (-32603): Internal error: Cannot call write after a stream was destroyed` | The adapter process is still alive, but the agent program it starts is not on `PATH`. On Windows, for example, `pi-acp` starts `pi.cmd`: when that program does not exist the child exits at once, the adapter then writes into the destroyed pipe, and the resulting internal error becomes the `session/new` answer. `initialize` never starts the inner program, so "Test connection" cannot catch it | Install the program the adapter needs (`pi-acp` needs `npm i -g @earendil-works/pi-coding-agent`), or reproduce outside the app with `node scripts/acp-probe.mjs npx -y pi-acp`, which prints the same error and the adapter's stderr |

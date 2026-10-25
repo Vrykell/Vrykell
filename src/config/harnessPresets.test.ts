@@ -37,4 +37,10 @@ describe('HARNESS_PRESETS', () => {
       expect(entry.hint.trim()).not.toBe('');
     }
   });
+
+  it('names the program a wrapper preset needs before it can run', () => {
+    // The npx package is only the adapter; the program it starts has to be installed too.
+    const pi = HARNESS_PRESETS.find((entry) => entry.name === 'Pi');
+    expect(pi?.hint).toContain('@earendil-works/pi-coding-agent');
+  });
 });

@@ -28,7 +28,7 @@ export const HARNESS_PRESETS: HarnessPreset[] = [
   { name: 'Kiro CLI', command: 'kiro-cli', args: ['acp'], hint: 'Requires kiro-cli.' },
   { name: 'Kimi CLI', command: 'kimi', args: ['acp'], hint: 'Requires kimi.' },
   { name: 'Goose', command: 'goose', args: ['acp'], hint: 'Requires goose.' },
-  { name: 'Pi', command: 'npx', args: ['-y', 'pi-acp'], hint: 'Run with npx; configure pi in a terminal first.' },
+  { name: 'Pi', command: 'npx', args: ['-y', 'pi-acp'], hint: 'Requires pi (npm i -g @earendil-works/pi-coding-agent) and a one-time provider setup; run with npx.' },
 ];
 
 export interface HarnessEntry {

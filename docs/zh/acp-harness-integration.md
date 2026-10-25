@@ -155,3 +155,9 @@ ACP v1 只提供 **`usage_update`**：会话上下文 `used`/`size`（token）+ 
 3. **接受**「harness 来源只显示上下文占用/成本」：用量页有 ACP 页签，选中单个服务器时整页只显示这些数字。
 4. **单开 `~/.vrykell/harnesses.json`**，与 `mcp.json` 同款，可手改。
 5. **入口改为侧栏 ACP 按钮 + 启动器**；设置分组名为「ACP」，不再叫「外部 harness」。
+
+## 12. 常见故障
+
+| 现象 | 原因 | 处理 |
+| --- | --- | --- |
+| 测试连接通过，但打开会话报 `harness could not open a session: agent error (-32603): Internal error: Cannot call write after a stream was destroyed` | 适配器进程还在，但它要启动的 agent 程序不在 `PATH` 上。例如 `pi-acp` 在 Windows 上启动 `pi.cmd`：程序不存在时子进程立即退出，适配器随后向已销毁的管道写入，这个内部错误就成了 `session/new` 的应答。`initialize` 不启动内层程序，所以测试连接测不出来 | 安装适配器依赖的程序（`pi-acp` 需要 `npm i -g @earendil-works/pi-coding-agent`），或先用 `node scripts/acp-probe.mjs npx -y pi-acp` 在应用外复现：probe 会打印同一错误和适配器的 stderr |
