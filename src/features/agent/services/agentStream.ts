@@ -382,12 +382,10 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
       `\n\n> ⚠️ 已达工具调用上限（${stepLimit} 步），回复可能不完整；可在「AI 行为」页调高最大迭代步数。`,
     );
   }
-  // Usage accounting: store the token counts the provider reported (not a local
-  // estimate) for the usage panel. Read only after a clean stream — on an aborted or
-  // failed stream the usage promise may never settle.
-  if (streamError == null) {
-    try {
-      const usage = await result.usage;
+  // Optional metrics must never hold a completed or cancelled turn open.
+  if (streamError == null && !ctx?.signal?.aborted) {
+    void Promise.resolve(result.usage).then(usage => {
+      if (ctx?.signal?.aborted) return;
       useUsageStore.getState().recordTurn({
         provider: info.provider,
         model: info.model,
@@ -398,10 +396,10 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
         steps: stepCount,
         toolCalls,
       });
-    } catch (e) {
+    }).catch((e: unknown) => {
       // Usage is optional: never let it fail the turn.
       console.warn('[agentStream] Could not report token usage:', e);
-    }
+    });
   }
   if (streamError != null) {
     console.error('[agentStream] 流式请求失败:', streamError);

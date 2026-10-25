@@ -53,6 +53,8 @@ function normalizeHeaders(h?: HeadersInit): [string, string][] {
 
 export function createProxyFetch(provider?: ProviderKind, sessionId?: string): typeof fetch {
   return (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
+    if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
     const url =
       typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     const method = init?.method ?? 'POST';
@@ -75,8 +77,11 @@ export function createProxyFetch(provider?: ProviderKind, sessionId?: string): t
       startedResolve = resolve;
       startedReject = reject;
     });
+    let settled = false;
+    const finish = () => { settled = true; signal?.removeEventListener('abort', abort); };
 
     channel.onmessage = (ev) => {
+      if (settled) return;
       try {
         switch (ev.kind) {
           case 'started':
@@ -86,10 +91,13 @@ export function createProxyFetch(provider?: ProviderKind, sessionId?: string): t
             controller.enqueue(base64ToBytes(ev.data ?? ''));
             break;
           case 'done':
+            finish();
             controller.close();
             break;
           case 'error':
-            controller.error(new Error(ev.message ?? 'LLM 代理请求失败'));
+            finish();
+            startedReject(new Error(ev.message ?? 'The model request failed.'));
+            controller.error(new Error(ev.message ?? 'The model request failed.'));
             break;
         }
       } catch {
@@ -102,12 +110,16 @@ export function createProxyFetch(provider?: ProviderKind, sessionId?: string): t
         controller = c;
       },
       cancel() {
+        finish();
         invoke('llm_abort', { id }).catch(() => {});
       },
     });
 
     const abort = () => {
+      if (settled) return;
+      finish();
       invoke('llm_abort', { id }).catch(() => {});
+      startedReject(new DOMException('The operation was aborted.', 'AbortError'));
       // Rust cancels the request and returns silently, without a terminal event, so the local
       // stream must settle here: a reader that never resolves would keep the consumer (the model
       // stream and the turn built on it) pending forever after an abort.
@@ -117,16 +129,14 @@ export function createProxyFetch(provider?: ProviderKind, sessionId?: string): t
         // stream already closed or errored
       }
     };
-    if (init?.signal) {
-      if (init.signal.aborted) {
-        abort();
-        throw new DOMException('The operation was aborted.', 'AbortError');
-      }
-      init.signal.addEventListener('abort', abort, { once: true });
+    if (signal) {
+      signal.addEventListener('abort', abort, { once: true });
     }
 
     invoke('llm_stream', { id, req: { url, method, headers, body, provider }, onEvent: channel }).catch(
       (e) => {
+        if (settled) return;
+        finish();
         console.error('[llmFetch] llm_stream 调用被 Rust 拒绝:', url, e);
         const err = e instanceof Error ? e : new Error(String(e));
         startedReject(err);

@@ -23,6 +23,23 @@ beforeEach(() => {
 });
 
 describe('createProxyFetch', () => {
+  it('settles abort before headers even when the transport never resolves', async () => {
+    invokeMock.mockImplementation(() => new Promise(() => {}));
+    const controller = new AbortController();
+    const pending = fetchProxy('https://api.example.com', { signal: controller.signal });
+    const rejected = expect(pending).rejects.toMatchObject({ name: 'AbortError' });
+    controller.abort();
+    await rejected;
+    expect(invokeMock).toHaveBeenCalledWith('llm_abort', expect.objectContaining({ id: expect.any(String) }));
+  });
+
+  it('rejects an error received before headers instead of waiting forever', async () => {
+    invokeMock.mockImplementation((_command, args) => {
+      args.onEvent.send({ kind: 'error', message: 'Connection lost' });
+      return Promise.resolve();
+    });
+    await expect(fetchProxy('https://api.example.com')).rejects.toThrow('Connection lost');
+  });
   it('started + chunk + done：组装响应并解码 base64 字节', async () => {
     invokeMock.mockImplementation((_cmd: string, args: { onEvent: { send: (ev: unknown) => void } }) => {
       args.onEvent.send({ kind: 'started', status: 200, headers: [['content-type', 'text/plain']] });
@@ -145,10 +162,10 @@ describe('createProxyFetch', () => {
     expect(invokeMock).toHaveBeenCalledWith('llm_abort', expect.objectContaining({ id: expect.any(String) }));
   });
 
-  it('signal 已中止：直接抛 AbortError 并触发 llm_abort', async () => {
+  it('rejects an already aborted signal without starting transport', async () => {
     const ctrl = new AbortController();
     ctrl.abort();
     await expect(fetchProxy('https://x.example', { signal: ctrl.signal })).rejects.toThrow('aborted');
-    expect(invokeMock).toHaveBeenCalledWith('llm_abort', expect.objectContaining({ id: expect.any(String) }));
+    expect(invokeMock).not.toHaveBeenCalled();
   });
 });
