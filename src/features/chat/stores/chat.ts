@@ -18,6 +18,8 @@ import { denyAllPending, clearSessionGrants } from '@features/agent/stores/permi
 import { clearCompactionCache } from '@features/agent/model/context';
 import { serializeAttachments, deserializeAttachments, type AttachmentMeta } from '@features/agent/model/attachments';
 import { useComposerDrafts } from '@features/chat/stores/composerDrafts';
+import { hasChatContent, stopChatMessage } from '../model/chatContent';
+import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
 export interface ChatMessage {
   id: string;
@@ -62,6 +64,7 @@ export type StreamFn = (
 ) => Promise<void>;
 
 export interface SendOptions {
+  ownerId?: string;
   conversationId?: string;
   references?: TerminalReference[];
   /** 来源 pane；缺省时为 undefined（仅进面板，不进块流） */
@@ -78,6 +81,8 @@ const nextId = () => `m${Date.now()}-${counter++}`;
 const abortControllers = new Map<string, AbortController>();
 
 interface ChatState {
+  queuedSends: Array<{ id: string; ownerId: string; text: string; options?: SendOptions }>;
+  cancelQueuedSend: (id: string) => void;
   conversations: Conversation[];
   activeConversationId: string;
   conversationsLoaded: boolean;
@@ -131,9 +136,16 @@ export function setDefaultStream(fn: StreamFn) {
 }
 
 export const useChatStore = create<ChatState>((set, get) => {
+  const drainQueue = () => {
+    if (get().sendingTab || !get().queuedSends.length) return;
+    const [next, ...rest] = get().queuedSends;
+    set({ queuedSends: rest });
+    if (next) void get().send(next.text, next.options).finally(() => { if (!get().sendingTab) queueMicrotask(drainQueue); });
+  };
   const saveQueues = new Map<string, Promise<void>>();
   const pendingMessageDeletes = new Map<string, string>();
   const pendingConversationDeletes = new Set<string>();
+  const savedConversationIds = new Set<string>();
   const queueSave = (id: string, save: () => Promise<void>) => {
     const previous = saveQueues.get(id) ?? Promise.resolve();
     const next = previous.catch(() => {}).then(save);
@@ -144,12 +156,22 @@ export const useChatStore = create<ChatState>((set, get) => {
     });
     return next;
   };
-  const persistConversation = (conversation: Conversation) => queueSave(conversation.id, () =>
-    conversationApi.saveConversation(conversation.id, conversation.title, conversation.createdAt, conversation.updatedAt, JSON.stringify(conversation.environment)));
+  const persistConversation = (conversation: Conversation) => {
+    const messages = get().byTab[conversation.id];
+    if (messages ? !messages.some(hasChatContent) : !savedConversationIds.has(conversation.id)) return Promise.resolve();
+    return queueSave(conversation.id, async () => {
+      await conversationApi.saveConversation(conversation.id, conversation.title, conversation.createdAt, conversation.updatedAt, JSON.stringify(conversation.environment));
+      savedConversationIds.add(conversation.id);
+    });
+  };
   const persistMessage = (ownerId: string, message: ChatMessage) => {
+    if (!hasChatContent(message)) return Promise.resolve();
     if (!get().conversations.some(conversation => conversation.id === ownerId)) {
-      return appendChatMessage(message.id, ownerId, message.role, message.content, message.createdAt,
-        serializeParts(message.parts), serializeAttachments(message.attachments), message.paneId);
+      return import('@features/workspace/services/sessionManager').then(async manager => {
+        await manager.ensureContentSession(ownerId);
+        await appendChatMessage(message.id, ownerId, message.role, message.content, message.createdAt,
+          serializeParts(message.parts), serializeAttachments(message.attachments), message.paneId);
+      });
     }
     return queueSave(ownerId, () => conversationApi.appendConversationMessage(message.id, ownerId, message.role,
       message.content, message.createdAt, serializeParts(message.parts), serializeAttachments(message.attachments), message.paneId ?? null,
@@ -159,7 +181,14 @@ export const useChatStore = create<ChatState>((set, get) => {
   const deleteMessage = async (ownerId: string, messageId: string) => {
     if (!get().conversations.some(conversation => conversation.id === ownerId)) return deleteChatMessage(messageId);
     try {
-      await queueSave(ownerId, () => conversationApi.deleteConversationMessage(messageId));
+      await queueSave(ownerId, async () => {
+        await conversationApi.deleteConversationMessage(messageId);
+        const messages = get().byTab[ownerId];
+        if (messages && !messages.some(hasChatContent) && savedConversationIds.has(ownerId)) {
+          await conversationApi.deleteConversation(ownerId);
+          savedConversationIds.delete(ownerId);
+        }
+      });
       pendingMessageDeletes.delete(messageId);
     } catch (error) {
       pendingMessageDeletes.set(messageId, ownerId);
@@ -198,7 +227,9 @@ export const useChatStore = create<ChatState>((set, get) => {
    * error state, but the answer is not marked red and carries no error text; an
    * empty shell aborted immediately is removed.
    */
-  const runAssistant = async (tabId: string, assistantId: string, streamFn?: StreamFn) => {
+  const runAssistant = async (tabId: string, assistantId: string, controller: AbortController, streamFn?: StreamFn) => {
+    const ownsTurn = () => abortControllers.get(tabId) === controller;
+    if (!ownsTurn() || controller.signal.aborted) return;
     // history 截止到回答占位之前（regenerate 时其后的旧交换不参与本轮上下文）
     const all = get().byTab[tabId] ?? [];
     const cut = all.findIndex((m) => m.id === assistantId);
@@ -219,18 +250,19 @@ export const useChatStore = create<ChatState>((set, get) => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const flush = () => {
       timer = null;
-      if (pending) {
+      if (pending && ownsTurn()) {
         get().appendChunk(tabId, assistantId, pending);
         pending = '';
       }
     };
     const onChunk = (chunk: string) => {
+      if (!ownsTurn() || controller.signal.aborted) return;
       pending += chunk;
       if (timer === null) timer = setTimeout(flush, 50);
     };
 
-    const controller = abortControllers.get(tabId) ?? new AbortController();
-    abortControllers.set(tabId, controller);
+    const flushOnAbort = () => { if (timer !== null) clearTimeout(timer); flush(); };
+    controller.signal.addEventListener('abort', flushOnAbort, { once: true });
 
     let failed = false;
     let failureText = '';
@@ -243,6 +275,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         handlers: {
           // 工具事件直写前先把滞留文本 flush 掉，保证 text/tool 时间序
           onToolEvent: (run) => {
+            if (!ownsTurn() || controller.signal.aborted) return;
             if (timer !== null) {
               clearTimeout(timer);
               timer = null;
@@ -252,10 +285,12 @@ export const useChatStore = create<ChatState>((set, get) => {
           },
           // 思考流：实时追加到回答的 reasoning 字段（AI 面板渲染为可折叠思考块）
           onReasoning: (chunk) => {
+            if (!ownsTurn() || controller.signal.aborted) return;
             get().appendReasoning(tabId, assistantId, chunk);
           },
           // 上下文占用：压缩后自动变小，驱动圆环组件
           onContextUsed: (used, budget) => {
+            if (!ownsTurn() || controller.signal.aborted) return;
             get().setContextUsed(tabId, used, budget);
           },
         },
@@ -265,12 +300,14 @@ export const useChatStore = create<ChatState>((set, get) => {
       // Keep the failure text on the message; the error row renders it in an ErrorBox.
       if (failed) failureText = err instanceof Error ? err.message : String(err);
     } finally {
-      abortControllers.delete(tabId);
+      controller.signal.removeEventListener('abort', flushOnAbort);
       if (timer !== null) {
         clearTimeout(timer);
         timer = null;
       }
       flush();
+      if (!ownsTurn()) return;
+      abortControllers.delete(tabId);
       const interrupted = failed || controller.signal.aborted;
       // 被 abort 的空壳（立即停止、什么都没生成）直接移除，不留空气泡；
       // 正常完成的空回答保留占位（向后兼容：持久化/测试都依赖问答成对）
@@ -324,6 +361,7 @@ export const useChatStore = create<ChatState>((set, get) => {
           },
         };
       });
+      queueMicrotask(drainQueue);
       // 持久化助手消息最终内容 + parts 渲染层
       const assistant = get().byTab[tabId]?.find((m) => m.id === assistantId);
       if (assistant) {
@@ -333,6 +371,7 @@ export const useChatStore = create<ChatState>((set, get) => {
   };
 
   return {
+  queuedSends: [], cancelQueuedSend: id => set(state => ({ queuedSends: state.queuedSends.filter(item => item.id !== id) })),
   conversations: [], activeConversationId: '', conversationsLoaded: false, conversationsLoading: false,
   conversationError: null, persistenceError: null,
   ensureConversationMessages: loadMessages,
@@ -341,6 +380,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     set({ conversationsLoading: true, conversationError: null });
     try {
       const records = await conversationApi.listConversations();
+      for (const record of records ?? []) savedConversationIds.add(record.id);
       const existing = get().conversations;
       const restored = (records ?? []).filter(record => !existing.some(conversation => conversation.id === record.id)).map(record => ({
         id: record.id, title: record.title.slice(0, 80) || t('New conversation'), createdAt: record.created_at,
@@ -495,18 +535,31 @@ export const useChatStore = create<ChatState>((set, get) => {
       };
     }),
   abortStream: (tabId) => {
-    abortControllers.get(tabId)?.abort();
+    const controller = abortControllers.get(tabId);
+    controller?.abort();
+    abortControllers.delete(tabId);
     // M3：挂起的审批 Promise 一律按拒绝放行，防工具 execute 悬挂卡死步进
     denyAllPending(tabId);
+    for (const message of get().byTab[tabId] ?? []) if (message.pending && !hasChatContent(message)) void deleteMessage(tabId, message.id).catch(() => {});
+    set(state => ({ sendingTab: state.sendingTab === tabId ? null : state.sendingTab, queuedSends: state.queuedSends.filter(item => item.ownerId !== tabId),
+      byTab: { ...state.byTab, ...(state.byTab[tabId] ? { [tabId]: state.byTab[tabId].flatMap(message => message.pending
+        ? hasChatContent(message) ? [stopChatMessage(message)] : [] : [message]) } : {}) } }));
+    for (const message of get().byTab[tabId] ?? []) if (message.stopped) void persistMessage(tabId, message).catch(() => {});
+    terminalDebug('chat-turn-stopped', { conversationId: tabId, hadController: !!controller });
+    queueMicrotask(drainQueue);
   },
   send: async (text, opts) => {
-    const tabId = opts?.conversationId ?? useWorkspaceStore.getState().activeId;
+    const tabId = opts?.conversationId ?? opts?.ownerId ?? useWorkspaceStore.getState().activeId;
     const conversation = get().conversations.find(item => item.id === tabId);
     if (opts?.conversationId && (!conversation || !(tabId in get().byTab))) return;
     const trimmed = text.trim();
     const atts = opts?.attachments?.length ? opts.attachments : undefined;
     // 空文本但有附件也允许发送（「看看这张图」之外的纯附件场景）
-    if ((!trimmed && !atts && !opts?.references?.length) || get().sendingTab) return;
+    if (!trimmed && !atts && !opts?.references?.length) return;
+    if (get().sendingTab) {
+      set(state => ({ queuedSends: [...state.queuedSends, { id: nextId(), ownerId: tabId, text: trimmed, options: { ...opts, ownerId: tabId, ...(conversation ? { conversationId: tabId } : {}) } }] }));
+      return;
+    }
     const now = Date.now();
     const environment = conversation?.environment ? { ...conversation.environment,
       cwd: useWorkspaceStore.getState().terminalCwds[conversation.environment.paneId] ?? conversation.environment.cwd } : null;
@@ -514,7 +567,8 @@ export const useChatStore = create<ChatState>((set, get) => {
       ...(conversation ? { environment } : {}) };
     const userMsg: ChatMessage = { id: nextId(), role: 'user', content: trimmed, attachments: atts, references: opts?.references, ...base };
     const assistantMsg: ChatMessage = { id: nextId(), role: 'assistant', content: '', pending: true, ...base };
-    abortControllers.set(tabId, new AbortController());
+    const controller = new AbortController();
+    abortControllers.set(tabId, controller);
     set((s) => ({
       byTab: { ...s.byTab, [tabId]: [...(s.byTab[tabId] ?? []), userMsg, assistantMsg] },
       sendingTab: tabId,
@@ -532,7 +586,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     } else useWorkspaceStore.getState().titleFromMessage(tabId, trimmed);
     if (conversation) await persistMessage(tabId, userMsg).catch(() => {});
     else void persistMessage(tabId, userMsg).catch(() => {});
-    await runAssistant(tabId, assistantMsg.id, opts?.streamFn);
+    await runAssistant(tabId, assistantMsg.id, controller, opts?.streamFn);
   },
   regenerate: async (tabId, userMsgId) => {
     if (get().sendingTab) return;
@@ -553,7 +607,8 @@ export const useChatStore = create<ChatState>((set, get) => {
       environment,
       createdAt: oldAnswer?.role === 'assistant' ? oldAnswer.createdAt : question.createdAt,
     };
-    abortControllers.set(tabId, new AbortController());
+    const controller = new AbortController();
+    abortControllers.set(tabId, controller);
     // 新回答占位替换旧回答（原地），history 随之 = 到该提问为止
     set((s) => {
       const cur = s.byTab[tabId] ?? [];
@@ -566,7 +621,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     });
     if (oldAnswerId && oldAnswerId !== assistantMsg.id) await deleteMessage(tabId, oldAnswerId).catch(() => {});
     if (conversation) await persistMessage(tabId, assistantMsg).catch(() => {});
-    await runAssistant(tabId, assistantMsg.id);
+    await runAssistant(tabId, assistantMsg.id, controller);
   },
   deleteExchange: (tabId, userMsgId) => {
     if (get().sendingTab) return;
@@ -605,13 +660,13 @@ export const useChatStore = create<ChatState>((set, get) => {
   },
   clearTab: () => {
     const tabId = useWorkspaceStore.getState().activeId;
+    get().abortStream(tabId);
     set((s) => ({ byTab: { ...s.byTab, [tabId]: [] } }));
   },
   dropTab: (tabId) => {
     useComposerDrafts.getState().dropTab(tabId);
     if (get().draftTabId === tabId) set({ draft: '', draftTabId: null });
-    abortControllers.get(tabId)?.abort();
-    abortControllers.delete(tabId);
+    get().abortStream(tabId);
     if (get().sendingTab === tabId) denyAllPending(tabId);
     clearCompactionCache(tabId); // 清理该 tab 的上下文摘要缓存
     clearSessionGrants(tabId);

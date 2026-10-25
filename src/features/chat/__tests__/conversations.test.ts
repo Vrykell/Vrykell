@@ -40,6 +40,78 @@ afterEach(() => {
 });
 
 describe('independent conversations', () => {
+  it('keeps empty conversations in memory without writing history', async () => {
+    const id = useChatStore.getState().createConversation();
+    useChatStore.getState().renameConversation(id, 'Draft');
+    useChatStore.getState().setEnvironment(id, environment);
+    await useChatStore.getState().retryPersistence();
+    expect(api.saveConversation).not.toHaveBeenCalled();
+    expect(api.appendConversationMessage).not.toHaveBeenCalled();
+    await useChatStore.getState().send('First message', { conversationId: id, streamFn: async () => {} });
+    expect(api.saveConversation).toHaveBeenCalled();
+    expect(api.appendConversationMessage).toHaveBeenCalledWith(expect.any(String), id, 'user', 'First message', expect.any(Number), '', '', 'a#0', expect.any(String));
+  });
+
+  it('removes empty history after deleting the final exchange and can save new content later', async () => {
+    const id = useChatStore.getState().createConversation();
+    await useChatStore.getState().send('First message', { conversationId: id, streamFn: async (_messages, chunk) => chunk('Reply') });
+    useChatStore.getState().deleteExchange(id, useChatStore.getState().byTab[id][0].id);
+    await vi.waitFor(() => expect(api.deleteConversation).toHaveBeenCalledWith(id));
+    expect(useChatStore.getState().byTab[id]).toEqual([]);
+    expect(useChatStore.getState().conversations.some(item => item.id === id)).toBe(true);
+    await useChatStore.getState().send('New content', { conversationId: id, streamFn: async () => {} });
+    expect(api.saveConversation).toHaveBeenLastCalledWith(id, expect.any(String), expect.any(Number), expect.any(Number), expect.any(String));
+  });
+
+  it('queues messages in order and retains their owner when navigation changes', async () => {
+    const id = useChatStore.getState().createConversation();
+    let finish!: () => void;
+    const running = useChatStore.getState().send('First', { conversationId: id, streamFn: () => new Promise(resolve => { finish = resolve; }) });
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+    const stream = vi.fn(async () => {});
+    await useChatStore.getState().send('Second', { conversationId: id, streamFn: stream });
+    await useChatStore.getState().send('Third', { conversationId: id, streamFn: stream });
+    useChatStore.getState().createConversation();
+    expect(useChatStore.getState().queuedSends.map(item => item.text)).toEqual(['Second', 'Third']);
+    finish(); await running;
+    await vi.waitFor(() => expect(stream).toHaveBeenCalledTimes(2));
+    expect(useChatStore.getState().byTab[id].filter(message => message.role === 'user').map(message => message.content)).toEqual(['First', 'Second', 'Third']);
+  });
+
+  it('stops a noncooperative stream immediately and fences its late callbacks and finalizer', async () => {
+    const id = useChatStore.getState().createConversation();
+    let finishOld!: () => void; let oldChunk!: (text: string) => void;
+    const old = useChatStore.getState().send('First', { conversationId: id, streamFn: async (_messages, chunk) => {
+      oldChunk = chunk; chunk('Partial'); await new Promise<void>(resolve => { finishOld = resolve; });
+    } });
+    await vi.waitFor(() => expect(finishOld).toBeTypeOf('function'));
+    await useChatStore.getState().send('Queued', { conversationId: id });
+    useChatStore.getState().abortStream(id);
+    expect(useChatStore.getState().sendingTab).toBeNull();
+    expect(useChatStore.getState().queuedSends).toEqual([]);
+    expect(useChatStore.getState().byTab[id][1]).toMatchObject({ content: 'Partial', stopped: true, pending: false });
+    let finishNew!: () => void;
+    const next = useChatStore.getState().send('Next', { conversationId: id, streamFn: () => new Promise(resolve => { finishNew = resolve; }) });
+    await vi.waitFor(() => expect(finishNew).toBeTypeOf('function'));
+    oldChunk('Late'); finishOld(); await old;
+    expect(useChatStore.getState().sendingTab).toBe(id);
+    expect(useChatStore.getState().byTab[id][1].content).toBe('Partial');
+    finishNew(); await next;
+  });
+
+  it('does not resurrect a stopped request when persistence finishes later', async () => {
+    const id = useChatStore.getState().createConversation();
+    let finishSave!: () => void;
+    vi.mocked(api.saveConversation).mockImplementationOnce(() => new Promise(resolve => { finishSave = resolve; }));
+    const stream = vi.fn(async () => {});
+    const sending = useChatStore.getState().send('First', { conversationId: id, streamFn: stream });
+    await vi.waitFor(() => expect(finishSave).toBeTypeOf('function'));
+    useChatStore.getState().dropTab(id);
+    finishSave(); await sending;
+    expect(stream).not.toHaveBeenCalled();
+    expect(useChatStore.getState().sendingTab).toBeNull();
+    expect(useChatStore.getState().byTab[id]).toBeUndefined();
+  });
   it('keeps the full current command result in both the reference and submitted history', async () => {
     const command = `printf ${'argument '.repeat(400)}END_COMMAND`;
     const output = `BEGIN_OUTPUT:${'line 😀\n'.repeat(900)}:FINAL_ERROR`;
@@ -172,6 +244,7 @@ describe('independent conversations', () => {
 
   it('does not recreate a conversation while deletion and save retry overlap', async () => {
     const id = useChatStore.getState().createConversation();
+    await useChatStore.getState().send('Saved question', { conversationId: id, streamFn: async () => {} });
     await vi.waitFor(() => expect(api.saveConversation).toHaveBeenCalledTimes(1));
     let finishDelete: (() => void) | undefined;
     vi.mocked(api.deleteConversation).mockImplementationOnce(() => new Promise<void>(resolve => { finishDelete = resolve; }));

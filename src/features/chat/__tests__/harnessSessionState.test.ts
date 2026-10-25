@@ -5,10 +5,10 @@
  * active mode, a whole new configuration, its plan and the context window in use. The page draws
  * those as controls and a plan card, so the store has to keep them next to the messages.
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useHarnessStore } from '@features/chat/stores/harness';
 import { useHarnessSessionRefs } from '@features/chat/stores/harnessSessions';
-import { acpClose, acpOpen, acpAppToolResult, acpSetConfigOption, acpSetMode, acpSetModel, type HarnessOpenResult } from '@platform/api/acp';
+import { acpClose, acpOpen, acpPrompt, acpAppToolResult, acpSetConfigOption, acpSetMode, acpSetModel, type HarnessOpenResult } from '@platform/api/acp';
 import { answerUserQuestion, questionKey, useUserQuestions } from '@features/agent/services/userQuestions';
 
 vi.mock('@platform/api/acp', () => ({
@@ -54,6 +54,7 @@ const notification = (update: Record<string, unknown>) => ({
 });
 
 const current = () => useHarnessStore.getState().byTab[TAB]!;
+afterEach(() => vi.useRealTimers());
 
 beforeEach(async () => {
   vi.mocked(acpSetMode).mockClear();
@@ -66,6 +67,73 @@ beforeEach(async () => {
 });
 
 describe('harness session state', () => {
+  it('keeps empty sessions out of saved history until the first input', async () => {
+    expect(useHarnessSessionRefs.getState().refs['Claude Code']).toBeUndefined();
+    await useHarnessStore.getState().prompt(TAB, 'First input');
+    expect(useHarnessSessionRefs.getState().refs['Claude Code']?.sessionId).toBe(SESSION);
+  });
+
+  it('sends queued inputs one at a time after stop events', async () => {
+    vi.mocked(acpPrompt).mockClear();
+    await useHarnessStore.getState().prompt(TAB, 'First');
+    await useHarnessStore.getState().prompt(TAB, 'Second');
+    await useHarnessStore.getState().prompt(TAB, 'Third');
+    expect(acpPrompt).toHaveBeenCalledTimes(1);
+    expect(current().queuedInputs?.map(item => item.text)).toEqual(['Second', 'Third']);
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'end_turn' } });
+    await vi.waitFor(() => expect(acpPrompt).toHaveBeenCalledTimes(2));
+    expect(acpPrompt).toHaveBeenLastCalledWith(SESSION, 'Second');
+    expect(current().pending).toBe(true);
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'end_turn' } });
+    await vi.waitFor(() => expect(acpPrompt).toHaveBeenCalledTimes(3));
+    expect(acpPrompt).toHaveBeenLastCalledWith(SESSION, 'Third');
+  });
+
+  it('releases an unresponsive cancelled session and resumes without accepting late output', async () => {
+    vi.useFakeTimers();
+    await useHarnessStore.getState().prompt(TAB, 'First');
+    await useHarnessStore.getState().prompt(TAB, 'Discard');
+    const cancelled = useHarnessStore.getState().cancel(TAB);
+    expect(current().pending).toBe(false);
+    expect(current().queuedInputs).toEqual([]);
+    await vi.advanceTimersByTimeAsync(1201); await cancelled;
+    expect(current().sessionId).toBeNull();
+    expect(current().stopping).toBe(false);
+    expect(acpClose).toHaveBeenCalledWith(SESSION);
+    const before = current().messages;
+    useHarnessStore.getState().applyEvent(notification({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Late output' } }) as never);
+    expect(current().messages).toBe(before);
+    await useHarnessStore.getState().prompt(TAB, 'Next');
+    expect(acpOpen).toHaveBeenLastCalledWith('Claude Code', '/tmp/project', SESSION, expect.any(Array));
+    expect(current().pending).toBe(true);
+  });
+
+  it('keeps a responsive session connected after acknowledged cancellation', async () => {
+    await useHarnessStore.getState().prompt(TAB, 'First');
+    const cancelled = useHarnessStore.getState().cancel(TAB);
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'cancelled' } });
+    await cancelled;
+    expect(current()).toMatchObject({ sessionId: SESSION, pending: false, stopping: false });
+    const before = current().messages;
+    useHarnessStore.getState().applyEvent(notification({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Late output' } }) as never);
+    expect(current().messages).toBe(before);
+  });
+
+  it('cancels an in-flight connection and closes its late result without sending the old prompt', async () => {
+    await useHarnessStore.getState().close(TAB);
+    let finish!: (result: HarnessOpenResult) => void;
+    vi.mocked(acpOpen).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+    const opening = useHarnessStore.getState().open(TAB, 'Claude Code', '/tmp/project', true);
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+    await useHarnessStore.getState().prompt(TAB, 'Queued during connection');
+    await useHarnessStore.getState().cancel(TAB);
+    expect(current()).toMatchObject({ pending: false, opening: false, queuedInputs: [] });
+    finish({ sessionId: 'late-open', resumeSessionId: 'late-history', harness: 'Claude Code', cwd: '/tmp/project',
+      agent: { protocolVersion: 1, agentInfo: null, agentCapabilities: null, authMethods: [] }, modes: null, models: null, configOptions: null });
+    await opening;
+    expect(acpClose).toHaveBeenCalledWith('late-open');
+    expect(current().sessionId).toBeNull();
+  });
   it('rotates the authorization identity when the execution target changes', () => {
     const original = current().toolContextId;
     useHarnessStore.setState({ byTab: { [TAB]: { ...current(), executionPaneId: 'previous-target' } } });
@@ -108,7 +176,7 @@ describe('harness session state', () => {
     expect(useHarnessSessionRefs.getState().refs.Agent?.sessionId).toBe('newer');
     useHarnessSessionRefs.getState().forget('Agent', 'newer');
     expect(useHarnessSessionRefs.getState().refs.Agent).toBeUndefined();
-    expect(useHarnessSessionRefs.getState().refs['Claude Code']).toBeDefined();
+    expect(useHarnessSessionRefs.getState().refs['Claude Code']).toBeUndefined();
   });
   it('keeps the plan, the context window and the active mode the agent publishes', () => {
     const store = useHarnessStore.getState();
@@ -187,6 +255,7 @@ describe('harness session state', () => {
   });
 
   it('opens a fresh connection without closing the previous conversation', async () => {
+    await useHarnessStore.getState().prompt(TAB, 'Existing conversation');
     expect(useHarnessSessionRefs.getState().refs['Claude Code']?.sessionId).toBe('s1');
     const previous = current();
     const closed = vi.mocked(acpClose).mock.calls.length;
@@ -199,6 +268,8 @@ describe('harness session state', () => {
     expect(acpOpen).toHaveBeenLastCalledWith('Claude Code', '/tmp/project', undefined, expect.arrayContaining([expect.objectContaining({ name: 'read_file' })]));
     expect(acpClose).toHaveBeenCalledTimes(closed);
     expect(current()).toBe(previous);
+    expect(useHarnessSessionRefs.getState().refs['Claude Code']?.sessionId).toBe('s1');
+    await useHarnessStore.getState().prompt('second-connection', 'New conversation');
     expect(useHarnessSessionRefs.getState().refs['Claude Code']?.sessionId).toBe('fresh-history');
   });
 
@@ -272,6 +343,8 @@ describe('harness session state', () => {
     await useHarnessStore.getState().close(TAB);
     await useHarnessStore.getState().open(TAB, 'Claude Code', '/tmp/project');
     expect(current().commands[0]?.name).toBe('early');
+    expect(useHarnessSessionRefs.getState().refs['Claude Code']).toBeUndefined();
+    await useHarnessStore.getState().prompt(TAB, 'First input');
     expect(useHarnessSessionRefs.getState().refs['Claude Code']?.sessionId).toBe('history-id');
   });
 });

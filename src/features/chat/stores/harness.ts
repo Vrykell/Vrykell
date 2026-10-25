@@ -21,6 +21,8 @@ import { ApplicationToolSession, applicationToolCatalog } from '@features/agent/
 import { clearSessionGrants } from '@features/agent/stores/permissions';
 import { executionPaneSpec } from '@features/agent/services/executionTarget';
 import { environmentForPane } from '../services/conversationContext';
+import { hasChatContent } from '../model/chatContent';
+import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
 /** One step of the plan an agent publishes while it works. */
 export interface HarnessPlanEntry {
@@ -38,6 +40,10 @@ export interface HarnessCommand {
 }
 
 export interface HarnessSession {
+  queuedInputs?: Array<{ id: string; text: string }>;
+  stopping?: boolean;
+  interrupted?: boolean;
+  resumeSessionId?: string;
   appToolsConnected?: boolean;
   executionPaneId?: string | null;
   toolContextId?: string;
@@ -79,6 +85,7 @@ export interface HarnessSession {
 }
 
 interface HarnessStore {
+  cancelQueuedInput: (tabId: string, id: string) => void;
   setExecutionPane: (tabId: string, paneId: string | null) => void;
   byTab: Record<string, HarnessSession>;
   open: (tabId: string, harness: string, cwd: string, fresh?: boolean, resumeSessionId?: string) => Promise<void>;
@@ -98,6 +105,7 @@ interface HarnessStore {
 }
 
 const fresh = (harness: string): HarnessSession => ({
+  queuedInputs: [], stopping: false,
   harness, sessionId: null, cwd: '', agent: null, messages: [], pending: false, opening: false, error: null, note: null,
   modes: null, models: null, configOptions: null, plan: [], context: null, commands: [],
   permission: null, permissionGeneration: 0,
@@ -109,6 +117,17 @@ const openingEvents = new Map<string, AcpSessionEvent[]>();
 let binding: Promise<void> | null = null;
 const applicationSessions = new Map<string, ApplicationToolSession>();
 let toolScopeSequence = 0;
+let inputSequence = 0;
+const openVersions = new Map<string, number>();
+const turnVersions = new Map<string, number>();
+const cancellationAcks = new Map<string, () => void>();
+function drainHarnessQueue(tabId: string) {
+  const session = useHarnessStore.getState().byTab[tabId];
+  if (!session || session.pending || session.opening || session.stopping || !session.queuedInputs?.length) return;
+  const [next, ...rest] = session.queuedInputs;
+  patch(tabId, current => ({ ...current, queuedInputs: rest }));
+  if (next) void useHarnessStore.getState().prompt(tabId, next.text);
+}
 function stopApplicationTools(tabId: string) { applicationSessions.get(tabId)?.close(); applicationSessions.delete(tabId); }
 
 /** Subscribe to the backend's events once; every harness page calls this on mount. */
@@ -131,10 +150,11 @@ function patch(tabId: string, update: (session: HarnessSession) => HarnessSessio
 
 export const useHarnessStore = create<HarnessStore>()((set, get) => ({
   byTab: {},
+  cancelQueuedInput: (tabId, id) => patch(tabId, current => ({ ...current, queuedInputs: current.queuedInputs?.filter(item => item.id !== id) })),
 
   setExecutionPane: (tabId, paneId) => {
     const session = get().byTab[tabId];
-    if (!session || session.pending || (session.executionPaneId ?? null) === paneId || (paneId && !executionPaneSpec(paneId))) return;
+    if (!session || session.pending || session.stopping || (session.executionPaneId ?? null) === paneId || (paneId && !executionPaneSpec(paneId))) return;
     clearSessionGrants(session.toolContextId ?? tabId);
     patch(tabId, current => ({ ...current, executionPaneId: paneId, toolContextId: `${session.sessionId}:app:${++toolScopeSequence}` }));
   },
@@ -142,6 +162,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
   open: async (tabId, harness, cwd, newSession = false, resumeSessionId) => {
     // One open per tab prevents a remount racing the first attempt from starting an extra process.
     if (get().byTab[tabId]?.opening) return;
+    const version = (openVersions.get(tabId) ?? 0) + 1; openVersions.set(tabId, version);
     if (!(tabId in get().byTab)) {
       set((state) => ({ byTab: { ...state.byTab, [tabId]: fresh(harness) } }));
     }
@@ -156,7 +177,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       const result = await acpOpen(harness, cwd, resume, applicationToolCatalog());
       tabOfSession.set(result.sessionId, tabId);
       const known = get().byTab[tabId];
-      if (!known) {
+      if (!known || openVersions.get(tabId) !== version) {
         // The tab was closed while this open was in flight: do not resurrect it, and do not leave a
         // process running with no page behind it. (A React remount keeps the entry, so it lands in
         // the branch below instead.)
@@ -164,57 +185,92 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
         tabOfSession.delete(result.sessionId);
         return;
       }
-      useHarnessSessionRefs.getState().remember(harness, {
-        sessionId: result.resumeSessionId ?? result.sessionId, cwd: result.cwd || cwd, at: Date.now(),
-      });
       const replayed = result.replayed ?? [];
       patch(tabId, (current) => replayEvents({
-        ...current, opening: false, sessionId: result.sessionId, cwd: result.cwd || cwd,
+        ...current, opening: false, stopping: false, sessionId: result.sessionId, resumeSessionId: result.resumeSessionId ?? result.sessionId, cwd: result.cwd || cwd,
+        messages: replayed.length ? [] : current.messages,
         agent: result.agent, error: null, appToolsConnected: result.appToolsConnected ?? false, toolContextId: `${result.sessionId}:app:${++toolScopeSequence}`,
         modes: result.modes ?? null, models: result.models ?? null, configOptions: result.configOptions ?? null,
         note: null,
       }, replayed));
+      if (get().byTab[tabId]?.messages.some(hasChatContent)) useHarnessSessionRefs.getState().remember(harness, {
+        sessionId: result.resumeSessionId ?? result.sessionId, cwd: result.cwd || cwd, at: Date.now(),
+      });
       const queued = openingEvents.get(result.sessionId) ?? [];
       openingEvents.delete(result.sessionId);
       for (const event of queued) get().applyEvent(event);
+      queueMicrotask(() => drainHarnessQueue(tabId));
     } catch (error) {
-      patch(tabId, (session) => ({ ...session, opening: false, error: String((error as Error)?.message ?? error) }));
+      if (openVersions.get(tabId) === version) patch(tabId, (session) => ({ ...session, opening: false, error: String((error as Error)?.message ?? error) }));
     } finally {
       if (!Object.values(get().byTab).some(session => session.opening)) openingEvents.clear();
     }
   },
 
   prompt: async (tabId, text) => {
-    const session = get().byTab[tabId];
-    if (!session?.sessionId || session.pending || !text.trim()) return;
+    let session = get().byTab[tabId];
+    if (!session || !text.trim()) return;
+    if (session.pending || session.stopping || session.opening) {
+      patch(tabId, current => ({ ...current, queuedInputs: [...(current.queuedInputs ?? []), { id: `queued-${Date.now()}-${inputSequence++}`, text: text.trim() }] }));
+      return;
+    }
+    const version = (turnVersions.get(tabId) ?? 0) + 1; turnVersions.set(tabId, version);
+    if (!session.sessionId) {
+      patch(tabId, current => ({ ...current, pending: true }));
+      await get().open(tabId, session.harness, session.cwd, false, session.resumeSessionId);
+      if (turnVersions.get(tabId) !== version) return;
+      session = get().byTab[tabId];
+      if (!session?.sessionId) { patch(tabId, current => ({ ...current, pending: false })); return; }
+    }
+    const sessionId = session.sessionId;
     const question: ChatMessage = {
-      id: `harness-question-${Date.now()}`, role: 'user', content: text.trim(), createdAt: Date.now(),
+      id: `harness-question-${Date.now()}-${inputSequence++}`, role: 'user', content: text.trim(), createdAt: Date.now(),
     };
-    patch(tabId, (current) => ({ ...current, messages: [...current.messages, question], pending: true, note: null, error: null }));
+    patch(tabId, (current) => ({ ...current, messages: [...current.messages, question], pending: true, interrupted: false, note: null, error: null }));
+    useHarnessSessionRefs.getState().remember(session.harness, { sessionId: session.resumeSessionId ?? sessionId, cwd: session.cwd, at: Date.now() });
     stopApplicationTools(tabId);
     const paneId = session.executionPaneId ?? null;
     const toolEnvironment = paneId ? environmentForPane(paneId) : null;
     applicationSessions.set(tabId, new ApplicationToolSession({ tabId: session.toolContextId ?? tabId, paneId, remote: executionPaneSpec(paneId)?.kind === 'ssh' }, run => {
+      if (turnVersions.get(tabId) !== version) return;
       patch(tabId, current => ({ ...current, messages: upsertHarnessTool(current.messages, run, { paneId: paneId ?? undefined, environment: toolEnvironment }) }));
     }));
     try {
-      await acpPrompt(session.sessionId, text.trim());
+      await acpPrompt(sessionId, text.trim());
     } catch (error) {
+      if (turnVersions.get(tabId) !== version || get().byTab[tabId]?.sessionId !== sessionId) return;
       stopApplicationTools(tabId);
       patch(tabId, (current) => ({ ...current, pending: false, error: String((error as Error)?.message ?? error) }));
+      queueMicrotask(() => drainHarnessQueue(tabId));
     }
   },
 
   cancel: async (tabId) => {
     stopApplicationTools(tabId);
     const session = get().byTab[tabId];
-    if (!session?.sessionId) return;
-    try {
-      await acpCancel(session.sessionId);
-      patch(tabId, current => ({ ...current, permission: null }));
-    } catch (error) {
-      patch(tabId, (current) => ({ ...current, note: String((error as Error)?.message ?? error) }));
+    if (!session || session.stopping) return;
+    turnVersions.set(tabId, (turnVersions.get(tabId) ?? 0) + 1);
+    if (!session.sessionId) {
+      openVersions.set(tabId, (openVersions.get(tabId) ?? 0) + 1);
+      patch(tabId, current => ({ ...current, opening: false, pending: false, queuedInputs: [], permission: null }));
+      return;
     }
+    patch(tabId, current => ({ ...current, pending: false, stopping: true, interrupted: true, permission: null, queuedInputs: [], note: t('Harness stopped.') }));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const acknowledged = await new Promise<boolean>(resolve => {
+      cancellationAcks.set(tabId, () => resolve(true));
+      timer = setTimeout(() => resolve(false), 1200);
+      void acpCancel(session.sessionId!).catch(() => resolve(false));
+    });
+    clearTimeout(timer); cancellationAcks.delete(tabId);
+    if (get().byTab[tabId]?.sessionId !== session.sessionId) return;
+    if (!acknowledged) {
+      tabOfSession.delete(session.sessionId);
+      patch(tabId, current => ({ ...current, sessionId: null, stopping: false, opening: false }));
+      void acpClose(session.sessionId).catch(() => undefined);
+    } else patch(tabId, current => ({ ...current, stopping: false }));
+    terminalDebug('harness-turn-stopped', { tabId, acknowledged });
+    drainHarnessQueue(tabId);
   },
 
   setMode: async (tabId, modeId) => {
@@ -260,6 +316,9 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
   },
 
   close: async (tabId) => {
+    openVersions.set(tabId, (openVersions.get(tabId) ?? 0) + 1);
+    turnVersions.set(tabId, (turnVersions.get(tabId) ?? 0) + 1);
+    cancellationAcks.get(tabId)?.(); cancellationAcks.delete(tabId);
     stopApplicationTools(tabId);
     const session = get().byTab[tabId];
     clearSessionGrants(session?.toolContextId ?? tabId);
@@ -302,6 +361,11 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       return;
     }
     const session = get().byTab[tabId];
+    if (session?.stopping && (event.kind === 'update' || event.kind === 'permission')) return;
+    if (session?.interrupted && !session.pending && event.kind === 'update') {
+      const kind = String(harnessUpdate(event.payload).sessionUpdate ?? '');
+      if (['agent_message_chunk', 'agent_thought_chunk', 'user_message_chunk', 'tool_call', 'tool_call_update'].includes(kind)) return;
+    }
     if (event.kind === 'app-tool') {
       if (event.payload.method === 'cancel') { stopApplicationTools(tabId); return; }
       const requestId = event.payload.requestId;
@@ -318,6 +382,10 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     // conversation arrives through `replayEvents`, which must not count it a second time.
     if (session) recordAcpEvent(session.harness, event);
     patch(tabId, (current) => foldSessionEvent(current, event));
+    if (event.kind === 'stop' || event.kind === 'error') {
+      if (session?.stopping) cancellationAcks.get(tabId)?.();
+      else queueMicrotask(() => drainHarnessQueue(tabId));
+    }
   },
 }));
 

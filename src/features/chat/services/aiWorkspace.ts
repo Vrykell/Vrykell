@@ -16,7 +16,7 @@ export function createSideAgent(harness: string, cwd?: string) {
 }
 
 export function closeAiWorkspaceSession(id = useAiWorkspace.getState().selected, force = false) {
-  if (id.startsWith('chat:')) useAiWorkspace.getState().closeNative(id.slice(5));
+  if (id.startsWith('chat:')) { useChatStore.getState().abortStream(id.slice(5)); useAiWorkspace.getState().closeNative(id.slice(5)); }
   else if (id.startsWith('acp:')) {
     const connection = id.slice(4);
     const complete = () => useHarnessWorkspace.getState().close([connection]);
