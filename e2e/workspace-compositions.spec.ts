@@ -49,6 +49,9 @@ test('filters a mixed history item by each member and restores the complete layo
   await page.getByRole('menuitem', { name: terminalTitle, exact: true }).click();
   await pickPlacementZone(page, workspace.locator('.unified-pane').first(), 'right');
   await expect(workspace.locator('.unified-pane')).toHaveCount(2);
+  const command = workspace.locator('[data-terminal-input]');
+  await command.fill('echo saved-composition'); await command.press('Enter');
+  await expect(workspace.locator('.command-block').filter({ hasText: 'saved-composition' }).first()).toBeVisible();
   const spawns = await page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: unknown[] }).__PTY_SPAWNS__.length);
   await bar.getByRole('button', { name: '全部历史', exact: true }).click();
   const history = page.getByTestId('unified-history-page');

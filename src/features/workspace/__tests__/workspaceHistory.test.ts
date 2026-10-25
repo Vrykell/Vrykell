@@ -12,6 +12,8 @@ import { currentWorkspaceResources } from '../services/workspaceResources';
 import { leaf } from '../model/windowLayout';
 import { saveWorkspaceHistory } from '@platform/api/historyPage';
 import { getSession } from '@platform/api/session';
+import { useBlockStore } from '@features/terminal/stores/blocks';
+import { useHarnessStore } from '@features/chat/stores/harness';
 
 vi.mock('@platform/diagnostics', () => ({ invoke: vi.fn(async () => undefined), diagnostic: vi.fn() }));
 vi.mock('@platform/api/historyPage', () => ({ saveWorkspaceHistory: vi.fn().mockResolvedValue(undefined) }));
@@ -31,6 +33,7 @@ beforeEach(() => {
   useHarnessWorkspace.setState({ connections: [], selected: '' });
   useUnifiedWorkspace.setState({ layout: null, focused: '', historyIdentity: undefined, startActive: true });
   useWorkspaceNavigation.setState({ area: 'history', historyDestination: 'unified' });
+  useBlockStore.setState({ byTab: {} });
   vi.mocked(saveWorkspaceHistory).mockResolvedValue(undefined);
 });
 
@@ -46,6 +49,33 @@ it('validates reference-only layouts and rejects duplicate or missing members', 
     expect(parseWorkspaceHistory(JSON.stringify(value))).toBeNull();
   }
   expect(() => remapWorkspaceHistory(snapshot(), new Map([['terminal:one#0', 'same'], ['chat:two', 'same']]))).toThrow();
+});
+
+it('restores empty pane templates without creating empty history records or reviving a saved conversation', async () => {
+  useWorkspaceStore.setState({ tabs: [], activeId: '' });
+  useChatStore.setState({ conversations: [], byTab: {} });
+  const terminal = await restoreWorkspaceMember({ ...snapshot().members[0]!, empty: true, shellType: 'bash' });
+  expect(terminal).toMatch(/^terminal:/);
+  expect(getSession).not.toHaveBeenCalled();
+  const conversation = await restoreWorkspaceMember({ ...snapshot().members[1]!, empty: true });
+  expect(conversation).not.toBe('chat:two');
+  expect(useChatStore.getState().byTab[conversation.slice(5)]).toEqual([]);
+  expect(useChatStore.getState().conversations.find(item => item.id === conversation.slice(5))?.title).toBe('Chat');
+  const invalid = snapshot(); invalid.members[0]!.empty = true;
+  expect(parseWorkspaceHistory(JSON.stringify(invalid))?.members[0]?.empty).toBe(true);
+  expect(parseWorkspaceHistory(JSON.stringify({ ...invalid, members: [{ ...invalid.members[0], empty: 'invalid' }, invalid.members[1]] }))).toBeNull();
+});
+
+it('stores durable external history identities rather than live process identifiers', () => {
+  useHarnessWorkspace.setState({ connections: [{ id: 'agent', harness: 'Agent', cwd: '/project', fresh: false }] });
+  useHarnessStore.setState({ byTab: { agent: { harness: 'Agent', sessionId: 'live', resumeSessionId: 'durable', messages: [{ id: 'q', role: 'user', content: 'Question', createdAt: 1 }] } as import('@features/chat/stores/harness').HarnessSession } });
+  const record = captureWorkspaceHistory({ type: 'split', direction: 'row', ratio: 0.5,
+    first: { type: 'pane', id: 'a', resourceId: 'acp:agent' }, second: { type: 'pane', id: 'b', resourceId: 'file:test' } }, 'a', [
+    { id: 'acp:agent', title: 'Agent', kind: 'agent', sessionId: 'agent' },
+    { id: 'file:test', title: 'test', kind: 'document', file: { path: '/test' } },
+  ]);
+  expect(record?.members[0]).toMatchObject({ remoteId: 'durable' });
+  expect(record?.members[0]?.empty).toBeUndefined();
 });
 
 it('updates one combination record rather than producing a record per resize or effect replay', async () => {
@@ -100,7 +130,9 @@ it('restores members through their owners and commits the layout without cloning
   expect(useUnifiedWorkspace.getState()).toMatchObject({ layout: snapshot().layout, focused: 'first', historyIdentity: { id: 'workspace:saved', createdAt: 1 } });
   expect(useWorkspaceNavigation.getState().area).toBe('unified');
   const captured = captureWorkspaceHistory(snapshot().layout, 'first', currentWorkspaceResources());
-  expect(captured?.members.map(member => member.kind)).toEqual(['terminal', 'conversation']);
+  expect(captured).toBeNull();
+  useChatStore.setState({ byTab: { two: [{ id: 'q', role: 'user', content: 'First input', createdAt: 1 }] } });
+  expect(captureWorkspaceHistory(snapshot().layout, 'first', currentWorkspaceResources())?.members.map(member => member.kind)).toEqual(['terminal', 'conversation']);
 });
 
 it('leaves the current layout intact when a member cannot be restored', async () => {

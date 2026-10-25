@@ -7,11 +7,16 @@ import { t } from '@i18n';
 import { workspacePaneIds } from '../model/workspaceResources';
 import type { WorkspaceResource } from '../model/workspaceResources';
 import { useHarnessStore } from '@features/chat/stores/harness';
+import { useChatStore } from '@features/chat/stores/chat';
+import { hasChatContent } from '@features/chat/model/chatContent';
+import { useBlockStore } from '@features/terminal/stores/blocks';
 import { useWorkspaceStore } from '../stores/workspace';
 import { compositionTabs, type CompositionTab } from '../stores/unifiedWorkspace';
 
 export function useWorkspaceHistory(resources: WorkspaceResource[], store = useUnifiedWorkspace) {
-  const agentRevision = useHarnessStore(state => JSON.stringify(Object.entries(state.byTab).map(([id, session]) => [id, session.sessionId])));
+  const agentRevision = useHarnessStore(state => JSON.stringify(Object.entries(state.byTab).map(([id, session]) => [id, session.sessionId, session.messages.some(hasChatContent)])));
+  const chatRevision = useChatStore(state => JSON.stringify(Object.entries(state.byTab).map(([id, messages]) => [id, messages.some(hasChatContent)])));
+  const terminalRevision = useBlockStore(state => JSON.stringify(Object.entries(state.byTab).map(([id, blocks]) => [id, blocks.some(block => block.command.trim() || block.outputText.trim() || block.outputRaw.trim())])));
   const writer = useRef<ReturnType<typeof createWorkspaceHistoryWriter> | null>(null);
   const compositionSave = useRef<((tab: CompositionTab) => void) | null>(null);
   if (!writer.current) writer.current = createWorkspaceHistoryWriter(error => useToastStore.getState().addToast(t('Could not save workspace history: {{error}}', { error: String(error) }), 'error'), historyIdentity => store.setState({ historyIdentity }));
@@ -68,5 +73,5 @@ export function useWorkspaceHistory(resources: WorkspaceResource[], store = useU
     if (store === useUnifiedWorkspace) { for (const tab of compositionTabs()) compositionSave.current?.(tab); return; }
     const state = store.getState();
     void writer.current!(captureWorkspaceHistory(state.layout, state.focused, resources), state.historyIdentity);
-  }, [resources, agentRevision, store]);
+  }, [resources, agentRevision, chatRevision, terminalRevision, store]);
 }

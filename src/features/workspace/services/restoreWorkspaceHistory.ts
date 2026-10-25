@@ -18,11 +18,14 @@ import { parseWorkspaceHistory, remapWorkspaceHistory, type WorkspaceHistoryIden
 import { t } from '@i18n';
 import { resolveWorkspaceResource, workspacePaneCells } from '../model/workspaceResources';
 import { scopedPaneStores } from '../stores/scopedPanes';
+import { SHELL_TYPES } from '@platform/shells';
+import { useSshStore } from '@features/ssh/stores/store';
+import { connectionTarget } from '@features/ssh/services/api';
 
 const pendingMembers = new Map<string, Promise<string>>();
 
 export function restoreWorkspaceMember(member: WorkspaceHistoryMember): Promise<string> {
-  const key = JSON.stringify([member.kind, member.reference, member.paneId, member.remoteId, member.cwd, member.connectionId, member.draftId, member.scope]);
+  const key = JSON.stringify([member.kind, member.reference, member.paneId, member.remoteId, member.cwd, member.connectionId, member.draftId, member.scope, member.empty]);
   const pending = pendingMembers.get(key);
   if (pending) return pending;
   const area = useWorkspaceNavigation.getState().area;
@@ -39,6 +42,17 @@ async function restoreMemberResource(member: WorkspaceHistoryMember): Promise<st
   if (existing && existing.kind === member.kind && (member.kind !== 'terminal' || !member.paneId || existing.kind === 'terminal' && existing.paneId === member.paneId)) return existing.id;
   const workspace = useWorkspaceStore.getState();
   if (member.kind === 'terminal') {
+    if (member.empty) {
+      if (member.ssh) {
+        if (!useSshStore.getState().loaded) await useSshStore.getState().load();
+        const connection = useSshStore.getState().connections.find(item => item.id === member.connectionId);
+        if (!connection) throw new Error(t('The saved terminal is no longer available.'));
+        const id = workspace.addTab({ kind: 'ssh', title: member.title, cwd: member.cwd, ssh: connectionTarget(connection) });
+        return `terminal:${id}#0`;
+      }
+      const id = workspace.addTab({ title: member.title, cwd: member.cwd, shellType: SHELL_TYPES.find(type => type === member.shellType) });
+      return `terminal:${id}#0`;
+    }
     const record = await getSession(member.reference);
     if (!record || record.kind === 'workspace') throw new Error(t('The saved terminal is no longer available.'));
     await sessionManager.restore(record.id, record.title);
@@ -47,6 +61,14 @@ async function restoreMemberResource(member: WorkspaceHistoryMember): Promise<st
     return resource.id;
   }
   if (member.kind === 'conversation') {
+    if (member.empty && !useChatStore.getState().conversations.some(item => item.id === member.reference)) {
+      const id = useChatStore.getState().createConversation(null, { activate: false });
+      useChatStore.getState().renameConversation(id, member.title);
+      useAiWorkspace.getState().openNative(id);
+      await useChatStore.getState().selectConversation(id);
+      workspace.openHarnessTab();
+      return `chat:${id}`;
+    }
     if (!useChatStore.getState().conversations.some(conversation => conversation.id === member.reference)) {
       const record = await getConversation(member.reference);
       if (record) useChatStore.setState(state => ({ conversations: [...state.conversations.filter(conversation => conversation.id !== record.id), {
@@ -60,7 +82,7 @@ async function restoreMemberResource(member: WorkspaceHistoryMember): Promise<st
     return `chat:${member.reference}`;
   }
   if (member.kind === 'agent') {
-    const id = useHarnessWorkspace.getState().connect(member.reference, member.cwd, !member.remoteId, member.remoteId);
+    const id = useHarnessWorkspace.getState().connect(member.reference, member.cwd, member.empty || !member.remoteId, member.empty ? undefined : member.remoteId);
     workspace.openHarnessTab();
     return `acp:${id}`;
   }

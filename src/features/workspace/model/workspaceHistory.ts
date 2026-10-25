@@ -16,6 +16,8 @@ export interface WorkspaceHistoryMember {
   shellType?: string;
   scope?: 'staged' | 'unstaged' | 'untracked' | 'conflicts';
   modes?: ('block' | 'classic')[];
+  /** A starter pane with no persisted session content. */
+  empty?: boolean;
 }
 
 export interface WorkspaceHistorySnapshot {
@@ -52,6 +54,7 @@ export function parseWorkspaceHistory(payload: string): WorkspaceHistorySnapshot
         if (member[field] !== undefined && (typeof member[field] !== 'string' || member[field].length > 4096)) return null;
       }
       if (member.shellType !== undefined && (typeof member.shellType !== 'string' || member.shellType.length > 64)) return null;
+      if (member.empty !== undefined && typeof member.empty !== 'boolean') return null;
       if (member.kind === 'comparison' && (typeof member.scope !== 'string' || !scopes.has(member.scope))) return null;
       if (member.modes !== undefined && (!Array.isArray(member.modes) || member.modes.some(mode => mode !== 'block' && mode !== 'classic'))) return null;
       ids.add(member.id);

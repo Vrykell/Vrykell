@@ -67,7 +67,7 @@ impl HistoryDb {
         }
         let members = payload["members"].as_array().ok_or("Invalid workspace members")?;
         if members.len() < 2 || members.len() != resources.len() { return Err("Invalid workspace members".into()); }
-        let fields = ["id", "title", "kind", "reference", "paneCount", "local", "ssh", "cwd", "connectionId", "draftId", "remoteId", "paneId", "shellType", "scope", "modes"];
+        let fields = ["id", "title", "kind", "reference", "paneCount", "local", "ssh", "cwd", "connectionId", "draftId", "remoteId", "paneId", "shellType", "scope", "modes", "empty"];
         for member in members {
             let object = member.as_object().ok_or("Invalid workspace member")?;
             if object.keys().any(|key| !fields.contains(&key.as_str()))
@@ -83,6 +83,7 @@ impl HistoryDb {
                 if object.contains_key(field) && !member[field].as_str().is_some_and(|value| value.len() <= 4096) { return Err("Invalid workspace reference".into()); }
             }
             if object.contains_key("shellType") && !member["shellType"].as_str().is_some_and(|value| value.len() <= 64) { return Err("Invalid terminal profile".into()); }
+            if object.contains_key("empty") && !member["empty"].is_boolean() { return Err("Invalid empty pane marker".into()); }
             if member["kind"] == "comparison" && !matches!(member["scope"].as_str(), Some("staged" | "unstaged" | "untracked" | "conflicts")) { return Err("Invalid comparison reference".into()); }
             if object.contains_key("modes") && !member["modes"].as_array().is_some_and(|modes| modes.len() <= 2 && modes.iter().all(|mode| matches!(mode.as_str(), Some("block" | "classic")))) { return Err("Invalid workspace modes".into()); }
         }
@@ -158,12 +159,17 @@ mod tests {
         let mut input = request();
         let mut payload: Value = serde_json::from_str(&input.payload).unwrap();
         payload["members"][0]["shellType"] = "powershell".into();
+        payload["members"][0]["empty"] = true.into();
         input.payload = payload.to_string();
         db.save_workspace_history(&input).unwrap();
         payload["members"][0]["shellType"] = "x".repeat(65).into();
         input.payload = payload.to_string();
         assert!(db.save_workspace_history(&input).is_err());
         assert!(db.get_session(&input.id).unwrap().payload.contains("powershell"));
+        payload["members"][0]["shellType"] = "bash".into();
+        payload["members"][0]["empty"] = "invalid".into();
+        input.payload = payload.to_string();
+        assert!(db.save_workspace_history(&input).is_err());
     }
 
     #[test]

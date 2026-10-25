@@ -3,11 +3,14 @@ import { useWorkspaceStore, terminalsOf } from '../stores/workspace';
 import { useChatStore } from '@features/chat/stores/chat';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { useHarnessStore } from '@features/chat/stores/harness';
+import { useBlockStore } from '@features/terminal/stores/blocks';
+import { hasChatContent } from '@features/chat/model/chatContent';
 import { workspacePaneCells, type WorkspacePaneLayout, type WorkspaceResource } from '../model/workspaceResources';
 import type { WorkspaceHistoryIdentity, WorkspaceHistoryMember, WorkspaceHistorySnapshot } from '../model/workspaceHistory';
 
 export function workspaceHistoryMember(resource: WorkspaceResource): WorkspaceHistoryMember | null {
-  const base = { id: resource.id, title: resource.title.slice(0, 320), paneCount: 1, local: false, ssh: false };
+  const base = { id: resource.id, title: resource.title.slice(0, 320), paneCount: 1, local: false, ssh: false,
+    ...(!workspaceResourceHasContent(resource) ? { empty: true } : {}) };
   if (resource.kind === 'terminal') {
     const tab = useWorkspaceStore.getState().tabs.find(tab => tab.id === resource.tabId);
     const terminals = tab ? terminalsOf(tab).filter(terminal => !resource.paneId || terminal.id === resource.paneId) : [];
@@ -24,7 +27,7 @@ export function workspaceHistoryMember(resource: WorkspaceResource): WorkspaceHi
     const connection = useHarnessWorkspace.getState().connections.find(connection => connection.id === resource.sessionId);
     if (!connection) return null;
     const session = useHarnessStore.getState().byTab[resource.sessionId];
-    return { ...base, kind: 'agent', reference: connection.harness, local: true, cwd: connection.cwd, remoteId: session?.sessionId ?? undefined };
+    return { ...base, kind: 'agent', reference: connection.harness, local: true, cwd: connection.cwd, remoteId: base.empty ? undefined : session?.resumeSessionId ?? session?.sessionId ?? undefined };
   }
   if (resource.kind === 'document') return { ...base, kind: 'document', reference: resource.file.path,
     connectionId: resource.file.connectionId, draftId: resource.file.draftId, local: !resource.file.connectionId, ssh: !!resource.file.connectionId };
@@ -40,10 +43,28 @@ export function workspaceHistoryMember(resource: WorkspaceResource): WorkspaceHi
   return null;
 }
 
+function workspaceResourceHasContent(resource: WorkspaceResource): boolean {
+  if (resource.kind === 'conversation') {
+    const messages = useChatStore.getState().byTab[resource.sessionId];
+    return messages ? messages.some(hasChatContent) : useChatStore.getState().conversations.some(item => item.id === resource.sessionId);
+  }
+  if (resource.kind === 'agent') return !!useHarnessStore.getState().byTab[resource.sessionId]?.messages.some(hasChatContent);
+  if (resource.kind === 'terminal') {
+    const blocks = useBlockStore.getState().byTab;
+    return Object.entries(blocks).some(([paneId, items]) => (resource.paneId ? paneId === resource.paneId : paneId === resource.tabId || paneId.startsWith(`${resource.tabId}#`))
+      && items.some(block => block.command.trim() || block.outputText.trim() || block.outputRaw.trim()));
+  }
+  return true;
+}
+
 export function captureWorkspaceHistory(layout: WorkspacePaneLayout | null, focused: string, resources: WorkspaceResource[], includeSingle = false): WorkspaceHistorySnapshot | null {
   if (!layout) return null;
   const cells = workspacePaneCells(layout);
   if (cells.length < (includeSingle ? 1 : 2)) return null;
+  if (!cells.some(cell => {
+    const resource = resources.find(item => item.id === cell.resourceId);
+    return resource && workspaceResourceHasContent(resource);
+  })) return null;
   const members = cells.map(cell => {
     const resource = resources.find(resource => resource.id === cell.resourceId);
     return resource ? workspaceHistoryMember(resource) : null;
