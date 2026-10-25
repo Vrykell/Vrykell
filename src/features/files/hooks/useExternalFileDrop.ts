@@ -22,10 +22,12 @@ export function useExternalFileDrop({ resolveTarget, onHover, onDrop }: UseExter
 
   useEffect(() => {
     if (!('__TAURI_INTERNALS__' in window)) return;
+    let disposed = false;
     let unlisten: (() => void) | undefined;
     const scale = () => window.devicePixelRatio || 1;
 
     getCurrentWindow().onDragDropEvent((event) => {
+      if (disposed) return;
       const payload = event.payload as {
         type: string;
         position?: { x: number; y: number };
@@ -45,8 +47,14 @@ export function useExternalFileDrop({ resolveTarget, onHover, onDrop }: UseExter
         return;
       }
       latest.current.onHover(target);
-    }).then((fn) => { unlisten = fn; }).catch(() => {});
+    }).then((fn) => {
+      if (disposed) fn();
+      else unlisten = fn;
+    }).catch(() => {});
 
-    return () => unlisten?.();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, []);
 }

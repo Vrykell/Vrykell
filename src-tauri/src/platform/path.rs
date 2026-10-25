@@ -115,6 +115,10 @@ pub fn numbered_name<F: Fn(&str) -> bool>(name: &str, exists: F) -> String {
     }
 }
 
+pub fn available_name<F: Fn(&str) -> bool>(name: &str, exists: F) -> String {
+    if exists(name) { numbered_name(name, exists) } else { name.to_string() }
+}
+
 /// 拆出「主干 + 扩展名」（无扩展名时扩展名为 None，点开头的隐藏文件整体视为主干）。
 pub fn split_extension(name: &str) -> (String, Option<String>) {
     match name.rfind('.') {
@@ -128,6 +132,16 @@ pub fn split_extension(name: &str) -> (String, Option<String>) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn available_transfer_names_keep_the_original_until_it_is_occupied() {
+        for name in ["Documents", "project-folder", "report.txt", ".config", "folder.with.dots", "資料"] {
+            assert_eq!(available_name(name, |_| false), name);
+        }
+        assert_eq!(available_name("Documents", |candidate| candidate == "Documents"), "Documents (1)");
+        assert_eq!(available_name("report.txt", |candidate| ["report.txt", "report (1).txt"].contains(&candidate)), "report (2).txt");
+        assert_eq!(numbered_name("Documents", |_| false), "Documents (1)");
+    }
 
     #[test]
     fn absolute_check_follows_posix_rules() {

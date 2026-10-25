@@ -81,4 +81,23 @@ describe('useFileRowDrag native drag-out', () => {
     );
     expect(onNativeDragEnd).toHaveBeenCalledWith('Dropped', items, { paths: ['/tmp/a.txt'], mode: 'move' });
   });
+
+  it('prepares one download while repeated pointer moves cross the window edge', async () => {
+    let finish: (payload: { paths: string[]; mode: 'copy' }) => void = () => {};
+    const prepareNativeDrag = vi.fn(() => new Promise<{ paths: string[]; mode: 'copy' }>(resolve => { finish = resolve; }));
+    startDragMock.mockResolvedValue(undefined);
+    const { result } = renderHook(() => useFileRowDrag({ onDrop: vi.fn(), prepareNativeDrag }));
+
+    await act(async () => {
+      result.current(pointerDown(), items);
+      window.dispatchEvent(pointerMove(1, -20, 10));
+      window.dispatchEvent(pointerMove(1, -30, 10));
+      window.dispatchEvent(pointerMove(1, -40, 10));
+    });
+    expect(prepareNativeDrag).toHaveBeenCalledExactlyOnceWith(items);
+    expect(startDragMock).not.toHaveBeenCalled();
+
+    await act(async () => { finish({ paths: ['/Downloads/folder'], mode: 'copy' }); });
+    expect(startDragMock).toHaveBeenCalledOnce();
+  });
 });

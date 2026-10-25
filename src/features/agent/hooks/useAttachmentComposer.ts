@@ -96,10 +96,11 @@ export function useAttachmentComposer(state?: AttachmentComposerState) {
   useEffect(() => {
     if (!('__TAURI_INTERNALS__' in window)) return;
 
-    const unlistenRef: { current: (() => void) | undefined } = { current: undefined };
+    let disposed = false;
+    let unlisten: (() => void) | undefined;
     getCurrentWindow()
       .onDragDropEvent((event) => {
-        if (event.payload.type !== 'drop') return;
+        if (disposed || event.payload.type !== 'drop') return;
         const element = panelRef.current;
         if (!element) return;
         const rect = element.getBoundingClientRect();
@@ -108,10 +109,16 @@ export function useAttachmentComposer(state?: AttachmentComposerState) {
         if (x / scale < rect.left || x / scale > rect.right || y / scale < rect.top || y / scale > rect.bottom) return;
         void importPaths((event.payload as { paths: string[] }).paths);
       })
-      .then((unlisten) => { unlistenRef.current = unlisten; })
+      .then((stop) => {
+        if (disposed) stop();
+        else unlisten = stop;
+      })
       .catch(() => {});
 
-    return () => unlistenRef.current?.();
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, [importPaths]);
 
   const addPastedText = useCallback((text: string) => {

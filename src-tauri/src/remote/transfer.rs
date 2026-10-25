@@ -396,7 +396,7 @@ pub fn start(app: tauri::AppHandle, conn: SshConnection, source: String, destina
         (source, target)
     } else {
         let root = super::ssh::downloads_dir()?;
-        let candidate = crate::platform::path::numbered_name(&name, |n| root.join(n).exists());
+        let candidate = crate::platform::path::available_name(&name, |candidate| root.join(candidate).exists());
         (root.join(candidate).to_string_lossy().into_owned(), source)
     };
     drop(sftp); drop(session);

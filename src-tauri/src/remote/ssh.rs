@@ -926,7 +926,7 @@ pub async fn ssh_download(app: tauri::AppHandle, state: State<'_, HistoryState>,
 /// 远端目录里为 name 找可用路径：同名时按 `name (1)`、`name (2)`… 递增（保留扩展名）。
 /// 序号规则来自平台层（`crate::platform::path::numbered_name`），远端只负责判断是否存在。
 pub(super) fn unique_remote_path(sftp: &Sftp, dir: &str, name: &str) -> String {
-    let candidate = crate::platform::path::numbered_name(name, |candidate| {
+    let candidate = crate::platform::path::available_name(name, |candidate| {
         sftp.stat(Path::new(&crate::platform::path::join(dir, candidate))).is_ok()
     });
     crate::platform::path::join(dir, &candidate)

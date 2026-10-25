@@ -1,6 +1,7 @@
 import { useFileUndoSettings } from '@config/fileUndo';
 import { useFileDirectoryShortcuts } from '../hooks/useFileDirectoryShortcuts';
 import { TextInput } from '@ui/fields/TextInput';
+import InlineRenameInput from '@ui/fields/InlineRenameInput';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ChevronRight, Search, MoreHorizontal, iconSizes } from '@ui/icons';
@@ -748,7 +749,7 @@ function FileRow({
       data-drop-dir={renaming ? undefined : dropDir}
       style={{
         display: 'flex', alignItems: 'center', gap: 4,
-        padding: `5px 10px 5px ${4 + depth * 14}px`,
+        padding: `${renaming ? 2 : 5}px 10px ${renaming ? 2 : 5}px ${4 + depth * 14}px`,
         fontSize: 'var(--fs-label)', lineHeight: '20px', minHeight: 32,
         cursor: renaming ? 'text' : 'pointer',
         background: dropTarget ? 'var(--accent-bg)' : restingBackground,
@@ -783,30 +784,22 @@ function FileRow({
         {icon ?? <RowIcon size={iconSizes.row} fill={entry.is_dir && highlighted ? 'currentColor' : 'none'} />}
       </span>
       {renaming ? (
-        <span className="file-rename-field">
-        <span aria-hidden="true" className="file-rename-measure">{draft || ' '}</span>
-        <TextInput
+        <InlineRenameInput
           autoFocus
+          aria-label={t('File name')}
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           onFocus={(event) => event.currentTarget.select()}
           onBlur={commit}
           onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing) return;
             if (event.key === 'Enter') commit();
             else if (event.key === 'Escape') cancel();
           }}
           onClick={(event) => event.stopPropagation()}
           onContextMenu={(event) => event.stopPropagation()}
           data-testid="rename-input"
-          style={{
-            position: 'absolute', inset: 0, width: '100%', minWidth: 0, boxSizing: 'border-box',
-            background: 'var(--field-bg)', border: '1px solid var(--border)',
-            borderRadius: 3, padding: '0 4px', fontSize: 'calc(12px * var(--ui-font-scale))',
-            color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
-            outline: 'none',
-          }}
         />
-        </span>
       ) : (
         <span style={{
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',

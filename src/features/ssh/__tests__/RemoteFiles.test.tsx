@@ -3,7 +3,8 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import type FilePanel from '@features/files/components/FilePanel';
 
-const mocks = vi.hoisted(() => ({ write: vi.fn(), toast: vi.fn(), focus: vi.fn(), debug: vi.fn(), upload: vi.fn(), download: vi.fn() }));
+const mocks = vi.hoisted(() => ({ write: vi.fn(), toast: vi.fn(), focus: vi.fn(), debug: vi.fn(), upload: vi.fn(), download: vi.fn(), open: vi.fn() }));
+vi.mock('@tauri-apps/plugin-dialog', () => ({ open: mocks.open }));
 vi.mock('@platform/pty', () => ({ ptyWrite: mocks.write }));
 vi.mock('@ui/feedback/Toast', () => ({ useToastStore: { getState: () => ({ addToast: mocks.toast }) } }));
 vi.mock('@features/terminal/services/terminalDebug', () => ({ terminalDebug: mocks.debug }));
@@ -14,7 +15,10 @@ vi.mock('@features/files/components/FilePanel', () => ({
     <button onClick={() => props.openEntry?.({ name: 'config.txt', path: '/home/test/config.txt', is_dir: false })}>Open remote file</button>
     <button onClick={() => props.onSyncToTerminal?.('/home/test')}>Sync directory</button>
     <button onClick={() => props.onExternalDrop?.(['/local/item.zip'], { rowPath: null, dir: '/home/test' })}>Drop upload</button>
+    <button onClick={() => props.handlers?.onUpload?.('file')}>Upload files</button>
+    <button onClick={() => props.handlers?.onUpload?.('dir')}>Upload folder</button>
     <button onClick={() => props.handlers?.onDownload?.([{ name: 'item.zip', path: '/home/test/item.zip', is_dir: false }])}>Download item</button>
+    <button onClick={() => props.handlers?.onDownload?.([{ name: 'folder', path: '/home/test/folder', is_dir: true }])}>Download folder</button>
     <button onClick={() => void props.prepareNativeDrag?.([{ name: 'drag.zip', path: '/home/test/drag.zip', is_dir: false }])}>Drag download</button>
   </>,
 }));
@@ -24,6 +28,7 @@ import { useSessionStore } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
 import { leaf } from '@features/workspace/model/windowLayout';
 import { useEditorPreferences } from '@config/editor';
+import { useRemotePathStore } from '@features/ssh/utils/remotePath';
 
 const conn = { id: 'ssh-1', name: 'server', host: 'server', user: 'test', authMethod: 'key' as const, password: '' };
 const sshPane = (id: string, connectionId = 'ssh-1') => leaf({ id, kind: 'ssh', ssh: { name: 'server', host: 'server', connectionId } });
@@ -42,6 +47,8 @@ beforeEach(() => {
   mocks.write.mockResolvedValue(undefined);
   mocks.upload.mockResolvedValue(undefined);
   mocks.download.mockResolvedValue('/Downloads/item.zip');
+  mocks.open.mockReset().mockResolvedValue(null);
+  useRemotePathStore.setState({ path: { 'ssh-1': '/home/test' } });
   useSessionStore.setState({ activeId: 'tab', tabs: [{ id: 'tab', kind: 'session', title: 'SSH', layout: sshPane('tab#0') }] });
   useTerminalStore.setState({ focusedPaneId: 'tab#0', sessions: { 'tab#0': 'ssh-session' } });
 });
@@ -52,6 +59,24 @@ describe('remote file terminal routing', () => {
     render(<RemoteFiles conn={conn} />);
     fireEvent.click(screen.getByRole('button', { name: 'Drop upload' }));
     expect(await screen.findByRole('button', { name: '返回文件浏览' })).toBeVisible();
+    expect(mocks.upload).toHaveBeenCalledExactlyOnceWith('/home/test', '/local/item.zip');
+  });
+
+  it.each(['file', 'dir'] as const)('uploads each selected %s once through the picker', async kind => {
+    const paths = kind === 'dir' ? ['/local/folder'] : ['/local/first.txt', '/local/second.txt'];
+    mocks.open.mockResolvedValue(kind === 'dir' ? paths[0] : paths);
+    render(<RemoteFiles conn={conn} />);
+    fireEvent.click(screen.getByRole('button', { name: kind === 'dir' ? 'Upload folder' : 'Upload files' }));
+    await waitFor(() => expect(mocks.upload).toHaveBeenCalledTimes(paths.length));
+    paths.forEach((path, index) => expect(mocks.upload).toHaveBeenNthCalledWith(index + 1, '/home/test', path));
+    expect(mocks.open).toHaveBeenCalledOnce();
+  });
+
+  it.each(['Download item', 'Download folder', 'Drag download'])('downloads once for %s', async action => {
+    render(<RemoteFiles conn={conn} />);
+    fireEvent.click(screen.getByRole('button', { name: action }));
+    await waitFor(() => expect(mocks.download).toHaveBeenCalledOnce());
+    expect(mocks.download).toHaveBeenCalledWith(action === 'Download folder' ? '/home/test/folder' : action === 'Drag download' ? '/home/test/drag.zip' : '/home/test/item.zip');
   });
 
   it('opens the download manager for menu and native drag downloads', async () => {
