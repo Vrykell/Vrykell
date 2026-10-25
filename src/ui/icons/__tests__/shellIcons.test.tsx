@@ -7,16 +7,19 @@ import { useHostSystems } from '@config/hostSystems';
 
 afterEach(() => { cleanup(); useHostSystems.setState({ systems: {} }); });
 
-it.each([undefined, '', 'unrecognized'])('uses the dark terminal identity as the fallback for %s', shell => {
+it.each([undefined, '', 'unrecognized'])('uses the generic terminal identity as the fallback for %s', shell => {
   expect(shellIconFor(shell)).toBe(TerminalIcon);
 });
 
-it('distinguishes the blue shell identity from the dark terminal fallback', () => {
-  const { container } = render(<><TerminalProfileIcon shellType="powershell" /><TerminalProfileIcon /></>);
+it('keeps the blue shell panel independent from hidden copies and the generic terminal fallback', () => {
+  const { container } = render(<><div hidden><TerminalProfileIcon shellType="powershell" /></div><TerminalProfileIcon shellType="pwsh" /><TerminalProfileIcon /></>);
   expect(container.querySelector('[data-shell-mark="powershell"]')).toHaveStyle({ color: 'var(--chart-blue)' });
-  expect(container.querySelector('[data-shell-mark="powershell"]')).toHaveAttribute('viewBox', '2 2 28 28');
-  expect(container.querySelector('[data-shell-mark="powershell"] linearGradient')).not.toBeNull();
-  expect(container.querySelector('[data-shell-mark="terminal"] linearGradient')).not.toBeNull();
+  for (const icon of container.querySelectorAll('[data-shell-mark="powershell"]')) {
+    expect(icon.querySelector('path')).toHaveAttribute('fill', 'currentColor');
+    expect(icon.querySelector('[id]')).toBeNull();
+    expect(icon.innerHTML).not.toContain('url(');
+  }
+  expect(container.querySelector('[data-shell-mark="terminal"]')).not.toHaveStyle({ color: 'var(--chart-blue)' });
 });
 
 it('uses orange and green for the two command shell identities', () => {

@@ -11,6 +11,7 @@ import { ArrowSort24Regular } from '@fluentui/react-icons/headless/svg/arrow-sor
 import { ArrowSwap24Regular } from '@fluentui/react-icons/headless/svg/arrow-swap';
 import { Bot24Regular } from '@fluentui/react-icons/headless/svg/bot';
 import { Brain24Regular } from '@fluentui/react-icons/headless/svg/brain';
+import { ChatHelp24Regular } from '@fluentui/react-icons/headless/svg/chat-help';
 import { BrainCircuit24Regular } from '@fluentui/react-icons/headless/svg/brain-circuit';
 import { Checkmark24Regular } from '@fluentui/react-icons/headless/svg/checkmark';
 import { CheckmarkCircle24Regular } from '@fluentui/react-icons/headless/svg/checkmark-circle';
@@ -236,6 +237,7 @@ export const TriangleAlert = createAppIcon(Warning24Regular);
 export const Undo2 = createAppIcon(ArrowUndo24Regular);
 export const Upload = createAppIcon(ArrowUpload24Regular);
 export const Wrench = createAppIcon(Wrench24Regular);
+export const AskQuestion = createAppIcon(ChatHelp24Regular);
 export const X = createAppIcon(Dismiss24Regular);
 export const CircleX = createAppIcon(DismissCircle24Regular);
 export const Zap = createAppIcon(Flash24Regular);

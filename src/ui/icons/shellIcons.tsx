@@ -1,8 +1,6 @@
 import { forwardRef, type ComponentType, type SVGProps } from 'react';
-import { iconSizes, type AppIcon, type AppIconProps } from '@ui/icons';
+import { iconSizes, TerminalPrompt, type AppIcon, type AppIconProps } from '@ui/icons';
 import BashMark from '~icons/devicon-plain/bash';
-import PowerShellMark from '~icons/devicon/powershell';
-import ClassicPowerShellMark from '~icons/vscode-icons/file-type-powershell';
 import WindowsMark from '~icons/devicon/windows8';
 import LinuxMark from '~icons/devicon/linux';
 import AppleMark from '~icons/mdi/apple';
@@ -25,8 +23,14 @@ function profileIcon(mark: string, Mark: ComponentType<SVGProps<SVGSVGElement>>,
   }) as AppIcon;
 }
 
-export const TerminalIcon = profileIcon('terminal', PowerShellMark);
-export const PowerShellIcon = profileIcon('powershell', ClassicPowerShellMark, 'var(--chart-blue)', '2 2 28 28');
+export const TerminalIcon = profileIcon('terminal', TerminalPrompt);
+export const PowerShellIcon = forwardRef<SVGSVGElement, AppIconProps>(function PowerShellIcon({ size = iconSizes.row, style, className }, ref) {
+  return <svg ref={ref} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" data-shell-mark="powershell" className={className}
+    style={{ color: 'var(--chart-blue)', flexShrink: 0, ...style }}>
+    <path d="M6 3.5h15a1.5 1.5 0 0 1 1.45 1.9l-4 14a1.5 1.5 0 0 1-1.45 1.1H2a1.5 1.5 0 0 1-1.45-1.9l4-14A1.5 1.5 0 0 1 6 3.5Z" fill="currentColor" />
+    <path d="m8 7 4 4-6 5m6.5 0H17" fill="none" stroke="var(--primary-button-text)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>;
+});
 export const ZshIcon = forwardRef<SVGSVGElement, AppIconProps>(function ZshIcon({ size = iconSizes.row, style, className }, ref) {
   return <svg ref={ref} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" data-shell-mark="zsh" className={className}
     style={{ color: 'var(--shell-zsh-accent)', flexShrink: 0, ...style }}>
