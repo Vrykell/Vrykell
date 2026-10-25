@@ -2,6 +2,7 @@ import { beforeEach, expect, it, vi } from 'vitest';
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue(null) }));
 import { useSessionStore, serializeSession } from '../index';
 import type { GitSelection } from '@core/git';
+import { useGitReview } from '@features/git';
 
 beforeEach(() => { useSessionStore.setState({ tabs: [], activeId: '', lastClosed: null }); });
 const selection: GitSelection = { target: { cwd: '/repo' }, paneId: 'owner#0', path: 'src/file.ts', scope: 'unstaged' };
@@ -71,4 +72,23 @@ it('merges legacy pages while retaining comparisons, selection and an active set
   expect(useSessionStore.getState().activeId).toBe(settingsId);
   expect(useSessionStore.getState().tabs.map(tab => tab.id)).toEqual(['first']);
   expect(useSessionStore.getState().tabs[0]).toMatchObject({ comparisons: [{ id: 'first', selection }, { id: 'second', selection: { ...selection, scope: 'staged' } }] });
+});
+
+it('closes the selected comparison after editor pages retarget its pane owner', () => {
+  const file = { path: '/repo/file.ts' };
+  useSessionStore.setState({ tabs: [
+    { id: 'editor-one', title: 'Editor', kind: 'editor', files: [file], selected: file },
+    { id: 'editor-two', title: 'Editor', kind: 'editor', files: [{ path: '/repo/other.ts' }], selected: { path: '/repo/other.ts' } },
+  ], activeId: 'editor-one' });
+  useSessionStore.getState().openGitDiff({ ...selection, paneId: 'editor-one' });
+  useSessionStore.getState().openGitDiff({ ...selection, paneId: 'editor-one', scope: 'staged' });
+  useSessionStore.getState().configureEditorTabs();
+
+  const page = useSessionStore.getState().tabs.find(tab => tab.kind === 'git-diff');
+  expect(page?.kind === 'git-diff' && page.selection.scope).toBe('staged');
+  useGitReview.getState().close();
+
+  const remaining = useSessionStore.getState().tabs.find(tab => tab.kind === 'git-diff');
+  expect(remaining?.kind === 'git-diff' && remaining.comparisons).toHaveLength(1);
+  expect(remaining?.kind === 'git-diff' && remaining.comparisons?.[0]?.selection.scope).toBe('unstaged');
 });

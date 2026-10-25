@@ -5,6 +5,7 @@ import { focusedWorkspaceArea, sideAiHasFocus } from './workspaceActions';
 import { selectWorkspaceArea } from './selectWorkspaceArea';
 import { useUnifiedWorkspace } from '../stores/unifiedWorkspace';
 import { closeCompositionTab } from './compositionTabs';
+import { gitComparisonKey } from '@core/git';
 
 /** Close the visible instance instead of the enclosing functional workspace. */
 export function closeWorkspaceItem() {
@@ -30,7 +31,10 @@ export function closeWorkspaceItem() {
   }
   if (!tab || workspaceAreaForKind(tab.kind) !== useWorkspaceNavigation.getState().area) return;
   if (tab.kind === 'editor') workspace.closeEditorFile(tab.selected);
-  else if (tab.kind === 'git-diff') workspace.closeGitComparison(tab.comparisons?.find(item => item.selection === tab.selection)?.id ?? tab.id);
+  else if (tab.kind === 'git-diff') {
+    const comparison = tab.comparisons?.find(item => gitComparisonKey(item.selection) === gitComparisonKey(tab.selection));
+    workspace.closeGitComparison(comparison?.id ?? tab.id);
+  }
   else if (isSessionTab(tab)) workspace.closeFocusedTerminal();
   else workspace.closeTab(tab.id);
 }
