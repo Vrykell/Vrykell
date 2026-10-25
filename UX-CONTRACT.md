@@ -4,6 +4,8 @@ Questions stay inside the owning transcript with choices, free text and skip. Re
 
 ## Product Context
 
+Sidebar conversations share the original title header and action order across backends. Agent selection and execution settings belong to the sliders panel. Users may queue inputs during a reply; each queued item can be removed and the next input starts only after the current turn ends. Stop immediately releases the conversation and clears its queue, pending questions and approvals. An unresponsive external session is detached after a bounded cancellation window and the next input resumes its saved session. Late callbacks cannot modify a newer turn. Empty terminal sessions and conversations remain transient until meaningful content exists; an entirely empty composition is not saved. Terminal disconnection returns an explicit tool result requiring user action rather than silently selecting another target.
+
 External sessions use the same application tool implementations and approval cards as native conversations. The execution target is explicitly selected, fixed during a turn and never inferred from workspace focus. Questions do not grant execution permission. Stopping disables execution and cancels pending interactions; closing revokes the session bridge.
 
 Workspace panes never add a second tool row: the focused conversation contributes its controls to the existing instance strip. Split creation choices appear directly when they would otherwise be the only submenu entry.

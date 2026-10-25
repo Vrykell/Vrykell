@@ -1,5 +1,7 @@
 # Security model
 
+Empty starter panes use a validated boolean marker in layout metadata. Explicit history restoration recreates them through existing resource owners; it never restores commands or missing nonempty conversation content. Remote starters require an existing saved connection and retain the standard authentication path. No credential, capability or execution policy changes are introduced.
+
 ## Session-owned application tools
 
 The internal tool adapter uses authenticated, ephemeral loopback framing and a standard-input/output helper. Tokens remain in the child environment. Each external connection owns its catalog allowlist, active-turn generation and pending result identifiers; initialization and replay cannot execute tools. Only the main window can answer `acp_app_tool_result`, and results are size-limited and correlated to a live request. Existing tool implementations retain backend policy, path grants, native confirmation and single-use leases. Terminal targets are explicit and fixed for a turn; remote targets cannot invoke local file tools. Cancellation clears pending approvals and questions, and late approvals cannot execute. No credentials, arbitrary IPC dispatch, public listener or new CSP origin is exposed. See `application-tools.md` for boundaries and tests.

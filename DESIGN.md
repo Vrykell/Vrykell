@@ -98,7 +98,7 @@ Use `SidebarItem`, `TextInput`, `SegmentedControl`, `TagInput`, `Select`, `Check
 
 Action-menu labels share a left-aligned inset without an empty icon column. Selection checks sit at the far right, alongside the shared trailing shortcut and submenu affordances. Explicit multi-select checkbox controls retain their checkbox semantics.
 
-External conversations select an application execution target with the shared select in the existing composer status row. The default is discussion only. Tool questions and approvals remain inside the owning transcript; integration adds no separate toolbar or notification stream.
+External conversations select an application execution target with the shared select in the existing composer status row, or in the sidebar settings panel. The default is discussion only. Both sidebar backends share a conversation title and the same history, settings and new actions. Agent selection lives in settings. Tool questions use vertically spaced full-width choices inside the owning transcript; integration adds no separate toolbar or notification stream. Streaming keeps the composer available and shows cancellable queued inputs above it.
 
 Tab-toolbar menus sit four pixels below their trigger. Creation uses at most two menu levels; terminal, server and agent choices close both levels before opening the existing rich launcher, retaining the toolbar anchor rather than the disappearing menu row. Agent search, availability and project directory remain part of that shared launcher.
 
