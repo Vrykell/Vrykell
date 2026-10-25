@@ -45,3 +45,40 @@ test('运行中块在命令输入框获得焦点后仍保持实心光标', async
   await expect.poll(cursorClass).toContain('xterm-cursor-block');
   await expect.poll(cursorClass).not.toContain('xterm-cursor-outline');
 });
+
+/**
+ * A program can request a blinking cursor shape. With the blink preference off the
+ * shape must still follow the request, but the blink animation must stay disabled so
+ * typing does not make the cursor flash on every redraw.
+ */
+test('停用闪烁后程序的光标闪烁请求只改变形状', async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { terminalRenderer: 'dom', terminalCursorBlink: false } }));
+  });
+  await setupTauriMock(page);
+  await page.goto('/');
+  const input = page.getByPlaceholder(/输入命令/);
+  await expect(input).toBeVisible({ timeout: 5000 });
+
+  await emitPtyOutput(page, `\x1b]133;E;${btoa('sleep 100')}\x07\x1b]133;C\x07`);
+  await expect(page.getByTestId('running-term').locator('.xterm')).toBeVisible({ timeout: 5000 });
+  await page.waitForFunction(() => document.activeElement?.classList.contains('xterm-helper-textarea'));
+
+  const cursorClass = () => page.evaluate(() => {
+    const map = (window as unknown as { __vrykellTerms: Map<string, { element?: HTMLElement }> }).__vrykellTerms;
+    const key = [...map.keys()].find((candidate) => candidate.startsWith('block:'));
+    const cell = map.get(key!)?.element?.querySelector('[class*="xterm-cursor"]');
+    return cell?.className ?? '';
+  });
+  await expect.poll(cursorClass).not.toContain('xterm-cursor-blink');
+
+  // Blinking bar request: the shape applies, the blink bit does not.
+  await emitPtyOutput(page, '\x1b[5 q');
+  await expect.poll(cursorClass).toContain('xterm-cursor-bar');
+  await expect.poll(cursorClass).not.toContain('xterm-cursor-blink');
+
+  // A later redraw (the typing path) must not restart a blink either.
+  await emitPtyOutput(page, 'x');
+  await expect.poll(cursorClass).toContain('xterm-cursor-bar');
+  await expect.poll(cursorClass).not.toContain('xterm-cursor-blink');
+});

@@ -42,6 +42,7 @@ import type { SshLogEntry } from '@core/ssh';
 import { appendLogEntry, connectionLogLines, isSshClientNotice } from '../model/connectionLog';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { getTerminalFontOptions, measureTerminalDomCellWidth } from '@features/terminal/model/terminalFont';
+import { applyTerminalCursorPreference } from '@features/terminal/model/terminalCursor';
 import { prepareSshHost } from '@features/ssh/services/hostTrust';
 import { startAutomaticForwarding } from '@features/ssh';
 import { useToastStore } from '@ui/feedback/Toast';
@@ -188,6 +189,9 @@ export function useTerminalSession(
       allowTransparency: false,
       theme: readXtermTheme(),
     });
+    // Keep the typography preference in charge of blinking while still honoring
+    // cursor-shape requests from running programs.
+    applyTerminalCursorPreference(term);
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.loadAddon(new WebLinksAddon());

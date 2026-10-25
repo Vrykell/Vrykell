@@ -34,7 +34,7 @@ vi.mock('@xterm/xterm', () => ({
     options: Record<string, unknown> = { fontSize: 13 };
     buffer = { active: { viewportY: 0, baseY: 0, cursorY: 0, getLine: () => undefined, getNullCell: () => ({}) } };
     element = document.createElement('div');
-    parser = { registerOscHandler: () => {} };
+    parser = { registerOscHandler: () => {}, registerCsiHandler: () => ({ dispose() {} }) };
     loadAddon() {}
     open() {}
     write = writeMock;

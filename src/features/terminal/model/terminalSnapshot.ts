@@ -11,6 +11,7 @@ import { getTerminalFontOptions } from '@features/terminal/model/terminalFont';
 import { terminalTypographyChanged, useTypographyStore } from '@config/typography';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 import { releaseTerminalRenderer } from '@features/terminal/model/xtermRenderer';
+import { applyTerminalCursorPreference } from '@features/terminal/model/terminalCursor';
 
 function getFgCss(cell: IBufferCell): string | null {
   if (cell.isFgDefault()) return null;
@@ -251,6 +252,9 @@ export function createBlockTerm(
     cursorInactiveStyle: 'block',
     theme: xtermTheme,
   });
+  // Keep the typography preference in charge of blinking while still honoring
+  // cursor-shape requests from the running program.
+  applyTerminalCursorPreference(term);
   // Running output must follow palette changes just like the surrounding pane.
   const themeObserver = new MutationObserver(() => {
     term.options.theme = { ...term.options.theme, ...readXtermTheme() };
