@@ -4,5 +4,8 @@ import { t } from '@i18n';
 import { requestWorkspaceSplit } from '../services/unifiedWorkspace';
 
 export default function WorkspaceSplitAction({ resourceId }: { resourceId: string }) {
-  return <IconButton compact className="workspace-split-action" aria-label={t('Split tab')} data-tip={t('Split tab')} onClick={() => requestWorkspaceSplit(resourceId)}><Columns2 size={iconSizes.control} /></IconButton>;
+  return <IconButton compact className="workspace-split-action" aria-label={t('Split tab')} data-tip={t('Split tab')} onClick={event => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    requestWorkspaceSplit(resourceId, { x: bounds.right, y: bounds.bottom + 4 });
+  }}><Columns2 size={iconSizes.control} /></IconButton>;
 }

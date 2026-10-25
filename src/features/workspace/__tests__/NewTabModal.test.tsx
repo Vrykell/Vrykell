@@ -30,6 +30,19 @@ vi.mock('@platform/api/fs', async importOriginal => ({
 const connection: SshConnection = {
   id: 'ssh-1', name: 'Prod', host: 'prod.example.com', port: 22, user: 'root', authMethod: 'password',
 };
+
+it('keeps server selection separate from local profiles, including its primary keyboard action', async () => {
+  useSshStore.setState({ touch: vi.fn().mockResolvedValue(undefined) });
+  const pick = vi.fn();
+  render(<NewTabModal open source="ssh" onPick={pick} onClose={vi.fn()} />);
+  const dialog = await screen.findByRole('dialog', { name: '连接服务器' });
+  expect(await screen.findByTestId('new-tab-option-ssh:ssh-1')).toBeVisible();
+  expect(screen.queryByTestId('new-tab-option-shell:zsh')).not.toBeInTheDocument();
+  expect(screen.queryByText('打开位置')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '添加连接' })).toBeEnabled();
+  fireEvent.keyDown(dialog, { key: 'Enter', ctrlKey: true });
+  expect(pick).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'ssh', ssh: expect.objectContaining({ connectionId: 'ssh-1' }) }));
+});
 const save = vi.fn(async () => {});
 const remove = vi.fn(async () => {});
 const sshSnapshot = useSshStore.getState();

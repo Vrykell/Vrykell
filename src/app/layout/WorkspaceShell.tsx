@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { memoLocalized } from '@ui/hooks/memoLocalized';
-import { selectActiveSessionTab, useSessionStore, useDockStore, useUiStore } from '@features/workspace';
+import { selectActiveSessionTab, useSessionStore, useDockStore, useUiStore, ScopedPaneWorkspace, useScopedSplitActive } from '@features/workspace';
 import SettingsScreen from '@features/settings/components/SettingsScreen';
 import { MIN_PANE_SIZE, minTerminalWidth } from '@features/workspace/model/windowLayout';
 import TopDock from '@features/workspace/components/TopDock';
@@ -27,6 +27,9 @@ import EditorWorkspace from '@features/editor/components/EditorWorkspace';
 import HistoryWorkspaceView from '@features/session-history/components/HistoryWorkspaceView';
 import { ResourceContentProvider } from '@ui/layout/ResourceContent';
 import UnifiedWorkspace from '@features/workspace/components/UnifiedWorkspace';
+import { editorFileKey } from '@core/editor';
+import { gitComparisonKey } from '@core/git';
+import { useGitSelection } from '@features/git';
 
 const StableTerminalView = memoLocalized(TerminalView);
 const StablePanelTabs = memoLocalized(PanelTabs);
@@ -50,6 +53,10 @@ export default function WorkspaceShell() {
   const aiPlacement = useWorkspaceNavigation(state => state.aiPlacement);
   const activeTab = useSessionStore(state => state.tabs.find(tab => tab.id === state.activeId));
   const contentVisible = !!activeTab && area === workspaceAreaForKind(activeTab.kind);
+  const codeSplit = useScopedSplitActive('code');
+  const gitSelection = useGitSelection();
+  const codeResourceId = activeTab?.kind === 'editor' ? `file:${editorFileKey(activeTab.selected)}` : activeTab?.kind === 'git-diff'
+    ? `diff:${activeTab.comparisons?.find(item => gitSelection && gitComparisonKey(item.selection) === gitComparisonKey(gitSelection))?.id ?? activeTab.id}` : '';
   const chatOpen = useDockStore(state => state.leftPanels.includes('chat') || state.rightPanels.includes('chat'));
   const chatOnLeft = useDockStore(state => state.leftPanels.includes('chat'));
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
@@ -114,13 +121,14 @@ export default function WorkspaceShell() {
         <div className="workspace-primary" style={{ minWidth: area === 'terminal' ? terminalMinWidth : 0 }}>
         <WorkspaceHeaderSlot visible={!settingsOpen && (area === 'terminal' || area === 'code' || area === 'ai' || area === 'unified')} />
         <main className="workspace-main" inert={settingsOpen} aria-hidden={settingsOpen || undefined} style={{ flex: 1, minWidth: area === 'terminal' ? terminalMinWidth : 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-          <div className="workspace-content-host" style={{ display: contentVisible ? 'flex' : 'none' }} inert={!contentVisible}>
+          <div className="workspace-content-host" style={{ display: contentVisible && !(area === 'code' && codeSplit && codeResourceId) ? 'flex' : 'none' }} inert={!contentVisible}>
             <EditorWorkspace><GitWorkspace><StableTerminalView active={contentVisible && !settingsOpen} /></GitWorkspace></EditorWorkspace>
           </div>
           <div className="workspace-resource-page" data-testid="ssh-workspace" style={{ display: area === 'ssh' ? 'flex' : 'none' }} inert={area !== 'ssh'}><StableHosts active={area === 'ssh' && !settingsOpen} /></div>
           <div className="workspace-resource-page" data-testid="forwarding-workspace" style={{ display: area === 'forwarding' ? 'flex' : 'none' }} inert={area !== 'forwarding'}><StablePortForwarding active={area === 'forwarding' && !settingsOpen} /></div>
           {area === 'history' && <StableHistoryWorkspace />}
           <UnifiedWorkspace active={area === 'unified'} />
+          <ScopedPaneWorkspace scope="code" selected={codeResourceId} active={area === 'code' && !!codeResourceId} />
         </main>
         </div>
         <StableSidePanel side="right" />

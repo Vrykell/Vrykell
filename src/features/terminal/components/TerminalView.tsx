@@ -18,7 +18,7 @@ import { CircleX, Minimize2, Square } from '@ui/icons';
 import TerminalLauncher from '@features/workspace/components/TerminalLauncher';
 import { STATUS_ACTION_ICON_SIZE, StatusActionButton, TerminalStatusBar } from '@features/terminal/components/TerminalStatusBar';
 import { MoveDragLayer, PlacementOverlay } from './TerminalPlacementOverlay';
-import { useSessionStore, useWorkspaceNavigation, type Tab } from '@features/workspace';
+import { useCanRemoveWorkspacePane, useSessionStore, useWorkspaceNavigation, type Tab } from '@features/workspace';
 import { useTerminalStore, useInputStore } from '@features/terminal';
 import { useUiStore, useDockDragStore } from '@features/workspace';
 import { useBlockStore, selectBlocks } from '@features/terminal';
@@ -53,8 +53,12 @@ import SshStatusPanel from '@features/ssh/components/SshStatusPanel';
 import type { SshSessionStatus } from '@core/ssh';
 import { useManualFullscreenVisible } from '../hooks/useManualFullscreenVisible';
 import ResourceContent from '@ui/layout/ResourceContent';
+import { closeTerminalPane, requestTerminalSplit } from '@features/workspace/services/unifiedWorkspace';
+import { detachCompositionPane, useUnifiedWorkspace } from '@features/workspace';
 
 export default function TerminalView({ active = true }: { active?: boolean }) {
+  const unified = useWorkspaceNavigation(state => state.area === 'unified');
+  const canRemovePane = useCanRemoveWorkspacePane();
   const tabs = useSessionStore((s) => s.tabs);
   const activeId = useSessionStore((s) => s.activeId);
   const setSession = useTerminalStore((s) => s.setSession);
@@ -94,10 +98,14 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
     ...(ctxMenu.sshActions ?? []),
     { label: t('terminal.menu.copy'), group: 'clipboard', shortcut: 'Ctrl+C', onClick: copySelection },
     { label: t('terminal.menu.paste'), group: 'clipboard', shortcut: 'Ctrl+V', onClick: pasteIntoPane },
-    { label: t('Split terminal (choose position)'), group: 'view', onClick: () => useUiStore.getState().beginSplit(null) },
+    { label: t(unified ? 'Split tab' : 'Split terminal (choose position)'), group: 'view', onClick: () => requestTerminalSplit(null) },
     { label: t('Choose split type'), group: 'view', onClick: () => useUiStore.getState().openSplitPicker() },
-    { label: t('Move terminal'), group: 'view', onClick: () => useUiStore.getState().beginMove(focusedTermId) },
-    { label: t('Close this terminal'), danger: true, onClick: () => useSessionStore.getState().closeFocusedTerminal() },
+    ...(!unified ? [{ label: t('Move terminal'), group: 'view' as const, onClick: () => useUiStore.getState().beginMove(focusedTermId) }] : []),
+    ...(unified && canRemovePane ? [
+      { label: t(useUnifiedWorkspace.getState().zoomed ? 'Restore panes' : 'Zoom pane'), group: 'view' as const, onClick: () => useUnifiedWorkspace.getState().single() },
+      { label: t('Move pane to new tab'), group: 'view' as const, onClick: () => detachCompositionPane(`terminal:${focusedTermId}`) },
+    ] : []),
+    ...(!unified || canRemovePane ? [{ label: t(unified ? 'Remove pane' : 'Close this terminal'), danger: !unified, onClick: () => closeTerminalPane(focusedTermId) }] : []),
   ];
 
   return (
@@ -108,19 +116,16 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
       {tabs.map((tab) => {
         if (tab.kind === 'session') {
           return (
-            <ResourceContent
+            <SessionTabView
               key={tab.id}
-              id={`terminal:${tab.id}`}
-              active={active && tab.id === activeId}
-            >{state => <SessionTabView
               tab={tab}
-              active={state.visible}
-              focused={state.focused}
-              placed={state.placed}
+              active={active && tab.id === activeId}
+              focused={active && tab.id === activeId}
+              placed={false}
               setSession={setSession}
               setFocusedPane={setFocusedPane}
               onPaneContextMenu={(e, sshActions) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, sshActions }); }}
-            />}</ResourceContent>
+            />
           );
         }
         // One AI surface hosts the harness workspace for every AI page kind; it follows the active tab.
@@ -135,7 +140,7 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
         // Placeholder start page: a system singleton that keeps the workspace toolbar visible.
         if (tab.kind === 'start') return <TerminalLauncher key={tab.id} />;
         // The terminal workspace owns the terminal-history page; the persisted filter reopens its search.
-        return tab.kind === 'history' ? <UnifiedHistoryView key={tab.id} preset="terminal" /> : null;
+        return tab.kind === 'history' ? <UnifiedHistoryView key={tab.id} preset="terminal" destination="native" /> : null;
       })}
 
       {/* Manual fullscreen host for a running block, with room for the toolbar. */}
@@ -299,8 +304,10 @@ function PaneLayout(props: {
   const layout = useMemo(() => layoutWidth > 0 ? fitLayoutWidth(savedLayout, layoutWidth) : savedLayout, [savedLayout, layoutWidth]);
   const geometry = useMemo(() => ({ cells: collectLayoutCells(layout).map(({ terminalId, ...cell }) => ({ id: terminalId, ...cell })), dividers: dividers(layout) }), [layout]);
   return <SplitPaneLayout ref={layoutRef} {...geometry} onRatio={setRatioNode} minWidth={MIN_PANE_WIDTH} minHeight={MIN_PANE_SIZE} thickness={DIVIDER_SIZE} dividerTestPrefix="terminal-divider"
-    renderPane={cell => <TerminalPane terminal={layoutLeaves(layout).find(terminal => terminal.id === cell.id)!} windowId={windowId}
-      focused={active && cell.id === focusedTermId} setSession={setSession} setFocusedPane={setFocusedPane} onContextMenu={onPaneContextMenu} inner={cell.inner} reorderable={geometry.cells.length > 1} />} />;
+    renderPane={cell => <ResourceContent id={`terminal:${cell.id}`} active={active}
+      >{state => <TerminalPane terminal={layoutLeaves(layout).find(terminal => terminal.id === cell.id)!} windowId={windowId}
+        focused={state.placed ? state.focused : active && cell.id === focusedTermId} placed={state.placed} setSession={setSession} setFocusedPane={setFocusedPane} onContextMenu={onPaneContextMenu}
+        inner={state.placed ? { left: false, right: false, top: false, bottom: false } : cell.inner} reorderable={!state.placed && geometry.cells.length > 1} />}</ResourceContent>} />;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -320,8 +327,9 @@ function TerminalPane(props: {
   onContextMenu: (e: React.MouseEvent, sshActions?: ContextMenuItem[]) => void;
   inner: InnerEdges;
   reorderable: boolean;
+  placed?: boolean;
 }) {
-  const { terminal, windowId, focused, setSession, setFocusedPane, onContextMenu, inner, reorderable } = props;
+  const { terminal, windowId, focused, setSession, setFocusedPane, onContextMenu, inner, reorderable, placed } = props;
   const commandDraft = useInputStore(state => state.byPane[terminal.id]?.text ?? '');
   const [sshState, setSshState] = useState<SshSessionStatus>({ phase: 'connecting', reconnectAttempt: 0, retrying: false, log: [] });
   const [sshStatusWidth, setSshStatusWidth] = useState(300);
@@ -426,6 +434,7 @@ function TerminalPane(props: {
         toggleRequest={sshStatusToggleRequest} onOpenChange={setSshPanelOpen}
         onReconnect={reconnectSsh}
       >{paneContent}</SshStatusPanel> : paneContent}
+      {placed && fullscreenVisible && <TuiBanner tabId={terminal.id} />}
     </SplitPaneSurface>
   );
 }

@@ -80,16 +80,17 @@ button.workspace-sidebar-toggle.icon-button:focus-visible { outline: 1px solid v
 .terminal-tab-group .tab-group-header[data-header-selected="true"] .terminal-group-chip { box-shadow: none; }
 .terminal-instance-tab { max-width: 220px; min-width: 80px; }
 .terminal-instance-tab > input { width: 150px; }
-.terminal-split-count { color: var(--text-muted); font: var(--fs-micro)/1.5 var(--font-mono); padding: 0 3px; }
 .ai-workspace-surface, .ai-workspace-host, .ai-native-surface { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; height: 100%; }
+.ai-sidebar-content { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
 .ai-workspace-empty { display: flex; flex-direction: column; align-items: center; flex: 1; min-height: 0; padding-top: 24px; }
 @media (max-width: 600px) { .terminal-tab-tools > :is([data-testid="tab-history-btn"], [data-testid="tab-acp-btn"]) { display: none; } .workspace-layout > .workspace-titlebar { --workspace-title-gap: 4px; } .workspace-layout .workspace-title-actions .window-control-button { width: 36px !important; } .workspace-empty { padding: 16px; } }
 .resource-content-parking { display: contents; }
 .resource-content-host, .resource-content-slot { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; flex-direction: column; }
 .unified-workspace { flex: 1; min-width: 0; min-height: 0; flex-direction: column; }
 .unified-pane-canvas { flex: 1; min-width: 0; min-height: 0; overflow: auto; }
-.unified-resource-actions { display: flex; align-items: center; min-width: 0; }
-.unified-resource-actions .folder-header { min-height: 0; background: transparent; }
+.unified-resource-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.unified-resource-actions .folder-header { min-height: 0; background: transparent; flex: 0 0 auto; container-type: normal; }
 .unified-resource-actions :is(.folder-more, .folder-tab-list, .folder-tab-spacer, .workspace-resource-switch-action, .workspace-split-action, .workspace-open-action, .workspace-create-action) { display: none; }
 .unified-resource-actions .folder-actions { padding: 0; min-width: 0; }
 .unified-resource-actions .ai-chat-header { margin: 0; }
+.scoped-pane-workspace { flex: 1; min-width: 0; min-height: 0; flex-direction: column; }

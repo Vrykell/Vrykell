@@ -1,9 +1,7 @@
 import { preferredShell, useTerminalDefaults } from '@config/terminalDefaults';
-import { useShellProfiles } from '@config/shellProfiles';
-import { loadRecentOpen } from '../model/tabTypes';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import AnchoredDropdown from '@ui/menus/AnchoredDropdown';
+import AnchoredDropdown, { type DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import { iconSizes, Check, ChevronRight, Columns2, FolderOpen, Settings, PanelLeft } from '@ui/icons';
 import { useSettingsNavigationStore } from '@features/settings';
 import HomeMark from '~icons/mdi/home-outline';
@@ -11,17 +9,16 @@ import FolderPlusMark from '~icons/mdi/folder-plus-outline';
 import { openAppWindow } from '@platform/appWindows';
 import KeyHint from '@ui/feedback/KeyHint';
 import { TerminalProfileIcon } from '@ui/icons/shellIcons';
-import { getAvailableShells, type ShellOption, type ShellType } from '@platform/shells';
+import { type ShellType } from '@platform/shells';
 import { pickPath } from '@platform/api/fs';
 import { isMacOS } from '@platform/runtime';
 import {
-  buildNewTabOptions,
   touchRecentOpen,
   type NewTabOption,
 } from '@features/workspace/model/tabTypes';
-import { useSshStore, ensureSshLoaded } from '@features/ssh';
+import { useSshStore } from '@features/ssh';
 import { connectionTarget, type SshConnection } from '@features/ssh/services/api';
-import { getFocusedCwd, useSessionStore, useUiStore } from '@features/workspace';
+import { getFocusedCwd, useSessionStore } from '@features/workspace';
 import type { TerminalSpec } from '@features/workspace/model/windowLayout';
 import { useAgentSettings } from '@features/agent';
 import { useHostEditor } from '@features/ssh';
@@ -30,12 +27,16 @@ import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import { useToastStore } from '@ui/feedback/Toast';
 import { t } from '@i18n';
 import { selectWorkspaceArea } from '../services/selectWorkspaceArea';
+import { requestTerminalSplit } from '../services/unifiedWorkspace';
+import { useNewTabCatalog } from '../hooks/useNewTabCatalog';
 
 interface Props {
   open: boolean;
   onClose: () => void;
   /** Group id for the new tab (undefined = ungrouped). */
   groupId?: string;
+  source?: 'all' | 'shell' | 'ssh';
+  anchor?: DropdownAnchor;
   /**
    * When provided, picking a row returns the terminal spec instead of creating a tab
    * (split / replace flows).
@@ -54,20 +55,17 @@ interface MenuState {
 /**
  * Available shells and saved connections share a profile picker and quick settings.
  */
-export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
+export default function NewTabModal({ open, onClose, groupId, onPick, source = 'all', anchor }: Props) {
   const [selected, setSelected] = useState(0);
   const [keyboardNavigation, setKeyboardNavigation] = useState(false);
-  const [shells, setShells] = useState<ShellOption[]>([]);
+  const { shells, defaultShell, profiles, allOptions } = useNewTabCatalog(open);
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [deleting, setDeleting] = useState<SshConnection | null>(null);
   const [location, setLocation] = useState<'profile' | 'current' | 'home' | 'custom'>('profile');
   const [customCwd, setCustomCwd] = useState('');
-  const defaultShell = useTerminalDefaults(state => state.shell);
-  const profiles = useShellProfiles(state => state.profiles);
   const openModeByShell = useAgentSettings(state => state.global.openModeByShell);
   const sshOpenMode = useAgentSettings(state => state.global.sshOpenMode);
   const dialogRef = useRef<HTMLDivElement>(null);
-  const sshConnections = useSshStore((s) => s.connections);
 
 
   useEffect(() => {
@@ -78,23 +76,10 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
     setDeleting(null);
     setLocation('profile');
     setCustomCwd('');
-    ensureSshLoaded();
-    let cancelled = false;
-    getAvailableShells().then((s) => {
-      if (!cancelled) setShells(s);
-    });
     requestAnimationFrame(() => dialogRef.current?.focus());
-    return () => {
-      cancelled = true;
-    };
   }, [open]);
 
-  const allOptions = useMemo(
-    () => buildNewTabOptions(shells, sshConnections, loadRecentOpen(), defaultShell)
-      .map(option => option.kind === 'shell' && profiles[option.shellType]?.name ? { ...option, label: profiles[option.shellType]!.name } : option),
-    [shells, sshConnections, defaultShell, profiles],
-  );
-  const options = useMemo(() => allOptions.filter(option => option.kind !== 'shell' || !profiles[option.shellType]?.hidden), [allOptions, profiles]);
+  const options = useMemo(() => allOptions.filter(option => (source === 'all' || option.kind === source) && (option.kind !== 'shell' || !profiles[option.shellType]?.hidden)), [allOptions, profiles, source]);
 
   useEffect(() => {
     if (open && keyboardNavigation) dialogRef.current?.querySelector<HTMLElement>('[data-keyboard-active="true"]')?.scrollIntoView?.({ block: 'nearest' });
@@ -103,9 +88,8 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
   const targetCwd = location === 'current' ? getFocusedCwd() : location === 'custom' ? customCwd || undefined : undefined;
   const defaultOption = useMemo(() => {
     const preferred = preferredShell(defaultShell, shells);
-    return allOptions.find(option => option.kind === 'shell' && option.shellType === preferred)
-      ?? allOptions.find(option => option.kind === 'shell');
-  }, [allOptions, shells, defaultShell]);
+    return source === 'ssh' ? options[0] : allOptions.find(option => option.kind === 'shell' && option.shellType === preferred) ?? options[0];
+  }, [options, allOptions, shells, defaultShell, source]);
 
   const create = useCallback((opt: NewTabOption) => {
     if (opt.kind === 'shell') {
@@ -257,11 +241,11 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
 
   if (!open) return null;
 
-  return createPortal(<><AnchoredDropdown open={open} onClose={onClose} panelRef={dialogRef} above={!!onPick} aria-label={t('New tab')}
+  return createPortal(<><AnchoredDropdown open={open} onClose={onClose} panelRef={dialogRef} anchor={anchor} above={!!onPick} aria-label={t(source === 'ssh' ? 'Connect a server' : 'New tab')}
         data-keyboard-navigation={keyboardNavigation} onPointerMove={() => setKeyboardNavigation(false)}
         onKeyDown={handleKey}>
         <section className="new-tab-section" aria-labelledby="new-tab-profiles">
-          <h2 id="new-tab-profiles">{t('Choose a profile')}</h2>
+          <h2 id="new-tab-profiles">{t(source === 'ssh' ? 'Saved hosts' : 'Choose a profile')}</h2>
           <div className="new-tab-option-list">
             {options.map((option, index) => <OptionRow key={option.key} opt={option} index={index}
               selected={keyboardNavigation && index === selected} isDefault={option.key === defaultOption?.key} onSelect={() => { setSelected(index); setKeyboardNavigation(false); }} onCreate={() => create(option)}
@@ -269,11 +253,13 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
           </div>
           {!options.length && <div className="new-tab-empty">{t('No matching tab types')}</div>}
           <button type="button" className="new-tab-row workspace-floating-row" onClick={() => {
-            onClose(); useSettingsNavigationStore.getState().setSelected(`profile:${preferredShell(defaultShell, shells) ?? 'powershell'}`); useSessionStore.getState().openSettings();
-          }}><Settings size={20} /><span>{t('More profiles…')}</span><ChevronRight size={16} /></button>
+            onClose();
+            if (source === 'ssh') { useHostEditor.getState().open(); selectWorkspaceArea('ssh'); }
+            else { useSettingsNavigationStore.getState().setSelected(`profile:${preferredShell(defaultShell, shells) ?? 'powershell'}`); useSessionStore.getState().openSettings(); }
+          }}><Settings size={20} /><span>{t(source === 'ssh' ? 'Add connection' : 'More profiles…')}</span><ChevronRight size={16} /></button>
         </section>
 
-        <section className="new-tab-section" aria-labelledby="new-tab-location">
+        {source !== 'ssh' && <section className="new-tab-section" aria-labelledby="new-tab-location">
           <h2 id="new-tab-location">{t('Open location')}</h2>
           <button type="button" className="new-tab-row workspace-floating-row" data-active={location === 'current' || undefined}
             onClick={() => setLocation('current')}><FolderOpen size={20} /><span>{t('Open in current directory')}</span>
@@ -284,14 +270,14 @@ export default function NewTabModal({ open, onClose, groupId, onPick }: Props) {
           <button type="button" className="new-tab-row workspace-floating-row" data-active={location === 'custom' || undefined}
             onClick={() => void chooseDirectory()}><FolderPlusMark width={20} height={20} /><span>{customCwd || t('Choose a directory…')}</span>
             <KeyHint shortcut={isMacOS ? 'Meta+Shift+O' : 'Control+Shift+O'} /></button>
-        </section>
+        </section>}
 
         <section className="new-tab-section" aria-labelledby="new-tab-advanced">
           <h2 id="new-tab-advanced">{t('Advanced')}</h2>
           {!onPick && <button type="button" className="new-tab-row workspace-floating-row" onClick={openWindow}>
             <PanelLeft size={20} /><span>{t('Open in new window')}</span><KeyHint shortcut={isMacOS ? 'Meta+N' : 'Control+N'} /></button>}
           <button type="button" className="new-tab-row workspace-floating-row" onClick={() => {
-            onClose(); useUiStore.getState().beginSplit(null);
+            onClose(); requestTerminalSplit(null);
           }}><Columns2 size={18} /><span>{t('Split tab')}</span><ChevronRight size={16} /></button>
         </section>
     </AnchoredDropdown>

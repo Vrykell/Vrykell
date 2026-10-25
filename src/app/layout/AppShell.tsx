@@ -8,6 +8,7 @@ import ApplicationOverlays from '@app/layout/ApplicationOverlays';
 import OverlayScrollbars from '@ui/layout/OverlayScrollbars';
 import { useTheme } from '@app/providers/ThemeProvider';
 import { syncWindowMaterial } from '@platform/windowChrome';
+import { requestTerminalSplit } from '@features/workspace/services/unifiedWorkspace';
 
 /** Paint the window surface, workspace, and application overlays. */
 export default function AppShell() {
@@ -20,7 +21,7 @@ export default function AppShell() {
 
   const handleSplitPick = useCallback((spec: TerminalSpec) => {
     useUiStore.getState().closeSplitPicker();
-    useUiStore.getState().beginSplit(spec);
+    requestTerminalSplit(spec);
   }, []);
 
   // Surfaces portaled to the document body sit outside the window element, so the window opacity

@@ -6,7 +6,7 @@ import { useUiStore } from '@features/workspace';
 import { redrawTerminal } from '@features/terminal/services/terminalRepaint';
 import { closeWorkspaceItem } from '@features/workspace/services/closeWorkspaceItem';
 import { activateWorkspaceInstance, focusedWorkspaceArea, newWorkspaceItem } from '@features/workspace/services/workspaceActions';
-import { requestWorkspaceSplit } from '@features/workspace/services/unifiedWorkspace';
+import { requestWorkspaceSplit, requestTerminalSplit } from '@features/workspace/services/unifiedWorkspace';
 
 /**
  * 全局快捷键：
@@ -123,7 +123,7 @@ export function useGlobalShortcuts() {
       } else if (e.key === 'd' && focusedWorkspaceArea() === 'terminal') {
         // Cmd+D 分裂：进入落点选择（新终端继承类型）
         e.preventDefault();
-        useUiStore.getState().beginSplit(null);
+        requestTerminalSplit(null);
       } else if (e.key === 'D' && focusedWorkspaceArea() === 'terminal') {
         // Cmd+Shift+D：直接上下分裂（跳过落点选择）
         e.preventDefault();

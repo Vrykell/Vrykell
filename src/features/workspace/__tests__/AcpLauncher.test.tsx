@@ -55,7 +55,7 @@ describe('AcpLauncher', () => {
     await within(agents).findByTestId('acp-launcher-Claude Code');
     fireEvent.keyDown(screen.getByTestId('acp-launcher-search'), { key: 'ArrowDown' });
     fireEvent.keyDown(screen.getByTestId('acp-launcher-search'), { key: 'Enter' });
-    expect(onPick).toHaveBeenCalledWith('Claude Code');
+    expect(onPick).toHaveBeenCalledWith('Claude Code', undefined);
     fireEvent.click(native);
     expect(onNewConversation).toHaveBeenCalledOnce();
   });
@@ -78,6 +78,16 @@ describe('AcpLauncher', () => {
     expect(opened).toHaveLength(1);
     expect(useHarnessWorkspace.getState().connections[0]).toMatchObject({ harness: 'Claude Code' });
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('passes the project directory to the chosen session instead of silently using the default', async () => {
+    const onPick = vi.fn();
+    render(<AcpLauncher open cwd="C:/work/initial" onClose={() => {}} onPick={onPick} />);
+    await screen.findByTestId('acp-launcher-Claude Code');
+    expect(screen.getByRole('textbox', { name: '项目路径' })).toHaveValue('C:/work/initial');
+    fireEvent.change(screen.getByRole('textbox', { name: '项目路径' }), { target: { value: 'C:/work/chosen' } });
+    fireEvent.click(screen.getByTestId('acp-launcher-Claude Code'));
+    expect(onPick).toHaveBeenCalledWith('Claude Code', 'C:/work/chosen');
   });
 
   it('marks a server whose program is not on PATH as unavailable', async () => {

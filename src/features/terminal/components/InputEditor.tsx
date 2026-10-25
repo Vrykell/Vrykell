@@ -9,7 +9,8 @@ import { iconSizes,
   ArrowDown, DollarSign, Columns2, X, Sparkles,
  } from '@ui/icons';
 import { useUiStore } from '@features/workspace';
-import { useSessionStore } from '@features/workspace';
+import { useCanRemoveWorkspacePane, useWorkspaceNavigation } from '@features/workspace';
+import { closeTerminalPane } from '@features/workspace/services/unifiedWorkspace';
 import { getLongRunningHint } from '@features/terminal/inputVisibility';
 import ShellIndicator from '@features/terminal/components/ShellIndicator';
 import { useInputEditorController } from '@features/terminal/hooks/useInputEditorController';
@@ -56,6 +57,8 @@ export default function InputEditor({
   insetLeft = 8,
   insetRight = 8,
 }: Props) {
+  const unified = useWorkspaceNavigation(state => state.area === 'unified');
+  const canRemovePane = useCanRemoveWorkspacePane();
   const {
     inputRef,
     text,
@@ -277,9 +280,9 @@ export default function InputEditor({
           <InputActionBtn title={t('Choose split type')} onClick={() => useUiStore.getState().openSplitPicker()}>
             <Columns2 size={iconSizes.control} />
           </InputActionBtn>
-          <InputActionBtn title={t('Close terminal')} onClick={() => useSessionStore.getState().closeTerminal(paneId)}>
+          {(!unified || canRemovePane) && <InputActionBtn title={t(unified ? 'Remove pane' : 'Close terminal')} onClick={() => closeTerminalPane(paneId)}>
             <X size={iconSizes.control} />
-          </InputActionBtn>
+          </InputActionBtn>}
         </div>
       </div>
 

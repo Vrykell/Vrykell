@@ -3,11 +3,14 @@ import { expect, it, vi } from 'vitest';
 import UnifiedStartPage from '../components/UnifiedStartPage';
 
 it('provides a distinct mixed-work landing page with real creation, history and live resource actions', () => {
-  const select = vi.fn(); const create = vi.fn(); const history = vi.fn();
+  const select = vi.fn(); const create = vi.fn(); const history = vi.fn(); const server = vi.fn(); const agent = vi.fn();
   render(<UnifiedStartPage resources={[{ id: 'terminal:one', tabId: 'one', kind: 'terminal', title: 'Work shell' }]} icon={() => null}
-    onSelect={select} onNew={create} onOpen={vi.fn()} onConnect={vi.fn()} onHistory={history} />);
+    onSelect={select} onNew={create} onOpen={vi.fn()} onConnect={server} onAgent={agent} onHistory={history} />);
   expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('聚合工作区');
   fireEvent.click(screen.getByRole('button', { name: '新建文件' })); expect(create).toHaveBeenCalledWith('document');
   fireEvent.click(screen.getByRole('button', { name: '全部历史' })); expect(history).toHaveBeenCalledTimes(1);
   fireEvent.click(screen.getByRole('button', { name: 'Work shell' })); expect(select).toHaveBeenCalledWith('terminal:one');
+  fireEvent.click(screen.getByRole('button', { name: '连接服务器' })); expect(server).toHaveBeenCalledOnce(); expect(agent).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: /ACP/ })); expect(agent).toHaveBeenCalledOnce();
+  fireEvent.click(screen.getByRole('button', { name: '新终端' })); expect(create).toHaveBeenLastCalledWith('terminal');
 });

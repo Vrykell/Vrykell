@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '@i18n';
-import { ArrowRight, ChevronRight, iconSizes, Search, Settings } from '@ui/icons';
+import { ArrowRight, ChevronRight, FolderOpen, iconSizes, Search, Settings } from '@ui/icons';
 import { TextInput } from '@ui/fields/TextInput';
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import ErrorBox from '@ui/feedback/ErrorBox';
-import AnchoredDropdown from '@ui/menus/AnchoredDropdown';
+import AnchoredDropdown, { type DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import { useSettingsNavigationStore } from '@features/settings/stores/navigation';
 import { harnessMark } from '@features/agent/components/HarnessBadge';
 import { useSessionStore, useUiStore } from '@features/workspace';
@@ -14,6 +14,7 @@ import AppMark from '@ui/icons/AppMark';
 import { useAiConfigStore, useUsageStore } from '@features/agent';
 import { formatCompact } from '@features/agent/model/usageStats';
 import LaunchStats from './LaunchStats';
+import { pickPath } from '@platform/api/fs';
 
 interface LauncherEntry {
   name: string;
@@ -22,8 +23,8 @@ interface LauncherEntry {
   enabled: boolean;
 }
 
-export default function AcpLauncher({ open, onClose, embedded = false, suspended = false, onPick, onNewConversation }: {
-  open: boolean; onClose: () => void; embedded?: boolean; suspended?: boolean; onPick?: (name: string) => void; onNewConversation?: () => void;
+export default function AcpLauncher({ open, onClose, embedded = false, suspended = false, onPick, onNewConversation, cwd, anchor }: {
+  open: boolean; onClose: () => void; embedded?: boolean; suspended?: boolean; onPick?: (name: string, cwd?: string) => void; onNewConversation?: () => void; cwd?: string; anchor?: DropdownAnchor;
 }) {
   const [list, setList] = useState<LauncherEntry[] | null>(null);
   const [installed, setInstalled] = useState<Record<string, boolean>>({});
@@ -34,6 +35,7 @@ export default function AcpLauncher({ open, onClose, embedded = false, suspended
   const dialogRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
+  const [directory, setDirectory] = useState(cwd ?? '');
   const settingsOpen = useUiStore(state => state.settingsOpen);
   const close = useRef(onClose); close.current = onClose;
   useEffect(() => { if (open && !embedded && settingsOpen) close.current(); }, [open, embedded, settingsOpen]);
@@ -50,6 +52,7 @@ export default function AcpLauncher({ open, onClose, embedded = false, suspended
   useEffect(() => {
     if (!open) return;
     setQuery('');
+    setDirectory(cwd ?? '');
     setError('');
     setList(null);
     setSelected(onNewConversation ? -1 : 0);
@@ -82,8 +85,8 @@ export default function AcpLauncher({ open, onClose, embedded = false, suspended
   useEffect(() => setSelected(onNewConversation ? -1 : 0), [query, Boolean(onNewConversation)]);
 
   const start = (entry: LauncherEntry) => {
-    if (onPick) onPick(entry.name);
-    else useSessionStore.getState().openHarnessTab(entry.name);
+    if (onPick) onPick(entry.name, directory.trim() || undefined);
+    else useSessionStore.getState().openHarnessTab(entry.name, directory.trim() || undefined);
     onClose();
   };
 
@@ -106,12 +109,16 @@ export default function AcpLauncher({ open, onClose, embedded = false, suspended
     useSessionStore.getState().openSettings();
   };
   if (!open || suspended) return null;
+  const folder = <div className="acp-launch-directory"><TextInput variant="field" value={directory} aria-label={t('Project folder')} data-testid="acp-launcher-directory"
+    placeholder={t('Default project folder')} onChange={event => setDirectory(event.target.value)} />
+    <OutlineButton aria-label={t('Choose project folder')} onClick={() => { void pickPath('directory').then(([path]) => { if (path) setDirectory(path); }).catch(reason => setError(String(reason))); }}><FolderOpen size={16} /></OutlineButton></div>;
 
-  if (!embedded) return <AnchoredDropdown open={open} onClose={onClose} panelRef={dialogRef} aria-label={t('ACP')}
+  if (!embedded) return <AnchoredDropdown open={open} onClose={onClose} panelRef={dialogRef} anchor={anchor} aria-label={t('ACP')}
     className="acp-profile-dropdown" data-testid="acp-launcher" data-embedded="false" data-keyboard-navigation={keyboardNavigation}
     onPointerMove={() => setKeyboardNavigation(false)} onKeyDown={handleKey}>
     <section className="new-tab-section">
       <h2>{t('ACP agents')}{list ? ` · ${list.length}` : ''}</h2>
+      {folder}
       <button type="button" className="new-tab-row workspace-floating-row" onClick={configure}><Settings size={20} /><span>{t('Configure servers')}</span><ChevronRight size={16} /></button>
       <div className="workspace-sidebar-search acp-profile-search"><Search size={iconSizes.compact} /><TextInput ref={inputRef} value={query}
         data-testid="acp-launcher-search" onChange={event => setQuery(event.target.value)} placeholder={t('Search servers…')} aria-label={t('Search servers…')} /></div>
@@ -153,6 +160,7 @@ export default function AcpLauncher({ open, onClose, embedded = false, suspended
         { label: t('Configured models'), value: models.length },
       ]} />}
       <section className="ai-launch-agents" aria-label={t('ACP agents')}>
+        {folder}
         <div className="ai-launch-section-heading">
           <h3>{t('ACP agents')}{list && <span>{list.length}</span>}</h3>
           <OutlineButton onClick={configure}>{t('Configure servers')}</OutlineButton>

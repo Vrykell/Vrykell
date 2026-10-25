@@ -21,6 +21,7 @@ import { historyGroupColor } from '@ui/history/historyGroupColor';
 import { orderedWorkspaceIds, useWorkspaceNavigation } from '../stores/navigation';
 import WorkspaceHeader from '@ui/layout/WorkspaceHeader';
 import { TerminalProfileIcon } from '@ui/icons/shellIcons';
+import IconCountBadge from '@ui/feedback/IconCountBadge';
 import {
   ListReorderPlaceholder, ListReorderPreview, ListReorderZonePlaceholder,
   useListReorder, useListReorderDrag, type ListReorderDrag, type ListReorderTarget,
@@ -346,7 +347,7 @@ function TerminalTabPreview({ tab, active, defaultShellType }: { tab: Tab; activ
   const title = useTabDisplayTitle(tab);
   const first = firstTerminalOf(tab);
   return <div className="folder-tab folder-tab-preview terminal-instance-tab" data-active={active} data-tab-surface={isSessionTab(tab) ? undefined : 'canvas'}>
-    <FolderTabContent selected={active} item={{ id: tab.id, label: title, tip: title, closeLabel: t('Close this tab'), icon: tab.kind === 'history' ? <History size={iconSizes.compact} /> : <TerminalProfileIcon colored kind={first?.kind} shellType={first?.shellType ?? (isSessionTab(tab) ? defaultShellType : undefined)} connectionId={first?.ssh?.connectionId} size={iconSizes.control} /> }} />
+    <FolderTabContent selected={active} item={{ id: tab.id, label: title, tip: title, closeLabel: t('Close this tab'), icon: tab.kind === 'history' ? <History size={iconSizes.compact} /> : <IconCountBadge count={terminalsOf(tab).length}><TerminalProfileIcon colored kind={first?.kind} shellType={first?.shellType ?? (isSessionTab(tab) ? defaultShellType : undefined)} connectionId={first?.ssh?.connectionId} size={iconSizes.control} /></IconCountBadge> }} />
   </div>;
 }
 
@@ -510,9 +511,8 @@ function TabRow({
         if (event.key === 'Enter') onCommitEdit(); else if (event.key === 'Escape') onCancelEdit();
       }} onClick={event => event.stopPropagation()} /> : <FolderTabContent item={{
         id: tab.id, label: displayTitle, tip: displayTitle,
-        icon: tab.kind === 'history' ? <History size={iconSizes.compact} /> : <TerminalProfileIcon colored kind={first?.kind} shellType={first?.shellType ?? (isSessionTab(tab) ? defaultShellType : undefined)} connectionId={first?.ssh?.connectionId} size={iconSizes.control} />,
+        icon: tab.kind === 'history' ? <History size={iconSizes.compact} /> : <IconCountBadge count={terms.length}><TerminalProfileIcon colored kind={first?.kind} shellType={first?.shellType ?? (isSessionTab(tab) ? defaultShellType : undefined)} connectionId={first?.ssh?.connectionId} size={iconSizes.control} /></IconCountBadge>,
         closeLabel: t('Close this tab'), closeTestId: `tab-close-${tab.id}`,
       }} selected={active} onSelect={onActivate} onClose={onClose} />}
-    {tab.kind === 'session' && terms.length > 1 && <span className="terminal-split-count">{terms.length}</span>}
   </div>;
 }

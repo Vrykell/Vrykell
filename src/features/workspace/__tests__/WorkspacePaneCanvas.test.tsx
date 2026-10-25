@@ -1,0 +1,32 @@
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import WorkspacePaneCanvas from '../components/WorkspacePaneCanvas';
+import type { WorkspacePaneLayout, WorkspaceResource } from '../model/workspaceResources';
+
+vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+afterEach(cleanup);
+const first = { type: 'pane' as const, id: 'first', resourceId: 'file:first' };
+const second = { type: 'pane' as const, id: 'second', resourceId: 'acp:second' };
+const resources: WorkspaceResource[] = [
+  { id: first.resourceId, title: 'File', kind: 'document', file: { path: '/file' } },
+  { id: second.resourceId, title: 'Agent', kind: 'agent', sessionId: 'second' },
+];
+
+it('provides shared editor and agent pane menus without exposing removal for the last pane', () => {
+  const remove = vi.fn(); const focus = vi.fn();
+  const props = { focused: 'first', resources, visible: true, onFocus: focus, onRatio: vi.fn(), onPlace: vi.fn(), onCancel: vi.fn(), onSplit: vi.fn(), onRemove: remove };
+  const layout: WorkspacePaneLayout = { type: 'split', direction: 'row', ratio: 0.5, first, second };
+  const view = render(<WorkspacePaneCanvas {...props} layout={layout} />);
+  const preventNative = (event: MouseEvent) => event.preventDefault();
+  window.addEventListener('contextmenu', preventNative, true);
+  for (const resource of resources) {
+    fireEvent.contextMenu(view.container.querySelector(`[data-resource-id="${resource.id}"]`)!, { clientX: 20, clientY: 20 });
+    fireEvent.click(screen.getByRole('menuitem', { name: '移除此分屏' }));
+    expect(remove).toHaveBeenLastCalledWith(resource.id);
+    expect(focus).toHaveBeenLastCalledWith(resource.id);
+  }
+  view.rerender(<WorkspacePaneCanvas {...props} layout={first} />);
+  fireEvent.contextMenu(view.container.querySelector('[data-resource-id="file:first"]')!, { clientX: 20, clientY: 20 });
+  expect(screen.queryByRole('menuitem', { name: '移除此分屏' })).toBeNull();
+  window.removeEventListener('contextmenu', preventNative, true);
+});

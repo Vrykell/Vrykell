@@ -39,10 +39,10 @@ export default function GitWorkspace({ children }: { children: ReactNode }) {
 }
 
 function GitComparison({ selection, active, tabId }: { selection: GitSelection; active: boolean; tabId: string }) {
-  return <ResourceContent id={`diff:${tabId}`} active={active}>{state => <GitComparisonContent selection={selection} tabId={tabId} active={state.visible} />}</ResourceContent>;
+  return <ResourceContent id={`diff:${tabId}`} active={active}>{state => <GitComparisonContent selection={selection} tabId={tabId} active={state.visible} focused={state.focused} />}</ResourceContent>;
 }
 
-function GitComparisonContent({ selection, active, tabId }: { selection: GitSelection; active: boolean; tabId: string }) {
+function GitComparisonContent({ selection, active, focused, tabId }: { selection: GitSelection; active: boolean; focused: boolean; tabId: string }) {
   const codeTabs = useCodeWorkspaceTabs();
   const revision = useGitReview(state => state.revision);
   const [diff, setDiff] = useState<GitDiff | null>(null);
@@ -82,7 +82,7 @@ function GitComparisonContent({ selection, active, tabId }: { selection: GitSele
   const backLabel = t(editorOwner ? 'Back to editor' : 'Back to terminal');
   const Icon = fileIcon(selection.path);
   const toolbar = (navigation?: ReactNode, navigate?: (direction: 'previous' | 'next') => void) => <>
-    <WorkspaceHeader active={active}><FolderTabs items={active ? codeTabs.items : []} selected={`diff:${tabId}`} label={t('Open files and comparisons')} listId="code-documents" className="git-review-tabs" headerClassName="git-review-toolbar"
+    <WorkspaceHeader active={active && focused}><FolderTabs items={active ? codeTabs.items : []} selected={`diff:${tabId}`} label={t('Open files and comparisons')} listId="code-documents" className="git-review-tabs" headerClassName="git-review-toolbar"
       onSelect={codeTabs.onSelect} onClose={codeTabs.onClose}
       onMove={codeTabs.onMove} menuItems={[
         { label: backLabel, onClick: back }, { label: t('Side by side'), checked: layout === 'split', onClick: () => setLayout('split') },
