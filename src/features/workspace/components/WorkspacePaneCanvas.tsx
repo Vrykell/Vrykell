@@ -6,7 +6,7 @@ import { PlacementOverlay } from '@ui/layout/PanePlacement';
 import type { PaneTarget } from '@core/paneLayout';
 import { t } from '@i18n';
 import ContextMenu from '@ui/menus/ContextMenu';
-import { fitWorkspacePanes, measureWorkspacePanes, workspacePaneCells, type WorkspacePaneLayout, type WorkspaceResource } from '../model/workspaceResources';
+import { fitWorkspacePanes, measureWorkspacePanes, workspacePaneCells, workspaceSplitDirection, type WorkspacePaneLayout, type WorkspaceResource } from '../model/workspaceResources';
 
 export default function WorkspacePaneCanvas({ layout, focused, zoomed, resources, visible, toolbarTarget, retainHeader, onFocus, onRatio, placing, onPlace, onCancel, onSplit, onRemove, onDetach, onZoom }: {
   layout: WorkspacePaneLayout | null; focused: string; resources: WorkspaceResource[]; visible: boolean; toolbarTarget?: HTMLElement | null; retainHeader?: boolean;
@@ -28,8 +28,15 @@ export default function WorkspacePaneCanvas({ layout, focused, zoomed, resources
   const fitted = useMemo(() => displayLayout && fitWorkspacePanes(displayLayout, size.width, size.height), [displayLayout, size]);
   const geometry = useMemo(() => fitted && measureWorkspacePanes(fitted.layout), [fitted]);
   const cells = layout ? workspacePaneCells(layout) : [];
+  // A narrow window may stack a horizontal split. Dragging the adapted divider must not
+  // write its vertical ratio back into the saved horizontal layout.
+  const persistRatio = (aId: string, bId: string, ratio: number) => {
+    const displayed = geometry?.dividers.find(line => line.aId === aId && line.bId === bId);
+    if (!displayed || !layout || displayed.dir !== workspaceSplitDirection(layout, aId, bId)) return;
+    onRatio(aId, bId, ratio);
+  };
   return <div className="unified-pane-canvas" ref={body} style={{ display: visible ? undefined : 'none' }}>
-    {geometry && <SplitPaneLayout {...geometry} style={{ height: fitted!.height }} minHeight={200} onRatio={onRatio} renderPane={cell => {
+    {geometry && <SplitPaneLayout {...geometry} style={{ height: fitted!.height }} minHeight={200} onRatio={persistRatio} renderPane={cell => {
       const resourceId = cells.find(item => item.id === cell.id)?.resourceId;
       const resource = resources.find(item => item.id === resourceId);
       return resource && <WorkspacePaneHost resource={resource} cell={cell} visible={visible} focused={cell.id === focused} toolbarTarget={toolbarTarget} retainHeader={retainHeader} onFocus={onFocus}

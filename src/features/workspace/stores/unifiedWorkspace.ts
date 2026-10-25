@@ -12,6 +12,10 @@ let syncing = false;
 let bound = false;
 let sequence = 0;
 const cells = (layout: WorkspacePaneLayout | null) => layout ? workspacePaneCells(layout) : [];
+const clearMissingZoom = () => {
+  const state = useUnifiedWorkspace.getState();
+  if (state.zoomed && !cells(state.layout).some(cell => cell.id === state.zoomed)) useUnifiedWorkspace.setState({ zoomed: null });
+};
 const single = (id: string): WorkspacePaneLayout => ({ type: 'pane', id: `workspace-pane-${Date.now()}-${sequence++}`, resourceId: id });
 export const compositionTabs = () => useWorkspaceStore.getState().tabs.filter((tab): tab is CompositionTab => tab.kind === 'workspace');
 
@@ -20,6 +24,7 @@ function project(tab?: CompositionTab) {
   useUnifiedWorkspace.setState({ activeTabId: tab?.id ?? '', layout: tab?.paneLayout ?? null, focused: tab?.focusedPane ?? '', zoomed: tab?.zoomedPane ?? null,
     historyIdentity: tab?.historyIdentity, startOpen: !tab?.paneLayout, startActive: !tab?.paneLayout, choosingSplit: false, pendingTerminalSplit: undefined });
   syncing = false;
+  clearMissingZoom();
 }
 
 function bind() {
@@ -112,20 +117,24 @@ useUnifiedWorkspace.setState({
     const tab = compositionTabs().find(tab => identity ? tab.historyIdentity?.id === identity.id : signature(tab.paneLayout) === signature(parsed));
     const id = tab?.id ?? open(parsed, focused, identity);
     release(new Set(cells(parsed).map(cell => cell.resourceId)), id);
-    if (tab) { selectCompositionTab(id); engine.restore(parsed, focused, identity); }
+    if (tab) { selectCompositionTab(id); engine.restore(parsed, focused, identity); clearMissingZoom(); }
   },
   place: (id, target) => {
     const tab = current(); const before = useUnifiedWorkspace.getState().layout;
     engine.place(id, target);
-    if (useUnifiedWorkspace.getState().layout !== before) release(new Set([id]), tab.id);
+    if (useUnifiedWorkspace.getState().layout !== before) { release(new Set([id]), tab.id); clearMissingZoom(); }
   },
   split: (id, direction) => {
     const tab = current(); const before = useUnifiedWorkspace.getState().layout;
     engine.split(id, direction);
-    if (useUnifiedWorkspace.getState().layout !== before) release(new Set([id]), tab.id);
+    if (useUnifiedWorkspace.getState().layout !== before) { release(new Set([id]), tab.id); clearMissingZoom(); }
   },
-  removePane: id => { current(); engine.removePane(id); },
-  single: () => { current(); const state = useUnifiedWorkspace.getState(); if (cells(state.layout).length > 1) useUnifiedWorkspace.setState({ zoomed: state.zoomed ? null : state.focused }); },
+  removePane: id => { current(); engine.removePane(id); clearMissingZoom(); },
+  single: () => {
+    current(); const state = useUnifiedWorkspace.getState(); const count = cells(state.layout).length;
+    if (count <= 1) { if (state.zoomed) useUnifiedWorkspace.setState({ zoomed: null }); return; }
+    useUnifiedWorkspace.setState({ zoomed: state.zoomed ? null : state.focused });
+  },
   ratio: (...args) => { current(); engine.ratio(...args); },
   move: (ids, id, over, after) => {
     const order = orderedWorkspaceIds(ids, ids).filter(item => item !== id);
@@ -168,6 +177,7 @@ export function detachCompositionPane(resourceId: string) {
   const tab = current(); const pane = cells(tab.paneLayout).find(cell => cell.resourceId === resourceId);
   if (!pane || cells(tab.paneLayout).length < 2) return;
   engine.removePane(pane.id);
+  clearMissingZoom();
   open({ type: 'pane', id: pane.id, resourceId: pane.resourceId }, pane.id);
 }
 

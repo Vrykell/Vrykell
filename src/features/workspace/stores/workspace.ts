@@ -600,7 +600,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
     const terminal = useTerminalStore.getState();
     const pane = tab && isSessionTab(tab) ? layoutLeaves(tab.layout).find(item => terminal.manualFullscreen[item.id]) ?? firstLeaf(tab.layout) : null;
-    terminal.setFocusedPane(pane?.id ?? id);
+    terminal.setFocusedPane(tab?.kind === 'workspace' ? null : pane?.id ?? id);
     get().ensureStartPages();
   },
   ensureStartPages: () => {

@@ -42,7 +42,7 @@ export default function ScopedPaneWorkspace({ scope, selected, active }: { scope
     const resource = resources.find(item => item.id === id); if (!resource) return;
     state.show(id); activateWorkspaceResource(resource); useWorkspaceNavigation.getState().selectArea(scope);
   };
-  const cancel = () => { setAddition(null); store.setState({ choosingSplit: false }); };
+  const cancel = () => { proceeding.current = false; setAddition(null); store.setState({ choosingSplit: false }); };
   const commit = (target: PaneTarget) => {
     if (!addition) return;
     let id: string | undefined;

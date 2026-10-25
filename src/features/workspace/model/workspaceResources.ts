@@ -52,6 +52,10 @@ export function rebindWorkspaceResources(layout: WorkspacePaneLayout, resources:
 
 export const measureWorkspacePanes = (layout: WorkspacePaneLayout) => measurePaneTree(layout, node => node.type === 'pane' ? { id: node.id } : { ...node, dir: node.direction });
 
+export function workspaceSplitDirection(layout: WorkspacePaneLayout, aId: string, bId: string): 'row' | 'col' | undefined {
+  return measureWorkspacePanes(layout).dividers.find(line => line.aId === aId && line.bId === bId)?.dir;
+}
+
 export function workspacePaneIds(layout: WorkspacePaneLayout): string[] {
   return layout.type === 'pane' ? [layout.resourceId] : [...workspacePaneIds(layout.first), ...workspacePaneIds(layout.second)];
 }

@@ -1,7 +1,7 @@
 import { beforeEach, expect, it } from 'vitest';
 import { compositionTabs, selectCompositionTab, useUnifiedWorkspace } from '../stores/unifiedWorkspace';
 import { useWorkspaceStore } from '../stores/workspace';
-import { fitWorkspacePanes, parseWorkspacePaneLayout, workspacePaneCells, workspacePaneIds } from '../model/workspaceResources';
+import { fitWorkspacePanes, parseWorkspacePaneLayout, workspacePaneCells, workspacePaneIds, workspaceSplitDirection } from '../model/workspaceResources';
 beforeEach(() => { useWorkspaceStore.setState({ tabs: [], activeId: '' }); useUnifiedWorkspace.setState({ activeTabId: '', layout: null, focused: '', historyIdentity: undefined }); });
 
 it('retains each tab layout while switching resources and pruning missing content', () => {
@@ -48,4 +48,14 @@ it('keeps controls usable at extreme split ratios and stacks narrow panes with a
     }
     expect(fitted.height).toBeGreaterThanOrEqual(600);
   }
+});
+
+it('marks a responsive direction change so a vertical drag cannot rewrite a horizontal split', () => {
+  const layout = { type: 'split' as const, direction: 'row' as const, ratio: 0.5,
+    first: { type: 'pane' as const, id: 'left', resourceId: 'file:left' },
+    second: { type: 'pane' as const, id: 'right', resourceId: 'file:right' } };
+  const fitted = fitWorkspacePanes(layout, 600, 800);
+  expect(workspaceSplitDirection(layout, 'left', 'right')).toBe('row');
+  expect(workspaceSplitDirection(fitted.layout, 'left', 'right')).toBe('col');
+  expect(workspaceSplitDirection(fitWorkspacePanes(layout, 1200, 800).layout, 'left', 'right')).toBe('row');
 });
