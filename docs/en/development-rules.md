@@ -2,6 +2,8 @@
 
 > Last updated: 2026-10-17
 >
+> Rule 43 clarification: AI execution and reply failures use the shared inline ErrorBox inside their transcript. Restoring, expanding or remounting history must not publish notifications. Approval timeouts remain tool results without a toast; human action notifications retain their existing behavior.
+>
 > This file (`docs/en/development-rules.md`) is the English mirror of the rule book; the canonical
 > Chinese version is `docs/zh/development-rules.md`. `AGENTS.md` is the always-on summary, and
 > `.agents/skills/vrykell-conventions/SKILL.md` is the agent-facing conventions entry point

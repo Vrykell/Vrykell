@@ -67,6 +67,7 @@ typechecking, architecture checks, or dev mode as appropriate.
   `ErrorDetails` (collapsible raw text with copy) from `src/ui/`. A failure of something the
   panel is displaying uses a persistent bottom-right notification through ErrorBox; a transient action result uses Toast in the same shared notification region. The global error page remains full-page. Keep retry, details, dismissal and modal keyboard access.
   Bare `role="alert"` blocks are not acceptable.
+  AI execution and reply failures stay in their transcript through `ErrorBox placement="inline"`; loading or remounting history must never publish notifications. Approval outcomes belong to the tool result, not a toast.
 - **Settings option groups** use the `Select` dropdown from `src/ui/fields/Select.tsx`, not
   segmented pill controls.
 - **Connection authentication** uses the shared `SegmentedControl` for its four explicit modes. Editable tag pills use `TagInput`; text fields use the shared field variant instead of local input styling.

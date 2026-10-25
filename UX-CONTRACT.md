@@ -1,6 +1,14 @@
 # UX Contract
 
+Questions stay inside the owning transcript with choices, free text and skip. Restored questions are inert. Split actions retain their workspace and share one layout engine; removing placement is available only for multiple panes. Creation dropdowns retain a trigger snapshot after parent menus close, and toolbar action containers reserve non-overlapping intrinsic width. Agent startup exposes the project directory before connecting. Conversation settings are a persistent non-modal panel: changing an option or choosing a new execution profile does not close it, and Escape closes the child first.
+
 ## Product Context
+
+External sessions use the same application tool implementations and approval cards as native conversations. The execution target is explicitly selected, fixed during a turn and never inferred from workspace focus. Questions do not grant execution permission. Stopping disables execution and cancels pending interactions; closing revokes the session bridge.
+
+Workspace panes never add a second tool row: the focused conversation contributes its controls to the existing instance strip. Split creation choices appear directly when they would otherwise be the only submenu entry.
+
+Creation actions use at most two menu levels. Terminal profiles, saved hosts and agents open their existing launch pickers after closing all parent menus, anchored to the original toolbar button. Agent startup retains search, availability and project-folder selection rather than reducing the launcher to a plain menu. Editor splits offer both new and existing files, and resource creation waits for placement. Non-terminal panes share a right-click menu for splitting and removing placement; last-pane removal stays hidden and removing a pane never bypasses the resource owner's guarded close.
 
 Desktop terminal, remote-host, file and conversation workflows use the existing English/Chinese locale provider. Localized dates follow the user's environment. Accessibility targets include keyboard operation, visible focus, semantic names and stable geometry. The visual contract is `DESIGN.md`; runtime tokens remain canonical.
 
@@ -43,6 +51,10 @@ Desktop terminal, remote-host, file and conversation workflows use the existing 
 - Model chips filter reported token usage across sources. Provider and time remain right-side filters. Session-only agent reports remain in the ACP details table and are never invented as per-model token counts.
 
 ## Navigation and Feedback
+
+Common-workspace tabs own complete reference layouts in the existing tab store. New creates a tab; Split adds a pane inside that tab. Move to new tab and explicit Merge retain content owners. Zoom restores the unchanged layout. Close pane closes that resource through its domain guard; close tab checks every member before closing any. Start appears only when no content tab exists. History restores keep their explicit destination and open a composition tab rather than overwriting an unrelated active layout. One tab retains its history identity while membership changes. Missing members leave the active layout intact. Forgetting history removes metadata only. See `docs/en/workspace-compositions.md` for ownership boundaries.
+
+The AI side panel switches native and external conversations independently from main navigation. Agent creation reuses the existing project-folder launcher and application-tool adapter. Moving to the main workspace preserves the same connection and draft. External thoughts, tool events and text form one answer per user turn, with one completion footer. Live replies keep that footer hidden until the turn finishes. Transcript status strips are absent; execution and directory context remain in existing selectors and tooltips.
 
 Provider creation accepts a custom name, API family, HTTP endpoint, model identifier and optional key. Changing an endpoint preserves configured credentials through the native secret store; moving to a different origin requires explicit confirmation before reusing a key. Selected models retain the normal font weight. Recognized model families use shared marks; unidentified aliases are never assigned an invented vendor.
 

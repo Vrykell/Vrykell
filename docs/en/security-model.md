@@ -1,10 +1,24 @@
 # Security model
 
+## Session-owned application tools
+
+The internal tool adapter uses authenticated, ephemeral loopback framing and a standard-input/output helper. Tokens remain in the child environment. Each external connection owns its catalog allowlist, active-turn generation and pending result identifiers; initialization and replay cannot execute tools. Only the main window can answer `acp_app_tool_result`, and results are size-limited and correlated to a live request. Existing tool implementations retain backend policy, path grants, native confirmation and single-use leases. Terminal targets are explicit and fixed for a turn; remote targets cannot invoke local file tools. Cancellation clears pending approvals and questions, and late approvals cannot execute. No credentials, arbitrary IPC dispatch, public listener or new CSP origin is exposed. See `application-tools.md` for boundaries and tests.
+
 > Readers: **read this page before adding any feature to Vrykell**, especially when integrating
 > third-party code (MCP servers, skills, external harnesses) or adding a new IPC command.
 > Companion documents: `security-review.md` (reviews and open items), `acp-harness-integration.md`
 > (the external-harness design), `architecture.md` (layering).
 > Last updated 2026-10-14.
+
+## Reference-only compositions and tool recovery
+
+Within a request, terminal command calls execute in submission order before authorization and PTY writes. A denied, cancelled or unconfirmed command prevents queued successors from writing. Completed nonzero diagnostics do not poison the queue. The existing busy guard still protects against human or independent callers; cancellation never kills the live process.
+
+`save_workspace_history` accepts bounded, versioned layout references with whitelisted member fields; it rejects content-bearing payloads, invalid layouts and attempts to overwrite terminal rows. Writes are atomic historical metadata, not startup process records. The additive metadata migration retains existing rows. Source and split filtering use indexed flags maintained on writes. `get_conversation` validates its identifier and performs one parameter-bound metadata lookup without loading messages. Neither command expands file access, network origins, capabilities, CSP or execution privileges.
+
+AI tool denials restrict subsequent steps to explanation or a user question, without execution. The next user request gets a fresh recovery scope. Native confirmation, foreground requirements and authorization leases are unchanged; interpreter or encoding substitutions never grant permission. Remote tool contexts reject local filesystem access even at execution time. Tool failures and approval outcomes remain in the transcript and cannot replay notifications when history mounts. Terminal readiness reports distinguish busy, ready, interactive and unknown; a quiet screen is not completion evidence. Diagnostics continue to omit commands, outputs and credentials.
+
+`ask_user` is bounded in-memory interaction, not privileged execution or approval. Requests bind to a conversation and call, support cancellation and expire after fifteen minutes. Answers never create grants; pending callbacks are not persisted. Hidden leaked control syntax is never executed. This adds no IPC, filesystem or network authority.
 
 ## 1. Threat model: who can influence what
 

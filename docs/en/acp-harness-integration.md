@@ -23,7 +23,7 @@ OpenCode, Gemini CLI, anything that speaks ACP — into the workspace:
 - No ACP **server**: Vrykell's own agent is not exposed to other editors.
 - No `elicitation/*` (form/URL interaction) and no `compaction_*` (context-compaction visuals): the
   capabilities are simply not advertised, and the spec requires harnesses to respect that.
-- No MCP passthrough: `session/new` sends an empty `mcpServers` array first.
+- Session-owned application tools are now injected on creation and loading through the adapter described in `application-tools.md`; arbitrary external tool-server passthrough remains excluded.
 - No process pooling: one process per harness definition, several sessions inside it.
 
 ## 3. Protocol essentials (v1, verified)
@@ -37,7 +37,7 @@ Client → agent (what we implement):
 | Method | Purpose |
 | --- | --- |
 | `initialize` | Version (`protocolVersion: 1`), capability negotiation, implementation info |
-| `session/new` | `{cwd, mcpServers: []}` → `{sessionId}` |
+| `session/new` | `{cwd, mcpServers}` → `{sessionId}`; the application adapter owns the supplied server |
 | `session/prompt` | `{sessionId, prompt: ContentBlock[]}` → `{stopReason}`: `end_turn` / `max_tokens` / `max_turn_requests` / `refusal` / `cancelled` |
 | `session/cancel` (notification) | Interrupt the current turn, no response |
 | `session/load` · `session/resume` · `session/close` | Restore or close sessions (the agent must advertise `loadSession` / `sessionCapabilities.*`) |

@@ -40,6 +40,12 @@ components:
 
 ## Overview
 
+Each common-workspace tab contains its complete pane layout. Switching tabs preserves that layout and each content host. The start page is an empty-state fallback and disappears when a content tab exists. Zooming never discards siblings. Existing tab-strip controls own split, merge and move actions; panes do not gain another toolbar. Native and external AI conversations share the side panel using the same live content owners as the main workspace. Neither conversation type adds an execution-target or directory strip above its transcript.
+
+Shell profile identities are owned by `src/ui/icons/shellIcons.tsx`. Both supported command-shell variants use the same blue panel mark. Generic terminal actions use a neutral prompt mark. The blue panel uses theme tokens without document-global gradient identifiers, so hidden copies cannot affect visible icons.
+
+Conversation settings use a persistent non-modal popover, not an action menu. Selecting an option or opening its profile picker does not dismiss the parent; Escape first closes the child. Resource icons reuse profile identities. Compositions use the first pane's content icon with a small circular count badge at the top right, not a separate split icon. Workspace-local splits share the composition canvas without changing navigation domains.
+
 The reference is a compact desktop terminal workbench, not an administrative website or an integrated development environment. Output and editable text carry the screen; navigation and tools stay quiet. The signature is uninterrupted terminal state beside dense, single-line host information.
 
 The audience manages local shells, remote hosts, files and conversations on desktop. English and Chinese interfaces share the same controls and density. There is no inferred market-specific business policy. Current user-provided prototypes govern host density, blue primary actions, yellow favorites and compact menus.
@@ -86,9 +92,15 @@ Shared inner corners are 8 px and block corners are 14 px. Favorites and tag fil
 
 ## Components
 
+The common start page groups terminal profiles and saved hosts, native and external conversations, and file creation and opening as distinct tasks. It reuses the launcher grid and typography rather than promoting the default terminal as the only creation path. Mixed history rows show a shared split icon, pane count and member types; expansion reveals members without loading their transcripts. Terminal panes are individually placed existing hosts, not nested terminal workspaces.
+
 Use `SidebarItem`, `TextInput`, `SegmentedControl`, `TagInput`, `Select`, `CheckboxMenu`, `ContextMenu`, `ErrorBox`, `ConfirmDialog`, `Toggle` and the existing button family. Connection authentication has four explicit parallel modes; settings option groups use authored selects. Opacity uses `RangeInput`, a thin blue track with native range keyboard semantics.
 
 Action-menu labels share a left-aligned inset without an empty icon column. Selection checks sit at the far right, alongside the shared trailing shortcut and submenu affordances. Explicit multi-select checkbox controls retain their checkbox semantics.
+
+External conversations select an application execution target with the shared select in the existing composer status row. The default is discussion only. Tool questions and approvals remain inside the owning transcript; integration adds no separate toolbar or notification stream.
+
+Tab-toolbar menus sit four pixels below their trigger. Creation uses at most two menu levels; terminal, server and agent choices close both levels before opening the existing rich launcher, retaining the toolbar anchor rather than the disappearing menu row. Agent search, availability and project directory remain part of that shared launcher.
 
 Enabled controls have deliberate gray hover, visible focus, disabled and busy states. Shared segmented controls animate selection and brighten foreground on hover without changing the fill. Errors preserve readable text and expose technical details separately; retry and dismiss controls never shrink into diagnostic text. Host cards and status cells distinguish stale read failure, authentication failure and offline state inline. The editor remains a single-file text editing surface with common editing commands, explicit file destinations and guarded unsaved changes. Filename, encoding and cursor information share the bottom status line; floating search never pushes the document. Markdown preview and optional modal keybindings preserve the mounted editor buffer.
 

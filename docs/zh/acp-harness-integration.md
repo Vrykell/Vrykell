@@ -15,7 +15,7 @@ Vrykell 作为 **ACP 客户端（host）**，把外部 agent harness（Claude Co
 
 - 不做 ACP **服务端**：不把 Vrykell 自己的 agent 暴露给别的编辑器；
 - 不做 `elicitation/*`（表单/URL 交互）与 `compaction_*`（上下文压缩可视化）：在 `initialize` 里**不声明**这些能力，harness 会退回普通消息（规范明确要求它们遵守能力协商）；
-- 不做 MCP 透传：`session/new` 的 `mcpServers` 先传空数组；
+- 新建和恢复会话现在注入会话专属应用工具适配层，见 `application-tools.md`；仍不透传任意外部工具服务器；
 - 不做进程池调度：先做到「一个 harness 定义一个进程，进程内多会话」。
 
 ## 3. 协议要点（v1，已核对）
@@ -27,7 +27,7 @@ Vrykell 作为 **ACP 客户端（host）**，把外部 agent harness（Claude Co
 | 方法 | 用途 |
 | --- | --- |
 | `initialize` | 版本（`protocolVersion: 1`）+ 能力协商 + 实现信息 |
-| `session/new` | `{cwd, mcpServers: []}` → `{sessionId}` |
+| `session/new` | `{cwd, mcpServers}` → `{sessionId}`；提供的服务器由应用适配层管理 |
 | `session/prompt` | `{sessionId, prompt: ContentBlock[]}` → `{stopReason}`：`end_turn` / `max_tokens` / `max_turn_requests` / `refusal` / `cancelled` |
 | `session/cancel`（通知） | 打断当前轮次，无需响应 |
 | `session/load` · `session/resume` · `session/close` | 恢复/关闭会话（需 agent 声明 `loadSession` / `sessionCapabilities.*`） |
