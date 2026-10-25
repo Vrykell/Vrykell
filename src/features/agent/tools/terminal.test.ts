@@ -8,7 +8,7 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 const { termMock } = vi.hoisted(() => ({
   termMock: {
-    state: { sessions: {} as Record<string, string>, scenes: {} as Record<string, string>, dims: {} as Record<string, { cols: number; rows: number }>, focusedPaneId: 'p1' },
+    state: { sessions: {} as Record<string, string>, startupStates: {} as Record<string, string>, scenes: {} as Record<string, string>, dims: {} as Record<string, { cols: number; rows: number }>, focusedPaneId: 'p1' },
     screen: null as { text?: string } | null,
   },
 }));
@@ -60,7 +60,7 @@ describe('read_terminal 工具', () => {
   });
   it('无会话：结构化错误', async () => {
     const r = await execOf(buildTerminalTools(CTX).read_terminal)({});
-    expect(r).toEqual({ ok: false, error: '没有可用的终端会话（请先打开一个终端）' });
+    expect(r).toMatchObject({ ok: false, code: 'TERMINAL_DISCONNECTED', requiresUserAction: true });
   });
 
   it('主 xterm 有画面：返回画面', async () => {
@@ -160,7 +160,7 @@ describe('terminal_keys 工具', () => {
 
   it('无会话 / 写入失败：结构化错误', async () => {
     const noSession = await execOf(buildTerminalTools(CTX).terminal_keys)({ keys: 'x', wait_ms: 0 });
-    expect(noSession).toEqual({ ok: false, error: '没有可用的终端会话（请先打开一个终端）' });
+    expect(noSession).toMatchObject({ ok: false, code: 'TERMINAL_DISCONNECTED', requiresUserAction: true });
     termMock.state.sessions = { p1: 's1' };
     invokeMock.mockRejectedValueOnce(new Error('pty 已关闭'));
     const fail = await execOf(buildTerminalTools(CTX).terminal_keys)({ keys: 'x', wait_ms: 0 });

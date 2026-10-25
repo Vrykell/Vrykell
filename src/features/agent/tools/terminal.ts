@@ -25,6 +25,7 @@ import {
 } from '@features/terminal';
 import { gate, type ToolContext } from '@features/agent/stores/permissions';
 import { agentControl } from '../services/agentControl';
+import { terminalDisconnected } from '../services/terminalAvailability';
 
 const BLOCK_OUTPUT_CAP = 2000;
 const BLOCK_COUNT = 4;
@@ -51,9 +52,8 @@ export function buildTerminalTools(ctx: ToolContext) {
         const paneId = ctx.paneId === undefined ? getFocusedTerminalId() : ctx.paneId;
         if (!paneId) return { ok: false, error: t('No execution terminal is connected to this conversation.') };
         const ts = useTerminalStore.getState();
-        if (!ts.sessions[paneId]) {
-          return { ok: false, error: '没有可用的终端会话（请先打开一个终端）' };
-        }
+        const disconnected = terminalDisconnected(paneId);
+        if (disconnected) return disconnected;
         const screen = ts.scenes[paneId] === 'blockList' ? null : getTerminalScreen(paneId);
         const executionState = agentControl.isControlled(paneId) || (useBlockStore.getState().byTab[paneId] ?? []).some(block => block.status === 'executing')
           ? 'busy' : ts.scenes[paneId] === 'altScreen' ? 'interactive' : ts.scenes[paneId] === 'blockList' ? 'ready' : 'unknown';
@@ -95,16 +95,19 @@ export function buildTerminalTools(ctx: ToolContext) {
         const paneId = ctx.paneId === undefined ? getFocusedTerminalId() : ctx.paneId;
         if (!paneId) return { ok: false, error: t('No execution terminal is connected to this conversation.') };
         const sessionId = useTerminalStore.getState().sessions[paneId];
-        if (!sessionId) {
-          return { ok: false, error: '没有可用的终端会话（请先打开一个终端）' };
-        }
+        const disconnected = terminalDisconnected(paneId);
+        if (disconnected || !sessionId) return disconnected ?? terminalDisconnected(paneId)!;
         try {
           if (normalized.length > 0) await ptyWrite(sessionId, normalized);
         } catch (e) {
+          const disconnected = terminalDisconnected(paneId, sessionId);
+          if (disconnected) return disconnected;
           return { ok: false, error: `写入终端失败: ${e instanceof Error ? e.message : String(e)}` };
         }
         const wait = wait_ms ?? 300;
         if (wait > 0) await new Promise((r) => setTimeout(r, wait));
+        const interrupted = terminalDisconnected(paneId, sessionId);
+        if (interrupted) return interrupted;
         return {
           ok: true,
           sent: normalized.length,

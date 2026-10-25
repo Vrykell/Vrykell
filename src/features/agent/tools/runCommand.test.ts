@@ -50,6 +50,18 @@ function mkBlock(p: Partial<TermBlock>): TermBlock {
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 describe('runCommandAndWait', () => {
+  it('reports a disconnected execution target before sending a command', async () => {
+    const result = await runCommandAndWait('echo test', { paneId: 'missing' });
+    expect(result).toMatchObject({ ok: false, completed: false, code: 'TERMINAL_DISCONNECTED', requiresUserAction: true });
+  });
+
+  it.each(['closed', 'replacement'])('settles immediately when the execution target becomes %s', async state => {
+    const paneId = setupPane();
+    const pending = runCommandAndWait('echo test', { paneId });
+    await tick();
+    useTerminalStore.setState({ sessions: state === 'closed' ? {} : { [paneId]: 'different-process' } });
+    await expect(pending).resolves.toMatchObject({ ok: false, completed: false, code: 'TERMINAL_DISCONNECTED', requiresUserAction: true });
+  });
   beforeEach(() => {
     useBlockStore.setState(initialBlocks, true);
     useTerminalStore.setState(initialTerm, true);

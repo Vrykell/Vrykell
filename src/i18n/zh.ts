@@ -1,5 +1,13 @@
 ﻿/** Simplified Chinese messages for shared UI and feature namespaces. */
 const zh: Record<string, string> = {
+  'Queued messages': '待发送消息',
+  'Waiting to send': '等待发送',
+  'Cancel queued message': '取消待发送消息',
+  'Message with attachments': '包含附件的消息',
+  'Queue message': '追加消息',
+  'Stopping also cancels queued messages for this conversation.': '停止也会取消此对话中等待发送的消息。',
+  'The selected execution terminal disconnected. The command was not confirmed as completed. Ask the user to reconnect or select another terminal; do not switch targets or retry automatically.': '选定的执行终端已断开，无法确认命令执行完成。请用户重新连接或选择其他终端，不要自动切换目标或重试。',
+  'Choose agent': '选择智能体',
   'Zoom pane': '放大当前窗格',
   'Restore panes': '还原窗格布局',
   'Move pane to new tab': '将窗格移至新标签页',

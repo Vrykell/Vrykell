@@ -19,6 +19,7 @@ import {
 } from '@features/terminal';
 import { agentControl } from '@features/agent/services/agentControl';
 import { DEFAULT_TOOL_COMMAND_TIMEOUT_MS } from '../model/messageParts';
+import { terminalDisconnected } from '../services/terminalAvailability';
 
 export interface RunCommandResult {
   ok: boolean;
@@ -28,6 +29,8 @@ export interface RunCommandResult {
   output: string;
   error?: string;
   completed?: boolean;
+  code?: string;
+  requiresUserAction?: boolean;
 }
 
 const OUTPUT_CAP = 8192;
@@ -57,9 +60,11 @@ export async function runCommandAndWait(
   const paneId = opts?.paneId === undefined ? getFocusedTerminalId() : opts.paneId;
   if (!paneId) return { ok: false, output: '', error: t('No execution terminal is connected to this conversation.') };
   const ts = useTerminalStore.getState();
+  const disconnected = terminalDisconnected(paneId);
+  if (disconnected) return disconnected;
   const sessionId = ts.sessions[paneId];
   if (!sessionId) {
-    return { ok: false, output: '', error: '没有可用的终端会话（请先打开一个终端）' };
+    return terminalDisconnected(paneId)!;
   }
   if (opts?.signal?.aborted) return { ok: false, completed: false, output: '', error: t('Command cancelled before execution.') };
   if (agentControl.isControlled(paneId) || (useBlockStore.getState().byTab[paneId] ?? []).some(block => block.status === 'executing')) {
@@ -88,10 +93,12 @@ export async function runCommandAndWait(
   diagnostic('agent-command-start', { paneId, completionMode: completion ? 'marker' : 'block' });
   try {
     await writeTerminalCommand(paneId, sessionId, completion ? completion.wrap(command) : command);
-    const result = await waitForCompletion(paneId, command, t0, opts?.toolCallId, opts?.signal, timeoutMs, completion);
+    const result = await waitForCompletion(paneId, sessionId, command, t0, opts?.toolCallId, opts?.signal, timeoutMs, completion);
     diagnostic('agent-command-completion', { paneId, completed: result.completed ?? false, ok: result.ok, exitCode: result.exitCode, outputChars: result.output.length });
     return result;
   } catch (e) {
+    const disconnected = terminalDisconnected(paneId, sessionId);
+    if (disconnected) return disconnected;
     return { ok: false, output: '', error: `写入终端失败: ${e instanceof Error ? e.message : String(e)}` };
   } finally {
     completion?.dispose();
@@ -101,6 +108,7 @@ export async function runCommandAndWait(
 
 function waitForCompletion(
   paneId: string,
+  sessionId: string,
   command: string,
   t0: number,
   toolCallId: string | undefined,
@@ -139,6 +147,8 @@ function waitForCompletion(
     /** 执行中途切入全屏 TUI（如模型无视描述跑了 vim/claude）→ 立即收口，
      *  不干等 120s 超时；程序留在终端里交给用户操作 */
     const unsubScene = useTerminalStore.subscribe((s) => {
+      const disconnected = terminalDisconnected(paneId, sessionId);
+      if (disconnected) { finish(disconnected); return; }
       if (s.scenes[paneId] === 'altScreen') {
         finish({
           ok: false,
@@ -283,7 +293,8 @@ function waitForCompletion(
         ...(result.exitCode !== 0 ? { error: t('Exit code: {{code}}', { code: result.exitCode }) } : {}) });
     };
     unsubCompletion = completion?.subscribe(settleCompletion);
-    if (signal?.aborted) onAbort();
+    if (terminalDisconnected(paneId, sessionId)) finish(terminalDisconnected(paneId, sessionId)!);
+    else if (signal?.aborted) onAbort();
     else if (useTerminalStore.getState().scenes[paneId] === 'altScreen') {
       finish({ ok: false, completed: false, output: '', error: t('The command entered an interactive screen. Use read_terminal and terminal_keys to continue.') });
     } else {
