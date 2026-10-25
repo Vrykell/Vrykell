@@ -5,6 +5,7 @@ import AiWorkspaceSurface, { AiWorkspaceProvider } from '../components/AiWorkspa
 import NativeConversationSurface from '../components/NativeConversationSurface';
 import { useAiWorkspace } from '../stores/aiWorkspace';
 import { useChatStore } from '../stores/chat';
+import { ResourceContentProvider } from '@ui/layout/ResourceContent';
 
 const lifecycle = vi.hoisted(() => ({ mounts: 0, stops: 0, renders: 0, harnessRenders: 0 }));
 vi.mock('../components/HarnessWorkspace', () => ({ default: () => {
@@ -19,7 +20,7 @@ vi.mock('../components/PanelChat', () => ({ default: function Conversation({ con
 } }));
 const ai = useAiWorkspace.getState();
 const chat = useChatStore.getState();
-beforeEach(() => { useAiWorkspace.setState({ nativeTabs: ['native'], selected: 'chat:native' }); useChatStore.setState({ activeConversationId: 'native' }); });
+beforeEach(() => { useAiWorkspace.setState({ nativeTabs: ['native'], selected: 'chat:native', sideSelected: '' }); useChatStore.setState({ activeConversationId: 'native' }); });
 afterEach(() => { cleanup(); lifecycle.mounts = 0; lifecycle.stops = 0; lifecycle.renders = 0; lifecycle.harnessRenders = 0; useAiWorkspace.setState(ai, true); useChatStore.setState(chat, true); });
 
 it('keeps each open native conversation mounted independently while the selection changes', () => {
@@ -53,9 +54,9 @@ it('does not rerender connected or native content when an unrelated layout width
 });
 
 it('moves the existing conversation node without restarting it or dropping local state', () => {
-  const view = (placement: 'main' | 'side') => <AiWorkspaceProvider placement={placement} mainActive headerActive sideActive>
+  const view = (placement: 'main' | 'side') => <ResourceContentProvider><AiWorkspaceProvider placement={placement} mainActive headerActive sideActive>
     <AiWorkspaceSurface placement="main" /><AiWorkspaceSurface placement="side" />
-  </AiWorkspaceProvider>;
+  </AiWorkspaceProvider></ResourceContentProvider>;
   const { rerender, unmount } = render(view('main'));
   const input = screen.getByRole('textbox', { name: 'Draft' });
   const connected = screen.getByTestId('connected-session');

@@ -79,6 +79,13 @@ it('places main conversation actions in the toolbar and keeps settings floating 
   expect(draft).toHaveValue('Keep this draft');
 });
 
+it('does not invent a per-pane heading when an unfocused workspace conversation has no toolbar target', () => {
+  const view = render(<PanelChat workspace />);
+  expect(view.container.querySelector('.chat-conversation-heading')).toBeNull();
+  expect(screen.queryByRole('button', { name: '会话设置' })).toBeNull();
+  expect(screen.getByPlaceholderText('自然语言描述你想做什么…')).toBeVisible();
+});
+
 beforeEach(() => {
   useSessionStore.setState({ tabs: [{ id: 'chat-tab', title: 'Build', kind: 'session', layout: leaf({ id: paneId, kind: 'local', shellType: 'bash', cwd: '/work' }) }], activeId: 'chat-tab', terminalCwds: {} });
   useTerminalStore.setState({ focusedPaneId: paneId, sessions: { [paneId]: 'pty-chat' } });
@@ -207,9 +214,11 @@ it('opens the new-tab panel from the picker and binds the terminal it creates', 
   // The action opens the panel; the tab exists only after a type is picked there.
   expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   const dialog = screen.getByRole('dialog', { name: '新建标签页' });
+  expect(screen.getByRole('dialog', { name: '会话设置' })).toBeVisible();
   expect(useSessionStore.getState().tabs).toHaveLength(1);
   fireEvent.click(await within(dialog).findByTestId('new-tab-option-shell:bash'));
   expect(screen.queryByRole('dialog', { name: '新建标签页' })).not.toBeInTheDocument();
+  expect(screen.getByRole('dialog', { name: '会话设置' })).toBeVisible();
   const created = useSessionStore.getState().tabs.find(tab => tab.id !== 'chat-tab');
   expect(created).toBeDefined();
   const createdPane = firstTerminalOf(created!)?.id;
@@ -217,14 +226,14 @@ it('opens the new-tab panel from the picker and binds the terminal it creates', 
   expect(useChatStore.getState().conversations[0]?.environment?.paneId).toBe(createdPane);
 });
 
-it('shows a concise server badge and keeps the host context in the trigger tooltip', () => {
+it('keeps execution context in settings without an extra status strip', () => {
   useSessionStore.setState({ tabs: [{ id: 'chat-tab', title: 'Server', kind: 'session', layout: leaf({
     id: paneId, kind: 'ssh', ssh: { name: 'Production', host: '10.21.76.61' },
   }) }], terminalCwds: { [paneId]: '/srv/app' } });
   useChatStore.setState({ conversations: [{ id: 'conversation', title: 'Deploy', createdAt: 1, updatedAt: 1,
     environment: { paneId, label: 'Server · Production', kind: 'ssh', cwd: '/srv/app' } }] });
   render(<PanelChat />);
-  expect(screen.getByTestId('chat-conversation-context')).toHaveTextContent('10.21.76.61');
+  expect(screen.queryByTestId('chat-conversation-context')).not.toBeInTheDocument();
   openSettings();
   const target = screen.getByRole('combobox', { name: '选择执行终端' });
   expect(target).toHaveTextContent('10.21.76.61');

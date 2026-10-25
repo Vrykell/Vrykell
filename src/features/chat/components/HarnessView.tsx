@@ -13,18 +13,28 @@ import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';
 import { IconButton } from '@ui/actions/IconButton';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import { TextArea } from '@ui/fields/TextInput';
+import Select from '@ui/fields/Select';
 import KeyHint from '@ui/feedback/KeyHint';
 import { formatCompact } from '@features/agent/model/usageStats';
 import { useComposerDrafts } from '../stores/composerDrafts';
 import { useHarnessWorkspace } from '../stores/harnessWorkspace';
+import { useAiWorkspace } from '../stores/aiWorkspace';
+import { useWorkspaceNavigation } from '@features/workspace';
+import { createSideAgent } from '../services/aiWorkspace';
 import { useTranscriptFollow } from '../hooks/useTranscriptFollow';
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import { toExchanges } from '@features/chat/model/exchanges';
+import { groupHarnessMessages } from '../model/harnessTranscript';
+import { createExecutionTerminal } from '@features/workspace/services/executionTerminal';
+import NewTabModal from '@features/workspace/components/NewTabModal';
+import type { DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import AiBlock from '@features/chat/components/AiBlock';
 import ChatComposerShell from './ChatComposerShell';
 import HarnessSelector, { type HarnessSelectorOption } from './HarnessSelector';
 import { useHarnessStore, type HarnessSession } from '../stores/harness';
 import type { AcpConfigGroup, AcpConfigValue } from '@platform/api/acp';
+import { useExecutionTerminalOptions } from '../hooks/useExecutionTerminalOptions';
+import { environmentForPane } from '../services/conversationContext';
 
 /** One control in the composer's status row. */
 interface SessionSelector {
@@ -114,12 +124,15 @@ function contextLabel(context: { used: number; size: number }): string {
 /**
  * A connected session reuses the conversation blocks, composer shell and transcript follow behavior.
  */
-export default function HarnessView({ tabId, harness, cwd, fresh = false, active = true }: { tabId: string; harness: string; cwd?: string; fresh?: boolean; active?: boolean }) {
+export default function HarnessView({ tabId, harness, cwd, fresh = false, active = true, resumeSessionId }: { tabId: string; harness: string; cwd?: string; fresh?: boolean; active?: boolean; resumeSessionId?: string }) {
   const session = useHarnessStore((state) => state.byTab[tabId]);
+  const executionOptions = useExecutionTerminalOptions(session?.executionPaneId ? environmentForPane(session.executionPaneId) ?? { paneId: session.executionPaneId, kind: 'local', label: t('Disconnected') } : null);
   const text = useComposerDrafts(state => state.byTab[tabId]?.text ?? '');
   const setText = (value: string) => useComposerDrafts.getState().setText(tabId, value);
   const follow = useTranscriptFollow(tabId, session?.messages, active);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const [terminalPicker, setTerminalPicker] = useState<{ anchor?: DropdownAnchor } | null>(null);
+  useEffect(() => { if (!active) setTerminalPicker(null); }, [active]);
   /** Escape hides the command list for the current text without touching what was typed. */
   const [commandDismissed, setCommandDismissed] = useState(false);
   const [commandIndex, setCommandIndex] = useState(0);
@@ -128,11 +141,11 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
    *  double click can only ever start one agent process. */
   useEffect(() => {
     if (session) return;
-    void useHarnessStore.getState().open(tabId, harness, cwd ?? '', fresh);
-  }, [tabId, harness, session, cwd, fresh]);
+    void useHarnessStore.getState().open(tabId, harness, cwd ?? '', fresh, resumeSessionId);
+  }, [tabId, harness, session, cwd, fresh, resumeSessionId]);
 
   const agent = session?.agent?.agentInfo;
-  const exchanges = toExchanges(session?.messages ?? []);
+  const exchanges = toExchanges(groupHarnessMessages(session?.messages ?? []));
   const canSend = Boolean(session?.sessionId) && !session?.pending && text.trim().length > 0;
   const selectors = session ? sessionSelectors(session, tabId) : [];
   const hints = authHints(session?.agent ?? null);
@@ -161,10 +174,12 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
   };
 
   return (
-    <div data-testid="harness-page" className="ai-chat-panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-      <div className="chat-conversation-context" data-testid="harness-directory" data-tip={session?.cwd || cwd || undefined}>
-        {session?.cwd || cwd || t('Default project folder')}
-      </div>
+    <div data-testid="harness-page" className="ai-chat-panel harness-chat-panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+      <NewTabModal open={!!terminalPicker} anchor={terminalPicker?.anchor} onClose={() => setTerminalPicker(null)} onPick={spec => {
+        const paneId = createExecutionTerminal(spec);
+        if (paneId) useHarnessStore.getState().setExecutionPane(tabId, paneId);
+        setTerminalPicker(null);
+      }} />
       <div ref={follow.scrollRef} className="scroll-region chat-transcript" onScroll={follow.onScroll}
         onWheel={follow.onWheel} onTouchMove={follow.onTouchMove}
         style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px 14px 4px' }}>
@@ -172,7 +187,7 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
           {t('Opening the harness session…')}
         </p>}
         {session?.error && <ErrorBox title={t('Connection failed')} details={session.error}
-          actions={!session.sessionId && <OutlineButton onClick={() => void useHarnessStore.getState().open(tabId, harness, cwd ?? '', fresh)}>{t('Retry')}</OutlineButton>} />}
+          actions={!session.sessionId && <OutlineButton onClick={() => void useHarnessStore.getState().open(tabId, harness, cwd ?? '', fresh, resumeSessionId)}>{t('Retry')}</OutlineButton>} />}
         {/* A failed turn is often just a missing login: the agent said how to sign in at handshake. */}
         {session?.error && hints.length > 0 && (
           <p data-testid="harness-auth-hint" style={{ margin: '2px 4px 8px', color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
@@ -182,8 +197,13 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
         {session?.note && <p data-testid="harness-note" style={{ margin: '6px 4px', color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>
           {session.note}
         </p>}
-        {exchanges.map((exchange) => (
-          <AiBlock key={exchange.id} exchange={exchange} presentation="conversation" />
+        {exchanges.map((exchange, index) => (
+          <AiBlock key={exchange.id} exchange={exchange.answer && index === exchanges.length - 1 ? { ...exchange, answer: { ...exchange.answer, pending: session?.pending ?? false } } : exchange}
+            allowExchangeActions={false} toolContextId={session?.toolContextId ?? tabId} presentation="conversation" onAskAboutTool={question => {
+            const drafts = useComposerDrafts.getState(); const previous = drafts.byTab[tabId]?.text;
+            drafts.setText(tabId, previous ? `${previous}\n${question}` : question);
+            requestAnimationFrame(() => composerRef.current?.focus());
+          }} />
         ))}
         {/* The plan the agent publishes while it works, in the order it sent it. */}
         {plan.length > 0 && (
@@ -257,13 +277,20 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
         status={<>
           <IconButton compact aria-label={t('New session')} data-tip={t('New session')} data-testid="harness-new-session"
             disabled={!session?.sessionId || session.pending}
-            onClick={() => useHarnessWorkspace.getState().connect(harness, session?.cwd || cwd, true)}>
+            onClick={() => {
+              if (useWorkspaceNavigation.getState().aiPlacement === 'side' && useAiWorkspace.getState().sideSelected === `acp:${tabId}`) createSideAgent(harness, session?.cwd || cwd);
+              else useHarnessWorkspace.getState().connect(harness, session?.cwd || cwd, true);
+            }}>
             <Plus size={iconSizes.compact} />
           </IconButton>
           {selectors.map((selector) => (
             <HarnessSelector key={selector.key} testId={`harness-selector-${selector.key}`} label={selector.label} model={selector.model}
               value={selector.value} options={selector.options} onChange={selector.apply} />
           ))}
+          {session?.appToolsConnected && <Select aria-label={t('Application execution terminal')} data-testid="harness-execution-target"
+            triggerClassName="harness-selector" style={{ width: 'auto', maxWidth: 180 }} value={session.executionPaneId ?? ''} options={executionOptions}
+            disabled={session.pending || session.opening} onChange={paneId => useHarnessStore.getState().setExecutionPane(tabId, paneId || null)}
+            action={{ label: t('New terminal'), onSelect: bounds => setTerminalPicker({ anchor: bounds ? { x: bounds.left, y: bounds.bottom + 4, aboveY: bounds.top } : undefined }) }} />}
           {session?.context && (session.context.used > 0 || session.context.size > 0) && (
             <span data-testid="harness-context" className="harness-context" data-tip={t('Context window in use')}>
               {contextLabel(session.context)}

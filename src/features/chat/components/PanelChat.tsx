@@ -7,11 +7,12 @@ import KeyHint from '@ui/feedback/KeyHint';
 import Select from '@ui/fields/Select';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import { IconButton } from '@ui/actions/IconButton';
-import ContextMenu, { type MenuAnchor } from '@ui/menus/ContextMenu';
+import type { MenuAnchor } from '@ui/menus/ContextMenu';
+import SettingsPopover from '@ui/menus/SettingsPopover';
 import { ArrowDown, ArrowUp, History, Plus, SlidersHorizontal, Sparkles, Square, Zap } from '@ui/icons';
 import { useAttachmentComposer } from '@features/agent';
 import { useSessionStore } from '@features/workspace';
-import { leaves, type TerminalSpec } from '@features/workspace/model/windowLayout';
+import { type TerminalSpec } from '@features/workspace/model/windowLayout';
 import NewTabModal from '@features/workspace/components/NewTabModal';
 import { useTerminalStore } from '@features/terminal';
 import { useChatStore, type ChatMessage } from '../stores/chat';
@@ -24,11 +25,12 @@ import AiBlock from './AiBlock';
 import { toExchanges } from '../model/exchanges';
 import { useChatComposer } from '../hooks/useChatComposer';
 import { environmentForPane, showExecutionTerminal } from '../services/conversationContext';
-import { firstTerminalOf, isSessionTab } from '@features/workspace';
-import type { ShellType } from '@platform/shells';
+import { createExecutionTerminal } from '@features/workspace/services/executionTerminal';
 import type { AttachmentMeta } from '@features/agent/model/attachments';
 import { useTranscriptFollow } from '../hooks/useTranscriptFollow';
 import ChatComposerShell from './ChatComposerShell';
+import type { DropdownAnchor } from '@ui/menus/AnchoredDropdown';
+import { useExecutionTerminalOptions } from '../hooks/useExecutionTerminalOptions';
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
 
@@ -47,11 +49,9 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
   const conversation = conversations.find(item => item.id === activeId);
   const environment = conversation?.environment;
   const sessions = useTerminalStore(state => state.sessions);
-  const startupStates = useTerminalStore(state => state.startupStates);
-  const tabs = useSessionStore(state => state.tabs);
-  const terminalCwds = useSessionStore(state => state.terminalCwds);
   const [renaming, setRenaming] = useState(false);
   const [newTabOpen, setNewTabOpen] = useState(false);
+  const [newTabAnchor, setNewTabAnchor] = useState<DropdownAnchor>();
   const [title, setTitle] = useState('');
   const [settingsMenu, setSettingsMenu] = useState<MenuAnchor | null>(null);
   const settingsOpen = !!settingsMenu;
@@ -73,34 +73,10 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
     sending: sendingTab !== null, isSession: ready && !loadError, attachments, clearAttachments,
     conversationId: activeId, references, clearReferences, value: composerDraft.text, onTextChange: setText, scopeKey: activeId,
   });
-  const environmentOptions = useMemo((): Array<{ value: string; label: string; triggerLabel?: string; description?: string; swatch?: string; disabled?: boolean }> => {
-    const available = tabs.flatMap(tab => tab.kind === 'session' ? leaves(tab.layout).map((pane, index, panes) => ({ pane, tab, index, count: panes.length })) : [])
-      .filter(({ pane }) => !!sessions[pane.id]).map(({ pane, tab, index, count }) => {
-        const context = environmentForPane(pane.id)!;
-        const triggerLabel = pane.kind === 'ssh' ? pane.ssh?.host || pane.ssh?.name || context.label : t('Local terminal');
-        const host = pane.kind === 'ssh' ? pane.ssh?.host : undefined;
-        const hostLabel = host && !context.label.includes(host) ? ` · ${host}` : '';
-        const name = `${tab.title}${count > 1 ? ` · ${t('Pane {{number}}', { number: index + 1 })}` : ''}`;
-        const swatch = startupStates[pane.id] === 'starting' ? 'var(--accent-warm)'
-          : startupStates[pane.id] === 'failed' || startupStates[pane.id] === 'closed' ? 'var(--error)' : 'var(--text-secondary)';
-        return { value: pane.id, label: name, triggerLabel, description: `${context.label}${hostLabel}${context.cwd ? ` · ${context.cwd}` : ''}`, swatch };
-      });
-    return [
-      { value: '', label: t('Discussion only'), triggerLabel: t('Discussion'), swatch: 'var(--text-muted)' },
-      ...(environment && !available.some(option => option.value === environment.paneId)
-        ? [{ value: environment.paneId, label: `${environment.label} · ${t('Disconnected')}`, swatch: 'var(--accent-warm)', disabled: true }] : []),
-      ...available,
-    ];
-  }, [tabs, sessions, startupStates, terminalCwds, environment]);
+  const environmentOptions = useExecutionTerminalOptions(environment);
   /** Create the terminal the new-tab panel returned and bind this conversation to it. */
   const createTerminalTab = (spec: TerminalSpec) => {
-    const store = useSessionStore.getState();
-    const tabId = spec.kind === 'ssh' && spec.ssh
-      ? store.addTab({ kind: 'ssh', ssh: spec.ssh })
-      // The panel only ever returns a real shell id here; TerminalSpec keeps the field loose.
-      : store.addTab({ shellType: spec.shellType as ShellType | undefined });
-    const tab = useSessionStore.getState().tabs.find(item => item.id === tabId);
-    const paneId = tab && isSessionTab(tab) ? firstTerminalOf(tab)?.id : undefined;
+    const paneId = createExecutionTerminal(spec);
     if (paneId) useChatStore.getState().setEnvironment(activeId, environmentForPane(paneId));
   };
 
@@ -129,13 +105,13 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
     {!workspace && <IconButton compact aria-label={t('New conversation')} data-tip={t('New conversation')}
       onClick={() => useChatStore.getState().createConversation()}><Plus size={16} /></IconButton>}
     <IconButton compact aria-label={t('Conversation settings')} data-tip={t('Conversation settings')}
-      aria-haspopup="menu" aria-expanded={settingsOpen} aria-controls={settingsOpen ? 'chat-conversation-settings' : undefined} onClick={event => {
+      aria-haspopup="dialog" aria-expanded={settingsOpen} aria-controls={settingsOpen ? 'chat-conversation-settings' : undefined} onClick={event => {
         const trigger = event.currentTarget; const bounds = trigger.getBoundingClientRect();
         setSettingsMenu(current => current ? null : { x: bounds.right - 320, y: bounds.bottom + 4, trigger });
       }}><SlidersHorizontal size={16} /></IconButton>
   </>;
   return <div ref={panelRef} className="ai-chat-panel">
-    {workspace && toolbarTarget ? createPortal(actions, toolbarTarget) : <div className="chat-conversation-heading">
+    {workspace ? toolbarTarget && createPortal(actions, toolbarTarget) : <div className="chat-conversation-heading">
       {renaming ? <InlineRenameInput autoFocus aria-label={t('Conversation title')} value={title} onChange={event => setTitle(event.target.value)}
         onFocus={event => event.currentTarget.select()} onClick={event => event.stopPropagation()}
         onBlur={commitTitle} onKeyDown={event => {
@@ -148,7 +124,7 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
         </button>}
       <div className="chat-conversation-actions">{actions}</div>
     </div>}
-    {settingsMenu && <ContextMenu anchor={settingsMenu} label={t('Conversation settings')} onClose={() => setSettingsMenu(null)} items={[]} header={
+    {settingsMenu && <SettingsPopover anchor={settingsMenu} label={t('Conversation settings')} onClose={() => setSettingsMenu(null)} suspended={newTabOpen}>
     <section id="chat-conversation-settings" className="chat-conversation-settings" aria-label={t('Conversation settings')} data-workspace-focus="ai">
       {!workspace && <div className="chat-setting-row"><span>{t('Recent conversations')}</span>
         <Select aria-label={t('Restore recent conversation')} value={activeId} disabled={loading}
@@ -159,7 +135,7 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
         <Select aria-label={t('Select execution environment')} data-testid="chat-execution-target"
           data-tip-description={environmentOptions.find(option => option.value === (environment?.paneId ?? ''))?.description}
           value={environment?.paneId ?? ''} options={environmentOptions} disabled={!ready || sendingTab === activeId}
-          action={{ label: t('New tab'), onSelect: () => { setSettingsMenu(null); setNewTabOpen(true); } }}
+          action={{ label: t('New tab'), onSelect: bounds => { setNewTabAnchor(bounds ? { x: bounds.left, y: bounds.bottom + 4, aboveY: bounds.top } : undefined); setNewTabOpen(true); } }}
           onChange={paneId => useChatStore.getState().setEnvironment(activeId, paneId ? environmentForPane(paneId) : null)} />
       </div>
       <div className="chat-setting-links">
@@ -167,12 +143,7 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
         <button type="button" data-subtle data-testid="chat-usage-entry" onClick={() => { setSettingsMenu(null); useSessionStore.getState().openUsageTab(); }}>{t('Usage statistics')}</button>
         <button type="button" data-subtle onClick={() => { setSettingsMenu(null); useSessionStore.getState().openSettings(); }}>{t('Open settings')}</button>
       </div>
-    </section>} />}
-    {environment && <div className="chat-conversation-context" data-testid="chat-conversation-context">
-      <span className="chat-terminal-status" style={{ background: environmentOptions.find(option => option.value === environment.paneId)?.swatch }} aria-hidden="true" />
-      <span>{environmentOptions.find(option => option.value === environment.paneId)?.triggerLabel ?? environment.label}</span>
-      {!sessions[environment.paneId] && <span>{t('Disconnected')}</span>}
-    </div>}
+    </section></SettingsPopover>}
     {environment && !sessions[environment.paneId] && <div className="chat-environment-note">{t('Terminal disconnected. Select a terminal to continue execution.')}</div>}
     {loadError && <ErrorBox compact actions={<button onClick={() => {
       if (!useChatStore.getState().conversationsLoaded) void useChatStore.getState().loadConversations();
@@ -235,6 +206,6 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
               if (addPastedText(event.clipboardData.getData('text/plain'))) event.preventDefault();
             }} />
     </ChatComposerShell>
-    {newTabOpen && <NewTabModal open onClose={() => setNewTabOpen(false)} onPick={createTerminalTab} />}
+    {newTabOpen && <NewTabModal open anchor={newTabAnchor} onClose={() => setNewTabOpen(false)} onPick={createTerminalTab} />}
   </div>;
 }
