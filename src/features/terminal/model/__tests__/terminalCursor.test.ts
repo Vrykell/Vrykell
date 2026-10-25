@@ -6,12 +6,11 @@ function write(term: Terminal, data: string): Promise<void> {
   return new Promise(resolve => term.write(data, resolve));
 }
 
-/** xterm keeps program-requested cursor blink in its private mode, ahead of the option. */
-function requestedBlink(term: Terminal): boolean | undefined {
-  const core = (term as unknown as {
-    _core: { coreService: { decPrivateModes: { cursorBlink?: boolean } } };
-  })._core;
-  return core.coreService.decPrivateModes.cursorBlink;
+/** xterm keeps program-requested cursor style and blink in its private modes. */
+function cursorModes(term: Terminal): { cursorStyle?: string; cursorBlink?: boolean } {
+  return (term as unknown as {
+    _core: { coreService: { decPrivateModes: { cursorStyle?: string; cursorBlink?: boolean } } };
+  })._core.coreService.decPrivateModes;
 }
 
 describe('terminal cursor preference', () => {
@@ -20,30 +19,44 @@ describe('terminal cursor preference', () => {
     applyTerminalCursorPreference(term);
 
     await write(term, '\x1b[5 q');
-    expect(term.options.cursorStyle).toBe('bar');
+    expect(cursorModes(term).cursorStyle).toBe('bar');
+    expect(cursorModes(term).cursorBlink).toBeUndefined();
     expect(term.options.cursorBlink).toBe(false);
-    expect(requestedBlink(term)).toBeUndefined();
 
     await write(term, '\x1b[3 q');
-    expect(term.options.cursorStyle).toBe('underline');
-    expect(requestedBlink(term)).toBeUndefined();
+    expect(cursorModes(term).cursorStyle).toBe('underline');
+    expect(cursorModes(term).cursorBlink).toBeUndefined();
 
     await write(term, '\x1b[2 q');
-    expect(term.options.cursorStyle).toBe('block');
-    expect(requestedBlink(term)).toBeUndefined();
+    expect(cursorModes(term).cursorStyle).toBe('block');
+    expect(cursorModes(term).cursorBlink).toBeUndefined();
 
     term.dispose();
   });
 
-  it('restores the default block cursor and never forces blinking', async () => {
+  it('restores the default shape and never forces blinking', async () => {
     const term = new Terminal({ cursorBlink: true });
     applyTerminalCursorPreference(term);
 
     await write(term, '\x1b[5 q');
     await write(term, '\x1b[0 q');
-    expect(term.options.cursorStyle).toBe('block');
+    expect(cursorModes(term).cursorStyle).toBeUndefined();
+    expect(cursorModes(term).cursorBlink).toBeUndefined();
     expect(term.options.cursorBlink).toBe(true);
-    expect(requestedBlink(term)).toBeUndefined();
+
+    term.dispose();
+  });
+
+  it('lets a full terminal reset clear the requested shape like xterm does', async () => {
+    const term = new Terminal({ cursorBlink: false });
+    applyTerminalCursorPreference(term);
+
+    await write(term, '\x1b[5 q');
+    expect(cursorModes(term).cursorStyle).toBe('bar');
+
+    term.reset();
+    expect(cursorModes(term).cursorStyle).toBeUndefined();
+    expect(cursorModes(term).cursorBlink).toBeUndefined();
 
     term.dispose();
   });
