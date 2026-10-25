@@ -33,6 +33,7 @@ export default function ErrorBox({
   style,
   onDismiss,
   dismissible,
+  placement = 'notification',
 }: {
   tone?: ErrorBoxTone;
   title?: ReactNode;
@@ -45,6 +46,7 @@ export default function ErrorBox({
   style?: CSSProperties;
   onDismiss?: () => void;
   dismissible?: boolean;
+  placement?: 'notification' | 'inline';
 }) {
   const [dismissed, setDismissed] = useState<string | null>(null);
   const identity = JSON.stringify([tone, typeof title === 'string' ? title : '', typeof children === 'string' ? children : '', details]);
@@ -61,7 +63,7 @@ export default function ErrorBox({
     ...style,
   };
 
-  if (tone === 'error') return <NotificationPortal><NotificationCard role="alert" data-testid={testId} tone="error" message={title ?? children} data-error-notification="true"
+  if (tone === 'error' && placement === 'notification') return <NotificationPortal><NotificationCard role="alert" data-testid={testId} tone="error" message={title ?? children} data-error-notification="true"
     dismissLabel={t('Dismiss error')} onDismiss={(dismissible ?? true) ? () => { setDismissed(identity); onDismiss?.(); } : undefined}
     onKeyDown={event => {
       if (event.key !== 'Escape' || !(dismissible ?? true)) return;
@@ -78,7 +80,7 @@ export default function ErrorBox({
     </> : null}
   </NotificationCard></NotificationPortal>;
 
-  if (compact) {
+  if (compact && !details && !title) {
     return (
       <div
         role={palette.role}

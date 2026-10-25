@@ -2,6 +2,10 @@
 export const MENU_GROUPS = ['primary', 'clipboard', 'edit', 'view', 'organize', 'danger'] as const;
 export type MenuGroup = typeof MENU_GROUPS[number];
 
+export function flattenSingleSubmenu<Item extends { disabled?: boolean; submenu?: { items: Item[] } }>(items: Item[]): Item[] {
+  return items.length === 1 && !items[0]!.disabled && items[0]!.submenu ? items[0]!.submenu.items : items;
+}
+
 export function menuGroup(item: { group?: MenuGroup; danger?: boolean }): MenuGroup {
   return item.danger ? 'danger' : item.group ?? 'primary';
 }

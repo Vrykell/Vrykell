@@ -21,7 +21,7 @@ export interface SelectOption<Value extends string | number> {
 /** Trailing action pinned below the options (e.g. "New tab"); the arrow keys reach it. */
 interface SelectAction {
   label: string;
-  onSelect: () => void;
+  onSelect: (bounds?: DOMRect) => void;
 }
 
 interface SelectProps<Value extends string | number> {
@@ -77,7 +77,7 @@ export default function Select<Value extends string | number>({
     if (action && index === actionIndex) {
       setOpen(false);
       trigger.current?.focus();
-      action.onSelect();
+      action.onSelect(trigger.current?.getBoundingClientRect());
       return;
     }
     const option = options[index];

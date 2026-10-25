@@ -12,6 +12,13 @@ vi.mock('@platform/clipboard', () => ({
 const writeClipboardTextMock = vi.mocked(writeClipboardText);
 
 describe('ErrorBox', () => {
+  it('supports persistent transcript failures inline without a notification portal', () => {
+    const { container } = render(<ErrorBox placement="inline" dismissible={false} title="Tool failed" details="Diagnostic output" actions={<button>Retry tool</button>} />);
+    expect(container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
+    expect(screen.queryByRole('button', { name: '关闭错误提示' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Retry tool' })).toBeVisible();
+  });
   it('includes the owning notification in modal keyboard navigation and dismisses it without closing the dialog', () => {
     const close = vi.fn();
     function Dialog() {

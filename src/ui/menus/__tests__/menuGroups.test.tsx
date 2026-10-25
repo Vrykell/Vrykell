@@ -1,7 +1,18 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import { ContextMenuItems } from '@ui/menus/ContextMenu';
+import { flattenSingleSubmenu } from '../menuGroups';
+import type { ContextMenuItem } from '../ContextMenu';
 afterEach(cleanup);
+it('flattens an unnecessary sole submenu without discarding mixed choices or disabled parents', () => {
+  const children: ContextMenuItem[] = [{ label: 'Terminal' }, { label: 'File' }];
+  const root: ContextMenuItem = { label: 'Create', submenu: { items: children } };
+  expect(flattenSingleSubmenu([root])).toBe(children);
+  const mixed = [{ label: 'Existing' }, root];
+  expect(flattenSingleSubmenu(mixed)).toBe(mixed);
+  const disabled: ContextMenuItem[] = [{ ...root, disabled: true }];
+  expect(flattenSingleSubmenu(disabled)).toBe(disabled);
+});
 it('groups actions consistently and keeps destructive items last', () => {
   const items = [
     { label: 'Delete', danger: true, onClick: vi.fn() },

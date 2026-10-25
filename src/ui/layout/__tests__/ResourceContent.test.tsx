@@ -32,3 +32,21 @@ it('moves a mounted resource and its actions between domain and mixed panes with
   expect(screen.getByTestId('domain')).toContainElement(draft); expect(mounted).toHaveBeenCalledTimes(1);
   unmount(); expect(disposed).toHaveBeenCalledTimes(1);
 });
+
+it('lets the visible workspace own a resource even when another workspace keeps an inactive slot mounted', () => {
+  function View({ common }: { common: boolean }) {
+    return <WorkspaceHeaderProvider><ResourceContentProvider><WorkspaceHeaderSlot />
+      <section data-testid="common"><ResourceContentSlot id="file:one" visible={common} focused={common} /></section>
+      <section data-testid="editor"><ResourceContentSlot id="file:one" visible={!common} focused={!common} retainHeader /></section>
+      <ResourceContent id="file:one" active={false}>{() => <><WorkspaceHeader><button>Save</button></WorkspaceHeader><input aria-label="Draft" /></>}</ResourceContent>
+    </ResourceContentProvider></WorkspaceHeaderProvider>;
+  }
+  const view = render(<View common={false} />);
+  const draft = screen.getByRole('textbox', { name: 'Draft' });
+  fireEvent.change(draft, { target: { value: 'Preserved' } });
+  expect(screen.getByTestId('editor')).toContainElement(draft);
+  expect(within(screen.getByTestId('workspace-instance-bar')).getByRole('button', { name: 'Save' })).toBeVisible();
+  view.rerender(<View common />); expect(screen.getByTestId('common')).toContainElement(draft);
+  view.rerender(<View common={false} />); expect(screen.getByTestId('editor')).toContainElement(draft);
+  expect(draft).toHaveValue('Preserved');
+});
