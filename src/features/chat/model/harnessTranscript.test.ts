@@ -1,10 +1,44 @@
 import { describe, expect, it } from 'vitest';
-import { applyHarnessUpdate } from './harnessTranscript';
+import { applyHarnessUpdate, groupHarnessMessages, upsertHarnessTool } from './harnessTranscript';
+import { toExchanges } from './exchanges';
 import type { ChatMessage } from '@features/chat';
 
 const update = (patch: Record<string, unknown>) => ({ sessionId: 's', update: patch });
 
 describe('applyHarnessUpdate', () => {
+  it('groups thoughts, multiple tools and final text into one answer per user turn', () => {
+    let messages: ChatMessage[] = [{ id: 'question', role: 'user', content: 'Inspect', createdAt: 1 }];
+    for (const event of [
+      { sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Checking' } },
+      { sessionUpdate: 'tool_call', toolCallId: 'first', title: 'Inspect', status: 'pending' },
+      { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'First result. ' } },
+      { sessionUpdate: 'tool_call', toolCallId: 'second', title: 'Verify', status: 'pending' },
+      { sessionUpdate: 'tool_call_update', toolCallId: 'first', status: 'completed' },
+      { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Done.' } },
+    ]) messages = applyHarnessUpdate(messages, update(event));
+    expect(messages.map(message => message.role)).toEqual(['user', 'assistant']);
+    expect(messages[1]!.parts?.map(part => part.kind)).toEqual(['tool', 'text', 'tool', 'text']);
+    expect(toExchanges(messages)).toHaveLength(1);
+    messages = applyHarnessUpdate(messages, update({ sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'Next task' } }));
+    messages = upsertHarnessTool(messages, { toolCallId: 'third', toolName: 'read_file', input: {}, state: 'running', startedAt: 1 });
+    expect(toExchanges(messages)).toHaveLength(2);
+    expect(messages[1]!.parts).toHaveLength(4);
+  });
+
+  it('groups previously fragmented replay messages without mutating them or merging user turns', () => {
+    const old: ChatMessage[] = [
+      { id: 'q', role: 'user', content: 'Inspect', createdAt: 1 },
+      { id: 'thought', role: 'assistant', content: '', reasoning: 'Checking', createdAt: 2 },
+      { id: 'tool', role: 'assistant', content: '', parts: [{ kind: 'tool', tool: { toolCallId: 'one', toolName: 'read_file', state: 'done', input: {}, startedAt: 2 } }], createdAt: 3 },
+      { id: 'text', role: 'assistant', content: 'Done', createdAt: 4 },
+      { id: 'next', role: 'user', content: 'Next task', createdAt: 5 },
+    ];
+    const grouped = groupHarnessMessages(old);
+    expect(grouped.map(message => message.id)).toEqual(['q', 'thought', 'next']);
+    expect(grouped[1]!.parts?.map(part => part.kind)).toEqual(['tool', 'text']);
+    expect(old).toHaveLength(5);
+    expect(old[1]!.parts).toBeUndefined();
+  });
   it('appends message chunks to one answer and keeps thoughts apart', () => {
     let messages: ChatMessage[] = [];
     messages = applyHarnessUpdate(messages, update({
@@ -83,6 +117,7 @@ describe('applyHarnessUpdate', () => {
     const tool = parts[0]!.kind === 'tool' ? parts[0]!.tool : null;
     expect(tool?.toolCallId).toBe('call_1');
     expect(tool?.state).toBe('done');
+    expect(tool?.toolName).toBe('execute');
     // The title from the first report survives the later update, and the body arrives with it.
     expect(tool?.input.title).toBe('Run the tests');
     expect(tool?.output).toBe('4 passed');

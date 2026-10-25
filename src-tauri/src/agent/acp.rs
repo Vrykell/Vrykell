@@ -155,6 +155,7 @@ pub struct AcpClient {
     child: Mutex<Option<Child>>,
     tasks: Vec<tokio::task::AbortHandle>,
     closed: AtomicBool,
+    mcp_servers: Mutex<Vec<Value>>,
 }
 
 impl AcpClient {
@@ -262,7 +263,7 @@ impl AcpClient {
             }
         });
 
-        Self { out: out_tx, next_id: AtomicU64::new(0), pending, events: tokio::sync::Mutex::new(events),
+        Self { out: out_tx, next_id: AtomicU64::new(0), pending, events: tokio::sync::Mutex::new(events), mcp_servers: Mutex::new(Vec::new()),
             child: Mutex::new(None), tasks: vec![writer_task.abort_handle(), reader_task.abort_handle()], closed: AtomicBool::new(false) }
     }
 
@@ -396,8 +397,9 @@ impl AcpClient {
     /// Create a session in a working directory and answer with the agent's whole session result —
     /// the id plus whatever state it publishes (modes, models, config options).
     pub async fn new_session(&self, cwd: &str) -> Result<Value, String> {
+        let servers = self.mcp_servers.lock().map_err(|_| "application tools unavailable")?.clone();
         let result = self
-            .request("session/new", json!({ "cwd": cwd, "mcpServers": [] }), SESSION_TIMEOUT)
+            .request("session/new", json!({ "cwd": cwd, "mcpServers": servers }), SESSION_TIMEOUT)
             .await?;
         if result.get("sessionId").and_then(Value::as_str).is_none() {
             return Err("the agent created no session".to_string());
@@ -408,9 +410,10 @@ impl AcpClient {
     /// Reopen an existing session. The agent replays the conversation as notifications before it
     /// answers, so the caller must drain [`Self::drain_events`] right afterwards.
     pub async fn load_session(&self, session_id: &str, cwd: &str) -> Result<Value, String> {
+        let servers = self.mcp_servers.lock().map_err(|_| "application tools unavailable")?.clone();
         self.request(
             "session/load",
-            json!({ "sessionId": session_id, "cwd": cwd, "mcpServers": [] }),
+            json!({ "sessionId": session_id, "cwd": cwd, "mcpServers": servers }),
             LOAD_TIMEOUT,
         )
         .await
@@ -634,7 +637,7 @@ pub struct AcpRuntime {
     pending: Arc<Mutex<HashMap<String, oneshot::Sender<PermissionOutcome>>>>,
 }
 
-struct RuntimeSession { client: Arc<AcpClient>, agent_session_id: String }
+struct RuntimeSession { client: Arc<AcpClient>, agent_session_id: String, app_tools: Option<super::app_mcp::AppMcpServer> }
 
 /// Key of a pending permission request: the session and the tool call id it belongs to.
 fn pending_key(session: &str, tool_call_id: &str) -> String {
@@ -642,9 +645,9 @@ fn pending_key(session: &str, tool_call_id: &str) -> String {
 }
 
 impl AcpRuntime {
-    fn insert(&self, session: String, agent_session_id: String, client: Arc<AcpClient>) {
+    fn insert(&self, session: String, agent_session_id: String, client: Arc<AcpClient>, app_tools: Option<super::app_mcp::AppMcpServer>) {
         if let Ok(mut map) = self.sessions.lock() {
-            map.insert(session, Arc::new(RuntimeSession { client, agent_session_id }));
+            map.insert(session, Arc::new(RuntimeSession { client, agent_session_id, app_tools }));
         }
     }
 
@@ -772,7 +775,9 @@ pub async fn acp_open<R: tauri::Runtime>(
     name: String,
     cwd: String,
     resume_session_id: Option<String>,
+    app_tools: Option<Vec<Value>>,
 ) -> Result<Value, String> {
+    let catalog = super::app_mcp::validate_catalog(app_tools.unwrap_or_default())?;
     let config = HarnessFile::load()?;
     note("acp-open", json!({
         "name": name, "hasDirectory": !cwd.is_empty(), "configured": config.harnesses.len(),
@@ -842,6 +847,17 @@ pub async fn acp_open<R: tauri::Runtime>(
         .and_then(Value::as_bool)
         .unwrap_or(false);
     let resume = resume_session_id.filter(|id| !id.trim().is_empty());
+    let app_tools = if catalog.is_empty() { None } else {
+        let tool_app = app.clone(); let tool_session = connection_id.clone();
+        let bridge = match super::app_mcp::AppMcpServer::start(catalog, Arc::new(move |payload| {
+            tauri::Emitter::emit_to(&tool_app, "main", EVENT, AcpEvent { session_id: tool_session.clone(), kind: "app-tool".into(), payload }).is_ok()
+        })).await {
+            Ok(bridge) => bridge,
+            Err(error) => { client.shutdown().await; return Err(error); }
+        };
+        if let Ok(mut servers) = client.mcp_servers.lock() { *servers = vec![bridge.descriptor()]; }
+        Some(bridge)
+    };
     let (session, agent_session_id, mut replayed) = match open_session(&client, &harness.name, &session_cwd, resume.as_deref(), can_load).await {
         Ok(result) => result,
         Err(error) => { client.shutdown().await; state.reject_pending(&connection_id); return Err(error); }
@@ -876,12 +892,14 @@ pub async fn acp_open<R: tauri::Runtime>(
         }
     });
 
-    state.insert(session_id.clone(), agent_session_id.clone(), client);
+    let app_tools_connected = app_tools.is_some();
+    state.insert(session_id.clone(), agent_session_id.clone(), client, app_tools);
     note("acp-open-ok", json!({ "name": harness.name, "sessionId": session_id }));
     // The session's own state travels with the id: the page shows the modes, models and config
     // options the agent published, and needs them before the first turn.
     Ok(json!({
         "sessionId": session_id,
+        "appToolsConnected": app_tools_connected,
         "resumeSessionId": agent_session_id,
         "harness": harness.name,
         "cwd": session_cwd,
@@ -936,12 +954,14 @@ pub async fn acp_prompt<R: tauri::Runtime>(
     text: String,
 ) -> Result<(), String> {
     let client = state.get(&session_id)?;
+    let generation = client.app_tools.as_ref().map(|tools| tools.begin_turn()).transpose()?;
     let app = app.clone();
     let session = session_id.clone();
     tokio::spawn(async move {
         let outcome = client.client
             .prompt(&client.agent_session_id, json!([{ "type": "text", "text": text }]))
             .await;
+        if let Some(tools) = &client.app_tools { tools.end_turn(generation); }
         match outcome {
             Ok(stop) => emit(
                 &app,
@@ -965,15 +985,29 @@ pub async fn acp_prompt<R: tauri::Runtime>(
 pub fn acp_cancel(state: tauri::State<'_, AcpRuntime>, session_id: String) -> Result<(), String> {
     state.reject_pending(&session_id);
     let session = state.get(&session_id)?;
+    if let Some(tools) = &session.app_tools { tools.end_turn(None); }
     session.client.cancel(&session.agent_session_id)
 }
 
 /// Close a session: the agent's process goes with it.
 #[tauri::command]
 pub async fn acp_close(state: tauri::State<'_, AcpRuntime>, session_id: String) -> Result<(), String> {
-    if let Some(session) = state.remove(&session_id) { session.client.shutdown().await; }
+    if let Some(session) = state.remove(&session_id) {
+        if let Some(tools) = &session.app_tools { tools.end_turn(None); }
+        session.client.shutdown().await;
+    }
     note("acp-closed", json!({ "sessionId": session_id }));
     Ok(())
+}
+
+#[tauri::command]
+pub fn acp_app_tool_result<R: tauri::Runtime>(
+    window: tauri::WebviewWindow<R>, state: tauri::State<'_, AcpRuntime>, session_id: String, request_id: String, payload: Value,
+) -> Result<(), String> {
+    if window.label() != "main" { return Err("application tools require the main window".into()); }
+    if session_id.len() > 128 || request_id.len() > 64 { return Err("invalid application tool request identity".into()); }
+    let session = state.get(&session_id)?;
+    session.app_tools.as_ref().ok_or("application tools are not connected")?.answer(&request_id, payload)
 }
 
 #[cfg(test)]
@@ -981,6 +1015,28 @@ mod tests {
     use super::*;
     use serde_json::json;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[tokio::test]
+    async fn application_server_descriptor_reaches_new_and_loaded_sessions() {
+        let (client_io, agent_io) = tokio::io::duplex(8192);
+        let (client_reader, client_writer) = tokio::io::split(client_io);
+        let client = AcpClient::over(client_reader, client_writer, Arc::new(|_| None));
+        let descriptor = json!({"name": "application", "command": "/fixture/helper", "args": ["--app-mcp"], "env": []});
+        *client.mcp_servers.lock().unwrap() = vec![descriptor.clone()];
+        let agent = tokio::spawn(async move {
+            let (reader, mut writer) = tokio::io::split(agent_io);
+            let mut lines = BufReader::new(reader).lines();
+            for method in ["session/new", "session/load"] {
+                let message: Value = serde_json::from_str(&lines.next_line().await.unwrap().unwrap()).unwrap();
+                assert_eq!(message["method"], method);
+                assert_eq!(message["params"]["mcpServers"], json!([descriptor.clone()]));
+                writer.write_all(format!("{}\n", json!({"jsonrpc": "2.0", "id": message["id"], "result": {"sessionId": "fixture"}})).as_bytes()).await.unwrap();
+            }
+        });
+        client.new_session("/tmp/project").await.unwrap();
+        client.load_session("fixture", "/tmp/project").await.unwrap();
+        agent.await.unwrap();
+    }
 
     #[test]
     fn idle_child_fixture() {
@@ -996,7 +1052,7 @@ mod tests {
             &["--exact".into(), "agent::acp::tests::idle_child_fixture".into(), "--nocapture".into()],
             None, &HashMap::from([("APP_ACP_TEST_CHILD".into(), "1".into())]), Arc::new(|_| None)).unwrap());
         let runtime = AcpRuntime::default();
-        runtime.insert("idle".into(), "agent-id".into(), client.clone());
+        runtime.insert("idle".into(), "agent-id".into(), client.clone(), None);
         let pump_client = client.clone();
         let pump = tokio::spawn(async move { pump_client.next_event().await });
         let request_client = client.clone();
@@ -1047,8 +1103,8 @@ mod tests {
         let runtime = AcpRuntime::default();
         let (first, first_agent) = client_pair(Arc::new(Mutex::new(Vec::new())), Arc::new(|_| None));
         let (second, second_agent) = client_pair(Arc::new(Mutex::new(Vec::new())), Arc::new(|_| None));
-        runtime.insert("local-a".into(), "same-agent-id".into(), Arc::new(first));
-        runtime.insert("local-b".into(), "same-agent-id".into(), Arc::new(second));
+        runtime.insert("local-a".into(), "same-agent-id".into(), Arc::new(first), None);
+        runtime.insert("local-b".into(), "same-agent-id".into(), Arc::new(second), None);
         runtime.remove("local-a").unwrap().client.shutdown().await;
         assert!(!runtime.get("local-b").unwrap().client.closed.load(Ordering::SeqCst));
         runtime.remove("local-b").unwrap().client.shutdown().await;

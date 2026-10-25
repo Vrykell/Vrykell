@@ -79,6 +79,7 @@ export interface AcpConfigOption {
 }
 
 export interface HarnessOpenResult {
+  appToolsConnected?: boolean;
   sessionId: string;
   /** Agent-owned history id; the live session id is local to the client runtime. */
   resumeSessionId?: string;
@@ -97,7 +98,7 @@ export interface HarnessOpenResult {
 /** What the backend pushes while a session lives. */
 export interface AcpSessionEvent {
   sessionId: string;
-  kind: 'update' | 'permission' | 'stop' | 'error';
+  kind: 'update' | 'permission' | 'stop' | 'error' | 'app-tool';
   payload: Record<string, unknown>;
 }
 
@@ -111,8 +112,11 @@ export const acpHandshake = (name: string) => invoke<AgentDescription>('acp_hand
 
 /** Start a harness and open a session in `cwd` (`cwd` empty means the app's own working directory).
  *  Passing `resumeSessionId` reopens that session and replays its conversation instead. */
-export const acpOpen = (name: string, cwd: string, resumeSessionId?: string) =>
-  invoke<HarnessOpenResult>('acp_open', { name, cwd, resumeSessionId: resumeSessionId ?? null });
+export const acpOpen = (name: string, cwd: string, resumeSessionId?: string, appTools?: Array<{ name: string; description?: string; inputSchema: Record<string, unknown> }>) =>
+  invoke<HarnessOpenResult>('acp_open', { name, cwd, resumeSessionId: resumeSessionId ?? null, appTools: appTools ?? null });
+
+export const acpAppToolResult = (sessionId: string, requestId: string, payload: unknown) =>
+  invoke<void>('acp_app_tool_result', { sessionId, requestId, payload });
 
 /** Send a prompt; the turn's content and its stop reason arrive as events. */
 export const acpPrompt = (sessionId: string, text: string) => invoke<void>('acp_prompt', { sessionId, text });

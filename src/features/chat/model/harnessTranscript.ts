@@ -66,13 +66,18 @@ function appendText(message: ChatMessage, text: string): ChatMessage {
   return { ...message, parts: nextParts };
 }
 
-function upsertTool(messages: ChatMessage[], run: ToolRun): ChatMessage[] {
+export function upsertHarnessTool(messages: ChatMessage[], run: ToolRun, context: Pick<ChatMessage, 'paneId' | 'environment'> = {}): ChatMessage[] {
   const index = messages.findIndex((message) =>
     message.parts?.some((part) => part.kind === 'tool' && part.tool.toolCallId === run.toolCallId));
   if (index < 0) {
+    const last = lastMessage(messages);
+    if (last?.role === 'assistant') return withLast(messages, message => ({
+      ...message, ...context, parts: [...(message.parts ?? (message.content ? [{ kind: 'text' as const, text: message.content }] : [])), { kind: 'tool', tool: run }],
+    }));
     // A tool report without a message yet opens one, so the row never floats without context.
     return [...messages, {
       id: nextId('harness-assistant'), role: 'assistant', content: '', createdAt: Date.now(),
+      ...context,
       parts: [{ kind: 'tool', tool: run }],
     }];
   }
@@ -92,6 +97,19 @@ function upsertTool(messages: ChatMessage[], run: ToolRun): ChatMessage[] {
     });
     return { ...message, parts };
   });
+}
+
+export function groupHarnessMessages(messages: ChatMessage[]): ChatMessage[] {
+  const grouped: ChatMessage[] = [];
+  for (const message of messages) {
+    const previous = lastMessage(grouped);
+    if (message.role !== 'assistant' || previous?.role !== 'assistant') { grouped.push(message); continue; }
+    const parts = (value: ChatMessage) => value.parts ?? (value.content ? [{ kind: 'text' as const, text: value.content }] : []);
+    grouped[grouped.length - 1] = { ...previous, parts: [...parts(previous), ...parts(message)],
+      reasoning: (previous.reasoning ?? '') + (message.reasoning ?? ''), pending: message.pending,
+      error: message.error ?? previous.error, stopped: message.stopped ?? previous.stopped };
+  }
+  return grouped;
 }
 
 /**
@@ -151,19 +169,21 @@ export function applyHarnessUpdate(messages: ChatMessage[], payload: Record<stri
     case 'tool_call_update': {
       const toolCallId = String(update.toolCallId ?? '');
       if (!toolCallId) return messages;
+      const previous = messages.flatMap(message => message.parts ?? []).find(part => part.kind === 'tool' && part.tool.toolCallId === toolCallId);
+      const existing = previous?.kind === 'tool' ? previous.tool : undefined;
       const title = typeof update.title === 'string' ? update.title : '';
       const run: ToolRun = {
         toolCallId,
         // Our card falls back to the provided title for tools it does not know (the ACP case).
-        toolName: typeof update.kind === 'string' ? update.kind : 'other',
+        toolName: typeof update.kind === 'string' ? update.kind : existing?.toolName ?? 'other',
         input: { ...(title ? { title } : {}), ...(update.rawInput ? { rawInput: update.rawInput } : {}) },
-        state: toolState(update.status),
-        startedAt: Date.now(),
+        state: update.status === undefined && existing ? existing.state : toolState(update.status),
+        startedAt: existing?.startedAt ?? Date.now(),
       };
       const body = contentText(update.content);
       if (body) run.output = body;
       if (update.status === 'failed') run.error = body || 'the harness reported a failure';
-      return upsertTool(messages, run);
+      return upsertHarnessTool(messages, run);
     }
     default:
       return messages;

@@ -8,10 +8,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useHarnessStore } from '@features/chat/stores/harness';
 import { useHarnessSessionRefs } from '@features/chat/stores/harnessSessions';
-import { acpClose, acpOpen, acpSetConfigOption, acpSetMode, acpSetModel, type HarnessOpenResult } from '@platform/api/acp';
+import { acpClose, acpOpen, acpAppToolResult, acpSetConfigOption, acpSetMode, acpSetModel, type HarnessOpenResult } from '@platform/api/acp';
+import { answerUserQuestion, questionKey, useUserQuestions } from '@features/agent/services/userQuestions';
 
 vi.mock('@platform/api/acp', () => ({
   acpAnswerPermission: vi.fn(async () => undefined),
+  acpAppToolResult: vi.fn(async () => undefined),
   acpCancel: vi.fn(async () => undefined),
   acpClose: vi.fn(async () => undefined),
   acpOpen: vi.fn(async () => ({
@@ -64,6 +66,42 @@ beforeEach(async () => {
 });
 
 describe('harness session state', () => {
+  it('rotates the authorization identity when the execution target changes', () => {
+    const original = current().toolContextId;
+    useHarnessStore.setState({ byTab: { [TAB]: { ...current(), executionPaneId: 'previous-target' } } });
+    useHarnessStore.getState().setExecutionPane(TAB, null);
+    expect(current().toolContextId).not.toBe(original);
+    expect(current().executionPaneId).toBeNull();
+    const scope = current().toolContextId;
+    useHarnessStore.setState({ byTab: { [TAB]: { ...current(), executionPaneId: 'previous-target', pending: true } } });
+    useHarnessStore.getState().setExecutionPane(TAB, null);
+    expect(current().executionPaneId).toBe('previous-target');
+    expect(current().toolContextId).toBe(scope);
+  });
+  it('routes application questions into the owning transcript and returns the answer to that session', async () => {
+    vi.mocked(acpAppToolResult).mockClear();
+    await useHarnessStore.getState().prompt(TAB, 'Ask before changing files');
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'app-tool', payload: { method: 'call', requestId: 'question', name: 'ask_user', arguments: { question: 'Choose a folder', options: ['Project'] } } });
+    const key = questionKey(current().toolContextId ?? TAB, 'app-mcp-question');
+    await vi.waitFor(() => expect(useUserQuestions.getState().pending[key]).toBeTruthy());
+    expect(current().messages.some(message => message.parts?.some(part => part.kind === 'tool' && part.tool.state === 'input-pending'))).toBe(true);
+    answerUserQuestion(key, 'Project');
+    await vi.waitFor(() => expect(acpAppToolResult).toHaveBeenCalledWith(SESSION, 'question', expect.objectContaining({ isError: false })));
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'end_turn' } });
+  });
+
+  it('rejects unbound terminal calls and cancels questions when the turn stops', async () => {
+    vi.mocked(acpAppToolResult).mockClear();
+    await useHarnessStore.getState().prompt(TAB, 'Do not choose a terminal implicitly');
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'app-tool', payload: { method: 'call', requestId: 'run', name: 'run_command', arguments: { command: 'echo test' } } });
+    await vi.waitFor(() => expect(acpAppToolResult).toHaveBeenCalledWith(SESSION, 'run', expect.objectContaining({ isError: true })));
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'app-tool', payload: { method: 'call', requestId: 'cancel', name: 'ask_user', arguments: { question: 'Continue?' } } });
+    const key = questionKey(current().toolContextId ?? TAB, 'app-mcp-cancel');
+    await vi.waitFor(() => expect(useUserQuestions.getState().pending[key]).toBeTruthy());
+    await useHarnessStore.getState().cancel(TAB);
+    await vi.waitFor(() => expect(useUserQuestions.getState().pending[key]).toBeUndefined());
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'cancelled' } });
+  });
   it('forgets only the requested saved reference without replacing a newer session', () => {
     useHarnessSessionRefs.getState().remember('Agent', { sessionId: 'newer', cwd: '/project', at: 20 });
     useHarnessSessionRefs.getState().forget('Agent', 'older');
@@ -140,11 +178,11 @@ describe('harness session state', () => {
     useHarnessStore.setState({ byTab: {} });
     await useHarnessStore.getState().open(TAB, 'Claude Code', '/tmp/project');
 
-    expect(acpOpen).toHaveBeenCalledWith('Claude Code', '/tmp/project', 'older');
+    expect(acpOpen).toHaveBeenCalledWith('Claude Code', '/tmp/project', 'older', expect.arrayContaining([expect.objectContaining({ name: 'ask_user' })]));
     const transcript = JSON.stringify(current().messages);
     expect(transcript).toContain('earlier question');
     expect(transcript).toContain('earlier answer');
-    expect(current().note).toBe('已恢复上次的对话。');
+    expect(current().note).toBeNull();
     expect(useHarnessSessionRefs.getState().refs['Claude Code']?.sessionId).toBe('older');
   });
 
@@ -158,7 +196,7 @@ describe('harness session state', () => {
       modes: null, models: null, configOptions: null });
     await useHarnessStore.getState().open('second-connection', 'Claude Code', '/tmp/project', true);
 
-    expect(acpOpen).toHaveBeenLastCalledWith('Claude Code', '/tmp/project', undefined);
+    expect(acpOpen).toHaveBeenLastCalledWith('Claude Code', '/tmp/project', undefined, expect.arrayContaining([expect.objectContaining({ name: 'read_file' })]));
     expect(acpClose).toHaveBeenCalledTimes(closed);
     expect(current()).toBe(previous);
     expect(useHarnessSessionRefs.getState().refs['Claude Code']?.sessionId).toBe('fresh-history');

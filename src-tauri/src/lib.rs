@@ -17,6 +17,7 @@ use std::sync::Mutex;
 use tauri::Manager;
 
 pub fn run_ssh_proxy_helper() -> Option<i32> { ssh_proxy::helper_exit_code() }
+pub fn run_app_mcp_helper() -> Option<i32> { agent::app_mcp::run_helper() }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -259,6 +260,7 @@ pub fn run() {
             agent::acp::acp_set_config_option,
             agent::acp::acp_close,
             agent::acp::acp_answer_permission,
+            agent::acp::acp_app_tool_result,
             files::file_open::file_open,
             files::file_open::file_open_with,
             commands::search::search_files,

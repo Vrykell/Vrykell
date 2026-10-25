@@ -3,11 +3,11 @@ import { useHarnessStore } from './harness';
 import { useComposerDrafts } from './composerDrafts';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
-export interface HarnessConnection { id: string; harness: string; cwd: string; fresh: boolean }
+export interface HarnessConnection { id: string; harness: string; cwd: string; fresh: boolean; resumeSessionId?: string }
 interface HarnessWorkspaceState {
   connections: HarnessConnection[];
   selected: string;
-  connect: (harness: string, cwd?: string, fresh?: boolean) => string;
+  connect: (harness: string, cwd?: string, fresh?: boolean, resumeSessionId?: string) => string;
   select: (id: string) => void;
   close: (ids: string[]) => void;
   move: (id: string, over: string, after: boolean) => void;
@@ -17,11 +17,11 @@ let sequence = 0;
 /** Workspace navigation is independent from each connection's protocol state. */
 export const useHarnessWorkspace = create<HarnessWorkspaceState>((set, get) => ({
   connections: [], selected: '',
-  connect: (harness, cwd = '', fresh = false) => {
-    const existing = !fresh && get().connections.find(item => item.harness === harness && item.cwd === cwd);
+  connect: (harness, cwd = '', fresh = false, resumeSessionId) => {
+    const existing = !fresh && get().connections.find(item => item.harness === harness && item.cwd === cwd && item.resumeSessionId === resumeSessionId);
     if (existing) { set({ selected: existing.id }); return existing.id; }
     const id = `harness-${Date.now()}-${sequence++}`;
-    set(state => ({ connections: [...state.connections, { id, harness, cwd, fresh }], selected: id }));
+    set(state => ({ connections: [...state.connections, { id, harness, cwd, fresh, ...(resumeSessionId ? { resumeSessionId } : {}) }], selected: id }));
     terminalDebug('harness-connection-added', { connectionId: id, hasDirectory: !!cwd });
     return id;
   },

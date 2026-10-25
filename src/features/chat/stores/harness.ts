@@ -8,15 +8,19 @@
 import { create } from 'zustand';
 import { t } from '@i18n';
 import type { ChatMessage } from '@features/chat';
-import { applyHarnessUpdate, harnessUpdate } from '@features/chat/model/harnessTranscript';
+import { applyHarnessUpdate, harnessUpdate, upsertHarnessTool } from '@features/chat/model/harnessTranscript';
 import {
   acpAnswerPermission, acpCancel, acpClose, acpOpen, acpPrompt, acpSetConfigOption, acpSetMode, acpSetModel,
-  onAcpSession,
+  onAcpSession, acpAppToolResult,
   type AcpConfigOption, type AcpSessionEvent, type AcpSessionModes, type AcpSessionModels, type AgentDescription,
 } from '@platform/api/acp';
 import { useUsageStore } from '@features/agent/stores/usage';
 import { useHarnessSessionRefs } from './harnessSessions';
 import { useToastStore } from '@ui/feedback/Toast';
+import { ApplicationToolSession, applicationToolCatalog } from '@features/agent/services/applicationTools';
+import { clearSessionGrants } from '@features/agent/stores/permissions';
+import { executionPaneSpec } from '@features/agent/services/executionTarget';
+import { environmentForPane } from '../services/conversationContext';
 
 /** One step of the plan an agent publishes while it works. */
 export interface HarnessPlanEntry {
@@ -34,6 +38,9 @@ export interface HarnessCommand {
 }
 
 export interface HarnessSession {
+  appToolsConnected?: boolean;
+  executionPaneId?: string | null;
+  toolContextId?: string;
   harness: string;
   sessionId: string | null;
   /** The directory the session runs in; a restart reopens there. */
@@ -72,8 +79,9 @@ export interface HarnessSession {
 }
 
 interface HarnessStore {
+  setExecutionPane: (tabId: string, paneId: string | null) => void;
   byTab: Record<string, HarnessSession>;
-  open: (tabId: string, harness: string, cwd: string, fresh?: boolean) => Promise<void>;
+  open: (tabId: string, harness: string, cwd: string, fresh?: boolean, resumeSessionId?: string) => Promise<void>;
   prompt: (tabId: string, text: string) => Promise<void>;
   cancel: (tabId: string) => Promise<void>;
   close: (tabId: string) => Promise<void>;
@@ -99,6 +107,9 @@ const fresh = (harness: string): HarnessSession => ({
 const tabOfSession = new Map<string, string>();
 const openingEvents = new Map<string, AcpSessionEvent[]>();
 let binding: Promise<void> | null = null;
+const applicationSessions = new Map<string, ApplicationToolSession>();
+let toolScopeSequence = 0;
+function stopApplicationTools(tabId: string) { applicationSessions.get(tabId)?.close(); applicationSessions.delete(tabId); }
 
 /** Subscribe to the backend's events once; every harness page calls this on mount. */
 export function bindHarnessEvents(): Promise<void> {
@@ -121,7 +132,14 @@ function patch(tabId: string, update: (session: HarnessSession) => HarnessSessio
 export const useHarnessStore = create<HarnessStore>()((set, get) => ({
   byTab: {},
 
-  open: async (tabId, harness, cwd, newSession = false) => {
+  setExecutionPane: (tabId, paneId) => {
+    const session = get().byTab[tabId];
+    if (!session || session.pending || (session.executionPaneId ?? null) === paneId || (paneId && !executionPaneSpec(paneId))) return;
+    clearSessionGrants(session.toolContextId ?? tabId);
+    patch(tabId, current => ({ ...current, executionPaneId: paneId, toolContextId: `${session.sessionId}:app:${++toolScopeSequence}` }));
+  },
+
+  open: async (tabId, harness, cwd, newSession = false, resumeSessionId) => {
     // One open per tab prevents a remount racing the first attempt from starting an extra process.
     if (get().byTab[tabId]?.opening) return;
     if (!(tabId in get().byTab)) {
@@ -134,8 +152,8 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       // agent replays it and the replay travels back with the open result. A stale reference (a
       // deleted session, another directory) falls back to a new session inside the backend.
       const stored = useHarnessSessionRefs.getState().refs[harness];
-      const resume = !newSession && stored && (!cwd || stored.cwd === cwd) ? stored.sessionId : undefined;
-      const result = await acpOpen(harness, cwd, resume);
+      const resume = resumeSessionId ?? (!newSession && stored && (!cwd || stored.cwd === cwd) ? stored.sessionId : undefined);
+      const result = await acpOpen(harness, cwd, resume, applicationToolCatalog());
       tabOfSession.set(result.sessionId, tabId);
       const known = get().byTab[tabId];
       if (!known) {
@@ -152,9 +170,9 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       const replayed = result.replayed ?? [];
       patch(tabId, (current) => replayEvents({
         ...current, opening: false, sessionId: result.sessionId, cwd: result.cwd || cwd,
-        agent: result.agent, error: null,
+        agent: result.agent, error: null, appToolsConnected: result.appToolsConnected ?? false, toolContextId: `${result.sessionId}:app:${++toolScopeSequence}`,
         modes: result.modes ?? null, models: result.models ?? null, configOptions: result.configOptions ?? null,
-        note: replayed.length > 0 ? t('Resumed the previous conversation.') : current.note,
+        note: null,
       }, replayed));
       const queued = openingEvents.get(result.sessionId) ?? [];
       openingEvents.delete(result.sessionId);
@@ -173,14 +191,22 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       id: `harness-question-${Date.now()}`, role: 'user', content: text.trim(), createdAt: Date.now(),
     };
     patch(tabId, (current) => ({ ...current, messages: [...current.messages, question], pending: true, note: null, error: null }));
+    stopApplicationTools(tabId);
+    const paneId = session.executionPaneId ?? null;
+    const toolEnvironment = paneId ? environmentForPane(paneId) : null;
+    applicationSessions.set(tabId, new ApplicationToolSession({ tabId: session.toolContextId ?? tabId, paneId, remote: executionPaneSpec(paneId)?.kind === 'ssh' }, run => {
+      patch(tabId, current => ({ ...current, messages: upsertHarnessTool(current.messages, run, { paneId: paneId ?? undefined, environment: toolEnvironment }) }));
+    }));
     try {
       await acpPrompt(session.sessionId, text.trim());
     } catch (error) {
+      stopApplicationTools(tabId);
       patch(tabId, (current) => ({ ...current, pending: false, error: String((error as Error)?.message ?? error) }));
     }
   },
 
   cancel: async (tabId) => {
+    stopApplicationTools(tabId);
     const session = get().byTab[tabId];
     if (!session?.sessionId) return;
     try {
@@ -234,7 +260,9 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
   },
 
   close: async (tabId) => {
+    stopApplicationTools(tabId);
     const session = get().byTab[tabId];
+    clearSessionGrants(session?.toolContextId ?? tabId);
     set((state) => {
       const { [tabId]: _dropped, ...rest } = state.byTab;
       return { byTab: rest };
@@ -274,6 +302,18 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       return;
     }
     const session = get().byTab[tabId];
+    if (event.kind === 'app-tool') {
+      if (event.payload.method === 'cancel') { stopApplicationTools(tabId); return; }
+      const requestId = event.payload.requestId;
+      const name = event.payload.name;
+      if (typeof requestId !== 'string' || typeof name !== 'string') return;
+      const tools = applicationSessions.get(tabId);
+      const result = session?.pending && tools ? tools.call(requestId, name, event.payload.arguments)
+        : Promise.resolve({ content: [{ type: 'text', text: 'The agent turn is no longer active.' }], isError: true });
+      void result.then(payload => acpAppToolResult(event.sessionId, requestId, payload)).catch(() => undefined);
+      return;
+    }
+    if (event.kind === 'stop' || event.kind === 'error') stopApplicationTools(tabId);
     // The usage panel counts what the ACP servers report about their own sessions. A loaded
     // conversation arrives through `replayEvents`, which must not count it a second time.
     if (session) recordAcpEvent(session.harness, event);

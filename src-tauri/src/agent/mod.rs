@@ -2,6 +2,7 @@
 pub mod agents;
 pub mod ai;
 pub mod acp;
+pub mod app_mcp;
 pub mod mcp;
 pub mod memory;
 pub mod permissions;
