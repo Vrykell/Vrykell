@@ -475,6 +475,11 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 ### 10.13 Batch-Cleaning Up Listener/Timer Leaks (`2114f6c`)
 - Numerous addEventListener/setTimeout calls had no matching cleanup; the Toast auto-dismiss path also had to clear its timer, or a manual close/hover-pause leaves it behind (`Toast.tsx:36`). The PTY output listener should be **registered globally once** and track the sessionId in a ref, rather than registered per session (`a1d0a13`, the same lesson from the v1 period).
 
+### 10.14 A Terminal in the Unified Workspace Still Judged Visibility from Its Native Tab → No Keyboard Input for a Running Block and a Blank Manual Fullscreen
+- **Symptom**: after a terminal pane was placed in the unified workspace, a running command could not receive keyboard input; entering fullscreen interaction showed a blank surface; returning to the terminal workspace took a noticeably long time to recover.
+- **Root cause**: `ResourceContent` moved the terminal host out of the native tab's DOM, but keyboard focus and the manual-fullscreen host were still driven by `SessionTabView`'s `active` flag. In the unified workspace the active id is a terminal session while the area is `unified`, so `contentVisible` is false and neither the focus hook nor the top-level fullscreen host rendered; the running block host was hidden by `showBlocks=false`, leaving the fullscreen surface blank. `RunningTerm` looked up its host only when the fullscreen flag changed, so an area switch never rebound it.
+- **Fix**: focus dispatch and the manual-fullscreen host moved down to `TerminalPane`, using the `ResourceContentSlot` focus for placed panes. A placed pane renders the fullscreen host inside its own bounds, while the native area keeps the top-level `TerminalView` host; `RunningTerm` rebinds when the area or unified tab changes. Regression: `unified-running-block.spec.ts`, `TerminalView.lifecycle.test.tsx`, `useManualFullscreenVisible.test.tsx`.
+
 ---
 
 ## 11. AI / LLM / Streaming

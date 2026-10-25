@@ -475,6 +475,11 @@
 ### 10.13 监听器/计时器泄漏批量清理（`2114f6c`）
 - 多处 addEventListener/setTimeout 无对应清理；Toast 自动消失路径也要清计时器表，否则手动关闭/悬停暂停后残留（`Toast.tsx:36`）。PTY 输出监听器应**全局注册一次** + ref 跟踪 sessionId，而不是每会话注册（`a1d0a13`，v1 时期同款教训）。
 
+### 10.14 聚合工作区的终端仍按原生标签页判断可见性 → 运行块收不到键盘、手动全屏空白
+- **现象**：终端窗格拖入聚合工作区后，运行中的命令无法输入；点「进入全屏交互」后画面为空；切回终端工作区后要等一段时间才恢复。
+- **根因**：聚合窗格通过 `ResourceContent` 把终端宿主移出原生标签页的 DOM，但键盘焦点和手动全屏宿主仍由 `SessionTabView` 的 `active` 驱动。聚合时 `activeId` 是终端会话、`area` 是 `unified`，`contentVisible` 为 false，焦点 hook 与顶层全屏宿主都不渲染；运行块终端又因 `showBlocks=false` 被隐藏，于是全屏为空。`RunningTerm` 只在全屏状态变化时寻找宿主，区域切换后不会重新绑定。
+- **修复**：焦点调度和手动全屏宿主下沉到 `TerminalPane`，放置状态使用 `ResourceContentSlot` 的 `focused`。聚合窗格在自身范围内渲染全屏宿主，原生区域继续使用 `TerminalView` 顶层宿主；`RunningTerm` 在区域或聚合标签变化时重新绑定宿主。回归：`unified-running-block.spec.ts`、`TerminalView.lifecycle.test.tsx`、`useManualFullscreenVisible.test.tsx`。
+
 ---
 
 ## 十一、AI / LLM / 流式
