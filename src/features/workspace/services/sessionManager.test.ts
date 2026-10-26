@@ -22,6 +22,18 @@ beforeEach(() => {
 });
 
 describe('sessionManager 生命周期', () => {
+  it('classifies drafts without writing them and waits for existing first writes', async () => {
+    invokeMock.mockResolvedValue(undefined);
+    await sessionManager.create('group-draft', 'Draft');
+    expect(await sessionManager.persistedSessionIds(['group-draft', 'saved'])).toEqual(new Set(['saved']));
+    expect(invokeMock).not.toHaveBeenCalled();
+    let finish!: () => void;
+    invokeMock.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    const saving = sessionManager.ensureContentSession('group-draft');
+    const classified = sessionManager.persistedSessionIds(['group-draft']);
+    finish(); await saving;
+    expect(await classified).toEqual(new Set(['group-draft']));
+  });
   it('retains metadata changes made while the first insert is in flight', async () => {
     let finish!: () => void;
     invokeMock.mockResolvedValue(undefined);

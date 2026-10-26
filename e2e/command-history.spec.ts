@@ -652,6 +652,12 @@ test('previews and applies AI grouping in command history and session tabs witho
   expect(await page.evaluate(() => (window as unknown as { __PTY_WRITES__: string[] }).__PTY_WRITES__.length)).toBe(writes);
   await ensureTabsOpen(page);
   const ids = await page.evaluate(async () => { const { useWorkspaceStore } = await import('/src/features/workspace/stores/workspace.ts'); const store = useWorkspaceStore.getState(); store.addTab({ title: 'Deploy' }); store.addTab({ title: 'Logs' }); return useWorkspaceStore.getState().tabs.filter(tab => tab.kind === 'session').map(tab => tab.id); });
+  // Reload assertions need saved session fixtures; untouched draft tabs intentionally do not restore.
+  await page.evaluate(async ids => {
+    const path = '/src/features/workspace/services/sessionManager.ts';
+    const { ensureContentSession } = await import(path) as typeof import('../src/features/workspace/services/sessionManager');
+    await Promise.all(ids.map(id => ensureContentSession(id)));
+  }, ids);
   await page.evaluate(ids => { (window as unknown as { __AI_REPLY__: string }).__AI_REPLY__ = JSON.stringify({ groups: [{ name: 'Operations', itemIds: ids.slice(0, 2) }, { name: 'Monitoring', itemIds: ids.slice(2) }] }); }, ids);
   await page.getByTestId(`tab-row-${ids[0]}`).click({ button: 'right' });
   const tabPopup = page.waitForEvent('popup');

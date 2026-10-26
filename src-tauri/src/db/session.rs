@@ -15,7 +15,7 @@ impl HistoryDb {
         let mut ids = std::collections::HashSet::new();
         let mut members = std::collections::HashSet::new();
         for (offset, group) in groups.iter().enumerate() {
-            if group.id.is_empty() || !ids.insert(&group.id) || group.title.trim().is_empty() || group.title.len() > 320 || group.item_ids.is_empty() { return Err("Invalid group plan".into()); }
+            if group.id.is_empty() || !ids.insert(&group.id) || group.title.trim().is_empty() || group.title.len() > 320 { return Err("Invalid group plan".into()); }
             tx.execute("INSERT INTO groups(id,title,sort_order,collapsed,created_at) VALUES(?1,?2,?3,0,CAST(strftime('%s','now') AS INTEGER)*1000)
                 ON CONFLICT(id) DO UPDATE SET title=excluded.title", params![group.id, group.title.trim(), next + offset as i64]).map_err(|e| e.to_string())?;
             let start: i64 = tx.query_row("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM sessions WHERE group_id=?1", [&group.id], |row| row.get(0)).map_err(|e| e.to_string())?;
@@ -626,6 +626,14 @@ fn map_chat_message(row: &rusqlite::Row) -> rusqlite::Result<ChatMessageEntry> {
 #[cfg(test)]
 mod grouping_tests {
     use super::*;
+    #[test]
+    fn reviewed_groups_can_hold_only_unpersisted_draft_tabs() {
+        let db = HistoryDb::open_in_memory();
+        db.apply_group_plan(&[GroupAssignment { id: "draft-group".into(), title: "Drafts".into(), item_ids: Vec::new() }]).unwrap();
+        assert_eq!(db.list_groups().unwrap()[0].title, "Drafts");
+        let count: i64 = db.conn().query_row("SELECT COUNT(*) FROM sessions", [], |row| row.get(0)).unwrap();
+        assert_eq!(count, 0);
+    }
     #[test]
     fn reviewed_grouping_is_atomic_and_preserves_other_sessions() {
         let db = HistoryDb::open_in_memory();

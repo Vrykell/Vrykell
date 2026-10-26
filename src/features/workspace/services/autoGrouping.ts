@@ -2,6 +2,7 @@ import { t } from '@i18n';
 import { applyTabGroups } from '@platform/api/group';
 import { useWorkspaceStore, isSessionTab } from '../stores/workspace';
 import type { GroupingProposal } from '@features/agent/services/autoGrouping';
+import { persistedSessionIds } from './sessionManager';
 
 export async function applySessionGrouping(proposals: GroupingProposal[]): Promise<void> {
   const before = useWorkspaceStore.getState();
@@ -11,7 +12,10 @@ export async function applySessionGrouping(proposals: GroupingProposal[]): Promi
     id: before.groups.find(group => group.title.toLowerCase() === proposal.name.toLowerCase())?.id ?? crypto.randomUUID(),
     title: proposal.name, itemIds: proposal.itemIds,
   }));
-  await applyTabGroups(assignments);
+  const persisted = await persistedSessionIds(assignments.flatMap(group => group.itemIds));
+  const current = new Set(useWorkspaceStore.getState().tabs.filter(isSessionTab).map(tab => tab.id));
+  if (assignments.some(group => group.itemIds.some(id => !current.has(id)))) throw new Error(t('Items changed. Generate a new grouping plan.'));
+  await applyTabGroups(assignments.map(group => ({ ...group, itemIds: group.itemIds.filter(id => persisted.has(id)) })));
   useWorkspaceStore.setState(state => {
     const groups = [...state.groups]; let tabs = [...state.tabs];
     for (const group of assignments) {

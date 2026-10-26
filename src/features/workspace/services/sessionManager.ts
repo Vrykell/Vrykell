@@ -88,6 +88,12 @@ export async function create(
 
 const pendingSessions = new Map<string, { title: string; timestamp: number; cwd?: string; kind: string; payload: string }>();
 const sessionWrites = new Map<string, Promise<void>>();
+/** Group draft tabs in memory without creating empty history records. */
+export async function persistedSessionIds(ids: readonly string[]): Promise<Set<string>> {
+  await Promise.all(ids.map(id => sessionWrites.get(id) ?? Promise.resolve()));
+  return new Set(ids.filter(id => !pendingSessions.has(id)));
+}
+
 export function ensureContentSession(tabId: string): Promise<void> {
   const pending = pendingSessions.get(tabId); if (!pending) return Promise.resolve();
   const existing = sessionWrites.get(tabId); if (existing) return existing;
