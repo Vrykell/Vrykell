@@ -6,6 +6,7 @@ import { diagnostic } from '@platform/diagnostics';
 import type { EditorVimCommand } from '@core/editor';
 import { bindEditorVimCommands, registerEditorVimCommands, type VimApi } from '@ui/editor/code/vimCommands';
 import { guardModalComposition } from '@ui/editor/code/modalCompositionGuard';
+import { replayVimText } from '@ui/editor/code/vimInput';
 import { useToastStore } from '@ui/feedback/Toast';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import { t } from '@i18n';
@@ -73,7 +74,8 @@ export default function CodeEditor({ path, value, onChange, onSave, onVimCommand
       const initialized = initVimMode(instance.current.view, vimStatus.current);
       let acceptsText = false;
       initialized.on('vim-mode-change', (change: { mode?: string }) => { acceptsText = change.mode === 'insert' || change.mode === 'replace'; });
-      if (host.current) unguardComposition = guardModalComposition(host.current, () => acceptsText);
+      if (host.current) unguardComposition = guardModalComposition(host.current, () => acceptsText,
+        text => replayVimText(initialized, vimStatus.current, text));
       initialized.openNotification = (content: unknown) => { const message = content instanceof Node ? content.textContent : String(content); if (message) useToastStore.getState().addToast(message, 'info'); };
       promptObserver = new MutationObserver(() => {
         const input = vimStatus.current?.querySelector('input');

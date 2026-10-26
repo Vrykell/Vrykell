@@ -3,7 +3,7 @@ import { setupTauriMock } from './tauri-mock';
 
 test.setTimeout(60_000);
 test.beforeEach(async ({ page }) => {
-  await setupTauriMock(page.context(), { schedulesSeed: [] });
+  await setupTauriMock(page.context(), {});
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/navigation.ts';
@@ -98,6 +98,44 @@ test('supports modal editing and writes through the same save path in Vim mode',
   await page.keyboard.type(':wq'); await page.keyboard.press('Enter');
   await expect(page.getByTestId('code-start-page')).toBeVisible();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mock-editor-files') || '{}')['["","/home/e2e/modal.txt"]'])).toContain('updated note');
+});
+
+test('keeps native composition available in editor overlays', async ({ page }) => {
+  await editorMenu(page, 'Vim 模式');
+  const status = page.getByTestId('file-editor').locator('.code-editor-vim-status');
+  await expect(status).toContainText('NORMAL', { timeout: 15_000 });
+  await editorMenu(page, '查找');
+  const widget = page.getByTestId('file-editor').locator('.find-widget');
+  await expect(widget).toBeVisible();
+  const field = widget.locator('textarea').first();
+  await field.focus();
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.imeSetComposition', { text: 'nihao', selectionStart: 5, selectionEnd: 5 });
+  await cdp.send('Input.insertText', { text: '你好' });
+  await expect(field).toHaveValue('你好');
+  await cdp.detach();
+});
+
+test('turns committed composition text into normal-mode commands', async ({ page }) => {
+  await editorMenu(page, 'Vim 模式');
+  const status = page.getByTestId('file-editor').locator('.code-editor-vim-status');
+  await expect(status).toContainText('NORMAL', { timeout: 15_000 });
+  const editor = page.getByTestId('file-editor');
+  const textarea = editor.locator('textarea.inputarea');
+  await textarea.focus();
+  await page.keyboard.press('i');
+  await page.keyboard.insertText('ime note');
+  await page.keyboard.press('Escape');
+  await textarea.focus();
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Input.imeSetComposition', { text: ':w', selectionStart: 2, selectionEnd: 2 });
+  await cdp.send('Input.insertText', { text: ':w' });
+  await expect(editor.getByRole('textbox', { name: 'Vim 命令' })).toHaveValue('w');
+  await destination(page, '/home/e2e/ime.txt');
+  await page.keyboard.press('Enter');
+  await expect(editor.locator('.folder-path')).toContainText('/home/e2e/ime.txt');
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mock-editor-files') || '{}')['["","/home/e2e/ime.txt"]'])).toBe('ime note');
+  await cdp.detach();
 });
 
 test('keeps native composition out of normal mode and does not replay a blocked preedit', async ({ page }) => {

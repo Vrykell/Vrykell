@@ -1,19 +1,20 @@
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import { guardModalComposition } from '@ui/editor/code/modalCompositionGuard';
 
 const types = ['compositionstart', 'compositionupdate', 'compositionend', 'beforeinput', 'input'] as const;
 const compositionEvents = ['compositionstart', 'compositionupdate', 'input', 'compositionupdate', 'input', 'compositionend', 'input'];
 
-function setup(value = '', accepts = false) {
+function setup(value = '', accepts = false, onCommitted?: (text: string) => void) {
   const host = document.createElement('div');
   const textarea = document.createElement('textarea');
+  textarea.className = 'inputarea';
   host.append(textarea);
   document.body.append(host);
   textarea.value = value;
   let accepting = accepts;
   const seen: string[] = [];
   for (const type of types) textarea.addEventListener(type, () => seen.push(type));
-  const dispose = guardModalComposition(host, () => accepting);
+  const dispose = guardModalComposition(host, () => accepting, onCommitted);
   return { host, textarea, seen, dispose, setAccepting: (next: boolean) => { accepting = next; } };
 }
 
@@ -51,6 +52,22 @@ it('delivers composition unchanged while the editor accepts text', () => {
   dispose();
 });
 
+it('hands committed text to the replay callback after blocking a composition', () => {
+  const committed = vi.fn();
+  const { textarea, dispose } = setup('', false, committed);
+  compose(textarea);
+  expect(committed).toHaveBeenCalledWith('你好');
+  dispose();
+});
+
+it('does not replay a composition that the editor accepts as text', () => {
+  const committed = vi.fn();
+  const { textarea, dispose } = setup('', true, committed);
+  compose(textarea);
+  expect(committed).not.toHaveBeenCalled();
+  dispose();
+});
+
 it('keeps the mode that was active when the composition started', () => {
   const { textarea, seen, dispose, setAccepting } = setup('');
   textarea.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
@@ -69,6 +86,22 @@ it('passes ordinary input outside a blocked composition', () => {
   textarea.value = 'a';
   textarea.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: 'a' }));
   expect(seen).toEqual(['beforeinput', 'input']);
+  dispose();
+});
+
+it('leaves editor overlays such as the find field editable', () => {
+  const { host, dispose } = setup('');
+  const overlay = document.createElement('textarea');
+  overlay.className = 'input';
+  host.append(overlay);
+  const seen: string[] = [];
+  overlay.addEventListener('compositionstart', () => seen.push('compositionstart'));
+  overlay.addEventListener('compositionend', () => seen.push('compositionend'));
+  overlay.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true }));
+  overlay.value = '你好';
+  overlay.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '你好' }));
+  expect(seen).toEqual(['compositionstart', 'compositionend']);
+  expect(overlay.value).toBe('你好');
   dispose();
 });
 

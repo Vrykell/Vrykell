@@ -10,10 +10,11 @@ interface TextAreaSnapshot {
  *
  * Composition events are delivered to the hidden text area before the editor input layer handles
  * them, so a committed composition would otherwise edit the buffer from normal mode. Events are
- * stopped on the host during the capture phase, and the text area is restored afterwards so the
- * next insertion does not replay the discarded preedit.
+ * stopped on the host during the capture phase, and the text area is restored afterwards so a
+ * later insertion does not replay the preedit. Committed text is handed to `onCommittedText` so
+ * the caller can apply it to the modal key map.
  */
-export function guardModalComposition(host: HTMLElement, acceptsText: () => boolean): () => void {
+export function guardModalComposition(host: HTMLElement, acceptsText: () => boolean, onCommittedText?: (text: string) => void): () => void {
   let blocked = false;
   let textarea: HTMLTextAreaElement | null = null;
   let snapshot: TextAreaSnapshot | null = null;
@@ -34,8 +35,13 @@ export function guardModalComposition(host: HTMLElement, acceptsText: () => bool
     event.preventDefault();
     event.stopPropagation();
   };
+  // Only the editor's main input participates; overlay fields such as the find box keep native
+  // composition. Without this filter the guard would also block those inputs.
+  const isEditorInput = (target: EventTarget | null): target is HTMLTextAreaElement =>
+    target instanceof HTMLTextAreaElement && target.classList.contains('inputarea');
+
   const onCompositionStart = (event: Event) => {
-    if (!(event.target instanceof HTMLTextAreaElement)) return;
+    if (!isEditorInput(event.target)) return;
     if (acceptsText()) {
       if (blocked) restore();
       blocked = false;
@@ -58,8 +64,10 @@ export function guardModalComposition(host: HTMLElement, acceptsText: () => bool
     if (!blocked || event.target !== textarea) return;
     stopAndPrevent(event);
     if (event.type === 'compositionend') {
+      const committed = event instanceof CompositionEvent ? event.data : '';
       blocked = false;
       restore();
+      if (committed) onCommittedText?.(committed);
     }
   };
 
