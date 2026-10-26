@@ -241,7 +241,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick, source = '
 
   if (!open) return null;
 
-  return createPortal(<><AnchoredDropdown open={open} onClose={onClose} panelRef={dialogRef} anchor={anchor} above={!!onPick} aria-label={t(source === 'ssh' ? 'Connect a server' : 'New tab')}
+  return createPortal(<><AnchoredDropdown open={open} onClose={onClose} panelRef={dialogRef} anchor={anchor} above={!!onPick} suspended={!!menu || !!deleting} aria-label={t(source === 'ssh' ? 'Connect a server' : 'New tab')}
         data-keyboard-navigation={keyboardNavigation} onPointerMove={() => setKeyboardNavigation(false)}
         onKeyDown={handleKey}>
         <section className="new-tab-section" aria-labelledby="new-tab-profiles">

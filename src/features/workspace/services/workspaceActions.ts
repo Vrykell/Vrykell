@@ -94,17 +94,21 @@ export function activateWorkspaceInstance(index: number): boolean {
       ...connections.connections.map(item => `acp:${item.id}`)];
     const id = orderedWorkspaceIds(ids, ai.order)[index];
     if (!id) return false;
-    if (side) { ai.selectSide(id); return true; }
+    if (side) {
+      ai.selectSide(id);
+      requestAnimationFrame(() => {
+        if (useAiWorkspace.getState().sideSelected !== id) return;
+        [...document.querySelectorAll<HTMLTextAreaElement>('[data-testid="ai-surface-side"] [data-chat-composer]')]
+          .find(element => element.getClientRects().length > 0 && !element.closest('[inert]'))?.focus({ preventScroll: true });
+      });
+      return true;
+    }
     if (id.startsWith('page:')) workspace.activate(id.slice(5));
     else {
-      if (!side) ai.select(id);
-      if (id.startsWith('chat:')) void useChatStore.getState().selectConversation(id.slice(5)).then(() => {
-        if (side) requestAnimationFrame(() => {
-          if (useChatStore.getState().activeConversationId !== id.slice(5)) return;
-          [...document.querySelectorAll<HTMLTextAreaElement>('[data-testid="ai-surface-side"] [data-chat-composer]')].find(element => element.getClientRects().length > 0 && !element.closest('[inert]'))?.focus({ preventScroll: true });
-        });
-      }); else connections.select(id.slice(4));
-      if (!side) workspace.openHarnessTab();
+      ai.select(id);
+      if (id.startsWith('chat:')) void useChatStore.getState().selectConversation(id.slice(5));
+      else connections.select(id.slice(4));
+      workspace.openHarnessTab();
     }
     return true;
   }

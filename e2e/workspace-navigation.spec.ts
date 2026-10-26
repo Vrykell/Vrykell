@@ -85,6 +85,10 @@ test('keeps native and connected sessions in one AI strip without closing either
   await page.locator('[data-dock-btn="chat"]').click();
   await expect(page.getByTestId('harness-composer')).toHaveValue('agent draft');
   const side = page.getByTestId('ai-surface-side');
+  await side.getByRole('button', { name: '会话设置', exact: true }).click();
+  await page.getByRole('combobox', { name: '侧栏对话' }).click();
+  await page.getByRole('option', { name: '新对话', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(side.locator('[data-chat-composer]')).toHaveValue('native draft');
   await expect(side.getByRole('tablist')).toHaveCount(0);
   await expect(side.getByTestId('harness-composer')).toHaveCount(0);
@@ -158,6 +162,12 @@ test('new, close and numeric shortcuts follow the workspace and the focused side
   await page.keyboard.press('Control+1'); await expect(composer).toHaveValue('');
   await page.keyboard.press('Control+2'); await expect(composer).toHaveValue('keep the second draft');
   await page.keyboard.press('Control+w');
-  await expect(page.getByTestId('ai-surface-side')).toBeHidden();
+  await expect(page.getByTestId('ai-surface-side')).toBeVisible();
+  await expect(composer).toHaveValue('');
+  await expect.poll(() => page.evaluate(async () => {
+    const path = '/src/features/chat/stores/aiWorkspace.ts';
+    const { useAiWorkspace } = await import(path) as typeof import('../src/features/chat/stores/aiWorkspace');
+    return useAiWorkspace.getState().nativeTabs.length;
+  })).toBe(1);
   await expect(strip.locator('[data-tab-kind="session"]')).toHaveCount(2);
 });

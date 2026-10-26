@@ -38,3 +38,17 @@ it('dismisses before a background editor can consume Escape after focus restorat
   expect(close).toHaveBeenCalledOnce();
   view.unmount(); editor.remove();
 });
+
+it('leaves Escape to an active child menu before dismissing its parent picker', () => {
+  const close = vi.fn();
+  function Picker({ suspended }: { suspended: boolean }) {
+    const panelRef = useRef<HTMLDivElement>(null);
+    return <AnchoredDropdown open suspended={suspended} onClose={close} panelRef={panelRef} aria-label="Profiles" />;
+  }
+  const view = render(<Picker suspended />);
+  fireEvent.keyDown(document.body, { key: 'Escape' });
+  expect(close).not.toHaveBeenCalled();
+  view.rerender(<Picker suspended={false} />);
+  fireEvent.keyDown(document.body, { key: 'Escape' });
+  expect(close).toHaveBeenCalledOnce();
+});

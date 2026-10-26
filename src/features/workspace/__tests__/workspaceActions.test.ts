@@ -13,9 +13,32 @@ const snapshot = useWorkspaceStore.getState();
 beforeEach(() => {
   useWorkspaceStore.setState({ tabs: [], activeId: '', groups: [] });
   useWorkspaceNavigation.setState({ area: 'terminal', collapsed: false, codeOrder: [], aiPlacement: 'main' });
-  useAiWorkspace.setState({ nativeTabs: [], selected: '', order: [] });
+  useAiWorkspace.setState({ nativeTabs: [], selected: '', sideSelected: '', order: [] });
 });
 afterEach(() => { useWorkspaceStore.setState(snapshot, true); document.body.replaceChildren(); vi.clearAllMocks(); });
+
+it('restores composer focus after a numeric shortcut switches the side conversation', () => {
+  useWorkspaceNavigation.setState({ area: 'terminal', aiPlacement: 'side' });
+  const first = useChatStore.getState().createConversation();
+  const second = useChatStore.getState().createConversation();
+  useAiWorkspace.setState({ nativeTabs: [first, second], sideSelected: `chat:${first}`, order: [] });
+  const surface = document.createElement('div'); surface.dataset.testid = 'ai-surface-side';
+  const previous = document.createElement('textarea'); previous.dataset.chatComposer = 'true';
+  surface.append(previous); document.body.append(surface); previous.focus();
+  let frame!: FrameRequestCallback;
+  const raf = vi.spyOn(globalThis, 'requestAnimationFrame').mockImplementation(callback => { frame = callback; return 1; });
+  const next = document.createElement('textarea'); next.dataset.chatComposer = 'true';
+  const rects = vi.spyOn(next, 'getClientRects').mockReturnValue([new DOMRect(0, 0, 100, 30)] as unknown as DOMRectList);
+  try {
+    expect(activateWorkspaceInstance(1)).toBe(true);
+    previous.remove(); surface.append(next);
+    frame(0);
+    expect(next).toHaveFocus();
+    expect(focusedWorkspaceArea()).toBe('ai');
+    expect(activateWorkspaceInstance(0)).toBe(true);
+    expect(useAiWorkspace.getState().sideSelected).toBe(`chat:${first}`);
+  } finally { raf.mockRestore(); rects.mockRestore(); }
+});
 
 it('opens a selected file in the code workspace and leaves a cancelled picker untouched', async () => {
   vi.mocked(pickPath).mockResolvedValueOnce([]);

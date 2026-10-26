@@ -5,20 +5,20 @@ import { hasOwnedListbox } from '../hooks/useExclusiveMenu';
 
 export interface DropdownAnchor { x: number; y: number; aboveY?: number; align?: 'start' | 'end' }
 
-export default function AnchoredDropdown({ open, onClose, panelRef, above = false, anchor: preferredAnchor, children, className = '', onKeyDown, ...props }: ComponentPropsWithoutRef<'div'> & {
-  open: boolean; onClose: () => void; panelRef: RefObject<HTMLDivElement | null>; above?: boolean; anchor?: DropdownAnchor;
+export default function AnchoredDropdown({ open, onClose, panelRef, above = false, anchor: preferredAnchor, suspended = false, children, className = '', onKeyDown, ...props }: ComponentPropsWithoutRef<'div'> & {
+  open: boolean; onClose: () => void; panelRef: RefObject<HTMLDivElement | null>; above?: boolean; anchor?: DropdownAnchor; suspended?: boolean;
 }) {
   const [anchor, setAnchor] = useState<DropdownAnchor>({ x: 8, y: 48 });
   const position = useFloatingPanelPosition(panelRef, anchor, undefined, open);
   useEffect(() => {
     if (!open) return;
     const escape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented || hasOwnedListbox(panelRef.current)) return;
+      if (suspended || event.key !== 'Escape' || event.defaultPrevented || hasOwnedListbox(panelRef.current)) return;
       event.preventDefault(); event.stopPropagation(); onClose();
     };
     window.addEventListener('keydown', escape, true);
     return () => window.removeEventListener('keydown', escape, true);
-  }, [open, onClose, panelRef]);
+  }, [open, onClose, panelRef, suspended]);
   useLayoutEffect(() => {
     if (!open) return;
     const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;

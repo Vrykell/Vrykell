@@ -54,7 +54,8 @@ button.workspace-sidebar-toggle.icon-button:focus-visible { outline: 1px solid v
 .terminal-group-preview { height: 100%; box-sizing: border-box; background: transparent; }
 .terminal-group-preview .terminal-group-chip { border-radius: 5px; box-shadow: none; }
 .terminal-group-preview .tab-group-header { width: max-content; height: 100%; }
-.terminal-group-reorder-preview { width: auto !important; min-width: 0 !important; }
+.terminal-group-reorder-preview { min-width: 0 !important; }
+.terminal-group-reorder-preview:has(.terminal-group-preview) { width: auto !important; }
 @container (max-width: 560px) { .terminal-tab-tools .terminal-secondary-actions { display: none; } }
 .terminal-tab-search { width: clamp(72px, 12vw, 160px) !important; height: 30px; min-width: 72px; min-height: 30px; flex: 1 1 72px; }
 .terminal-tab-list { overflow-y: hidden; align-items: stretch; }
