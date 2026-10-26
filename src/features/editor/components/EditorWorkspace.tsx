@@ -13,7 +13,8 @@ import { OutlineButton } from '@ui/actions/OutlineButton';
 import { Eye, EyeOff, Save, Plus, FileCode, FolderOpen, Search, Undo2, RotateCw, iconSizes } from '@ui/icons';
 import { isWindows } from '@platform/runtime';
 import { normPath } from '@platform/path';
-import FolderTabs, { type FolderTab } from '@ui/layout/FolderTabs';
+import FolderTabs from '@ui/layout/FolderTabs';
+import { tabCapabilities, type TabHandle } from '@ui/layout/tabHandle';
 import WorkspaceHeader from '@ui/layout/WorkspaceHeader';
 import ResourceContent from '@ui/layout/ResourceContent';
 import { useCodeWorkspaceTabs } from '@features/workspace/hooks/useCodeWorkspaceTabs';
@@ -79,9 +80,9 @@ export default function EditorWorkspace({ children }: { children: ReactNode }) {
 }
 
 function CodeStartPane({ tab, active }: { tab: Extract<Tab, { kind: 'start-code' }>; active: boolean }) {
-  const items: FolderTab[] = [{
+  const items: TabHandle[] = [{
     id: tab.id, label: tab.title, tip: tab.title, icon: <FileCode size={iconSizes.control} />,
-    closeLabel: t('Close this tab'), surface: 'canvas', renameable: false,
+    closeLabel: t('Close this tab'), surface: 'canvas', capabilities: tabCapabilities({ renameable: false }),
     dataAttributes: { 'data-tab-kind': 'start-code' },
   }];
   return <section className="editor-pane" data-testid="code-start-page" style={{ display: active ? 'flex' : 'none' }} inert={!active}>
@@ -135,7 +136,7 @@ function DocumentContent({ file, active, focused }: { file: EditorFile; active: 
     return () => window.removeEventListener('keydown', onKey, true);
   }, [focused, file]);
   return <section className="editor-pane" data-testid={active ? 'file-editor' : undefined} style={{ display: active ? 'flex' : 'none' }} inert={!active}>
-    <WorkspaceHeader active={active && focused}><FolderTabs items={active ? codeTabs.items : []} selected={`file:${editorFileKey(file)}`} label={t('Open files and comparisons')} listId="code-documents" className="editor-tabs"
+    <WorkspaceHeader active={active && focused}><FolderTabs items={active ? codeTabs.handles : []} selected={`file:${editorFileKey(file)}`} label={t('Open files and comparisons')} listId="code-documents" className="editor-tabs"
       onSelect={codeTabs.onSelect} onClose={codeTabs.onClose}
       onMove={codeTabs.onMove} menuItems={[
         { label: t('New file'), onClick: newEditorFile },

@@ -82,7 +82,7 @@ function GitComparisonContent({ selection, active, focused, tabId }: { selection
   const backLabel = t(editorOwner ? 'Back to editor' : 'Back to terminal');
   const Icon = fileIcon(selection.path);
   const toolbar = (navigation?: ReactNode, navigate?: (direction: 'previous' | 'next') => void) => <>
-    <WorkspaceHeader active={active && focused}><FolderTabs items={active ? codeTabs.items : []} selected={`diff:${tabId}`} label={t('Open files and comparisons')} listId="code-documents" className="git-review-tabs" headerClassName="git-review-toolbar"
+    <WorkspaceHeader active={active && focused}><FolderTabs items={active ? codeTabs.handles : []} selected={`diff:${tabId}`} label={t('Open files and comparisons')} listId="code-documents" className="git-review-tabs" headerClassName="git-review-toolbar"
       onSelect={codeTabs.onSelect} onClose={codeTabs.onClose}
       onMove={codeTabs.onMove} menuItems={[
         { label: backLabel, onClick: back }, { label: t('Side by side'), checked: layout === 'split', onClick: () => setLayout('split') },

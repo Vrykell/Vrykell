@@ -9,12 +9,11 @@ import { useHorizontalWheel } from '../hooks/useHorizontalWheel';
 import { useActiveTabVisibility } from '../hooks/useActiveTabVisibility';
 import '@ui/layout/FolderTabs.css';
 import { TextInput } from '@ui/fields/TextInput';
-
-export interface FolderTab { id: string; label: string; icon: ReactNode; tip: string; closeLabel: string; closeTestId?: string; dataAttributes?: Record<string, string>; surface?: 'canvas'; renameable?: boolean }
+import type { TabHandle } from '@ui/layout/tabHandle';
 
 /** Connected document tabs share dragging, wheel navigation and reserved toolbar space. */
 export default function FolderTabs({ items, selected, label, listId, className = '', headerClassName = '', toolbar, menuItems, onSelect, onClose, onMove, onRename }: {
-  items: FolderTab[]; selected: string; label: string; className?: string; headerClassName?: string; toolbar: ReactNode;
+  items: TabHandle[]; selected: string; label: string; className?: string; headerClassName?: string; toolbar: ReactNode;
   listId?: string;
   menuItems?: ContextMenuItem[];
   onSelect: (id: string) => void; onClose: (id: string) => void; onMove: (id: string, over: string, after: boolean) => void;
@@ -29,8 +28,8 @@ export default function FolderTabs({ items, selected, label, listId, className =
   useHorizontalWheel(strip, items.length > 0);
   useActiveTabVisibility(strip, '.folder-tab[data-active="true"]', `${selected}:${items.length}`);
   const remaining = items.filter(item => item.id !== dragId); const last = remaining[remaining.length - 1]?.id;
-  const beginRename = (item: FolderTab) => {
-    if (!onRename || item.renameable === false) return;
+  const beginRename = (item: TabHandle) => {
+    if (!onRename || !item.capabilities.renameable) return;
     renameFinished.current = false;
     setEditingId(item.id);
     setEditTitle(item.label);
@@ -75,7 +74,7 @@ export default function FolderTabs({ items, selected, label, listId, className =
 export function FolderTabContent({ item, selected, onSelect, onClose, editing = false, editTitle = '', setEditTitle,
   onStartRename, onCommitRename, onCancelRename,
 }: {
-  item: FolderTab; selected: boolean; onSelect?: (id: string) => void; onClose?: (id: string) => void;
+  item: TabHandle; selected: boolean; onSelect?: (id: string) => void; onClose?: (id: string) => void;
   editing?: boolean; editTitle?: string; setEditTitle?: (title: string) => void;
   onStartRename?: () => void; onCommitRename?: () => void; onCancelRename?: () => void;
 }) {

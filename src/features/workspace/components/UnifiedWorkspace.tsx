@@ -7,15 +7,13 @@ import type { PaneTarget } from '@core/paneLayout';
 import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/menus/ContextMenu';
 import type { DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import { flattenSingleSubmenu } from '@ui/menus/menuGroups';
-import { Columns2, FolderOpen, Grid, History, Plus } from '@ui/icons';
+import { Columns2, FolderOpen, History, Plus } from '@ui/icons';
 import { useWorkspaceResources } from '../hooks/useWorkspaceResources';
 import { detachCompositionPane, mergeCompositionTab, useUnifiedWorkspace } from '../stores/unifiedWorkspace';
 import { useWorkspaceNavigation } from '../stores/navigation';
 import { useWorkspaceStore } from '../stores/workspace';
-import { activateCompositionTab, closeCompositionTab } from '../services/compositionTabs';
 import { useUiStore } from '../stores/ui';
 import { measureWorkspacePanes, rebindWorkspaceResources, workspacePaneCells, type WorkspaceResource } from '../model/workspaceResources';
-import IconCountBadge from '@ui/feedback/IconCountBadge';
 import { connectUnifiedAgent, createUnifiedResource, createUnifiedTerminal, focusUnifiedResource, removeUnifiedPane } from '../services/unifiedWorkspace';
 import { openWorkspaceFile, pickWorkspaceFile } from '../services/workspaceActions';
 import WorkspaceResourceSwitcher from './WorkspaceResourceSwitcher';
@@ -29,6 +27,7 @@ import WorkspaceResourceIcon from './WorkspaceResourceIcon';
 import { useDefaultShellType } from '../hooks/useDefaultShellType';
 import WorkspacePaneCanvas from './WorkspacePaneCanvas';
 import { createScopedResource } from '../services/scopedPanes';
+import { useUnifiedWorkspaceTabs } from '../hooks/useUnifiedWorkspaceTabs';
 import type { EditorFile } from '@core/editor';
 
 type Creation = 'terminal' | 'document' | 'conversation';
@@ -41,6 +40,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
   useWorkspaceHistory(resources);
   const state = useUnifiedWorkspace(); const ids = resources.map(resource => resource.id); const key = JSON.stringify(ids);
   const tabs = useWorkspaceStore(store => store.tabs).filter(tab => tab.kind === 'workspace');
+  const strip = useUnifiedWorkspaceTabs(resources, resourceIcon);
   const settingsOpen = useUiStore(store => store.settingsOpen); const visible = active && !settingsOpen;
   const splitButton = useRef<HTMLButtonElement>(null);
   const [menu, setMenu] = useState<{ anchor: MenuAnchor; split: boolean } | null>(null);
@@ -75,15 +75,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
   }, [visible, state.pendingTerminalSplit]);
   useEffect(() => { if (!visible) { setMenu(null); setPlacement(null); setLauncher(null); setTerminalPicker(null); } }, [visible]);
   useEffect(() => { setMenu(null); setPlacement(null); setLauncher(null); setTerminalPicker(null); }, [state.activeTabId]);
-  const items = tabs.map(tab => {
-    const members = tab.paneLayout ? workspacePaneCells(tab.paneLayout).flatMap(cell => resources.filter(resource => resource.id === cell.resourceId)) : [];
-    const title = tab.titleSource === 'manual' ? tab.title : members.map(resource => resource.title).join(' + ') || t('Start');
-    return { id: tab.id, label: `${title}${members.some(resource => resource.dirty) ? ' •' : ''}`, tip: title, closeLabel: t('Close this tab'),
-      icon: <IconCountBadge count={members.length}>{members[0] ? resourceIcon(members[0]) : <Grid size={16} />}</IconCountBadge>,
-      surface: members.length ? undefined : 'canvas' as const, renameable: members.length > 0, dataAttributes: { 'data-tab-kind': 'workspace' } };
-  });
   const newItem = (kind: Creation) => createUnifiedResource(kind);
-  const close = (id: string) => closeCompositionTab(id);
   const history = () => useWorkspaceNavigation.getState().selectHistory('all');
   const remove = () => {
     if (focused) removeUnifiedPane(focused.resourceId);
@@ -109,12 +101,12 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
   ];
   return <section className="unified-workspace" data-testid="unified-workspace" style={{ display: active ? 'flex' : 'none' }} inert={!visible}>
     <WorkspaceHeader active={visible}><FolderTabs label={t('All workspace tabs')} listId="unified-resources"
-      items={items}
-      selected={state.activeTabId} onSelect={activateCompositionTab} onClose={close}
-      onMove={(...args) => state.move(tabs.map(tab => tab.id), ...args)} onRename={(id, title) => useWorkspaceStore.getState().renameTab(id, title)} menuItems={[
+      items={strip.handles}
+      selected={state.activeTabId} onSelect={strip.onSelect} onClose={strip.onClose}
+      onMove={strip.onMove} onRename={(id, title) => useWorkspaceStore.getState().renameTab(id, title)} menuItems={[
         { label: t(state.zoomed ? 'Restore panes' : 'Zoom pane'), disabled: cells.length < 2, onClick: state.single },
         ...(cells.length > 1 && focused ? [{ label: t('Move pane to new tab'), onClick: () => detachCompositionPane(focused.resourceId) }] : []),
-        ...(tabs.some(tab => tab.id !== state.activeTabId && tab.paneLayout && workspacePaneCells(tab.paneLayout).length + cells.length <= 4) && cells.length ? [{ label: t('Merge tab into this tab'), submenu: { items: tabs.filter(tab => tab.id !== state.activeTabId && tab.paneLayout && workspacePaneCells(tab.paneLayout).length + cells.length <= 4).map(tab => ({ label: items.find(item => item.id === tab.id)!.tip, onClick: () => beginPlacement({ kind: 'tab', id: tab.id }) })) } }] : []),
+        ...(tabs.some(tab => tab.id !== state.activeTabId && tab.paneLayout && workspacePaneCells(tab.paneLayout).length + cells.length <= 4) && cells.length ? [{ label: t('Merge tab into this tab'), submenu: { items: tabs.filter(tab => tab.id !== state.activeTabId && tab.paneLayout && workspacePaneCells(tab.paneLayout).length + cells.length <= 4).map(tab => ({ label: strip.handles.find(handle => handle.id === tab.id)!.tip, onClick: () => beginPlacement({ kind: 'tab', id: tab.id }) })) } }] : []),
         ...(cells.length > 1 ? [{ label: t('Remove pane'), onClick: remove }] : []),
       ]} toolbar={<>
         <WorkspaceResourceSwitcher destination="unified" />

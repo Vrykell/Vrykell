@@ -62,6 +62,13 @@ export default defineConfig(async () => ({
         "src/platform/**/*.{ts,tsx}",
         "src/app/providers/ThemeProvider.tsx",
         "src/utils/**/*.{ts,tsx}",
+        "src/ui/layout/tabHandle.ts",
+        "src/features/workspace/model/tabArea.ts",
+        "src/features/workspace/model/tabStrip.ts",
+        "src/features/workspace/model/codeTabHandles.tsx",
+        "src/features/workspace/model/terminalTabHandle.tsx",
+        "src/features/workspace/model/unifiedTabHandles.tsx",
+        "src/features/chat/model/aiTabHandles.tsx",
       ],
       exclude: [
         "src/app/providers/**",

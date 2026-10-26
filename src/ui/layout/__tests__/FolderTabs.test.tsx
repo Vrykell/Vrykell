@@ -1,9 +1,10 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import FolderTabs, { type FolderTab } from '@ui/layout/FolderTabs';
+import FolderTabs from '@ui/layout/FolderTabs';
+import { tabCapabilities, type TabHandle } from '@ui/layout/tabHandle';
 import { useListReorder } from '@ui/layout/listReorder';
 
-const items: FolderTab[] = ['first', 'second'].map(id => ({ id, label: id, icon: null, tip: id, closeLabel: `Close ${id}` }));
+const items: TabHandle[] = ['first', 'second'].map(id => ({ id, label: id, icon: null, tip: id, closeLabel: `Close ${id}`, capabilities: tabCapabilities({ renameable: true }) }));
 
 function setup() {
   const onSelect = vi.fn(); const onClose = vi.fn(); const onMove = vi.fn();
@@ -114,4 +115,11 @@ it('renames directly on a tab and cancels from the same input', () => {
   fireEvent.doubleClick(screen.getAllByRole('tab')[0]!);
   fireEvent.keyDown(screen.getByRole('textbox', { name: '标签页标题' }), { key: 'Escape' });
   expect(onRename).toHaveBeenCalledOnce();
+});
+
+it('does not start a rename for rows that cannot rename', () => {
+  const readOnly = items.map(item => ({ ...item, capabilities: tabCapabilities({ renameable: false }) }));
+  render(<FolderTabs items={readOnly} selected="first" label="Open documents" toolbar={null} onSelect={vi.fn()} onClose={vi.fn()} onMove={vi.fn()} onRename={vi.fn()} />);
+  fireEvent.doubleClick(screen.getAllByRole('tab')[0]!);
+  expect(screen.queryByRole('textbox', { name: '标签页标题' })).toBeNull();
 });

@@ -12,12 +12,7 @@ export const WORKSPACE_COMPACT_BREAKPOINT = 900;
 const STORAGE_KEY = 'workspace-navigation-v1';
 const DEFAULT_WORKSPACE_ORDER: WorkspaceArea[] = ['terminal', 'code', 'ai', 'ssh', 'unified'];
 
-export function workspaceAreaForKind(kind: string): WorkspaceArea {
-  if (kind === 'workspace') return 'unified';
-  if (kind === 'editor' || kind === 'git-diff' || kind === 'start-code') return 'code';
-  if (kind === 'harness' || kind === 'ai-history' || kind === 'usage' || kind === 'start-ai') return 'ai';
-  return 'terminal';
-}
+export { workspaceAreaForKind } from '../model/tabArea';
 
 interface NavigationState {
   area: WorkspaceArea;

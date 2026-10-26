@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { iconSizes,
   Plus, History, Bot, Search, ChevronDown,
  } from '@ui/icons';
-import { useSessionStore, isSessionTab, firstTerminalOf, terminalsOf, useTabDisplayTitle, type Tab, type TabGroup } from '@features/workspace';
+import { useSessionStore, isSessionTab, terminalsOf, useTabDisplayTitle, type Tab, type TabGroup } from '@features/workspace';
 import { HistoryColorChoices } from '@ui/history/HistoryColorPalette';
 import { regenerateTitle } from '@features/agent/services/title';
 import { useToastStore } from '@ui/feedback/Toast';
@@ -20,8 +20,7 @@ import { useActiveTabVisibility } from '@ui/hooks/useActiveTabVisibility';
 import { historyGroupColor } from '@ui/history/historyGroupColor';
 import { orderedWorkspaceIds, useWorkspaceNavigation } from '../stores/navigation';
 import WorkspaceHeader from '@ui/layout/WorkspaceHeader';
-import { TerminalProfileIcon } from '@ui/icons/shellIcons';
-import IconCountBadge from '@ui/feedback/IconCountBadge';
+import { terminalTabHandle } from '../model/terminalTabHandle';
 import {
   ListReorderPlaceholder, ListReorderPreview, ListReorderZonePlaceholder,
   useListReorder, useListReorderDrag, type ListReorderDrag, type ListReorderTarget,
@@ -345,9 +344,9 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
 
 function TerminalTabPreview({ tab, active, defaultShellType }: { tab: Tab; active: boolean; defaultShellType?: ShellType }) {
   const title = useTabDisplayTitle(tab);
-  const first = firstTerminalOf(tab);
-  return <div className="folder-tab folder-tab-preview terminal-instance-tab" data-active={active} data-tab-surface={isSessionTab(tab) ? undefined : 'canvas'}>
-    <FolderTabContent selected={active} item={{ id: tab.id, label: title, tip: title, closeLabel: t('Close this tab'), icon: tab.kind === 'history' ? <History size={iconSizes.compact} /> : <IconCountBadge count={terminalsOf(tab).length}><TerminalProfileIcon colored kind={first?.kind} shellType={first?.shellType ?? (isSessionTab(tab) ? defaultShellType : undefined)} connectionId={first?.ssh?.connectionId} size={iconSizes.control} /></IconCountBadge> }} />
+  const handle = terminalTabHandle(tab, title, defaultShellType);
+  return <div className="folder-tab folder-tab-preview terminal-instance-tab" data-active={active} data-tab-surface={handle.capabilities.groupable ? undefined : 'canvas'}>
+    <FolderTabContent selected={active} item={handle} />
   </div>;
 }
 
@@ -488,14 +487,14 @@ function TabRow({
   onPointerDown: (event: React.PointerEvent<HTMLElement>) => void;
   onContextMenu: (event: React.MouseEvent) => void;
 }) {
-  const first = firstTerminalOf(tab);
-  const terms = terminalsOf(tab);
   const displayTitle = useTabDisplayTitle(tab);
+  const handle = terminalTabHandle(tab, displayTitle, defaultShellType, `tab-close-${tab.id}`);
+  const groupId = isSessionTab(tab) ? tab.groupId ?? '' : '';
   const dragging = useListReorder(state => state.drag?.listId === LIST_ID && state.drag.id === tab.id);
   return <div className="folder-tab terminal-instance-tab" data-active={active} data-testid={`tab-row-${tab.id}`}
-    data-tab-row-id={tab.id} data-tab-kind={tab.kind} data-tab-group={isSessionTab(tab) ? tab.groupId ?? '' : ''}
-    data-tab-surface={isSessionTab(tab) ? undefined : 'canvas'}
-    data-reorder-item={tab.id} data-reorder-kind={isSessionTab(tab) && tab.groupId ? 'tab' : 'loose-tab'}
+    data-tab-row-id={tab.id} data-tab-kind={tab.kind} data-tab-group={handle.capabilities.groupable ? groupId : ''}
+    data-tab-surface={handle.capabilities.groupable ? undefined : 'canvas'}
+    data-reorder-item={tab.id} data-reorder-kind={handle.capabilities.groupable && groupId ? 'tab' : 'loose-tab'}
     data-reorder-dragging={dragging ? 'true' : undefined} onPointerDown={event => {
       if (event.button !== 0 || event.isPrimary === false || (event.target as Element).closest('[data-no-drag], input')) return;
       onPointerDown(event);
@@ -509,10 +508,6 @@ function TabRow({
       onChange={event => setEditTitle(event.target.value)} onFocus={event => event.currentTarget.select()}
       onBlur={onCommitEdit} onKeyDown={event => {
         if (event.key === 'Enter') onCommitEdit(); else if (event.key === 'Escape') onCancelEdit();
-      }} onClick={event => event.stopPropagation()} /> : <FolderTabContent item={{
-        id: tab.id, label: displayTitle, tip: displayTitle,
-        icon: tab.kind === 'history' ? <History size={iconSizes.compact} /> : <IconCountBadge count={terms.length}><TerminalProfileIcon colored kind={first?.kind} shellType={first?.shellType ?? (isSessionTab(tab) ? defaultShellType : undefined)} connectionId={first?.ssh?.connectionId} size={iconSizes.control} /></IconCountBadge>,
-        closeLabel: t('Close this tab'), closeTestId: `tab-close-${tab.id}`,
-      }} selected={active} onSelect={onActivate} onClose={onClose} />}
+      }} onClick={event => event.stopPropagation()} /> : <FolderTabContent item={handle} selected={active} onSelect={onActivate} onClose={onClose} />}
   </div>;
 }
