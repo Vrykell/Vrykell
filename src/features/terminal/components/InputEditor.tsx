@@ -193,6 +193,7 @@ export default function InputEditor({
             <TextArea
               ref={inputRef}
               data-terminal-input
+              className={highlightInput ? 'command-input-highlighted' : undefined}
               value={text}
               placeholder={t('Enter a command…')}
               rows={1}

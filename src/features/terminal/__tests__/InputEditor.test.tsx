@@ -77,6 +77,16 @@ it('re-syncs the colored mirror after content changes when the input is scrolled
   expect(overlay.scrollTop).toBe(30);
 });
 
+it('marks the transparent input so selected text does not double the colored mirror', () => {
+  useTypographyStore.setState({ commandHighlighting: true });
+  render(<InputEditor paneId="pane" />);
+  const input = screen.getByPlaceholderText(/输入命令/);
+  fireEvent.change(input, { target: { value: 'Get-ChildItem' } });
+  expect(input).toHaveClass('command-input-highlighted');
+  fireEvent.change(input, { target: { value: '' } });
+  expect(input).not.toHaveClass('command-input-highlighted');
+});
+
 it('reserves the caret line after a trailing newline in the colored mirror', () => {
   useTypographyStore.setState({ commandHighlighting: true });
   render(<InputEditor paneId="pane" />);

@@ -132,6 +132,15 @@ input, textarea, [contenteditable="true"] { caret-color: var(--text-caret); }
 .settings-nav-group { margin-bottom: 16px; }
 .settings-nav-heading { padding: 12px 16px 6px; color: var(--text-muted); font-size: var(--fs-caption); font-weight: var(--fw-medium); }
 .settings-navigation [role="button"]:focus-visible { outline: none; }
+/* The syntax mirror paints over the native selection. Hide the duplicate glyphs so the
+   highlighted text keeps its weight and crisp edges, and give the selection an explicit
+   background so it remains visible with a transparent text color. */
+.command-input-highlighted::selection {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+  background-color: var(--primary-action);
+  background-color: Highlight;
+}
 .command-token[data-kind="command"] { color: var(--cmd-program); }
 .command-token[data-kind="flag"] { color: var(--cmd-flag); }
 .command-token[data-kind="variable"] { color: var(--cmd-variable); }
