@@ -14,6 +14,8 @@ export function activateCompositionTab(id: string) {
   const pane = cells.find(cell => cell.id === state.focused) ?? cells[0];
   const resource = currentWorkspaceResources().find(resource => resource.id === pane?.resourceId);
   if (resource) activateWorkspaceResource(resource);
+  // Activating a native resource can move the workspace active tab; the composition tab stays selected.
+  selectCompositionTab(id);
   useWorkspaceNavigation.getState().selectArea('unified');
 }
 

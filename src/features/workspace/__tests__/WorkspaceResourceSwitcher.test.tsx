@@ -39,16 +39,36 @@ it('navigates to the native pane from a regular workspace', () => {
   expect(useUnifiedWorkspace.getState().layout).toBeNull();
 });
 
-it('adds the chosen resource to the active composition instead of only navigating', () => {
+it('focuses the resource in its own composition instead of splitting the current one', () => {
   useUnifiedWorkspace.getState().reconcile(['terminal:one#0', 'terminal:two#0']);
   useUnifiedWorkspace.setState({ zoomed: useUnifiedWorkspace.getState().focused });
   render(<WorkspaceResourceSwitcher destination="unified" />);
   fireEvent.click(within(openSwitcher()).getByRole('menuitem', { name: 'First shell' }));
 
-  expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toEqual(['terminal:two#0', 'terminal:one#0']);
-  expect(useUnifiedWorkspace.getState().zoomed).toBeNull();
-  expect(compositionTabs()).toHaveLength(1);
-  expect(useWorkspaceStore.getState().activeId).toBe('one');
+  expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toEqual(['terminal:one#0']);
+  expect(useUnifiedWorkspace.getState().activeTabId).toBe(
+    compositionTabs().find(tab => tab.paneLayout && workspacePaneIds(tab.paneLayout).includes('terminal:one#0'))!.id,
+  );
+  expect(compositionTabs()).toHaveLength(2);
+  expect(useWorkspaceStore.getState().activeId).toBe(useUnifiedWorkspace.getState().activeTabId);
+  expect(useWorkspaceNavigation.getState().area).toBe('unified');
+});
+
+it('creates a new composition tab and switches the workspace to it when the resource is unplaced', () => {
+  useUnifiedWorkspace.getState().reconcile(['terminal:one#0', 'terminal:two#0']);
+  const second = compositionTabs().find(tab => tab.paneLayout && workspacePaneIds(tab.paneLayout).includes('terminal:two#0'))!;
+  useWorkspaceStore.setState({ tabs: useWorkspaceStore.getState().tabs.filter(tab => tab.id !== second.id) });
+  useUnifiedWorkspace.getState().reconcile(['terminal:one#0']);
+  const before = compositionTabs().length;
+
+  render(<WorkspaceResourceSwitcher destination="unified" />);
+  fireEvent.click(within(openSwitcher()).getByRole('menuitem', { name: 'Second shell' }));
+
+  const active = useUnifiedWorkspace.getState();
+  expect(compositionTabs()).toHaveLength(before + 1);
+  expect(workspacePaneIds(active.layout!)).toEqual(['terminal:two#0']);
+  expect(compositionTabs().find(tab => tab.id === active.activeTabId)?.paneLayout).toBe(active.layout);
+  expect(useWorkspaceStore.getState().activeId).toBe(active.activeTabId);
   expect(useWorkspaceNavigation.getState().area).toBe('unified');
 });
 

@@ -1,5 +1,5 @@
 import { useWorkspaceNavigation } from '../stores/navigation';
-import { useUnifiedWorkspace } from '../stores/unifiedWorkspace';
+import { useUnifiedWorkspace, selectCompositionTab } from '../stores/unifiedWorkspace';
 import { activateWorkspaceResource, closeWorkspaceResource, currentWorkspaceResources } from './workspaceResources';
 import { selectWorkspaceArea } from './selectWorkspaceArea';
 import { newEditorFile } from '@features/editor/services/documentActions';
@@ -86,6 +86,8 @@ export function focusUnifiedResource(id: string) {
   if (!resource || resource.kind === 'page') return;
   useUnifiedWorkspace.getState().show(resource.id);
   activateWorkspaceResource(resource);
+  // Keep the composition tab as the workspace's active tab after the native resource is focused.
+  selectCompositionTab(useUnifiedWorkspace.getState().activeTabId);
   useWorkspaceNavigation.getState().selectArea('unified');
 }
 

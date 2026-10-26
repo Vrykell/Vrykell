@@ -56,6 +56,7 @@ export function selectCompositionTab(id: string) {
   const tab = compositionTabs().find(tab => tab.id === id);
   if (!tab) return;
   project(tab);
+  useWorkspaceStore.setState({ activeId: id });
   useWorkspaceNavigation.getState().rememberTab('unified', id);
 }
 
