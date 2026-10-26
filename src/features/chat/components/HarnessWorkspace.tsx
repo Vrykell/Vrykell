@@ -138,7 +138,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
         <WorkspaceResourceSwitcher />
         {!activeSystemPage && selected && <WorkspaceSplitAction resourceId={selected} />}
         <IconButton compact aria-label={t('AI conversation history')} data-tip={t('AI conversation history')} onClick={() => useSessionStore.getState().openAiHistoryTab()}><History size={16} /></IconButton>
-        <div ref={surface?.toolbar} className="ai-conversation-toolbar" style={{ display: placement === 'main' && selected.startsWith('chat:') && activePage?.kind === 'harness' ? 'flex' : 'none' }} />
+        <div ref={surface?.toolbar} className="ai-conversation-toolbar" style={{ display: selected.startsWith('chat:') && activePage?.kind === 'harness' ? 'flex' : 'none' }} />
         <span className="folder-action-secondary ai-secondary-actions">
         <IconButton compact aria-label={t('Choose project folder')} data-tip={t('Choose project folder')} onClick={() => void chooseDirectory()}><Folder size={16} /></IconButton>
         <IconButton compact aria-label={t('Usage statistics')} data-tip={t('Usage statistics')} onClick={() => useSessionStore.getState().openUsageTab()}><DataUsage size={16} /></IconButton>

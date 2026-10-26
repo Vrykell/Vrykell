@@ -4,6 +4,8 @@
 
 See [Workspace compositions](workspace-compositions.md) for composition ownership, restoration and the regression checklist.
 
+- Main and split conversation tabs keep all tools in the shared tab toolbar, with no duplicate title/action row inside their content. Cover opening and reopening an independent sidebar in both themes and narrow/wide layouts.
+
 - Opening the AI sidebar restores its independent conversation or creates a draft without moving main or split content. Explicit movement retains the mounted owner and draft. Native execution confirmation remains available in the background and still rejects timeout or late approval. Completed question cards retain only the selected option or typed content with horizontal insets. Code execution actions use the shared terminal icon. Cover both themes, narrow/wide layouts, split ownership, reopen and explicit movement.
 
 - Agent selection reuses the shared dropdown field and rich launcher. Tool refusal and failure badges match; cancelled questions retain cancellation. Verify live failures and explicit historical review in bottom-right notifications, quiet history mounting, no tool footer errors, both themes and narrow/wide sidebars.

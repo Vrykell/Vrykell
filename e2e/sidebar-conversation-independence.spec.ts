@@ -24,12 +24,15 @@ for (const split of [false, true]) for (const theme of ['dark', 'light']) {
     const side = page.getByTestId('ai-surface-side').locator('[data-chat-composer]:visible');
     await expect(side).toHaveValue('');
     await side.fill('Independent side draft');
+    await expect(page.getByTestId('ai-surface-main').locator('.chat-conversation-heading')).toHaveCount(0);
+    await expect(page.getByTestId('workspace-instance-bar').getByRole('button', { name: '会话设置', exact: true })).toHaveCount(1);
     for (let index = 0; index < await main.count(); index++) await expect(main.nth(index)).toHaveValue(`Main draft ${index + 1}`);
     expect(await main.evaluateAll(elements => elements.every((element, index) => element === (window as unknown as { mainNodes: Element[] }).mainNodes[index]))).toBe(true);
     await page.locator('[data-dock-btn="chat"]').click();
     await expect(side).toHaveCount(0);
     await page.locator('[data-dock-btn="chat"]').click();
     await expect(side).toHaveValue('Independent side draft');
+    await expect(page.getByTestId('ai-surface-main').locator('.chat-conversation-heading')).toHaveCount(0);
     await expect(main).toHaveCount(split ? 2 : 1);
     await page.screenshot({ path: info.outputPath('independent-conversations.png') });
     if (split) {

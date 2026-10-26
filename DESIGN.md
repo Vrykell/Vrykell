@@ -102,6 +102,8 @@ External conversations select an application execution target with the shared se
 
 Tab-toolbar menus sit four pixels below their trigger. Creation uses at most two menu levels; terminal, server and agent choices close both levels before opening the existing rich launcher, retaining the toolbar anchor rather than the disappearing menu row. Agent search, availability and project directory remain part of that shared launcher.
 
+Main and split conversation tabs never add a title or action row inside their content. Their tools belong to the shared tab toolbar, including while an independent AI sidebar is open.
+
 Enabled controls have deliberate gray hover, visible focus, disabled and busy states. Shared segmented controls animate selection and brighten foreground on hover without changing the fill. Errors preserve readable text and expose technical details separately; retry and dismiss controls never shrink into diagnostic text. Host cards and status cells distinguish stale read failure, authentication failure and offline state inline. The editor remains a single-file text editing surface with common editing commands, explicit file destinations and guarded unsaved changes. Filename, encoding and cursor information share the bottom status line; floating search never pushes the document. Markdown preview and optional modal keybindings preserve the mounted editor buffer.
 
 All icons come from shared icon components. Do not substitute text symbols or native disclosure triangles. Animation uses the existing 140–260 ms motion scale and respects reduced motion. Existing terminal scrollbar exceptions retain their shared owner.

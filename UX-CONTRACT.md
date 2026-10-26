@@ -54,6 +54,8 @@ Desktop terminal, remote-host, file and conversation workflows use the existing 
 
 ## Navigation and Feedback
 
+Main and split AI conversation content has no separate heading or toolbar. Conversation actions stay in the shared tab toolbar when the sidebar opens, closes or changes its selection.
+
 Common-workspace tabs own complete reference layouts in the existing tab store. New creates a tab; Split adds a pane inside that tab. Move to new tab and explicit Merge retain content owners. Zoom restores the unchanged layout. Close pane closes that resource through its domain guard; close tab checks every member before closing any. Start appears only when no content tab exists. History restores keep their explicit destination and open a composition tab rather than overwriting an unrelated active layout. One tab retains its history identity while membership changes. Missing members leave the active layout intact. Forgetting history removes metadata only. See `docs/en/workspace-compositions.md` for ownership boundaries.
 
 The AI side panel switches native and external conversations independently from main navigation. Opening it restores its own selection or creates a separate draft; it never borrows a resource assigned to the main workspace or split layouts. Main and sidebar content can remain visible together. Only explicit movement transfers a mounted owner and its draft. Agent creation reuses the existing project-folder launcher and application-tool adapter. External thoughts, tool events and text form one answer per user turn, with one completion footer. Live replies keep that footer hidden until the turn finishes. Transcript status strips are absent; execution and directory context remain in existing selectors and tooltips.

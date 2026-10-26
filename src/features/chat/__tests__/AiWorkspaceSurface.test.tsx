@@ -12,11 +12,11 @@ vi.mock('../components/HarnessWorkspace', () => ({ default: () => {
   lifecycle.harnessRenders += 1;
   return <><span data-testid="connected-session">Connected session</span><NativeConversationSurface /></>;
 } }));
-vi.mock('../components/PanelChat', () => ({ default: function Conversation({ conversationId }: { conversationId: string }) {
+vi.mock('../components/PanelChat', () => ({ default: function Conversation({ conversationId, workspace }: { conversationId: string; workspace: boolean }) {
   lifecycle.renders += 1;
   const [draft, setDraft] = useState('');
   useEffect(() => { lifecycle.mounts += 1; return () => { lifecycle.stops += 1; }; }, []);
-  return <input aria-label="Draft" data-conversation={conversationId} value={draft} onChange={event => setDraft(event.target.value)} />;
+  return <input aria-label="Draft" data-conversation={conversationId} data-workspace={workspace} value={draft} onChange={event => setDraft(event.target.value)} />;
 } }));
 const ai = useAiWorkspace.getState();
 const chat = useChatStore.getState();
@@ -87,11 +87,13 @@ it('opens and reopens an independent sidebar without moving the main conversatio
   const sideId = useAiWorkspace.getState().sideSelected.slice(5);
   expect(sideId).not.toBe('native');
   expect(main.closest('[data-testid="ai-surface-main"]')).not.toBeNull();
+  expect(main).toHaveAttribute('data-workspace', 'true');
   const side = document.querySelector<HTMLInputElement>(`[data-conversation="${sideId}"]`)!;
   fireEvent.change(side, { target: { value: 'Side draft' } });
   act(() => rerender(view(false)));
   act(() => rerender(view(true)));
   expect(useAiWorkspace.getState().sideSelected).toBe(`chat:${sideId}`);
   expect(main).toHaveValue('Main draft'); expect(side).toHaveValue('Side draft');
+  expect(main).toHaveAttribute('data-workspace', 'true');
   expect(main.closest('[data-testid="ai-surface-main"]')).not.toBeNull();
 });
