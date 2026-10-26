@@ -10,10 +10,9 @@
 //!   * dangerous and credential-touching calls are confirmed through a native system dialog
 //!     raised here, so page or tool output cannot answer the prompt for the user.
 //!
-//! A prompt nobody answers must not hold a turn open: when the window is not in front the
-//! confirmation is skipped (a modal dialog would block a window nobody is looking at) and when
-//! the answer takes too long the call is denied. Both outcomes are denials with their own reason
-//! code, so the transcript says what happened instead of appearing to stop mid-thought.
+//! Native confirmation does not depend on window focus. A prompt nobody answers must not hold
+//! a turn open: when the answer takes too long the call is denied. Late answers cannot issue
+//! an execution lease after that deadline.
 //!
 //! Residual gap, stated plainly: the shared UI commands (the file panel, the settings pages)
 //! are reachable from the same webview and are not lease-gated, so a fully compromised
@@ -27,7 +26,7 @@ use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 /// How long an approved call may stay unused before it must be asked again.
@@ -500,27 +499,16 @@ fn args_preview(args: &Value) -> String {
 }
 
 /// Outcome of the native confirmation.
+#[derive(Debug, PartialEq, Eq)]
 enum Confirmation {
     Approved,
     Denied,
-    /// The window was not in front, so asking would have blocked a window nobody was watching.
-    Unattended,
     /// The dialog waited past its deadline.
     TimedOut,
 }
 
 /// Ask the user through a native dialog. Page content cannot answer this.
 async fn confirm_natively(app: &AppHandle, request: &AuthorizeRequest, reason: &str) -> Confirmation {
-    let focused = app
-        .get_webview_window("main")
-        .and_then(|window| window.is_focused().ok())
-        .unwrap_or(false);
-    if !focused {
-        // A modal dialog on a window nobody is looking at would disable that window until it is
-        // dismissed, and a scheduled turn must not park the app. Deny, and say so in the reason.
-        record_diagnostic("tool-confirm-unattended", request);
-        return Confirmation::Unattended;
-    }
     let mut message = format!("{}\n\n{}", request.tool, reason);
     if let Some(hint) = request.reason_hint.as_deref().filter(|h| !h.trim().is_empty()) {
         message.push_str(&format!("\n\n{hint}"));
@@ -538,14 +526,17 @@ async fn confirm_natively(app: &AppHandle, request: &AuthorizeRequest, reason: &
         .show(move |approved| {
             let _ = tx.send(approved);
         });
-    match tokio::time::timeout(confirm_timeout(request), rx).await {
+    let outcome = wait_for_confirmation(rx, confirm_timeout(request)).await;
+    if outcome == Confirmation::TimedOut { record_diagnostic("tool-confirm-timeout", request); }
+    outcome
+}
+
+async fn wait_for_confirmation(rx: tokio::sync::oneshot::Receiver<bool>, timeout: Duration) -> Confirmation {
+    match tokio::time::timeout(timeout, rx).await {
         Ok(Ok(true)) => Confirmation::Approved,
         // Dismissed without an answer, or the dialog went away: treat both as a refusal.
         Ok(_) => Confirmation::Denied,
-        Err(_) => {
-            record_diagnostic("tool-confirm-timeout", request);
-            Confirmation::TimedOut
-        }
+        Err(_) => Confirmation::TimedOut,
     }
 }
 
@@ -692,7 +683,6 @@ pub async fn authorize_tool_call(
                 state.issue(&command, &request.args)?,
             )),
             Confirmation::Denied => Ok(ToolDecision::deny(Some(code))),
-            Confirmation::Unattended => Ok(ToolDecision::deny(Some("policy.unattended".to_string()))),
             Confirmation::TimedOut => {
                 Ok(ToolDecision::deny(Some("policy.confirm_timeout".to_string())))
             }
@@ -803,6 +793,20 @@ pub fn tool_policy_clear_session_grants(state: tauri::State<'_, ToolPolicy>, con
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn native_confirmation_waits_for_an_answer_and_rejects_late_approval() {
+        for (answer, expected) in [(true, super::Confirmation::Approved), (false, super::Confirmation::Denied)] {
+            let (sender, receiver) = tokio::sync::oneshot::channel();
+            sender.send(answer).unwrap();
+            assert_eq!(super::wait_for_confirmation(receiver, std::time::Duration::from_secs(1)).await, expected);
+        }
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        assert_eq!(super::wait_for_confirmation(receiver, std::time::Duration::from_millis(1)).await, super::Confirmation::TimedOut);
+        assert!(sender.send(true).is_err());
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        drop(sender);
+        assert_eq!(super::wait_for_confirmation(receiver, std::time::Duration::from_secs(1)).await, super::Confirmation::Denied);
+    }
     use super::*;
     use serde_json::json;
 
