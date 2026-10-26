@@ -19,7 +19,7 @@ test('chooses an execution profile from the AI settings menu without creating a 
   await expect(settings).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(settings).toHaveCount(0);
-  await expect(page.locator('[data-chat-composer]')).toBeVisible();
+  await expect(page.getByTestId('ai-surface-side').locator('[data-chat-composer]')).toBeVisible();
   await expect(page.getByTestId('chat-conversation-context')).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: unknown[] }).__PTY_SPAWNS__.length)).toBe(before + 1);
 });
@@ -49,11 +49,14 @@ for (const answer of ['option', 'custom', 'skip', 'cancel'] as const) test(`asks
   await expect(page.getByRole('button', { name: '停止生成', exact: true })).toHaveCount(0);
   await expect(page.locator('#app-notifications [role="alert"]')).toHaveCount(0);
   if (answer === 'option') {
-    const selected = page.getByRole('button', { name: 'Preview', exact: true, pressed: true });
-    await expect(selected).toBeDisabled();
-    const bubble = page.locator('.chat-exchange > .ai-block-question').first();
-    await expect(selected).toHaveCSS('background-color', await bubble.evaluate(element => getComputedStyle(element).backgroundColor));
-    await expect(selected).toHaveCSS('color', await bubble.evaluate(element => getComputedStyle(element).color));
+    const selected = page.getByTestId('tool-question-result');
+    await expect(selected).toHaveText('Preview');
+    await expect(selected).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(page.getByRole('button', { name: 'Production', exact: true })).toHaveCount(0);
+    const resultBounds = (await selected.boundingBox())!;
+    const cardBounds = (await selected.locator('..').boundingBox())!;
+    expect(await selected.evaluate(element => parseFloat(getComputedStyle(element).paddingLeft))).toBeGreaterThanOrEqual(10);
+    expect(resultBounds.width).toBeLessThanOrEqual(cardBounds.width);
     await page.screenshot({ path: info.outputPath('question-option-selected.png') });
     const saved = await page.evaluate(async () => {
       const path = '/src/features/chat/stores/aiWorkspace.ts';
@@ -77,7 +80,7 @@ for (const answer of ['option', 'custom', 'skip', 'cancel'] as const) test(`asks
     }, saved);
     await expect(page.getByTestId('ai-sidebar-content')).toBeVisible();
     await expect(page.getByRole('group', { name: '回答问题', exact: true })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Preview', exact: true, pressed: true })).toBeDisabled();
+    await expect(page.getByTestId('tool-question-result')).toHaveText('Preview');
   }
 });
 
@@ -92,7 +95,7 @@ test('does not reopen a question when the model requests the same confirmation a
   await question.getByRole('button', { name: 'Preview', exact: true }).click();
   await expect(page.getByText('Using the answer without another confirmation.', { exact: true })).toBeVisible();
   await expect(question).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Preview', exact: true, pressed: true })).toHaveCount(1);
+  await expect(page.getByTestId('tool-question-result').filter({ hasText: /^Preview$/ })).toHaveCount(1);
   await expect(page.getByRole('button', { name: '停止生成', exact: true })).toHaveCount(0);
 });
 

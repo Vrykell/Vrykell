@@ -58,6 +58,11 @@ for (const theme of ['dark', 'light']) test(`keeps agent sidebar headings and qu
       const rect = button.getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right };
     }));
     expect(bounds).toHaveLength(3);
+    const card = (await question.locator('..').boundingBox())!;
+    for (const option of bounds) {
+      expect(option.left - card.x).toBeGreaterThanOrEqual(10);
+      expect(card.x + card.width - option.right).toBeGreaterThanOrEqual(10);
+    }
     for (let index = 1; index < bounds.length; index++) expect(bounds[index].top - bounds[index - 1].bottom).toBeGreaterThanOrEqual(7);
     const input = (await question.getByRole('textbox').boundingBox())!;
     expect(input.y - bounds[2].bottom).toBeGreaterThanOrEqual(11);

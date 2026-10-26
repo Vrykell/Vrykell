@@ -819,7 +819,7 @@ button.history-option-row[aria-pressed="true"] { color: var(--text-primary); }
 .acp-launch-directory { display: flex; align-items: stretch; gap: 8px; margin: 8px 0; min-width: 0; }
 .acp-launch-directory > input { flex: 1; min-width: 0; }
 .ai-question-options button { justify-content: flex-start; min-height: 32px; max-width: 100%; padding: 8px 10px; text-align: left; white-space: normal; overflow-wrap: anywhere; }
-.ai-question-options button[data-selected="true"] { background: var(--primary-button-bg); color: var(--primary-button-text); opacity: 1; }
+.ai-tool-verdict.ai-question-result { padding: 6px 10px 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .ai-user-question .ai-tool-approval-actions { margin-top: 0; }
 .history-row-star, .history-row-lock { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 24px; color: var(--text-secondary); }
 .history-row-star { color: var(--favorite-color); }

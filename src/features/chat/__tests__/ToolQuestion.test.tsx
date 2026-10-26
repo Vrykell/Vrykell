@@ -22,15 +22,17 @@ it('answers an option inside the owning transcript without a permission prompt',
   expect(screen.getByRole('textbox', { name: '你的回答' })).toHaveClass('text-input-field');
   fireEvent.click(screen.getByRole('button', { name: 'Preview' }));
   expect(await pending).toMatchObject({ answered: true, answer: 'Preview' });
-  expect(screen.getByRole('button', { name: 'Preview', pressed: true })).toBeDisabled();
-  expect(screen.getByRole('button', { name: 'Production', pressed: false })).toBeDisabled();
+  expect(screen.getByTestId('tool-question-result')).toHaveTextContent('Preview');
+  expect(screen.queryByRole('button')).toBeNull();
+  expect(screen.queryByText('Production')).toBeNull();
   expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
 });
 
 it('restores the selected option without making the saved question interactive', () => {
   render(<ToolQuestion run={{ ...run, state: 'done', input: { options: ['Preview', 'Production'] }, output: JSON.stringify({ ok: true, answered: true, answer: 'Production' }) }} conversationId="owner" />);
-  expect(screen.getByRole('button', { name: 'Production', pressed: true })).toHaveAttribute('data-selected', 'true');
-  expect(screen.getByRole('button', { name: 'Preview', pressed: false })).toBeDisabled();
+  expect(screen.getByTestId('tool-question-result')).toHaveTextContent('Production');
+  expect(screen.queryByText('Preview')).toBeNull();
+  expect(screen.queryByRole('button')).toBeNull();
   expect(screen.queryByRole('textbox')).toBeNull();
   expect(useUserQuestions.getState().pending).toEqual({});
 });
