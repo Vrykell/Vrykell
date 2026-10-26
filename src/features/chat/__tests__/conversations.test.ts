@@ -40,6 +40,32 @@ afterEach(() => {
 });
 
 describe('independent conversations', () => {
+  it('reserves scheduled work before recording its run while manual requests join the queue', async () => {
+    const manual = useChatStore.getState().createConversation();
+    let release!: () => void;
+    const recording = new Promise<void>(resolve => { release = resolve; });
+    const started = sendToChat('Scheduled task', () => recording);
+    const reserved = useChatStore.getState().sendingTab;
+    expect(reserved).toBeTruthy();
+    const stream = vi.fn(async () => {});
+    await useChatStore.getState().send('Manual task', { conversationId: manual, streamFn: stream });
+    expect(useChatStore.getState().queuedSends.map(item => item.text)).toEqual(['Manual task']);
+    expect(stream).not.toHaveBeenCalled();
+    release();
+    await expect(started).resolves.toBe(true);
+    expect(useChatStore.getState().byTab[reserved!]?.[0].content).toBe('Scheduled task');
+    useChatStore.getState().abortStream(reserved!);
+    await vi.waitFor(() => expect(stream).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(useChatStore.getState().sendingTab).toBeNull());
+  });
+
+  it('removes an unstarted automated conversation when run persistence fails', async () => {
+    const recording = vi.fn().mockRejectedValue(new Error('Database unavailable'));
+    await expect(sendToChat('Scheduled task', recording)).rejects.toThrow('Database unavailable');
+    expect(useChatStore.getState().sendingTab).toBeNull();
+    expect(useChatStore.getState().conversations).toEqual([]);
+    expect(Object.keys(useChatStore.getState().byTab)).toEqual([]);
+  });
   it('keeps empty conversations in memory without writing history', async () => {
     const id = useChatStore.getState().createConversation();
     useChatStore.getState().renameConversation(id, 'Draft');

@@ -23,6 +23,16 @@ function sentMessages(): unknown[] {
 }
 
 describe('scheduleRunner', () => {
+  it('coalesces overlapping polls while a schedule read is pending', async () => {
+    let release!: (value: Schedule[]) => void;
+    invokeMock.mockImplementation(() => new Promise<Schedule[]>(resolve => { release = resolve; }));
+    kickScheduleRunner();
+    kickScheduleRunner();
+    kickScheduleRunner();
+    expect(invokeMock).toHaveBeenCalledTimes(1);
+    release([]);
+    await flush();
+  });
   beforeEach(() => {
     invokeMock.mockReset();
     vi.spyOn(console, 'warn').mockImplementation(() => {});

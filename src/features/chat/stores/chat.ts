@@ -686,12 +686,29 @@ export function isChatTurnActive(): boolean {
 }
 
 /** Automated requests get a dedicated conversation without replacing the user's current work. */
-export function sendToChat(text: string) {
-  if (!text.trim()) return;
+export async function sendToChat(text: string, beforeStart?: () => Promise<void>): Promise<boolean> {
+  if (!text.trim()) return false;
   const state = useChatStore.getState();
-  if (state.sendingTab) return;
+  if (state.sendingTab) return false;
   const id = state.createConversation(null, { activate: false });
+  if (beforeStart) {
+    // Reserve the same send slot used by manual requests before persisting the run.
+    // Requests arriving during this await join the normal queue behind this turn.
+    useChatStore.setState({ sendingTab: id });
+    try { await beforeStart(); }
+    catch (error) {
+      useChatStore.getState().abortStream(id);
+      useChatStore.setState(current => {
+        const byTab = { ...current.byTab }; delete byTab[id];
+        return { byTab, conversations: current.conversations.filter(conversation => conversation.id !== id) };
+      });
+      throw error;
+    }
+    if (useChatStore.getState().sendingTab !== id) return false;
+    useChatStore.setState({ sendingTab: null });
+  }
   void state.send(text.trim(), { conversationId: id });
+  return true;
 }
 
 const EMPTY: ChatMessage[] = [];

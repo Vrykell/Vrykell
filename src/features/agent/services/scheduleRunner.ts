@@ -6,13 +6,15 @@
  */
 import { listSchedules, markScheduleRun } from '@features/agent/services/platform';
 import { isChatTurnActive, sendToChat } from '@features/chat';
+import { t } from '@i18n';
 
 const POLL_MS = 30_000;
 
 let timer: ReturnType<typeof setInterval> | null = null;
+let runningTick: Promise<void> | null = null;
 
 /** 检查并触发到期任务；markScheduleRun 成功后才发送，失败跳过本轮防重复触发。 */
-async function tick(): Promise<void> {
+async function runTick(): Promise<void> {
   const list = await listSchedules().catch((e) => {
     console.warn('[scheduleRunner] 读取定时任务失败:', e);
     return [];
@@ -26,12 +28,16 @@ async function tick(): Promise<void> {
     // task for a whole interval, whereas waiting leaves it due for the next tick.
     if (isChatTurnActive()) continue;
     try {
-      await markScheduleRun(s.id, now);
-      sendToChat(`【定时任务】${s.name}\n${s.prompt}`);
+      await sendToChat(`${t('Scheduled task: {{name}}', { name: s.name })}\n${s.prompt}`, () => markScheduleRun(s.id, now));
     } catch (e) {
       console.warn('[scheduleRunner] 定时任务触发失败（跳过本轮，防止重复发送）:', s.id, e);
     }
   }
+}
+
+function tick(): Promise<void> {
+  runningTick ??= runTick().finally(() => { runningTick = null; });
+  return runningTick;
 }
 
 /** 启动调度器（幂等）；返回解绑函数。 */

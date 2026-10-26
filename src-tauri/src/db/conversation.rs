@@ -93,6 +93,8 @@ impl HistoryDb {
         updated_at: u64,
         environment: &str,
     ) -> Result<(), String> {
+        let title = crate::redact::redact_text(title);
+        let environment = crate::redact::redact_json(environment);
         self.conn().execute(
             "INSERT INTO ai_conversations (id, title, created_at, updated_at, environment) VALUES (?1, ?2, ?3, ?4, ?5)
              ON CONFLICT(id) DO UPDATE SET title=excluded.title, updated_at=excluded.updated_at, environment=excluded.environment",
@@ -114,6 +116,10 @@ impl HistoryDb {
         pane_id: Option<&str>,
         context: &str,
     ) -> Result<(), String> {
+        let content = crate::redact::redact_text(content);
+        let parts = crate::redact::redact_json(parts);
+        let attachments = crate::redact::redact_json(attachments);
+        let context = crate::redact::redact_json(context);
         self.conn().execute(
             "INSERT INTO ai_messages (id, conversation_id, role, content, created_at, parts, attachments, pane_id, context)
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
@@ -166,6 +172,26 @@ impl HistoryDb {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn independent_conversations_redact_secrets_at_every_persistence_boundary() {
+        let db = HistoryDb::open_in_memory();
+        let secret = "sk-audit-fixture-123456789";
+        let json = serde_json::json!({ "label": "keep", "nested": [{ "text": secret }], "apiKey": "fixture-value" }).to_string();
+        db.save_conversation("c", secret, 1, 2, &json).unwrap();
+        db.append_conversation_message("m", "c", "user", secret, 3, &json, &json, None, &json).unwrap();
+        let conversation = db.get_conversation("c").unwrap();
+        assert_eq!(conversation.title, "[redacted]");
+        let message = db.list_conversation_messages("c").unwrap().remove(0);
+        assert_eq!(message.content, "[redacted]");
+        for stored in [&conversation.environment, &message.parts, &message.attachments, &message.context] {
+            assert!(!stored.contains(secret));
+            assert!(!stored.contains("fixture-value"));
+            let restored: serde_json::Value = serde_json::from_str(stored).unwrap();
+            assert_eq!(restored["label"], "keep");
+            assert_eq!(restored["nested"][0]["text"], "[redacted]");
+        }
+    }
 
     #[test]
     fn conversations_survive_terminal_deletion_and_have_independent_messages() {
