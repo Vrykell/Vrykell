@@ -101,9 +101,6 @@ export default function WorkspaceShell() {
     document.addEventListener('keydown', escape);
     return () => { document.removeEventListener('pointerdown', outside, true); document.removeEventListener('keydown', escape); };
   }, [sidebarOverlay, collapsed]);
-  useEffect(() => {
-    if (aiPlacement === 'main' && chatOpen) useDockStore.getState().closePanel('chat');
-  }, [aiPlacement, chatOpen]);
   // Safety net for every path that can empty a strip: close, group archive, restore and reload.
   useEffect(() => { useSessionStore.getState().ensureStartPages(); }, [sessionTabs, nativeTabs, harnessConnections, area]);
 

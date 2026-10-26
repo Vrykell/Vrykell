@@ -54,7 +54,7 @@ it('does not rerender connected or native content when an unrelated layout width
 });
 
 it('moves the existing conversation node without restarting it or dropping local state', () => {
-  const view = (placement: 'main' | 'side') => <ResourceContentProvider><AiWorkspaceProvider placement={placement} mainActive headerActive sideActive>
+  const view = (placement: 'main' | 'side') => <ResourceContentProvider><AiWorkspaceProvider placement={placement} mainActive headerActive sideActive={placement === 'side'}>
     <AiWorkspaceSurface placement="main" /><AiWorkspaceSurface placement="side" />
   </AiWorkspaceProvider></ResourceContentProvider>;
   const { rerender, unmount } = render(view('main'));
@@ -62,15 +62,36 @@ it('moves the existing conversation node without restarting it or dropping local
   const connected = screen.getByTestId('connected-session');
   fireEvent.change(input, { target: { value: 'Unsent work' } });
   expect(input.closest('[data-testid="ai-surface-main"]')).not.toBeNull();
-  act(() => rerender(view('side')));
+  act(() => { useAiWorkspace.getState().selectSide('chat:native'); useAiWorkspace.getState().select(''); rerender(view('side')); });
   expect(screen.getByRole('textbox', { name: 'Draft' })).toBe(input);
   expect(input).toHaveValue('Unsent work');
   expect(input.closest('[data-testid="ai-surface-side"]')).not.toBeNull();
   expect(screen.getByTestId('connected-session')).toBe(connected);
   expect(connected.closest('[data-testid="ai-surface-main"]')).not.toBeNull();
-  act(() => rerender(view('main')));
+  act(() => { useAiWorkspace.getState().openNative('native'); rerender(view('main')); });
   expect(screen.getByRole('textbox', { name: 'Draft' })).toBe(input);
   expect(lifecycle.mounts).toBe(1);
   expect(lifecycle.stops).toBe(0);
   unmount(); expect(lifecycle.stops).toBe(1);
+});
+
+it('opens and reopens an independent sidebar without moving the main conversation', () => {
+  useChatStore.setState({ conversationsLoaded: true, conversations: [{ id: 'native', title: 'Main', createdAt: 1, updatedAt: 1, environment: null }], byTab: { native: [] } });
+  const view = (sideActive: boolean) => <ResourceContentProvider><AiWorkspaceProvider placement={sideActive ? 'side' : 'main'} mainActive headerActive sideActive={sideActive}>
+    <AiWorkspaceSurface placement="main" /><AiWorkspaceSurface placement="side" />
+  </AiWorkspaceProvider></ResourceContentProvider>;
+  const { rerender } = render(view(false));
+  const main = document.querySelector<HTMLInputElement>('[data-conversation="native"]')!;
+  fireEvent.change(main, { target: { value: 'Main draft' } });
+  act(() => rerender(view(true)));
+  const sideId = useAiWorkspace.getState().sideSelected.slice(5);
+  expect(sideId).not.toBe('native');
+  expect(main.closest('[data-testid="ai-surface-main"]')).not.toBeNull();
+  const side = document.querySelector<HTMLInputElement>(`[data-conversation="${sideId}"]`)!;
+  fireEvent.change(side, { target: { value: 'Side draft' } });
+  act(() => rerender(view(false)));
+  act(() => rerender(view(true)));
+  expect(useAiWorkspace.getState().sideSelected).toBe(`chat:${sideId}`);
+  expect(main).toHaveValue('Main draft'); expect(side).toHaveValue('Side draft');
+  expect(main.closest('[data-testid="ai-surface-main"]')).not.toBeNull();
 });

@@ -31,7 +31,7 @@ export function AiWorkspaceProvider({ placement, mainActive, headerActive, sideA
   const nativeTabs = useAiWorkspace(state => state.nativeTabs);
   const selected = useAiWorkspace(state => state.selected);
   const sideSelected = useAiWorkspace(state => state.sideSelected);
-  const sidebarSettings = useMemo(() => ({ resourceId: placement === 'side' && sideActive ? sideSelected : '', target: sidebarSettingsTarget, suspend: setSettingsSuspended }), [placement, sideActive, sideSelected, sidebarSettingsTarget]);
+  const sidebarSettings = useMemo(() => ({ resourceId: sideActive ? sideSelected : '', target: sidebarSettingsTarget, suspend: setSettingsSuspended }), [sideActive, sideSelected, sidebarSettingsTarget]);
   const nativeSelected = useChatStore(state => state.activeConversationId);
   const [visited, setVisited] = useState(nativeTabs.length > 0 || sideActive);
   useEffect(() => { if (nativeTabs.length || sideActive) setVisited(true); }, [nativeTabs.length, sideActive]);
@@ -42,13 +42,13 @@ export function AiWorkspaceProvider({ placement, mainActive, headerActive, sideA
     return () => { host.remove(); };
   }, [host, main, parking]);
   const target = native;
-  const nativeActive = placement === 'main' && mainActive && selected === `chat:${nativeSelected}`;
+  const nativeActive = mainActive && selected === `chat:${nativeSelected}`;
   const mountedNativeIds = [...new Set([...nativeTabs, ...(visited && nativeSelected ? [nativeSelected] : []), ...(sideSelected.startsWith('chat:') ? [sideSelected.slice(5)] : [])])].sort();
   return <SidebarSettingsContext.Provider value={sidebarSettings}><SurfaceContext.Provider value={context}>
     {children}
     <div hidden ref={setParking} />
     {createPortal(<StableHarnessWorkspace active={mainActive} headerActive={headerActive} />, host)}
-    {side && createPortal(<AiSidebar active={placement === 'side' && sideActive} onSettingsTarget={setSidebarSettingsTarget} settingsSuspended={settingsSuspended} />, side)}
+    {side && createPortal(<AiSidebar active={sideActive} onSettingsTarget={setSidebarSettingsTarget} settingsSuspended={settingsSuspended} />, side)}
     {mountedNativeIds.map(id => <ResourceContent key={id} id={`chat:${id}`} active={nativeActive && id === nativeSelected} fallbackTarget={id === nativeSelected ? target ?? parking : parking}>
       {state => <StablePanelChat conversationId={id} active={state.visible} workspace={state.placed || placement === 'main'} toolbarTarget={state.placed ? state.header ?? (state.retainsHeader && state.focused ? toolbar : null) : id === nativeSelected ? toolbar : null} />}
     </ResourceContent>)}

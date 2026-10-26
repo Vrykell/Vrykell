@@ -8,7 +8,6 @@ import { Plus, DataUsage, Folder, PanelRight, History, Sparkles } from '@ui/icon
 import AppMark from '@ui/icons/AppMark';
 import WorkspaceHeader from '@ui/layout/WorkspaceHeader';
 import ResourceContent from '@ui/layout/ResourceContent';
-import { OutlineButton } from '@ui/actions/OutlineButton';
 import { registerHarnessCloseGuard } from '@core/harness';
 import { pickPath } from '@platform/api/fs';
 import { useToastStore } from '@ui/feedback/Toast';
@@ -27,13 +26,13 @@ import { useAiWorkspace } from '../stores/aiWorkspace';
 import { orderedWorkspaceIds, useWorkspaceNavigation } from '@features/workspace';
 import { selectWorkspaceArea } from '@features/workspace/services/selectWorkspaceArea';
 import { useDockStore } from '@features/workspace';
-import { closeAiWorkspaceSession } from '../services/aiWorkspace';
+import { closeAiWorkspaceSession, moveMainConversationToSide } from '../services/aiWorkspace';
 
 /** One workspace page hosts independent sessions through the shared connected tabs. */
 export default function HarnessWorkspace({ active, headerActive = active }: { active: boolean; headerActive?: boolean }) {
   const surface = useContext(AiSurfaceContext);
-  const { connections, selected: harnessSelected } = useHarnessWorkspace();
-  const { nativeTabs, selected, order } = useAiWorkspace();
+  const { connections } = useHarnessWorkspace();
+  const { nativeTabs, selected, sideSelected, sideSessions, order } = useAiWorkspace();
   const conversations = useChatStore(state => state.conversations);
   const nativeSelected = useChatStore(state => state.activeConversationId);
   const placement = useWorkspaceNavigation(state => state.aiPlacement);
@@ -50,7 +49,6 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
     }
     lastNative.current = nativeSelected;
   }, [nativeSelected, nativeVisited, nativeTabs.length, placement]);
-  useEffect(() => { if (harnessSelected && placement === 'main') useAiWorkspace.getState().select(`acp:${harnessSelected}`); }, [harnessSelected, placement]);
   const settingsOpen = useUiStore(state => state.settingsOpen);
   const visible = active && !settingsOpen;
   const splitActive = useScopedSplitActive('ai');
@@ -69,7 +67,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
     useAiWorkspace.getState().openNative(useChatStore.getState().createConversation());
   };
   const relocate = () => {
-    useAiWorkspace.getState().selectSide(selected);
+    moveMainConversationToSide(selected);
     const dock = useDockStore.getState();
     dock.openPanel('chat');
     if (![...useDockStore.getState().leftPanels, ...useDockStore.getState().rightPanels].includes('chat')) {
@@ -101,10 +99,10 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
   };
   const systemPages = pages.filter(page => page.kind === 'ai-history' || page.kind === 'usage' || page.kind === 'start-ai');
   const tabs = [
-    ...nativeTabs.flatMap(id => { const conversation = conversations.find(item => item.id === id); return conversation ? [{
+    ...nativeTabs.flatMap(id => { const conversation = conversations.find(item => item.id === id); return conversation && !sideSessions.includes(`chat:${id}`) && `chat:${id}` !== sideSelected ? [{
       id: `chat:${id}`, label: conversation.title, tip: conversation.title, icon: <AppMark colored size={16} />, closeLabel: t('Close session {{name}}', { name: conversation.title }),
     }] : []; }),
-    ...connections.map(item => { const Mark = harnessMark(item.harness); return {
+    ...connections.filter(item => `acp:${item.id}` !== sideSelected && !sideSessions.includes(`acp:${item.id}`)).map(item => { const Mark = harnessMark(item.harness); return {
         id: `acp:${item.id}`, label: item.harness, tip: item.cwd ? `${item.harness} · ${item.cwd}` : item.harness,
         icon: <Mark size={16} />, closeLabel: t('Close session {{name}}', { name: item.harness }),
     }; }),
@@ -120,13 +118,13 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
   const activeSystemPage = activePage && (activePage.kind === 'ai-history' || activePage.kind === 'usage' || activePage.kind === 'start-ai') ? activePage : undefined;
   const stripSelected = activePage?.kind === 'harness' ? selected : activeSystemPage ? `page:${activeSystemPage.id}` : '';
   useEffect(() => {
-    const sessions = ids.filter(id => !id.startsWith('page:'));
+    const sessions = ids.filter(id => !id.startsWith('page:') && id !== sideSelected);
     if (!sessions.includes(selected) && sessions.length) {
       const id = sessions[0]!;
       useAiWorkspace.getState().select(id);
       if (id.startsWith('chat:')) void useChatStore.getState().selectConversation(id.slice(5));
     }
-  }, [ids.join('|'), selected]);
+  }, [ids.join('|'), selected, sideSelected]);
   const header = <FolderTabs label={t('AI sessions')} selected={stripSelected} listId="harness-sessions"
       items={orderedWorkspaceIds(ids, order).map(id => tabs.find(item => item.id === id)!)} onSelect={select}
       onMove={(...args) => useAiWorkspace.getState().move(ids, ...args)} onClose={close}
@@ -159,13 +157,12 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
         : <UnifiedHistoryView preset="conversation" destination="native" />}
     </div>}
     {nativeVisited && <div className="ai-native-surface" inert={!visible || splitActive || activePage?.kind !== 'harness' || !selected.startsWith('chat:')} style={{ display: visible && !splitActive && activePage?.kind === 'harness' && selected.startsWith('chat:') ? 'flex' : 'none' }}>
-      <NativeConversationSurface active={placement === 'main'} />
-      {placement === 'side' && <div className="workspace-empty"><p>{t('This conversation is open in the side panel.')}</p><OutlineButton onClick={() => selectWorkspaceArea('ai')}>{t('Move AI to workspace')}</OutlineButton></div>}
+      <NativeConversationSurface />
     </div>}
     {connections.map(item => <ResourceContent key={item.id} id={`acp:${item.id}`} active={visible && activePage?.kind === 'harness' && `acp:${item.id}` === selected}>
       {state => <HarnessView tabId={item.id} harness={item.harness} cwd={item.cwd} fresh={item.fresh} active={state.visible} resumeSessionId={item.resumeSessionId} />}
     </ResourceContent>)}
-    {!activeSystemPage && !nativeTabs.length && !connections.length && <div className="ai-start-page" data-testid="ai-start-page"><AcpLauncher embedded open={visible} onClose={() => {}} onPick={pick} onNewConversation={newConversation} /></div>}
+    {!activeSystemPage && !selected && <div className="ai-start-page" data-testid="ai-start-page"><AcpLauncher embedded open={visible} onClose={() => {}} onPick={pick} onNewConversation={newConversation} /></div>}
     {closing && createPortal(<ConfirmDialog open title={t('Close ACP sessions?')}
       message={t('Closing stops active work and discards unsent drafts.')} confirmLabel={t('Close sessions')} cancelLabel={t('Cancel')} danger
       onCancel={() => setClosing(null)} onConfirm={() => { const complete = closing; setClosing(null); complete(); }} />, document.body)}

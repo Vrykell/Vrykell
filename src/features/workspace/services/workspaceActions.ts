@@ -5,6 +5,7 @@ import { pickPath } from '@platform/api/fs';
 import { useToastStore } from '@ui/feedback/Toast';
 import { useAiWorkspace, useChatStore } from '@features/chat';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
+import { availableSideConversationIds } from '@features/chat/services/aiWorkspace';
 import { useWorkspaceStore } from '../stores/workspace';
 import { orderedWorkspaceIds, useWorkspaceNavigation, workspaceAreaForKind, type WorkspaceArea } from '../stores/navigation';
 import { compositionTabs, useUnifiedWorkspace } from '../stores/unifiedWorkspace';
@@ -13,7 +14,7 @@ import { workspacePaneCells } from '../model/workspaceResources';
 import { createUnifiedResource, createUnifiedTerminal, focusUnifiedResource } from './unifiedWorkspace';
 
 export function sideAiHasFocus(element: Element | null = document.activeElement): boolean {
-  return useWorkspaceNavigation.getState().aiPlacement === 'side' && !!element?.closest('[data-testid="ai-surface-side"], [data-workspace-focus="ai"]');
+  return !!element?.closest('[data-testid="ai-surface-side"], [data-workspace-focus="ai-side"]');
 }
 
 export function focusedWorkspaceArea(): WorkspaceArea {
@@ -92,7 +93,8 @@ export function activateWorkspaceInstance(index: number): boolean {
     const side = sideAiHasFocus();
     const ids = [...ai.nativeTabs.filter(id => useChatStore.getState().conversations.some(item => item.id === id)).map(id => `chat:${id}`),
       ...connections.connections.map(item => `acp:${item.id}`)];
-    const id = orderedWorkspaceIds(ids, ai.order)[index];
+    const available = side ? availableSideConversationIds() : null;
+    const id = orderedWorkspaceIds(available ? ids.filter(id => available.has(id)) : ids, ai.order)[index];
     if (!id) return false;
     if (side) {
       ai.selectSide(id);

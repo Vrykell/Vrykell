@@ -13,7 +13,7 @@ const snapshot = useWorkspaceStore.getState();
 beforeEach(() => {
   useWorkspaceStore.setState({ tabs: [], activeId: '', groups: [] });
   useWorkspaceNavigation.setState({ area: 'terminal', collapsed: false, codeOrder: [], aiPlacement: 'main' });
-  useAiWorkspace.setState({ nativeTabs: [], selected: '', sideSelected: '', order: [] });
+  useAiWorkspace.setState({ nativeTabs: [], selected: '', sideSelected: '', sideSessions: [], order: [] });
 });
 afterEach(() => { useWorkspaceStore.setState(snapshot, true); document.body.replaceChildren(); vi.clearAllMocks(); });
 
@@ -21,7 +21,7 @@ it('restores composer focus after a numeric shortcut switches the side conversat
   useWorkspaceNavigation.setState({ area: 'terminal', aiPlacement: 'side' });
   const first = useChatStore.getState().createConversation();
   const second = useChatStore.getState().createConversation();
-  useAiWorkspace.setState({ nativeTabs: [first, second], sideSelected: `chat:${first}`, order: [] });
+  useAiWorkspace.setState({ nativeTabs: [first, second], sideSelected: `chat:${first}`, sideSessions: [`chat:${first}`, `chat:${second}`], order: [] });
   const surface = document.createElement('div'); surface.dataset.testid = 'ai-surface-side';
   const previous = document.createElement('textarea'); previous.dataset.chatComposer = 'true';
   surface.append(previous); document.body.append(surface); previous.focus();
@@ -94,7 +94,7 @@ it('creates AI conversations in the focused side surface without replacing the m
 
 it('keeps a portaled conversation settings field in the side conversation keyboard scope', () => {
   useWorkspaceNavigation.setState({ area: 'terminal', aiPlacement: 'side' });
-  const menu = document.createElement('section'); menu.dataset.workspaceFocus = 'ai';
+  const menu = document.createElement('section'); menu.dataset.workspaceFocus = 'ai-side';
   const field = document.createElement('button'); menu.appendChild(field); document.body.appendChild(menu); field.focus();
   expect(focusedWorkspaceArea()).toBe('ai');
   newWorkspaceItem();

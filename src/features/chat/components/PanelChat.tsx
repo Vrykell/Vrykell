@@ -110,7 +110,7 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
         setSettingsMenu(current => current ? null : { x: bounds.right - 320, y: bounds.bottom + 4, trigger });
       }}><SlidersHorizontal size={16} /></IconButton>
   </>;
-  const settingsContents = <section id="chat-conversation-settings" className="chat-conversation-settings" aria-label={inSidebar ? undefined : t('Conversation settings')} data-workspace-focus="ai">
+  const settingsContents = <section id="chat-conversation-settings" className="chat-conversation-settings" aria-label={inSidebar ? undefined : t('Conversation settings')} data-workspace-focus={inSidebar ? 'ai-side' : 'ai'}>
       {!workspace && !inSidebar && <div className="chat-setting-row"><span>{t('Recent conversations')}</span>
         <Select aria-label={t('Restore recent conversation')} value={activeId} disabled={loading}
           options={[...conversations].sort((first, second) => second.updatedAt - first.updatedAt).filter((item, index) => index < 20 || item.id === activeId).map(item => ({ value: item.id, label: item.title || t('Untitled') }))}

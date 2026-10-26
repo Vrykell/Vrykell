@@ -374,7 +374,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const focused = active && isSessionTab(active) ? findLeaf(active.layout, useTerminalStore.getState().focusedPaneId ?? '') ?? firstLeaf(active.layout) : null;
     const spec = focused?.kind === 'local' ? focused : sessionLeaves.find(pane => pane.id === state.lastLocalPaneId);
     const directory = cwd ?? (spec ? state.terminalCwds[spec.id] ?? spec.cwd : undefined);
-    if (name) useHarnessWorkspace.getState().connect(name, directory);
+    if (name) useAiWorkspace.getState().select(`acp:${useHarnessWorkspace.getState().connect(name, directory)}`);
     useUiStore.getState().setSettingsOpen(false);
     if (useWorkspaceNavigation.getState().area !== 'unified') useWorkspaceNavigation.getState().selectArea('ai');
     get().addTab({ kind: 'harness' });

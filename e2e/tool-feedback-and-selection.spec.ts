@@ -28,7 +28,9 @@ for (const theme of ['dark', 'light']) for (const width of [900, 1440]) {
     await page.evaluate(async () => {
       const path = '/src/features/chat/stores/chat.ts';
       const { useChatStore } = await import(path) as typeof import('../src/features/chat/stores/chat');
-      const id = useChatStore.getState().activeConversationId;
+      const workspacePath = '/src/features/chat/stores/aiWorkspace.ts';
+      const { useAiWorkspace } = await import(workspacePath) as typeof import('../src/features/chat/stores/aiWorkspace');
+      const id = useAiWorkspace.getState().sideSelected.slice(5);
       useChatStore.setState({ byTab: { [id]: [
         { id: 'question', role: 'user', content: 'Check tool results', createdAt: 1 },
         { id: 'answer', role: 'assistant', content: '', createdAt: 2, parts: [
@@ -65,7 +67,9 @@ for (const theme of ['dark', 'light']) for (const width of [900, 1440]) {
     await page.evaluate(async () => {
       const path = '/src/features/chat/stores/chat.ts';
       const { useChatStore } = await import(path) as typeof import('../src/features/chat/stores/chat');
-      const id = useChatStore.getState().activeConversationId;
+      const workspacePath = '/src/features/chat/stores/aiWorkspace.ts';
+      const { useAiWorkspace } = await import(workspacePath) as typeof import('../src/features/chat/stores/aiWorkspace');
+      const id = useAiWorkspace.getState().sideSelected.slice(5);
       useChatStore.setState(state => ({ byTab: { ...state.byTab, [id]: state.byTab[id]!.map(message => ({ ...message,
         parts: message.parts?.map(part => part.kind === 'tool' && part.tool.toolCallId === 'live'
           ? { kind: 'tool', tool: { ...part.tool, state: 'error', error: 'Live read failed' } } : part),
