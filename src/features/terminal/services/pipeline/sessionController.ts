@@ -18,6 +18,7 @@ import { workingDirectoryFromUri } from '@features/terminal/services/pipeline/wo
 import { trackBufferTruncation, type BufferTruncationTracker } from '@features/terminal/services/pipeline/bufferTruncation';
 import { getTerminalFontSize, measureTerminalDomCellWidth } from '@features/terminal/model/terminalFont';
 import { registerBlockTerminal, unregisterBlockTerminal } from '@features/terminal/services/terminalRepaint';
+import { decodePowerShellSubmission } from '../../model/commandSubmission';
 import { getCellMetrics } from '@utils/termMetrics';
 
 export type Scene = 'classic' | 'blockList' | 'altScreen';
@@ -33,7 +34,7 @@ export interface SessionSinks {
   onProgramTitle?(title: string): void;
   /** Keep terminal replies connected even before a running output view mounts. */
   onTerminalData?(data: string): void;
-  takePendingUiCommand?(): string | null;
+  takePendingUiCommand?(): { command: string; wireCommand?: string } | null;
   clearPendingUiCommand?(): void;
 }
 
@@ -68,7 +69,10 @@ export class SessionController {
   /** 是否启用块系统：false = 经典模式（传统终端，输出直进 xterm，不建块） */
   private blockEnabled: boolean;
   private pendingUiCommand = '';
+  private pendingWireCommand = '';
   private pendingShellCommand = '';
+  private pendingShellEcho = '';
+  private pendingPreexecTimer: ReturnType<typeof setTimeout> | null = null;
   private longRunningTimer: ReturnType<typeof setTimeout> | null = null;
   private _disposed = false;
   /** 最近一次 OSC 7 上报的 cwd：真实 RC 顺序是 OSC7 → D → A，新 block 以此播种 */
@@ -88,11 +92,22 @@ export class SessionController {
     initialScene: Scene = 'classic',
     /** 块系统开关；false = 经典模式（传统终端） */
     blockEnabled = true,
+    /** Integrated shells create the block when OSC 133;E reports the command. */
+    private deferBlockUntilPreexec = false,
+    /** Show output even if a broken integration never emits OSC 133;C. */
+    private deferFallbackMs = 3000,
   ) {
     this.ioLog = new TerminalIoLog(tabId);
     this._scene = initialScene;
     this.preAltScene = initialScene;
     this.blockEnabled = blockEnabled;
+  }
+
+  private clearPendingPreexecTimer(): void {
+    if (this.pendingPreexecTimer) {
+      clearTimeout(this.pendingPreexecTimer);
+      this.pendingPreexecTimer = null;
+    }
   }
 
   get scene(): Scene {
@@ -275,6 +290,7 @@ export class SessionController {
   // ── Block 生命周期（Spec §2） ──
 
   private onPrecmd(fromA = true): void {
+    const wasClassic = this._scene === 'classic';
     if (isTerminalDebugEnabled()) {
       terminalDebug('block-prompt-start', { tabId: this.tabId, scene: this._scene, previousStatus: this.activeBlock?.status ?? null });
     }
@@ -296,9 +312,17 @@ export class SessionController {
         prev.endedAt = Date.now();
       }
     }
-    this.pendingUiCommand = '';
+    // An integrated shell can report the prompt after the command was submitted but before
+    // OSC 133;E. Keep the visible command until the preexec marker consumes it, but not when
+    // the pane was still in classic mode (authentication or a missing integration).
+    if (!(this.deferBlockUntilPreexec && !wasClassic && this.pendingUiCommand)) {
+      this.clearPendingPreexecTimer();
+      this.pendingUiCommand = '';
+      this.pendingWireCommand = '';
+      this.sinks.clearPendingUiCommand?.();
+    }
     this.pendingShellCommand = '';
-    this.sinks.clearPendingUiCommand?.();
+    this.pendingShellEcho = '';
     const block: InternalBlock = {
       id: `b${BLOCK_PREFIX}-${nextId++}`,
       command: '',
@@ -329,20 +353,26 @@ export class SessionController {
   }
 
   private onPreexec(): void {
+    this.clearPendingPreexecTimer();
     const ab = this.activeBlock;
     if (!ab || ab.status !== 'pending') return;
     const controllerUiCommand = this.pendingUiCommand;
-    const deferredUiCommand = this.sinks.takePendingUiCommand?.() ?? '';
+    const deferred = this.sinks.takePendingUiCommand?.() ?? null;
+    const deferredUiCommand = deferred?.command ?? '';
     const uiCommand = controllerUiCommand || deferredUiCommand;
     const shellCommand = this.pendingShellCommand;
     const command = uiCommand || shellCommand;
+    const wireCommand = this.pendingWireCommand || deferred?.wireCommand || this.pendingShellEcho || command;
     this.pendingUiCommand = '';
+    this.pendingWireCommand = '';
     this.pendingShellCommand = '';
+    this.pendingShellEcho = '';
     if (isTerminalDebugEnabled()) {
       terminalDebug('command-start', {
         tabId: this.tabId,
         blockId: ab.id,
         commandChars: command.length,
+        wireChars: wireCommand.length,
         commandSource: controllerUiCommand
           ? 'input-editor-controller'
           : deferredUiCommand
@@ -357,7 +387,7 @@ export class SessionController {
     ab._commandFromUi = Boolean(uiCommand);
     ab.startedAt = Date.now();
     ab.status = 'executing';
-    ab._pendingCommandEcho = ab.command.split(/\r?\n/, 1)[0]?.trim() || null;
+    ab._pendingCommandEcho = wireCommand.split(/\r?\n/, 1)[0]?.trim() || null;
     ab._commandEchoPrefixConsumed = false;
 
     // 创建块内活终端（隐藏宿主，RunningItem 挂载后移入卡片可见化）
@@ -389,17 +419,22 @@ export class SessionController {
     if (early) {
       let rest = early;
       const lines = early.split('\n');
-      const lastNonEmpty = [...lines].reverse().find((line) => line.trim().length > 0);
-      if (lastNonEmpty !== undefined) {
-        const lineIndex = lines.lastIndexOf(lastNonEmpty);
-        const commandEcho = isCommandEcho(lastNonEmpty, ab.command);
-        if (ab._fromA || commandEcho) {
-          lines.splice(lineIndex, 1);
-          rest = lines.join('\n');
-        }
-        if (commandEcho) {
-          ab._pendingCommandEcho = null;
-          ab._commandEchoPrefixConsumed = false;
+      // The echo can precede output when a broken integration falls back to the eager boundary.
+      const echoIndex = lines.findIndex((line) => isCommandEcho(line, wireCommand) || isCommandEcho(line, ab.command));
+      if (echoIndex >= 0) {
+        lines.splice(echoIndex, 1);
+        rest = lines.join('\n');
+        ab._pendingCommandEcho = null;
+        ab._commandEchoPrefixConsumed = false;
+      } else if (ab._fromA) {
+        const lastNonEmpty = [...lines].reverse().find((line) => line.trim().length > 0);
+        if (lastNonEmpty !== undefined) {
+          const visible = stripTerminalControls(lastNonEmpty).trim();
+          // Discard a prompt-shaped line, never a line that could be command output.
+          if (!visible || /[$#>%❯]$/.test(visible)) {
+            lines.splice(lines.lastIndexOf(lastNonEmpty), 1);
+            rest = lines.join('\n');
+          }
         }
       }
       // 剩余含非空白内容 → 后台输出，进 outputTerm
@@ -421,7 +456,7 @@ export class SessionController {
     this.sinks.onBlocksChanged();
   }
 
-  setPendingCommand(command: string): boolean {
+  setPendingCommand(command: string, wireCommand?: string): boolean {
     const normalized = command.trim();
     if (!normalized) return false;
     const active = this.activeBlock;
@@ -435,13 +470,32 @@ export class SessionController {
       }
       return false;
     }
+    if (this.deferBlockUntilPreexec && this.pendingUiCommand) {
+      return normalized === this.pendingUiCommand && (wireCommand ?? normalized) === this.pendingWireCommand;
+    }
     this.pendingUiCommand = normalized;
+    this.pendingWireCommand = wireCommand ?? normalized;
     if (isTerminalDebugEnabled()) {
       terminalDebug('command-pending-ui', {
         tabId: this.tabId,
         chars: normalized.length,
+        wireChars: this.pendingWireCommand.length,
         activeStatus: active?.status ?? null,
       });
+    }
+    // Integrated shells create the block at OSC 133;E with the visible command, so a late
+    // prompt cannot close an eager block before the real command starts. A broken integration
+    // must not hide the output, so fall back to the eager boundary after a grace period.
+    if (this.deferBlockUntilPreexec) {
+      this.clearPendingPreexecTimer();
+      this.pendingPreexecTimer = setTimeout(() => {
+        this.pendingPreexecTimer = null;
+        if (this._disposed) return;
+        if (this.deferBlockUntilPreexec && this.pendingUiCommand && this.activeBlock?.status === 'pending') {
+          this.onPreexec();
+        }
+      }, this.deferFallbackMs);
+      return true;
     }
     // UI submission already identifies the command boundary. Remote shells may
     // emit prompt/completion markers without a preexec hook; their output must
@@ -450,18 +504,27 @@ export class SessionController {
       if (this.activeBlock?.status !== 'pending') {
         this.onPrecmd(false);
         this.pendingUiCommand = normalized;
+        this.pendingWireCommand = wireCommand ?? normalized;
       }
       this.onPreexec();
     }
     return true;
   }
 
+  /** Drop a submission that never reached the shell, including its fallback boundary. */
+  clearPendingCommand(): void {
+    this.clearPendingPreexecTimer();
+    this.pendingUiCommand = '';
+    this.pendingWireCommand = '';
+  }
+
   private onShellCommand(command: string): void {
     if (!command) return;
+    const displayCommand = decodePowerShellSubmission(command) ?? command;
     const active = this.activeBlock;
     if (active?.status === 'executing') {
       if (!active._commandFromUi) {
-        active.command = command;
+        active.command = displayCommand;
         active._pendingCommandEcho = command.split(/\r?\n/, 1)[0]?.trim() || null;
         active._commandEchoPrefixConsumed = false;
         this.sinks.onBlocksChanged();
@@ -470,17 +533,32 @@ export class SessionController {
         terminalDebug('shell-command-late', {
           tabId: this.tabId,
           blockId: active.id,
-          commandChars: command.length,
+          commandChars: displayCommand.length,
+          wireChars: command.length,
           uiCommandAuthoritative: active._commandFromUi,
         });
       }
       return;
     }
-    this.pendingShellCommand = command;
+    // A command can arrive before the prompt marker on a slow or fast shell. Create the
+    // boundary now, but keep the visible command for the preexec that follows.
+    if (this.deferBlockUntilPreexec && active?.status !== 'pending') {
+      const staged = this.sinks.takePendingUiCommand?.() ?? null;
+      const uiCommand = this.pendingUiCommand || staged?.command || '';
+      const wireCommand = this.pendingWireCommand || staged?.wireCommand || '';
+      this.pendingUiCommand = uiCommand;
+      this.pendingWireCommand = wireCommand;
+      this.onPrecmd(false);
+      this.pendingUiCommand = uiCommand;
+      this.pendingWireCommand = wireCommand;
+    }
+    this.pendingShellCommand = displayCommand;
+    this.pendingShellEcho = command;
     if (isTerminalDebugEnabled()) {
       terminalDebug('shell-command-pending', {
         tabId: this.tabId,
-        commandChars: command.length,
+        commandChars: displayCommand.length,
+        wireChars: command.length,
         activeStatus: active?.status ?? null,
       });
     }
@@ -758,6 +836,7 @@ export class SessionController {
 
   dispose(): void {
     this._disposed = true;
+    this.clearPendingPreexecTimer();
     // The pane keeps its last counter window even though the pipeline stops here.
     this.ioLog.flush();
     this.ioLog.dispose();

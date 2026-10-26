@@ -1352,6 +1352,7 @@ const zh: Record<string, string> = {
   'Run in terminal': '在终端运行',
   'Script added to command input. Press Enter to run.': '脚本已放入命令输入框，检查后按 Enter 运行。',
   'Could not run the command in the selected terminal': '无法在所选终端运行命令',
+  'Wait for the current command to start': '请等待当前命令开始执行',
   'Conversation interrupted': '对话中断',
   'Stopped waiting; the terminal command may still be running': '已停止等待，终端命令可能仍在运行',
   'Reply stopped. Terminal commands may still be running.': '回复已停止。终端命令可能仍在运行。',

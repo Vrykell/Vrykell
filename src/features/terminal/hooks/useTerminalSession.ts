@@ -35,6 +35,7 @@ import { SessionController } from '@features/terminal/services/pipeline/sessionC
 import { blockTerminalFor, recoverTerminalSurfaces } from '@features/terminal/services/terminalRepaint';
 import { captureTerminalPaste, copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { cancelTerminalInput, writeTerminalInput } from '@features/terminal/services/terminalWriteQueue';
+import { setPendingCommandRegistrar } from '@features/terminal/services/pendingCommandRegistry';
 import { querySequences } from '@features/terminal/model/terminalQueries';
 import { getCellMetrics } from '@utils/termMetrics';
 import type { DispatchEvent } from '@core/terminal/events';
@@ -52,7 +53,7 @@ import { isLayoutResizeDragActive, onLayoutResizeDragEnd } from '@ui/layout/layo
 /** Live session references shared across development reloads. */
 interface SessionRegistry {
   controllers: Map<string, SessionController>;
-  pendingUiCommands: Map<string, { command: string; stagedAt: number }>;
+  pendingUiCommands: Map<string, { command: string; wireCommand?: string; stagedAt: number }>;
   widthSyncs: Map<string, () => void>;
 }
 
@@ -60,7 +61,7 @@ interface SessionRegistry {
 const registryScope = globalThis as typeof globalThis & { __vrykellSessionRegistry?: SessionRegistry };
 const sessionRegistry = registryScope.__vrykellSessionRegistry ??= {
   controllers: new Map<string, SessionController>(),
-  pendingUiCommands: new Map<string, { command: string; stagedAt: number }>(),
+  pendingUiCommands: new Map<string, { command: string; wireCommand?: string; stagedAt: number }>(),
   widthSyncs: new Map<string, () => void>(),
 };
 const sessionControllers = sessionRegistry.controllers;
@@ -81,20 +82,27 @@ export function clearSessionBlocks(tabId: string): void {
   else useBlockStore.getState().clearBlocks(tabId);
 }
 
-export function setPendingTerminalCommand(tabId: string, command: string): void {
+export function setPendingTerminalCommand(tabId: string, command: string, wireCommand?: string): boolean {
   const normalized = command.trim();
-  if (!normalized) return;
+  if (!normalized) return false;
   const controller = sessionControllers.get(tabId);
   if (!controller) {
-    pendingUiCommands.set(tabId, { command: normalized, stagedAt: Date.now() });
+    pendingUiCommands.set(tabId, { command: normalized, wireCommand, stagedAt: Date.now() });
     if (isTerminalDebugEnabled()) {
-      terminalDebug('command-pending-deferred', { paneId: tabId, chars: normalized.length });
+      terminalDebug('command-pending-deferred', { paneId: tabId, chars: normalized.length, wireChars: wireCommand?.length ?? 0 });
     }
-    return;
+    return true;
   }
-  const accepted = controller.setPendingCommand(normalized);
-  if (accepted) pendingUiCommands.set(tabId, { command: normalized, stagedAt: Date.now() });
+  const accepted = controller.setPendingCommand(normalized, wireCommand);
+  if (accepted) pendingUiCommands.set(tabId, { command: normalized, wireCommand, stagedAt: Date.now() });
   else pendingUiCommands.delete(tabId);
+  return accepted;
+}
+
+/** Drop a submission whose PTY write failed before the shell could report it. */
+export function clearPendingTerminalCommand(tabId: string): void {
+  pendingUiCommands.delete(tabId);
+  sessionControllers.get(tabId)?.clearPendingCommand();
 }
 
 /** Empty submissions retain their visual spacing while the PTY handles the actual input. */
@@ -301,6 +309,10 @@ export function useTerminalSession(
     const openMode = spec?.kind === 'local' && spec.shellType === 'cmd' ? 'classic'
       : spec?.openMode ?? (spec?.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(spec?.shellType));
     const blockEnabled = openMode === 'block';
+    // Block mode injects shell integration, which reports the command line through OSC 133;E.
+    // Waiting for that marker keeps the visible command authoritative and prevents a late prompt
+    // from closing an eager block.
+    const deferBlockUntilPreexec = blockEnabled;
     // Remote authentication must remain interactive until shell integration announces its prompt.
     const initialScene: 'classic' | 'blockList' = blockEnabled && spec?.kind !== 'ssh' ? 'blockList' : 'classic';
     if (isTerminalDebugEnabled()) {
@@ -410,15 +422,18 @@ export function useTerminalSession(
           }
           return null;
         }
-        return pending.command;
+        return { command: pending.command, wireCommand: pending.wireCommand };
       },
       clearPendingUiCommand: () => {
         pendingUiCommands.delete(paneId);
       },
-    }, term.rows, initialScene, blockEnabled);
+    }, term.rows, initialScene, blockEnabled, deferBlockUntilPreexec);
     sessionControllers.set(paneId, controller);
+    setPendingCommandRegistrar((targetPane, command, payload) => {
+      if (sessionControllers.has(targetPane)) setPendingTerminalCommand(targetPane, command, payload);
+    });
     if (isTerminalDebugEnabled()) {
-      terminalDebug('session-controller-register', { paneId, tabId, scene: initialScene, blockEnabled });
+      terminalDebug('session-controller-register', { paneId, tabId, scene: initialScene, blockEnabled, deferBlockUntilPreexec });
     }
     // 初始场景手动落位（无 OSC 133 触发）：
     // blockList → 清 classic 残留、焦点到输入栏；classic → 焦点到 xterm 直接打字

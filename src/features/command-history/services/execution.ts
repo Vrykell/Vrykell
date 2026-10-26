@@ -1,6 +1,6 @@
 import { commandEnvironment } from '@core/commandHistory';
 import { t } from '@i18n';
-import { writeTerminalCommand } from '@features/terminal/services/commandSubmission';
+import { terminalCommandPayload, writeTerminalCommand } from '@features/terminal/services/commandSubmission';
 import { getAvailableShells, SHELL_TYPES, type ShellType } from '@platform/shells';
 import { useSessionStore } from '@features/workspace';
 import type { TerminalSpec } from '@features/workspace/model/windowLayout';
@@ -66,7 +66,8 @@ export async function runHistoryCommand(context: ExecutionContext, item: Command
   if (error) throw new Error(error);
   submitting.add(paneId);
   try {
-    setPendingTerminalCommand(paneId, item.command);
-    await writeTerminalCommand(paneId, useTerminalStore.getState().sessions[paneId]!, item.command);
+    const payload = terminalCommandPayload(paneId, item.command);
+    setPendingTerminalCommand(paneId, item.command, payload);
+    await writeTerminalCommand(paneId, useTerminalStore.getState().sessions[paneId]!, item.command, payload);
   } finally { setTimeout(() => submitting.delete(paneId), 500); }
 }

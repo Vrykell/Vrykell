@@ -20,6 +20,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.list.mockResolvedValue(folders);
   mocks.write.mockResolvedValue(undefined);
+  mocks.pending.mockReturnValue(true);
   mocks.factory.mockReturnValue({ list: mocks.list, parentOf: (path: string) => path === '/' ? null : path.slice(0, path.lastIndexOf('/')) || '/' });
   useTerminalStore.setState({ sessions: { pane: 'pty' } });
   useBlockStore.setState({ byTab: {} });
@@ -46,6 +47,16 @@ it('searches folders, keeps the parent choice, and navigates without losing the 
   expect(useInputStore.getState().byPane.pane.text).toBe('my draft');
   expect(screen.queryByRole('dialog')).toBeNull();
 });
+it('does not write a directory command while a submission is waiting', async () => {
+  mocks.pending.mockReturnValueOnce(false);
+  render(<DirectoryPicker paneId="pane" dir="/work" />);
+  fireEvent.click(screen.getByRole('button', { name: '切换工作目录' }));
+  await screen.findByRole('option', { name: 'Documents' });
+  fireEvent.click(screen.getByRole('option', { name: 'Documents' }));
+  await waitFor(() => expect(mocks.pending).toHaveBeenCalled());
+  expect(mocks.write).not.toHaveBeenCalled();
+});
+
 it('reports directory-read failures inline and retries', async () => {
   mocks.list.mockRejectedValueOnce(new Error('Unavailable'));
   render(<DirectoryPicker paneId="pane" dir="/work" />);

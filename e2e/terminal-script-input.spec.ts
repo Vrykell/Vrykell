@@ -29,6 +29,30 @@ test('an AI multiline script enters its terminal draft and runs only after an ex
   await expect.poll(async () => (await ptyWrites(page)).slice(before)).toEqual([formatCommandSubmission(script, 'posix')]);
 });
 
+test('PowerShell multiline transport stays out of the visible command and output', async ({ page }) => {
+  test.skip(process.platform !== 'win32', 'Requires the Windows PowerShell path.');
+  await setupTauriMock(page, { shells: [{ id: 'powershell', label: 'Windows PowerShell', default: true }] });
+  await page.goto('/');
+  const input = page.locator('[data-terminal-input]:visible');
+  await expect(input).toBeVisible();
+  await emitPtyOutput(page, '\x1b]133;A\x07');
+
+  const script = "Write-Output '中文'\nWrite-Output 'done'";
+  await input.fill(script);
+  const before = (await ptyWrites(page)).length;
+  await input.press('Enter');
+  await expect.poll(async () => (await ptyWrites(page)).slice(before).join('')).toContain('Invoke-Expression');
+  const payload = (await ptyWrites(page)).slice(before).join('').trimEnd();
+  const encoded = Buffer.from(payload, 'utf8').toString('base64');
+  await emitPtyOutput(page, `${payload}\r\n\x1b]133;E;${encoded}\x07\x1b]133;C\x07中文\r\ndone\r\n\x1b]133;D;0\x07\x1b]133;A\x07`);
+
+  const block = page.locator('[data-testid^="command-block-"]').last();
+  await expect(block.locator('.command-block-command')).toContainText("Write-Output '中文'");
+  await expect(block.locator('.command-block-command')).not.toContainText('Invoke-Expression');
+  await expect(block.locator('.command-block-output')).toContainText('中文');
+  await expect(block.locator('.command-block-output')).not.toContainText('Invoke-Expression');
+});
+
 test('pasting a multiline script from the idle terminal menu preserves it without execution', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');

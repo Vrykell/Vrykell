@@ -25,6 +25,47 @@ describe('diagnostics', () => {
     expect(JSON.stringify(page)).not.toMatch(/private-history-title|private-record-id/);
   });
 
+  it('redacts terminal output fields regardless of casing and separators', () => {
+    const detail = sanitizeDiagnostic({
+      outputClean: 'private-clean',
+      output_html: 'private-html',
+      OutputRaw: 'private-raw',
+      output: 'private-output',
+      stdout: 'private-stdout',
+      stderr: 'private-stderr',
+      command: 'private-command',
+      dataBase64: 'private-base64',
+      textContent: 'private-text',
+      attachments: 'private-files',
+      safe: 'visible',
+    });
+    expect(JSON.stringify(detail)).not.toContain('private-');
+    expect(detail).toMatchObject({
+      outputClean: { redacted: true, length: 13 },
+      output_html: { redacted: true, length: 12 },
+      OutputRaw: { redacted: true, length: 11 },
+      output: { redacted: true, length: 14 },
+      stdout: { redacted: true, length: 14 },
+      stderr: { redacted: true, length: 14 },
+      command: { redacted: true, length: 15 },
+      dataBase64: { redacted: true, length: 14 },
+      textContent: { redacted: true, length: 12 },
+      attachments: { redacted: true, length: 13 },
+      safe: 'visible',
+    });
+  });
+
+  it('redacts credential fields regardless of casing and separators', () => {
+    const detail = sanitizeDiagnostic({ api_key: 'private-key', 'UI-Lease': 'private-lease', environment: 'private-env', safe: 'visible' });
+    expect(JSON.stringify(detail)).not.toContain('private-');
+    expect(detail).toMatchObject({
+      api_key: '[redacted]',
+      'UI-Lease': '[redacted]',
+      environment: '[redacted]',
+      safe: 'visible',
+    });
+  });
+
   it('records invocation durations and failures while excluding request secrets', async () => {
     const before = diagnosticSnapshot().length;
     invokeMock.mockRejectedValueOnce(new Error('failed Bearer never-export-this'));

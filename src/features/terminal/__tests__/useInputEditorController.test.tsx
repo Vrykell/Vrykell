@@ -148,6 +148,17 @@ describe('useInputEditorController', () => {
     expect(payload).toContain("line with '\\''quotes'\\''");
   });
 
+  it('submits a multiline PowerShell script through the one-line transport', async () => {
+    useTerminalStore.setState({ shellTypes: { 'pane-1': 'powershell' } });
+    const script = "Write-Output 'one'\nWrite-Output 'two'";
+    useInputStore.getState().setText('pane-1', script);
+    const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
+    await act(async () => result.current.execute());
+    const payload = mocks.ptyWrite.mock.calls[0]![1] as string;
+    expect(payload).toContain('Invoke-Expression');
+    expect(payload.trimEnd()).not.toContain('\n');
+  });
+
   it('restores the script draft if the terminal write fails', async () => {
     mocks.ptyWrite.mockRejectedValueOnce(new Error('closed'));
     const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));

@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from 'vitest';
 import { SessionController, type SessionSinks } from '@features/terminal/services/pipeline/sessionController';
+import { formatCommandSubmission } from '@features/terminal/model/commandSubmission';
 import { blockTerminalFor } from '@features/terminal/services/terminalRepaint';
 import { ScanHelper } from '@features/terminal/services/pipeline/__tests__/scanHelper';
 
-function wire(tabId = 't1') {
+function wire(tabId = 't1', deferBlockUntilPreexec = false, pendingUiCommand?: { command: string; wireCommand?: string }, deferFallbackMs = 3000) {
   const st = {
     written: '',
     blocksChanged: 0,
@@ -14,6 +15,7 @@ function wire(tabId = 't1') {
     replies: [] as string[],
     programTitles: [] as string[],
   };
+  let staged = pendingUiCommand;
   const sinks: SessionSinks = {
     writeMain: (d) => { st.written += d; },
     onBlocksChanged: () => { st.blocksChanged++; },
@@ -23,8 +25,14 @@ function wire(tabId = 't1') {
     onBlockComplete: (b) => { st.completed.push(b.command); },
     onTerminalData: data => { st.replies.push(data); },
     onProgramTitle: (title) => { st.programTitles.push(title); },
+    takePendingUiCommand: pendingUiCommand ? () => {
+      const pending = staged;
+      staged = undefined;
+      return pending ?? null;
+    } : undefined,
+    clearPendingUiCommand: () => { staged = undefined; },
   };
-  const ctrl = new SessionController(tabId, 80, sinks);
+  const ctrl = new SessionController(tabId, 80, sinks, 24, 'classic', true, deferBlockUntilPreexec, deferFallbackMs);
   const scan = new ScanHelper();
   const feed = (chunk: string) => ctrl.handleEvents(scan.push(chunk));
   return { st, ctrl, feed };
@@ -202,6 +210,185 @@ describe('SessionController', () => {
     expect(st.started).toEqual(['ls']);
     expect(ctrl.blocks).toHaveLength(2);
     expect(ctrl.blocks[0]?.outputText).toBe('notes.txt');
+    ctrl.dispose();
+  });
+
+  it('defers an integrated submission until the shell reports the command', async () => {
+    const { st, ctrl, feed } = wire('deferred', true);
+    const script = "Write-Output '中文'\nWrite-Output 'done'";
+    const payload = formatCommandSubmission(script, 'powershell').trimEnd();
+    feed(A);
+    ctrl.setPendingCommand(script, payload);
+    expect(ctrl.activeBlock?.status).toBe('pending');
+    expect(ctrl.blocks).toHaveLength(1);
+    feed(`${payload}\r\n${E(payload)}${C}中文\r\ndone\r\n${D(0)}`);
+    await waitFor(() => st.completed.length === 1);
+    expect(st.started).toEqual([script]);
+    expect(ctrl.blocks[0]?.command).toBe(script);
+    expect(ctrl.blocks[0]?.outputText).toBe('中文\ndone');
+    expect(ctrl.blocks[0]?.outputText).not.toContain('Invoke-Expression');
+    ctrl.dispose();
+  });
+
+  it('keeps the visible command when a late prompt arrives before preexec', async () => {
+    const { st, ctrl, feed } = wire('late-prompt', true);
+    const script = "Write-Output 'one'\nWrite-Output 'two'";
+    const payload = formatCommandSubmission(script, 'powershell').trimEnd();
+    feed(A);
+    ctrl.setPendingCommand(script, payload);
+    feed(`${payload}\r\n${A}${E(payload)}${C}one\r\ntwo\r\n${D(0)}`);
+    await waitFor(() => st.completed.length === 1);
+    expect(st.completed).toEqual([script]);
+    const completed = ctrl.blocks.find(block => block.command === script);
+    expect(completed?.outputText).toBe('one\ntwo');
+    ctrl.dispose();
+  });
+
+  it('uses the staged wire when the controller starts after submission', async () => {
+    const script = "Write-Output 'staged'\nWrite-Output 'wire'";
+    const payload = formatCommandSubmission(script, 'powershell').trimEnd();
+    const { st, ctrl, feed } = wire('staged', true, { command: script, wireCommand: payload });
+    feed(`${E(payload)}${C}staged\r\nwire\r\n${D(0)}`);
+    await waitFor(() => st.completed.length === 1);
+    expect(st.completed).toEqual([script]);
+    expect(ctrl.blocks[0]?.command).toBe(script);
+    expect(ctrl.blocks[0]?.outputText).toBe('staged\nwire');
+    ctrl.dispose();
+  });
+
+  it('does not carry a classic-scene submission into the first prompt', async () => {
+    const { st, ctrl, feed } = wire('classic-stale', true);
+    ctrl.setPendingCommand('stale', 'stale-wire');
+    feed(A);
+    feed(`${E('fresh')}${C}fresh\r\n${D(0)}`);
+    await waitFor(() => st.completed.length === 1);
+    expect(st.completed).toEqual(['fresh']);
+    ctrl.dispose();
+  });
+
+  it('decodes a shell-reported transport without a UI submission', async () => {
+    const { st, ctrl, feed } = wire('agent', true);
+    const script = "Write-Output 'agent'\nWrite-Output 'done'";
+    const payload = formatCommandSubmission(script, 'powershell').trimEnd();
+    feed(`${A}${E(payload)}${C}agent\r\ndone\r\n${D(0)}`);
+    await waitFor(() => st.completed.length === 1);
+    expect(st.completed).toEqual([script]);
+    expect(ctrl.blocks[0]?.command).toBe(script);
+    expect(ctrl.blocks[0]?.outputText).toBe('agent\ndone');
+    ctrl.dispose();
+  });
+
+  it('strips a repainted transport echo before output', async () => {
+    const { st, ctrl, feed } = wire('repaint', true);
+    const script = "Write-Output 'repaint'\nWrite-Output 'done'";
+    const payload = formatCommandSubmission(script, 'powershell').trimEnd();
+    feed(A);
+    ctrl.setPendingCommand(script, payload);
+    feed(`\x1b[12;2H${payload}\x1b[K\r\n${E(payload)}${C}repaint\r\ndone\r\n${D(0)}`);
+    await waitFor(() => st.completed.length === 1);
+    expect(ctrl.blocks[0]?.outputText).toBe('repaint\ndone');
+    expect(ctrl.blocks[0]?.outputText).not.toContain('Invoke-Expression');
+    ctrl.dispose();
+  });
+
+  it('shows output when integration never reports preexec', async () => {
+    const { st, ctrl, feed } = wire('fallback', true, undefined, 10);
+    const script = "Write-Output 'fallback'";
+    const payload = formatCommandSubmission(script, 'powershell').trimEnd();
+    feed(A);
+    ctrl.setPendingCommand(script, payload);
+    feed(`${payload}\r\nfallback\r\n`);
+    await waitFor(() => ctrl.activeBlock?.status === 'executing');
+    feed(`${D(0)}`);
+    await waitFor(() => st.completed.length === 1);
+    expect(st.completed).toEqual([script]);
+    expect(ctrl.blocks[0]?.outputText).toBe('fallback');
+    ctrl.dispose();
+  });
+
+  it('clears a pending submission and its fallback timer', async () => {
+    const { ctrl, feed } = wire('cleared', true, undefined, 10);
+    feed(A);
+    ctrl.setPendingCommand('echo never', 'echo never');
+    ctrl.clearPendingCommand();
+    await new Promise(resolve => setTimeout(resolve, 25));
+    expect(ctrl.activeBlock?.status).toBe('pending');
+    ctrl.dispose();
+  });
+
+  it('rejects a different submission while one is waiting for preexec', () => {
+    const { ctrl, feed } = wire('busy-pending', true);
+    feed(A);
+    expect(ctrl.setPendingCommand('first', 'first-wire')).toBe(true);
+    expect(ctrl.setPendingCommand('second', 'second-wire')).toBe(false);
+    expect(ctrl.setPendingCommand('first', 'first-wire')).toBe(true);
+    ctrl.dispose();
+  });
+
+  it('creates a deferred block when preexec arrives before the prompt', async () => {
+    const { st, ctrl, feed } = wire('early-preexec', true);
+    const script = "Write-Output 'early'";
+    const payload = formatCommandSubmission(script, 'powershell').trimEnd();
+    ctrl.setPendingCommand(script, payload);
+    feed(`${E(payload)}${C}early\r\n${D(0)}`);
+    await waitFor(() => st.completed.length === 1);
+    expect(st.completed).toEqual([script]);
+    expect(ctrl.blocks[0]?.outputText).toBe('early');
+    ctrl.dispose();
+  });
+
+  it('strips the wire transport echo when the block is created eagerly', () => {
+    const { ctrl, feed } = wire();
+    const script = "Write-Output 'one'\nWrite-Output 'two'";
+    const payload = formatCommandSubmission(script, 'powershell').trimEnd();
+    feed(A);
+    ctrl.setPendingCommand(script, payload);
+    expect(ctrl.activeBlock?.status).toBe('executing');
+    feed(`${payload}\r\n`);
+    expect(ctrl.activeBlock?.outputRaw).not.toContain('Invoke-Expression');
+    ctrl.dispose();
+  });
+
+  it('replaces a running block command with the decoded transport', () => {
+    const { ctrl, feed } = wire();
+    const script = "Write-Output 'x'\nWrite-Output 'y'";
+    const payload = formatCommandSubmission(script, 'powershell').trimEnd();
+    feed(`${A}${E('placeholder')}${C}`);
+    feed(E(payload));
+    expect(ctrl.activeBlock?.command).toBe(script);
+    ctrl.dispose();
+  });
+
+  it('creates a boundary for an eager submission after a completed block', () => {
+    const { ctrl, feed } = wire();
+    feed(`${A}${E('first')}${C}one\r\n${D(0)}`);
+    ctrl.setPendingCommand('second');
+    expect(ctrl.activeBlock?.command).toBe('second');
+    expect(ctrl.activeBlock?.status).toBe('executing');
+    ctrl.dispose();
+  });
+
+  it('restores a prepared wire when an eager submission needs a boundary', () => {
+    const { ctrl, feed } = wire();
+    feed(`${A}${E('first')}${C}one\r\n${D(0)}`);
+    ctrl.setPendingCommand('second', 'second-wire');
+    expect(ctrl.activeBlock?.command).toBe('second');
+    expect(ctrl.activeBlock?._pendingCommandEcho).toBe('second-wire');
+    ctrl.dispose();
+  });
+
+  it('ignores an empty shell command report', () => {
+    const { ctrl, feed } = wire();
+    feed(`${A}${E(' ')}`);
+    expect(ctrl.activeBlock?.status).toBe('pending');
+    ctrl.dispose();
+  });
+
+  it('keeps an undecodable transport-looking command unchanged', () => {
+    const { ctrl, feed } = wire();
+    const command = "Invoke-Expression ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('abc')))";
+    feed(`${A}${E(command)}${C}`);
+    expect(ctrl.activeBlock?.command).toBe(command);
     ctrl.dispose();
   });
 

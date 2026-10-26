@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCommandSubmission, posixScriptCommand } from '../model/commandSubmission';
+import { decodePowerShellSubmission, formatCommandSubmission, posixScriptCommand } from '../model/commandSubmission';
 
 describe('script submission', () => {
   it('leaves ordinary commands and explicit blank Enter submissions unchanged', () => {
@@ -26,5 +26,22 @@ describe('script submission', () => {
     expect(payload.trimEnd()).not.toMatch(/[\r\n]/);
     const encoded = /FromBase64String\('([^']+)'\)/.exec(payload)![1]!;
     expect(new TextDecoder().decode(Uint8Array.from(atob(encoded), char => char.charCodeAt(0)))).toBe(script);
+  });
+
+  it('decodes the PowerShell transport back to the submitted script', () => {
+    const script = "$value = '中文 😀'\nWrite-Output $value";
+    const payload = formatCommandSubmission(script, 'powershell').trimEnd();
+    expect(decodePowerShellSubmission(payload)).toBe(script);
+    expect(decodePowerShellSubmission(` \n${payload}\n `)).toBe(script);
+  });
+
+  it('rejects malformed PowerShell transports and ordinary commands', () => {
+    expect(decodePowerShellSubmission('git status')).toBeNull();
+    expect(decodePowerShellSubmission("Invoke-Expression ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('abc')))")).toBeNull();
+    expect(decodePowerShellSubmission("Invoke-Expression ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('/w=='))))")).toBeNull();
+  });
+
+  it('decodes an empty PowerShell transport to an empty script', () => {
+    expect(decodePowerShellSubmission("Invoke-Expression ([System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String('')))")).toBe('');
   });
 });

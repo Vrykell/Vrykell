@@ -92,6 +92,13 @@ trap '__ait_preexec' DEBUG
 /// 中文字节在中文区域被当 GBK 解析会吞掉换行、破坏脚本。
 const PS_RC: &str = r#"# vrykell shell integration (PowerShell / pwsh)
 
+# The host decodes PTY bytes as UTF-8; keep both console directions on the same encoding.
+try {
+    [Console]::InputEncoding = [Text.UTF8Encoding]::new($false)
+    [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+    $OutputEncoding = [Text.UTF8Encoding]::new($false)
+} catch { }
+
 function Write-VrykellOsc {
     param([string]$Code, [string]$Payload)
     [Console]::Out.Write([char]27 + "]" + $Code + ";" + $Payload + [char]7)
@@ -461,6 +468,14 @@ HISTTIMEFORMAT='%F %T '
     }
 
     #[test]
+    fn powershell_integration_keeps_the_console_on_utf8() {
+        assert!(PS_RC.is_ascii());
+        assert!(PS_RC.contains("[Console]::InputEncoding"));
+        assert!(PS_RC.contains("[Console]::OutputEncoding"));
+        assert!(PS_RC.contains("$OutputEncoding"));
+    }
+
+    #[test]
     fn powershell_prompt_does_not_leak_git_exit_status() {
         let lookup = "__vrykell_git_branch = (& git branch --show-current 2>$null | Out-String).Trim()";
         let reset = "$global:LASTEXITCODE = $null";
@@ -599,7 +614,7 @@ HISTTIMEFORMAT='%F %T '
             }
             if saw_a && !sent {
                 sent = true;
-                let _ = writer.write_all(b"echo v2psok\r");
+                let _ = writer.write_all("echo v2psok; echo '中文'\r".as_bytes());
                 let _ = writer.flush();
             }
             if saw_a && saw_c && saw_e && last_out.matches("\u{1b}]133;A").count() >= 2 {
@@ -619,5 +634,6 @@ HISTTIMEFORMAT='%F %T '
             assert!(!last_out.contains("PS>"), "Default prompt leaked into block mode: {last_out:?}");
             assert!(last_out.contains("v2psok"), "Command output missing: {last_out:?}");
         }
+        assert!(last_out.contains("中文"), "UTF-8 console I/O was not preserved: {last_out:?}");
     }
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
 import type { ChangeEvent, KeyboardEvent } from 'react';
-import { writeTerminalCommand } from '../services/commandSubmission';
+import { terminalCommandPayload, writeTerminalCommand } from '../services/commandSubmission';
 import { useToastStore } from '@ui/feedback/Toast';
 import { t } from '@i18n';
 import { askAboutTerminal } from '@features/chat/services/conversationContext';
@@ -10,7 +10,7 @@ import { useCommandHistoryNavigation } from './useCommandHistoryNavigation';
 import { useTerminalInputContext } from './useTerminalInputContext';
 import { useCommandCompletion } from './useCommandCompletion';
 import { usePathCompletion } from './usePathCompletion';
-import { appendTerminalBlankLines, setPendingTerminalCommand } from './useTerminalSession';
+import { appendTerminalBlankLines, clearPendingTerminalCommand, setPendingTerminalCommand } from './useTerminalSession';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { useAutoSizeTextarea } from '@ui/hooks/useAutoSizeTextarea';
 import { acceptsCompletionKey, completionShortcut, useCompletionPreferences } from '@config/completion';
@@ -74,19 +74,24 @@ export function useInputEditorController({ paneId, focused, isLongRunning, onEnd
     if (latest.aiMode) return;
     const command = latest.text.trim();
     if (!command && !sessions[paneId]) return;
+    const payload = command || `${latest.text}\n`;
+    const wire = command ? terminalCommandPayload(paneId, command) : payload;
+    if (command && !setPendingTerminalCommand(paneId, command, wire)) {
+      useToastStore.getState().addToast(t('Wait for the current command to start'), 'info');
+      return;
+    }
     useInputStore.getState().clearText(paneId);
     resetHeight(); resetHistNav();
-    if (command) setPendingTerminalCommand(paneId, command);
     const sessionId = sessions[paneId];
     terminalDebug('command-submit', { paneId, commandChars: command.length, sessionReady: Boolean(sessionId) });
     if (sessionId) {
-      const payload = command || `${latest.text}\n`;
       if (!command) appendTerminalBlankLines(paneId, (payload.match(/\n/g) ?? []).length);
-      terminalDebug('pty-write-request', { sessionId, chars: payload.length });
-      void writeTerminalCommand(paneId, sessionId, payload)
-        .then(() => terminalDebug('pty-write-complete', { sessionId, chars: payload.length }))
+      terminalDebug('pty-write-request', { sessionId, chars: wire.length });
+      void writeTerminalCommand(paneId, sessionId, command || payload, wire)
+        .then(() => terminalDebug('pty-write-complete', { sessionId, chars: wire.length }))
         .catch(error => {
           terminalDebug('pty-write-error', { sessionId, errorType: error instanceof Error ? error.name : typeof error });
+          clearPendingTerminalCommand(paneId);
           if (!useInputStore.getState().byPane[paneId]?.text) useInputStore.getState().setText(paneId, latest.text);
           useToastStore.getState().addToast(t('Could not run the command in the selected terminal'), 'error');
         });

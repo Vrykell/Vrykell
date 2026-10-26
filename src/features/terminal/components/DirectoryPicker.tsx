@@ -91,7 +91,7 @@ export default function DirectoryPicker({ paneId, dir }: { paneId: string; dir?:
     if (!connected || !currentSession || useBlockStore.getState().byTab[paneId]?.some(block => block.status === 'executing' || block.snapshotPending)) return;
     try {
       const command = directoryCommand(target, spec?.kind === 'local' ? shellType : 'zsh');
-      setPendingTerminalCommand(paneId, command);
+      if (!setPendingTerminalCommand(paneId, command)) return;
       await ptyWrite(currentSession, command + '\n');
       engageFollow(paneId);
       setOpen(false);

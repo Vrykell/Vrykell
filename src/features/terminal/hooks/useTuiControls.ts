@@ -3,6 +3,7 @@ import { writeTerminalInput } from '@features/terminal/services/terminalWriteQue
 import { killForeground, ESCALATE_WINDOW_MS } from '@utils/killForeground';
 import { useToastStore } from '@ui/feedback/Toast';
 import { useBlockStore, useTerminalStore, selectBlocks } from '@features/terminal';
+import { clearPendingTerminalCommand } from './useTerminalSession';
 
 /** Keep toolbar actions and manual presentation state scoped to their owning pane. */
 export function useTuiControls(tabId: string) {
@@ -26,6 +27,7 @@ export function useTuiControls(tabId: string) {
 
   const sendCtrlC = useCallback(() => {
     const sessionId = sessions[tabId];
+    clearPendingTerminalCommand(tabId);
     // Goes through the input queue: an interrupt leads whatever paste is still streaming.
     if (sessionId) writeTerminalInput(sessionId, '\x03').catch(() => {});
   }, [sessions, tabId]);

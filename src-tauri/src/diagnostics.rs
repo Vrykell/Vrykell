@@ -214,11 +214,19 @@ fn redact_text(text: &str) -> String {
     crate::redact::redact_text(text).chars().take(4000).collect()
 }
 
+/// Match key spellings that differ only by case, underscores or hyphens.
+fn normalized_key(key: &str) -> String {
+    key.chars()
+        .filter(|character| *character != '_' && *character != '-')
+        .collect::<String>()
+        .to_ascii_lowercase()
+}
+
 fn sanitize(value: Value, key: &str, depth: usize) -> Value {
     if depth > 12 {
         return json!("[truncated]");
     }
-    let normalized = key.to_ascii_lowercase();
+    let normalized = normalized_key(key);
     if [
         "password",
         "passphrase",
@@ -233,14 +241,19 @@ fn sanitize(value: Value, key: &str, depth: usize) -> Value {
         "privatekey",
         "privatekeycontent",
         "env",
+        "environment",
+        "lease",
+        "uilease",
     ]
     .contains(&normalized.as_str())
     {
         return json!("[redacted]");
     }
     if [
-        "data", "raw", "output", "content", "text", "payload", "prompt", "command", "question",
-        "messages",
+        "data", "raw", "output", "outputclean", "outputhtml", "outputraw", "outputtext",
+        "outputansi", "outputplain", "stdout", "stderr", "content", "text", "payload", "prompt",
+        "command", "question", "query", "messages", "notes", "ainotes", "cursor", "parts",
+        "modeloutput", "attachments", "database64", "textcontent",
     ]
     .contains(&normalized.as_str())
     {
@@ -549,6 +562,56 @@ mod tests {
             "failed [redacted] [redacted] [redacted]"
         );
     }
+    #[test]
+    fn terminal_output_fields_are_redacted_under_any_spelling() {
+        let value = sanitize(
+            json!({
+                "outputClean": "private-clean",
+                "output_html": "private-html",
+                "OutputRaw": "private-raw",
+                "output": "private-output",
+                "stdout": "private-stdout",
+                "stderr": "private-stderr",
+                "command": "private-command",
+                "dataBase64": "private-base64",
+                "textContent": "private-text",
+                "attachments": "private-files",
+                "safe": "visible",
+            }),
+            "",
+            0,
+        );
+        for key in [
+            "outputClean",
+            "output_html",
+            "OutputRaw",
+            "output",
+            "stdout",
+            "stderr",
+            "command",
+            "dataBase64",
+            "textContent",
+            "attachments",
+        ] {
+            assert_eq!(value[key]["redacted"], true, "{key}");
+        }
+        assert_eq!(value["safe"], "visible");
+        assert!(!value.to_string().contains("private-"));
+    }
+
+    #[test]
+    fn credential_fields_match_case_and_separator_variants() {
+        let value = sanitize(
+            json!({ "api_key": "private-key", "UI-Lease": "private-lease", "environment": "private-env", "safe": "visible" }),
+            "",
+            0,
+        );
+        assert_eq!(value["api_key"], "[redacted]");
+        assert_eq!(value["UI-Lease"], "[redacted]");
+        assert_eq!(value["environment"], "[redacted]");
+        assert_eq!(value["safe"], "visible");
+    }
+
     #[test]
     fn export_contains_metadata_and_sorted_deduplicated_records() {
         let path =

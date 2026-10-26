@@ -39,8 +39,13 @@ export function flushDiagnostics(): Promise<void> {
   }
   return writeQueue;
 }
-const privateKeys = /^(password|passphrase|key|apiKey|accessToken|refreshToken|token|secret|authorization|cookie|privateKey|privateKeyContent|env|environment)$/i;
-const contentKeys = /^(data|raw|output|content|text|payload|prompt|command|question|messages|notes|aiNotes|cursor)$/i;
+const privateKeys = new Set(['password', 'passphrase', 'key', 'apikey', 'accesstoken', 'refreshtoken', 'token', 'secret', 'authorization', 'cookie', 'privatekey', 'privatekeycontent', 'env', 'environment', 'lease', 'uilease']);
+const contentKeys = new Set(['data', 'raw', 'output', 'outputclean', 'outputhtml', 'outputraw', 'outputtext', 'outputansi', 'outputplain', 'stdout', 'stderr', 'content', 'text', 'payload', 'prompt', 'command', 'question', 'query', 'messages', 'notes', 'ainotes', 'cursor', 'parts', 'modeloutput', 'attachments', 'database64', 'textcontent']);
+
+/** Match key spellings that differ only by case, underscores or hyphens. */
+function normalizedKey(key: string): string {
+  return key.replace(/[_-]/g, '').toLowerCase();
+}
 
 export function redactText(value: string): string {
   return value
@@ -51,8 +56,9 @@ export function redactText(value: string): string {
 }
 
 export function sanitizeDiagnostic(value: unknown, key = '', depth = 0): unknown {
-  if (privateKeys.test(key)) return '[redacted]';
-  if (contentKeys.test(key)) return { redacted: true, length: typeof value === 'string' ? value.length : undefined };
+  const normalized = normalizedKey(key);
+  if (privateKeys.has(normalized)) return '[redacted]';
+  if (contentKeys.has(normalized)) return { redacted: true, length: typeof value === 'string' ? value.length : undefined };
   if (depth > 6) return '[truncated]';
   if (value instanceof Error) return { name: value.name, message: redactText(value.message), stack: redactText(value.stack ?? '').slice(0, 4000) };
   if (typeof value === 'string') return redactText(value).slice(0, 4000);
