@@ -753,6 +753,13 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               const win = window as unknown as Record<string, (msg: { index: number; message?: unknown; end?: boolean }) => void>;
               let idx = 0;
               const send = (message: unknown) => win[`_${cbId}`]?.({ index: idx++, message });
+              const failure = (window as unknown as { __AI_CONNECTION_FAILURES__?: { remaining: number; retryable: boolean } }).__AI_CONNECTION_FAILURES__;
+              if (wantsStream && failure && failure.remaining > 0) {
+                failure.remaining--;
+                send({ kind: 'error', retryable: failure.retryable, message: 'Model connection interrupted' });
+                win[`_${cbId}`]?.({ index: idx, end: true });
+                return;
+              }
               const pieces: unknown[] = [];
               let body: string;
               if (!wantsStream) {

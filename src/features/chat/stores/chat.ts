@@ -99,8 +99,8 @@ interface ChatState {
   retryPersistence: () => Promise<void>;
   /** Independent conversations and legacy terminal history are keyed by their owning ID. */
   byTab: Record<string, ChatMessage[]>;
-  /** A single active stream owner; terminal navigation never changes this ID. */
-  sendingTab: string | null;
+  /** Active stream owners run independently; each owner's queue remains ordered. */
+  sendingTabs: string[];
   /** 上下文占用（tabId → 估算 token / 预算）；null=未知 */
   contextUsed: Record<string, { used: number; budget: number } | null>;
   setContextUsed: (tabId: string, used: number, budget: number) => void;
@@ -137,10 +137,12 @@ export function setDefaultStream(fn: StreamFn) {
 
 export const useChatStore = create<ChatState>((set, get) => {
   const drainQueue = () => {
-    if (get().sendingTab || !get().queuedSends.length) return;
-    const [next, ...rest] = get().queuedSends;
-    set({ queuedSends: rest });
-    if (next) void get().send(next.text, next.options).finally(() => { if (!get().sendingTab) queueMicrotask(drainQueue); });
+    const index = get().queuedSends.findIndex(item => !get().sendingTabs.includes(item.ownerId));
+    if (index < 0) return;
+    const next = get().queuedSends[index];
+    set(state => ({ queuedSends: state.queuedSends.filter(item => item.id !== next.id) }));
+    void get().send(next.text, next.options).finally(() => queueMicrotask(drainQueue));
+    queueMicrotask(drainQueue);
   };
   const saveQueues = new Map<string, Promise<void>>();
   const pendingMessageDeletes = new Map<string, string>();
@@ -314,7 +316,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       const cur = get().byTab[tabId]?.find((m) => m.id === assistantId);
       if (controller.signal.aborted && cur && !cur.content && !(cur.parts && cur.parts.length)) {
         set((s) => ({
-          sendingTab: null,
+          sendingTabs: s.sendingTabs.filter(id => id !== tabId),
           byTab: {
             ...s.byTab,
             [tabId]: (s.byTab[tabId] ?? []).filter((m) => m.id !== assistantId),
@@ -324,9 +326,9 @@ export const useChatStore = create<ChatState>((set, get) => {
         return;
       }
       set((s) => {
-        if (!(tabId in s.byTab)) return { sendingTab: null }; // tab 已关闭，丢弃收尾写入
+        if (!(tabId in s.byTab)) return { sendingTabs: s.sendingTabs.filter(id => id !== tabId) };
         return {
-          sendingTab: null,
+          sendingTabs: s.sendingTabs.filter(id => id !== tabId),
           byTab: {
             ...s.byTab,
             [tabId]: (s.byTab[tabId] ?? []).map((m) => {
@@ -413,7 +415,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     return id;
   },
   setEnvironment: (id, environment) => {
-    if (get().sendingTab === id || pendingConversationDeletes.has(id)) return;
+    if (get().sendingTabs.includes(id) || pendingConversationDeletes.has(id)) return;
     const current = get().conversations.find(conversation => conversation.id === id);
     if (!current) return;
     if (current.environment?.paneId !== environment?.paneId) clearSessionGrants(id);
@@ -430,7 +432,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     void persistConversation(updated);
   },
   deleteConversation: async (id) => {
-    if (get().sendingTab === id || pendingConversationDeletes.has(id)) return;
+    if (get().sendingTabs.includes(id) || pendingConversationDeletes.has(id)) return;
     pendingConversationDeletes.add(id);
     try {
       await queueSave(id, () => conversationApi.deleteConversation(id));
@@ -459,7 +461,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     }
   },
   byTab: {},
-  sendingTab: null,
+  sendingTabs: [],
   contextUsed: {},
   draft: '',
   draftTabId: null,
@@ -541,7 +543,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     // M3：挂起的审批 Promise 一律按拒绝放行，防工具 execute 悬挂卡死步进
     denyAllPending(tabId);
     for (const message of get().byTab[tabId] ?? []) if (message.pending && !hasChatContent(message)) void deleteMessage(tabId, message.id).catch(() => {});
-    set(state => ({ sendingTab: state.sendingTab === tabId ? null : state.sendingTab, queuedSends: state.queuedSends.filter(item => item.ownerId !== tabId),
+    set(state => ({ sendingTabs: state.sendingTabs.filter(id => id !== tabId), queuedSends: state.queuedSends.filter(item => item.ownerId !== tabId),
       byTab: { ...state.byTab, ...(state.byTab[tabId] ? { [tabId]: state.byTab[tabId].flatMap(message => message.pending
         ? hasChatContent(message) ? [stopChatMessage(message)] : [] : [message]) } : {}) } }));
     for (const message of get().byTab[tabId] ?? []) if (message.stopped) void persistMessage(tabId, message).catch(() => {});
@@ -556,7 +558,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     const atts = opts?.attachments?.length ? opts.attachments : undefined;
     // 空文本但有附件也允许发送（「看看这张图」之外的纯附件场景）
     if (!trimmed && !atts && !opts?.references?.length) return;
-    if (get().sendingTab) {
+    if (get().sendingTabs.includes(tabId)) {
       set(state => ({ queuedSends: [...state.queuedSends, { id: nextId(), ownerId: tabId, text: trimmed, options: { ...opts, ownerId: tabId, ...(conversation ? { conversationId: tabId } : {}) } }] }));
       return;
     }
@@ -571,7 +573,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     abortControllers.set(tabId, controller);
     set((s) => ({
       byTab: { ...s.byTab, [tabId]: [...(s.byTab[tabId] ?? []), userMsg, assistantMsg] },
-      sendingTab: tabId,
+      sendingTabs: [...s.sendingTabs, tabId],
       draft: '',
       draftTabId: null,
       contextUsed: { ...s.contextUsed, [tabId]: null },
@@ -589,7 +591,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     await runAssistant(tabId, assistantMsg.id, controller, opts?.streamFn);
   },
   regenerate: async (tabId, userMsgId) => {
-    if (get().sendingTab) return;
+    if (get().sendingTabs.includes(tabId)) return;
     const msgs = get().byTab[tabId] ?? [];
     const idx = msgs.findIndex((m) => m.id === userMsgId);
     if (idx < 0 || msgs[idx].role !== 'user') return;
@@ -617,14 +619,14 @@ export const useChatStore = create<ChatState>((set, get) => {
       const next = cur.slice();
       if (oldAnswerId) next.splice(i + 1, 1, assistantMsg);
       else next.splice(i + 1, 0, assistantMsg);
-      return { byTab: { ...s.byTab, [tabId]: next }, sendingTab: tabId };
+      return { byTab: { ...s.byTab, [tabId]: next }, sendingTabs: [...s.sendingTabs, tabId] };
     });
     if (oldAnswerId && oldAnswerId !== assistantMsg.id) await deleteMessage(tabId, oldAnswerId).catch(() => {});
     if (conversation) await persistMessage(tabId, assistantMsg).catch(() => {});
     await runAssistant(tabId, assistantMsg.id, controller);
   },
   deleteExchange: (tabId, userMsgId) => {
-    if (get().sendingTab) return;
+    if (get().sendingTabs.includes(tabId)) return;
     const msgs = get().byTab[tabId] ?? [];
     const idx = msgs.findIndex((m) => m.id === userMsgId);
     if (idx < 0 || msgs[idx].role !== 'user') return;
@@ -640,7 +642,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     for (const id of ids) void deleteMessage(tabId, id).catch(() => {});
   },
   editResend: (tabId, userMsgId) => {
-    if (get().sendingTab) return;
+    if (get().sendingTabs.includes(tabId)) return;
     const msgs = get().byTab[tabId] ?? [];
     const idx = msgs.findIndex((m) => m.id === userMsgId);
     if (idx < 0 || msgs[idx].role !== 'user') return;
@@ -667,34 +669,32 @@ export const useChatStore = create<ChatState>((set, get) => {
     useComposerDrafts.getState().dropTab(tabId);
     if (get().draftTabId === tabId) set({ draft: '', draftTabId: null });
     get().abortStream(tabId);
-    if (get().sendingTab === tabId) denyAllPending(tabId);
     clearCompactionCache(tabId); // 清理该 tab 的上下文摘要缓存
     clearSessionGrants(tabId);
     set((s) => {
-      if (!(tabId in s.byTab) && s.sendingTab !== tabId) return s;
+      if (!(tabId in s.byTab)) return s;
       const byTab = { ...s.byTab };
       delete byTab[tabId];
-      return { byTab, sendingTab: s.sendingTab === tabId ? null : s.sendingTab };
+      return { byTab };
     });
   },
   };
 });
 
-/** True while a turn is in flight: the store runs one turn at a time across all conversations. */
+/** Automated work waits for an idle workspace; interactive owners run independently. */
 export function isChatTurnActive(): boolean {
-  return useChatStore.getState().sendingTab !== null;
+  return useChatStore.getState().sendingTabs.length > 0;
 }
 
 /** Automated requests get a dedicated conversation without replacing the user's current work. */
 export async function sendToChat(text: string, beforeStart?: () => Promise<void>): Promise<boolean> {
   if (!text.trim()) return false;
   const state = useChatStore.getState();
-  if (state.sendingTab) return false;
+  if (state.sendingTabs.length) return false;
   const id = state.createConversation(null, { activate: false });
   if (beforeStart) {
-    // Reserve the same send slot used by manual requests before persisting the run.
-    // Requests arriving during this await join the normal queue behind this turn.
-    useChatStore.setState({ sendingTab: id });
+    // Reserve this owner before recording the run, without blocking other conversations.
+    useChatStore.setState(current => ({ sendingTabs: [...current.sendingTabs, id] }));
     try { await beforeStart(); }
     catch (error) {
       useChatStore.getState().abortStream(id);
@@ -704,8 +704,8 @@ export async function sendToChat(text: string, beforeStart?: () => Promise<void>
       });
       throw error;
     }
-    if (useChatStore.getState().sendingTab !== id) return false;
-    useChatStore.setState({ sendingTab: null });
+    if (!useChatStore.getState().sendingTabs.includes(id)) return false;
+    useChatStore.setState(current => ({ sendingTabs: current.sendingTabs.filter(owner => owner !== id) }));
   }
   void state.send(text.trim(), { conversationId: id });
   return true;

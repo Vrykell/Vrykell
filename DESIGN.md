@@ -104,6 +104,8 @@ Tab-toolbar menus sit four pixels below their trigger. Creation uses at most two
 
 Main and split conversation tabs never add a title or action row inside their content. Their tools belong to the shared tab toolbar, including while an independent AI sidebar is open.
 
+Independent conversations may generate simultaneously in main panes and the sidebar. Each composer shows only its own busy, queue and stop state. Transient model connection failures keep the existing pending reply while bounded retries run; exhaustion retains the shared inline reply error and manual retry.
+
 Enabled controls have deliberate gray hover, visible focus, disabled and busy states. Shared segmented controls animate selection and brighten foreground on hover without changing the fill. Errors preserve readable text and expose technical details separately; retry and dismiss controls never shrink into diagnostic text. Host cards and status cells distinguish stale read failure, authentication failure and offline state inline. The editor remains a single-file text editing surface with common editing commands, explicit file destinations and guarded unsaved changes. Filename, encoding and cursor information share the bottom status line; floating search never pushes the document. Markdown preview and optional modal keybindings preserve the mounted editor buffer.
 
 All icons come from shared icon components. Do not substitute text symbols or native disclosure triangles. Animation uses the existing 140–260 ms motion scale and respects reduced motion. Existing terminal scrollbar exceptions retain their shared owner.

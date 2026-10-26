@@ -44,7 +44,7 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
   const conversations = useChatStore(state => state.conversations);
   const messages = useChatStore(state => state.byTab[activeId] ?? EMPTY_MESSAGES);
   const ready = useChatStore(state => !!activeId && activeId in state.byTab);
-  const sendingTab = useChatStore(state => state.sendingTab);
+  const sending = useChatStore(state => state.sendingTabs.includes(activeId));
   const queuedSends = useChatStore(state => state.queuedSends).filter(item => item.ownerId === activeId);
   const loading = useChatStore(state => state.conversationsLoading);
   const storeLoadError = useChatStore(state => state.conversationError);
@@ -73,7 +73,7 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
   const questions = useMemo(() => exchanges.map(exchange => exchange.question?.content).filter((content): content is string => !!content).reverse(), [exchanges]);
   const composer = useChatComposer({
     questions, draft, setDraft: useChatStore.getState().setDraft, send: useChatStore.getState().send,
-    sending: sendingTab !== null, queueWhileSending: true, isSession: ready && !loadError, attachments, clearAttachments,
+    sending, queueWhileSending: true, isSession: ready && !loadError, attachments, clearAttachments,
     conversationId: activeId, references, clearReferences, value: composerDraft.text, onTextChange: setText, scopeKey: activeId,
   });
   const environmentOptions = useExecutionTerminalOptions(environment);
@@ -119,7 +119,7 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
       <div className="chat-setting-row"><span>{t('Execution terminal')}</span>
         <Select aria-label={t('Select execution environment')} data-testid="chat-execution-target"
           data-tip-description={environmentOptions.find(option => option.value === (environment?.paneId ?? ''))?.description}
-          value={environment?.paneId ?? ''} options={environmentOptions} disabled={!ready || sendingTab === activeId}
+          value={environment?.paneId ?? ''} options={environmentOptions} disabled={!ready || sending}
           action={{ label: t('New tab'), onSelect: bounds => { setNewTabAnchor(bounds ? { x: bounds.left, y: bounds.bottom + 4, aboveY: bounds.top } : undefined); setNewTabOpen(true); } }}
           onChange={paneId => useChatStore.getState().setEnvironment(activeId, paneId ? environmentForPane(paneId) : null)} />
       </div>
@@ -146,10 +146,6 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
     {persistenceError && <ErrorBox compact actions={<button onClick={() => void useChatStore.getState().retryPersistence().catch(() => {})}>{t('Retry saving')}</button>}>
       {t('Conversation changes have not been saved')}
     </ErrorBox>}
-    {sendingTab && sendingTab !== activeId && <div className="chat-background-task">
-      <span>{t('Another conversation is working')}</span>
-      <button type="button" data-subtle onClick={() => { void useChatStore.getState().selectConversation(sendingTab); }}>{t('View')}</button>
-    </div>}
     {/* Streaming content must never yank the view away from what is being read: any upward
         scroll input pauses the follow, even one too small to leave the "near the bottom"
         window, while a nested scroller that consumes the wheel leaves it alone. */}
@@ -183,10 +179,10 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
           <ChatModeSelect />
           <span className="chat-footer-space" />
           <ModelPill showThinking={false} />
-          {sendingTab === activeId && composer.canSend && <IconButton compact aria-label={t('Queue message')} data-tip={t('Queue message')} onClick={submit}><ArrowUp size={18} /></IconButton>}
-          {sendingTab === activeId ? <IconButton className="chat-send-button" tone="accent" aria-label={t('Stop generating')} data-tip={t('Stop generating')} data-tip-description={t('Stopping also cancels queued messages for this conversation.')}
+          {sending && composer.canSend && <IconButton compact aria-label={t('Queue message')} data-tip={t('Queue message')} onClick={submit}><ArrowUp size={18} /></IconButton>}
+          {sending ? <IconButton className="chat-send-button" tone="accent" aria-label={t('Stop generating')} data-tip={t('Stop generating')} data-tip-description={t('Stopping also cancels queued messages for this conversation.')}
             onClick={() => useChatStore.getState().abortStream(activeId)}><Square size={15} fill="currentColor" /></IconButton>
-            : <IconButton className="chat-send-button" tone="accent" aria-label={t(sendingTab ? 'Queue message' : 'Send')} data-tip={t(sendingTab ? 'Queue message' : 'Send')} data-tip-shortcut="Enter" onClick={submit} disabled={!composer.canSend}><ArrowUp size={18} /></IconButton>}
+            : <IconButton className="chat-send-button" tone="accent" aria-label={t('Send')} data-tip={t('Send')} data-tip-shortcut="Enter" onClick={submit} disabled={!composer.canSend}><ArrowUp size={18} /></IconButton>}
       </>}>
           <TextArea ref={composer.inputRef} data-chat-composer value={composer.text} placeholder={t('Describe what you want to do…')} rows={1}
             onChange={composer.handleChange} onKeyDown={event => {

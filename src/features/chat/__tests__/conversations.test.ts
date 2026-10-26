@@ -7,6 +7,7 @@ import { leaf } from '@features/workspace/model/windowLayout';
 import * as api from '@platform/api/conversation';
 import { askAboutTerminal } from '../services/conversationContext';
 import type { TerminalReference } from '../model/conversation';
+import { useAiWorkspace } from '../stores/aiWorkspace';
 
 vi.mock('@platform/api/conversation', () => ({
   listConversations: vi.fn().mockResolvedValue([]), saveConversation: vi.fn().mockResolvedValue(undefined),
@@ -19,12 +20,14 @@ const workspace = useWorkspaceStore.getState();
 const terminal = useTerminalStore.getState();
 const drafts = useComposerDrafts.getState();
 const blocks = useBlockStore.getState();
+const aiWorkspace = useAiWorkspace.getState();
 const environment = { paneId: 'a#0', label: 'Build terminal', kind: 'local' as const, cwd: '/project' };
 const reference: TerminalReference = { id: 'block-1', paneId: 'a#0', label: 'Source terminal', command: 'npm run build', output: 'Failed to compile', cwd: '/project', exitCode: 1, createdAt: 1 };
 
 beforeEach(() => {
   vi.clearAllMocks();
   useChatStore.setState(chat, true);
+  useAiWorkspace.setState(aiWorkspace, true);
   useChatStore.setState({ conversationsLoaded: true });
   useComposerDrafts.setState(drafts, true);
   useWorkspaceStore.setState({ tabs: [
@@ -37,9 +40,56 @@ afterEach(() => {
   useChatStore.setState(chat, true); useWorkspaceStore.setState(workspace, true);
   useTerminalStore.setState(terminal, true); useComposerDrafts.setState(drafts, true);
   useBlockStore.setState(blocks, true);
+  useAiWorkspace.setState(aiWorkspace, true);
 });
 
 describe('independent conversations', () => {
+  it('streams three owners concurrently and drains each queue without waiting for other owners', async () => {
+    const ids = Array.from({ length: 3 }, () => useChatStore.getState().createConversation());
+    const releases = new Map<string, () => void>();
+    const stream: StreamFn = async (_messages, chunk, context) => {
+      const id = context!.tabId!;
+      chunk(`Reply for ${id}`);
+      await new Promise<void>(resolve => { releases.set(id, resolve); });
+    };
+    const running = ids.map(conversationId => useChatStore.getState().send('First', { conversationId, streamFn: stream }));
+    await vi.waitFor(() => expect(releases.size).toBe(3));
+    expect(useChatStore.getState().sendingTabs).toEqual(ids);
+    const followup = vi.fn(async (_messages, chunk: (text: string) => void) => { chunk('Second reply'); });
+    await useChatStore.getState().send('Second', { conversationId: ids[0], streamFn: followup });
+    await useChatStore.getState().send('Third', { conversationId: ids[0], streamFn: followup });
+    releases.get(ids[0])!();
+    await running[0];
+    await vi.waitFor(() => expect(followup).toHaveBeenCalledTimes(2));
+    expect(useChatStore.getState().sendingTabs).toEqual(ids.slice(1));
+    expect(useChatStore.getState().byTab[ids[0]].filter(message => message.role === 'user').map(message => message.content)).toEqual(['First', 'Second', 'Third']);
+    for (const id of ids.slice(1)) expect(useChatStore.getState().byTab[id][1].pending).toBe(true);
+    for (const id of ids.slice(1)) releases.get(id)!();
+    await Promise.all(running);
+    expect(useChatStore.getState().sendingTabs).toEqual([]);
+    for (const id of ids) expect(useChatStore.getState().byTab[id][1].content).toBe(`Reply for ${id}`);
+  });
+
+  it('stopping or failing an owner leaves another owner and its queued turn running', async () => {
+    const first = useChatStore.getState().createConversation();
+    const second = useChatStore.getState().createConversation();
+    let fail!: (error: Error) => void;
+    let finish!: () => void;
+    const failing = useChatStore.getState().send('First', { conversationId: first, streamFn: () => new Promise((_resolve, reject) => { fail = reject; }) });
+    const continuing = useChatStore.getState().send('Second', { conversationId: second, streamFn: () => new Promise(resolve => { finish = resolve; }) });
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+    const queued = vi.fn(async () => {});
+    await useChatStore.getState().send('Queued for second', { conversationId: second, streamFn: queued });
+    fail(new Error('Connection unavailable')); await failing;
+    expect(useChatStore.getState().sendingTabs).toEqual([second]);
+    expect(useChatStore.getState().byTab[first][1].error).toBe(true);
+    useChatStore.getState().abortStream(first);
+    expect(useChatStore.getState().queuedSends).toHaveLength(1);
+    expect(useChatStore.getState().byTab[second][1].pending).toBe(true);
+    finish(); await continuing;
+    await vi.waitFor(() => expect(queued).toHaveBeenCalledTimes(1));
+  });
+
   it('keeps an unanswered tool cancelled immediately and after its stopped stream settles', async () => {
     const id = useChatStore.getState().createConversation();
     let finish!: () => void;
@@ -54,29 +104,29 @@ describe('independent conversations', () => {
     finish(); await pending;
     expect(state()).toMatchObject({ tool: { state: 'cancelled' } });
   });
-  it('reserves scheduled work before recording its run while manual requests join the queue', async () => {
+  it('reserves scheduled work without blocking a different manual conversation', async () => {
     const manual = useChatStore.getState().createConversation();
     let release!: () => void;
     const recording = new Promise<void>(resolve => { release = resolve; });
     const started = sendToChat('Scheduled task', () => recording);
-    const reserved = useChatStore.getState().sendingTab;
+    const reserved = useChatStore.getState().sendingTabs[0];
     expect(reserved).toBeTruthy();
     const stream = vi.fn(async () => {});
     await useChatStore.getState().send('Manual task', { conversationId: manual, streamFn: stream });
-    expect(useChatStore.getState().queuedSends.map(item => item.text)).toEqual(['Manual task']);
-    expect(stream).not.toHaveBeenCalled();
+    expect(useChatStore.getState().queuedSends).toEqual([]);
+    expect(stream).toHaveBeenCalledTimes(1);
     release();
     await expect(started).resolves.toBe(true);
     expect(useChatStore.getState().byTab[reserved!]?.[0].content).toBe('Scheduled task');
     useChatStore.getState().abortStream(reserved!);
     await vi.waitFor(() => expect(stream).toHaveBeenCalledTimes(1));
-    await vi.waitFor(() => expect(useChatStore.getState().sendingTab).toBeNull());
+    await vi.waitFor(() => expect(useChatStore.getState().sendingTabs).toEqual([]));
   });
 
   it('removes an unstarted automated conversation when run persistence fails', async () => {
     const recording = vi.fn().mockRejectedValue(new Error('Database unavailable'));
     await expect(sendToChat('Scheduled task', recording)).rejects.toThrow('Database unavailable');
-    expect(useChatStore.getState().sendingTab).toBeNull();
+    expect(useChatStore.getState().sendingTabs).toEqual([]);
     expect(useChatStore.getState().conversations).toEqual([]);
     expect(Object.keys(useChatStore.getState().byTab)).toEqual([]);
   });
@@ -127,14 +177,14 @@ describe('independent conversations', () => {
     await vi.waitFor(() => expect(finishOld).toBeTypeOf('function'));
     await useChatStore.getState().send('Queued', { conversationId: id });
     useChatStore.getState().abortStream(id);
-    expect(useChatStore.getState().sendingTab).toBeNull();
+    expect(useChatStore.getState().sendingTabs).toEqual([]);
     expect(useChatStore.getState().queuedSends).toEqual([]);
     expect(useChatStore.getState().byTab[id][1]).toMatchObject({ content: 'Partial', stopped: true, pending: false });
     let finishNew!: () => void;
     const next = useChatStore.getState().send('Next', { conversationId: id, streamFn: () => new Promise(resolve => { finishNew = resolve; }) });
     await vi.waitFor(() => expect(finishNew).toBeTypeOf('function'));
     oldChunk('Late'); finishOld(); await old;
-    expect(useChatStore.getState().sendingTab).toBe(id);
+    expect(useChatStore.getState().sendingTabs).toContain(id);
     expect(useChatStore.getState().byTab[id][1].content).toBe('Partial');
     finishNew(); await next;
   });
@@ -149,7 +199,7 @@ describe('independent conversations', () => {
     useChatStore.getState().dropTab(id);
     finishSave(); await sending;
     expect(stream).not.toHaveBeenCalled();
-    expect(useChatStore.getState().sendingTab).toBeNull();
+    expect(useChatStore.getState().sendingTabs).toEqual([]);
     expect(useChatStore.getState().byTab[id]).toBeUndefined();
   });
   it('keeps the full current command result in both the reference and submitted history', async () => {
@@ -171,9 +221,9 @@ describe('independent conversations', () => {
     sendToChat('Scheduled task');
     expect(useChatStore.getState().activeConversationId).toBe(selected);
     expect(useChatStore.getState().conversations).toHaveLength(2);
-    expect(useChatStore.getState().sendingTab).not.toBe(selected);
-    useChatStore.getState().abortStream(useChatStore.getState().sendingTab!);
-    await vi.waitFor(() => expect(useChatStore.getState().sendingTab).toBeNull());
+    expect(useChatStore.getState().sendingTabs).not.toContain(selected);
+    useChatStore.getState().abortStream(useChatStore.getState().sendingTabs[0]);
+    await vi.waitFor(() => expect(useChatStore.getState().sendingTabs).toEqual([]));
   });
   it('keeps the request target fixed while the user changes tabs and closes its terminal', async () => {
     const id = useChatStore.getState().createConversation(environment);
@@ -193,7 +243,13 @@ describe('independent conversations', () => {
   });
 
   it('does not grant terminal access when a command snapshot is added', async () => {
+    const main = useChatStore.getState().createConversation();
+    useAiWorkspace.getState().openNative(main);
     const id = askAboutTerminal('a#0', reference, 'Explain this error');
+    expect(id).not.toBe(main);
+    expect(useAiWorkspace.getState().selected).toBe(`chat:${main}`);
+    expect(useAiWorkspace.getState().sideSelected).toBe(`chat:${id}`);
+    expect(useChatStore.getState().activeConversationId).toBe(main);
     expect(useChatStore.getState().conversations.find(item => item.id === id)?.environment).toBeNull();
     expect(useComposerDrafts.getState().byTab[id]?.references?.[0].output).toBe('Failed to compile');
     expect(useChatStore.getState().byTab[id]).toEqual([]);
@@ -203,6 +259,18 @@ describe('independent conversations', () => {
       expect(messages[0].content).toContain('Exit code: 1');
     };
     await useChatStore.getState().send('Explain this error', { conversationId: id, references: [reference], streamFn: stream });
+  });
+
+  it('stages terminal analysis in the existing compatible sidebar without moving its owner', () => {
+    const main = useChatStore.getState().createConversation();
+    useAiWorkspace.getState().openNative(main);
+    const side = useChatStore.getState().createConversation(null, { activate: false });
+    useAiWorkspace.getState().selectSide(`chat:${side}`);
+    useComposerDrafts.getState().setText(side, 'Existing note');
+    expect(askAboutTerminal('a#0', reference, 'Explain this error')).toBe(side);
+    expect(useComposerDrafts.getState().byTab[side]?.text).toBe('Existing note\nExplain this error');
+    expect(useAiWorkspace.getState().selected).toBe(`chat:${main}`);
+    expect(useAiWorkspace.getState().sideSelected).toBe(`chat:${side}`);
   });
 
   it('isolates drafts and restores references when a question is edited', async () => {

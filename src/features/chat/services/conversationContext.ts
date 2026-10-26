@@ -8,6 +8,7 @@ import { shellTypeLabel } from '@platform/shells';
 import { useChatStore } from '../stores/chat';
 import { useComposerDrafts } from '../stores/composerDrafts';
 import { useAiWorkspace } from '../stores/aiWorkspace';
+import { availableSideConversationIds } from './aiWorkspace';
 import type { ChatEnvironment, TerminalReference } from '../model/conversation';
 import { useSshStore } from '@features/ssh';
 
@@ -53,11 +54,13 @@ export function askAboutTerminal(paneId: string, reference?: TerminalReference, 
       exitCode: block?.exitCode, createdAt: block?.startedAt ?? Date.now(),
     };
   }
-  const current = chat.conversations.find(item => item.id === chat.activeConversationId);
-  const id = current && (!current.environment || current.environment.paneId === paneId)
-    ? current.id : chat.createConversation();
-  void chat.selectConversation(id);
-  useAiWorkspace.getState().openNative(id);
+  const ai = useAiWorkspace.getState();
+  const sideId = availableSideConversationIds().has(ai.sideSelected) && ai.sideSelected.startsWith('chat:')
+    ? ai.sideSelected.slice(5) : '';
+  const current = chat.conversations.find(item => item.id === sideId);
+  const id = current && sideId in chat.byTab && (!current.environment || current.environment.paneId === paneId)
+    ? current.id : chat.createConversation(null, { activate: false });
+  ai.selectSide(`chat:${id}`);
   const drafts = useComposerDrafts.getState();
   if (reference) {
     const previous = drafts.byTab[id]?.references ?? [];

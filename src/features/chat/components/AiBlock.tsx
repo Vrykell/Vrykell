@@ -33,11 +33,10 @@ export default function AiBlock({ exchange, conversationId, toolContextId, onAsk
   const { question, answer } = exchange;
   const plain = presentation === 'conversation';
   const expanded = plain || !collapsed;
-  // The store runs one turn at a time, but that turn may belong to a background conversation: only
-  // the conversation that owns this exchange decides whether its actions are available.
+  // Only the conversation that owns this exchange decides whether its actions are available.
   const ownerConversation = useChatStore(state => conversationId ?? Object.entries(state.byTab)
     .find(([, messages]) => messages.some(message => message.id === exchange.id))?.[0]);
-  const sending = useChatStore(state => ownerConversation !== undefined && state.sendingTab === ownerConversation);
+  const sending = useChatStore(state => ownerConversation !== undefined && state.sendingTabs.includes(ownerConversation));
   const executionPane = useChatStore(state => conversationId
     ? state.conversations.find(conversation => conversation.id === conversationId)?.environment?.paneId ?? null
     : exchange.paneId);

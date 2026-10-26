@@ -2,6 +2,10 @@
 
 > Last updated: 2026-10-26
 
+- Independent native conversations generate concurrently across main, split and sidebar surfaces. Queue, cancellation, execution target, history working badges and editing guards belong to each conversation. Cover three simultaneous owners, independent completion/failure/stop, same-owner FIFO and a manual turn during scheduled-run persistence.
+- Terminal analysis stages its reference in a compatible independent sidebar conversation, creating one when needed without moving main or split content or granting execution access.
+- Transient connection failures before response headers retry twice with exponential backoff. The pending reply and stop control remain available; exhaustion retains manual retry. Cover successful recovery, the three-attempt limit, abort during backoff, non-retryable authentication/configuration, and no replay after streaming starts. External connections keep their own transport behavior.
+
 See [Workspace compositions](workspace-compositions.md) for composition ownership, restoration and the regression checklist.
 
 - Main and split conversation tabs keep all tools in the shared tab toolbar, with no duplicate title/action row inside their content. Cover opening and reopening an independent sidebar in both themes and narrow/wide layouts.

@@ -2265,6 +2265,8 @@ const zh: Record<string, string> = {
   'Application execution terminal': '应用工具执行终端',
   'Tool call cancelled.': '工具调用已取消。',
   'Application tool failed.': '应用工具调用失败。',
+  'The model request failed.': '模型请求失败。',
+  'Could not connect to the model service: {{message}}': '无法连接模型服务：{{message}}',
 };
 
 export default zh;

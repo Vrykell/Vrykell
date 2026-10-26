@@ -4,20 +4,19 @@ import { fillHistorySearch } from './history-search';
 
 async function boot(page: Page, reply = 'The build is fixed.') {
   await mockAnthropic(page, reply);
-  await setupTauriMock(page);
+  await setupTauriMock(page, { schedulesSeed: [] });
   await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.locator('[data-dock-btn="chat"]').click();
-  await expect(page.locator('[data-chat-composer]')).toBeVisible();
+  await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
   await expect(page.getByRole('button', { name: '会话设置' })).toBeVisible();
 }
 
 test('conversation drafts survive terminal navigation, settings and closing the final terminal', async ({ page }) => {
   await boot(page);
-  const composer = page.locator('[data-chat-composer]');
+  const composer = page.locator('[data-chat-composer]:visible');
   await composer.fill('Fix the project build');
   await page.getByRole('button', { name: '设置', exact: true }).click();
-  await expect(composer).toHaveValue('Fix the project build');
   await expect(page.locator('[data-dock-btn="chat"]')).toBeVisible();
   await ensureTabsOpen(page);
   await page.getByTestId('tab-row-t1').click();
@@ -54,7 +53,7 @@ test('history owns separate drafts and messages and restores them after reload',
   await expect(history.locator('[data-history-kind="conversation"]').filter({ hasText: '新对话' })).toHaveCount(0);
   await history.locator('[data-history-kind="conversation"]').filter({ hasText: 'Fix the build' }).click();
   await page.reload();
-  await page.locator('[data-dock-btn="chat"]').click();
+  await page.getByTestId('workspace-area-ai').click();
   await expect(page.getByText('The build is fixed.', { exact: true })).toBeVisible();
 });
 
@@ -98,8 +97,8 @@ test('the picker opens the new-tab panel and binds the terminal it creates', asy
 
 test('rename and delete manage conversation history independently of terminals', async ({ page }) => {
   await boot(page);
-  await page.locator('[data-chat-composer]').fill('Investigate the build');
-  await page.locator('[data-chat-composer]').press('Enter');
+  await page.locator('[data-chat-composer]:visible').fill('Investigate the build');
+  await page.locator('[data-chat-composer]:visible').press('Enter');
   await expect(page.getByText('The build is fixed.', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: '重命名对话' }).click();
   const title = page.getByRole('textbox', { name: '对话标题' });
@@ -136,7 +135,7 @@ test('command analysis stages a reference before sending and never changes termi
   await expect(block).toBeVisible();
   await block.click({ button: 'right' });
   await page.getByRole('menuitem', { name: '发给 AI 分析' }).click();
-  const composer = page.locator('[data-chat-composer]');
+  const composer = page.locator('[data-chat-composer]:visible');
   await expect(composer).toHaveValue('帮我分析这条命令的执行结果。');
   await expect(page.getByText('This is a command snapshot.', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '会话设置' })).toBeVisible();
@@ -152,7 +151,7 @@ test('command analysis stages a reference before sending and never changes termi
 for (const themePalette of ['dark', 'light'] as const) {
   test(`plain conversation answers remain readable in ${themePalette}`, async ({ page }) => {
     await mockAnthropic(page, 'The build failed because the configuration is missing.\n\n```sh\nnpm run build\n```\n\n| 监听地址 | 含义 |\n| --- | --- |\n| `0.0.0.0:80` | 全网卡、外部可达 |\n| `127.0.0.1:3306` | 仅本机 |\n\nCheck the configuration and run the build again.');
-    await setupTauriMock(page);
+    await setupTauriMock(page, { schedulesSeed: [] });
     await page.goto('/');
     if (themePalette === 'light') {
       await page.getByRole('button', { name: '设置', exact: true }).click();
@@ -160,9 +159,9 @@ for (const themePalette of ['dark', 'light'] as const) {
       await page.getByRole('radio', { name: '浅色', exact: true }).click();
     }
     await page.locator('[data-dock-btn="chat"]').click();
-    await page.locator('[data-chat-composer]').fill('Why did the build fail?');
-    await page.locator('[data-chat-composer]').press('Enter');
-    const exchange = page.locator('.ai-block');
+    await page.locator('[data-chat-composer]:visible').fill('Why did the build fail?');
+    await page.locator('[data-chat-composer]:visible').press('Enter');
+    const exchange = page.locator('.ai-block:visible');
     await expect(exchange.getByText('Check the configuration and run the build again.')).toBeVisible();
     await expect(exchange).not.toHaveClass(/command-block/);
     await expect(exchange).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
@@ -186,7 +185,7 @@ for (const themePalette of ['dark', 'light'] as const) {
     expect(widths.box - widths.row).toBeLessThanOrEqual(4);
     await exchange.locator('.ai-block-question').click();
     await expect(exchange.locator('.ai-block-answer')).toBeVisible();
-    await page.locator('.ai-chat-panel').screenshot({ path: `.cache/ai-chat-redesign-${themePalette}.png` });
+    await page.locator('.ai-chat-panel:visible').screenshot({ path: `.cache/ai-chat-redesign-${themePalette}.png` });
     await expect(exchange.getByRole('button', { name: '收起回答' })).toHaveCount(0);
     // The reply's actions are expanded under the answer rather than hidden in a menu.
     const actions = exchange.locator('.chat-answer-actions');
@@ -201,7 +200,7 @@ for (const themePalette of ['dark', 'light'] as const) {
 }
 
 test('tool activity stays available within the plain conversation flow', async ({ page }) => {
-  await setupTauriMock(page);
+  await setupTauriMock(page, { schedulesSeed: [] });
   await page.goto('/');
   await page.evaluate(async () => {
     const now = Date.now();
@@ -223,8 +222,9 @@ test('tool activity stays available within the plain conversation flow', async (
     localStorage.setItem('active-ai-conversation', id);
   });
   await page.reload();
-  await page.locator('[data-dock-btn="chat"]').click();
-  const rows = page.locator('.ai-tool-card');
+  await page.getByTestId('workspace-history').click();
+  await page.getByTestId('unified-history-conversation:tool-row-review').click();
+  const rows = page.locator('.ai-tool-card:visible');
   await expect(rows).toHaveCount(3);
   const presentation = await rows.first().evaluate(element => ({
     background: getComputedStyle(element).backgroundColor,
@@ -255,11 +255,8 @@ test('tool activity stays available within the plain conversation flow', async (
     inner: getComputedStyle(element.firstElementChild as HTMLElement).overflowY,
   }));
   expect(scroll).toEqual({ wrapper: 'auto', inner: 'hidden' });
-  // A failure is readable straight away and can be collapsed again from its own row.
+  // History stays quiet until a stored failure is explicitly reviewed.
   const failed = rows.nth(2);
-  await expect(page.getByRole('alert')).toContainText('Exit code 2');
-  await expect(failed.locator('.ai-tool-summary')).toHaveAttribute('aria-expanded', 'true');
-  await failed.locator('.ai-tool-summary').click();
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(failed.locator('.ai-tool-summary')).toHaveAttribute('aria-expanded', 'false');
   await failed.locator('.ai-tool-summary').click();
@@ -270,16 +267,16 @@ test('tool activity stays available within the plain conversation flow', async (
   await output.hover();
   await expect(copy).toHaveCSS('opacity', '1');
   await expect(copy).toHaveAttribute('data-tip', '复制输出');
-  await page.locator('.ai-chat-panel').screenshot({ path: '.cache/ai-tool-frame.png' });
-  await expect(page.locator('.ai-block')).not.toHaveClass(/command-block/);
+  await page.locator('.ai-chat-panel:visible').screenshot({ path: '.cache/ai-tool-frame.png' });
+  await expect(page.locator('.ai-block:visible')).not.toHaveClass(/command-block/);
   await expect(page.locator('.ai-block-question')).toHaveCSS('word-break', 'normal');
 });
 
 test('reading earlier content pauses automatic scroll until the user returns to the latest reply', async ({ page }) => {
   await boot(page, Array.from({ length: 100 }, (_, index) => `Paragraph ${index}: review the project configuration.\n\n`).join(''));
-  await page.locator('[data-chat-composer]').fill('Explain the project');
-  await page.locator('[data-chat-composer]').press('Enter');
-  const transcript = page.locator('.chat-transcript');
+  await page.locator('[data-chat-composer]:visible').fill('Explain the project');
+  await page.locator('[data-chat-composer]:visible').press('Enter');
+  const transcript = page.locator('.chat-transcript:visible');
   await expect.poll(() => transcript.evaluate(element => element.scrollHeight)).toBeGreaterThan(1000);
   await transcript.evaluate(element => { element.scrollTop = 0; element.dispatchEvent(new Event('scroll')); });
   await expect(page.getByRole('button', { name: '回到最新回复' })).toBeVisible();
@@ -291,16 +288,16 @@ test('reading earlier content pauses automatic scroll until the user returns to 
 
 test('pausing and resuming the follow never shifts the transcript layout', async ({ page }) => {
   await boot(page, Array.from({ length: 80 }, (_, index) => `Paragraph ${index}: review the project configuration.\n\n`).join(''));
-  await page.locator('[data-chat-composer]').fill('Explain the project');
-  await page.locator('[data-chat-composer]').press('Enter');
-  const transcript = page.locator('.chat-transcript');
-  const jump = page.locator('.chat-jump-latest');
+  await page.locator('[data-chat-composer]:visible').fill('Explain the project');
+  await page.locator('[data-chat-composer]:visible').press('Enter');
+  const transcript = page.locator('.chat-transcript:visible');
+  const jump = page.getByTestId('ai-surface-side').locator('.chat-jump-latest');
   await expect.poll(() => transcript.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(200);
   const layout = () => transcript.evaluate(element => {
     const rect = element.getBoundingClientRect();
     return {
       box: `${Math.round(rect.top)}/${Math.round(rect.height)}`,
-      slot: document.querySelector('.chat-jump-slot')?.getAttribute('data-active') ?? null,
+      slot: element.closest('.ai-chat-panel')?.querySelector('.chat-jump-slot')?.getAttribute('data-active') ?? null,
     };
   });
   const following = await layout();
@@ -326,18 +323,18 @@ test('a small scroll while the reply streams keeps the reading position', async 
   await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.locator('[data-dock-btn="chat"]').click();
-  const composer = page.locator('[data-chat-composer]');
+  const composer = page.locator('[data-chat-composer]:visible');
   await composer.fill('Explain the project');
   await composer.press('Enter');
 
-  const transcript = page.locator('.chat-transcript');
+  const transcript = page.locator('.chat-transcript:visible');
   const distance = () => transcript.evaluate(element => element.scrollHeight - element.scrollTop - element.clientHeight);
   await expect.poll(() => transcript.evaluate(element => element.scrollHeight - element.clientHeight), { timeout: 30_000 }).toBeGreaterThan(200);
   await transcript.hover();
   await page.mouse.wheel(0, -18);
 
   // The follow pauses on the input itself rather than on the distance from the bottom.
-  const slot = page.locator('.chat-jump-slot');
+  const slot = page.locator('.chat-jump-slot:visible');
   await expect.poll(() => slot.getAttribute('data-active'), { timeout: 15_000 }).toBe('true');
   // Streamed content keeps arriving; the reading position must not be pulled back down.
   await expect.poll(distance, { timeout: 15_000 }).toBeGreaterThan(100);

@@ -131,12 +131,12 @@ createRoot(document.getElementById('root')!).render(
   </StrictMode>,
 );
 
-// 启动流式模拟；流结束后（sendingTab 复位）再发布测量结果
+// Publish measurements after all simulated streams finish.
 setTimeout(startStreamSimulation, 300);
 const poll = setInterval(() => {
   const s = useChatStore.getState();
   const msgs = s.byTab[tab.id] ?? [];
-  if (msgs.length > 0 && s.sendingTab === null) {
+  if (msgs.length > 0 && s.sendingTabs.length === 0) {
     clearInterval(poll);
     setTimeout(publish, 400); // 等最后一帧渲染落地
   }

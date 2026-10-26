@@ -36,7 +36,7 @@ describe('scheduleRunner', () => {
   beforeEach(() => {
     invokeMock.mockReset();
     vi.spyOn(console, 'warn').mockImplementation(() => {});
-    useChatStore.setState({ byTab: {}, sendingTab: null, draft: '', contextUsed: {} });
+    useChatStore.setState({ byTab: {}, sendingTabs: [], draft: '', contextUsed: {} });
   });
   afterEach(() => {
     vi.restoreAllMocks();
@@ -71,7 +71,7 @@ describe('scheduleRunner', () => {
   it('有对话正在生成时：本轮既不标记也不发送，留给下一次 tick 重试', async () => {
     // The store runs one turn at a time. Marking a run that cannot start would drop the task for a
     // whole interval, so a due task waits instead of being recorded as done.
-    useChatStore.setState({ sendingTab: 'conversation-1' });
+    useChatStore.setState({ sendingTabs: ['conversation-1'] });
     invokeMock.mockResolvedValue([makeSchedule()]);
     kickScheduleRunner();
     await flush();

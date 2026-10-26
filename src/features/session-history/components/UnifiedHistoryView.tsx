@@ -69,7 +69,7 @@ export default function UnifiedHistoryView({ preset, destination }: { preset?: H
   const starred = useHistoryMetaStore(state => state.starred);
   const meta = useHistoryMetaStore.getState();
   const activeConversationId = useChatStore(state => state.activeConversationId);
-  const sendingId = useChatStore(state => state.sendingTab);
+  const sendingIds = useChatStore(state => state.sendingTabs);
 
   useEffect(() => {
     history.setFilter({ type: preset ?? historyPreset });
@@ -114,7 +114,7 @@ export default function UnifiedHistoryView({ preset, destination }: { preset?: H
     }
   };
   const deletable = (records: readonly UnifiedHistoryRecord[]) => records.filter(record =>
-    !lockedRecords[record.key] && !(record.kind === 'conversation' && sendingId === record.conversation.id));
+    !lockedRecords[record.key] && !(record.kind === 'conversation' && sendingIds.includes(record.conversation.id)));
   const deleteRecords = async (records: readonly UnifiedHistoryRecord[]) => {
     const targets = deletable(records);
     if (!targets.length || batchBusy) return;
@@ -206,7 +206,7 @@ export default function UnifiedHistoryView({ preset, destination }: { preset?: H
     { label: t(lockedRecords[rowMenu.record.key] ? 'Unlock record' : 'Lock record'), group: 'organize',
       onClick: () => meta.setLocked([rowMenu.record.key], !lockedRecords[rowMenu.record.key]) },
     { label: deleteLabel(rowMenu.record), danger: true,
-      disabled: Boolean(lockedRecords[rowMenu.record.key]) || rowMenu.record.kind === 'conversation' && sendingId === rowMenu.record.conversation.id,
+      disabled: Boolean(lockedRecords[rowMenu.record.key]) || rowMenu.record.kind === 'conversation' && sendingIds.includes(rowMenu.record.conversation.id),
       onClick: () => void deleteRecords([rowMenu.record]) },
   ] : [];
 
@@ -365,7 +365,7 @@ export default function UnifiedHistoryView({ preset, destination }: { preset?: H
         {group.records.map(record => <UnifiedHistoryRow key={record.key} record={record}
           active={record.kind === 'conversation' && readingActive(record, activeConversationId)}
           locked={Boolean(lockedRecords[record.key])}
-          busy={history.busy || batchBusy || record.kind === 'conversation' && sendingId === record.conversation.id}
+          busy={history.busy || batchBusy || record.kind === 'conversation' && sendingIds.includes(record.conversation.id)}
           onOpen={() => history.open(record)} onDelete={() => void deleteRecords([record])}
           onMenu={anchor => setRowMenu({ record, anchor })} onOpenMember={history.openMember} />)}
       </HistoryGroupCard>;

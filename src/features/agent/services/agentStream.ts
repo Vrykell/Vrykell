@@ -257,6 +257,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   let streamError: unknown = null;
   const result = streamText({
     model,
+    maxRetries: 2,
     messages: modelMessages,
     instructions: systemPrompt || undefined,
     tools: hasTools ? tools : undefined,

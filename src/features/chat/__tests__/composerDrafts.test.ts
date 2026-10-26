@@ -24,7 +24,7 @@ describe('session composer drafts', () => {
     const previous = useChatStore.getState();
     useComposerDrafts.getState().setText('other', 'unrelated task');
     useChatStore.setState({
-      sendingTab: null,
+      sendingTabs: [],
       byTab: { one: [{ id: 'question', role: 'user', content: 'retry this', attachments: [attachment], createdAt: 1 }] },
     });
     try {

@@ -114,7 +114,7 @@ describe('useInputEditorController', () => {
     mocks.clearAttachments.mockReset();
     mocks.sessions = { 'pane-1': 'pty-1' };
     useInputStore.setState({ byPane: { 'pane-1': { text: 'git status', aiMode: false } } });
-    useChatStore.setState({ sendingTab: null, send: mocks.chatSend });
+    useChatStore.setState({ sendingTabs: [], send: mocks.chatSend });
     useSessionStore.setState({ activeId: 'tab-1' });
     useDockStore.setState({ leftPanels: [], rightPanels: [] });
   });

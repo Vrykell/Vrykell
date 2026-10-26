@@ -3,6 +3,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import BlockMenu from '../components/BlockMenu';
 import { useChatStore } from '@features/chat';
 import { useComposerDrafts } from '@features/chat/stores/composerDrafts';
+import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useTerminalStore } from '../stores/terminal';
 import type { TermBlock } from '../services/pipeline/termBlock';
 
@@ -17,6 +18,8 @@ const block: TermBlock = {
 };
 const chat = useChatStore.getState();
 const terminal = useTerminalStore.getState();
+const ai = useAiWorkspace.getState();
+const drafts = useComposerDrafts.getState();
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -28,6 +31,8 @@ beforeEach(() => {
 afterEach(() => {
   useChatStore.setState(chat, true);
   useTerminalStore.setState(terminal, true);
+  useAiWorkspace.setState(ai, true);
+  useComposerDrafts.setState(drafts, true);
 });
 
 function open(output = 'clean') {
@@ -59,7 +64,8 @@ describe('command action menu', () => {
     open(output);
     fireEvent.click(screen.getByRole('menuitem', { name: '发给 AI 分析' }));
     expect(mocks.send).not.toHaveBeenCalled();
-    const id = useChatStore.getState().activeConversationId;
+    const id = useAiWorkspace.getState().sideSelected.slice(5);
+    expect(useChatStore.getState().activeConversationId).toBe(chat.activeConversationId);
     expect(useComposerDrafts.getState().byTab[id]?.references?.[0]).toMatchObject({ paneId: 'pane', command: 'git status', output, exitCode: 0 });
   });
 

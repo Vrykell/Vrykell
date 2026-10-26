@@ -772,11 +772,13 @@ pub struct LlmStreamEvent {
     data: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     message: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    retryable: Option<bool>,
 }
 
 impl LlmStreamEvent {
     fn started(status: u16, headers: Vec<(String, String)>) -> Self {
-        Self { kind: "started", status: Some(status), headers: Some(headers), data: None, message: None }
+        Self { kind: "started", status: Some(status), headers: Some(headers), data: None, message: None, retryable: None }
     }
     fn chunk(bytes: &[u8]) -> Self {
         Self {
@@ -785,10 +787,16 @@ impl LlmStreamEvent {
             headers: None,
             data: Some(base64::engine::general_purpose::STANDARD.encode(bytes)),
             message: None,
+            retryable: None,
         }
     }
     fn done() -> Self {
-        Self { kind: "done", status: None, headers: None, data: None, message: None }
+        Self { kind: "done", status: None, headers: None, data: None, message: None, retryable: None }
+    }
+    fn connection_error(error: &reqwest::Error) -> Self {
+        Self { kind: "error", status: None, headers: None, data: None,
+            message: Some(error.to_string()),
+            retryable: Some(error.is_connect() || error.is_timeout() || error.is_request()) }
     }
 }
 
@@ -917,7 +925,13 @@ async fn run_proxy(
         rb = rb.body(body);
     }
 
-    let resp = rb.send().await.map_err(|e| format!("请求 AI 服务失败：{e}"))?;
+    let resp = match rb.send().await {
+        Ok(response) => response,
+        Err(error) => {
+            on_event.send(LlmStreamEvent::connection_error(&error)).map_err(|e| e.to_string())?;
+            return Ok(());
+        }
+    };
     let status = resp.status().as_u16();
     let headers = resp
         .headers()
@@ -976,6 +990,23 @@ pub fn llm_abort(streams: State<'_, LlmStreamState>, id: String) {
 #[cfg(test)]
 mod config_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn connection_failures_carry_retry_metadata_but_invalid_requests_do_not() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        drop(listener);
+        let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        let failure = client.get(format!("http://{address}")).send().await.unwrap_err();
+        let event = serde_json::to_value(LlmStreamEvent::connection_error(&failure)).unwrap();
+        assert_eq!(event["kind"], "error");
+        assert_eq!(event["retryable"], true);
+        assert!(event.get("status").is_none());
+
+        let invalid = client.get("http://127.0.0.1").header("invalid", "\n").send().await.unwrap_err();
+        assert_eq!(LlmStreamEvent::connection_error(&invalid).retryable, Some(false));
+        assert!(serde_json::to_value(LlmStreamEvent::done()).unwrap().get("retryable").is_none());
+    }
 
     #[test]
     fn serialized_config_never_carries_keys() {

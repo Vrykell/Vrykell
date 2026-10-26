@@ -100,7 +100,7 @@ export default function AiHistoryView() {
   const batchBusyRef = useRef(false);
   const conversations = useChatStore(state => state.conversations);
   const activeId = useChatStore(state => state.activeConversationId);
-  const sendingId = useChatStore(state => state.sendingTab);
+  const sendingIds = useChatStore(state => state.sendingTabs);
   const loading = useChatStore(state => state.conversationsLoading);
   const loaded = useChatStore(state => state.conversationsLoaded);
   const error = useChatStore(state => state.conversationError);
@@ -162,7 +162,7 @@ export default function AiHistoryView() {
       setBatchBusy(false);
     }
   };
-  const deletable = (items: readonly Conversation[]) => items.filter(item => item.id !== useChatStore.getState().sendingTab
+  const deletable = (items: readonly Conversation[]) => items.filter(item => !useChatStore.getState().sendingTabs.includes(item.id)
     && !useHistoryMetaStore.getState().lockedRecords[noteKey(item.id)]);
   const deleteMatching = async (items: readonly Conversation[]) => {
     const targets = deletable(items);
@@ -223,7 +223,7 @@ export default function AiHistoryView() {
       { label: t(lockedRecords[noteKey(rowMenuConversation.id)] ? 'Unlock record' : 'Lock record'), group: 'organize',
         onClick: () => meta.setLocked([noteKey(rowMenuConversation.id)], !lockedRecords[noteKey(rowMenuConversation.id)]) },
     );
-    if (sendingId !== rowMenuConversation.id) {
+    if (!sendingIds.includes(rowMenuConversation.id)) {
       rowMenuItems.push({ label: t('Delete conversation'), danger: true, disabled: batchBusy || Boolean(lockedRecords[noteKey(rowMenuConversation.id)]), onClick: () => { void remove(rowMenuConversation.id); } });
     }
   }
@@ -379,7 +379,7 @@ export default function AiHistoryView() {
           leadingActions={[
             { icon: <X size={16} aria-hidden="true" />, label: t('Delete conversation'),
               title: t(lockedRecords[noteKey(item.id)] ? 'Locked record' : 'Delete conversation'),
-              disabled: batchBusy || sendingId === item.id || Boolean(lockedRecords[noteKey(item.id)]),
+              disabled: batchBusy || sendingIds.includes(item.id) || Boolean(lockedRecords[noteKey(item.id)]),
               testId: `conversation-delete-${item.id}`, onClick: () => { void remove(item.id); } },
             { icon: <Undo2 size={16} aria-hidden="true" />, label: t('Open conversation'),
               testId: `conversation-open-${item.id}`, onClick: () => open(item.id) },
@@ -389,12 +389,12 @@ export default function AiHistoryView() {
             openRowMenu(item.id, { x: event.clientX, y: event.clientY, trigger: event.currentTarget });
           }}
           onKeyDown={event => { if (event.target === event.currentTarget && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); open(item.id); } }}
-          badge={starredIds.has(item.id) || sendingId === item.id || lockedRecords[noteKey(item.id)] ? <span className="history-row-flags">
+          badge={starredIds.has(item.id) || sendingIds.includes(item.id) || lockedRecords[noteKey(item.id)] ? <span className="history-row-flags">
             {lockedRecords[noteKey(item.id)] && <span className="history-row-lock" data-tip={t('Locked record')}><Lock size={16} aria-hidden="true" /></span>}
             {starredIds.has(item.id) && <span className="history-row-star" data-tip={t('Starred')} data-testid={`conversation-star-${item.id}`}><Star size={16} color="var(--favorite-color)" aria-hidden="true" /></span>}
-            {sendingId === item.id && <span className="ai-history-working">{t('Working')}</span>}
+            {sendingIds.includes(item.id) && <span className="ai-history-working">{t('Working')}</span>}
           </span> : undefined}
-          action={sendingId === item.id ? undefined : {
+          action={sendingIds.includes(item.id) ? undefined : {
             icon: <Ellipsis size={16} aria-hidden="true" />,
             label: t('More actions'),
             title: t('More actions'),

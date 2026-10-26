@@ -14,7 +14,7 @@ const writeClipboardTextMock = vi.mocked(writeClipboardText);
 
 afterEach(() => {
   cleanup();
-  useChatStore.setState({ sendingTab: null });
+  useChatStore.setState({ sendingTabs: [] });
 });
 const exchange: ChatExchange = { id: 'question', createdAt: 1,
   question: { id: 'question', role: 'user', content: 'Why did the build fail?', createdAt: 1 },
@@ -59,7 +59,7 @@ it('uses the tool summary treatment for reasoning and keeps its disclosure usabl
 });
 
 it('renders panel answers as plain conversation content with message actions', () => {
-  useChatStore.setState({ sendingTab: null });
+  useChatStore.setState({ sendingTabs: [] });
   const { container } = render(<AiBlock exchange={exchange} conversationId="conversation" presentation="conversation" />);
   expect(container.querySelector('.chat-exchange')).not.toBeNull();
   expect(container.querySelector('.command-block')).toBeNull();
@@ -76,7 +76,7 @@ it('renders panel answers as plain conversation content with message actions', (
 });
 
 it('keeps question selection separate from explicit reply collapse', () => {
-  useChatStore.setState({ sendingTab: null });
+  useChatStore.setState({ sendingTabs: [] });
   render(<AiBlock exchange={exchange} conversationId="conversation" />);
   fireEvent.click(screen.getByText('Why did the build fail?'));
   expect(screen.getByText('configuration')).toBeInTheDocument();
@@ -87,7 +87,7 @@ it('keeps question selection separate from explicit reply collapse', () => {
 });
 
 it('rotates the disclosure chevron a quarter turn instead of pointing it sideways', () => {
-  useChatStore.setState({ sendingTab: null });
+  useChatStore.setState({ sendingTabs: [] });
   const { container } = render(<AiBlock exchange={exchange} conversationId="conversation" />);
   const arrow = () => container.querySelector('.ai-block-actions svg') as SVGElement;
   // 展开时朝上（▴ = 朝下的箭头翻 180°），收起时朝下（▾）——AI 面板的展开箭头统一这一套
@@ -206,14 +206,14 @@ it('copies the tool log when a stopped reply has no answer text yet', async () =
 
 it('keeps this exchange actionable while a background conversation answers', () => {
   // The single send slot is taken by a scheduled (background) conversation: this exchange is idle.
-  useChatStore.setState({ sendingTab: 'background-conversation' });
+  useChatStore.setState({ sendingTabs: ['background-conversation'] });
   render(<AiBlock exchange={exchange} conversationId="conversation" presentation="conversation" />);
   expect(screen.getByRole('button', { name: '重新生成' })).toBeInTheDocument();
   expect(screen.getByRole('button', { name: '编辑重发' })).toBeInTheDocument();
 });
 
 it('hides regenerate and edit while its own conversation answers', () => {
-  useChatStore.setState({ sendingTab: 'conversation' });
+  useChatStore.setState({ sendingTabs: ['conversation'] });
   render(<AiBlock exchange={exchange} conversationId="conversation" presentation="conversation" />);
   expect(screen.queryByRole('button', { name: '重新生成' })).toBeNull();
   expect(screen.queryByRole('button', { name: '编辑重发' })).toBeNull();

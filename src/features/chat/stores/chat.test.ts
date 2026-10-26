@@ -226,7 +226,7 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
     expect(msgs[1]!.id).not.toBe(oldAnswerId);
     // history 截止该提问（不含旧回答）
     expect(seen).toEqual([{ role: 'user', content: '问题一' }]);
-    expect(useChatStore.getState().sendingTab).toBeNull();
+    expect(useChatStore.getState().sendingTabs).toEqual([]);
   });
 
   it('regenerate：多轮历史只取到目标提问为止', async () => {
@@ -295,7 +295,7 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
     expect(msgs[1]).toMatchObject({ role: 'assistant', content: '半截回答', pending: false });
     expect(msgs[1]!.error).toBeUndefined();
     expect(msgs[1]!.errorText).toBeUndefined();
-    expect(useChatStore.getState().sendingTab).toBeNull();
+    expect(useChatStore.getState().sendingTabs).toEqual([]);
   });
 
   it('立即停止的空壳回答被移除（不留空气泡）', async () => {
@@ -313,7 +313,7 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
     expect(msgs[0]!.role).toBe('user');
   });
 
-  it('sendingTab 守卫：流式中 regenerate/deleteExchange/editResend 均为空操作', async () => {
+  it('blocks edits to the owner while its stream is active', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     let release!: () => void;
     const gate = new Promise<void>((r) => { release = r; });

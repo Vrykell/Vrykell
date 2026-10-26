@@ -110,9 +110,9 @@ it('prevents quick deletion of locked or working conversations without activatin
   useHistoryMetaStore.getState().setLocked(['conversation:first'], true);
   render(<AiHistoryView />);
   expect(screen.getByTestId('conversation-delete-first')).toBeDisabled();
-  act(() => useChatStore.setState({ sendingTab: 'second' }));
+  act(() => useChatStore.setState({ sendingTabs: ['second'] }));
   expect(screen.getByTestId('conversation-delete-second')).toBeDisabled();
-  act(() => useChatStore.setState({ sendingTab: null }));
+  act(() => useChatStore.setState({ sendingTabs: [] }));
   fireEvent.click(screen.getByTestId('conversation-delete-second'));
   await waitFor(() => expect(conversationApi.deleteConversation).toHaveBeenCalledWith('second'));
   expect(useChatStore.getState().activeConversationId).toBe('first');

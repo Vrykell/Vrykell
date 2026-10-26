@@ -1,5 +1,15 @@
 # Code audit and regression fixes — 2026-10-26
 
+## Concurrent conversations and model connection recovery
+
+Main, split and sidebar native conversations now run concurrently under separate owners. Queues, stop controls, history working flags, editing guards and finalizers belong to each owner. Background schedules still begin while idle but no longer block a later interactive conversation. Two connected agent sessions are also verified to complete independently.
+
+Transient model connection failures before response headers retain explicit retry metadata through the proxy. The model transport retries twice with exponential backoff and supports stopping during the wait. Authentication/configuration errors and started responses are not replayed; exhaustion keeps manual retry available. This backend change requires an application restart and does not change an external agent's own networking.
+
+Opening the sidebar no longer restores an in-content toolbar or hides the main tab's settings action. Terminal analysis stages its reference in a compatible independent sidebar owner without moving main/split content or granting execution access. Historical tool errors stay quiet until explicitly reviewed. Legacy browser selectors and history-opening assumptions now follow their actual owners.
+
+Final verification: 2488 frontend tests passed with 1 skipped. Backend verification for this change reports 323 passed and 5 ignored; the final localized connection-error adjustment also passes its targeted backend test. Nineteen expanded browser cases and eight lifecycle/sidebar regressions pass. Typechecking and architecture checks pass. The strict UI audit retains its 64 existing findings. Concurrent edits to the separate external-session runtime were excluded from this commit and from these backend verification claims.
+
 This batch fixes the sixteen previously reported defects and follows their callers and adjacent boundaries. Repository-wide type, architecture and test checks complement that source review. They do not establish that every source file received a complete manual review or that the project has no remaining defects.
 
 ## Previously reported defects

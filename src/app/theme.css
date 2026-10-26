@@ -649,7 +649,6 @@ button.window-control-button {
 .chat-empty { min-height: 180px; padding: 30px 16px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; color: var(--text-muted); text-align: center; font-size: var(--fs-caption); }
 .chat-empty > svg { color: var(--chat-rail); }
 .chat-empty > strong { color: var(--text-primary); font-size: var(--fs-label); font-weight: var(--fw-semibold); }
-.chat-background-task { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px; background: var(--hover); color: var(--text-secondary); font-size: var(--fs-caption); }
 /* Rounded jump-to-latest control: it floats over the transcript's own bottom padding band, so it
    never occupies layout or masks message content. */
 .chat-jump-slot { position: absolute; left: 0; right: 0; bottom: 8px; display: flex; align-items: center; justify-content: center; pointer-events: none; }

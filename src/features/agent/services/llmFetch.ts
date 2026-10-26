@@ -14,6 +14,8 @@ import type { ProviderKind } from './provider';
 import { sessionHeaderFor } from '@config/providers';
 import { Channel } from '@tauri-apps/api/core';
 import { invoke } from '@platform/diagnostics';
+import { APICallError } from 'ai';
+import { t } from '@i18n';
 
 interface LlmStreamEvent {
   kind: 'started' | 'chunk' | 'done' | 'error';
@@ -22,6 +24,7 @@ interface LlmStreamEvent {
   /** base64 编码的原始字节（chunk 可能切断多字节 UTF-8，拼好再解码） */
   data?: string;
   message?: string;
+  retryable?: boolean;
 }
 
 function base64ToBytes(b64: string): Uint8Array {
@@ -78,6 +81,7 @@ export function createProxyFetch(provider?: ProviderKind, sessionId?: string): t
       startedReject = reject;
     });
     let settled = false;
+    let responseStarted = false;
     const finish = () => { settled = true; signal?.removeEventListener('abort', abort); };
 
     channel.onmessage = (ev) => {
@@ -85,6 +89,7 @@ export function createProxyFetch(provider?: ProviderKind, sessionId?: string): t
       try {
         switch (ev.kind) {
           case 'started':
+            responseStarted = true;
             startedResolve({ status: ev.status ?? 200, headers: new Headers(ev.headers ?? []) });
             break;
           case 'chunk':
@@ -94,11 +99,18 @@ export function createProxyFetch(provider?: ProviderKind, sessionId?: string): t
             finish();
             controller.close();
             break;
-          case 'error':
+          case 'error': {
             finish();
-            startedReject(new Error(ev.message ?? 'The model request failed.'));
-            controller.error(new Error(ev.message ?? 'The model request failed.'));
+            const message = ev.message ?? t('The model request failed.');
+            const error = new APICallError({
+              message: !responseStarted && ev.retryable !== undefined
+                ? t('Could not connect to the model service: {{message}}', { message }) : message,
+              url, requestBodyValues: undefined, isRetryable: !responseStarted && ev.retryable === true,
+            });
+            startedReject(error);
+            controller.error(error);
             break;
+          }
         }
       } catch {
         // stream 已关闭/已取消时忽略迟到事件

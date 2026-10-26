@@ -1,5 +1,7 @@
 # Security model
 
+Conversation streams run concurrently under separate owner IDs, cancellation controllers, queues and approval scopes. Existing terminal busy guards still reject conflicting command execution. The model proxy marks only failures while establishing a request as potentially retryable; the client never replays a started response or a whole tool turn. Retries retain the same validated endpoint and credential path, use a bounded abortable delay, and add no IPC command or capability.
+
 Empty starter panes use a validated boolean marker in layout metadata. Explicit history restoration recreates them through existing resource owners; it never restores commands or missing nonempty conversation content. Remote starters require an existing saved connection and retain the standard authentication path. No credential, capability or execution policy changes are introduced.
 
 ## Session-owned application tools

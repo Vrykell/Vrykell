@@ -514,11 +514,14 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 - **Root cause**: on abort Rust returns silently and sends no further `done`/`error`, while `llmFetch`'s local `ReadableStream` is never closed or errored. The AI SDK's wrapper stream only checks `abortSignal.aborted` **after** a read settles, so the reader hangs forever and the `fullStream` teardown (`finally`: clear `sendingTab`, land the terminal state) never runs.
 - **Fix**: the abort listener also calls `controller.error(new DOMException(…, 'AbortError'))` so the local stream settles immediately; `llmFetch.test.ts` ("abort mid-stream") locks the behaviour in. On the e2e side, the mock's `llm_abort` must likewise "stop sending and emit no terminal event", otherwise this class of hang cannot be reproduced.
 
-### 11.10 The global send state read as "this conversation is answering", and "mark before send" losing a run (`sendingTab`)
-- The store runs one turn at a time (a single `sendingTab` slot), which produced two traps:
-  1. `AiBlock` treated `sendingTab !== null` as "this reply is still generating" — a background scheduled turn greyed out Regenerate/Edit/Delete on **every** reply, as if the current conversation were stuck;
-  2. `scheduleRunner` called `markScheduleRun` before `sendToChat` — when the send slot was taken, `sendToChat` skipped silently while the task was already recorded as run, so that whole interval (up to an hour) vanished.
-- **Rule**: "this conversation is answering" is always `sendingTab === <conversation id>` (`PanelChat` always did this; `AiBlock` now scopes to the owning conversation), and background work must not write a run timestamp before it can truly start — when the slot is busy it waits for the next tick (`isChatTurnActive()`).
+### 11.10 Global busy state blocks independent conversations and premature scheduling loses a run
+- A single global send slot prevented main, split and sidebar conversations from running together. It also incorrectly disabled actions in unrelated history rows.
+- **Rule**: derive busy state from `sendingTabs.includes(conversationId)`. Each owner keeps its own controller, queue, execution target and finalizer; completion or stop removes only that owner. Queue draining skips busy owners instead of blocking unrelated work.
+- Background schedules wait for an idle workspace before recording a run. Reserving their own owner before persistence prevents lost tasks without blocking a later manual turn.
+
+### 11.11 Flattening connection failures into ordinary errors disables automatic retries
+- The proxy previously rejected connection failures as ordinary strings, so the model transport could not identify transient failures.
+- Connection failures now carry explicit retry metadata before response headers. The model transport retries twice with abortable exponential backoff; authentication and configuration errors remain immediate. Started responses and whole tool turns are never replayed. Cover this with the real model transport and mocked IPC, including abort during backoff and exhaustion followed by manual retry.
 
 ---
 
