@@ -277,32 +277,55 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
         }
         let from = e.path();
         let to = dst.join(e.file_name());
-        if from.is_dir() {
+        let kind = e.file_type().map_err(|error| error.to_string())?;
+        // Match hash traversal: linked content is excluded from installed skills.
+        if kind.is_symlink() { continue; }
+        if kind.is_dir() {
             copy_dir_recursive(&from, &to)?;
-        } else {
+        } else if kind.is_file() {
             std::fs::copy(&from, &to).map_err(|e| format!("复制文件失败：{e}"))?;
+        } else {
+            return Err("Only regular skill files can be imported.".into());
         }
     }
     Ok(())
 }
 
-/// 原子安装：复制到临时目录 → 哈希校验 → 替换目标。
+/// Stage and verify independently before replacing the installed directory.
 fn copy_dir_atomic(src: &Path, dst: &Path) -> Result<(), String> {
     let src_hash = compute_dir_hash(src);
-    let tmp = dst.with_extension(format!("tmp-{}", std::process::id()));
-    if tmp.exists() {
-        std::fs::remove_dir_all(&tmp).map_err(|e| format!("清理临时目录失败：{e}"))?;
+    let tmp = dst.with_extension(format!("tmp-{}", uuid::Uuid::new_v4()));
+    if let Err(error) = copy_dir_recursive(src, &tmp) {
+        let _ = std::fs::remove_dir_all(&tmp);
+        return Err(error);
     }
-    copy_dir_recursive(src, &tmp)?;
     let tmp_hash = compute_dir_hash(&tmp);
     if tmp_hash != src_hash {
         let _ = std::fs::remove_dir_all(&tmp);
         return Err("安装内容与源不一致，已中止".to_string());
     }
-    if dst.exists() {
-        std::fs::remove_dir_all(dst).map_err(|e| format!("覆盖旧技能失败：{e}"))?;
+    commit_skill_dir(&tmp, dst, |from, to| std::fs::rename(from, to))
+}
+
+fn commit_skill_dir(
+    staged: &Path,
+    destination: &Path,
+    mut rename: impl FnMut(&Path, &Path) -> std::io::Result<()>,
+) -> Result<(), String> {
+    let previous = destination.with_extension(format!("previous-{}", uuid::Uuid::new_v4()));
+    let replacing = destination.exists();
+    if replacing {
+        rename(destination, &previous).map_err(|error| format!("Could not preserve the installed skill: {error}"))?;
     }
-    std::fs::rename(&tmp, dst).map_err(|e| format!("提交技能失败：{e}"))?;
+    if let Err(error) = rename(staged, destination) {
+        if replacing {
+            if let Err(restore_error) = rename(&previous, destination) {
+                return Err(format!("Could not install the skill: {error}. The previous copy is preserved at {}: {restore_error}", previous.display()));
+            }
+        }
+        return Err(format!("Could not install the skill: {error}"));
+    }
+    if replacing { let _ = std::fs::remove_dir_all(previous); }
     Ok(())
 }
 
@@ -336,6 +359,9 @@ fn read_skill_meta(dir: &Path) -> Option<SkillMeta> {
 }
 
 fn collect_skill_roots(path: &Path, roots: &mut Vec<PathBuf>) {
+    if !std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_dir() && !metadata.file_type().is_symlink()) {
+        return;
+    }
     if path.join("SKILL.md").is_file() {
         roots.push(path.to_path_buf());
         return;
@@ -930,6 +956,61 @@ pub async fn market_github_install(repo: String, dir: String) -> Result<SkillMet
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn failed_skill_commit_restores_the_previous_installation() {
+        let root = std::env::temp_dir().join(format!("skill-commit-{}", uuid::Uuid::new_v4()));
+        let installed = root.join("installed");
+        let staged = root.join("staged");
+        std::fs::create_dir_all(&installed).unwrap();
+        std::fs::create_dir(&staged).unwrap();
+        std::fs::write(installed.join("SKILL.md"), "old").unwrap();
+        std::fs::write(staged.join("SKILL.md"), "new").unwrap();
+        let result = commit_skill_dir(&staged, &installed, |from, to| {
+            if from == staged { return Err(std::io::Error::new(std::io::ErrorKind::PermissionDenied, "fixture")); }
+            std::fs::rename(from, to)
+        });
+        assert!(result.is_err());
+        assert_eq!(std::fs::read_to_string(installed.join("SKILL.md")).unwrap(), "old");
+        assert_eq!(std::fs::read_to_string(staged.join("SKILL.md")).unwrap(), "new");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn recursive_copy_matches_the_hashed_files() {
+        let root = std::env::temp_dir().join(format!("skill-copy-{}", uuid::Uuid::new_v4()));
+        let source = root.join("source");
+        let destination = root.join("destination");
+        std::fs::create_dir_all(source.join("scripts")).unwrap();
+        std::fs::write(source.join("SKILL.md"), "---\nname: sample\n---\nDescription").unwrap();
+        std::fs::write(source.join("scripts/run.sh"), "echo safe").unwrap();
+        std::fs::write(source.join(".ignored"), "ignored").unwrap();
+        copy_dir_recursive(&source, &destination).unwrap();
+        assert_eq!(compute_dir_hash(&source), compute_dir_hash(&destination));
+        assert!(!destination.join(".ignored").exists());
+        assert_eq!(std::fs::read_to_string(destination.join("scripts/run.sh")).unwrap(), "echo safe");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn linked_directories_are_excluded_from_discovery_and_copy() {
+        let root = std::env::temp_dir().join(format!("skill-links-{}", uuid::Uuid::new_v4()));
+        let source = root.join("source");
+        let destination = root.join("destination");
+        std::fs::create_dir_all(source.join("nested")).unwrap();
+        std::fs::write(source.join("nested/SKILL.md"), "---\nname: sample\n---\nDescription").unwrap();
+        std::os::unix::fs::symlink(&source, source.join("loop")).unwrap();
+        std::os::unix::fs::symlink(source.join("nested"), source.join("alias")).unwrap();
+        let mut roots = Vec::new();
+        collect_skill_roots(&source, &mut roots);
+        assert_eq!(roots, vec![source.join("nested")]);
+        copy_dir_recursive(&source, &destination).unwrap();
+        assert!(!destination.join("loop").exists());
+        assert!(!destination.join("alias").exists());
+        assert_eq!(compute_dir_hash(&source), compute_dir_hash(&destination));
+        std::fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn market_paths_require_exact_descriptor_files_and_safe_directories() {
