@@ -213,7 +213,7 @@ impl Resolve for PinnedResolver {
                     }
                 }
             }
-            let addrs: Vec<std::net::SocketAddr> = tokio::net::lookup_host(host.as_str())
+            let addrs: Vec<std::net::SocketAddr> = tokio::net::lookup_host((host.as_str(), 0))
                 .await
                 .map_err(|e| format!("域名解析失败：{e}"))?
                 .collect();
@@ -753,8 +753,7 @@ pub async fn web_search(query: String, max_results: Option<u32>) -> Result<WebSe
         String::from_utf8_lossy(&bytes).into_owned()
     };
     if !status.is_success() {
-        let cap = html.len().min(300);
-        return Err(format!("DuckDuckGo 返回 {status}：{}", &html[..cap]));
+        return Err(format!("DuckDuckGo 返回 {status}：{}", truncate_chars(&html, 300)));
     }
     let results = parse_duckduckgo(&html, n);
     if results.is_empty() {
@@ -795,8 +794,7 @@ pub async fn web_fetch(url: String) -> Result<WebFetchResponse, String> {
         String::from_utf8_lossy(&bytes).into_owned()
     };
     if !status.is_success() {
-        let cap = body.len().min(300);
-        return Err(format!("返回 {status}：{}", &body[..cap]));
+        return Err(format!("返回 {status}：{}", truncate_chars(&body, 300)));
     }
     let is_html = content_type.contains("text/html") || body.trim_start().starts_with('<');
     let title = if is_html { extract_title(&body) } else { String::new() };
@@ -955,8 +953,7 @@ pub async fn fetch_skill_registry(url: String) -> Result<Vec<RemoteSkill>, Strin
         String::from_utf8_lossy(&bytes).into_owned()
     };
     if !status.is_success() {
-        let cap = body.len().min(300);
-        return Err(format!("返回 {status}：{}", &body[..cap]));
+        return Err(format!("返回 {status}：{}", truncate_chars(&body, 300)));
     }
     parse_skill_registry(&body)
 }
@@ -964,6 +961,16 @@ pub async fn fetch_skill_registry(url: String) -> Result<Vec<RemoteSkill>, Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn resolver_accepts_a_hostname_without_an_embedded_port() {
+        let resolver = PinnedResolver::new(false, HashSet::new());
+        let addresses: Vec<_> = resolver.resolve("localhost".parse().unwrap()).await.unwrap().collect();
+        assert!(!addresses.is_empty());
+        assert!(addresses.iter().all(|address| address.port() == 0));
+        let validating = PinnedResolver::new(true, HashSet::new());
+        assert!(validating.resolve("localhost".parse().unwrap()).await.is_err());
+    }
 
     #[test]
     fn html_to_text_strips_tags_and_collapses() {
@@ -978,6 +985,8 @@ mod tests {
     #[test]
     fn truncate_is_utf8_safe() {
         assert_eq!(truncate_chars("你好世界", 2), "你好");
+        let body = format!("{}😀error", "a".repeat(299));
+        assert_eq!(truncate_chars(&body, 300), format!("{}😀", "a".repeat(299)));
     }
 
     #[test]

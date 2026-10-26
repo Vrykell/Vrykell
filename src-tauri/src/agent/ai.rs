@@ -548,7 +548,7 @@ pub async fn provider_fetch_models(
     let key = read_provider_key(&provider_id)
         .ok_or_else(|| "这个服务商还没有配置 API Key".to_string())?;
     let (url, headers) = models_request(&provider, &base_url, &key)?;
-    let client = reqwest::Client::builder()
+    let client = credential_client_builder()
         .timeout(std::time::Duration::from_secs(20))
         .build()
         .map_err(|e| format!("创建请求失败：{e}"))?;
@@ -630,7 +630,7 @@ pub async fn tavily_search(
     if q.is_empty() {
         return Err("搜索词不能为空".to_string());
     }
-    let client = reqwest::Client::builder()
+    let client = credential_client_builder()
         .connect_timeout(std::time::Duration::from_secs(10))
         .timeout(std::time::Duration::from_secs(30))
         .build()
@@ -652,8 +652,8 @@ pub async fn tavily_search(
         .await
         .map_err(|e| format!("读取 Tavily 响应失败：{e}"))?;
     if !status.is_success() {
-        let cap = text.len().min(300);
-        return Err(format!("Tavily 返回 {status}：{}", &text[..cap]));
+        let snippet: String = text.chars().take(300).collect();
+        return Err(format!("Tavily 返回 {status}：{snippet}"));
     }
     serde_json::from_str(&text).map_err(|e| format!("解析 Tavily 响应失败：{e}"))
 }
@@ -686,7 +686,7 @@ pub async fn ai_stream(
             .collect::<Vec<_>>(),
     });
 
-    let client = reqwest::Client::builder()
+    let client = credential_client_builder()
         .connect_timeout(std::time::Duration::from_secs(15))
         .timeout(std::time::Duration::from_secs(180))
         .build()
@@ -868,6 +868,11 @@ fn request_identity(url: &reqwest::Url, cfg: &AiConfigInner, kind: &str) -> Stri
     provider_identity(kind, "")
 }
 
+fn credential_client_builder() -> reqwest::ClientBuilder {
+    // Only the selected endpoint may receive credentials, including keys in request bodies.
+    reqwest::Client::builder().redirect(reqwest::redirect::Policy::none())
+}
+
 async fn run_proxy(
     cfg: AiConfigInner,
     req: LlmProxyRequest,
@@ -879,7 +884,7 @@ async fn run_proxy(
 
     let method = reqwest::Method::from_bytes(req.method.as_deref().unwrap_or("POST").as_bytes())
         .map_err(|e| format!("无效 HTTP 方法：{e}"))?;
-    let client = reqwest::Client::builder()
+    let client = credential_client_builder()
         .connect_timeout(std::time::Duration::from_secs(15))
         // 流式响应可能持续很久，不设总超时，靠 llm_abort 取消
         .build()
@@ -1022,6 +1027,25 @@ mod config_tests {
 #[cfg(test)]
 mod proxy_endpoint_tests {
     use super::*;
+
+    #[tokio::test]
+    async fn credential_requests_do_not_follow_redirects() {
+        use std::io::{Read, Write};
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let address = listener.local_addr().unwrap();
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            socket.set_read_timeout(Some(std::time::Duration::from_secs(3))).unwrap();
+            let mut buffer = [0; 8192];
+            let count = socket.read(&mut buffer).unwrap();
+            assert!(String::from_utf8_lossy(&buffer[..count]).contains("x-api-key: fixture"));
+            write!(socket, "HTTP/1.1 307 Temporary Redirect\r\nLocation: http://{address}/other\r\nContent-Length: 0\r\nConnection: close\r\n\r\n").unwrap();
+        });
+        let response = credential_client_builder().no_proxy().timeout(std::time::Duration::from_secs(3)).build().unwrap()
+            .post(format!("http://{address}/original")).header("x-api-key", "fixture").body("fixture body").send().await.unwrap();
+        assert_eq!(response.status(), reqwest::StatusCode::TEMPORARY_REDIRECT);
+        server.join().unwrap();
+    }
 
     #[test]
     fn configured_gateways_use_their_provider_auth() {
