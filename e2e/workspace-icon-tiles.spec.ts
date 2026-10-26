@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 test('observed host metadata is used in the profile picker', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(() => {
     localStorage.setItem('vrykell-host-systems', JSON.stringify({ state: { systems: { 'ssh-1': 'Ubuntu' } }, version: 0 }));
   });

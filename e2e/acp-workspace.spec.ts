@@ -10,7 +10,7 @@ async function connect(page: Page) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
 });

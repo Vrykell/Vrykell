@@ -16,8 +16,6 @@ export interface TauriMockOptions {
   integration?: boolean;
   sshHost?: 'known' | 'unknown' | 'changed';
   sshTrustConfirmed?: boolean;
-  /** Scheduled-task seed; pass [] to keep the send slot for the spec (the default seed is due at boot). */
-  schedulesSeed?: Record<string, unknown>[];
   /** Simulate a remote shell with prompt hooks but no preexec hook. */
   sshPreexec?: boolean;
   /** Seed an archived tab group with members spanning directories and dates. */
@@ -55,18 +53,12 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     { id: 'm-local', name: '本地模型', provider: 'openai-compatible', baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen2.5', capabilities: { vision: false, reasoning: false, tools: true, search: false } },
   ];
   const seedActive = opts.aiActive ?? 'm-local';
-  // Scheduled tasks: the default seed has never run, so it is due the moment the app boots. A spec
-  // that needs the single send slot for itself (asserting Stop, say) must pass [] — otherwise that
-  // background turn takes sendingTab first and the user's own send is dropped.
-  const seedSchedules = opts.schedulesSeed ?? [
-    { id: 's1', name: '每日巡检', prompt: '检查系统状态并汇报', intervalMinutes: 60, enabled: true, lastRunAt: 0 },
-  ];
   const seedSkills = opts.skills ?? [
     { name: '写单测', description: '为代码写单元测试', source: 'local', trusted: true, enabled: true, hasScripts: false, modified: false, files: ['SKILL.md'], dir: '/home/e2e/.vrykell/skills/写单测', prompt: '先看代码，再写 vitest 单测。' },
     { name: '旧脚本技能', description: '遗留技能，含脚本', source: 'market', trusted: false, enabled: false, hasScripts: true, modified: true, files: ['SKILL.md', 'scripts/run.sh', 'references/说明.md'], dir: '/home/e2e/.vrykell/skills/旧脚本技能', prompt: '运行 scripts/run.sh 完成工作。' },
   ];
   await page.addInitScript(
-    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, scheduleSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, pendingDirs, menuSeed, terminalDirectories, mainPermissions, sshWorkspaceView, shells }) => {
+    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, pendingDirs, menuSeed, terminalDirectories, mainPermissions, sshWorkspaceView, shells }) => {
     const menu = { supported: true, available: true, enabled: false, stale: false, certificateTrusted: false, certificateThumbprint: 'E2E-CERTIFICATE', ...menuSeed };
     localStorage.setItem('vrykell-ssh-workspace-view', sshWorkspaceView ?? 'manage');
     const menuActions: string[] = [];
@@ -167,7 +159,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       run_command: 'ask', read_file: 'allow', write_file: 'ask', edit_file: 'ask',
       list_dir: 'allow', search_files: 'allow', web_search: 'allow', web_fetch: 'allow',
       web_crawl: 'allow', read_terminal: 'allow', terminal_keys: 'ask', use_skill: 'allow',
-      install_skill: 'ask', mcp: 'ask', memory: 'allow', schedule: 'allow', subagent: 'allow',
+      install_skill: 'ask', mcp: 'ask', memory: 'allow',
     };
     const policyOps: { op: string; tool?: string; level?: string }[] = [];
     /** Session approvals (whole tool or one command shape), mirroring the Rust sets. */
@@ -185,16 +177,9 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     let leaseCounter = 0;
     const nextLease = () => `e2e-lease-${++leaseCounter}`;
     // ── 记忆 ──
-    const memory = { fact: '用户偏好：优先用 Rust。\n项目约定：单测覆盖核心逻辑。', journal: '2025-06-01 修复了工具注册 bug\n2025-06-02 补了 e2e 测试' };
-    const memoryOps: { op: string; content?: string; text?: string }[] = [];
-    // ── 子代理 ──
-    const agents: Record<string, unknown>[] = [
-      { id: 'a1', name: '代码审查员', description: '审查代码质量', prompt: '你是严格的代码审查员。' },
+    const memory: import('../src/features/agent/services/platform').MemoryRecord[] = [
+      { id: 'legacy', key: 'legacy:memory.md:0', content: 'Old editor preference', scope: 'global', status: 'pending', source: 'memory.md', updatedAt: 1, expiresAt: 1, revision: 1 },
     ];
-    const agentOps: { op: string; id?: string; agent?: unknown }[] = [];
-    // ── 定时任务 ──
-    const schedules: Record<string, unknown>[] = scheduleSeed.map((item) => ({ ...item }));
-    const scheduleOps: { op: string; id?: string; schedule?: unknown }[] = [];
     // ── 主题 ──
     const theme = { opacity: 1, backgroundImage: null, vars: {} as Record<string, string> };
     // ── 搜索 / 历史 ──
@@ -259,11 +244,6 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     (window as unknown as Record<string, unknown>).__MCP_SERVERS__ = mcpServers;
     (window as unknown as Record<string, unknown>).__MCP_OPS__ = mcpOps;
     (window as unknown as Record<string, unknown>).__MEMORY__ = memory;
-    (window as unknown as Record<string, unknown>).__MEMORY_OPS__ = memoryOps;
-    (window as unknown as Record<string, unknown>).__AGENTS__ = agents;
-    (window as unknown as Record<string, unknown>).__AGENT_OPS__ = agentOps;
-    (window as unknown as Record<string, unknown>).__SCHEDULES__ = schedules;
-    (window as unknown as Record<string, unknown>).__SCHEDULE_OPS__ = scheduleOps;
     (window as unknown as Record<string, unknown>).__THEME__ = theme;
     (window as unknown as Record<string, unknown>).__SEARCH_CALLS__ = searchCalls;
     (window as unknown as Record<string, unknown>).__POLICY_OPS__ = policyOps;
@@ -774,10 +754,13 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
                 pieces.push({ kind: 'started', status: 200, headers: [['content-type', 'text/event-stream']] });
                 const plan = (window as unknown as Record<string, { tool: string; args: unknown; arm?: number } | undefined>)
                   .__AI_TOOL_CALL__;
-                // A scripted tool call lands on a streaming request while the plan is armed and the
-                // request carries no tool result yet; the follow-up step then gets the plain reply,
-                // like a provider that answers once the tool has run. Tests arm it per turn.
-                const hasToolResult = /"type"\s*:\s*"tool_result"|"role"\s*:\s*"tool"/.test(reqBody);
+                // Historical results precede the latest user request and must not disarm a new turn.
+                const history = (JSON.parse(reqBody) as { messages?: { role: string; content: unknown }[] }).messages ?? [];
+                const resultMessage = (message: { role: string; content: unknown }) => message.role === 'tool'
+                  || Array.isArray(message.content) && message.content.some(part => part?.type === 'tool_result');
+                let latestUser = -1;
+                history.forEach((message, index) => { if (message.role === 'user' && !resultMessage(message)) latestUser = index; });
+                const hasToolResult = history.slice(latestUser + 1).some(resultMessage);
                 if (plan && (plan.arm ?? 0) > 0 && !hasToolResult) {
                   plan.arm = (plan.arm ?? 0) - 1;
                   body = isAnthropic
@@ -1035,61 +1018,28 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return [{ server: '文件系统', name: 'read_file', description: '读取文件' }];
           case 'mcp_call_tool':
             return { ok: true, result: 'mcp 工具结果' };
-          // ── 记忆 ──
-          case 'get_memory':
-            return memory.fact;
-          case 'set_memory':
-            memory.fact = args.content as string;
-            memoryOps.push({ op: 'set', content: args.content as string });
-            return undefined;
-          case 'get_memory_journal':
-            return memory.journal;
-          case 'append_memory_journal':
-            memory.journal = `${memory.journal}\n${args.text}`;
-            memoryOps.push({ op: 'append', text: args.text as string });
-            return undefined;
-          // ── 子代理 ──
-          case 'list_agents':
-            return agents.map((a) => ({ ...a }));
-          case 'save_agent': {
-            const a = args.agent as Record<string, unknown>;
-            const existing = agents.find((x) => x.id === a.id && a.id !== '');
-            const id = (a.id as string) || `a${Date.now().toString(36)}`;
-            const stored = { ...a, id };
-            if (existing) Object.assign(existing, stored); else agents.push(stored);
-            agentOps.push({ op: 'save', id, agent: stored });
-            return undefined;
+          case 'authorize_ui_command': return nextLease();
+          case 'memory_stats': return { total: memory.length, active: memory.filter(record => record.status === 'active' && record.expiresAt > Date.now()).length,
+            pending: memory.filter(record => record.status === 'pending').length, inactive: memory.filter(record => record.status === 'inactive').length,
+            expired: memory.filter(record => record.status === 'active' && record.expiresAt <= Date.now()).length };
+          case 'query_memories': {
+            const input = args.input as { query?: string; scope?: string; includeInactive?: boolean; offset?: number; limit?: number };
+            return memory.filter(record => (!input.scope || ['global', input.scope].includes(record.scope))
+              && (input.includeInactive || record.status === 'active' && record.expiresAt > Date.now())
+              && (input.includeInactive || record.scope !== 'global' || !input.scope || input.scope === 'global'
+                || !memory.some(override => override.scope === input.scope && override.key === record.key
+                  && override.status === 'active' && override.expiresAt > Date.now()))
+              && (!input.query || `${record.key} ${record.content}`.toLowerCase().includes(input.query.toLowerCase())))
+              .slice(input.offset ?? 0, (input.offset ?? 0) + (input.limit ?? 20)).map(record => ({ ...record }));
           }
-          case 'remove_agent': {
-            const i = agents.findIndex((x) => x.id === args.id);
-            if (i >= 0) agents.splice(i, 1);
-            agentOps.push({ op: 'remove', id: args.id as string });
-            return undefined;
-          }
-          case 'get_agent':
-            return agents.find((x) => x.id === args.nameOrId || x.name === args.nameOrId) ?? { id: 'x', name: args.nameOrId, description: '', prompt: '' };
-          // ── 定时任务 ──
-          case 'list_schedules':
-            return schedules.map((s) => ({ ...s }));
-          case 'save_schedule': {
-            const s = args.schedule as Record<string, unknown>;
-            const existing = schedules.find((x) => x.id === s.id && s.id !== '');
-            const id = (s.id as string) || `s${Date.now().toString(36)}`;
-            const stored = { ...s, id };
-            if (existing) Object.assign(existing, stored); else schedules.push(stored);
-            scheduleOps.push({ op: 'save', id, schedule: stored });
-            return undefined;
-          }
-          case 'remove_schedule': {
-            const i = schedules.findIndex((x) => x.id === args.id);
-            if (i >= 0) schedules.splice(i, 1);
-            scheduleOps.push({ op: 'remove', id: args.id as string });
-            return undefined;
-          }
-          case 'mark_schedule_run': {
-            const s = schedules.find((x) => x.id === args.id);
-            if (s) s.lastRunAt = args.timestamp;
-            return undefined;
+          case 'save_memory': {
+            const input = args.input as import('../src/features/agent/services/platform').MemoryWrite;
+            const existing = memory.find(record => record.id === input.id);
+            if (input.id && (!existing || existing.revision !== input.expectedRevision)) throw new Error('Memory changed. Reload before saving.');
+            if (memory.some(record => record.id !== input.id && record.scope === input.scope && record.key === input.key)) throw new Error('Memory key already exists.');
+            const record = { ...input, id: input.id ?? `memory-${Date.now()}`, revision: (existing?.revision ?? 0) + 1, updatedAt: Date.now(), expiresAt: input.expiresAt ?? Date.now() + 90 * 86_400_000 };
+            if (existing) Object.assign(existing, record); else memory.push(record);
+            return { ...record };
           }
           // ── 主题 ──
           case 'apply_window_frame':
@@ -1793,7 +1743,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       },
     };
     localStorage.setItem('vrykell-api-key', 'sk-e2e-fake');
-  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, scheduleSeed: seedSchedules, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, pendingDirs: opts.pendingLaunchDirectories ?? [], menuSeed: opts.contextMenu, terminalDirectories: opts.terminalDirectories ?? false, mainPermissions: mainCapability.permissions.filter((permission): permission is string => typeof permission === 'string'), sshWorkspaceView: opts.sshWorkspaceView ?? 'manage', shells: opts.shells });
+  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, pendingDirs: opts.pendingLaunchDirectories ?? [], menuSeed: opts.contextMenu, terminalDirectories: opts.terminalDirectories ?? false, mainPermissions: mainCapability.permissions.filter((permission): permission is string => typeof permission === 'string'), sshWorkspaceView: opts.sshWorkspaceView ?? 'manage', shells: opts.shells });
 }
 
 /** 预置 AI 回复文本：mock 的 ai_stream 会按 chunk 流式 emit ai-chunk 事件。
@@ -1977,21 +1927,6 @@ export function policyLevels(page: Page): Promise<Record<string, string>> {
   return page.evaluate(() => (window as unknown as { __POLICY_LEVELS__: Record<string, string> }).__POLICY_LEVELS__);
 }
 
-/** 读取记忆操作记录 */
-export function memoryOps(page: Page): Promise<{ op: string; content?: string; text?: string }[]> {
-  return page.evaluate(() => (window as unknown as { __MEMORY_OPS__: { op: string; content?: string; text?: string }[] }).__MEMORY_OPS__);
-}
-
-/** 读取子代理操作记录 */
-export function agentOps(page: Page): Promise<{ op: string; id?: string; agent?: unknown }[]> {
-  return page.evaluate(() => (window as unknown as { __AGENT_OPS__: { op: string; id?: string; agent?: unknown }[] }).__AGENT_OPS__);
-}
-
-/** 读取定时任务操作记录 */
-export function scheduleOps(page: Page): Promise<{ op: string; id?: string; schedule?: unknown }[]> {
-  return page.evaluate(() => (window as unknown as { __SCHEDULE_OPS__: { op: string; id?: string; schedule?: unknown }[] }).__SCHEDULE_OPS__);
-}
-
 /** 读取搜索 invoke 调用记录 */
 export function searchCalls(page: Page): Promise<{ cmd: string; args: Record<string, unknown> }[]> {
   return page.evaluate(() => (window as unknown as { __SEARCH_CALLS__: { cmd: string; args: Record<string, unknown> }[] }).__SEARCH_CALLS__);
@@ -2005,11 +1940,6 @@ export function themeConfig(page: Page): Promise<{ opacity: number; backgroundIm
 /** 读取窗口边框颜色同步记录（apply_window_frame） */
 export function windowFrameCalls(page: Page): Promise<{ label: string; color: string }[]> {
   return page.evaluate(() => (window as unknown as { __WINDOW_FRAME_CALLS__: { label: string; color: string }[] }).__WINDOW_FRAME_CALLS__);
-}
-
-/** 读取记忆当前内容（FACT） */
-export function memoryFact(page: Page): Promise<string> {
-  return page.evaluate(() => (window as unknown as { __MEMORY__: { fact: string } }).__MEMORY__.fact);
 }
 
 /**

@@ -75,8 +75,8 @@ export function buildTerminalTools(ctx: ToolContext) {
     terminal_keys: tool({
       description: DESC_TERMINAL_KEYS,
       inputSchema: z.object({
-        keys: z.string().describe('要发送的按键序列；退格=\\b、Ctrl+X=\\u0018、Esc=\\e 或 \\u001b、↑=\\u001b[A，其余控制字符同理用 \\uXXXX 或 \\xNN'),
-        wait_ms: z.number().int().min(0).max(3000).optional().describe('发送后等待毫秒让画面更新，默认 300'),
+        keys: z.string().describe('Raw keys; escapes such as \\b, \\u0018, \\e, \\u001b[A and \\xNN are decoded'),
+        wait_ms: z.number().int().min(0).max(3000).optional().describe('Milliseconds to wait for screen updates, default 300'),
       }),
       execute: async ({ keys, wait_ms }, { toolCallId }) => {
         const g = await gate('terminal_keys', { keys }, toolCallId, ctx);

@@ -251,7 +251,7 @@ test('resource text stays aligned with mixed percentage widths and larger UI tex
 
 test('resource plots append samples automatically and never drift while waiting for data', async ({ page }, testInfo) => {
   test.setTimeout(60_000);
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.clock.install({ time: new Date('2026-10-17T06:00:00Z') });
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
@@ -297,7 +297,7 @@ test('resource plots append samples automatically and never drift while waiting 
 });
 
 test('automatic probes respect pause and visibility and retain actionable failures', async ({ page }, testInfo) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.clock.install();
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();

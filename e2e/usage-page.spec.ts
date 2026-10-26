@@ -31,7 +31,7 @@ test.describe('usage statistics page', () => {
   test('opens from conversation settings and accounts for one turn', async ({ page }) => {
     await mockAnthropic(page, '已记录');
     // The default schedule seed is due at boot and would record a turn of its own.
-    await setupTauriMock(page, { schedulesSeed: [] });
+    await setupTauriMock(page, {});
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
@@ -121,7 +121,7 @@ test.describe('usage statistics page', () => {
   });
 
   test('keeps session totals in the ACP details tab without a source selector', async ({ page }) => {
-    await setupTauriMock(page, { schedulesSeed: [] });
+    await setupTauriMock(page, {});
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 

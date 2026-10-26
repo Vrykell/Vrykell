@@ -14,7 +14,7 @@ async function classify(page: Page, name: string) {
 }
 
 test.beforeEach(async ({ page }) => {
-  await setupTauriMock(page, { groupedHistoricalSession: true, schedulesSeed: [] });
+  await setupTauriMock(page, { groupedHistoricalSession: true });
   await page.goto('/');
   await openHistory(page);
 });

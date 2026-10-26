@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { mockAnthropic, setupTauriMock } from './tauri-mock';
 
 for (const theme of ['dark', 'light']) test(`profiles, history contrast and single menu highlight in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
   await page.goto('/');
   for (const [id, name] of [['terminal', '终端会话'], ['code', '项目文件'], ['ai', '智能对话'], ['ssh', '主机管理']]) await expect(page.getByTestId(`workspace-area-${id}`)).toHaveAttribute('aria-label', name);
@@ -50,7 +50,7 @@ for (const theme of ['dark', 'light']) test(`profiles, history contrast and sing
 
 for (const theme of ['dark', 'light']) test(`host groups, table and native conversation launch in ${theme}`, async ({ page }, info) => {
   await mockAnthropic(page, 'Ready.');
-  await setupTauriMock(page, { schedulesSeed: [], sshWorkspaceView: 'dashboard' });
+  await setupTauriMock(page, { sshWorkspaceView: 'dashboard' });
   await page.addInitScript(theme => {
     localStorage.setItem('vrykell-theme-mode', theme);
     localStorage.setItem('vrykell-host-library', JSON.stringify({ state: { hosts: { 'ssh-1': { group: 'Production', tags: ['api', 'production'], starred: true } } }, version: 0 }));
@@ -127,7 +127,7 @@ for (const theme of ['dark', 'light']) test(`host groups, table and native conve
 });
 
 test('shell icons distinguish the blue profile from the dark start-page fallback', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(() => {
     localStorage.setItem('vrykell-startup-mode', 'empty');
     const runtime = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__;
@@ -149,7 +149,7 @@ test('shell icons distinguish the blue profile from the dark start-page fallback
 });
 
 test('host views keep narrow layouts within their own scroll area', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [], sshWorkspaceView: 'dashboard' });
+  await setupTauriMock(page, { sshWorkspaceView: 'dashboard' });
   await page.goto('/'); await page.getByTestId('workspace-area-ssh').click();
   await page.setViewportSize({ width: 700, height: 800 });
   await expect(page.getByTestId('ssh-row-ssh-1')).toBeVisible();

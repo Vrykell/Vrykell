@@ -191,7 +191,7 @@ describe('chat store v2（parts / 工具事件）', () => {
     };
     await useChatStore.getState().send('第二轮', { streamFn: second });
     const prevAssistant = seen.find((m) => m.role === 'assistant')!;
-    expect(prevAssistant.content).toContain('[执行命令: ls -la → 成功]');
+    expect(prevAssistant).toMatchObject({ parts: [{ kind: 'tool', tool: { toolCallId: 't1', input: { command: 'ls -la' } } }] });
     expect(tabId).toBeTruthy();
   });
 });

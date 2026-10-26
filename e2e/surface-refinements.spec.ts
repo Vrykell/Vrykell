@@ -45,7 +45,7 @@ for (const theme of ['深色', '浅色']) {
     await page.mouse.move(0, 0);
     await navigation.getByRole('button', { name: '模型行为', exact: true }).hover();
     await expect(page.getByTestId('app-tooltip')).toHaveCSS('font-family', 'Arial, sans-serif');
-    for (const name of ['模型配置', '联网搜索', 'MCP 服务器', '内存', '子代理', '本地文件打开方式', '远程文件打开方式']) {
+    for (const name of ['模型配置', '联网搜索', 'MCP 服务器', '记忆', '本地文件打开方式', '远程文件打开方式']) {
       await navigation.getByRole('button', { name, exact: true }).click();
       const wrong = await page.locator('.settings-content input:not([type="checkbox"]), .settings-content textarea').evaluateAll(elements => elements
         // A URL field is deliberately monospace; the rule is about UI text.

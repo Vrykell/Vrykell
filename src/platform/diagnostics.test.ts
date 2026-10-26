@@ -14,6 +14,7 @@ describe('diagnostics', () => {
   afterEach(async () => { await flushDiagnostics(); vi.useRealTimers(); });
 
   it('keeps auto save disabled by default and exports credential-safe detailed context', () => {
+    expect(JSON.stringify(sanitizeDiagnostic({ lease: 'private-lease', uiLease: 'private-ui-lease', parts: 'private-transcript', modelOutput: 'private-result', query: 'private-question' }))).not.toMatch(/private-/);
     expect(useDiagnosticSettings.getState().autoSave).toBe(false);
     const detail = sanitizeDiagnostic({ error: new Error('SFTP handshake failed'), columns: 132, password: 'do-not-save', data: 'secret terminal screen' });
     expect(detail).toMatchObject({ error: { name: 'Error', message: 'SFTP handshake failed' }, columns: 132, password: '[redacted]', data: { redacted: true, length: 22 } });

@@ -9,7 +9,7 @@ import type { LanguageModel, ModelMessage } from 'ai';
 const { mockGenerate } = vi.hoisted(() => ({ mockGenerate: vi.fn() }));
 vi.mock('ai', () => ({ generateText: mockGenerate }));
 
-import { estimateTokens, planContext, type SizedMessage } from '@features/agent/model/context';
+import { estimateTokens, messageTokens, planContext, IMAGE_TOKEN_ESTIMATE, type SizedMessage } from '@features/agent/model/context';
 
 const model = {} as LanguageModel;
 
@@ -22,6 +22,9 @@ function reset() {
 }
 
 describe('estimateTokens', () => {
+  it('counts image overhead without counting encoded image bytes as text', () => {
+    expect(messageTokens({ role: 'user', content: [{ type: 'image', image: 'data:image/png;base64,' + 'x'.repeat(100_000) }] })).toBe(IMAGE_TOKEN_ESTIMATE + 16);
+  });
   it('CJK 按 1 token/字，ASCII 按 4 字符/token', () => {
     expect(estimateTokens('你好')).toBe(2);
     expect(estimateTokens('abcd')).toBe(1);
@@ -31,6 +34,15 @@ describe('estimateTokens', () => {
 });
 
 describe('planContext：off / window', () => {
+  it('reserves instruction and tool-schema space and never keeps an orphaned result', async () => {
+    reset();
+    const grouped: SizedMessage[] = [mk('user', 'earlier', 5),
+      { ...mk('assistant', 'call', 6), group: 'tools' },
+      { msg: { role: 'tool', content: [{ type: 'tool-result', toolCallId: 'one', toolName: 'read', output: { type: 'text', value: 'evidence' } }] }, tokens: 6, group: 'tools' },
+      mk('user', 'current', 5)];
+    const plan = await planContext({ sized: grouped, strategy: 'window', maxTokens: 20, reservedTokens: 5, summaryTokens: 0, model });
+    expect(plan.messages).toEqual([{ role: 'user', content: 'current' }]);
+  });
   it('off 返回全部消息，不裁剪', async () => {
     reset();
     const r = await planContext({
@@ -64,32 +76,40 @@ describe('planContext：off / window', () => {
 });
 
 describe('planContext：compact 摘要压缩', () => {
+  it('merges a previous step summary instead of losing it during later loop compaction', async () => {
+    reset(); mockGenerate.mockResolvedValue({ text: 'Merged evidence' });
+    const result = await planContext({ sized: [mk('assistant', 'new tool evidence', 1000), mk('user', 'current', 500)],
+      strategy: 'compact', maxTokens: 1200, summaryTokens: 100, previousSummary: 'Earlier execution evidence', model });
+    expect(mockGenerate.mock.calls[0]?.[0].prompt).toContain('Earlier execution evidence');
+    expect(mockGenerate.mock.calls[0]?.[0].prompt).toContain('new tool evidence');
+    expect(result.system).toBe('Merged evidence');
+  });
   it('超预算生成摘要并作为 system 前置', async () => {
     reset();
-    mockGenerate.mockResolvedValue({ text: '摘要内容' });
+    mockGenerate.mockResolvedValue({ text: '摘要' });
     const r = await planContext({
-      sized: [mk('user', 'a', 5), mk('assistant', 'b', 5), mk('user', 'c', 5)],
-      strategy: 'compact', maxTokens: 12, summaryTokens: 100, model, tabId: 't1',
+      sized: [mk('user', 'a', 500), mk('assistant', 'b', 500), mk('user', 'c', 500)],
+      strategy: 'compact', maxTokens: 1200, summaryTokens: 100, model, tabId: 't1',
     });
     expect(mockGenerate).toHaveBeenCalledTimes(1);
-    expect(r.system).toBe('摘要内容');
+    expect(r.system).toBe('摘要');
     expect(r.messages).toHaveLength(2);
   });
 
   it('增量缓存：新增溢出只摘要增量，不重复折叠旧内容', async () => {
     reset();
     mockGenerate.mockResolvedValueOnce({ text: '摘要1' });
-    const base = [mk('user', 'a', 5), mk('assistant', 'b', 5), mk('user', 'c', 5), mk('assistant', 'd', 5), mk('user', 'e', 5)];
+    const base = [mk('user', 'a', 500), mk('assistant', 'b', 500), mk('user', 'c', 500), mk('assistant', 'd', 500), mk('user', 'e', 500)];
     const r1 = await planContext({
-      sized: base, strategy: 'compact', maxTokens: 12, summaryTokens: 100, model, tabId: 't-inc',
+      sized: base, strategy: 'compact', maxTokens: 1200, summaryTokens: 100, model, tabId: 't-inc',
     });
     expect(r1.system).toBe('摘要1');
     expect(mockGenerate).toHaveBeenCalledTimes(1);
 
     mockGenerate.mockResolvedValueOnce({ text: '摘要2' });
-    const grown = [...base, mk('user', 'f', 5)];
+    const grown = [...base, mk('user', 'f', 500)];
     const r2 = await planContext({
-      sized: grown, strategy: 'compact', maxTokens: 12, summaryTokens: 100, model, tabId: 't-inc',
+      sized: grown, strategy: 'compact', maxTokens: 1200, summaryTokens: 100, model, tabId: 't-inc',
     });
     expect(r2.system).toBe('摘要2');
     expect(mockGenerate).toHaveBeenCalledTimes(2); // 只摘要新增的 1 条
@@ -100,8 +120,8 @@ describe('planContext：compact 摘要压缩', () => {
     mockGenerate.mockRejectedValue(new Error('boom'));
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const r = await planContext({
-      sized: [mk('user', 'a', 5), mk('assistant', 'b', 5), mk('user', 'c', 5)],
-      strategy: 'compact', maxTokens: 12, summaryTokens: 100, model, tabId: 't-fail',
+      sized: [mk('user', 'a', 500), mk('assistant', 'b', 500), mk('user', 'c', 500)],
+      strategy: 'compact', maxTokens: 1200, summaryTokens: 100, model, tabId: 't-fail',
     });
     spy.mockRestore();
     expect(r.system).toBeUndefined();

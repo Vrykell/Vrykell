@@ -7,7 +7,7 @@ for (const [shell, directory, command] of [
   ['cmd', 'D:/my workspace', 'cd /d "D:/my workspace"\r'],
 ] as const) {
   test(`directory synchronization uses the focused ${shell} shell`, async ({ page }) => {
-    await setupTauriMock(page, { schedulesSeed: [], shells: [{ id: shell, label: shell, default: true }] });
+    await setupTauriMock(page, { shells: [{ id: shell, label: shell, default: true }] });
     await page.addInitScript(directory => {
       localStorage.setItem('vrykell-files-location', JSON.stringify({ state: { remembered: { path: directory } }, version: 0 }));
     }, directory);
@@ -21,7 +21,7 @@ for (const [shell, directory, command] of [
 }
 
 test('a partial deletion keeps an undo action for the completed item', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(() => {
     const host = window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } };
     const original = host.__TAURI_INTERNALS__.invoke;

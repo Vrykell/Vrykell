@@ -13,7 +13,6 @@ export interface ApplicationBootstrapDependencies {
   refreshAiConfig: ApplicationTask;
   refreshToolPolicy: ApplicationTask;
   subscribeAutoTitle: () => ApplicationCleanup;
-  startScheduleRunner: () => ApplicationCleanup;
   restoreWorkspace: ApplicationTask;
   loadWorkspaceDirs: ApplicationTask;
   hydrateHistory: ApplicationTask;
@@ -65,7 +64,6 @@ export function createApplicationBootstrap(
   runTask('刷新 AI 配置', dependencies.refreshAiConfig, onError);
   runTask('刷新工具权限', dependencies.refreshToolPolicy, onError);
   registerCleanup(cleanups, '初始化智能标题', dependencies.subscribeAutoTitle, onError);
-  registerCleanup(cleanups, '启动定时任务', dependencies.startScheduleRunner, onError);
   runTask('恢复工作区会话', dependencies.restoreWorkspace, onError);
   runTask('加载工作区目录', dependencies.loadWorkspaceDirs, onError);
   runTask('恢复命令历史', dependencies.hydrateHistory, onError);

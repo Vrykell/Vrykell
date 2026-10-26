@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 test('one host workspace switches resource collection on and pauses while inactive', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/'); await page.getByTestId('workspace-area-ssh').click();
   const hosts = page.getByTestId('ssh-dashboard');
   await expect(page.getByTestId('workspace-area-dashboard')).toHaveCount(0);

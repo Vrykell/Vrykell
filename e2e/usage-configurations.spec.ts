@@ -22,7 +22,7 @@ async function tokenBackground(page: Page, token: string) {
 }
 
 for (const theme of ['dark', 'light'] as const) test(`unused configurations and neutral open dropdowns in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
   await page.goto('/');
   await openUsage(page);

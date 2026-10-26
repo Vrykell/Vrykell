@@ -14,7 +14,7 @@ async function greenPixels(page: Page, pixels: Buffer) {
 }
 
 async function startRunning(page: Page, manual: boolean) {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.setViewportSize({ width: 1240, height: 800 });
   await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();

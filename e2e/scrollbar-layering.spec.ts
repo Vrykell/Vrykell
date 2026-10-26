@@ -38,7 +38,7 @@ test('page scrollbars stay below an open dialog and become usable again after cl
 test('a code block track cannot leave the chat transcript over the composer', async ({ page }) => {
   const code = Array.from({ length: 40 }, (_, row) => `const value_${row} = ${row}; // a line wide enough to overflow horizontally`).join('\n');
   await mockAnthropic(page, `Here is the block:\n\n\`\`\`ts\n${code}\n\`\`\`\n\nAfter the block.`);
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await page.locator('[data-dock-btn="chat"]').click();
   await page.locator('[data-chat-composer]').fill('show me a long block');

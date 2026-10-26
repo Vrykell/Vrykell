@@ -8,7 +8,7 @@ const asRgb = (hex: string) => {
 };
 
 for (const theme of ['dark', 'light']) test(`workspace chrome and cards share the unified ${theme} surface`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
   await page.goto('/');
   const titlebar = page.locator('.workspace-titlebar');

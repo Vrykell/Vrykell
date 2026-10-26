@@ -58,8 +58,8 @@ export const setSkillState = (name: string, trusted?: boolean, enabled?: boolean
 export const readSkillFile = (name: string, relativePath: string) =>
   invoke<string>('read_skill_file', { name, relativePath });
 export const removeSkill = (name: string) => invoke<void>('remove_skill', { name });
-export const installSkillMd = (name: string, description: string, prompt: string) =>
-  invoke<SkillMeta>('install_skill_md', { name, description, prompt });
+export const installSkillMd = (name: string, description: string, prompt: string, lease?: string | null) =>
+  invoke<SkillMeta>('install_skill_md', { name, description, prompt, ...(lease === undefined ? {} : { lease }) });
 export const importSkillsFromPath = (path: string) =>
   invoke<SkillMeta[]>('import_skills_from_path', { path });
 export const fetchRemoteSkills = (url: string) =>
@@ -92,9 +92,9 @@ export function availableSkillMetas(metas: SkillMeta[]): SkillMeta[] {
 /** 注入系统提示词的「可用技能清单」（仅名称 + 描述）。 */
 export function buildSkillsContext(metas: SkillMeta[]): string {
   if (metas.length === 0) return '';
-  const lines = metas.map((k) => `- ${k.name}：${k.description || '无描述'}`);
+  const lines = metas.map(k => `- ${k.name}: ${k.description || 'No description'}`);
   return [
-    '可用技能（当任务匹配某个技能时，用 use_skill 工具按名加载其完整指令，技能目录里的脚本/参考文件可用 read_file / run_command 读取运行）：',
+    'Available skills: load matching instructions with use_skill. Read or run resources through read_file and run_command within the granted permissions.',
     ...lines,
   ].join('\n');
 }

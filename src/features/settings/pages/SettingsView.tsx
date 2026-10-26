@@ -5,7 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/services/fileOpen';
 import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@features/agent';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
-import { MemorySettings, AgentsSettings, SchedulesSettings } from '@features/settings/pages/AgentExtrasSettings';
+import { MemorySettings } from '@features/settings/pages/MemorySettings';
 import HarnessPage from '@features/settings/pages/harnessPage';
 import Select from '@ui/fields/Select';
 import { useToastStore } from '@ui/feedback/Toast';
@@ -54,9 +54,7 @@ const PERM_TOOL_LABEL: Record<ToolName, string> = {
   use_skill: "Use skill",
   install_skill: "Install skill",
   mcp: "MCP server tools",
-  memory: "Write memory",
-  schedule: "Manage scheduled tasks",
-  subagent: "Delegate subagent",
+  memory: "Memory access",
 };
 
 /** Offered approval deadlines: long enough to walk back, short enough to free the turn. */
@@ -231,12 +229,6 @@ function SettingsContent() {
       case 'ai-memory':
         return <MemorySettings />;
 
-      case 'ai-agents':
-        return <AgentsSettings />;
-
-      case 'ai-schedules':
-        return <SchedulesSettings />;
-
       case 'ai-harness':
         return <HarnessPage />;
 
@@ -328,7 +320,7 @@ function SettingsContent() {
               <h1>{activeLabel}</h1>
             </div>
             <div className="settings-save-hint">
-              <span>{t('Options save immediately; text saves after you stop typing.')}</span>
+              {selected !== 'ai-memory' && <span>{t('Options save immediately; text saves after you stop typing.')}</span>}
               <SaveStatus status={status} onRetry={retry} />
             </div>
           </header>

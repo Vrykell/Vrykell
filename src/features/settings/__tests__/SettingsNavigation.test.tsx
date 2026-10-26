@@ -14,7 +14,9 @@ afterEach(() => { cleanup(); useSettingsNavigationStore.setState({ selected: 'ai
 it('keeps the complete directory visible after selecting a page', () => {
   render(<Navigation />);
   const directory = screen.getByRole('complementary', { name: '设置目录' });
-  expect(directory.querySelectorAll('.sidebar-row')).toHaveLength(isWindows ? 29 : 28);
+  expect(directory.querySelectorAll('.sidebar-row')).toHaveLength(isWindows ? 27 : 26);
+  expect(screen.queryByRole('button', { name: '子代理' })).toBeNull();
+  expect(screen.queryByRole('button', { name: '定时任务' })).toBeNull();
   expect(screen.getByRole('button', { name: '语言' })).toBeVisible();
   expect(screen.queryByRole('textbox')).toBeNull();
   expect(screen.queryByRole('button', { name: '版本控制' })).toBeNull();

@@ -7,7 +7,6 @@ function createDependencies(): ApplicationBootstrapDependencies {
     refreshAiConfig: vi.fn(),
     refreshToolPolicy: vi.fn(),
     subscribeAutoTitle: vi.fn(() => vi.fn()),
-    startScheduleRunner: vi.fn(() => vi.fn()),
     restoreWorkspace: vi.fn(),
     loadWorkspaceDirs: vi.fn(),
     hydrateHistory: vi.fn(),
@@ -23,13 +22,12 @@ describe('createApplicationBootstrap', () => {
       'refreshAiConfig',
       'refreshToolPolicy',
       'subscribeAutoTitle',
-      'startScheduleRunner',
       'restoreWorkspace',
       'loadWorkspaceDirs',
       'hydrateHistory',
     ];
     for (const name of names) {
-      if (name === 'subscribeAutoTitle' || name === 'startScheduleRunner') {
+      if (name === 'subscribeAutoTitle') {
         instrumented[name] = vi.fn(() => {
           order.push(name);
           return vi.fn();
@@ -49,7 +47,6 @@ describe('createApplicationBootstrap', () => {
       'refreshAiConfig',
       'refreshToolPolicy',
       'subscribeAutoTitle',
-      'startScheduleRunner',
       'restoreWorkspace',
       'loadWorkspaceDirs',
       'hydrateHistory',
@@ -59,17 +56,13 @@ describe('createApplicationBootstrap', () => {
   it('销毁时逆序清理，并且清理操作幂等', () => {
     const deps = createDependencies();
     const firstCleanup = vi.fn();
-    const secondCleanup = vi.fn();
     deps.subscribeAutoTitle = vi.fn(() => firstCleanup);
-    deps.startScheduleRunner = vi.fn(() => secondCleanup);
 
     const dispose = createApplicationBootstrap(deps);
     dispose();
     dispose();
 
-    expect(secondCleanup).toHaveBeenCalledOnce();
     expect(firstCleanup).toHaveBeenCalledOnce();
-    expect(secondCleanup.mock.invocationCallOrder[0]).toBeLessThan(firstCleanup.mock.invocationCallOrder[0]!);
   });
 
   it('隔离启动任务错误，不阻断其他初始化', () => {

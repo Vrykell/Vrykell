@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 test('identifies saved agent references separately and resumes them without creating a native conversation', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(() => localStorage.setItem('vrykell-harness-sessions', JSON.stringify({ version: 1, state: { refs: { 'Fake ACP': { sessionId: 'previous-agent-session', cwd: '/home/e2e/project', at: Date.now() } } } })));
   await page.goto('/'); await page.getByTestId('workspace-area-ai').click();
   await page.getByTestId('workspace-instance-bar').getByRole('button', { name: 'AI 对话历史' }).click();
@@ -16,7 +16,7 @@ test('identifies saved agent references separately and resumes them without crea
 });
 
 test('reads history incrementally on scroll and searches beyond the first page without loading message bodies', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(() => {
     const host = window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> }; __HISTORY_PAGES__: unknown[]; __HISTORY_BODY_READS__: number };
     const invoke = host.__TAURI_INTERNALS__.invoke; host.__HISTORY_PAGES__ = []; host.__HISTORY_BODY_READS__ = 0;

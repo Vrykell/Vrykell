@@ -45,7 +45,7 @@ for (const density of [1, 1.25, 2]) {
 
       test('file and comparison tabs join the content without gaps or square protrusions', async ({ page }, info) => {
         test.setTimeout(60_000);
-        await setupTauriMock(page.context(), { launchDirectory: '/home/e2e/project', terminalDirectories: true, schedulesSeed: [] });
+        await setupTauriMock(page.context(), { launchDirectory: '/home/e2e/project', terminalDirectories: true });
         await page.addInitScript(mode => localStorage.setItem('vrykell-theme-mode', mode), mode);
         await page.goto('/', { waitUntil: 'domcontentloaded' });
         await expect(page.locator('html')).toHaveAttribute('data-theme', mode);

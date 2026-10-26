@@ -106,7 +106,7 @@ export function AiBehaviorPage() {
             onChange={(v) => { void save(() => update({ contextStrategy: v })); }}
           />
         </Field>
-        <Field title="上下文 Token 预算" description={t("Limit context tokens. Use 0 for no limit.")}>
+        <Field title={t('Context token budget')} description={t('Estimated input budget including instructions, images, tool schemas and results. Counts vary by model. Use 0 for no limit.')}>
           <NumberInput key={scope} value={eff.contextMaxTokens} min={0} max={1000000} onChange={(v) => update({ contextMaxTokens: v })} />
         </Field>
         {(eff.contextStrategy === 'compact' || targetField === t('Summary length limit')) && (
@@ -114,7 +114,7 @@ export function AiBehaviorPage() {
             <NumberInput key={scope} value={eff.contextSummaryTokens} min={64} max={8000} onChange={(v) => update({ contextSummaryTokens: v })} />
           </Field>
         )}
-        <Field title="工具输出截断" description={t('Maximum characters per tool result.')}>
+        <Field title={t('Tool output truncation')} description={t('Maximum characters in the tool preview. Complete results are retained for conversation history.')}>
           <NumberInput key={scope} value={eff.contextToolChars} min={256} max={65536} onChange={(v) => update({ contextToolChars: v })} />
         </Field>
       </SettingsGroup>

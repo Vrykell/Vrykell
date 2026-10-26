@@ -3,7 +3,7 @@ import { setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 for (const theme of ['深色', '浅色']) test(`workspace colors and model controls remain consistent in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await gotoSetting(page, '主题'); await page.getByRole('radio', { name: theme, exact: true }).click();
   await page.keyboard.press('Escape');
   const selected = page.getByTestId('workspace-area-terminal').locator('.sidebar-row-icon svg');
@@ -66,7 +66,7 @@ for (const theme of ['深色', '浅色']) test(`workspace colors and model contr
 for (const platform of ['macos', 'linux']) test.describe(`${platform} settings and materials`, () => {
   test.use({ userAgent: platform === 'macos' ? 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15' : 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140.0.0.0 Safari/537.36' });
   test('omits unsupported system integration and retains a usable material treatment', async ({ page }, info) => {
-    await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+    await setupTauriMock(page, {}); await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('data-native-material', platform === 'macos' ? 'active' : 'fallback');
     await gotoSetting(page, '主题');
     await expect(page.locator('.settings-navigation').getByRole('button', { name: 'Windows 右键菜单', exact: true })).toHaveCount(0);

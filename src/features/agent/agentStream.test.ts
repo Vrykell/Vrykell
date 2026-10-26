@@ -71,6 +71,29 @@ function setupInvoke(sseBody: string, status = 200) {
 }
 
 describe('agentStream（mock IPC 边界）', () => {
+  it('replays the complete persisted tool result into the next model request', async () => {
+    setupInvoke('data: {"choices":[{"delta":{"content":"Using the previous result"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
+    const original = useAgentSettings.getState().global;
+    useAgentSettings.setState({ global: { ...original, agentMode: false, contextStrategy: 'off' } });
+    const full = JSON.stringify({ files: ['one.ts', 'two.ts'], detail: 'evidence '.repeat(4000) });
+    try {
+      await agentStream([
+        { role: 'user', content: 'Read the file' },
+        { role: 'assistant', content: 'Read completed', parts: [
+          { kind: 'tool', tool: { toolCallId: 'previous-call', toolName: 'read_file', input: { path: '/project/one.ts' }, state: 'done', startedAt: 1, output: 'short preview', modelOutput: full } },
+          { kind: 'text', text: 'Read completed' },
+        ] },
+        { role: 'user', content: 'Use the previous evidence' },
+      ], () => {}, { paneId: null, tabId: 'history-owner' });
+      const raw = mockInvoke.mock.calls.find(([name]) => name === 'llm_stream')?.[1] as { req: { body: string } };
+      const request = JSON.parse(raw.req.body) as { messages: Array<{ role: string; content: string; tool_calls?: { id: string; function: { arguments: string } }[]; tool_call_id?: string }> };
+      const call = request.messages.find(message => message.tool_calls?.length);
+      const result = request.messages.find(message => message.role === 'tool');
+      expect(call?.tool_calls?.[0]?.id).toBe('previous-call');
+      expect(result?.tool_call_id).toBe('previous-call');
+      expect(result?.content).toBe(full);
+    } finally { useAgentSettings.setState({ global: original }); }
+  });
   it('hands a denied tool back to the user with a text-only model step', async () => {
     const initial = useAgentSettings.getState().global;
     useAgentSettings.setState({ global: { ...initial, agentMode: true, maxSteps: 4 } });

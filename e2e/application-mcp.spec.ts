@@ -22,7 +22,7 @@ async function result(page: Page, requestId: string) {
 }
 
 async function open(page: Page, theme = 'dark') {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
   await page.goto('/');
   await page.getByTestId('workspace-area-ai').click(); await page.getByTestId('harness-add-session').click();

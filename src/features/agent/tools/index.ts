@@ -21,8 +21,6 @@ import { buildSearchTools } from '@features/agent/tools/search';
 import { buildTerminalTools } from '@features/agent/tools/terminal';
 import { buildSkillTool, buildInstallSkillTool } from '@features/agent/tools/skill';
 import { buildMemoryTool } from '@features/agent/tools/memory';
-import { buildScheduleTool } from '@features/agent/tools/schedule';
-import { buildSubagentTool } from '@features/agent/tools/subagent';
 import { gate, levelOf, ensureSkillAccess, TOOL_NAMES, type ToolContext } from '@features/agent/stores/permissions';
 import { createCommandQueue } from '../services/commandQueue';
 import { buildAskUserTool } from './askUser';
@@ -57,7 +55,7 @@ export function buildTools(ctx: ToolContext) {
     run_command: tool({
       description: DESC_RUN_COMMAND,
       inputSchema: z.object({
-        command: z.string().describe('要执行的完整 shell 命令（单行）'),
+        command: z.string().describe('Complete shell command'),
       }),
       execute: (input, { abortSignal, toolCallId }) => queueCommand(async () => {
         const g = await gate('run_command', input, toolCallId, ctx);
@@ -75,8 +73,6 @@ export function buildTools(ctx: ToolContext) {
     ...buildSkillTool(ctx),
     ...buildInstallSkillTool(ctx),
     ...buildMemoryTool(ctx),
-    ...buildScheduleTool(ctx),
-    ...buildSubagentTool(ctx),
   } as Record<string, unknown>;
   // deny 级工具不注册（模型根本看不到，比 execute 拒绝更省 token）
   const out: ToolSet = {};

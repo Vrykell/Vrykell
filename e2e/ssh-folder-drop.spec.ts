@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 async function setupNativeDropMock(page: Page) {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(() => {
     type Upload = { id: string; remoteDir: string; localPath: string };
     const host = window as unknown as {

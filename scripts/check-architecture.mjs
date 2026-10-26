@@ -118,6 +118,11 @@ if (!handler) {
   }
 }
 
+const sharedCommands = JSON.parse(fs.readFileSync(path.join(root, 'core', 'sharedCommands.json'), 'utf8'));
+for (const name of sharedCommands) {
+  if (!registeredCommands.has(name)) violations.push(`Shared command ${name} is not registered`);
+}
+
 for (const [name, site] of invokedCommands) {
   if (!registeredCommands.has(name)) {
     violations.push(`${site.file}:${site.line}\n  IPC 命令 ${name} 未在 lib.rs 的 generate_handler! 中注册`);

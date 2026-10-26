@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock, ensureTabsOpen } from './tauri-mock';
 
 for (const theme of ['dark', 'light']) test(`remote icons are shared across profiles, hosts and tabs in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => {
     localStorage.setItem('vrykell-theme-mode', theme);
     localStorage.setItem('vrykell-ssh-workspace-view', 'manage');

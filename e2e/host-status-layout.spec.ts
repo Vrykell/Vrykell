@@ -3,7 +3,7 @@ import { setupTauriMock } from './tauri-mock';
 
 test.use({ deviceScaleFactor: 1.25 });
 for (const theme of ['dark', 'light']) test(`aligned host columns, inline states and neutral cards in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
   await page.goto('/'); await page.getByTestId('workspace-area-ssh').click();
   const root = page.getByTestId('ssh-dashboard');
@@ -97,7 +97,7 @@ for (const theme of ['dark', 'light']) test(`aligned host columns, inline states
 });
 
 test('host context actions copy, duplicate, exclude collection and confirm removal', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/'); await page.getByTestId('workspace-area-ssh').click();
+  await setupTauriMock(page, {}); await page.goto('/'); await page.getByTestId('workspace-area-ssh').click();
   const root = page.getByTestId('ssh-dashboard'); const host = root.getByTestId('ssh-row-ssh-1');
   await host.click({ button: 'right' }); await page.getByRole('menu').getByText('复制地址', { exact: true }).click();
   await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, unknown>).__CLIPBOARD_TEXT__)).toBe('root@prod.example.com:22');
@@ -112,7 +112,7 @@ test('host context actions copy, duplicate, exclude collection and confirm remov
 });
 
 test('the contextual titlebar action opens and closes resources for the current remote terminal', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/'); await page.getByTestId('workspace-area-ssh').click();
+  await setupTauriMock(page, {}); await page.goto('/'); await page.getByTestId('workspace-area-ssh').click();
   await page.getByTestId('ssh-row-ssh-1').dblclick();
   const resources = page.getByRole('button', { name: 'SSH 资源面板', exact: true });
   await resources.click(); await expect(page.getByTestId('ssh-status-panel')).toContainText('Linux 6.8');

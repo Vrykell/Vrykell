@@ -4,7 +4,7 @@ import { gotoSetting } from './settings';
 
 for (const theme of ['dark', 'light'] as const) {
   test(`settings and history have clean edges and bottom color choices in ${theme}`, async ({ page }, testInfo) => {
-    await setupTauriMock(page, { groupedHistoricalSession: true, schedulesSeed: [] });
+    await setupTauriMock(page, { groupedHistoricalSession: true });
     await page.addInitScript(() => {
       const now = Date.now();
       localStorage.setItem('e2e-conversations', JSON.stringify([

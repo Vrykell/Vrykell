@@ -15,13 +15,14 @@ async function attachTerminal(page: import('@playwright/test').Page) {
 
 test.describe('shape approvals', () => {
   test('approves one kind of command for the session instead of the whole tool', async ({ page }) => {
+    test.setTimeout(60_000);
     await mockAnthropic(page, '已记录');
     await mockAnthropicToolCall(page, 'run_command', { command: 'npm run build' }, 2);
-    await setupTauriMock(page, { schedulesSeed: [] });
+    await setupTauriMock(page, {});
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
     await page.locator('[data-dock-btn="chat"]').click();
-    const composer = page.getByPlaceholder(/自然语言描述/);
+    const composer = page.getByTestId('ai-sidebar-content').getByPlaceholder(/自然语言描述/);
     await expect(composer).toBeVisible({ timeout: 3000 });
     await attachTerminal(page);
 

@@ -10,7 +10,7 @@ test('keeps failed tool output and replies inside restored conversations across 
         parts: JSON.stringify([{ kind: 'tool', tool: { toolCallId: 'failed-command', toolName: 'run_command', state: 'error', input: { command: 'check-service' }, startedAt: 1, error: 'Exit code 3', output: JSON.stringify({ ok: false, exitCode: 3, output: 'service is inactive' }) } }]) },
     ]));
   });
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   for (let visit = 0; visit < 2; visit += 1) {
     await page.getByTestId('workspace-area-unified').click();
@@ -18,12 +18,15 @@ test('keeps failed tool output and replies inside restored conversations across 
     await page.getByTestId('unified-history-conversation:failed-chat').click();
     const workspace = page.getByTestId('unified-workspace');
     await expect(workspace.locator('.ai-tool-card[data-tool-state="error"]')).toBeVisible();
-    await expect(workspace.getByText('Exit code 3', { exact: true })).toBeVisible();
     await expect(workspace.getByText('回复未能完成', { exact: true })).toBeVisible();
     await expect(page.locator('#app-notifications [data-error-notification]')).toHaveCount(0);
-    await workspace.locator('.ai-tool-card').getByRole('button', { name: '技术详情', exact: true }).click();
-    await expect(workspace.getByText('service is inactive', { exact: true })).toBeVisible();
+    await workspace.locator('.ai-tool-summary').click();
+    const notice = page.locator('#app-notifications [data-error-notification]');
+    await expect(notice).toContainText('Exit code 3');
+    await notice.getByRole('button', { name: '技术详情', exact: true }).click();
+    await expect(notice).toContainText('service is inactive');
     await page.screenshot({ path: info.outputPath(`inline-failure-${visit}.png`) });
+    await notice.getByRole('button', { name: '关闭错误提示', exact: true }).click();
     if (visit === 0) await page.reload();
   }
 });

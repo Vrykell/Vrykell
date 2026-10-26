@@ -3,7 +3,7 @@ import { setupTauriMock, emitPtyOutput, expectAnyTermContains } from './tauri-mo
 import { gotoSetting } from './settings';
 
 for (const theme of ['dark', 'light']) test(`host editor and toolbars match the prototype in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => { localStorage.setItem('vrykell-theme-mode', theme); localStorage.setItem('vrykell-startup-mode', 'empty'); }, theme);
   await page.goto('/');
   await page.evaluate(() => { document.documentElement.dataset.nativeMaterial = 'fallback'; });
@@ -91,7 +91,7 @@ for (const theme of ['dark', 'light']) test(`host editor and toolbars match the 
 });
 
 test('classic cursors default to steady and persist independent blinking settings', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await emitPtyOutput(page, '\x1b]133;C\x07\x1b[?1049hSTATIC TUI'); await expectAnyTermContains(page, 'STATIC TUI');
   const blinking = () => page.evaluate(() => [...(window as unknown as { __vrykellTerms: Map<string, { options: { cursorBlink: boolean } }> }).__vrykellTerms.values()].some(terminal => terminal.options.cursorBlink));
@@ -109,7 +109,7 @@ test('classic cursors default to steady and persist independent blinking setting
 });
 
 test('agent menus retain full-width rows, searchable models and fixed navigation icons', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-ai').click();
   const icon = page.getByTestId('workspace-area-ai').locator('svg').first();
   const initialIcon = await icon.evaluate(element => element.outerHTML);

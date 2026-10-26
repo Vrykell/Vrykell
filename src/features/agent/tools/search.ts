@@ -29,13 +29,13 @@ export function buildSearchTools(ctx: ToolContext) {
     list_dir: tool({
       description: DESC_LIST_DIR,
       inputSchema: z.object({
-        path: z.string().describe('绝对路径'),
+        path: z.string().describe('Absolute directory path'),
       }),
       execute: async ({ path }, { toolCallId }) => {
-        const g = await gate('list_dir', { path }, toolCallId, ctx);
+        const g = await gate('list_dir', { path }, toolCallId, ctx, 'fs_list');
         if (!g.proceed) return g.result;
         try {
-          const entries = await invoke<FsEntry[]>('fs_list', { path });
+          const entries = await invoke<FsEntry[]>('fs_list', { path, lease: g.lease ?? null });
           return {
             ok: true,
             result: entries.map((e) => `${e.is_dir ? '📁' : '📄'} ${e.name}`).join('\n') || '（空目录）',
@@ -49,10 +49,10 @@ export function buildSearchTools(ctx: ToolContext) {
     search_files: tool({
       description: DESC_SEARCH_FILES,
       inputSchema: z.object({
-        root: z.string().describe('搜索根目录（绝对路径）'),
-        query: z.string().describe('搜索词（大小写不敏感子串）'),
-        content: z.boolean().optional().describe('true=搜文件内容，false=搜文件名（默认）'),
-        max_results: z.number().optional().describe('结果上限，默认 100'),
+        root: z.string().describe('Absolute search root'),
+        query: z.string().describe('Case-insensitive search substring'),
+        content: z.boolean().optional().describe('Search contents when true, otherwise names'),
+        max_results: z.number().optional().describe('Result limit, default 100'),
       }),
       execute: async ({ root, query, content, max_results }, { toolCallId }) => {
         const args = { root, query, content: content ?? false, maxResults: max_results ?? null };

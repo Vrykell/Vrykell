@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 test('visual review surfaces', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
 

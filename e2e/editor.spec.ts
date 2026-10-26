@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 test.setTimeout(60_000);
 test.beforeEach(async ({ page }) => {
-  await setupTauriMock(page.context(), { launchDirectory: '/home/e2e/project', terminalDirectories: true, schedulesSeed: [] });
+  await setupTauriMock(page.context(), { launchDirectory: '/home/e2e/project', terminalDirectories: true });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: '版本控制', exact: true }).click();
 });

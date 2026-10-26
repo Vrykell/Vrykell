@@ -40,7 +40,7 @@ async function auditOutlinedActions(page: Page, scope: Locator, gray: string) {
 for (const theme of ['dark', 'light'] as const) {
   test(`outlined actions share hover and focus feedback in ${theme}`, async ({ page }, testInfo) => {
     test.setTimeout(90_000);
-    await setupTauriMock(page, { schedulesSeed: [], sshHost: 'known', sshTrustConfirmed: true });
+    await setupTauriMock(page, { sshHost: 'known', sshTrustConfirmed: true });
     await page.goto('/');
     await gotoSetting(page, '主题');
     await page.getByRole('radio', { name: theme === 'dark' ? '深色' : '浅色', exact: true }).click();
@@ -48,21 +48,23 @@ for (const theme of ['dark', 'light'] as const) {
     const report: Record<string, string[]> = {};
     const body = page.locator('.settings-page-body');
     report['主题'] = await auditOutlinedActions(page, body, gray);
-    for (const label of ['块外观', '字体与显示', '主题文件', '子代理', '定时任务', '内存', '技能', 'MCP 服务器', '模型配置', 'Windows 右键菜单', '日志与诊断']) {
+    for (const label of ['块外观', '字体与显示', '主题文件', '记忆', '技能', 'MCP 服务器', '模型配置', 'Windows 右键菜单', '日志与诊断']) {
       await page.locator('aside').getByRole('button', { name: label, exact: true }).click();
       report[label] = await auditOutlinedActions(page, body, gray);
     }
     expect(Object.values(report).flat().length).toBeGreaterThanOrEqual(20);
 
-    await page.locator('aside').getByRole('button', { name: '子代理', exact: true }).click();
-    const add = page.getByRole('button', { name: /添加子代理/ });
+    await page.locator('aside').getByRole('button', { name: '记忆', exact: true }).click();
+    const add = page.getByRole('button', { name: '重新加载', exact: true });
+    await expect(add).toBeEnabled();
     await add.focus();
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Tab');
     await expect(add).toBeFocused();
     await expect(add).toHaveCSS('background-color', gray);
     await add.click();
-    await expect(body.getByPlaceholder('名称')).toHaveCount(2);
+    await expect(add).toHaveAttribute('aria-busy', 'false');
+    await expect(page.getByTestId('memory-count-total')).toHaveText('1');
     await expect(add).toBeFocused();
     await expect(add).toHaveCSS('background-color', gray);
     await add.scrollIntoViewIfNeeded();

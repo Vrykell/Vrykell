@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 for (const theme of ['dark', 'light']) test(`new tab picker follows the profile and location layout in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
   await page.goto('/');
   await page.getByTestId('tab-new-btn').click();
@@ -39,7 +39,7 @@ for (const theme of ['dark', 'light']) test(`new tab picker follows the profile 
 });
 
 test('profile number shortcuts create the matching terminal', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await page.getByTestId('tab-new-btn').click();
   const dialog = page.getByRole('dialog', { name: '新建标签页' });
@@ -50,7 +50,7 @@ test('profile number shortcuts create the matching terminal', async ({ page }) =
 });
 
 for (const theme of ['dark', 'light']) test(`start tab keeps its canvas color while dragging in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(() => localStorage.setItem('vrykell-startup-mode', 'empty'));
   await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
   await page.goto('/');

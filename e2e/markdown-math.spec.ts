@@ -25,7 +25,7 @@ for (const scale of [1, 1.25, 1.5]) {
       const failedFonts: string[] = [];
       page.on('requestfailed', request => { if (/KaTeX_.*\.(woff2?|ttf)/.test(request.url())) failedFonts.push(request.url()); });
       await mockAnthropic(page, answer);
-      await setupTauriMock(page, { schedulesSeed: [] });
+      await setupTauriMock(page, {});
       await paceLlmStream(page, 5);
       await page.goto('/');
       await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();

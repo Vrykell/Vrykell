@@ -108,7 +108,7 @@ describe('AI 增强', () => {
     const r = await completeCommand('kubectl get po', {});
     expect(r).toBe('ds -n prod');
     const prompt = (mockGenerate.mock.calls[0]![0] as { prompt: string }).prompt;
-    expect(prompt).toContain('输入前缀：kubectl get po');
+    expect(prompt).toContain('Input prefix: kubectl get po');
   });
 
   it('AI 返回不以前缀开头 → null（不误导）', async () => {

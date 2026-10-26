@@ -56,7 +56,7 @@ test.describe('AI 对话面板', () => {
     // Deliver the answer piece by piece so it is still arriving when Stop is pressed, and keep the
     // single send slot free: the default schedule seed would fire a background turn at boot.
     await paceLlmStream(page, 30);
-    await boot(page, '这是一段足够长的流式回复内容。'.repeat(12), { schedulesSeed: [] });
+    await boot(page, '这是一段足够长的流式回复内容。'.repeat(12), {});
     await page.locator('[data-dock-btn="chat"]').click();
     const input = page.getByPlaceholder(/自然语言描述/);
     await expect(input).toBeVisible({ timeout: 3000 });
@@ -82,7 +82,7 @@ test.describe('AI 对话面板', () => {
   test('复制被终止的回复：还没有正文时复制工具日志，而不是空串', async ({ page }) => {
     await mockAnthropic(page, '收尾文字');
     await mockAnthropicToolCall(page, 'run_command', { command: 'npm run build' });
-    await setupTauriMock(page, { schedulesSeed: [] });
+    await setupTauriMock(page, {});
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
     await page.locator('[data-dock-btn="chat"]').click();
@@ -106,7 +106,7 @@ test.describe('AI 对话面板', () => {
   test('复制被终止的回复：停止后复制按钮给出已经收到的正文', async ({ page }) => {
     // 流式放慢，保证点「停止」时正文只到了一部分。
     await paceLlmStream(page, 60);
-    await boot(page, '这是一段足够长的流式回复内容。'.repeat(40), { schedulesSeed: [] });
+    await boot(page, '这是一段足够长的流式回复内容。'.repeat(40), {});
     await page.locator('[data-dock-btn="chat"]').click();
     const input = page.getByPlaceholder(/自然语言描述/);
     await expect(input).toBeVisible({ timeout: 3000 });

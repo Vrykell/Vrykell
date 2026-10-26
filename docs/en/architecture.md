@@ -277,7 +277,7 @@ zustand, split by domain (`src/features/*/stores/`):
 | `commands/` | Tauri command forwarding layer (search/session/group/workspace/download) |
 | `files/` | filesystem operations (fs, `fs_disks` disk list, file_open) |
 | `remote/ssh.rs` | SSH/SFTP (connection CRUD, host fingerprint TOFU, SFTP download/upload) |
-| `agent/` | AI streaming (ai.rs), Skills, memory, MCP, scheduling, web scraping, custom agents |
+| `agent/` | AI streaming (ai.rs), Skills, memory, MCP, web scraping |
 | `theme.rs` | theme configuration persistence |
 | `lib.rs` / `main.rs` | Tauri command registration, AppState assembly, startup/exit archiving |
 
@@ -352,14 +352,14 @@ With auto-save enabled, records go to `diagnostics-<YYYYMMDDTHH>.jsonl` in the l
 |------|------|
 | `src/features/agent/services/agentStream.ts` | AI SDK streaming implementation for the chat store (streamText + tools) |
 | `src/features/agent/model/messageParts.ts` | message part model (ToolRun state, etc.) |
-| `src/features/agent/tools/` | tool set (runCommand/terminal/files/skill/webSearch/webFetch/subagent/memory/schedule) |
+| `src/features/agent/tools/` | tool set (runCommand/terminal/files/skill/webSearch/webFetch/memory) |
 | `src/features/agent/stores/permissions.ts` | permission modes (standard/strict/allow) |
 | `src/features/agent/model/context.ts` | context strategy (off/window/compact + summary compaction) |
 | `src/features/agent/services/skills.ts` / `src/features/agent/services/mcp.ts` | Skills / MCP tool assembly |
 | `src/features/chat/components/PanelChat.tsx` | global AI chat panel (dock sidebar) |
 | `src/features/chat/components/AiBlock.tsx` / `ToolRunCard.tsx` | conversation exchange card / tool status card |
 | `src/features/settings/` | settings page (AI behavior/model/MCP/Skills/shortcuts/terminal open mode/appearance: theme, block appearance, typography, theme files) |
-| `src-tauri/src/agent/` | AI stream/config/memory/Skills/MCP/scheduling/web scraping backend |
+| `src-tauri/src/agent/` | AI stream/config/memory/Skills/MCP/web scraping backend |
 | `src-tauri/src/remote/ssh.rs` | SSH/SFTP (host fingerprint TOFU, password authentication) |
 
 ### File Panel (single implementation for local / SSH)
@@ -447,20 +447,20 @@ Therefore:
 ```
 chat store send → agentStream (AI SDK streamText)
   ├─ createChatModel (provider wrapper: Anthropic/Gemini/OpenAI compatible/OpenCode)
-  ├─ buildSystemPrompt + buildSkillsContext + memory/agent lists (platform IPC)
-  ├─ buildTools (terminal/runCommand/files/*/skill/subagent/memory/schedule/webSearch/webFetch/webCrawl)
+  ├─ buildSystemPrompt + buildSkillsContext + bounded local memory retrieval
+  ├─ buildTools (terminal/runCommand/files/*/skill/memory/webSearch/webFetch/webCrawl)
   ├─ buildMcpTool (one tool per MCP server; mcp.rs on the Rust side starts/stops connections)
   ├─ text delta → onChunk (store batches at 50ms); tool events → ToolRun (status card)
   └─ stepCountIs(maxSteps) loop; run_command targets the pane captured when the request starts
 ```
 
-- **Tool authorization** (frontend `permissions.ts` + backend `src-tauri/src/agent/permissions.rs`): the backend decides. The level table lives in `~/.vrykell/permissions.json`, the danger / credential-path / durable-write heuristics are implemented in Rust, and a hit is confirmed through a native system dialog (page content cannot answer it). An approval mints a single-use lease bound to the command plus a digest of its arguments; the gated commands (`read_file_text`, `write_file_text`, `edit_file_text`, `fs_search`) must present it, so a call that skipped the authorization fails closed. The webview keeps only the level mirror (settings rendering and which tools to register), the approval card and the per-session grant. Shared UI commands (file panel, settings pages) are not gated yet — that is the next step.
+- **Tool authorization** (frontend `permissions.ts` + backend `src-tauri/src/agent/permissions.rs`): the backend owns the level table, danger/credential checks and durable-write confirmation. Dedicated file handlers consume single-use command/argument leases. Shared privileged UI commands also consume leases through the dispatch registry; interface leases additionally bind the native webview. Tool-to-command mappings are validated. The frontend retains the level mirror and approval interface. The main renderer remains trusted; leases do not isolate callers inside one webview. See [agent and memory review](agent-memory-review.md).
 - **Permission modes** (`permissions.ts`): standard (decided per tool per the settings page) / strict (ask every time) / allow (dangerous commands still ask every time); the Shield status-bar chip cycles through them.
 - **Context strategy** (`context.ts`): off (full) / window (token budget) / compact (budget + automatic summary compaction), with estimates from `estimateTokens`.
 - **Settings layering** (`agentSettings.ts`): global defaults + per-model overrides (merged by `resolve(modelId)`), persisted in localStorage; connection settings such as provider/model remain in the Rust `config.json`, while API keys join the SSH passwords in the platform secret store (`secret.rs`: DPAPI-sealed on Windows, the system keychain on macOS, a 0600 file elsewhere). `config.json` no longer carries keys, and older plaintext values migrate automatically.
 - **Provider catalog** (`src/config/providers.json` + `providers.ts`): family identifiers, labels, default endpoints and conversation-routing headers are data; preset models live in `modelPresets.json`, the real model list is synced from the endpoint's `/models`, and a unit test checks the endpoint mirror in `ai.rs` against the catalog.
 - **Terminal tab titles** (`agent/title.ts`): when a terminal has enough command activity, an LLM can generate its tab title (the App calls `initAutoTitle()` on startup). Independent conversation titles are managed in the AI panel.
-- **Backend**: `src-tauri/src/agent/` (`ai.rs` SSE streaming, `skills.rs`, `memory.rs`, `mcp.rs`, `schedules.rs`, `web.rs` scraping, `agents.rs` custom agents).
+- **Backend**: `src-tauri/src/agent/` (`ai.rs` SSE streaming, `skills.rs`, `memory.rs`, `mcp.rs`, `web.rs` scraping).
 
 ## 18. Theme System
 
@@ -480,6 +480,6 @@ The chat domain owns conversation IDs, titles, messages, execution environments 
 
 SQLite links `ai_conversations` and `ai_messages` by conversation ID independently of terminal `sessions`. A compatible database migration copies legacy `chat_messages` into `legacy:<session-id>` conversations once; a migration marker prevents deleted conversations from returning. Legacy terminal history remains available, and opening the AI panel never hides history or commands executed by AI.
 
-Messages retain command, directory, exit code and output snapshots plus the request environment. Assistant persistence includes text, tools, stopped and failure states; reasoning remains in memory. Unsent drafts and reading positions are retained per conversation during the application session. ErrorBox displays save failures with retry. A single AI request runs at a time; switching conversations shows a link to background work. Schedules create dedicated background conversations.
+Messages retain command, directory, exit code and output snapshots plus the request environment. Assistant persistence includes text, tools, stopped and failure states; reasoning remains in memory. Unsent drafts and reading positions are retained per conversation during the application session. ErrorBox displays save failures with retry. Independent conversations can generate concurrently; complete tool results are persisted and replayed as paired model messages.
 
 AiBlock reuses the transparent background, padding, divider and action menu of terminal command blocks, with a blue left rail for each exchange. ToolRunCard shows tool status, approval and output in compact rows: inside the AI panel the rows carry no divider hairline, and expanded reasoning and tool output share the framed surface used by markdown code blocks (border, inner radius, flat background), with a copy target that appears in the tool output box's top-right corner on hover or focus, while inline terminal AI blocks keep the flat separated rows. SafeMarkdown passes explicit execution targets to shell blocks and hides terminal execution for discussion. Terminal InputEditor submits commands; Ask AI stages recent output or a command snapshot for review before sending.

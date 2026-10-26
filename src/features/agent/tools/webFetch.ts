@@ -78,8 +78,8 @@ export function buildWebSearchTool(ctx: ToolContext) {
   return tool({
       description: DESC_WEB_SEARCH_DDG,
     inputSchema: z.object({
-      query: z.string().describe('搜索词'),
-      maxResults: z.number().int().min(1).max(8).optional().describe('结果条数，默认 5'),
+      query: z.string().describe('Search query'),
+      maxResults: z.number().int().min(1).max(8).optional().describe('Result limit, default 5'),
     }),
     execute: async ({ query, maxResults }, { toolCallId }) => {
       const g = await gate('web_search', { query }, toolCallId, ctx);
@@ -102,7 +102,7 @@ export function buildWebFetchTool(ctx: ToolContext) {
   return tool({
       description: DESC_WEB_FETCH,
     inputSchema: z.object({
-      url: z.string().describe('要抓取的完整 URL（含 http/https）'),
+      url: z.string().describe('Complete HTTP or HTTPS URL'),
     }),
     execute: async ({ url }, { toolCallId }) => {
       const g = await gate('web_fetch', { url }, toolCallId, ctx);
@@ -122,10 +122,10 @@ export function buildWebCrawlTool(ctx: ToolContext) {
   return tool({
       description: DESC_WEB_CRAWL,
     inputSchema: z.object({
-      start_url: z.string().describe('起始 URL（含 http/https）'),
-      max_pages: z.number().int().min(1).max(30).optional().describe('最多抓取页数，默认 10'),
-      max_depth: z.number().int().min(1).max(4).optional().describe('爬取深度（起始页=0），默认 2'),
-      same_domain: z.boolean().optional().describe('是否只爬同域链接，默认 true'),
+      start_url: z.string().describe('Starting HTTP or HTTPS URL'),
+      max_pages: z.number().int().min(1).max(30).optional().describe('Page limit, default 10'),
+      max_depth: z.number().int().min(1).max(4).optional().describe('Depth limit, starting page is depth 0; default 2'),
+      same_domain: z.boolean().optional().describe('Restrict links to the same domain, default true'),
     }),
     execute: async ({ start_url, max_pages, max_depth, same_domain }, { toolCallId }) => {
       const g = await gate('web_crawl', { start_url }, toolCallId, ctx);

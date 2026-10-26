@@ -3,7 +3,7 @@ import { setupTauriMock, acpCalls } from './tauri-mock';
 import { pickPlacementZone } from './placement';
 
 test('uses the shared split picker from the agent workspace and creates a distinct agent only after placement', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-ai').click(); await page.getByTestId('harness-add-session').click();
   await page.getByTestId('acp-launcher-Fake ACP').click();
   await page.locator('[data-testid="harness-page"]:visible').getByTestId('harness-composer').fill('first agent draft');
@@ -27,7 +27,7 @@ test('uses the shared split picker from the agent workspace and creates a distin
 });
 
 test('moves a connected agent into the common workspace and retains its guarded close', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-ai').click(); await page.getByTestId('harness-add-session').click();
   await page.getByTestId('acp-launcher-Fake ACP').click();
   const input = page.locator('[data-testid="harness-page"]:visible').getByTestId('harness-composer');

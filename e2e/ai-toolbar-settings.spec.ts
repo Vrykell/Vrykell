@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 for (const theme of ['dark', 'light']) test(`conversation toolbar and floating settings retain scope and content in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
   await page.goto('/');
   await page.getByTestId('workspace-area-ai').click();

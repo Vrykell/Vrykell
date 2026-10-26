@@ -3,7 +3,7 @@ import { ptyWrites, setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 test.beforeEach(async ({ page }) => {
-  await setupTauriMock(page, { launchDirectory: '/home/e2e/project', terminalDirectories: true, schedulesSeed: [], sshHost: 'known' });
+  await setupTauriMock(page, { launchDirectory: '/home/e2e/project', terminalDirectories: true, sshHost: 'known' });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
 });
 

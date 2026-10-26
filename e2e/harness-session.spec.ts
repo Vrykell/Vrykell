@@ -29,7 +29,7 @@ function permissionRequest(toolCallId: string, title: string) {
 
 test.describe('harness session', () => {
   test('streams the harness output and answers its permission request', async ({ page }) => {
-    await setupTauriMock(page, { schedulesSeed: [] });
+    await setupTauriMock(page, {});
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 

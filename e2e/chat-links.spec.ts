@@ -8,7 +8,7 @@ import { setupTauriMock, mockAnthropic, openedUrls } from './tauri-mock';
 test('a reply link leaves for the system browser instead of taking the window', async ({ page }) => {
   await mockAnthropic(page,
     '参考：[网页](https://example.com/doc) 以及 [本地](file:///C:/Windows/System32/calc.exe) 和 [协议](ms-msdt:/id)');
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
   await page.locator('[data-dock-btn="chat"]').click();

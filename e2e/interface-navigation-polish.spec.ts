@@ -25,7 +25,7 @@ async function dragTo(page: Page, source: Locator, destination: Locator, after =
 
 for (const theme of ['dark', 'light'] as const) {
   test(`launch pages, selection and shared surfaces in ${theme}`, async ({ page }, info) => {
-    await setupTauriMock(page, { schedulesSeed: [] });
+    await setupTauriMock(page, {});
     await page.addInitScript(theme => {
       localStorage.setItem('vrykell-theme-mode', theme);
       localStorage.setItem('vrykell-startup-mode', 'empty');
@@ -90,7 +90,7 @@ for (const theme of ['dark', 'light'] as const) {
   });
 
   test(`file rename uses the shared fixed-width field in ${theme}`, async ({ page }, info) => {
-    await setupTauriMock(page, { schedulesSeed: [] });
+    await setupTauriMock(page, {});
     await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
     await page.goto('/'); await page.locator('[data-dock-btn="files"]').click();
     const row = page.getByTestId('local-file-tree').locator('[data-path="/home/e2e/notes.txt"]');
@@ -121,7 +121,7 @@ for (const theme of ['dark', 'light'] as const) {
 }
 
 for (const layout of ['cards', 'table']) test(`hosts change fixed groups through their editor in ${layout}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(layout => {
     localStorage.setItem('vrykell-host-library', JSON.stringify({ state: { hosts: { 'ssh-1': { group: 'Alpha', tags: ['production'], starred: true }, other: { group: 'Beta', tags: [], starred: false } } }, version: 0 }));
     localStorage.setItem('vrykell-host-view-v2', JSON.stringify({ layout }));
@@ -151,7 +151,7 @@ for (const layout of ['cards', 'table']) test(`hosts change fixed groups through
 });
 
 test('dragging a singleton history tab retains its content and query', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/'); await page.getByTestId('tab-history-btn').click();
   const history = page.locator('.history-page:visible');
   await expect(history).toBeVisible();

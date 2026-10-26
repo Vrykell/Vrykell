@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 test('forwarding has its own compact page with create, edit, start, stop and delete', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(() => { localStorage.setItem('workspace-navigation-v1', JSON.stringify({ collapsed: false })); });
   await page.goto('/');
   await page.evaluate(() => { document.documentElement.dataset.nativeMaterial = 'fallback'; });
@@ -35,7 +35,7 @@ test('forwarding has its own compact page with create, edit, start, stop and del
 });
 
 test('host list never wraps and metric menu stays inside the viewport at narrow width', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.setViewportSize({ width: 780, height: 620 });
   await page.goto('/');
   if (await page.getByTestId('workspace-sidebar-expand').isVisible()) await page.getByTestId('workspace-sidebar-expand').click();

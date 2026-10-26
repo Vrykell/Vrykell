@@ -77,11 +77,11 @@ function gatherContext(tabId: string, force = false): { prompt: string } | null 
   if (force && !doneCmds.length && !firstQ) return null;
   const last = [...blocks].reverse().find((b) => b.command);
   const parts: string[] = [];
-  if (last?.cwd) parts.push(`工作目录：${last.cwd}`);
-  if (last?.gitBranch) parts.push(`Git 分支：${last.gitBranch}`);
-  if (doneCmds.length) parts.push('最近执行的命令：\n' + doneCmds.slice(-6).join('\n'));
-  if (firstQ) parts.push('用户提问：' + firstQ.content.slice(0, 200));
-  if (firstA) parts.push('AI 回答摘要：' + firstA.content.slice(0, 200));
+  if (last?.cwd) parts.push(`Working directory: ${last.cwd}`);
+  if (last?.gitBranch) parts.push(`Branch: ${last.gitBranch}`);
+  if (doneCmds.length) parts.push('Recent commands:\n' + doneCmds.slice(-6).join('\n'));
+  if (firstQ) parts.push('User request: ' + firstQ.content.slice(0, 200));
+  if (firstA) parts.push('Assistant response excerpt: ' + firstA.content.slice(0, 200));
   return { prompt: parts.join('\n\n') };
 }
 
@@ -148,8 +148,8 @@ export async function maybeAutoTitle(
     const { text } = await generateText({
       model,
       prompt:
-        '你是终端会话标题生成器。根据下面的会话线索，用不超过 12 个字的中文概括这个会话在做什么。' +
-        '只输出标题本身：不要引号、书名号、句号或解释，优先体现任务目标而不是命令名。\n\n' +
+        'Generate a concise terminal-session title from the context below, using the language of the conversation and at most 12 characters. ' +
+        'Return only the title without quotes, punctuation or explanation. Describe the task rather than a command name.\n\n' +
         ctx.prompt,
     });
     const title = sanitizeTitle(text);

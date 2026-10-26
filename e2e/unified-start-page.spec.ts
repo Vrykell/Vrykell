@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 for (const theme of ['dark', 'light']) test(`uses the existing launcher design and one tab toolbar in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(value => { localStorage.setItem('vrykell-theme-mode', value); localStorage.setItem('vrykell-startup-mode', 'empty'); }, theme); await page.goto('/');
   await page.getByTestId('workspace-area-unified').click();
   const start = page.getByTestId('unified-start-page'); await expect(start.locator('.ai-launch-title')).toHaveText('聚合工作区');

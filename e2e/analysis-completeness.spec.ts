@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { emitPtyOutput, setupTauriMock } from './tauri-mock';
 
 test('command analysis retains the complete command and output through the model request', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.waitForFunction(async () => {
     const path = '/src/features/terminal/stores/terminal.ts';

@@ -122,10 +122,10 @@ export async function aiComplete(
       model,
       abortSignal: signal,
       prompt: [
-        '你是 shell 命令补全器。根据输入前缀，只输出补全后的完整命令（单行），不要解释、不要引号。',
-        opts.cwd ? `当前目录：${opts.cwd}` : '',
-        recent.length ? `最近命令：\n${recent.join('\n')}` : '',
-        `输入前缀：${prefix}`,
+        'Complete the shell command prefix. Return only one complete command line, without explanations or surrounding quotes.',
+        opts.cwd ? `Current directory: ${opts.cwd}` : '',
+        recent.length ? `Recent commands:\n${recent.join('\n')}` : '',
+        `Input prefix: ${prefix}`,
       ]
         .filter(Boolean)
         .join('\n'),

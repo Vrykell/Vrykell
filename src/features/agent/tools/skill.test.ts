@@ -70,7 +70,7 @@ describe('install_skill 工具', () => {
   it('写入技能目录并返回结果', async () => {
     invokeMock.mockResolvedValue({ name: '写 SQL', description: 'd', dir: '/s/x', files: [] });
     const r = await execOf(buildInstallSkillTool(CTX).install_skill)({ name: '写 SQL', description: 'd', prompt: 'p' });
-    expect(invokeMock).toHaveBeenLastCalledWith('install_skill_md', { name: '写 SQL', description: 'd', prompt: 'p' });
+    expect(invokeMock).toHaveBeenLastCalledWith('install_skill_md', { name: '写 SQL', description: 'd', prompt: 'p', lease: 'test-lease' });
     expect(r).toEqual({ ok: true, result: '已安装技能「写 SQL」' });
   });
 

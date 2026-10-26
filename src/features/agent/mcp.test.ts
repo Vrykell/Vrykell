@@ -43,6 +43,7 @@ describe('buildMcpTool', () => {
       server: 'fs',
       tool: 'read_file',
       args: { path: '/tmp/a.txt' },
+      lease: 'test-lease',
     });
     expect(r).toBe('file content');
   });

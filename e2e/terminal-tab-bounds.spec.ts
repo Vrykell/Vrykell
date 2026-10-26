@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 for (const direction of ['left', 'right'] as const) test(`unequal terminal tabs exchange by their bounds toward the ${direction}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   const ids = await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
@@ -33,7 +33,7 @@ for (const direction of ['left', 'right'] as const) test(`unequal terminal tabs 
 });
 
 test('group dragging shows one folded preview and moves the whole group', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
     const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');

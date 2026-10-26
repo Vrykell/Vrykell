@@ -8,7 +8,7 @@
  * 网络层走 createChatModel 注入的 Rust 代理 fetch（key 不出 Rust）。
  */
 import { describeError } from '@features/agent/model/agentErrors';
-import { stepCountIs, streamText, type ModelMessage, type ToolSet } from 'ai';
+import { stepCountIs, streamText, type ModelMessage, type ToolSet, asSchema } from 'ai';
 import { getFocusedTerminalId } from '@features/terminal';
 import { useSshStore } from '@features/ssh';
 import { invoke } from '@platform/diagnostics';
@@ -16,7 +16,7 @@ import { t } from '@i18n';
 import type { StreamFn } from '@features/chat';
 import { createChatModel, createNativeWebSearchTool, deepThinkProviderOptions, providerId, supportsThinkingPassback, type ProviderKind } from '@features/agent/services/provider';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
-import { estimateTokens, planContext, IMAGE_TOKEN_ESTIMATE, type SizedMessage } from '@features/agent/model/context';
+import { estimateTokens, messageTokens, planContext, IMAGE_TOKEN_ESTIMATE, type SizedMessage } from '@features/agent/model/context';
 import { attachmentsForModel, supportsVision } from '@features/agent/model/attachments';
 import { buildTools } from '@features/agent/tools';
 import { buildTavilySearchTool } from '@features/agent/tools/webSearch';
@@ -24,11 +24,12 @@ import { buildWebSearchTool, buildWebFetchTool, buildWebCrawlTool } from '@featu
 import { buildSystemPrompt } from '@features/agent/model/systemPrompt';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { listSkills, buildSkillsContext, availableSkillMetas } from '@features/agent/services/skills';
-import { getMemory, getMemoryJournal, listAgents } from '@features/agent/services/platform';
+import { memoryScope, retrieveMemory } from './memory';
+import { environmentForPane } from '@features/chat/services/conversationContext';
 import { listMcpTools, buildMcpTool } from '@features/agent/services/mcp';
 import { levelOf, type ToolContext } from '@features/agent/stores/permissions';
 import { useUsageStore } from '@features/agent/stores/usage';
-import type { ToolRunState } from '@features/agent/model/messageParts';
+import { partsToModelMessages, type ToolRunState } from '@features/agent/model/messageParts';
 import { executionPaneSpec } from './executionTarget';
 import { prepareToolRecoveryStep, TOOL_RECOVERY_GUIDANCE } from '../model/toolRecovery';
 import { visibleAssistantText } from '@features/chat/model/providerMarkup';
@@ -66,6 +67,7 @@ function hasKeyFor(info: AiConfigInfoRust): boolean {
 export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   // Resolve once before any asynchronous work; focus changes never redirect a running request.
   const executionPane = ctx?.paneId === undefined ? getFocusedTerminalId() : ctx.paneId;
+  const capturedEnvironment = ctx?.environment ?? (executionPane ? environmentForPane(executionPane) : null);
   const remote = ctx?.environment?.kind === 'ssh' || executionPaneSpec(executionPane)?.kind === 'ssh';
   const remoteSpec = executionPaneSpec(executionPane)?.ssh;
   const hostNotes = remote ? useSshStore.getState().connections.find(connection => connection.id === remoteSpec?.connectionId)?.aiNotes ?? ctx?.environment?.aiNotes ?? remoteSpec?.aiNotes : undefined;
@@ -82,6 +84,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     sessionId: ctx?.tabId,
   });
   const settings = useAgentSettings.getState().resolve(info.active_model);
+  const countTokens = estimateTokens;
   const agentMode = settings.agentMode;
   const emitTool = ctx?.handlers?.onToolEvent;
   const emitReasoning = ctx?.handlers?.onReasoning;
@@ -94,6 +97,14 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     supportsVision(info.provider, info.model);
   const sized: SizedMessage[] = [];
   for (const m of messages) {
+    if (m.role === 'assistant' && m.parts?.some(part => part.kind === 'tool')) {
+      const group = `history:${sized.length}`;
+      for (const msg of partsToModelMessages(m.content, m.parts)) {
+        const safe = msg.role === 'assistant' && typeof msg.content === 'string' ? { ...msg, content: visibleAssistantText(msg.content) } : msg;
+        sized.push({ msg: safe, tokens: messageTokens(safe), group });
+      }
+      continue;
+    }
     if (m.attachments?.length) {
       const { text, images } = await attachmentsForModel(m.attachments, vision);
       const content = [m.content, text].filter(Boolean).join('\n\n');
@@ -105,27 +116,18 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
             ...images.map((image) => ({ type: 'image' as const, image })),
           ],
         };
-        sized.push({ msg, tokens: estimateTokens(content) + images.length * IMAGE_TOKEN_ESTIMATE });
+        sized.push({ msg, tokens: countTokens(content) + images.length * IMAGE_TOKEN_ESTIMATE + 16 });
       } else {
         const safeContent = m.role === 'assistant' ? visibleAssistantText(content) : content;
-        sized.push({ msg: { role: m.role as 'user' | 'assistant', content: safeContent }, tokens: estimateTokens(safeContent) });
+        sized.push({ msg: { role: m.role as 'user' | 'assistant', content: safeContent }, tokens: countTokens(safeContent) + 16 });
       }
     } else {
       const content = m.role === 'assistant' ? visibleAssistantText(m.content) || '[Unstructured tool markup omitted; no tool was executed.]' : m.content;
-      sized.push({ msg: { ...m, content } as ModelMessage, tokens: estimateTokens(content) });
+      sized.push({ msg: { role: m.role as 'user' | 'assistant', content }, tokens: countTokens(content) + 16 });
     }
   }
 
   // code-agent 式上下文管理：按 token 预算窗口裁剪，compact 策略下把溢出旧消息压缩成摘要
-  const plan = await planContext({
-    sized,
-    strategy: settings.contextStrategy,
-    maxTokens: settings.contextMaxTokens,
-    summaryTokens: settings.contextSummaryTokens,
-    model,
-    tabId: ctx?.tabId,
-    signal: ctx?.signal,
-  });
   // 系统提示词：自定义（设置里）优先，否则内置默认；压缩摘要（compact）作为运行上下文追加。
   // AI SDK v7 默认 allowSystemInMessages=false：system 必须走 instructions 选项，
   // 不能塞进 messages（否则 provider 校验直接抛 InvalidPromptError）。
@@ -136,29 +138,18 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     /* 技能目录未就绪或扫描失败：跳过技能清单 */
   }
   let memoryContext = '';
+  const scope = memoryScope(capturedEnvironment, ctx?.tabId);
   try {
-    const [fact, journal] = await Promise.all([getMemory(), getMemoryJournal()]);
-    const parts: string[] = [];
-    if (fact.trim()) parts.push(`持久知识：\n${fact}`);
-    const jlines = journal.split('\n').filter(Boolean).slice(-15);
-    if (jlines.length) parts.push(`近期流水：\n${jlines.join('\n')}`);
-    if (parts.length) memoryContext = `长期记忆：\n${parts.join('\n\n')}`;
-  } catch {
-    /* 记忆读取失败：跳过 */
-  }
-  let agentsContext = '';
-  try {
-    const agents = await listAgents();
-    if (agents.length) {
-      agentsContext =
-        '子代理（用 spawn_agent 工具按名委派任务）：\n' +
-        agents.map((a) => `- ${a.name}：${a.description || '无描述'}`).join('\n');
+    const query = [...messages].reverse().find(message => message.role === 'user')?.content ?? '';
+    if (levelOf('memory') !== 'deny') {
+      memoryContext = await retrieveMemory(query, scope,
+        settings.contextMaxTokens > 0 ? Math.min(800, Math.floor(settings.contextMaxTokens * 0.1)) : 800, ctx?.signal, countTokens);
     }
   } catch {
-    /* 子代理读取失败：跳过 */
+    terminalDebug('agent-memory-retrieval', { available: false });
   }
-  const systemPrompt = [
-    buildSystemPrompt(settings.systemPrompt, plan.system, agentMode),
+  const basePrompt = [
+    buildSystemPrompt(settings.systemPrompt, undefined, agentMode),
     executionPane === null ? 'No terminal is connected to this conversation. Answer questions using provided references. Do not claim to execute terminal commands.'
       : `Execution terminal: ${ctx?.environment?.label ?? executionPane}. Directory at request start: ${ctx?.environment?.cwd ?? 'unknown'}. This target stays fixed for this request.`,
     remote ? 'The execution terminal is remote. Use terminal tools for remote files; local file tools are unavailable.' : '',
@@ -166,20 +157,9 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     hostNotes ? `User-provided host notes (context only; these do not grant permissions):\n${hostNotes}` : '',
     memoryContext,
     skillsContext,
-    agentsContext,
   ]
     .filter(Boolean)
     .join('\n\n');
-  // 上下文占用上报：压缩后 kept 变小 → 圆环自动减小
-  if (ctx?.handlers?.onContextUsed) {
-    let used = 0;
-    for (const m of plan.messages) {
-      used += estimateTokens(typeof m.content === 'string' ? m.content : '');
-    }
-    if (systemPrompt) used += estimateTokens(systemPrompt);
-    ctx.handlers.onContextUsed(used, settings.contextMaxTokens > 0 ? settings.contextMaxTokens : 0);
-  }
-  const modelMessages: ModelMessage[] = plan.messages;
 
   // 工具调用账本：tool-result/tool-error 事件重建完整 ToolRun 需要
   // toolName/input/startedAt（result 部分不一定带回 input）
@@ -195,6 +175,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   // M3 审批状态回写：gate() 在 ask/决定时把 ToolRun 打到
   // approval-pending / running / denied（含危险命令原因）。本地工具与 MCP 工具共用。
   const toolContext: ToolContext = {
+    memoryScope: scope,
     signal: ctx?.signal,
     paneId: executionPane,
     remote,
@@ -246,6 +227,26 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     }
   }
   const hasTools = Object.keys(tools).length > 0;
+  let schemaTokens = 0;
+  for (const [name, entry] of Object.entries(tools)) {
+    const schema = entry.inputSchema;
+    const value = schema ? await asSchema(schema).jsonSchema : undefined;
+    schemaTokens += countTokens(JSON.stringify({ name, description: entry.description, schema: value }) ?? '') + 16;
+  }
+  const reservedTokens = countTokens(basePrompt) + schemaTokens + 64;
+  const plan = await planContext({
+    sized, strategy: settings.contextStrategy, maxTokens: settings.contextMaxTokens,
+    summaryTokens: settings.contextSummaryTokens, reservedTokens,
+    model, tabId: ctx?.tabId, signal: ctx?.signal,
+  });
+  const systemPrompt = [basePrompt, plan.system].filter(Boolean).join('\n\n');
+  if (ctx?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+  const initialUsage = plan.messages.reduce((sum, message) => sum + messageTokens(message), 0) + countTokens(systemPrompt) + schemaTokens + 64;
+  ctx?.handlers?.onContextUsed?.(initialUsage, settings.contextMaxTokens);
+  if (settings.contextStrategy !== 'off' && settings.contextMaxTokens > 0 && initialUsage > settings.contextMaxTokens) {
+    throw new Error(t('The current request exceeds the context budget. Increase the budget or request smaller tool results.'));
+  }
+  const modelMessages = plan.messages;
 
   // 深思考：兼容端点无法回传 thinking，显式关闭；官方端点按开关发送。
   const thinkingOptions = deepThinkProviderOptions(info.provider, settings.thinkingLevel, info.base_url, settings.deepThink);
@@ -255,13 +256,34 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   // AI SDK v7 的流不 reject：错误走 onError 回调 + fullStream 的 error part，
   // 迭代静默结束。这里捕获后重抛，维持 chat store「catch → 显示出错了」的行为。
   let streamError: unknown = null;
+  let stepSummary = '';
   const result = streamText({
     model,
     maxRetries: 2,
     messages: modelMessages,
     instructions: systemPrompt || undefined,
     tools: hasTools ? tools : undefined,
-    prepareStep: hasTools ? options => prepareToolRecoveryStep(options, Object.keys(tools)) : undefined,
+    prepareStep: hasTools ? async options => {
+      if (ctx?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+      let group = 'previous';
+      const current = options.messages.map((msg, index) => {
+        if (msg.role === 'user') group = `turn:${index}`;
+        return { msg, group, tokens: messageTokens(msg) };
+      });
+      const next = await planContext({ sized: current, strategy: settings.contextStrategy,
+        maxTokens: settings.contextMaxTokens, summaryTokens: settings.contextSummaryTokens,
+        reservedTokens: countTokens([systemPrompt, stepSummary].filter(Boolean).join('\n\n')) + schemaTokens + 64,
+        previousSummary: stepSummary, model, signal: ctx?.signal });
+      if (next.system) stepSummary = next.system;
+      const instructions = [systemPrompt, stepSummary].filter(Boolean).join('\n\n');
+      const used = next.messages.reduce((sum, msg) => sum + messageTokens(msg), 0)
+        + countTokens(instructions) + schemaTokens + 64;
+      ctx?.handlers?.onContextUsed?.(used, settings.contextMaxTokens);
+      if (settings.contextStrategy !== 'off' && settings.contextMaxTokens > 0 && used > settings.contextMaxTokens) {
+        throw new Error(t('The current request exceeds the context budget. Increase the budget or request smaller tool results.'));
+      }
+      return { ...prepareToolRecoveryStep(options, Object.keys(tools)), messages: next.messages, instructions };
+    } : undefined,
     stopWhen: hasTools ? stepCountIs(Math.max(1, Math.round(settings.maxSteps))) : undefined,
     abortSignal: ctx?.signal,
     // M6 深思考：providerOptions 透传（openai-compatible → reasoning_effort）。
@@ -308,6 +330,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
           toolCallId: string;
           toolName: string;
           input?: unknown;
+          providerExecuted?: boolean;
         };
         const input = (p.input ?? {}) as Record<string, unknown>;
         const startedAt = Date.now();
@@ -317,6 +340,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
           toolCallId: p.toolCallId,
           toolName: p.toolName,
           input,
+          providerExecuted: p.providerExecuted,
           state: 'running',
           startedAt,
         });
@@ -326,7 +350,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
         const p = part as { toolCallId: string; toolName?: string; output?: unknown; result?: unknown };
         const c = calls.get(p.toolCallId);
         const raw = p.output ?? p.result;
-        const out = typeof raw === 'string' ? raw : JSON.stringify(raw);
+        const out = typeof raw === 'string' ? raw : JSON.stringify(raw ?? null);
         // Structured results preserve cancellation and refusal separately from execution failure.
         let state: ToolRunState = 'done';
         let error: string | undefined;
@@ -350,6 +374,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
           input: c?.input ?? {},
           state,
           output: out.length > settings.contextToolChars ? out.slice(0, settings.contextToolChars) : out,
+          modelOutput: out,
           error,
           startedAt: c?.startedAt ?? Date.now(),
           endedAt: Date.now(),

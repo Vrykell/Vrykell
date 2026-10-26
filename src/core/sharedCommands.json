@@ -1,0 +1,15 @@
+[
+  "pty_spawn", "pty_write", "pty_close", "pty_kill_foreground", "editor_read_file", "editor_save_file",
+  "fs_list", "fs_rename", "fs_create_file", "fs_create_dir", "fs_copy", "fs_move",
+  "fs_stage_delete", "fs_restore_staged", "fs_purge_staged",
+  "save_memory", "set_skill_state", "remove_skill", "install_skill_md", "import_skills_from_path", "market_github_install",
+  "mcp_save_server", "mcp_remove_server", "mcp_toggle_server", "mcp_connect", "mcp_disconnect", "mcp_call_tool",
+  "tool_policy_set_level", "tool_policy_clear_session_grants",
+  "set_ai_key", "clear_ai_key", "set_ai_base_url", "set_ai_model", "set_ai_provider", "set_ai_models", "set_active_model",
+  "set_provider_key", "clear_provider_key", "provider_key_reveal", "set_tavily_key", "clear_tavily_key",
+  "ssh_connection_save", "ssh_connection_delete", "ssh_proxy_save", "ssh_proxy_delete", "ssh_proxy_set_default",
+  "ssh_rename", "ssh_create_file", "ssh_create_dir", "ssh_move", "ssh_copy", "ssh_trust_host_key",
+  "ssh_stage_delete", "ssh_restore_staged", "ssh_purge_staged", "ssh_upload", "ssh_download",
+  "ssh_forward_start", "ssh_forward_stop", "set_theme_config", "theme_import", "file_open", "file_open_with",
+  "git_operate", "git_change_file", "git_edit_reference", "git_switch_branch", "context_menu_manage"
+]

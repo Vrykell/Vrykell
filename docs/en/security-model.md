@@ -1,5 +1,7 @@
 # Security model
 
+Local memory uses scoped, expiring records and bounded retrieval; legacy files remain pending and never enter prompts wholesale. Shared privileged UI operations consume single-use leases at the dispatch boundary. Interface leases bind the native webview and exact payload; dedicated tool leases retain their authorization path. Tool-to-command mappings are validated, and complete tool results/leases are excluded from diagnostics. No new network service, model, capability or CSP origin is added. The main renderer remains trusted: an interface lease is not a physical user gesture or isolation within one webview. See [agent and memory review](agent-memory-review.md) for lifecycle and remaining limits.
+
 Conversation streams run concurrently under separate owner IDs, cancellation controllers, queues and approval scopes. Existing terminal busy guards still reject conflicting command execution. The model proxy marks only failures while establishing a request as potentially retryable; the client never replays a started response or a whole tool turn. Retries retain the same validated endpoint and credential path, use a bounded abortable delay, and add no IPC command or capability.
 
 Empty starter panes use a validated boolean marker in layout metadata. Explicit history restoration recreates them through existing resource owners; it never restores commands or missing nonempty conversation content. Remote starters require an existing saved connection and retain the standard authentication path. No credential, capability or execution policy changes are introduced.
@@ -44,7 +46,7 @@ not pretend to protect "the renderer itself" or "the programs the user installs"
 | Line | State | Evidence | How it is verified |
 | --- | --- | --- | --- |
 | No Node in the renderer | ✅ Tauri by construction; the renderer has no direct filesystem access, everything goes through IPC | `src-tauri/tauri.conf.json` | Structural |
-| Explicit IPC with a capability list | ✅ Only `core:default` + dialog/drag/clipboard/opener + window controls; 171 own commands | `src-tauri/capabilities/default.json` | Changing the list means updating the docs |
+| Explicit IPC with a capability list | ✅ Only `core:default` + dialog/drag/clipboard/opener + window controls; application-owned commands | `src-tauri/capabilities/default.json` | Changing the list means updating the docs |
 | Per-command authorization (leases) | ✅ The four gated commands (`read_file_text`/`write_file_text`/`edit_file_text`/`fs_search`) must present a **single-use lease bound to the command plus an argument digest** or fail closed | `src-tauri/src/agent/permissions.rs` | The lease cases in `cargo test --lib` |
 | Unforgeable confirmation for dangerous work | ✅ A hit on a dangerous command, a credential path or a durable write raises a **native system dialog**; window focus does not bypass the dialog or cause an automatic refusal; approval cards have a deadline | the same file | cargo tests + e2e `approval-timeout` |
 | Authorization granularity | ✅ Level table (allow/ask/deny) + **per-shape session approval** (`npm run` opens that kind only) + danger rules decided before any grant | the same file | cargo shape-derivation cases + e2e `approval-shape` |

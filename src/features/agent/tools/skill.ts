@@ -18,7 +18,7 @@ export function buildSkillTool(ctx: ToolContext) {
     use_skill: tool({
       description: DESC_USE_SKILL,
       inputSchema: z.object({
-        name: z.string().describe('技能名（与系统提示词清单中的名字一致）'),
+        name: z.string().describe('Skill name from the available-skills list'),
       }),
       execute: async ({ name }, { toolCallId }) => {
         const g = await gate('use_skill', { name }, toolCallId, ctx);
@@ -53,16 +53,16 @@ export function buildInstallSkillTool(ctx: ToolContext) {
     install_skill: tool({
       description: DESC_INSTALL_SKILL,
       inputSchema: z.object({
-        name: z.string().describe('技能名，唯一'),
-        description: z.string().describe('一句话描述何时该用这个技能'),
-        prompt: z.string().describe('完整提示词正文，写清步骤'),
+        name: z.string().describe('Unique skill name'),
+        description: z.string().describe('One sentence describing when to use this skill'),
+        prompt: z.string().describe('Complete instructions with explicit steps'),
       }),
       execute: async ({ name, description, prompt }, { toolCallId }) => {
-        const g = await gate('install_skill', { name }, toolCallId, ctx);
+        const g = await gate('install_skill', { name, description, prompt }, toolCallId, ctx, 'install_skill_md');
         if (!g.proceed) return g.result;
         if (!name.trim()) return { ok: false, error: '技能名不能为空' };
         try {
-          const sk = await installSkillMd(name, description, prompt);
+          const sk = await installSkillMd(name, description, prompt, g.lease ?? null);
           return { ok: true, result: `已安装技能「${sk.name}」` };
         } catch (e) {
           return { ok: false, error: String((e as Error)?.message ?? e) };

@@ -18,7 +18,7 @@ async function beginDrag(page: Page, source: Locator, y: number) {
 }
 
 test('groups and loose tabs share one drag order and a dragged group folds only for the gesture', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await page.locator('[data-tab-row-id]').first().click({ button: 'right' });
   await page.getByRole('button', { name: '新建分组', exact: true }).click();
@@ -69,7 +69,7 @@ test('groups and loose tabs share one drag order and a dragged group folds only 
 });
 
 test('a loose tab entering a group at its first member joins the group instead of swapping the group', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await page.locator('[data-tab-row-id]').first().click({ button: 'right' });
   await page.getByRole('button', { name: '新建分组', exact: true }).click();
@@ -104,7 +104,7 @@ test('a loose tab entering a group at its first member joins the group instead o
 });
 
 test('dragging a loose tab across a leading group never absorbs it', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await page.locator('[data-tab-row-id]').first().click({ button: 'right' });
   await page.getByRole('button', { name: '新建分组', exact: true }).click();
@@ -146,7 +146,7 @@ test('dragging a loose tab across a leading group never absorbs it', async ({ pa
 });
 
 test('a collapsed group joins the dragged tab only after the pointer dwells on its label', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await page.locator('[data-tab-row-id]').first().click({ button: 'right' });
   await page.getByRole('button', { name: '新建分组', exact: true }).click();

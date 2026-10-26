@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 for (const theme of ['dark', 'light']) test(`unified hosts follow the list and card prototypes in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => {
     localStorage.setItem('vrykell-theme-mode', theme);
     localStorage.setItem('e2e-conversations', JSON.stringify([{ id: 'favorite-chat', title: 'Deployment notes', created_at: Date.now(), updated_at: Date.now(), environment: 'null' }]));

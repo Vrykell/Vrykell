@@ -66,13 +66,8 @@ const REASON_KEYS: Record<string, I18nKey> = {
   'path.app_config': 'Application configuration (may hold API keys)',
   'path.system_accounts': 'System account file',
 
-  'durable.memory_rewrite': 'Rewrites long-term memory (injected into every later request)',
-  'durable.memory_append': 'Appends to long-term memory (injected into every later request)',
-  'durable.subagent_create': 'Creates a subagent prompt that is reused later',
-  'durable.subagent_remove': 'Removes a subagent definition',
-  'durable.schedule_create': 'Arms a recurring task that runs without asking again',
-  'durable.schedule_toggle': 'Starts or stops a recurring task',
-  'durable.schedule_remove': 'Removes a recurring task',
+  'durable.memory_rewrite': 'Updates a durable memory fact used by future retrieval',
+  'durable.memory_append': 'Adds a durable memory fact used by future retrieval',
 };
 
 /** Localized text for a reason code; unknown codes are shown as-is (never swallowed). */

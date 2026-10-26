@@ -79,7 +79,7 @@ Key files: `src-tauri/src/terminal/scan.rs`, `src/core/terminal/events.ts`,
 `src/features/terminal/services/pipeline/sessionController.ts`,
 `src-tauri/src/terminal/pty.rs`, `src-tauri/src/shell_integration.rs`.
 
-Domains: `src/features/agent` (stream, tools, permissions, MCP, context, memory, scheduling),
+Domains: `src/features/agent` (stream, tools, permissions, MCP, context, memory),
 `src/features/chat`, `src/features/settings`, `src/features/ssh`, `src/features/files`,
 `src/features/search`, `src/features/terminal`, `src/features/workspace`.
 

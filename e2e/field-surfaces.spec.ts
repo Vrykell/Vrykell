@@ -1,5 +1,5 @@
 import { test, expect, type Locator, type Page } from '@playwright/test';
-import { setupTauriMock, memoryFact } from './tauri-mock';
+import { setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 /** Chromium serializes color-mix() results as `color(srgb r g b)` with 0..1 channels. */
@@ -87,12 +87,6 @@ for (const theme of ['深色', '浅色']) {
     await expectFieldHierarchy(page.getByPlaceholder('模型名称').first());
     await page.screenshot({ path: test.info().outputPath('model-fields.png') });
     await page.keyboard.press('Escape');
-    await page.locator('aside').getByRole('button', { name: '内存', exact: true }).click();
-    const memory = page.getByPlaceholder(/持久知识/);
-    await expectFieldHierarchy(memory.locator('xpath=..'));
-    await memory.fill('surface editing check');
-    await memory.blur();
-    await expect.poll(() => memoryFact(page)).toBe('surface editing check');
     await page.keyboard.press('Meta+1');
     const composer = page.locator('.terminal-composer').first();
     await expectFieldHierarchy(composer);

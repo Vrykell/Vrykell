@@ -93,8 +93,8 @@ PTY output -> Rust StreamScanner (src-tauri/src/terminal/scan.rs, synchronous)
 ```
 
 - `src/core/terminal/events.ts` mirrors the Rust `ScanEvent` as `DispatchEvent`.
-- Domains: `src/features/agent` (stream, tools, permissions, MCP, context, memory,
-  scheduling), `src/features/chat` (AiBlock, ToolRunCard, Markdown, PanelChat),
+- Domains: `src/features/agent` (stream, tools, permissions, MCP, context, memory),
+  `src/features/chat` (AiBlock, ToolRunCard, Markdown, PanelChat),
   `src/features/settings`, `src/features/ssh`, `src/features/files`, `src/features/search`,
   `src/features/terminal`, `src/features/workspace`.
 - Infrastructure: `src/platform/` (Tauri IPC, PTY, fs, shells), `src/ui/` (business-agnostic

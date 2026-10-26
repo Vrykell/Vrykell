@@ -14,10 +14,9 @@
 //! a turn open: when the answer takes too long the call is denied. Late answers cannot issue
 //! an execution lease after that deadline.
 //!
-//! Residual gap, stated plainly: the shared UI commands (the file panel, the settings pages)
-//! are reachable from the same webview and are not lease-gated, so a fully compromised
-//! renderer is still inside the trust boundary. Closing that needs a separate IPC surface per
-//! audience, which is the next step.
+//! Shared privileged commands also consume leases at the dispatch boundary. UI leases bind to
+//! the native webview label and exact payload. The main renderer remains trusted: a lease is
+//! not evidence of a human gesture and does not isolate two callers in the same webview.
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -159,11 +158,6 @@ const DURABLE_ACTIONS: &[(&str, &str, &str)] = &[
         "durable.memory_rewrite",
     ),
     ("memory", "append", "durable.memory_append"),
-    ("subagent", "create", "durable.subagent_create"),
-    ("subagent", "remove", "durable.subagent_remove"),
-    ("schedule", "create", "durable.schedule_create"),
-    ("schedule", "toggle", "durable.schedule_toggle"),
-    ("schedule", "remove", "durable.schedule_remove"),
 ];
 
 /// Wrapper invocations that run the rest of the line in a nested shell (`cmd /c`, `powershell
@@ -336,6 +330,12 @@ impl Default for ToolPolicy {
 }
 
 impl ToolPolicy {
+    pub fn issue_ui(&self, label: &str, command: &str, args: &Value) -> Result<String, String> {
+        if !shared_command(command) || !(label == "main" || label.starts_with("tool-")) {
+            return Err("This interface cannot authorize the requested command".into());
+        }
+        self.issue(&format!("ui:{label}:{command}"), args)
+    }
     pub fn level_of(&self, tool: &str) -> Level {
         self.0
             .lock()
@@ -556,6 +556,18 @@ fn gated_command(request: &AuthorizeRequest) -> String {
         .unwrap_or_else(|| request.tool.clone())
 }
 
+fn validate_tool_command(tool: &str, command: Option<&str>) -> Result<(), String> {
+    let expected = match tool {
+        "read_file" => "read_file_text", "write_file" => "write_file_text", "edit_file" => "edit_file_text",
+        "list_dir" => "fs_list", "search_files" => "fs_search", "memory" => "save_memory",
+        "install_skill" => "install_skill_md", "mcp" => "mcp_call_tool",
+        "run_command" | "terminal_keys" | "read_terminal" | "use_skill" | "web_fetch" | "web_crawl" | "web_search" => tool,
+        _ => return Err("Unknown tool authorization target".into()),
+    };
+    if command.is_some_and(|name| name != expected) { return Err("Tool and execution command do not match".into()); }
+    Ok(())
+}
+
 /// Programs that exist to run text handed to them: a shape approval on one of these would approve
 /// everything it could be told to do, so they only ever get the per-call (or whole-tool) approval.
 const NO_SHAPE_PROGRAMS: &[&str] = &[
@@ -663,6 +675,7 @@ pub async fn authorize_tool_call(
     request: AuthorizeRequest,
 ) -> Result<ToolDecision, String> {
     let tool = request.tool.as_str();
+    validate_tool_command(tool, request.command.as_deref())?;
     if state.level_of(tool) == Level::Deny {
         return Ok(ToolDecision::deny(Some("policy.denied".to_string())));
     }
@@ -708,6 +721,7 @@ pub fn approve_tool_call(
     scope: Option<String>,
     conversation_id: Option<String>,
 ) -> Result<ToolDecision, String> {
+    validate_tool_command(&tool, command.as_deref())?;
     if state.level_of(&tool) == Level::Deny {
         return Ok(ToolDecision::deny(Some("policy.denied".to_string())));
     }
@@ -739,6 +753,44 @@ pub fn require_lease(
     policy.consume(&token, command, args)
 }
 
+fn shared_command(command: &str) -> bool {
+    static COMMANDS: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+    COMMANDS.get_or_init(|| serde_json::from_str(include_str!("../../../src/core/sharedCommands.json")).expect("valid command registry"))
+        .iter().any(|name| name == command)
+}
+
+fn consume_shared(policy: &ToolPolicy, label: &str, command: &str, payload: &Value) -> Result<(), String> {
+    let mut args = payload.as_object().cloned().ok_or("A command payload must be an object")?;
+    let lease = args.remove("lease");
+    let ui_lease = args.remove("uiLease");
+    match (lease.and_then(|v| v.as_str().map(str::to_string)), ui_lease.and_then(|v| v.as_str().map(str::to_string))) {
+        (Some(token), None) => policy.consume(&token, command, &Value::Object(args)),
+        (None, Some(token)) => policy.consume(&token, &format!("ui:{label}:{command}"), &Value::Object(args)),
+        _ => Err("This command requires one valid execution lease".into()),
+    }
+}
+
+#[tauri::command]
+pub fn authorize_ui_command<R: tauri::Runtime>(webview: tauri::Webview<R>, state: tauri::State<'_, ToolPolicy>, command: String, args: Value) -> Result<String, String> {
+    state.issue_ui(webview.label(), &command, &args)
+}
+
+pub fn guard_ipc<R: tauri::Runtime>(next: impl Fn(tauri::ipc::Invoke<R>) -> bool + Send + Sync + 'static)
+    -> impl Fn(tauri::ipc::Invoke<R>) -> bool + Send + Sync + 'static {
+    move |invoke| {
+        use tauri::Manager;
+        if shared_command(invoke.message.command()) {
+            let webview = invoke.message.webview();
+            let result = match invoke.message.payload() {
+                tauri::ipc::InvokeBody::Json(payload) => consume_shared(&webview.state::<ToolPolicy>(), webview.label(), invoke.message.command(), payload),
+                _ => Err("Binary payloads cannot authorize shared commands".into()),
+            };
+            if let Err(error) = result { invoke.resolver.reject(error); return true; }
+        }
+        next(invoke)
+    }
+}
+
 // ── policy commands ──────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -760,8 +812,6 @@ pub fn tool_policy_get(state: tauri::State<'_, ToolPolicy>) -> Result<Value, Str
         "install_skill",
         "mcp",
         "memory",
-        "schedule",
-        "subagent",
     ] {
         out.insert(
             tool.to_string(),
@@ -828,6 +878,34 @@ mod tests {
         for tool in ["read_file", "list_dir", "search_files", "memory", "web_fetch"] {
             assert_eq!(p.level_of(tool), Level::Allow, "{tool}");
         }
+    }
+
+    #[test]
+    fn shared_leases_bind_the_caller_payload_and_single_execution() {
+        let p = policy();
+        let args = json!({"input": {"key":"editor", "content":"current"}});
+        let token = p.issue_ui("main", "save_memory", &args).unwrap();
+        let mut payload = args.clone(); payload["uiLease"] = json!(token);
+        consume_shared(&p, "main", "save_memory", &payload).unwrap();
+        assert!(consume_shared(&p, "main", "save_memory", &payload).is_err());
+        assert!(consume_shared(&p, "main", "save_memory", &args).is_err());
+        let token = p.issue_ui("main", "save_memory", &args).unwrap();
+        payload["uiLease"] = json!(token);
+        assert!(consume_shared(&p, "tool-other", "save_memory", &payload).is_err());
+        let token = p.issue_ui("main", "save_memory", &args).unwrap();
+        payload["uiLease"] = json!(token); payload["input"]["content"] = json!("substituted");
+        assert!(consume_shared(&p, "main", "save_memory", &payload).is_err());
+        assert!(p.issue_ui("unknown", "save_memory", &args).is_err());
+        assert!(p.issue_ui("main", "authorize_tool_call", &args).is_err());
+    }
+
+    #[test]
+    fn a_read_tool_cannot_mint_a_write_or_shared_command_lease() {
+        assert!(validate_tool_command("read_file", Some("save_memory")).is_err());
+        assert!(validate_tool_command("read_file", Some("pty_write")).is_err());
+        assert!(validate_tool_command("missing", None).is_err());
+        assert!(validate_tool_command("memory", Some("save_memory")).is_ok());
+        assert!(validate_tool_command("mcp", Some("mcp_call_tool")).is_ok());
     }
 
     #[test]
@@ -1004,10 +1082,6 @@ mod tests {
             Some("durable.memory_rewrite")
         );
         assert_eq!(durable_action_reason("memory", &json!({ "action": "read" })), None);
-        assert_eq!(
-            durable_action_reason("schedule", &json!({ "action": "create" })).as_deref(),
-            Some("durable.schedule_create")
-        );
         assert_eq!(durable_action_reason("run_command", &json!({ "command": "ls" })), None);
     }
 

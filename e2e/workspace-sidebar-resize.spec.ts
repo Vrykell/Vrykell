@@ -9,7 +9,7 @@ async function dragStart(page: Page) {
 }
 
 test('sidebar width is bounded, reversible while held, persisted and fully collapsed on release', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   const sidebar = page.getByTestId('workspace-sidebar');
   const input = page.locator('[data-terminal-input]').first();
   await input.fill('keep command draft');
@@ -44,7 +44,7 @@ test('sidebar width is bounded, reversible while held, persisted and fully colla
 });
 
 test('narrow windows retain manual expansion without consuming the terminal minimum', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   const sidebar = page.getByTestId('workspace-sidebar');
   const y = await dragStart(page);
   await page.mouse.move(800, y); await page.mouse.up();
@@ -60,7 +60,7 @@ test('narrow windows retain manual expansion without consuming the terminal mini
 });
 
 test('a full terminal grid can open navigation as a temporary overlay without resizing its panes', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   const input = page.locator('[data-terminal-input]').first();
   await input.fill('retain the terminal draft');
   await page.evaluate(async () => {

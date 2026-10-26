@@ -20,7 +20,7 @@ for (const theme of ['深色', '浅色']) {
     await page.getByRole('radio', { name: theme, exact: true }).click();
     const nav = page.locator('.settings-navigation');
     const labels = ['启动', '日志与诊断', '模型配置', '模型行为', '工具权限', '联网搜索', '技能',
-      'MCP 服务器', '内存', '子代理', '定时任务', '编辑器设置', '本地文件打开方式', '远程文件打开方式', '主题',
+      'MCP 服务器', '记忆', '编辑器设置', '本地文件打开方式', '远程文件打开方式', '主题',
       '块外观', '字体与显示', '主题文件', '快捷键说明'];
     for (const [index, label] of labels.entries()) {
       await nav.getByRole('button', { name: label, exact: true }).click();

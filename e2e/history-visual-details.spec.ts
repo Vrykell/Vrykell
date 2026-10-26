@@ -10,7 +10,7 @@ async function centerY(element: Locator) {
 for (const theme of ['dark', 'light'] as const) {
   test(`history details use clear actions, single-line headers and scoped menus in ${theme}`, async ({ page }, testInfo) => {
     test.setTimeout(60_000);
-    await setupTauriMock(page, { schedulesSeed: [], groupedHistoricalSession: true });
+    await setupTauriMock(page, { groupedHistoricalSession: true });
     await page.goto('/');
     await page.evaluate(() => {
       const now = Date.now();
@@ -144,7 +144,7 @@ for (const theme of ['dark', 'light'] as const) {
 }
 
 test('quick controls restore one original member with the keyboard and delete without restoring', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [], groupedHistoricalSession: true });
+  await setupTauriMock(page, { groupedHistoricalSession: true });
   await page.goto('/');
   await ensureTabsOpen(page);
   await page.getByTestId('tab-history-btn').click();

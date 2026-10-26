@@ -5,7 +5,7 @@ for (const theme of ['dark', 'light'] as const) for (const density of [1, 1.25, 
   test(`colored shell identities at ${density}x in ${theme}`, async ({ browser }, info) => {
     const context = await browser.newContext({ viewport: { width: 1240, height: 800 }, deviceScaleFactor: density });
     const page = await context.newPage();
-    await setupTauriMock(page, { schedulesSeed: [] });
+    await setupTauriMock(page, {});
     await page.addInitScript(theme => {
       localStorage.setItem('vrykell-theme-mode', theme);
       localStorage.setItem('vrykell-startup-mode', 'empty');

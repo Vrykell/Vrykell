@@ -5,7 +5,7 @@ import { pickPlacementZone } from './placement';
 for (const split of [false, true]) test(`runs the sidebar alongside ${split ? 'two split' : 'a main'} conversation without sharing stop or queue state`, async ({ page }, info) => {
   await mockAnthropic(page, 'Independent responses keep streaming while another conversation is stopped.');
   await paceLlmStream(page, 500);
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/');
   await page.getByTestId('workspace-area-ai').click();
@@ -42,7 +42,7 @@ for (const split of [false, true]) test(`runs the sidebar alongside ${split ? 't
 });
 
 test('keeps two connected agent turns independent across main and sidebar surfaces', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-ai').click();
   await page.getByTestId('harness-add-session').click(); await page.getByTestId('acp-launcher-Fake ACP').click();
   const main = page.getByTestId('ai-surface-main');
@@ -70,7 +70,7 @@ test('keeps two connected agent turns independent across main and sidebar surfac
 
 test('recovers from two connection failures without adding duplicate messages', async ({ page }) => {
   await mockAnthropic(page, 'Recovered after retry');
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(() => { (window as unknown as { __AI_CONNECTION_FAILURES__: unknown }).__AI_CONNECTION_FAILURES__ = { remaining: 2, retryable: true }; });
   await page.goto('/'); await page.locator('[data-dock-btn="chat"]').click();
   const side = page.getByTestId('ai-surface-side');
@@ -85,7 +85,7 @@ test('recovers from two connection failures without adding duplicate messages', 
 
 test('reports an exhausted connection retry and keeps manual retry available', async ({ page }) => {
   await mockAnthropic(page, 'Manual retry succeeded');
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(() => { (window as unknown as { __AI_CONNECTION_FAILURES__: unknown }).__AI_CONNECTION_FAILURES__ = { remaining: 3, retryable: true }; });
   await page.goto('/'); await page.locator('[data-dock-btn="chat"]').click();
   const side = page.getByTestId('ai-surface-side');

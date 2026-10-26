@@ -3,7 +3,7 @@ import { setupTauriMock } from './tauri-mock';
 
 test.use({ deviceScaleFactor: 1.25, viewport: { width: 1024, height: 640 } });
 for (const theme of ['dark', 'light']) test(`host controls retain compact prototype dimensions at display scaling in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => {
     localStorage.setItem('vrykell-theme-mode', theme);
     localStorage.setItem('workspace-navigation-v1', JSON.stringify({ collapsed: true }));

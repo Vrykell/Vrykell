@@ -4,7 +4,7 @@ import { setupTauriMock } from './tauri-mock';
 test.use({ deviceScaleFactor: 1.25 });
 
 for (const theme of ['dark', 'light']) test(`compact creation, opacity and long conversation errors in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
   await page.goto('/');
   await page.evaluate(() => { document.documentElement.dataset.nativeMaterial = 'fallback'; });

@@ -10,7 +10,6 @@ import { appendChatMessage, deleteChatMessage } from '@platform/api/session';
 import {
   serializeParts,
   deserializeParts,
-  partsToHistoryText,
   type MessagePart,
   type ToolRun,
 } from '@features/agent/model/messageParts';
@@ -58,7 +57,7 @@ export interface StreamHandlers {
 }
 
 export type StreamFn = (
-  messages: Array<{ role: string; content: string; attachments?: AttachmentMeta[] }>,
+  messages: Array<{ role: string; content: string; attachments?: AttachmentMeta[]; parts?: MessagePart[] }>,
   onChunk: (text: string) => void,
   ctx?: { signal?: AbortSignal; tabId?: string; paneId?: string | null; environment?: ChatEnvironment | null; handlers?: StreamHandlers },
 ) => Promise<void>;
@@ -239,8 +238,8 @@ export const useChatStore = create<ChatState>((set, get) => {
       .filter((m) => !m.pending)
       .map((m) => ({
         role: m.role,
-        // 助手消息追加单行工具摘要，让后续轮次知道本轮做过什么
-        content: m.role === 'assistant' ? m.content + partsToHistoryText(m.parts) : m.content + referenceHistoryText(m.references),
+        content: m.role === 'assistant' ? m.content : m.content + referenceHistoryText(m.references),
+        ...(m.role === 'assistant' && m.parts ? { parts: m.parts } : {}),
         // 附件透传：文本/图片映射由 agentStream 按模型能力展开
         ...(m.attachments?.length ? { attachments: m.attachments } : {}),
       }));

@@ -3,7 +3,7 @@ import { setupTauriMock } from './tauri-mock';
 import { pickPlacementZone } from './placement';
 
 test('splits files inside the editor workspace and preserves independent buffers', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-code').click();
   await page.getByTestId('code-start-page-content').getByRole('button', { name: '新建文件', exact: true }).click();
   const bar = page.getByTestId('workspace-instance-bar');
@@ -27,7 +27,7 @@ test('splits files inside the editor workspace and preserves independent buffers
 });
 
 test('opens an existing file as a split only after choosing its position', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-code').click();
   await page.getByTestId('code-start-page-content').getByRole('button', { name: '新建文件', exact: true }).click();
   await page.evaluate(() => { (window as unknown as { __PICK_PATHS__: string[] }).__PICK_PATHS__ = ['/home/e2e/project/chosen.txt']; });
@@ -43,7 +43,7 @@ test('opens an existing file as a split only after choosing its position', async
 });
 
 test('selects an ACP working directory before opening its session', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-ai').click();
   await page.getByTestId('harness-add-session').click();
   await page.locator('[data-testid="acp-launcher-directory"]:visible').fill('C:/work/project');
@@ -53,7 +53,7 @@ test('selects an ACP working directory before opening its session', async ({ pag
 });
 
 test('keeps terminal splitting native and badges the original terminal icon', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await expect(page.locator('.terminal-pane:visible')).toHaveCount(1);
   await page.keyboard.press('Control+d');
   await pickPlacementZone(page, page.locator('.terminal-pane:visible').first(), 'right');
@@ -67,7 +67,7 @@ test('keeps terminal splitting native and badges the original terminal icon', as
 });
 
 test('keeps split conversation tools in the existing tab strip, not extra pane headers', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-ai').click();
   await page.getByTestId('ai-new-conversation').click();
   const bar = page.getByTestId('workspace-instance-bar');

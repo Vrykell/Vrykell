@@ -1,41 +1,27 @@
-/**
- * platform — 长期记忆 / 子代理 / 定时任务 的 Rust 封装与类型。
- */
+/** Typed access to the local memory store. */
 import { invoke } from '@platform/diagnostics';
 
 // ── 记忆 ──
 
-export const getMemory = () => invoke<string>('get_memory');
-export const setMemory = (content: string) => invoke<void>('set_memory', { content });
-export const getMemoryJournal = () => invoke<string>('get_memory_journal');
-export const appendMemoryJournal = (text: string) => invoke<void>('append_memory_journal', { text });
-
-// ── 子代理 ──
-
-export interface AgentDef {
+export interface MemoryRecord {
   id: string;
-  name: string;
-  description: string;
-  prompt: string;
+  scope: string;
+  key: string;
+  content: string;
+  status: 'active' | 'inactive' | 'pending';
+  source: string;
+  updatedAt: number;
+  expiresAt: number;
+  revision: number;
 }
-
-export const listAgents = () => invoke<AgentDef[]>('list_agents');
-export const saveAgent = (agent: AgentDef) => invoke<void>('save_agent', { agent });
-export const removeAgent = (id: string) => invoke<void>('remove_agent', { id });
-export const getAgent = (nameOrId: string) => invoke<AgentDef>('get_agent', { nameOrId });
-
-// ── 定时任务 ──
-
-export interface Schedule {
-  id: string;
-  name: string;
-  prompt: string;
-  intervalMinutes: number;
-  enabled: boolean;
-  lastRunAt: number;
+export interface MemoryQuery {
+  scope?: string; query?: string; includeInactive?: boolean; offset?: number; limit?: number;
 }
-
-export const listSchedules = () => invoke<Schedule[]>('list_schedules');
-export const saveSchedule = (s: Schedule) => invoke<void>('save_schedule', { schedule: s });
-export const removeSchedule = (id: string) => invoke<void>('remove_schedule', { id });
-export const markScheduleRun = (id: string, at: number) => invoke<void>('mark_schedule_run', { id, at });
+export type MemoryWrite = Omit<MemoryRecord, 'id' | 'updatedAt' | 'revision' | 'expiresAt'> & {
+  id?: string; expectedRevision?: number; expiresAt?: number;
+};
+export const queryMemories = (input: MemoryQuery) => invoke<MemoryRecord[]>('query_memories', { input });
+export interface MemoryStats { total: number; active: number; pending: number; inactive: number; expired: number }
+export const memoryStats = () => invoke<MemoryStats>('memory_stats');
+export const saveMemory = (input: MemoryWrite, authorization?: { lease: string | null; action: 'append' | 'update' }) =>
+  invoke<MemoryRecord>('save_memory', { input, ...authorization });

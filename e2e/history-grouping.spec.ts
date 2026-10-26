@@ -45,7 +45,7 @@ async function seedSessionHistory(page: Page) {
 }
 
 test('session grouping separates remote directories and combines connection filtering with record sorting', async ({ page }, testInfo) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await ensureTabsOpen(page);
@@ -192,7 +192,7 @@ test('AI history groups by working directory and conversation type and uses sett
 });
 
 test('session date basis survives title sorting, regrouping and reopening', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await ensureTabsOpen(page);
@@ -223,7 +223,7 @@ test('session date basis survives title sorting, regrouping and reopening', asyn
 });
 
 test('AI remote directory grouping retains the selected date basis and search after reload', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.evaluate(() => {
@@ -271,7 +271,7 @@ test('AI remote directory grouping retains the selected date basis and search af
 });
 
 test('card metadata stays outside the collapse button at normal and maximum UI font sizes', async ({ page }, testInfo) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await ensureTabsOpen(page);

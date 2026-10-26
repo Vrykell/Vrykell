@@ -24,8 +24,8 @@ describe('availableSkillMetas / buildSkillsContext', () => {
   it('清单仅含名称与描述，提示 use_skill', () => {
     const ctx = buildSkillsContext([m1, m2]);
     expect(ctx).toContain('use_skill');
-    expect(ctx).toContain('- 写单测：写测试');
-    expect(ctx).toContain('- 代码审查：审查');
+    expect(ctx).toContain('- 写单测: 写测试');
+    expect(ctx).toContain('- 代码审查: 审查');
   });
 });
 

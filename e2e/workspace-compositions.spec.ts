@@ -3,7 +3,7 @@ import { setupTauriMock } from './tauri-mock';
 import { pickPlacementZone } from './placement';
 
 for (const theme of ['dark', 'light']) test(`common start scopes creation correctly in ${theme} and retains its workspace`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => { localStorage.setItem('vrykell-theme-mode', theme); localStorage.setItem('vrykell-startup-mode', 'empty'); }, theme);
   await page.goto('/');
   await page.getByTestId('workspace-area-unified').click();
@@ -37,7 +37,7 @@ for (const theme of ['dark', 'light']) test(`common start scopes creation correc
 });
 
 test('filters a mixed history item by each member and restores the complete layout in place', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/'); await page.getByTestId('workspace-area-unified').click();
   const workspace = page.getByTestId('unified-workspace'); const bar = page.getByTestId('workspace-instance-bar');
   const terminalTitle = await bar.getByRole('tab').nth(0).innerText();
@@ -81,7 +81,7 @@ test('filters a mixed history item by each member and restores the complete layo
 });
 
 test('only offers pane removal for a real split and keeps the remaining terminal alive', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-unified').click();
   const workspace = page.getByTestId('unified-workspace'); const bar = page.getByTestId('workspace-instance-bar');
   await bar.getByRole('tab').nth(0).click();
@@ -105,7 +105,7 @@ test('only offers pane removal for a real split and keeps the remaining terminal
 });
 
 for (const theme of ['dark', 'light']) test(`opens the existing agent launcher after closing both split menu levels in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
   await page.goto('/'); await page.getByTestId('workspace-area-unified').click();
   await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '新建工作区标签', exact: true }).click();
@@ -140,7 +140,7 @@ for (const theme of ['dark', 'light']) test(`opens the existing agent launcher a
 });
 
 for (const width of [640, 1240]) test(`keeps toolbar actions and creation pickers separate inside a ${width}px window`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-unified').click();
   await page.setViewportSize({ width, height: 800 });
   const bar = page.getByTestId('workspace-instance-bar');
@@ -173,7 +173,7 @@ for (const width of [640, 1240]) test(`keeps toolbar actions and creation picker
 
 test('restores single conversation history back into the common workspace from its start page', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('e2e-conversations', JSON.stringify([{ id: 'saved-chat', title: 'Saved work', created_at: 1, updated_at: 2, environment: '{}' }])));
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/'); await page.getByTestId('workspace-area-unified').click();
   await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '全部历史', exact: true }).click();
   await page.getByTestId('unified-history-conversation:saved-chat').click();
@@ -183,7 +183,7 @@ test('restores single conversation history back into the common workspace from i
 });
 
 test('shows creation choices directly when a split has no existing tabs to add', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-unified').click();
   const bar = page.getByTestId('workspace-instance-bar');
   await bar.getByRole('tab').nth(0).click();

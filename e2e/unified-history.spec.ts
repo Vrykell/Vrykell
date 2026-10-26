@@ -10,7 +10,7 @@ test('unified history searches terminals and AI conversations and routes to thei
     }]));
     localStorage.setItem('e2e-conversation-messages', '[]');
   });
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await page.getByTestId('workspace-history').click();
   const unified = page.getByTestId('unified-history-page');
@@ -55,7 +55,7 @@ test('unified history searches terminals and AI conversations and routes to thei
 });
 
 test('filter cards stay on one line and secondary controls collapse into more actions', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await page.getByTestId('workspace-history').click();
   await page.getByTestId('unified-history-filter').click();

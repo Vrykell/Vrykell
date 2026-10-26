@@ -81,7 +81,7 @@ for (const density of [1, 1.25, 1.5, 2]) {
     test.use({ deviceScaleFactor: density });
     test('held sidebar drag stays uniform beside pinned titles, editors and comparisons', async ({ page }) => {
       test.setTimeout(60_000);
-      await setupTauriMock(page, { schedulesSeed: [] });
+      await setupTauriMock(page, {});
       await page.goto('/');
       await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
       await page.locator('[data-dock-btn="chat"]').click();

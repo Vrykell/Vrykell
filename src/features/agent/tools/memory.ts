@@ -1,64 +1,53 @@
-/**
- * memory — 长期记忆工具（FACT + JOURNAL）：
- *   read=读取全部记忆；update=重写持久知识（记忆整理）；
- *   append=追加一条流水；search=按关键词搜索。
- */
 import { tool } from 'ai';
-import { DESC_MEMORY } from '@features/agent/model/toolTexts';
 import { z } from 'zod';
-import { getMemory, setMemory, getMemoryJournal, appendMemoryJournal } from '@features/agent/services/platform';
-import { gate, type ToolContext } from '@features/agent/stores/permissions';
+import { t } from '@i18n';
+import { DESC_MEMORY } from '../model/toolTexts';
+import { queryMemories, saveMemory } from '../services/platform';
+import { gate, type ToolContext } from '../stores/permissions';
 
 export function buildMemoryTool(ctx: ToolContext) {
   return {
     memory: tool({
       description: DESC_MEMORY,
       inputSchema: z.object({
-        action: z.enum(['read', 'update', 'append', 'search']),
-        content: z.string().optional().describe('update 时的完整 FACT 内容'),
-        text: z.string().optional().describe('append 时的流水文本'),
-        query: z.string().optional().describe('search 时的关键词'),
-        limit: z.number().int().min(1).max(50).optional().describe('search 返回条数，默认 10'),
+        action: z.enum(['read', 'search', 'append', 'update']),
+        query: z.string().max(2048).optional(),
+        includeInactive: z.boolean().default(false).describe('Explicit review only: include pending, inactive and expired records. Revalidate before activating.'),
+        key: z.string().min(1).max(160).optional().describe('Stable subject key. Reuse the same key when a fact changes.'),
+        content: z.string().min(1).max(2048).optional(),
+        id: z.string().optional(),
+        expectedRevision: z.number().int().positive().optional(),
+        scope: z.enum(['project', 'global']).default('project'),
+        status: z.enum(['active', 'inactive']).default('active'),
+        validDays: z.number().int().min(1).max(365).default(90),
+        limit: z.number().int().min(1).max(20).default(10),
+        offset: z.number().int().min(0).max(100_000).optional().describe('Offset for explicit paged review'),
       }),
       execute: async (args, { toolCallId }) => {
-        const g = await gate('memory', { action: args.action }, toolCallId, ctx);
-        if (!g.proceed) return g.result;
+        if (ctx.signal?.aborted) return { ok: false, cancelled: true };
+        const scope = args.scope === 'global' ? 'global' : ctx.memoryScope ?? `conversation:${ctx.tabId ?? 'discussion'}`;
         try {
-          switch (args.action) {
-            case 'read': {
-              const fact = await getMemory();
-              const journal = await getMemoryJournal();
-              return `【持久知识】\n${fact || '（空）'}\n\n【流水】\n${journal || '（空）'}`;
-            }
-            case 'update': {
-              if (!args.content) return { ok: false, error: 'update 需要 content' };
-              await setMemory(args.content);
-              return { ok: true, result: '已重写持久知识' };
-            }
-            case 'append': {
-              if (!args.text?.trim()) return { ok: false, error: 'append 需要 text' };
-              await appendMemoryJournal(args.text);
-              return { ok: true, result: '已追加流水' };
-            }
-            case 'search': {
-              const q = (args.query ?? '').toLowerCase();
-              const fact = await getMemory();
-              const journal = await getMemoryJournal();
-              const hits: string[] = [];
-              for (const line of fact.split('\n')) {
-                if (!q || line.toLowerCase().includes(q)) hits.push(`FACT: ${line}`);
-              }
-              for (const line of journal.split('\n')) {
-                if (!q || line.toLowerCase().includes(q)) hits.push(line);
-              }
-              const lim = args.limit ?? 10;
-              return hits.slice(-lim).join('\n') || '（无匹配）';
-            }
-            default:
-              return { ok: false, error: '未知 action' };
+          if (args.action === 'read' || args.action === 'search') {
+            const g = await gate('memory', { action: args.action }, toolCallId, ctx);
+            if (!g.proceed) return g.result;
+            if (args.action === 'search' && !args.query?.trim()) return { ok: false, error: t('Enter a memory query.') };
+            return { ok: true, records: await queryMemories({ scope, query: args.query, limit: args.limit,
+              ...(args.offset !== undefined ? { offset: args.offset } : {}), ...(args.includeInactive ? { includeInactive: true } : {}) }) };
           }
-        } catch (e) {
-          return { ok: false, error: String((e as Error)?.message ?? e) };
+          if (!args.key?.trim() || !args.content?.trim() || args.action === 'update' && (!args.id || !args.expectedRevision)) {
+            return { ok: false, error: t('Provide a memory key and content; updates also require the current id and revision.') };
+          }
+          const input = {
+            ...(args.action === 'update' ? { id: args.id, expectedRevision: args.expectedRevision } : {}),
+            scope, key: args.key, content: args.content, status: args.status,
+            source: `conversation:${ctx.tabId ?? 'discussion'}`, expiresAt: Date.now() + args.validDays * 86_400_000,
+          };
+          const g = await gate('memory', { input, action: args.action }, toolCallId, ctx, 'save_memory');
+          if (!g.proceed) return g.result;
+          if (ctx.signal?.aborted) return { ok: false, cancelled: true };
+          return { ok: true, record: await saveMemory(input, { lease: g.lease ?? null, action: args.action }) };
+        } catch (error) {
+          return { ok: false, error: String(error instanceof Error ? error.message : error) };
         }
       },
     }),

@@ -4,7 +4,7 @@ import { gotoSetting } from './settings';
 
 test.setTimeout(60_000);
 test.beforeEach(async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByTestId('workspace-area-code').click();
   await page.getByTestId('code-start-page-content').getByRole('button', { name: '新建文件', exact: true }).click();

@@ -277,7 +277,7 @@ zustand，按域拆分（`src/features/*/stores/`）：
 | `commands/` | Tauri command 转发层（search/session/group/workspace/download） |
 | `files/` | 文件系统操作（fs、`fs_disks` 磁盘列表、file_open） |
 | `remote/ssh.rs` | SSH/SFTP（connection CRUD、主机指纹 TOFU、SFTP 下载上传） |
-| `agent/` | AI 流式（ai.rs）、Skills、记忆、MCP、调度、web 抓取、自定义 agent |
+| `agent/` | AI 流式（ai.rs）、Skills、记忆、MCP、web 抓取 |
 | `theme.rs` | 主题配置持久化 |
 | `lib.rs` / `main.rs` | Tauri 命令注册、AppState 组装、启动/退出归档 |
 
@@ -352,14 +352,14 @@ T4   渲染帧
 |------|------|
 | `src/features/agent/services/agentStream.ts` | chat store 的 AI SDK 流式实现（streamText + 工具） |
 | `src/features/agent/model/messageParts.ts` | 消息部件模型（ToolRun 状态等） |
-| `src/features/agent/tools/` | 工具集（runCommand/terminal/files/skill/webSearch/webFetch/subagent/memory/schedule） |
+| `src/features/agent/tools/` | 工具集（runCommand/terminal/files/skill/webSearch/webFetch/memory） |
 | `src/features/agent/stores/permissions.ts` | 权限模式（标准/严格/放行） |
 | `src/features/agent/model/context.ts` | 上下文策略（off/window/compact + 摘要压缩） |
 | `src/features/agent/services/skills.ts` / `src/features/agent/services/mcp.ts` | Skills / MCP 工具装配 |
 | `src/features/chat/components/PanelChat.tsx` | 全局 AI 对话面板（dock 侧栏） |
 | `src/features/chat/components/AiBlock.tsx` / `ToolRunCard.tsx` | 对话问答块 / 工具状态卡片 |
 | `src/features/settings/` | 设置页（AI 行为/模型/MCP/Skills/快捷键/终端打开模式/外观：主题、块外观、字体与显示、主题文件） |
-| `src-tauri/src/agent/` | AI 流/配置/记忆/Skills/MCP/调度/web 抓取后端 |
+| `src-tauri/src/agent/` | AI 流/配置/记忆/Skills/MCP/web 抓取后端 |
 | `src-tauri/src/remote/ssh.rs` | SSH/SFTP（主机指纹 TOFU、密码认证） |
 
 ### 文件面板（本地 / SSH 唯一实现）
@@ -447,20 +447,20 @@ Dock 中的 `PanelChat` 管理独立 AI 对话。终端 `InputEditor` 提交命�
 ```
 chat store send → agentStream（AI SDK streamText）
   ├─ createChatModel（provider 封装：Anthropic/Gemini/OpenAI 兼容/OpenCode）
-  ├─ buildSystemPrompt + buildSkillsContext + 记忆/agent 列表（platform IPC）
-  ├─ buildTools（terminal/runCommand/files/*/skill/subagent/memory/schedule/webSearch/webFetch/webCrawl）
+  ├─ buildSystemPrompt + buildSkillsContext + 有限本地记忆检索
+  ├─ buildTools（terminal/runCommand/files/*/skill/memory/webSearch/webFetch/webCrawl）
   ├─ buildMcpTool（每 MCP server 一个工具，Rust 侧 mcp.rs 启停连接）
   ├─ 文本 delta → onChunk（store 50ms 合批）；工具事件 → ToolRun（状态卡片）
   └─ stepCountIs(maxSteps) 循环，run_command 使用请求开始时固定的目标 pane
 ```
 
-- **工具授权**（前端 `permissions.ts` + 后端 `src-tauri/src/agent/permissions.rs`）：请求由后端裁决。等级表存 `~/.vrykell/permissions.json`，危险命令 / 凭据路径 / 持久化写入的判断都实现在 Rust，命中时用系统原生对话框确认（网页内容无法代替用户点它）；放行后签发与「命令 + 参数摘要」绑定的一次性租约，受门控的后端命令（`read_file_text`/`write_file_text`/`edit_file_text`/`fs_search`）必须出示租约，漏掉授权的调用会失败关闭。前端只保留等级镜像（渲染设置页与决定注册哪些工具）、审批卡与「本会话允许」的会话授权。共享 UI 命令（文件面板、设置页）尚未纳入门控，这是下一步。
+- **工具授权**（前端 `permissions.ts` + 后端 `src-tauri/src/agent/permissions.rs`）：请求由后端裁决。等级表存 `~/.vrykell/permissions.json`，危险命令 / 凭据路径 / 持久化写入的判断都实现在 Rust，命中时用系统原生对话框确认（网页内容无法代替用户点它）；放行后签发与「命令 + 参数摘要」绑定的一次性租约，受门控的后端命令（`read_file_text`/`write_file_text`/`edit_file_text`/`fs_search`）必须出示租约，漏掉授权的调用会失败关闭。前端只保留等级镜像（渲染设置页与决定注册哪些工具）、审批卡与「本会话允许」的会话授权。共享界面的特权命令也通过统一分发注册表消费租约；界面租约绑定原生 webview 和完整参数，主渲染进程仍属于信任边界。
 - **权限模式**（`permissions.ts`）：标准（按设置页逐工具判定）/ 严格（逐次问）/ 放行（危险命令仍逐次问）；Shield 状态栏 chip 循环切换。
 - **上下文策略**（`context.ts`）：off（全量）/ window（token 预算）/ compact（预算 + 自动摘要压缩），估算用 `estimateTokens`。
 - **设置分层**（`agentSettings.ts`）：global 默认 + per-model overrides（`resolve(modelId)` 合并），localStorage 持久化；provider/模型等连接配置仍在 Rust `config.json`，而 API Key 与 SSH 密码一起放进平台密钥存储（`secret.rs`：Windows DPAPI 加密 / macOS 钥匙串 / 其它平台 0600 文件），`config.json` 不再包含 key，旧明文自动迁移。
 - **服务商目录**（`src/config/providers.json` + `providers.ts`）：家族标识、显示名、默认端点与会话路由头都来自数据；预设模型在 `modelPresets.json`，真实模型列表由端点 `/models` 同步；`ai.rs` 的默认端点镜像由单测对照目录校验。
 - **终端标签标题**（`agent/title.ts`）：终端命令活动足够时可调用 LLM 生成标签标题（App 启动 `initAutoTitle()`）；独立对话的标题在 AI 面板管理。
-- **后端**：`src-tauri/src/agent/`（`ai.rs` SSE 流式、`skills.rs`、`memory.rs`、`mcp.rs`、`schedules.rs`、`web.rs` 抓取、`agents.rs` 自定义 agent）。
+- **后端**：`src-tauri/src/agent/`（`ai.rs` SSE 流式、`skills.rs`、`memory.rs`、`mcp.rs`、`web.rs` 抓取）。
 
 ## 18. 主题系统
 
@@ -480,6 +480,6 @@ chat store send → agentStream（AI SDK streamText）
 
 SQLite 的 `ai_conversations` 与 `ai_messages` 通过对话 ID 关联，独立于终端 `sessions` 的生命周期。兼容旧库时，一次性将 `chat_messages` 复制到 `legacy:<session-id>` 对话；迁移标记阻止删除后的旧对话重新出现。旧终端历史继续保留，打开 AI 面板不隐藏历史或 AI 执行的命令。
 
-消息保存当时的命令、目录、退出码与输出快照，以及本轮执行环境。助手消息保存文本、工具结果、停止与失败状态；思考流仍只在内存中。未发送草稿和阅读位置在应用运行期间按对话保留。保存失败通过 ErrorBox 显示并可重试。当前仍一次处理一个 AI 请求，切换对话时显示后台工作入口；定时任务创建独立后台对话。
+消息保存当时的命令、目录、退出码与输出快照，以及本轮执行环境。助手消息保存文本、工具结果、停止与失败状态；思考流仍只在内存中。未发送草稿和阅读位置在应用运行期间按对话保留。保存失败通过 ErrorBox 显示并可重试。独立会话可以并发生成，完整工具结果持久保存并作为配对模型消息重放。
 
 AiBlock 沿用终端命令块的透明底色、内边距、分隔线和更多操作菜单，以整块蓝色左侧导轨标识问答。ToolRunCard 以紧凑行展示工具状态、审批和输出；在 AI 面板中每行不再带分隔细线，展开后的思考与工具输出改用与 markdown 代码块一致的外框（描边、圆角、平底色），工具输出框悬停或聚焦时在右上角出现复制按钮，终端内联 AI 块则保持平铺分隔行。SafeMarkdown 将明确执行目标传递到代码块，纯讨论隐藏终端运行入口。终端 InputEditor 只提交命令，询问 AI 将最近输出或命令块快照带入对话输入区供检查后发送。

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 test('previews markdown without execution actions and switches real encoding requests', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.evaluate(async () => {

@@ -4,7 +4,7 @@ import { acpCalls, acpUpdate, emitAcpSession, mockAnthropic, paceLlmStream, setu
 test('queues native inputs during streaming and stop remains usable for the next turn', async ({ page }) => {
   await mockAnthropic(page, 'A response delivered in several pieces so the next message can wait.');
   await paceLlmStream(page, 80);
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await page.locator('[data-dock-btn="chat"]').click();
   const composer = page.locator('[data-chat-composer]:visible');
   await composer.fill('First question'); await composer.press('Enter');
@@ -26,7 +26,7 @@ test('queues native inputs during streaming and stop remains usable for the next
 });
 
 for (const theme of ['dark', 'light']) test(`keeps agent sidebar headings and question choices aligned in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
   await page.goto('/'); await page.locator('[data-dock-btn="chat"]').click();
   const sidebar = page.getByTestId('ai-sidebar-content');

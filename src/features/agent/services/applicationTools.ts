@@ -79,6 +79,7 @@ export class ApplicationToolSession {
       const oversized = new TextEncoder().encode(output).length > 240_000;
       const text = oversized ? JSON.stringify({ ok: false, error: 'Tool result exceeds its limit. Request a smaller range.' }) : output;
       run.output = text.length > 8000 ? JSON.stringify({ result: text.slice(0, 7600), truncated: true }) : text;
+      run.modelOutput = text;
       run.state = cancelled ? 'cancelled' : denied ? 'denied' : failed ? 'error' : 'done'; run.endedAt = Date.now();
       this.onTool({ ...run });
       return { content: [{ type: 'text', text }], isError: failed || denied || cancelled || oversized };

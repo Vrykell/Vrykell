@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { setupTauriMock, acpCalls } from './tauri-mock';
 
 test.beforeEach(async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [], terminalDirectories: true });
+  await setupTauriMock(page, { terminalDirectories: true });
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
 });

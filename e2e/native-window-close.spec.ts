@@ -8,7 +8,7 @@ async function destroys(page: Page) {
   return page.evaluate(() => (window as unknown as { __WINDOW_OPS__: { command: string }[] }).__WINDOW_OPS__.filter(item => item.command === 'plugin:window|destroy').length);
 }
 test.beforeEach(async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
 });
 

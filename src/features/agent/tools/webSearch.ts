@@ -34,8 +34,8 @@ export function buildTavilySearchTool(ctx: ToolContext) {
   return tool({
       description: DESC_WEB_SEARCH_TAVILY,
     inputSchema: z.object({
-      query: z.string().describe('搜索词'),
-      maxResults: z.number().int().min(1).max(8).optional().describe('结果条数，默认 5'),
+      query: z.string().describe('Search query'),
+      maxResults: z.number().int().min(1).max(8).optional().describe('Result limit, default 5'),
     }),
     execute: async ({ query, maxResults }, { toolCallId }) => {
       const g = await gate('web_search', { query }, toolCallId, ctx);

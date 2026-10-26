@@ -56,7 +56,7 @@ async function openAiHistory(page: Page) {
 }
 
 test('group names, notes, colors and collapse choices survive reload without changing automatic membership', async ({ page }, testInfo) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await seedSessions(page);
@@ -124,7 +124,7 @@ test('group names, notes, colors and collapse choices survive reload without cha
 });
 
 test('filtered group deletion protects locked records across regrouping and restore processes only matching sessions', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [], sshTrustConfirmed: true });
+  await setupTauriMock(page, { sshTrustConfirmed: true });
   await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await seedSessions(page);
@@ -156,7 +156,7 @@ test('filtered group deletion protects locked records across regrouping and rest
 });
 
 test('AI group copy and deletion use the filtered set while retaining locked and unrelated conversations', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [], sshTrustConfirmed: true });
+  await setupTauriMock(page, { sshTrustConfirmed: true });
   await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.evaluate(() => {

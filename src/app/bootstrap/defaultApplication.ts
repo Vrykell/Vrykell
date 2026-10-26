@@ -2,7 +2,6 @@ import { setDefaultStream, useChatStore } from '@features/chat';
 import { refreshAiConfig, refreshToolPolicy } from '@features/agent';
 import { agentStream } from '@features/agent/services/agentStream';
 import { initAutoTitle } from '@features/agent/services/title';
-import { initScheduleRunner } from '@features/agent/services/scheduleRunner';
 import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
 import { useHistoryStore } from '@features/terminal/stores/history';
 import { initForwardedLaunch, restoreWorkspace } from '@features/workspace';
@@ -38,7 +37,6 @@ export function startDefaultApplication(): () => void {
     refreshAiConfig,
     refreshToolPolicy,
     subscribeAutoTitle: initAutoTitle,
-    startScheduleRunner: initScheduleRunner,
     restoreWorkspace: async () => {
       // A page reload keeps the Rust process and its PTY sessions alive; terminate the
       // previous page's shells before the restored tabs start their own.

@@ -4,7 +4,7 @@ import { pickPlacementZone } from './placement';
 
 for (const split of [false, true]) for (const theme of ['dark', 'light']) {
   test(`sidebar retains its own conversation beside ${split ? 'split' : 'single'} main content in ${theme}`, async ({ page }, info) => {
-    await setupTauriMock(page, { schedulesSeed: [] });
+    await setupTauriMock(page, {});
     await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
@@ -43,7 +43,7 @@ for (const split of [false, true]) for (const theme of ['dark', 'light']) {
 }
 
 test('opening the main agent workspace does not claim the sidebar agent', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-ai').click();
   await page.getByTestId('harness-add-session').click(); await page.getByTestId('acp-launcher-Fake ACP').click();
   const main = page.getByTestId('ai-surface-main').locator('[data-testid="harness-composer"]:visible');

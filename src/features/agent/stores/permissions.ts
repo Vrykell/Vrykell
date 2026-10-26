@@ -49,6 +49,7 @@ export interface GateResult {
 }
 
 export interface ToolContext {
+  memoryScope?: string;
   signal?: AbortSignal;
   /** A fixed execution target; null explicitly disables terminal access. */
   paneId?: string | null;
@@ -78,8 +79,6 @@ export const TOOL_NAMES = [
   'install_skill',
   'mcp',
   'memory',
-  'schedule',
-  'subagent',
 ] as const;
 export type ToolName = (typeof TOOL_NAMES)[number];
 
@@ -105,8 +104,6 @@ export const DEFAULT_LEVELS: Record<ToolName, ToolLevel> = {
   // MCP tools are arbitrary third-party capabilities.
   mcp: 'ask',
   memory: 'allow',
-  schedule: 'allow',
-  subagent: 'allow',
 };
 
 interface PermissionsState {

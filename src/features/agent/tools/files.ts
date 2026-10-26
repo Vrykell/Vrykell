@@ -26,7 +26,7 @@ export function buildFileTools(ctx: ToolContext) {
     read_file: tool({
       description: DESC_READ_FILE,
       inputSchema: z.object({
-        path: z.string().describe('绝对路径'),
+        path: z.string().describe('Absolute file path'),
         max_bytes: z.number().int().min(1).max(8 * 1024 * 1024).optional().describe('Maximum bytes to read, default 256KB, limit 8MB'),
       }),
       execute: async ({ path, max_bytes }, { toolCallId }) => {
@@ -42,8 +42,8 @@ export function buildFileTools(ctx: ToolContext) {
     write_file: tool({
       description: DESC_WRITE_FILE,
       inputSchema: z.object({
-        path: z.string().describe('绝对路径'),
-        content: z.string().describe('完整文件内容'),
+        path: z.string().describe('Absolute file path'),
+        content: z.string().describe('Complete replacement contents'),
       }),
       execute: async ({ path, content }, { toolCallId }) => {
         const args = { path, content };
@@ -58,9 +58,9 @@ export function buildFileTools(ctx: ToolContext) {
     edit_file: tool({
       description: DESC_EDIT_FILE,
       inputSchema: z.object({
-        path: z.string().describe('绝对路径'),
-        old_string: z.string().describe('要被替换的原文（须唯一命中，含缩进/换行）'),
-        new_string: z.string().describe('替换后的新内容'),
+        path: z.string().describe('Absolute file path'),
+        old_string: z.string().describe('Exact unique original text including whitespace'),
+        new_string: z.string().describe('Replacement text'),
       }),
       execute: async ({ path, old_string, new_string }, { toolCallId }) => {
         const args = { path, oldString: old_string, newString: new_string };

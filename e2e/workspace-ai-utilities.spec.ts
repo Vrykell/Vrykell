@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 test('an unavailable side dock keeps the same conversation visible in the main workspace', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-ai').click(); await page.getByTestId('ai-new-conversation').click();
   await page.setViewportSize({ width: 500, height: 800 });
   const composer = page.locator('[data-chat-composer]:visible');
@@ -16,7 +16,7 @@ test('an unavailable side dock keeps the same conversation visible in the main w
 });
 
 test('AI utility pages become singleton tabs while docked conversations keep their draft', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.getByTestId('workspace-area-ai').click();
   await page.getByTestId('ai-new-conversation').click();
@@ -41,7 +41,7 @@ test('AI utility pages become singleton tabs while docked conversations keep the
 });
 
 test('hidden terminal splits do not reserve the resource or code workspace width', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';

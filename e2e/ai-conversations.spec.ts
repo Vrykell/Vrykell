@@ -4,7 +4,7 @@ import { fillHistorySearch } from './history-search';
 
 async function boot(page: Page, reply = 'The build is fixed.') {
   await mockAnthropic(page, reply);
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.locator('[data-dock-btn="chat"]').click();
@@ -151,7 +151,7 @@ test('command analysis stages a reference before sending and never changes termi
 for (const themePalette of ['dark', 'light'] as const) {
   test(`plain conversation answers remain readable in ${themePalette}`, async ({ page }) => {
     await mockAnthropic(page, 'The build failed because the configuration is missing.\n\n```sh\nnpm run build\n```\n\n| 监听地址 | 含义 |\n| --- | --- |\n| `0.0.0.0:80` | 全网卡、外部可达 |\n| `127.0.0.1:3306` | 仅本机 |\n\nCheck the configuration and run the build again.');
-    await setupTauriMock(page, { schedulesSeed: [] });
+    await setupTauriMock(page, {});
     await page.goto('/');
     if (themePalette === 'light') {
       await page.getByRole('button', { name: '设置', exact: true }).click();
@@ -200,7 +200,7 @@ for (const themePalette of ['dark', 'light'] as const) {
 }
 
 test('tool activity stays available within the plain conversation flow', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await page.evaluate(async () => {
     const now = Date.now();
@@ -319,7 +319,7 @@ test('a small scroll while the reply streams keeps the reading position', async 
   // trackpad nudges a few pixels at a time: the follow has to pause on the input itself.
   await mockAnthropic(page, Array.from({ length: 60 }, (_, index) => `Paragraph ${index}: review the project configuration.`).join('\n\n'));
   await paceLlmStream(page, 60);
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.locator('[data-dock-btn="chat"]').click();

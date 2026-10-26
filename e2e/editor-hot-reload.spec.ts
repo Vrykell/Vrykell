@@ -19,7 +19,7 @@ test('localization hot updates retain editor registrations, buffers and modal bi
   test.setTimeout(90_000);
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));
-  await setupTauriMock(page.context(), { schedulesSeed: [] });
+  await setupTauriMock(page.context(), {});
   await page.goto(server.resolvedUrls!.local[0], { waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.evaluate(async () => {

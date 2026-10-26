@@ -47,8 +47,8 @@ export const toggleMcpServer = (name: string, enabled: boolean) =>
 export const connectMcp = (name: string) => invoke<void>('mcp_connect', { name });
 export const disconnectMcp = (name: string) => invoke<void>('mcp_disconnect', { name });
 export const listMcpTools = () => invoke<McpExposedTool[]>('mcp_list_all_tools');
-export const callMcpTool = (server: string, tool: string, args: Record<string, unknown>) =>
-  invoke<unknown>('mcp_call_tool', { server, tool, args });
+export const callMcpTool = (server: string, tool: string, args: Record<string, unknown>, lease?: string | null) =>
+  invoke<unknown>('mcp_call_tool', { server, tool, args, ...(lease === undefined ? {} : { lease }) });
 
 /** 把一个 MCP 工具包装成 AI SDK 工具（execute 转发到 Rust mcp_call_tool）。 */
 export function buildMcpTool(mcp: McpExposedTool, ctx: ToolContext) {
@@ -59,10 +59,12 @@ export function buildMcpTool(mcp: McpExposedTool, ctx: ToolContext) {
       (mcp.inputSchema ?? { type: 'object', properties: {} }) as Parameters<typeof jsonSchema>[0],
     ),
     execute: async (args, { toolCallId }) => {
-      const g = await gate('mcp', { server: mcp.server, tool: mcp.name }, toolCallId, ctx);
+      const input = { server: mcp.server, tool: mcp.name, args: (args ?? {}) as Record<string, unknown> };
+      const g = await gate('mcp', input, toolCallId, ctx, 'mcp_call_tool');
       if (!g.proceed) return g.result;
       try {
-        return await callMcpTool(mcp.server, mcp.name, (args ?? {}) as Record<string, unknown>);
+        if (ctx.signal?.aborted) return { ok: false, cancelled: true };
+        return await callMcpTool(mcp.server, mcp.name, input.args, g.lease ?? null);
       } catch (e) {
         return { ok: false, error: String((e as Error)?.message ?? e) };
       }

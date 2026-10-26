@@ -1,4 +1,4 @@
-import { BrainCircuit, FileCode, Keyboard, Settings, SquareTerminal, History, FileText, ShieldCheck, Globe, Folder, Plug, Bot, RefreshCw, Sun, Palette, TextFont } from '@ui/icons';
+import { BrainCircuit, FileCode, Keyboard, Settings, SquareTerminal, History, FileText, ShieldCheck, Globe, Folder, Plug, Bot, Sun, Palette, TextFont } from '@ui/icons';
 import type { PageId } from '../model/navigation';
 import { isSettingsPageAvailable } from '../model/navigation';
 import { t } from '@i18n';
@@ -39,9 +39,7 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
       { id: 'ai-web', icon: Globe, label: 'Web search' },
       { id: 'ai-skill', icon: Folder, label: 'Skills' },
       { id: 'ai-mcp', icon: Plug, label: 'MCP servers' },
-      { id: 'ai-memory', icon: FileText, label: 'Memory' },
-      { id: 'ai-agents', icon: Bot, label: 'Subagents' },
-      { id: 'ai-schedules', icon: RefreshCw, label: 'Schedules' },
+      { id: 'ai-memory', icon: FileText, label: 'Agent memory' },
       { id: 'ai-harness', icon: Bot, label: 'ACP' },
     ],
   },

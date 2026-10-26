@@ -4,7 +4,7 @@ import { gotoSetting } from './settings';
 
 test.setTimeout(60_000);
 test.beforeEach(async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [], launchDirectory: '/home/e2e/project' });
+  await setupTauriMock(page, { launchDirectory: '/home/e2e/project' });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
 });
 

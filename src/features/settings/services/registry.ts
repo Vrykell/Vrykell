@@ -129,9 +129,7 @@ const permissionLabels: Record<ToolName, string> = {
   "use_skill": "Use skill",
   "install_skill": "Install skill",
   "mcp": "MCP server tools",
-  "memory": "Write memory",
-  "schedule": "Manage scheduled tasks",
-  "subagent": "Delegate subagent"
+  "memory": "Memory access"
 };
 for (const tool of TOOL_NAMES) {
   const label = permissionLabels[tool];

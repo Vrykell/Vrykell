@@ -1,17 +1,10 @@
 import { t } from '@i18n';
+import type { ModelMessage } from 'ai';
 
 /**
- * messageParts — 助手消息的 parts 模型（M1 数据基座）。
- *
- * ChatMessage.content 语义不变（= 全部 text part 拼接），它是模型 history、
- * 复制按钮、DB content 列的唯一文本源；parts 只是渲染增强层（rail 上的
- * 文本段/动作条目），与 content 两写同步（chat store 负责）。
- *
- * 隐形契约：纯文本回答的 parts 恒为 undefined（AiBlock 据此选渲染分支）。
- * 唯一物化点 = chat store 的 upsertToolPart（首个工具事件到达时用当前
- * content 重建首 text part）。别处不要给 assistant 消息写 parts: []。
- *
- * 持久化：parts JSON 序列化进 DB chat_messages.parts 列，'' 表示无。
+ * Transcript parts preserve text/tool order and complete model results in the existing
+ * message storage column. Plain-text answers leave parts undefined. The display preview
+ * is independent of the complete result used to recreate model history.
  */
 
 export type ToolRunState = 'approval-pending' | 'input-pending' | 'running' | 'done' | 'error' | 'denied' | 'cancelled';
@@ -23,8 +16,11 @@ export interface ToolRun {
   toolName: string; // 'run_command' | 'read_file' | ...
   input: Record<string, unknown>;
   state: ToolRunState;
-  /** 结构化结果序列化（≤8KB 截断）；run_command = {ok, exitCode, output} JSON */
+  /** Bounded display preview; complete results belong to modelOutput. */
   output?: string;
+  /** Complete serialized result for model history, independent of the display preview. */
+  modelOutput?: string;
+  providerExecuted?: boolean;
   error?: string;
   /** 危险命令命中原因（M3 审批卡展示「⚠ …」）；仅 run_command 可能有 */
   danger?: string;
@@ -35,6 +31,28 @@ export interface ToolRun {
 }
 
 export type MessagePart = { kind: 'text'; text: string } | { kind: 'tool'; tool: ToolRun };
+
+/** Recreate standard call/result pairs in transcript order; history never executes a tool. */
+export function partsToModelMessages(content: string, parts?: MessagePart[]): ModelMessage[] {
+  if (!parts?.some(part => part.kind === 'tool')) return [{ role: 'assistant', content }];
+  const messages: ModelMessage[] = [];
+  const ids = new Set<string>();
+  for (const part of parts) {
+    if (part.kind === 'text') {
+      if (part.text) messages.push({ role: 'assistant', content: part.text });
+      continue;
+    }
+    const run = part.tool;
+    if (!run.toolCallId || !run.toolName || ids.has(run.toolCallId)) continue;
+    ids.add(run.toolCallId);
+    const value = run.modelOutput ?? run.output ?? run.error ?? 'This call was interrupted. No completed result is available.';
+    messages.push({ role: 'assistant', content: [{ type: 'tool-call', toolCallId: run.toolCallId,
+      toolName: run.toolName, input: run.input, ...(run.providerExecuted ? { providerExecuted: true } : {}) }] });
+    messages.push({ role: 'tool', content: [{ type: 'tool-result', toolCallId: run.toolCallId, toolName: run.toolName,
+      output: { type: run.state === 'error' ? 'error-text' : 'text', value } }] });
+  }
+  return messages;
+}
 
 /** parts → DB 字符串；空/undefined → ''（省空间且与旧数据同形） */
 export function serializeParts(parts?: MessagePart[]): string {
@@ -47,6 +65,17 @@ export function deserializeParts(raw: string): MessagePart[] | undefined {
   try {
     const v: unknown = JSON.parse(raw);
     if (!Array.isArray(v) || v.length === 0) return undefined;
+    const valid = v.every((part: unknown) => {
+      if (!part || typeof part !== 'object' || !('kind' in part)) return false;
+      if (part.kind === 'text') return 'text' in part && typeof part.text === 'string';
+      if (part.kind !== 'tool' || !('tool' in part) || !part.tool || typeof part.tool !== 'object') return false;
+      const run = part.tool as Record<string, unknown>;
+      return typeof run.toolCallId === 'string' && typeof run.toolName === 'string' && typeof run.startedAt === 'number'
+        && typeof run.state === 'string' && ['approval-pending', 'input-pending', 'running', 'done', 'error', 'denied', 'cancelled'].includes(run.state)
+        && !!run.input && typeof run.input === 'object' && !Array.isArray(run.input)
+        && ['output', 'modelOutput', 'error', 'danger', 'shape'].every(key => run[key] === undefined || typeof run[key] === 'string');
+    });
+    if (!valid) return undefined;
     return v as MessagePart[];
   } catch {
     return undefined;
@@ -70,8 +99,6 @@ const TOOL_LABEL: Record<string, string> = {
   install_skill: '安装技能',
   mcp: 'MCP 工具',
   memory: '记忆',
-  schedule: '定时任务',
-  subagent: '子代理',
   think: '思考',
 };
 
@@ -85,11 +112,7 @@ const STATE_LABEL: Record<ToolRunState, string> = {
   cancelled: t('Cancelled'),
 };
 
-/**
- * parts → 单行工具摘要，追加在 content 后喂给后续轮次的模型，
- * 让它知道本轮做过什么。（真实的 ToolCall/ToolResult ModelMessage
- * 双向映射留到 M2+；M1 务实方案。）
- */
+/** Build a compact display/export summary; model history uses full call/result pairs. */
 export function partsToHistoryText(parts?: MessagePart[]): string {
   if (!parts) return '';
   const lines: string[] = [];

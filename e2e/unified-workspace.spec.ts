@@ -3,7 +3,7 @@ import { setupTauriMock } from './tauri-mock';
 import { pickPlacementZone } from './placement';
 
 test('creates directly into a split and preserves the initial live resource', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   const terminal = await page.locator('.terminal-pane').first().elementHandle();
   await page.getByTestId('workspace-area-unified').click();
   const mixed = page.getByTestId('unified-workspace'); const bar = page.getByTestId('workspace-instance-bar');
@@ -29,7 +29,7 @@ test('creates directly into a split and preserves the initial live resource', as
 });
 
 test('shares mixed tabs and split panes without restarting terminals or discarding editor and conversation drafts', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   const terminal = page.locator('.terminal-pane').first(); const terminalNode = await terminal.elementHandle();
@@ -98,7 +98,7 @@ test('shares mixed tabs and split panes without restarting terminals or discardi
 });
 
 test('adds a resource to the active composition from the unified switcher and keeps native navigation', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.evaluate(async () => {

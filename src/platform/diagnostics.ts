@@ -1,5 +1,6 @@
 import { invoke as rawInvoke, type InvokeArgs, type InvokeOptions } from '@tauri-apps/api/core';
 import { create } from 'zustand';
+import sharedCommands from '@core/sharedCommands.json';
 export type { InvokeArgs, InvokeOptions } from '@tauri-apps/api/core';
 
 export interface DiagnosticRecord {
@@ -137,6 +138,15 @@ export async function invoke<T>(command: string, args?: InvokeArgs, options?: In
   const started = performance.now();
   diagnostic('ipc-start', { requestId, commandName: command, parameters: args });
   try {
+    if (sharedCommands.includes(command) && typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
+      if (args instanceof ArrayBuffer || args instanceof Uint8Array || Array.isArray(args)) throw new Error('Shared commands require named arguments');
+      const payload = { ...(args ?? {}) };
+      if (!('lease' in payload) && !('uiLease' in payload)) {
+        const uiLease = await rawInvoke<string>('authorize_ui_command', { command, args: payload });
+        if (!uiLease) throw new Error('Command authorization unavailable');
+        args = { ...payload, uiLease };
+      }
+    }
     const result = options !== undefined
       ? await rawInvoke<T>(command, args, options)
       : args !== undefined

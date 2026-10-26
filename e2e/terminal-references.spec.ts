@@ -4,7 +4,7 @@ import { gotoSetting } from './settings';
 
 for (const theme of ['深色', '浅色']) {
   test(`terminal references start expanded and share tool presentation in ${theme}`, async ({ page }, testInfo) => {
-    await setupTauriMock(page, { schedulesSeed: [] });
+    await setupTauriMock(page, {});
     await page.goto('/');
     await gotoSetting(page, '主题');
     await page.getByRole('radio', { name: theme, exact: true }).click();

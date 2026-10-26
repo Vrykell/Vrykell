@@ -29,7 +29,7 @@ async function checkMenuInput(page: Page, menu: Locator) {
 
 for (const theme of ['dark', 'light'] as const) {
   for (const width of [1240, 700]) test(`settings hover stays under the pointer at ${width}px in ${theme}`, async ({ page }, info) => {
-    await setupTauriMock(page, { schedulesSeed: [] });
+    await setupTauriMock(page, {});
     await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
     await page.goto('/');
     await gotoSetting(page, '字体与显示');
@@ -73,7 +73,7 @@ for (const theme of ['dark', 'light'] as const) {
   });
 
   test(`action, history, source and conversation menus do not retain stale highlights in ${theme}`, async ({ page }, info) => {
-    await setupTauriMock(page, { schedulesSeed: [] });
+    await setupTauriMock(page, {});
     await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
     await page.goto('/');
     await page.locator('[data-tab-row-id]').first().click({ button: 'right' });
@@ -109,7 +109,7 @@ for (const theme of ['dark', 'light'] as const) {
   });
 
   test(`agent selectors and slash commands hand highlighting to the pointer in ${theme}`, async ({ page }, info) => {
-    await setupTauriMock(page, { schedulesSeed: [] });
+    await setupTauriMock(page, {});
     await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
     await page.goto('/');
     await page.keyboard.press('Control+,');

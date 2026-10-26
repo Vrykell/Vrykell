@@ -92,6 +92,8 @@ Shared inner corners are 8 px and block corners are 14 px. Favorites and tag fil
 
 ## Components
 
+Memory settings is a compact status surface with aggregate counts and a reload action. It never lists or edits memory bodies and offers no bulk activation. Retrieval and review stay explicit assistant operations. Loading and failures reuse the shared status and persistent notification components.
+
 The common start page groups terminal profiles and saved hosts, native and external conversations, and file creation and opening as distinct tasks. It reuses the launcher grid and typography rather than promoting the default terminal as the only creation path. Mixed history rows show a shared split icon, pane count and member types; expansion reveals members without loading their transcripts. Terminal panes are individually placed existing hosts, not nested terminal workspaces.
 
 Use `SidebarItem`, `TextInput`, `SegmentedControl`, `TagInput`, `Select`, `CheckboxMenu`, `ContextMenu`, `ErrorBox`, `ConfirmDialog`, `Toggle` and the existing button family. Connection authentication has four explicit parallel modes; settings option groups use authored selects. Opacity uses `RangeInput`, a thin blue track with native range keyboard semantics.

@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 for (const theme of ['dark', 'light']) test(`compact shared fields, authentication tabs and tag rows in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => {
     localStorage.setItem('vrykell-theme-mode', theme);
     localStorage.setItem('vrykell-host-library', JSON.stringify({ state: { hosts: { 'ssh-1': { group: 'Production', tags: ['production', 'api'], starred: true } } }, version: 0 }));

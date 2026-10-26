@@ -4,7 +4,7 @@ import { pickPlacementZone } from './placement';
 import { gotoSetting } from './settings';
 
 for (const theme of ['dark', 'light']) test(`keeps layouts inside tabs and shows Start only when empty in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.addInitScript(theme => {
     localStorage.setItem('vrykell-startup-mode', 'empty');
     localStorage.setItem('vrykell-theme-mode', theme);
@@ -51,7 +51,7 @@ for (const theme of ['dark', 'light']) test(`keeps layouts inside tabs and shows
 });
 
 test('starts ACP in the side panel and moves the same connection back to the workspace', async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   const originalSpawns = await page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: unknown[] }).__PTY_SPAWNS__.length);
   await page.locator('[data-dock-btn="chat"]').click();
   const sidebar = page.getByTestId('ai-sidebar-content');
@@ -81,7 +81,7 @@ test('starts ACP in the side panel and moves the same connection back to the wor
 });
 
 for (const theme of ['dark', 'light']) test(`uses one blue shell identity in launchers and settings in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, { schedulesSeed: [], shells: [{ id: 'powershell', label: 'Windows PowerShell', default: true }, { id: 'pwsh', label: 'PowerShell 7', default: false }] });
+  await setupTauriMock(page, { shells: [{ id: 'powershell', label: 'Windows PowerShell', default: true }, { id: 'pwsh', label: 'PowerShell 7', default: false }] });
   await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
   await page.goto('/'); await page.getByTestId('tab-new-btn').click();
   const picker = page.getByRole('dialog', { name: '新建标签页', exact: true });
@@ -107,7 +107,7 @@ for (const theme of ['dark', 'light']) test(`uses one blue shell identity in lau
 });
 
 for (const placement of ['main', 'side']) test(`creates and binds an execution terminal from the agent selector in ${placement}`, async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-ai').click(); await page.getByTestId('harness-add-session').click();
   await page.getByTestId('acp-launcher-Fake ACP').click();
   if (placement === 'side') await page.getByTestId('ai-relocate').click();

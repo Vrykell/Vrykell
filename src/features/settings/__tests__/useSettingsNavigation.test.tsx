@@ -21,7 +21,7 @@ it('opens the globally indexed page before mounting and updates an existing sett
 
 it('keeps all pages available and clears field targets when choosing a page', () => {
   const { result } = renderHook(() => useSettingsNavigation());
-  expect(result.current.groups.flatMap(group => group.items)).toHaveLength(isWindows ? 29 : 28);
+  expect(result.current.groups.flatMap(group => group.items)).toHaveLength(isWindows ? 27 : 26);
   act(() => useSettingsNavigationStore.getState().openField('ai-perms', 'Permissions'));
   act(() => result.current.setSelected('profile:powershell'));
   expect(result.current.selected).toBe('profile:powershell');

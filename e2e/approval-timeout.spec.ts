@@ -17,13 +17,13 @@ test.describe('approval timeout', () => {
         state: { levels: {}, mode: 'standard', approvalTimeoutSeconds: 3 },
       }));
     });
-    await setupTauriMock(page, { schedulesSeed: [] });
+    await setupTauriMock(page, {});
     await page.goto('/');
 
     // A terminal tab exists, so the agent has a pane to run commands in.
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
     await page.locator('[data-dock-btn="chat"]').click();
-    const composer = page.getByPlaceholder(/自然语言描述/);
+    const composer = page.getByTestId('ai-sidebar-content').getByPlaceholder(/自然语言描述/);
     await expect(composer).toBeVisible({ timeout: 3000 });
     await composer.fill('写个便签');
     await composer.press('Enter');
@@ -31,8 +31,13 @@ test.describe('approval timeout', () => {
     // The card asks, and nothing answers it.
     await expect(page.getByRole('button', { name: '允许一次' })).toBeVisible({ timeout: 10000 });
 
-    await expect(page.getByTestId('tool-denied-reason')).toContainText('已自动拒绝', { timeout: 15000 });
-    await expect(page.getByTestId('tool-denied-reason')).toContainText('无人应答');
+    const denied = page.getByTestId('ai-sidebar-content').locator('.ai-tool-card[data-tool-state="denied"]');
+    await expect(denied).toBeVisible({ timeout: 15000 });
+    await denied.locator('.ai-tool-summary').click();
+    const notice = page.locator('#app-notifications [data-error-notification]');
+    await expect(notice).toContainText('已自动拒绝');
+    await expect(notice).toContainText('无人应答');
+    await notice.getByRole('button', { name: '关闭错误提示', exact: true }).click();
     await expect(page.locator('#app-notifications [role="status"]')).toHaveCount(0);
     await expect(page.getByRole('button', { name: '允许一次' })).toHaveCount(0);
 

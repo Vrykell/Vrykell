@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { emitPtyOutput, ptyWrites, setupTauriMock } from './tauri-mock';
 
 test('routes input and manual fullscreen to a running block placed in the unified workspace', async ({ page }) => {
-  await setupTauriMock(page, { schedulesSeed: [] });
+  await setupTauriMock(page, {});
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.waitForFunction(async () => {

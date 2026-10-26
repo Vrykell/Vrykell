@@ -14,7 +14,7 @@ async function dragTo(page: Page, source: Locator, target: Locator, after = fals
 }
 
 test.beforeEach(async ({ page }) => {
-  await setupTauriMock(page.context(), { launchDirectory: '/home/e2e/project', schedulesSeed: [], sshHost: 'known', terminalDirectories: true });
+  await setupTauriMock(page.context(), { launchDirectory: '/home/e2e/project', sshHost: 'known', terminalDirectories: true });
   await page.addInitScript(() => {
     if (!localStorage.getItem('mock-command-history-runs')) localStorage.setItem('mock-command-history-runs', JSON.stringify([
       { id: 'build', target: 'local', shell: 'system', command: 'npm run build', cwd: '/home/e2e/project', status: 'success', exitCode: 0, timestamp: 3000, runCount: 3 },

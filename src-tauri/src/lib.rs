@@ -93,7 +93,7 @@ pub fn run() {
             }
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(agent::permissions::guard_ipc(tauri::generate_handler![
             commands::git::git_snapshot,
             commands::git::git_diff,
             commands::git::git_change_file,
@@ -154,20 +154,11 @@ pub fn run() {
             agent::skills::remove_skill,
             agent::skills::install_skill_md,
             agent::skills::import_skills_from_path,
-            agent::memory::get_memory,
-            agent::memory::set_memory,
-            agent::memory::get_memory_journal,
-            agent::memory::append_memory_journal,
-            agent::agents::list_agents,
-            agent::agents::save_agent,
-            agent::agents::remove_agent,
-            agent::agents::get_agent,
+            agent::memory::query_memories,
+            agent::memory::save_memory,
+            agent::memory::memory_stats,
             agent::skills::market_github_list,
             agent::skills::market_github_install,
-            agent::schedules::list_schedules,
-            agent::schedules::save_schedule,
-            agent::schedules::remove_schedule,
-            agent::schedules::mark_schedule_run,
             agent::mcp::mcp_get_servers,
             agent::mcp::mcp_save_server,
             agent::mcp::mcp_remove_server,
@@ -177,6 +168,7 @@ pub fn run() {
             agent::mcp::mcp_list_all_tools,
             agent::mcp::mcp_call_tool,
             agent::permissions::authorize_tool_call,
+            agent::permissions::authorize_ui_command,
             agent::permissions::approve_tool_call,
             agent::permissions::tool_policy_get,
             agent::permissions::tool_policy_set_level,
@@ -318,7 +310,7 @@ pub fn run() {
             commands::download::downloads_delete,
             commands::download::downloads_discard,
             commands::clipboard::clipboard_write_files,
-        ])
+        ]))
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 

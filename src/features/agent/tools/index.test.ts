@@ -16,8 +16,8 @@ describe('buildTools', () => {
     expect(tools.use_skill).toBeDefined();
     expect(tools.install_skill).toBeDefined();
     expect(tools.memory).toBeDefined();
-    expect(tools.schedule).toBeDefined();
-    expect(tools.subagent).toBeDefined();
+    expect(tools.schedule).toBeUndefined();
+    expect(tools.subagent).toBeUndefined();
   });
 });
 
