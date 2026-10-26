@@ -14,7 +14,7 @@ test.describe('命令块链路', () => {
     await page.getByRole('combobox', { name: '选择执行终端' }).click();
     await page.getByRole('listbox', { name: '选择执行终端' }).getByRole('option').filter({ hasNotText: '仅讨论' }).first().click();
     await page.keyboard.press('Escape');
-    const input = page.getByPlaceholder(/自然语言描述/);
+    const input = page.getByTestId('ai-surface-side').getByPlaceholder(/自然语言描述/);
     await input.fill('给我个命令');
     await input.press('Enter');
 
@@ -37,7 +37,7 @@ test.describe('命令块链路', () => {
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
     await page.getByRole('button', { name: '询问 AI', exact: true }).click();
-    const input = page.getByPlaceholder(/自然语言描述/);
+    const input = page.getByTestId('ai-surface-side').getByPlaceholder(/自然语言描述/);
     await input.fill('写代码');
     await input.press('Enter');
 
@@ -54,7 +54,7 @@ for (const mode of ['dark', 'light'] as const) {
     await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('data-theme', mode);
     await page.locator('[data-dock-btn="chat"]').click();
-    const composer = page.locator('[data-chat-composer]');
+    const composer = page.getByTestId('ai-surface-side').locator('[data-chat-composer]');
     await composer.fill('Show the output');
     await composer.press('Enter');
     const frame = page.locator('.md-code-block').first();

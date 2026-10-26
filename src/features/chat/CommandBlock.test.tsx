@@ -22,6 +22,9 @@ describe('CommandBlock', () => {
 
   it('bash 代码块带运行按钮，点击写入终端', () => {
     render(<Markdown content={'```bash\nls -la\n```'} />);
+    const action = screen.getByRole('button', { name: '在终端运行' });
+    expect(action.querySelector('svg rect')).not.toBeNull();
+    expect(action.querySelector('svg text')).toBeNull();
     fireEvent.click(screen.getByText('在终端运行'));
     expect(invokeMock).toHaveBeenCalledWith('pty_write', { id: 's1', data: 'ls -la\n' });
   });

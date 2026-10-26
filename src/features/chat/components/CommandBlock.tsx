@@ -2,7 +2,7 @@ import { isValidElement, useState, type ReactNode, type ReactElement } from 'rea
 import { t } from '@i18n';
 import { useToastStore } from '@ui/feedback/Toast';
 import { TextButton } from '@ui/actions/TextButton';
-import { Play, Copy, Check, iconSizes } from '@ui/icons';
+import { TerminalPrompt, Copy, Check, iconSizes } from '@ui/icons';
 import { useTerminalStore } from '@features/terminal';
 import CodeSyntax from '@ui/editor/CodeSyntax';
 
@@ -73,7 +73,7 @@ export default function CommandBlock({ children, paneId }: { children?: ReactNod
                   if (/[\r\n]/.test(text)) useToastStore.getState().addToast(t('Script added to command input. Press Enter to run.'), 'info');
                 }}
               >
-                <Play size={10} /> {t('Run in terminal')}
+                <TerminalPrompt size={iconSizes.compact} /> {t('Run in terminal')}
               </TextButton>
             )}
             <TextButton className="md-code-block-action"
