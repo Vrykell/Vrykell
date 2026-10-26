@@ -40,6 +40,20 @@ afterEach(() => {
 });
 
 describe('independent conversations', () => {
+  it('keeps an unanswered tool cancelled immediately and after its stopped stream settles', async () => {
+    const id = useChatStore.getState().createConversation();
+    let finish!: () => void;
+    const pending = useChatStore.getState().send('Ask a question', { conversationId: id, streamFn: async (_messages, _chunk, ctx) => {
+      ctx?.handlers?.onToolEvent?.({ toolCallId: 'question', toolName: 'ask_user', state: 'input-pending', input: { question: 'Which target?' }, startedAt: 1 });
+      await new Promise<void>(resolve => { finish = resolve; });
+    } });
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+    useChatStore.getState().abortStream(id);
+    const state = () => useChatStore.getState().byTab[id]?.[1]?.parts?.find(part => part.kind === 'tool');
+    expect(state()).toMatchObject({ tool: { state: 'cancelled' } });
+    finish(); await pending;
+    expect(state()).toMatchObject({ tool: { state: 'cancelled' } });
+  });
   it('reserves scheduled work before recording its run while manual requests join the queue', async () => {
     const manual = useChatStore.getState().createConversation();
     let release!: () => void;

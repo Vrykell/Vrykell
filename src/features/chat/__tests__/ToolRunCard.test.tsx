@@ -30,17 +30,38 @@ it('routes a review question to the provided owner instead of a native conversat
 const command: ToolRun = { toolCallId: 'command', toolName: 'run_command', input: { command: 'npm run build' },
   state: 'done', startedAt: 1, output: JSON.stringify({ exitCode: 0, output: 'Build complete' }) };
 
-it('keeps live and restored tool failures inline, with their actual output and no global notification', () => {
+it('keeps restored failures quiet until explicitly reviewed in the shared notification region', () => {
   const failed: ToolRun = { ...command, state: 'error', error: 'Exit code 3', output: JSON.stringify({ exitCode: 3, output: 'service is inactive' }) };
   for (let mount = 0; mount < 2; mount += 1) {
     const view = render(<ToolRunCard run={failed} framed />);
-    expect(view.container.querySelector('[role="alert"]')).not.toBeNull();
+    expect(view.container.querySelector('[role="alert"]')).toBeNull();
     expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /运行命令 npm run build 退出码 3/ }));
+    expect(document.querySelector('#app-notifications [role="alert"]')).not.toBeNull();
     expect(screen.getByText('Exit code 3')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: '技术详情' }));
-    expect(screen.getByText('service is inactive')).toBeVisible();
+    expect(screen.getByText(/service is inactive/)).toBeVisible();
     view.unmount();
   }
+});
+
+it('announces a live failure once and keeps refusals and cancellations out of the card footer', () => {
+  const view = render(<ToolRunCard run={{ ...command, state: 'running' }} />);
+  view.rerender(<ToolRunCard run={{ ...command, state: 'error', error: 'Connection closed' }} />);
+  expect(document.querySelector('#app-notifications [role="alert"]')).toHaveTextContent('Connection closed');
+  expect(view.container.querySelector('.ai-tool-verdict')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '关闭错误提示' }));
+  view.rerender(<ToolRunCard run={{ ...command, state: 'error', error: 'Connection closed' }} />);
+  expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
+  view.rerender(<ToolRunCard run={{ ...command, state: 'denied', danger: 'Confirmation skipped' }} />);
+  expect(view.container.querySelector('.ai-tool-state')).toHaveTextContent('已拒绝');
+  expect(view.container.querySelector('.ai-tool-verdict')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: /已拒绝/ }));
+  expect(document.querySelector('#app-notifications [role="alert"]')).toHaveTextContent('Confirmation skipped');
+  view.rerender(<ToolRunCard run={{ ...command, toolName: 'ask_user', state: 'cancelled', error: 'Question cancelled' }} />);
+  expect(view.container.querySelector('.ai-tool-state')).toHaveTextContent('已取消');
+  expect(view.container.querySelector('.ai-tool-verdict')).toBeNull();
+  expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
 });
 
 it('shows the command label and exit code before disclosing input and output', () => {

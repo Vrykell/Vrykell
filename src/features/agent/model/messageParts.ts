@@ -14,7 +14,7 @@ import { t } from '@i18n';
  * 持久化：parts JSON 序列化进 DB chat_messages.parts 列，'' 表示无。
  */
 
-export type ToolRunState = 'approval-pending' | 'input-pending' | 'running' | 'done' | 'error' | 'denied';
+export type ToolRunState = 'approval-pending' | 'input-pending' | 'running' | 'done' | 'error' | 'denied' | 'cancelled';
 
 export const DEFAULT_TOOL_COMMAND_TIMEOUT_MS = 120_000;
 
@@ -82,6 +82,7 @@ const STATE_LABEL: Record<ToolRunState, string> = {
   done: '成功',
   error: '失败',
   denied: '已拒绝',
+  cancelled: t('Cancelled'),
 };
 
 /**

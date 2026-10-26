@@ -115,30 +115,26 @@ it('keeps approval actions and failures visible without timeline nodes', () => {
     { kind: 'tool', tool: { toolCallId: 'failure', toolName: 'read_file', input: { path: '/project/missing' }, state: 'error', startedAt: 1, error: 'Missing file' } },
   ] } }} />);
   expect(screen.getByRole('button', { name: '运行' })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: /读取文件.*失败/ }));
   expect(screen.getByRole('alert')).toHaveTextContent('Missing file');
   expect(container.querySelectorAll('.ai-tool-card')).toHaveLength(2);
   expect(container.querySelector('[style*="position: absolute"]')).toBeNull();
 });
 
-it('collapses a failure through the row toggle after showing it by default', () => {
+it('opens a restored failure through explicit review and dismisses it outside the transcript', () => {
   const { container } = render(<AiBlock conversationId="conversation" presentation="conversation" exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [
     { kind: 'tool', tool: { toolCallId: 'failure', toolName: 'run_command', input: { command: 'cat /etc/hosts' }, state: 'error', startedAt: 1, error: 'Exit code 2' } },
   ] } }} />);
-  // A failure is readable without expanding anything ...
-  expect(screen.getByRole('alert')).toHaveTextContent('Exit code 2');
   const summary = () => container.querySelector('.ai-tool-summary') as HTMLElement;
-  const arrow = () => {
-    const icons = container.querySelectorAll('.ai-tool-summary svg');
-    return icons[icons.length - 1] as SVGElement;
-  };
-  expect(summary()).toHaveAttribute('aria-expanded', 'true');
-  // ... the disclosure arrow is flipped up while expanded (the row's last icon) ...
-  expect(arrow().style.transform).toBe('rotate(90deg)');
-  // ... and collapsing it hides the failure again and points the arrow down.
-  fireEvent.click(summary());
   expect(screen.queryByRole('alert')).toBeNull();
   expect(summary()).toHaveAttribute('aria-expanded', 'false');
-  expect(arrow().style.transform).toBe('');
+  fireEvent.click(summary());
+  expect(screen.getByRole('alert')).toHaveTextContent('Exit code 2');
+  expect(summary()).toHaveAttribute('aria-expanded', 'true');
+  expect(container.querySelector('[role="alert"]')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '关闭错误提示' }));
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(summary()).toHaveAttribute('aria-expanded', 'false');
 });
 
 it('reopens a failure that arrives after the row was collapsed', () => {
@@ -239,13 +235,16 @@ it('explains a reply whose provider sent its tool call as plain text', () => {
   expect(screen.queryByTestId('chat-leaked-tool-call')).toBeNull();
 });
 
-it('keeps the reason visible after a refusal', () => {
+it('keeps a refusal available through explicit review without a footer error', () => {
   const { container } = render(<AiBlock conversationId="conversation" exchange={{ ...exchange, answer: { ...exchange.answer!, parts: [
     { kind: 'tool', tool: { toolCallId: 'denied', toolName: 'run_command', input: { command: 'rm -rf /' }, state: 'denied', startedAt: 1, danger: '等待 5 分钟无人应答，已自动拒绝本次操作。' } },
   ] } }} />);
-  // The row keeps the state word and the reason once the approval buttons are gone.
+  // The result retains its state; explicit review opens its reason in the notification region.
   expect(container.querySelector('.ai-tool-summary')).toHaveTextContent('已拒绝');
-  expect(screen.getByTestId('tool-denied-reason')).toHaveTextContent('已自动拒绝本次操作');
+  expect(screen.queryByTestId('tool-denied-reason')).toBeNull();
+  expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
+  fireEvent.click(container.querySelector<HTMLButtonElement>('.ai-tool-summary')!);
+  expect(document.querySelector('#app-notifications [role="alert"]')).toHaveTextContent('已自动拒绝本次操作');
   expect(screen.queryByRole('button', { name: '允许一次' })).toBeNull();
 });
 

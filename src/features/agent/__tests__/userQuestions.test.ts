@@ -26,7 +26,7 @@ it('supports skipping, cancellation, timeouts and rejects duplicate requests wit
   const controller = new AbortController();
   const cancelled = requestUserAnswer(key, { question: 'Choose' }, controller.signal);
   controller.abort();
-  expect(await cancelled).toMatchObject({ ok: false, answered: false });
+  expect(await cancelled).toMatchObject({ ok: false, answered: false, cancelled: true });
   const expired = requestUserAnswer(key, { question: 'Choose' }, undefined, 20);
   await vi.advanceTimersByTimeAsync(20);
   expect(await expired).toMatchObject({ ok: false, answered: false });
@@ -40,4 +40,7 @@ it('exposes a pending tool card and feeds the response back without granting per
   expect(state).toHaveBeenCalledWith('tool', 'input-pending');
   answerUserQuestion(questionKey('owner', 'tool'), 'No');
   expect(await pending).toEqual({ ok: true, answered: true, answer: 'No' });
+  expect(await ask.execute!({ question: 'Are you sure?' }, { toolCallId: 'repeat', messages: [], context: {} })).toMatchObject({ ok: false, answered: false });
+  expect(state).toHaveBeenCalledTimes(1);
+  expect(useUserQuestions.getState().pending).toEqual({});
 });

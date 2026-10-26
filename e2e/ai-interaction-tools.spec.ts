@@ -43,16 +43,57 @@ for (const answer of ['option', 'custom', 'skip', 'cancel'] as const) test(`asks
   } else if (answer === 'skip') await question.getByRole('button', { name: '跳过问题', exact: true }).click();
   else await page.getByRole('button', { name: '停止生成', exact: true }).click();
   await expect(question).toHaveCount(0);
+  if (answer === 'cancel') await expect(page.locator('.ai-tool-card[data-tool-state="cancelled"] .ai-tool-state')).toHaveText('已取消');
   if (answer !== 'cancel') await expect(page.getByText('Thanks, I have the information.', { exact: true })).toBeVisible();
   await expect(composer).toBeEnabled();
   await expect(page.getByRole('button', { name: '停止生成', exact: true })).toHaveCount(0);
   await expect(page.locator('#app-notifications [role="alert"]')).toHaveCount(0);
   if (answer === 'option') {
+    const selected = page.getByRole('button', { name: 'Preview', exact: true, pressed: true });
+    await expect(selected).toBeDisabled();
+    const bubble = page.locator('.chat-exchange > .ai-block-question').first();
+    await expect(selected).toHaveCSS('background-color', await bubble.evaluate(element => getComputedStyle(element).backgroundColor));
+    await expect(selected).toHaveCSS('color', await bubble.evaluate(element => getComputedStyle(element).color));
+    await page.screenshot({ path: info.outputPath('question-option-selected.png') });
+    const saved = await page.evaluate(async () => {
+      const path = '/src/features/chat/stores/aiWorkspace.ts';
+      const { useAiWorkspace } = await import(path) as typeof import('../src/features/chat/stores/aiWorkspace');
+      return useAiWorkspace.getState().sideSelected.slice(5);
+    });
     await armToolCall(page, 0);
     await page.reload();
-    await page.locator('[data-dock-btn="chat"]').click();
+    await expect(page.locator('[data-dock-btn="chat"]')).toBeVisible();
+    if (!await page.getByTestId('ai-sidebar-content').isVisible()) await page.locator('[data-dock-btn="chat"]').click();
+    await expect.poll(() => page.evaluate(async () => {
+      const path = '/src/features/chat/stores/chat.ts';
+      const { useChatStore } = await import(path) as typeof import('../src/features/chat/stores/chat');
+      return useChatStore.getState().conversationsLoaded;
+    })).toBe(true);
+    await page.evaluate(async id => {
+      const chatPath = '/src/features/chat/stores/chat.ts'; const workspacePath = '/src/features/chat/stores/aiWorkspace.ts';
+      const { useChatStore } = await import(chatPath) as typeof import('../src/features/chat/stores/chat');
+      const { useAiWorkspace } = await import(workspacePath) as typeof import('../src/features/chat/stores/aiWorkspace');
+      await useChatStore.getState().selectConversation(id); useAiWorkspace.getState().selectSide(`chat:${id}`);
+    }, saved);
+    await expect(page.getByTestId('ai-sidebar-content')).toBeVisible();
     await expect(page.getByRole('group', { name: '回答问题', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Preview', exact: true, pressed: true })).toBeDisabled();
   }
+});
+
+test('does not reopen a question when the model requests the same confirmation again', async ({ page }) => {
+  await mockAnthropic(page, 'Using the answer without another confirmation.');
+  await mockAnthropicToolCall(page, 'ask_user', { question: 'Choose the target', options: ['Preview', 'Production'] }, 2);
+  await setupTauriMock(page, { schedulesSeed: [] }); await page.goto('/');
+  await page.locator('[data-dock-btn="chat"]').click();
+  const composer = page.locator('[data-chat-composer]:visible');
+  await composer.fill('Inspect Preview'); await composer.press('Enter');
+  const question = page.getByRole('group', { name: '回答问题', exact: true });
+  await question.getByRole('button', { name: 'Preview', exact: true }).click();
+  await expect(page.getByText('Using the answer without another confirmation.', { exact: true })).toBeVisible();
+  await expect(question).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Preview', exact: true, pressed: true })).toHaveCount(1);
+  await expect(page.getByRole('button', { name: '停止生成', exact: true })).toHaveCount(0);
 });
 
 test('hides leaked spaced tool syntax from streamed answers and copied text without executing it', async ({ page }) => {

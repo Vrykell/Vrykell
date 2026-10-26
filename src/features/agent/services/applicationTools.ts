@@ -29,6 +29,7 @@ export class ApplicationToolSession {
   private tools: Record<string, AppTool>;
   private tail = Promise.resolve();
   private blocked = false;
+  private asked = false;
   private calls = new Map<string, ToolRun>();
 
   constructor(context: ToolContext, private onTool: (run: ToolRun) => void) {
@@ -40,7 +41,12 @@ export class ApplicationToolSession {
 
   close() {
     this.controller.abort();
-    for (const id of this.calls.keys()) resolveApproval(id, 'deny');
+    for (const [id, run] of this.calls) {
+      if (['running', 'approval-pending', 'input-pending'].includes(run.state)) {
+        run.state = 'cancelled'; run.endedAt = Date.now(); this.onTool({ ...run });
+      }
+      resolveApproval(id, 'deny');
+    }
   }
 
   call(requestId: string, name: string, args: unknown): Promise<ApplicationToolResult> {
@@ -52,29 +58,34 @@ export class ApplicationToolSession {
   private async execute(requestId: string, name: string, args: unknown): Promise<ApplicationToolResult> {
     const error = (message: string): ApplicationToolResult => ({ content: [{ type: 'text', text: message }], isError: true });
     if (this.controller.signal.aborted) return error('The agent turn is no longer active.');
-    if (this.blocked && name !== 'ask_user') return error('A previous tool call was denied. Stop execution and wait for a new user request.');
+    if (this.blocked) return error('A previous tool call was denied. Explain the result and finish this turn. Do not ask for confirmation again; wait for a new user message.');
+    if (name === 'ask_user' && this.asked) return error('A question was already asked in this turn. Use its answer and finish without asking again.');
     const tool = this.tools[name];
     if (!tool?.execute || !(tool.inputSchema instanceof z.ZodType)) return error('This tool is unavailable. Terminal tools require an explicitly selected execution terminal; remote terminals cannot use local file tools.');
     const parsed = await tool.inputSchema.safeParseAsync(args);
     if (!parsed.success) return error('Invalid tool arguments. Check the advertised input schema.');
     if (this.controller.signal.aborted) return error('The agent turn is no longer active.');
+    if (name === 'ask_user') this.asked = true;
     const run: ToolRun = { toolCallId: `app-mcp-${requestId}`, toolName: name, input: parsed.data as Record<string, unknown>, startedAt: Date.now(), state: 'running' };
     this.calls.set(run.toolCallId, run);
     this.onTool({ ...run });
     try {
       const result = await tool.execute(parsed.data, { toolCallId: run.toolCallId, messages: [], context: undefined, abortSignal: this.controller.signal });
       const denied = typeof result === 'object' && result !== null && 'denied' in result && result.denied === true;
+      const cancelled = this.controller.signal.aborted || typeof result === 'object' && result !== null && 'cancelled' in result && result.cancelled === true;
       const failed = typeof result === 'object' && result !== null && 'ok' in result && result.ok === false;
       this.blocked ||= denied;
       const output = JSON.stringify(result ?? { ok: false, error: 'Tool unavailable' });
       const oversized = new TextEncoder().encode(output).length > 240_000;
       const text = oversized ? JSON.stringify({ ok: false, error: 'Tool result exceeds its limit. Request a smaller range.' }) : output;
       run.output = text.length > 8000 ? JSON.stringify({ result: text.slice(0, 7600), truncated: true }) : text;
-      run.state = this.controller.signal.aborted ? 'denied' : denied ? 'denied' : failed ? 'error' : 'done'; run.endedAt = Date.now();
+      run.state = cancelled ? 'cancelled' : denied ? 'denied' : failed ? 'error' : 'done'; run.endedAt = Date.now();
       this.onTool({ ...run });
-      return { content: [{ type: 'text', text }], isError: failed || denied || this.controller.signal.aborted || oversized };
+      return { content: [{ type: 'text', text }], isError: failed || denied || cancelled || oversized };
     } catch {
-      run.state = 'error'; run.error = t('Application tool failed.'); run.endedAt = Date.now(); this.onTool({ ...run });
+      run.state = this.controller.signal.aborted ? 'cancelled' : 'error';
+      run.error = t(this.controller.signal.aborted ? 'Tool call cancelled.' : 'Application tool failed.');
+      run.endedAt = Date.now(); this.onTool({ ...run });
       this.blocked = true;
       return error(run.error);
     } finally { this.calls.delete(run.toolCallId); }

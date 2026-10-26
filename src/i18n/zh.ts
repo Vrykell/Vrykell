@@ -1,5 +1,7 @@
 ﻿/** Simplified Chinese messages for shared UI and feature namespaces. */
 const zh: Record<string, string> = {
+  'Cancelled': '已取消',
+  'A question was already asked in this turn. Use its answer and finish without asking again.': '本轮已经提问，请使用已有回答完成处理，不要再次询问。',
   'Scheduled task: {{name}}': '【定时任务】{{name}}',
   'Files with control characters cannot be opened in a terminal.': '包含控制字符的文件无法在终端中打开。',
   'This path cannot be represented safely in the selected shell.': '无法在所选命令行中安全表示此路径。',

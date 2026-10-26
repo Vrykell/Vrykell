@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { t, type I18nKey } from '@i18n';
 import { AskQuestion, Brain, Check, ChevronRight, FileText, Folder, Globe, Pencil, RefreshCw, Search, TerminalPrompt, Wrench, X } from '@ui/icons';
 import ErrorBox from '@ui/feedback/ErrorBox';
@@ -19,6 +19,7 @@ const STATE_LABEL: Record<ToolRunState, I18nKey> = {
   done: 'Completed',
   error: 'Failed',
   denied: 'Denied',
+  cancelled: 'Cancelled',
 };
 
 function str(value: unknown): string { return typeof value === 'string' ? value : ''; }
@@ -91,10 +92,16 @@ function CommandOutputBlock({ run, paneId, framed }: { run: ToolRun; paneId?: st
  * shared code-block frame and therefore drops its own terminal surface.
  */
 export default function ToolRunCard({ run, paneId, framed = false, conversationId, environment, onAskAboutTool }: { run: ToolRun; paneId?: string; framed?: boolean; conversationId?: string; environment?: ChatEnvironment; onAskAboutTool?: (question: string) => void }) {
-  // A failure starts expanded so a broken call is readable at a glance; an explicit toggle
-  // wins from then on, which also lets the row be collapsed again. The toggle is recorded with
-  // the state it was made in, so a run that fails after being collapsed reopens its error.
   const [toggled, setToggled] = useState<{ state: ToolRunState; open: boolean } | null>(null);
+  const [notice, setNotice] = useState(false);
+  const previous = useRef({ id: run.toolCallId, state: run.state });
+  const problem = run.state === 'error' || run.state === 'denied';
+  useEffect(() => {
+    const last = previous.current;
+    previous.current = { id: run.toolCallId, state: run.state };
+    // Restored results never replay notifications. A live transition or explicit review opens one.
+    setNotice(last.id === run.toolCallId && last.state !== run.state && run.state === 'error');
+  }, [run.toolCallId, run.state, problem]);
   const sessions = useTerminalStore(state => state.sessions);
   const { icon, label, text } = summarize(run);
   const exitCode = commandExitCode(run);
@@ -103,33 +110,30 @@ export default function ToolRunCard({ run, paneId, framed = false, conversationI
   const body = expandBody(run);
   const isCommand = run.toolName === 'run_command';
   const pending = run.state === 'approval-pending' || run.state === 'input-pending';
-  const failed = run.state === 'error';
-  const open = toggled?.state === run.state ? toggled.open : failed;
+  const open = toggled?.state === run.state ? toggled.open : false;
   const input = JSON.stringify(run.input, null, 2);
-  const expandable = run.toolName !== 'ask_user' && (isCommand || Object.keys(run.input).length > 0 || body.length > 0 || failed);
+  const expandable = problem || run.toolName !== 'ask_user' && (isCommand || Object.keys(run.input).length > 0 || body.length > 0);
   const truncated = body.length > 6000;
   return <div className="ai-tool-card" data-tool-state={run.state} data-open={open}>
-    <button type="button" data-subtle className="ai-tool-summary" aria-label={[label, text, status].filter(Boolean).join(' ')} aria-expanded={open} disabled={!expandable || pending}
-      onClick={() => setToggled({ state: run.state, open: !open })}>
+    <button type="button" data-subtle className="ai-tool-summary" aria-label={[label, text, status].filter(Boolean).join(' ')} aria-expanded={problem ? notice : open} disabled={!expandable || pending}
+      onClick={() => { if (problem) setNotice(true); else setToggled({ state: run.state, open: !open }); }}>
       {icon}<span className="ai-tool-label">{label}</span><span className="ai-tool-description" data-tip={pending ? undefined : text || undefined}>{pending ? '' : text}</span>
       <span className="ai-tool-state" data-state={run.state}>
         {run.state === 'done' ? <Check size={12} /> : run.state === 'running' ? <RefreshCw size={12} className="reload-spin" />
-          : (failed || run.state === 'denied') ? <X size={12} /> : null}{status}
+          : (problem || run.state === 'cancelled') ? <X size={12} /> : null}{status}
       </span>
       {expandable && !pending && <ChevronRight size={14} style={{ transform: open ? 'rotate(90deg)' : undefined }} />}
     </button>
     {run.toolName === 'ask_user' && <ToolQuestion run={run} conversationId={conversationId} />}
     {run.state === 'approval-pending' && <ToolApproval run={run} paneId={paneId} conversationId={conversationId} environment={environment} onAskAboutTool={onAskAboutTool} />}
-    {/* A refusal keeps its reason once the buttons are gone — the deadline, or what was blocked. */}
-    {run.state === 'denied' && run.danger && (
-      <div className="ai-tool-verdict" data-testid="tool-denied-reason">{run.danger}</div>
-    )}
+    {problem && notice && <ErrorBox title={label} details={`${t('Tool input')}\n${input}\n\n${t('Tool output')}\n${body}`} onDismiss={() => setNotice(false)}>
+      {run.state === 'denied' ? run.danger || run.error || t('Denied') : run.error || t('Tool execution failed')}
+    </ErrorBox>}
     {open && <div className="ai-tool-details">
       <div className="ai-tool-section-label">{t('Tool input')}</div>
       <pre className="ai-tool-input" data-selectable>{input}</pre>
       <div className="ai-tool-section-label">{t('Tool output')}</div>
-      {failed ? <ErrorBox placement="inline" dismissible={false} details={body || undefined}>{run.error || t('Tool execution failed')}</ErrorBox>
-        : isCommand ? <CommandOutputBlock run={run} paneId={paneId} framed={framed} />
+      {isCommand ? <CommandOutputBlock run={run} paneId={paneId} framed={framed} />
           : <ToolOutput framed={framed} text={body}>
             <pre className="ai-tool-output" data-selectable>{truncated ? `${t('Only the end of the output is shown')}\n` : ''}{body.slice(-6000) || t('No output')}</pre>
           </ToolOutput>}

@@ -15,7 +15,7 @@ export const DEFAULT_SYSTEM_PROMPT = [
   '- 默认用中文回答，简洁准确，先给结论再给过程。',
   '- 改动文件前先 read_file 了解现状；小改动优先 edit_file（old_string 必须唯一命中），',
   '  整文件重写用 write_file，绝不臆造文件内容。',
-  '- 执行有副作用或危险命令前先说明影响并尽量征得用户同意（命令会显示在终端里）。',
+  '- Explain material effects before execution and proceed within the scope the user already requested. The authorization interface handles execution approval; do not repeatedly ask the user whether to start or continue the same operation.',
   '- 交互式/长驻命令（dev server、TUI）不要用 run_command；全屏程序用 read_terminal + terminal_keys。',
   '- 需要联网时优先 web_fetch/web_crawl 读原文，web_search 找线索；引用来源时给出 URL。',
   '- 工具调用只能通过结构化接口提交：绝不要把调用语法写进回答正文（例如 ｜｜DSML｜｜…、',

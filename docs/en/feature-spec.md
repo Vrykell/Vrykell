@@ -4,6 +4,8 @@
 
 See [Workspace compositions](workspace-compositions.md) for composition ownership, restoration and the regression checklist.
 
+- Agent selection reuses the shared dropdown field and rich launcher. Tool refusal and failure badges match; cancelled questions retain cancellation. Verify live failures and explicit historical review in bottom-right notifications, quiet history mounting, no tool footer errors, both themes and narrow/wide sidebars.
+
 - Sidebar backends share the conversation title header, history/settings/new order and composer alignment. Agent selection and execution settings live in the persistent sliders panel. Verify narrow/wide layouts and both themes; long question choices have separate full-width rows and space before free text.
 - Inputs submitted during streaming queue for the next turn, preserve their owner through navigation and can be removed individually. Stop clears that conversation's queue, questions and approvals immediately. Cover pre-header cancellation, blocked persistence, unresponsive external cancellation, late callbacks, close/reopen and sending after stop.
 - Empty terminal sessions, native conversations and external session references are not persisted until content exists; entirely empty compositions are skipped. Preserve meaningful attachments, references, errors and tools. Cover first-content persistence and historical restoration.
@@ -26,7 +28,7 @@ See [Workspace compositions](workspace-compositions.md) for composition ownershi
 - Split actions stay in the current workspace. Editor and conversation splits reuse the same pane store factory, content host, geometry, placement controls and dividers as mixed compositions. Single panes hide removal. Toolbar action containers reserve their intrinsic width. Resource icons resolve actual profiles. A composition uses its first pane's content icon and a small circular count badge at the top right; a single pane has no badge.
 
 - AI tool and reply failures stay inline with output, details and retry; reloading history never republishes notifications. Approval timeout has no toast. Cover live/remounted cards, restored browser history and ordinary notifications.
-- Tool denial restricts the current turn to explanation or a user question, without execution. Nonzero exits and busy snapshots remain diagnosable. Captured remote contexts cannot execute local filesystem tools. Cover structured denial detection, remote gate rejection and terminal readiness.
+- Tool denial ends all tools for the current turn, including questions, followed by one explanation. At most one user question opens per turn; retain the selected option in the chat bubble palette and reject repeated confirmations. Nonzero exits and busy snapshots remain diagnosable. Captured remote contexts cannot execute local filesystem tools. Cover structured denial detection, question repetition, remote gate rejection and terminal readiness.
 - Concurrent command calls to one captured terminal execute in order. Denial, cancellation or unconfirmed completion blocks queued writes; a completed diagnostic failure permits the next command. Cover deferred execution, aborted queues, independent turns and the real model-stream restricted handoff.
 - Uploads and downloads preserve original names when available; numbering applies only to actual collisions. Explicit duplication retains always-numbered semantics. Native tests cover free names, repeated collisions, extensions, hidden and Unicode names; browser tests cover single drops.
 

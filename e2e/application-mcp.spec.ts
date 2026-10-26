@@ -2,9 +2,17 @@ import { expect, test, type Page } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 async function call(page: Page, requestId: string, name: string, args: Record<string, unknown>) {
-  await page.evaluate(({ requestId, name, args }) => {
+  await expect.poll(() => page.evaluate(async () => {
+    const path = '/src/features/chat/stores/harness.ts';
+    const { useHarnessStore } = await import(path) as typeof import('../src/features/chat/stores/harness');
+    return Object.values(useHarnessStore.getState().byTab).some(session => session.pending && !!session.sessionId);
+  })).toBe(true);
+  await page.evaluate(async ({ requestId, name, args }) => {
+    const path = '/src/features/chat/stores/harness.ts';
+    const { useHarnessStore } = await import(path) as typeof import('../src/features/chat/stores/harness');
+    const session = Object.values(useHarnessStore.getState().byTab).find(session => session.pending && session.sessionId)!;
     (window as unknown as { __EMIT_EVENT__: (event: string, payload: unknown) => void }).__EMIT_EVENT__('acp://session', {
-      sessionId: 'sess_e2e', kind: 'app-tool', payload: { method: 'call', requestId, name, arguments: args },
+      sessionId: session.sessionId, kind: 'app-tool', payload: { method: 'call', requestId, name, arguments: args },
     });
   }, { requestId, name, args });
 }
@@ -46,10 +54,16 @@ for (const theme of ['dark', 'light']) test(`answers application MCP questions i
   await question.getByRole('button', { name: 'Current project', exact: true }).click();
   await expect.poll(async () => (await result(page, 'question'))?.isError).toBe(false);
   expect((await result(page, 'question'))?.content[0]?.text).toContain('Current project');
+  await call(page, 'repeat', 'ask_user', { question: 'Confirm the same choice again?' });
+  await expect.poll(async () => (await result(page, 'repeat'))?.isError).toBe(true);
+  await expect(question).toHaveCount(0);
+  await page.getByRole('button', { name: '停止本轮', exact: true }).click();
+  await page.getByTestId('harness-composer').fill('Ask a new question'); await page.getByTestId('harness-send').click();
   await call(page, 'cancel', 'ask_user', { question: 'Proceed?' });
   await expect(question).toBeVisible();
   await page.getByRole('button', { name: '停止本轮', exact: true }).click();
   await expect(question).toHaveCount(0);
+  await expect(page.locator('.ai-tool-card[data-tool-state="cancelled"] .ai-tool-state')).toHaveText('已取消');
   await expect(page.locator('#app-notifications [role="alert"]')).toHaveCount(0);
 });
 

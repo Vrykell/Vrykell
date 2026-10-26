@@ -2,7 +2,7 @@
 
 > 最后更新: 2026-10-17
 >
-> 规则 43 补充：AI 执行与回复错误使用公共 ErrorBox 内联模式，留在所属对话中。恢复、展开或重新挂载历史不得发布通知。审批超时只作为工具结果显示，不弹全局提示；人类主动操作的通知行为不变。
+> 规则 43 补充：工具卡保留状态和已存结果，不在底部显示错误。实时工具失败使用公共右下角 ErrorBox；主动查看结果时也在同一区域展示。恢复或重新挂载历史不得发布通知，审批结果不自动发布通知。AI 回复错误保留公共 ErrorBox 内联模式；人类主动操作的通知行为不变。
 >
 > 本文件（`docs/zh/development-rules.md`）是规则正本，英文镜像为 `docs/en/development-rules.md`。
 > `AGENTS.md` 是常驻摘要，`.agents/skills/vrykell-conventions/SKILL.md` 是面向 agent 的规范入口

@@ -95,7 +95,7 @@ describe('agentStream（mock IPC 边界）', () => {
       let text = '';
       await agentStream([{ role: 'user', content: 'Inspect the service' }], chunk => { text += chunk; }, { paneId: 'fixed', tabId: 'owner' });
       expect(requests).toHaveLength(2);
-      expect(requests[1]!.tools).toEqual([expect.objectContaining({ function: expect.objectContaining({ name: 'ask_user' }) })]);
+      expect(requests[1]!.tool_choice).toBe('none');
       expect(text).toBe('Waiting for authorization');
     } finally {
       useAgentSettings.setState({ global: initial });

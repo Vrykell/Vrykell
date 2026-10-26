@@ -9,5 +9,5 @@ export function hasChatContent(message: Pick<ChatMessage, 'content' | 'parts' | 
 export function stopChatMessage(message: ChatMessage): ChatMessage {
   return { ...message, pending: false, stopped: true, parts: message.parts?.map(part => part.kind === 'tool'
     && ['running', 'approval-pending', 'input-pending'].includes(part.tool.state)
-    ? { kind: 'tool', tool: { ...part.tool, state: 'error', endedAt: Date.now(), error: t(part.tool.toolName === 'ask_user' ? 'Question cancelled' : 'Stopped waiting; the terminal command may still be running') } } : part) };
+    ? { kind: 'tool', tool: { ...part.tool, state: 'cancelled', endedAt: Date.now(), error: t(part.tool.toolName === 'ask_user' ? 'Question cancelled' : 'Stopped waiting; the terminal command may still be running') } } : part) };
 }

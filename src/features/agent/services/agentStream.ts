@@ -260,7 +260,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     messages: modelMessages,
     instructions: systemPrompt || undefined,
     tools: hasTools ? tools : undefined,
-    prepareStep: hasTools ? options => prepareToolRecoveryStep(options, !!tools.ask_user) : undefined,
+    prepareStep: hasTools ? options => prepareToolRecoveryStep(options, Object.keys(tools)) : undefined,
     stopWhen: hasTools ? stepCountIs(Math.max(1, Math.round(settings.maxSteps))) : undefined,
     abortSignal: ctx?.signal,
     // M6 深思考：providerOptions 透传（openai-compatible → reasoning_effort）。
@@ -326,14 +326,15 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
         const c = calls.get(p.toolCallId);
         const raw = p.output ?? p.result;
         const out = typeof raw === 'string' ? raw : JSON.stringify(raw);
-        // 结构化结果哨兵：denied → 保持灰环（不盖成绿）；ok:false → 红节点
-        let state: 'done' | 'error' | 'denied' = 'done';
+        // Structured results preserve cancellation and refusal separately from execution failure.
+        let state: ToolRunState = 'done';
         let error: string | undefined;
         try {
           const v: unknown = JSON.parse(out);
           if (v && typeof v === 'object') {
-            const o = v as { denied?: unknown; ok?: unknown; error?: unknown };
-            if (o.denied === true) state = 'denied';
+            const o = v as { denied?: unknown; cancelled?: unknown; ok?: unknown; error?: unknown };
+            if (o.cancelled === true) state = 'cancelled';
+            else if (o.denied === true) state = 'denied';
             else if (o.ok === false) {
               state = 'error';
               error = typeof o.error === 'string' ? o.error : undefined;

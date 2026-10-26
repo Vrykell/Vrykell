@@ -2,12 +2,13 @@ import { beforeEach, expect, it, vi } from 'vitest';
 import { agentStream } from '../services/agentStream';
 import { useAgentSettings } from '../stores/agentSettings';
 import { useUsageStore } from '../stores/usage';
+import type { ToolRun } from '../model/messageParts';
 
-const metrics = vi.hoisted(() => ({ resolve: undefined as ((usage: unknown) => void) | undefined }));
+const metrics = vi.hoisted(() => ({ resolve: undefined as ((usage: unknown) => void) | undefined, parts: [] as unknown[] }));
 vi.mock('ai', async importOriginal => ({
   ...await importOriginal<typeof import('ai')>(),
   streamText: vi.fn(() => ({
-    fullStream: (async function* () {})(),
+    fullStream: (async function* () { yield* metrics.parts; })(),
     usage: new Promise(resolve => { metrics.resolve = resolve; }),
   })),
 }));
@@ -22,7 +23,14 @@ vi.mock('@tauri-apps/api/core', () => ({
 
 beforeEach(() => {
   useAgentSettings.setState(state => ({ global: { ...state.global, agentMode: false } }));
-  useUsageStore.setState({ records: [] }); metrics.resolve = undefined;
+  useUsageStore.setState({ records: [] }); metrics.resolve = undefined; metrics.parts = [];
+});
+
+it('preserves cancellation in structured tool results', async () => {
+  metrics.parts = [{ type: 'tool-result', toolCallId: 'question', toolName: 'ask_user', output: { ok: false, answered: false, cancelled: true } }];
+  const runs: ToolRun[] = [];
+  await agentStream([{ role: 'user', content: 'Question' }], () => {}, { handlers: { onToolEvent: run => runs.push(run) } });
+  expect(runs[runs.length - 1]?.state).toBe('cancelled');
 });
 
 it('finishes the reply without waiting for optional usage and records it when available', async () => {

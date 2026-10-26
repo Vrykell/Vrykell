@@ -76,6 +76,8 @@ History uses native keyset pages of 40 metadata records, without loading transcr
 
 Read failures use persistent bottom-right `ErrorBox` notifications with useful guidance, diagnostic details, dismissal and retry. Ordinary transient outcomes use `Toast` in the same shared notification region. Notifications track the visibility and lifetime of their owner, and an active modal includes its own notification controls in keyboard navigation. The global error page remains full-page. Long diagnostics wrap or scroll without squeezing action buttons. All visible copy and accessible labels use the locale catalog.
 
+Tool cards retain result statuses without footer errors. Live execution failures and explicit result review use the same bottom-right ErrorBox. Restored history and approval outcomes never automatically replay notifications. Refusal shares the failed badge appearance; a cancelled question remains cancellation rather than failure.
+
 ## Verification
 
 The strict static audit retains the baseline heuristic findings: shared `Select` usages classified as native selects, plus existing form, wrapper and terminal-scrollbar findings. The custom-provider choice uses the canonical authored `Select`; no native select was introduced. These findings remain explicitly unresolved by the checker, not a passing audit result. Runtime verification covers notification retry and modal focus, actual menu alignment, compact creation pickers, cross-domain resource switching, dark/light dialogs, narrow editor commands and fixed rename geometry.

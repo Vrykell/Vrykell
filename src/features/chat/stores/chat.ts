@@ -224,7 +224,7 @@ export const useChatStore = create<ChatState>((set, get) => {
   /**
    * 流式内核（send/regenerate 共用）：history 取自 store 现状（排除 pending 占位）。
    * User aborts are not failures: partial content stays, unfinished tools end in the
-   * error state, but the answer is not marked red and carries no error text; an
+   * cancelled state, but the answer is not marked red and carries no error text; an
    * empty shell aborted immediately is removed.
    */
   const runAssistant = async (tabId: string, assistantId: string, controller: AbortController, streamFn?: StreamFn) => {
@@ -333,7 +333,7 @@ export const useChatStore = create<ChatState>((set, get) => {
               if (m.id !== assistantId) return m;
               let parts = m.parts;
               if (interrupted && parts) {
-                // 失败/中止时，未完结的工具动作落 error 终态（节点转红）
+                // Stopped calls retain cancellation separately from interrupted execution failures.
                 parts = parts.map((p) =>
                   p.kind === 'tool' &&
                   (p.tool.state === 'running' || p.tool.state === 'approval-pending' || p.tool.state === 'input-pending')
@@ -341,9 +341,9 @@ export const useChatStore = create<ChatState>((set, get) => {
                         kind: 'tool' as const,
                         tool: {
                           ...p.tool,
-                          state: 'error' as const,
+                          state: controller.signal.aborted ? 'cancelled' as const : 'error' as const,
                           endedAt: p.tool.endedAt ?? Date.now(),
-                          error: p.tool.error ?? t(p.tool.toolName === 'ask_user' ? 'Question cancelled' : failed ? 'Conversation interrupted' : 'Stopped waiting; the terminal command may still be running'),
+                          error: p.tool.error ?? t(failed ? 'Conversation interrupted' : p.tool.toolName === 'ask_user' ? 'Question cancelled' : 'Stopped waiting; the terminal command may still be running'),
                         },
                       }
                     : p,
