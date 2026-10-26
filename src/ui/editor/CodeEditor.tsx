@@ -5,6 +5,7 @@ import { useEditorPreferences } from '@config/editor';
 import { diagnostic } from '@platform/diagnostics';
 import type { EditorVimCommand } from '@core/editor';
 import { bindEditorVimCommands, registerEditorVimCommands, type VimApi } from '@ui/editor/code/vimCommands';
+import { guardModalComposition } from '@ui/editor/code/modalCompositionGuard';
 import { useToastStore } from '@ui/feedback/Toast';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import { t } from '@i18n';
@@ -63,13 +64,16 @@ export default function CodeEditor({ path, value, onChange, onSave, onVimCommand
   useEffect(() => { instance.current?.view.updateOptions({ lineNumbers: lineNumbers ? 'on' : 'off' }); }, [ready, lineNumbers]);
   useEffect(() => { instance.current?.view.updateOptions({ fontFamily: terminalFontFamily(fontPreset), fontSize, fontWeight: String(fontWeight), lineHeight: fontSize * lineHeight }); }, [ready, fontSize, fontPreset, fontWeight, lineHeight]);
   useEffect(() => {
-    let disposed = false; let adapter: { dispose: () => void } | undefined; let promptObserver: MutationObserver | undefined;
+    let disposed = false; let adapter: { dispose: () => void } | undefined; let promptObserver: MutationObserver | undefined; let unguardComposition: (() => void) | undefined;
     if (ready && vimMode && !readOnly && instance.current) void import('monaco-vim').then(loaded => {
       if (disposed || !instance.current || !vimStatus.current) return;
       const bindings = 'default' in loaded && loaded.default && typeof loaded.default === 'object' ? loaded.default as typeof loaded : loaded;
       const { initVimMode, VimMode } = bindings;
       registerEditorVimCommands((VimMode as unknown as { Vim: VimApi }).Vim);
       const initialized = initVimMode(instance.current.view, vimStatus.current);
+      let acceptsText = false;
+      initialized.on('vim-mode-change', (change: { mode?: string }) => { acceptsText = change.mode === 'insert' || change.mode === 'replace'; });
+      if (host.current) unguardComposition = guardModalComposition(host.current, () => acceptsText);
       initialized.openNotification = (content: unknown) => { const message = content instanceof Node ? content.textContent : String(content); if (message) useToastStore.getState().addToast(message, 'info'); };
       promptObserver = new MutationObserver(() => {
         const input = vimStatus.current?.querySelector('input');
@@ -80,7 +84,7 @@ export default function CodeEditor({ path, value, onChange, onSave, onVimCommand
       initialized.dispatch?.('vim-mode-change', { mode: 'normal' });
       adapter = initialized;
     }).catch(reason => { if (!disposed) { setError(String(reason)); diagnostic('code-editor-vim', { stage: 'error', error: reason }, 'error'); } });
-    return () => { disposed = true; promptObserver?.disconnect(); adapter?.dispose(); setVimPrompt(false); };
+    return () => { disposed = true; promptObserver?.disconnect(); unguardComposition?.(); adapter?.dispose(); setVimPrompt(false); };
   }, [ready, vimMode, readOnly]);
   return <div className="code-editor" data-testid="code-editor">
     {error && <ErrorBox title={t('Could not load editor')} details={error} />}

@@ -5,7 +5,7 @@ import { useEditorPreferences } from '@config/editor';
 import { useTypographyStore } from '@config/typography';
 import { act } from '@testing-library/react';
 
-const mocks = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), dispose: vi.fn(), modelDispose: vi.fn(), trigger: vi.fn(), command: vi.fn(), vim: vi.fn(), vimDispose: vi.fn(), defineEx: vi.fn(), theme: vi.fn(), diagnostic: vi.fn() }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), dispose: vi.fn(), modelDispose: vi.fn(), trigger: vi.fn(), command: vi.fn(), vim: vi.fn(), vimDispose: vi.fn(), vimOn: vi.fn(), defineEx: vi.fn(), theme: vi.fn(), diagnostic: vi.fn() }));
 vi.mock('@platform/diagnostics', () => ({ diagnostic: mocks.diagnostic }));
 vi.mock('@ui/editor/code/runtime', () => ({
   applyCodeTheme: mocks.theme, languageForFile: () => 'plaintext',
@@ -24,7 +24,7 @@ beforeEach(() => {
   useTypographyStore.getState().reset();
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   mocks.create.mockImplementation(() => ({ updateOptions: mocks.update, dispose: mocks.dispose, layout: vi.fn(), focus: vi.fn(), addCommand: mocks.command, onDidChangeCursorPosition: vi.fn(), trigger: mocks.trigger }));
-  mocks.vim.mockReturnValue({ dispose: mocks.vimDispose });
+  mocks.vim.mockReturnValue({ dispose: mocks.vimDispose, on: mocks.vimOn });
 });
 
 it('uses restrained text-editor defaults and exposes common edit commands without remounting', async () => {
@@ -53,6 +53,7 @@ it('adds optional modal bindings and disposes them when disabled without replaci
   const { rerender } = render(<CodeEditor {...props} vimMode />);
   await waitFor(() => expect(mocks.vim).toHaveBeenCalledTimes(1));
   expect(mocks.defineEx).toHaveBeenCalledWith('write', 'w', expect.any(Function));
+  expect(mocks.vimOn).toHaveBeenCalledWith('vim-mode-change', expect.any(Function));
   const write = mocks.defineEx.mock.calls[0][2] as (adapter: { editor: unknown }) => void;
   write({ editor: mocks.create.mock.results[0].value }); await waitFor(() => expect(props.onSave).toHaveBeenCalledTimes(1));
   rerender(<CodeEditor {...props} vimMode={false} />);

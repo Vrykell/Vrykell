@@ -99,3 +99,28 @@ test('supports modal editing and writes through the same save path in Vim mode',
   await expect(page.getByTestId('code-start-page')).toBeVisible();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mock-editor-files') || '{}')['["","/home/e2e/modal.txt"]'])).toContain('updated note');
 });
+
+test('keeps native composition out of normal mode and does not replay a blocked preedit', async ({ page }) => {
+  await editorMenu(page, 'Vim 模式');
+  const status = page.getByTestId('file-editor').locator('.code-editor-vim-status');
+  await expect(status).toContainText('NORMAL', { timeout: 15_000 });
+  const editor = page.getByTestId('file-editor');
+  const textarea = editor.locator('textarea.inputarea');
+  await textarea.focus();
+  const cdp = await page.context().newCDPSession(page);
+  const compose = async (committed: string) => {
+    await cdp.send('Input.imeSetComposition', { text: 'nihao', selectionStart: 5, selectionEnd: 5 });
+    await cdp.send('Input.insertText', { text: committed });
+  };
+  await compose('你好');
+  await expect(editor.locator('.view-lines')).not.toContainText('你好');
+  await page.keyboard.press('i');
+  await expect(status).toContainText('INSERT');
+  await page.keyboard.insertText('a');
+  // The blocked preedit must not be replayed when the editor starts accepting text.
+  await expect(editor.locator('.view-lines')).toHaveText('a');
+  await compose('你好');
+  await expect(editor.locator('.view-lines')).toHaveText('a你好');
+  await expect(status).toContainText('INSERT');
+  await cdp.detach();
+});
