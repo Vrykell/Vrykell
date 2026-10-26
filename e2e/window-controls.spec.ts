@@ -41,10 +41,14 @@ test('window controls keep the surface for visible keyboard focus', async ({ pag
   const minimize = page.getByTestId('window-minimize');
   const hoverSurface = await themeColor(page, '--button-hover');
 
-  for (let press = 0; press < 60; press += 1) {
-    await page.keyboard.press('Tab');
-    if (await minimize.evaluate(element => element === document.activeElement)) break;
-  }
+  await page.waitForFunction(async () => {
+    const path = '/src/features/terminal/stores/terminal.ts';
+    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    return Object.values(useTerminalStore.getState().startupStates).includes('ready');
+  });
+  await page.getByTestId('window-close').focus();
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Shift+Tab');
   await expect(minimize).toBeFocused();
   await page.mouse.move(2, 300);
   await expect(minimize).toHaveCSS('background-color', hoverSurface);

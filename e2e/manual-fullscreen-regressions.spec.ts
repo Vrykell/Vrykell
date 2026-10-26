@@ -63,7 +63,7 @@ for (const scale of [1, 1.25]) test.describe(`fullscreen at scale ${scale}`, () 
       const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
       useWorkspaceStore.getState().addTab();
     });
-    await expect(page.getByTestId('tui-fullscreen')).toHaveCount(0);
+    await expect(page.getByTestId('tui-fullscreen')).toBeHidden();
     await page.locator(`[data-tab-row-id="${original.tab}"]`).click();
     await expect(page.getByTestId('tui-fullscreen')).toHaveAttribute('data-pane-id', original.pane);
     await expect(screen).toBeVisible();

@@ -34,7 +34,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('终端右键菜单提供复制/粘贴并标注 Ctrl+C/V', async ({ page }) => {
-  await page.locator('[data-testid^="pane-"]').first().click({ button: 'right' });
+  await page.locator('.terminal-pane:visible').first().click({ button: 'right' });
   const menu = page.getByRole('menu', { name: '操作菜单' });
   await expect(menu).toBeVisible();
   await expect(menu).toContainText('复制');

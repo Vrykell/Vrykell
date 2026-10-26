@@ -28,7 +28,7 @@ test(`real vi receives normal-mode, insertion and Escape commands from ${integra
     await writeFile(file, 'alpha\nbeta\n');
     await setupTauriMock(page, { integration });
     await page.goto('/');
-    await expect(page.locator('[data-testid^="pane-"] .xterm-helper-textarea').first()).toBeAttached();
+    await expect(page.locator('.terminal-pane:visible .xterm-helper-textarea').first()).toBeAttached();
     await page.waitForFunction(() => (window as unknown as { __PTY_SPAWNS__: unknown[] }).__PTY_SPAWNS__.length > 0);
     await page.exposeFunction('writeEditorInput', (data: string) => {
       editorInput.push(data);
@@ -54,7 +54,7 @@ test(`real vi receives normal-mode, insertion and Escape commands from ${integra
       });
     });
     if (integration) {
-      const composer = page.locator('[data-testid^="pane-"] .terminal-composer textarea');
+      const composer = page.locator('.terminal-pane:visible .terminal-composer textarea');
       await composer.fill('vi');
       await composer.press('Enter');
       await emitPtyOutput(page, '\x1b]133;C\x07');
@@ -88,7 +88,7 @@ test(`real vi receives normal-mode, insertion and Escape commands from ${integra
       }
     });
     await expectAnyTermContains(page, 'alpha');
-    await page.locator('[data-testid^="pane-"] .xterm-helper-textarea').first().focus();
+    await page.locator('.terminal-pane:visible .xterm-helper-textarea').first().focus();
     await page.evaluate(async () => {
       const path = '/src/features/terminal/stores/terminal.ts';
       const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
@@ -98,7 +98,7 @@ test(`real vi receives normal-mode, insertion and Escape commands from ${integra
       const hidden = page.getByTestId('running-term').locator('textarea');
       await expect(hidden).toBeAttached();
       await hidden.evaluate(element => (element as HTMLTextAreaElement).focus());
-      await expect(page.locator('[data-testid^="pane-"] .xterm-helper-textarea').first()).toBeFocused();
+      await expect(page.locator('.terminal-pane:visible .xterm-helper-textarea').first()).toBeFocused();
     }
     await page.keyboard.press('j');
     for (const key of ['ArrowUp', 'ArrowDown', 'ArrowRight', 'ArrowLeft']) {
@@ -107,7 +107,7 @@ test(`real vi receives normal-mode, insertion and Escape commands from ${integra
     await page.keyboard.press('d');
     await page.keyboard.press('Escape');
     // Exercise the composed native commit path that may omit keypress in a webview.
-    await page.locator('[data-testid^="pane-"] .xterm-helper-textarea').first().evaluate(element => {
+    await page.locator('.terminal-pane:visible .xterm-helper-textarea').first().evaluate(element => {
       element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Unidentified', keyCode: 229 }));
       element.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: 'i' }));
     });

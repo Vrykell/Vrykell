@@ -36,7 +36,7 @@ test('pasting a multiline script from the idle terminal menu preserves it withou
   await expect(input).toBeVisible();
   await page.evaluate(() => { (window as unknown as { __CLIPBOARD_TEXT__: string }).__CLIPBOARD_TEXT__ = 'echo one\necho two\n'; });
   const before = (await ptyWrites(page)).length;
-  await page.locator('[data-testid^="pane-"]').first().click({ button: 'right' });
+  await page.locator('.terminal-pane:visible').first().click({ button: 'right' });
   await page.getByRole('menu', { name: '操作菜单' }).getByRole('button', { name: /粘贴/ }).click();
   await expect(input).toHaveValue('echo one\necho two\n');
   expect((await ptyWrites(page)).slice(before)).toEqual([]);

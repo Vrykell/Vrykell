@@ -74,13 +74,14 @@ test.describe('打开方式设置页', () => {
     expect(saved).toContain('"zsh":"classic"');
   });
 
-  test('SSH 打开方式：默认经典，可切换块模式并持久化', async ({ page }) => {
-    await gotoSetting(page, 'SSH');
-    await expect(page.getByRole('combobox', { name: '打开方式', exact: true })).toHaveText('经典模式');
-    await page.getByRole('combobox', { name: '打开方式', exact: true }).click();
-    await page.getByRole('option', { name: '块模式', exact: true }).click();
+  test('SSH opening mode is configured through the saved host quick menu', async ({ page }) => {
+    await page.getByTestId('tab-new-btn').click();
+    await page.getByTestId('new-tab-option-ssh:ssh-1').click({ button: 'right' });
+    await page.getByRole('menuitem', { name: '打开方式', exact: true }).press('ArrowRight');
+    await expect(page.getByRole('menuitemradio', { name: '经典模式' })).toHaveAttribute('aria-checked', 'true');
+    await page.getByRole('menuitemradio', { name: '块模式' }).click();
     const saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
-    expect(saved).toContain('"ssh":"block"');
+    expect(saved).toContain('"sshOpenMode":"block"');
   });
 });
 

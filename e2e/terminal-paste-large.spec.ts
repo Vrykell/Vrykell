@@ -21,7 +21,7 @@ async function openClassicShell(page: Page) {
   });
 }
 
-const terminalInput = (page: Page) => page.locator('[data-testid^="pane-"] .xterm-helper-textarea').first();
+const terminalInput = (page: Page) => page.locator('.terminal-pane:visible .xterm-helper-textarea').first();
 
 /** A representative seven-line script, including its trailing newline. */
 const MULTI_LINE = 'one\ntwo\nthree\nfour\nfive\nsix\n';

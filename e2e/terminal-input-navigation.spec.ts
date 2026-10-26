@@ -87,8 +87,7 @@ test('cwd menu searches folders, changes directories, and preserves the command 
   await expect(menu.getByRole('option', { name: 'notes.txt' })).toHaveCount(0);
   const folder = menu.getByRole('option', { name: 'Documents' });
   await folder.hover();
-  const hover = await folder.evaluate(element => getComputedStyle(element).backgroundColor);
-  expect(hover).not.toBe('rgba(0, 0, 0, 0)');
+  await expect(folder).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await menu.getByRole('combobox').hover();
   await expect(folder).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const search = menu.getByRole('combobox');

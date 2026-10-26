@@ -67,15 +67,20 @@ test('restores sidebar history, fits rename inputs and colors complete fenced bl
     const path = '/src/features/chat/stores/chat.ts'; const { useChatStore } = await import(path) as typeof import('../src/features/chat/stores/chat');
     const store = useChatStore.getState(); const first = store.createConversation(); store.renameConversation(first, 'Short');
     const second = store.createConversation(); store.renameConversation(second, 'Recent response');
+    const workspacePath = '/src/features/chat/stores/aiWorkspace.ts';
+    const { useAiWorkspace } = await import(workspacePath) as typeof import('../src/features/chat/stores/aiWorkspace');
+    useAiWorkspace.getState().ensureNative(first);
+    useAiWorkspace.getState().selectSide(`chat:${second}`);
     useChatStore.setState(state => ({ byTab: { ...state.byTab, [second]: [
       { id: 'question', role: 'user', content: 'Code sample', createdAt: 1 },
       { id: 'reply', role: 'assistant', content: '```ts\nconst value = "safe";\n// second line\n```', createdAt: 2 },
     ] } }));
   });
-  const panel = page.locator('.ai-chat-panel:visible');
+  const panel = page.getByTestId('ai-sidebar-content');
   await expect(panel.locator('[data-code-token="keyword.ts"]')).toHaveCount(1);
   await expect(panel.locator('[data-code-token^="comment"]')).toHaveText('// second line');
-  await panel.getByRole('button', { name: '会话设置', exact: true }).click(); await page.getByRole('combobox', { name: '恢复最近会话' }).click(); await page.getByRole('option', { name: 'Short', exact: true }).click();
+  await panel.getByRole('button', { name: '会话设置', exact: true }).click(); await page.getByRole('combobox', { name: '侧栏对话' }).click(); await page.getByRole('option', { name: 'Short', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(panel.getByRole('button', { name: '重命名对话' })).toHaveText('Short');
   await panel.getByRole('button', { name: '重命名对话' }).click(); const input = panel.getByRole('textbox', { name: '对话标题' });
   const small = (await input.boundingBox())!.width; expect(small).toBeLessThanOrEqual(176);

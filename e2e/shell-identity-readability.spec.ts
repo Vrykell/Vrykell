@@ -27,14 +27,14 @@ for (const theme of ['dark', 'light'] as const) for (const density of [1, 1.25, 
     }
     const powerShell = page.getByTestId('new-tab-option-shell:powershell');
     const powerShellMark = powerShell.locator('[data-shell-mark="powershell"]');
-    await expect(powerShellMark).toHaveAttribute('viewBox', '2 2 28 28');
-    await expect(powerShell.locator('linearGradient').first()).toBeAttached();
+    await expect(powerShellMark).toHaveAttribute('viewBox', '0 0 24 24');
+    await expect(powerShell.locator('linearGradient')).toHaveCount(0);
     const powerShellGeometry = await powerShellMark.evaluate(element => {
       const mark = element as SVGSVGElement;
       return { width: mark.getBBox().width / mark.viewBox.baseVal.width, height: mark.getBBox().height / mark.viewBox.baseVal.height };
     });
-    expect(powerShellGeometry.width).toBeGreaterThan(.98);
-    expect(powerShellGeometry.height).toBeGreaterThan(.75);
+    expect(powerShellGeometry.width).toBeCloseTo(22 / 24, 2);
+    expect(powerShellGeometry.height).toBeCloseTo(17 / 24, 2);
     await page.screenshot({ path: info.outputPath(`shell-menu-${theme}-${density}.png`), animations: 'disabled' });
     await page.setViewportSize({ width: 700, height: 800 });
     await page.screenshot({ path: info.outputPath(`shell-menu-narrow-${theme}-${density}.png`), animations: 'disabled' });

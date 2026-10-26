@@ -12,7 +12,7 @@ const SIDE_OFFSETS: Record<PlacementSide, [number, number]> = {
 
 /** 当前获得焦点的窗格。 */
 export function focusedPane(page: Page): Locator {
-  return page.locator('[data-testid^="pane-"][data-focused="true"]').first();
+  return page.locator('.terminal-pane[data-focused="true"]:visible').first();
 }
 
 /** 悬停某个窗格一侧的半屏落点，返回悬停坐标；预览只在该落点渲染。 */

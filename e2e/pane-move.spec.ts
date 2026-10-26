@@ -6,7 +6,7 @@ test('a single pane ignores reordering gestures and remains ready for splitting'
   await setupTauriMock(page);
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
-  const pane = await page.locator('[data-testid^="pane-"]').boundingBox();
+  const pane = await page.locator('.terminal-pane:visible').boundingBox();
   await page.mouse.move(pane!.x + pane!.width / 2, pane!.y + 100);
   await page.mouse.down();
   await page.mouse.move(pane!.x + pane!.width / 2 + 50, pane!.y + 100);
@@ -16,7 +16,7 @@ test('a single pane ignores reordering gestures and remains ready for splitting'
   const point = await hoverPlacementZone(page, focusedPane(page), 'right');
   await expect(page.getByTestId('placement-zone-1')).toBeVisible();
   await page.mouse.click(point.x, point.y);
-  await expect(page.locator('[data-testid^="pane-"]')).toHaveCount(2);
+  await expect(page.locator('.terminal-pane:visible')).toHaveCount(2);
 });
 
 /**
@@ -36,7 +36,7 @@ test('拖动终端重排：运行中块的 PTY 保活（不重挂、命令不退
   await page.keyboard.press('Meta+d');
   await expect(page.getByTestId('placement-overlay')).toBeVisible({ timeout: 5000 });
   await pickPlacementZone(page, focusedPane(page), 'right');
-  const panes = page.locator('[data-testid^="pane-"]');
+  const panes = page.locator('.terminal-pane:visible');
   await expect(panes).toHaveCount(2);
 
   // 启动长时间运行命令（单监听 → 只有后分裂 pane 进入执行）
@@ -71,7 +71,7 @@ test('更换位置：悬停目标落点后点击即可移动窗格', async ({ pa
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.keyboard.press('Meta+d');
   await pickPlacementZone(page, focusedPane(page), 'right');
-  const panes = page.locator('[data-testid^="pane-"]');
+  const panes = page.locator('.terminal-pane:visible');
   await expect(panes).toHaveCount(2);
 
   // 右键第一个窗格 → 更换位置：被移动的窗格在剩余区域的落点里悬停并点击
@@ -92,7 +92,7 @@ test('更换位置在只有一个终端时提示并保持原状', async ({ page 
   await setupTauriMock(page);
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
-  await page.locator('[data-testid^="pane-"]').first().click({ button: 'right' });
+  await page.locator('.terminal-pane:visible').first().click({ button: 'right' });
   await page.getByText('更换位置', { exact: true }).click();
   await expect(page.getByText('只有一个终端，无法更换位置')).toBeVisible();
   await expect(page.getByTestId('placement-overlay')).toHaveCount(0);

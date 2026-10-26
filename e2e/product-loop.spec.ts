@@ -7,6 +7,10 @@ test('AI 草稿和附件按会话保留，关闭面板后仍能继续发送', as
   await page.goto('/');
   await ensureTabsOpen(page);
   await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
+  const side = page.getByTestId('ai-sidebar-content');
+  await side.getByRole('button', { name: '重命名对话' }).click();
+  await side.getByRole('textbox', { name: '对话标题' }).fill('First draft');
+  await side.getByRole('textbox', { name: '对话标题' }).press('Enter');
   const input = page.locator('[data-chat-composer]:visible');
   await input.fill('终端一的草稿');
   await input.evaluate((element) => {
@@ -22,11 +26,10 @@ test('AI 草稿和附件按会话保留，关闭面板后仍能继续发送', as
   await page.getByRole('button', { name: '新对话', exact: true }).click();
   await expect(input).toHaveValue('');
   await input.fill('第二个对话的草稿');
-  await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
-  await page.getByTestId('unified-history-page').locator('[data-history-kind="conversation"]').last().click();
-  await ensureTabsOpen(page);
-  await page.getByTestId('tab-row-t1').click();
-  if (!await input.isVisible()) await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
+  await side.getByRole('button', { name: '会话设置', exact: true }).click();
+  await page.getByRole('combobox', { name: '侧栏对话' }).click();
+  await page.getByRole('option', { name: 'First draft', exact: true }).click();
+  await page.keyboard.press('Escape');
   await expect(input).toHaveValue('终端一的草稿');
   await expect(page.locator('[data-tip="移除附件"]')).toHaveCount(1);
   const visibleComposer = page.locator('[data-chat-composer]:visible');

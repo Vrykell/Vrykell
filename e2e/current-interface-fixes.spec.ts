@@ -16,12 +16,15 @@ test('keeps a fixed shared rename field, right-pinned actions and one aligned tr
     const chatPath = '/src/features/chat/stores/chat.ts';
     const { useChatStore } = await import(chatPath) as typeof import('../src/features/chat/stores/chat');
     const id = useChatStore.getState().createConversation();
+    const workspacePath = '/src/features/chat/stores/aiWorkspace.ts';
+    const { useAiWorkspace } = await import(workspacePath) as typeof import('../src/features/chat/stores/aiWorkspace');
+    useAiWorkspace.getState().selectSide(`chat:${id}`);
     useChatStore.setState(state => ({ byTab: { ...state.byTab, [id]: [
       { id: 'q', role: 'user', content: 'A short question', createdAt: 1 },
       { id: 'a', role: 'assistant', content: 'A short answer.', createdAt: 2 },
     ] } }));
   });
-  const panel = page.locator('.ai-chat-panel:visible');
+  const panel = page.getByTestId('ai-sidebar-content');
   await panel.getByRole('button', { name: '重命名对话' }).click();
   const field = panel.getByRole('textbox', { name: '对话标题' });
   await expect(field).toHaveClass(/text-input-field/);
