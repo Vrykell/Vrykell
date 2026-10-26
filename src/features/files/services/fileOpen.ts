@@ -2,6 +2,8 @@ import { invoke } from '@platform/diagnostics';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { normPath } from '@platform/path';
 import { safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
+import { t } from '@i18n';
+import type { ShellType } from '@platform/shells';
 
 /**
  * fileOpen — 文件面板的文件打开逻辑。
@@ -109,8 +111,9 @@ function shellQuote(path: string): string {
 
 /** 按远程模板/远程默认编辑器构造远程打开命令；有 {file} 替换，无则追加引用路径。 */
 export function remoteOpenCommand(cfg: FileOpenConfig, path: string): string {
+  if (/[\x00-\x1f\x7f-\x9f]/.test(path)) throw new Error(t('Files with control characters cannot be opened in a terminal.'));
   const tpl = cfg.remoteTemplates[extOf(path)] ?? cfg.remoteEditor;
-  const cmd = tpl.includes('{file}') ? tpl.replace('{file}', shellQuote(path)) : `${tpl} ${shellQuote(path)}`;
+  const cmd = tpl.includes('{file}') ? tpl.split('{file}').join(shellQuote(path)) : `${tpl} ${shellQuote(path)}`;
   return cmd.endsWith('\n') ? cmd : `${cmd}\n`;
 }
 
@@ -135,9 +138,10 @@ interface FileOpenResultRust {
 export async function openFile(
   path: string,
   write: (commandLine: string) => void,
+  shell?: ShellType,
 ): Promise<OpenResult> {
   const cfg = loadConfig();
-  const res = await invoke<FileOpenResultRust>('file_open', { path, cfg });
+  const res = await invoke<FileOpenResultRust>('file_open', { path, cfg: shell ? { ...cfg, shell } : cfg });
 
   if (res.via === 'terminal') {
     write(res.command ?? '');

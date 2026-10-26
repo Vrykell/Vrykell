@@ -9,6 +9,10 @@ import {
 } from '@platform/api/fs';
 
 describe('api/fs 封装', () => {
+  it('preserves empty staging destinations for non-undoable deletions', async () => {
+    invokeMock.mockResolvedValueOnce({ completed: [{ from: 'C:\\work\\a.txt', to: '' }], errors: [] });
+    await expect(fsStageDelete(['C:/work/a.txt'], false)).resolves.toEqual({ completed: [{ from: 'C:/work/a.txt', to: '' }], errors: [] });
+  });
   it('各命令按约定透传', async () => {
     invokeMock.mockResolvedValueOnce([{ name: 'a', path: '/a', is_dir: false }]);
     await fsList('/x');
@@ -74,10 +78,10 @@ describe('api/fs 封装', () => {
   });
 
   it('可回退删除：暂存映射归一化，回退与清理按约定透传', async () => {
-    invokeMock.mockResolvedValueOnce([{ from: 'C:\\Users\\37863\\old.txt', to: 'C:\\Users\\37863\\.vrykell\\undo\\u-old.txt' }]);
+    invokeMock.mockResolvedValueOnce({ completed: [{ from: 'C:\\Users\\37863\\old.txt', to: 'C:\\Users\\37863\\.vrykell\\undo\\u-old.txt' }], errors: ['unavailable'] });
     const staged = await fsStageDelete(['C:\\Users\\37863\\old.txt']);
     expect(invokeMock).toHaveBeenLastCalledWith('fs_stage_delete', { paths: ['C:/Users/37863/old.txt'] });
-    expect(staged).toEqual([{ from: 'C:/Users/37863/old.txt', to: 'C:/Users/37863/.vrykell/undo/u-old.txt' }]);
+    expect(staged).toEqual({ completed: [{ from: 'C:/Users/37863/old.txt', to: 'C:/Users/37863/.vrykell/undo/u-old.txt' }], errors: ['unavailable'] });
 
     invokeMock.mockResolvedValueOnce({ completed: [{ from: 'C:/a/old.txt', to: 'C:/s/old.txt' }], errors: [] });
     await fsRestoreStaged([{ from: 'C:\\a\\old.txt', to: 'C:\\s\\old.txt' }]);

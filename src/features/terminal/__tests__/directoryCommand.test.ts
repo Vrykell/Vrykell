@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { directoryCommand, directoryLabel } from '../model/directoryCommand';
 
+it.each(['\x15', '\x1b', '\x7f', '\x9b'])('rejects terminal controls %j', control => {
+  expect(() => directoryCommand(`/tmp/a${control}bad`, 'bash')).toThrow();
+});
+
 describe('directory commands', () => {
   it('quotes literal paths for POSIX, PowerShell, and Command Prompt', () => {
     expect(directoryCommand("/work/it's $HOME `pwd`", 'bash')).toBe("cd -- '/work/it'\\''s $HOME `pwd`'");

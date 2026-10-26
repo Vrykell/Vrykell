@@ -225,8 +225,9 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     const savedGroups = localStorage.getItem('mock-reviewed-tab-groups');
     const savedSessions = localStorage.getItem('mock-reviewed-tab-sessions');
     if (savedGroups && savedSessions) { mockGroups.splice(0, mockGroups.length, ...JSON.parse(savedGroups)); mockSessions.splice(0, mockSessions.length, ...JSON.parse(savedSessions)); }
-    const mockConversations = JSON.parse(localStorage.getItem('e2e-conversations') || '[]') as Record<string, unknown>[];
-    const mockConversationMessages = JSON.parse(localStorage.getItem('e2e-conversation-messages') || '[]') as Record<string, unknown>[];
+    const mockConversations: Record<string, unknown>[] = [];
+    const mockConversationMessages: Record<string, unknown>[] = [];
+    let conversationsLoaded = false;
     const saveConversations = () => {
       localStorage.setItem('e2e-conversations', JSON.stringify(mockConversations));
       localStorage.setItem('e2e-conversation-messages', JSON.stringify(mockConversationMessages));
@@ -509,6 +510,12 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       convertFileSrc: (p: string) => p,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       invoke: async (cmd: string, args: any) => {
+        // Read fixtures after every initialization script has had a chance to seed storage.
+        if (!conversationsLoaded) {
+          conversationsLoaded = true;
+          mockConversations.push(...JSON.parse(localStorage.getItem('e2e-conversations') || '[]'));
+          mockConversationMessages.push(...JSON.parse(localStorage.getItem('e2e-conversation-messages') || '[]'));
+        }
         windowToken = new URLSearchParams(location.search).get('toolWindow');
         windowLabel = windowToken ? `tool-${windowToken}` : 'main';
         const metadata = (window as unknown as { __TAURI_INTERNALS__: { metadata: { currentWindow: { label: string }; currentWebview: { label: string } } } }).__TAURI_INTERNALS__.metadata;
@@ -1637,7 +1644,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'fs_stage_delete': {
             const paths = args.paths as string[];
             for (const path of paths) fsOps.push({ op: 'delete', path });
-            return paths.map((path) => ({ from: path, to: `/home/e2e/.vrykell/undo/u-${path.split('/').pop()}` }));
+            return { completed: paths.map((path) => ({ from: path, to: args.undoEnabled === false ? '' : `/home/e2e/.vrykell/undo/u-${path.split('/').pop()}` })), errors: [] };
           }
           case 'fs_restore_staged': {
             const items = args.items as { from: string; to: string }[];

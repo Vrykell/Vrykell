@@ -5,6 +5,7 @@ import { useSessionStore } from '@features/workspace';
 import { leaves } from '@features/workspace/model/windowLayout';
 import { completeShell } from '@platform/api/completion';
 import { resolveCompletion } from '../services/completionArbiter';
+import { useTerminalStore } from '../stores/terminal';
 
 export function usePathCompletion({ paneId, text, cwd, visible, isFocused, inputRef, setText }: {
   paneId: string; text: string; cwd?: string; visible: boolean; isFocused: boolean;
@@ -12,7 +13,8 @@ export function usePathCompletion({ paneId, text, cwd, visible, isFocused, input
 }) {
   const spec = useSessionStore(state => state.tabs.flatMap(tab => tab.kind === 'session' ? leaves(tab.layout) : []).find(pane => pane.id === paneId));
   const connectionId = spec?.kind === 'ssh' ? spec.ssh?.connectionId : undefined;
-  const shell = spec?.kind === 'ssh' ? undefined : spec?.shellType;
+  const runningShell = useTerminalStore(state => state.shellTypes?.[paneId]);
+  const shell = spec?.kind === 'ssh' ? undefined : runningShell ?? spec?.shellType;
   const cycle = useRef<{ base: string; cursor: number; candidates: PathCompletion[]; index: number; current: string } | null>(null);
   const sequence = useRef(0);
   const pending = useRef(false);

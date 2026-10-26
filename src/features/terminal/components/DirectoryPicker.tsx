@@ -35,6 +35,7 @@ export default function DirectoryPicker({ paneId, dir }: { paneId: string; dir?:
   const [position, setPosition] = useState({ left: 8, top: 8, width: 280 });
   const spec = useSessionStore(state => state.tabs.flatMap(tab => tab.kind === 'session' ? leaves(tab.layout) : []).find(pane => pane.id === paneId));
   const session = useTerminalStore(state => state.sessions[paneId]);
+  const shellType = useTerminalStore(state => state.shellTypes?.[paneId]) ?? spec?.shellType;
   const blocks = useBlockStore(selectBlocks(paneId));
   const busy = blocks.some(block => block.status === 'executing' || block.snapshotPending);
   const connectionId = spec?.kind === 'ssh' ? spec.ssh?.connectionId : undefined;
@@ -89,7 +90,7 @@ export default function DirectoryPicker({ paneId, dir }: { paneId: string; dir?:
     const currentSession = useTerminalStore.getState().sessions[paneId];
     if (!connected || !currentSession || useBlockStore.getState().byTab[paneId]?.some(block => block.status === 'executing' || block.snapshotPending)) return;
     try {
-      const command = directoryCommand(target, spec?.kind === 'local' ? spec.shellType : 'zsh');
+      const command = directoryCommand(target, spec?.kind === 'local' ? shellType : 'zsh');
       setPendingTerminalCommand(paneId, command);
       await ptyWrite(currentSession, command + '\n');
       engageFollow(paneId);

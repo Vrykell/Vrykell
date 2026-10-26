@@ -13,6 +13,7 @@ import {
   saveConfig,
   SYSTEM_DEFAULT,
   DEFAULT_CONFIG,
+  remoteOpenCommand,
   type FileOpenConfig,
 } from '@features/files/services/fileOpen';
 
@@ -30,6 +31,11 @@ beforeEach(() => {
 });
 
 describe('模板文本解析/序列化', () => {
+  it('quotes every remote file placeholder and refuses control characters', () => {
+    const config = cfg({ remoteTemplates: { txt: 'diff {file} {file}' } });
+    expect(remoteOpenCommand(config, "/tmp/it's.txt")).toBe("diff '/tmp/it'\\''s.txt' '/tmp/it'\\''s.txt'\n");
+    expect(() => remoteOpenCommand(config, '/tmp/\x15echo unsafe\r#')).toThrow();
+  });
   it('每行 ext=命令，忽略注释和空行', () => {
     const t = parseTemplatesText('md=code\n# 注释\n\n.PNG=__system__\n坏行\n=log');
     expect(t).toEqual({ md: 'code', png: SYSTEM_DEFAULT });
@@ -41,6 +47,13 @@ describe('模板文本解析/序列化', () => {
 });
 
 describe('openFile（策略在 Rust，前端只做副作用）', () => {
+  it('passes the selected terminal shell to command construction', async () => {
+    invokeMock.mockResolvedValue({ via: 'terminal', editor: 'vim', command: "vim 'C:/a''b.txt'", fellBack: false });
+    const write = vi.fn();
+    await openFile("C:/a'b.txt", write, 'pwsh');
+    expect(invokeMock).toHaveBeenCalledWith('file_open', { path: "C:/a'b.txt", cfg: { ...cfg(), shell: 'pwsh' } });
+    expect(write).toHaveBeenCalledWith("vim 'C:/a''b.txt'");
+  });
   it('Rust 返回 terminal → 写命令', async () => {
     invokeMock.mockResolvedValue({
       via: 'terminal',

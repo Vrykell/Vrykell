@@ -1,6 +1,7 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({ windows: false, add: vi.fn(() => 'new-tab'), write: vi.fn(), admin: vi.fn(), open: vi.fn() }));
 vi.mock('@platform/runtime', () => ({ get isWindows() { return mocks.windows; } }));
+vi.mock('@platform/shells', () => ({ getAvailableShells: async () => [{ id: 'bash', label: 'Bash', default: true }] }));
 vi.mock('@platform/api/editor', () => ({ openElevatedEditorFile: mocks.admin }));
 vi.mock('@platform/pty', () => ({ ptyWrite: mocks.write }));
 vi.mock('@features/terminal/services/terminalStartup', () => ({ waitForTerminalStartup: vi.fn(async () => 'new-session') }));

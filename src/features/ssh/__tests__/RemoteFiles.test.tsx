@@ -114,7 +114,7 @@ describe('remote file terminal routing', () => {
     useSessionStore.setState({ activeId: 'other', tabs: [{ id: 'other', kind: 'session', title: 'SSH', layout: sshPane('other#0') }] });
     useTerminalStore.setState({ focusedPaneId: 'other#0', sessions: { 'other#0': 'other-session' } });
     fireEvent.click(screen.getByRole('button', { name: 'Sync directory' }));
-    await waitFor(() => expect(mocks.write).toHaveBeenCalledWith('other-session', "cd '/home/test'\r"));
+    await waitFor(() => expect(mocks.write).toHaveBeenCalledWith('other-session', "cd -- '/home/test'\r"));
   });
 
   it('does not write a remote command into an unrelated local pane', () => {

@@ -1,6 +1,6 @@
 /** Quote a literal directory according to the pane's actual command language. */
 export function directoryCommand(path: string, shell: string = 'zsh'): string {
-  if (/[\r\n\0]/.test(path)) throw new Error('Invalid directory path');
+  if (/[\x00-\x1f\x7f-\x9f]/.test(path)) throw new Error('Invalid directory path');
   if (shell === 'cmd') {
     if (/["%!]/.test(path)) throw new Error('This path cannot be represented safely in Command Prompt');
     return `cd /d "${path}"`;

@@ -4,13 +4,15 @@ import { isWindows } from '@platform/runtime';
 import { formatCommandSubmission, type CommandShell } from '../model/commandSubmission';
 import { writeTerminalInput } from './terminalWriteQueue';
 import { terminalDebug } from './terminalDebug';
+import { useTerminalStore } from '../stores/terminal';
 
 export function terminalCommandPayload(paneId: string, command: string): string {
   const pane = useWorkspaceStore.getState().tabs.flatMap(tab => isSessionTab(tab) ? leaves(tab.layout) : [])
     .find(item => item.id === paneId);
+  const shellType = useTerminalStore.getState().shellTypes[paneId] ?? pane?.shellType;
   const shell: CommandShell = pane?.kind === 'ssh' ? 'posix'
-    : pane?.shellType === 'cmd' ? 'cmd'
-    : ['powershell', 'pwsh'].includes(pane?.shellType ?? '') || (!pane?.shellType && isWindows) ? 'powershell' : 'posix';
+    : shellType === 'cmd' ? 'cmd'
+    : ['powershell', 'pwsh'].includes(shellType ?? '') || (!shellType && isWindows) ? 'powershell' : 'posix';
   return formatCommandSubmission(command, shell);
 }
 

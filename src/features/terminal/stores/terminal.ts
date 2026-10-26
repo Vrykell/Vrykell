@@ -140,6 +140,8 @@ interface TerminalState {
   setFocusedPane: (paneId: string | null) => void;
   /** tabId → 当前场景状态机（classic / blockList / altScreen） */
   scenes: Record<string, Scene>;
+  /** Actual local shell selected when each live process started. */
+  shellTypes: Record<string, string>;
   setScene: (tabId: string, scene: Scene) => void;
   setSession: (tabId: string, sessionId: string) => void;
   /** Clear a stopped session without discarding its scene, dimensions or history. */
@@ -158,6 +160,7 @@ interface TerminalState {
 
 export const useTerminalStore = create<TerminalState>((set, get) => ({
   sessions: {},
+  shellTypes: {},
   startupStates: {},
   setStartupState: (paneId, status) => set(s => ({ startupStates: { ...s.startupStates, [paneId]: status } })),
   pendingCommands: {},
@@ -205,10 +208,12 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
   clearSession: (tabId, expectedSessionId) => set((s) => {
     if (expectedSessionId && s.sessions[tabId] !== expectedSessionId) return s;
     const sessions = { ...s.sessions };
+    const shellTypes = { ...s.shellTypes };
     const pendingCommands = { ...s.pendingCommands };
     delete sessions[tabId];
+    delete shellTypes[tabId];
     delete pendingCommands[tabId];
-    return { sessions, pendingCommands, startupStates: { ...s.startupStates, [tabId]: 'closed' } };
+    return { sessions, shellTypes, pendingCommands, startupStates: { ...s.startupStates, [tabId]: 'closed' } };
   }),
   queueCommand: (tabId, command) => {
     const sessionId = get().sessions[tabId];
@@ -236,20 +241,23 @@ export const useTerminalStore = create<TerminalState>((set, get) => ({
         && !(tabId in s.scenes)
         && !(tabId in s.startupStates)
         && !(tabId in s.manualFullscreen)
+        && !(tabId in s.shellTypes)
       ) return s;
       const sessions = { ...s.sessions };
+      const shellTypes = { ...s.shellTypes };
       const pendingCommands = { ...s.pendingCommands };
       const dims = { ...s.dims };
       const scenes = { ...s.scenes };
       const startupStates = { ...s.startupStates };
       const manualFullscreen = { ...s.manualFullscreen };
       delete sessions[tabId];
+      delete shellTypes[tabId];
       delete pendingCommands[tabId];
       delete dims[tabId];
       delete scenes[tabId];
       delete startupStates[tabId];
       delete manualFullscreen[tabId];
-      return { sessions, pendingCommands, dims, scenes, startupStates, manualFullscreen };
+      return { sessions, shellTypes, pendingCommands, dims, scenes, startupStates, manualFullscreen };
     }),
   toggle: () => set((s) => ({ visible: !s.visible })),
   stageCommand: (paneId, command) => {

@@ -44,12 +44,24 @@ describe('useFileBrowser（本地目标）', () => {
     fsMocks.fsCreateDir.mockReset().mockResolvedValue('C:/work/NewFolder');
     fsMocks.fsCopy.mockReset().mockResolvedValue({ completed: [], errors: [] });
     fsMocks.fsMove.mockReset().mockResolvedValue({ completed: [], errors: [] });
-    fsMocks.fsStageDelete.mockReset().mockResolvedValue([]);
+    fsMocks.fsStageDelete.mockReset().mockResolvedValue({ completed: [], errors: [] });
     fsMocks.fsRestoreStaged.mockReset().mockResolvedValue({ completed: [], errors: [] });
     fsMocks.fsPurgeStaged.mockReset().mockResolvedValue(undefined);
   });
 
   afterEach(() => { vi.clearAllMocks(); });
+
+  it('retains undo for completed deletions when a later item fails', async () => {
+    const completed = [{ from: 'C:/work/a.txt', to: 'C:/Users/test/.vrykell/undo/u-a.txt' }];
+    fsMocks.fsStageDelete.mockResolvedValue({ completed, errors: ['Access denied'] });
+    const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
+    await waitFor(() => expect(result.current.entries).toHaveLength(2));
+    act(() => result.current.confirmDelete([entry('a.txt', 'C:/work/a.txt'), entry('b.txt', 'C:/work/b.txt')]));
+    await act(async () => { result.current.confirmAction(); });
+    await waitFor(() => expect(result.current.undo?.pairs).toEqual(completed));
+    await act(async () => { await result.current.runUndo(); });
+    expect(fsMocks.fsRestoreStaged).toHaveBeenCalledWith(completed);
+  });
 
   it('用给定目录作为起始视图，未给定时落到主目录', async () => {
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
@@ -238,7 +250,7 @@ describe('useFileBrowser（本地目标）', () => {
   });
 
   it('删除走暂存并可从历史栈回退', async () => {
-    fsMocks.fsStageDelete.mockResolvedValue([{ from: 'C:/work/a.txt', to: 'C:/Users/test/.vrykell/undo/u-a.txt' }]);
+    fsMocks.fsStageDelete.mockResolvedValue({ completed: [{ from: 'C:/work/a.txt', to: 'C:/Users/test/.vrykell/undo/u-a.txt' }], errors: [] });
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
@@ -326,7 +338,7 @@ describe('useFileBrowser（本地目标）', () => {
     act(() => result.current.toggleExpand(folder));
     await waitFor(() => expect(result.current.childCache['C:/work/src']).toHaveLength(1));
 
-    fsMocks.fsStageDelete.mockResolvedValue([{ from: child.path, to: 'C:/Users/test/.vrykell/undo/u-a.txt' }]);
+    fsMocks.fsStageDelete.mockResolvedValue({ completed: [{ from: child.path, to: 'C:/Users/test/.vrykell/undo/u-a.txt' }], errors: [] });
     fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
       dir === 'C:/work/src' ? [] : [entry('src', 'C:/work/src', true)],
     ));
@@ -396,7 +408,7 @@ describe('useFileBrowser（本地目标）', () => {
     expect(result.current.undo).toMatchObject({ kind: 'remove', labelKey: 'files.undo.create' });
     expect(result.current.undo?.pairs).toEqual([{ from: 'C:/work/Untitled', to: 'C:/work/Untitled' }]);
 
-    fsMocks.fsStageDelete.mockResolvedValue([{ from: 'C:/work/Untitled', to: 'C:/Users/test/.vrykell/undo/u-Untitled' }]);
+    fsMocks.fsStageDelete.mockResolvedValue({ completed: [{ from: 'C:/work/Untitled', to: 'C:/Users/test/.vrykell/undo/u-Untitled' }], errors: [] });
     await act(async () => { await result.current.runUndo(); });
     expect(fsMocks.fsStageDelete).toHaveBeenCalledWith(['C:/work/Untitled']);
     expect(result.current.undoCount).toBe(0);
@@ -435,7 +447,7 @@ describe('useFileBrowser（本地目标）', () => {
     await act(async () => { await result.current.pasteInto('C:/work/src'); });
     expect(result.current.undo).toMatchObject({ kind: 'remove', labelKey: 'files.undo.paste' });
 
-    fsMocks.fsStageDelete.mockResolvedValue([{ from: 'C:/work/src/a (1).txt', to: 'C:/Users/test/.vrykell/undo/u-a' }]);
+    fsMocks.fsStageDelete.mockResolvedValue({ completed: [{ from: 'C:/work/src/a (1).txt', to: 'C:/Users/test/.vrykell/undo/u-a' }], errors: [] });
     await act(async () => { await result.current.runUndo(); });
     expect(fsMocks.fsStageDelete).toHaveBeenCalledWith(['C:/work/src/a (1).txt']);
     expect(result.current.undoCount).toBe(0);
@@ -461,7 +473,7 @@ describe('useFileBrowser（本地目标）', () => {
   it('回退部分失败时不保留失败项（计数跟着实际剩余步数走）', async () => {
     const first = { from: 'C:/work/a.txt', to: 'C:/Users/test/.vrykell/undo/u-a.txt' };
     const second = { from: 'C:/work/b.txt', to: 'C:/Users/test/.vrykell/undo/u-b.txt' };
-    fsMocks.fsStageDelete.mockResolvedValue([first, second]);
+    fsMocks.fsStageDelete.mockResolvedValue({ completed: [first, second], errors: [] });
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
@@ -477,7 +489,7 @@ describe('useFileBrowser（本地目标）', () => {
   });
   it('deletes without staging when local undo is disabled', async () => {
     useFileUndoSettings.getState().update({ local: false });
-    fsMocks.fsStageDelete.mockResolvedValue([{ from: 'C:/work/a.txt', to: '' }]);
+    fsMocks.fsStageDelete.mockResolvedValue({ completed: [{ from: 'C:/work/a.txt', to: '' }], errors: [] });
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
     act(() => result.current.confirmDelete([entry('a.txt', 'C:/work/a.txt')]));
@@ -490,7 +502,7 @@ describe('useFileBrowser（本地目标）', () => {
 
   it('moves dragged-out sources without promising an undo step when local undo is disabled', async () => {
     useFileUndoSettings.getState().update({ local: false });
-    fsMocks.fsStageDelete.mockResolvedValue([{ from: 'C:/work/a.txt', to: '' }]);
+    fsMocks.fsStageDelete.mockResolvedValue({ completed: [{ from: 'C:/work/a.txt', to: '' }], errors: [] });
     const { result } = renderHook(() => useFileBrowser({ target: LOCAL_TARGET, initialPath: 'C:/work', openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
     await act(async () => { await result.current.removeAfterTransfer([entry('a.txt', 'C:/work/a.txt')]); });

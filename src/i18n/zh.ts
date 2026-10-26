@@ -1,5 +1,9 @@
 ﻿/** Simplified Chinese messages for shared UI and feature namespaces. */
 const zh: Record<string, string> = {
+  'Scheduled task: {{name}}': '【定时任务】{{name}}',
+  'Files with control characters cannot be opened in a terminal.': '包含控制字符的文件无法在终端中打开。',
+  'This path cannot be represented safely in the selected shell.': '无法在所选命令行中安全表示此路径。',
+  'Only regular files can be read as text': '只能将普通文件作为文本读取',
   'Queued messages': '待发送消息',
   'Waiting to send': '等待发送',
   'Cancel queued message': '取消待发送消息',

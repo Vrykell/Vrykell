@@ -30,7 +30,7 @@ test('restores the last directory on launch without restoring the navigation tra
   }
   await page.keyboard.press('Escape');
   await page.keyboard.press('Control+Alt+l');
-  await expect.poll(() => ptyWrites(page)).toContain("cd '/home/e2e/Documents'\r");
+  await expect.poll(() => ptyWrites(page)).toContain("cd -- '/home/e2e/Documents'\r");
   await page.keyboard.press('Control+Alt+Shift+l');
   await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
 });

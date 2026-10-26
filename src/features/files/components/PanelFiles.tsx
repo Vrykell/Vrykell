@@ -19,7 +19,8 @@ import { useDockStore, useSessionStore } from '@features/workspace';
 import { ptyWrite } from '@platform/pty';
 import { getAvailableShells } from '@platform/shells';
 import { parentOf } from '@platform/path';
-import { shellQuote } from '@features/ssh/utils/remotePath';
+import { directoryCommand } from '@features/terminal/model/directoryCommand';
+import { useTerminalStore } from '@features/terminal';
 import { waitForTerminalStartup } from '@features/terminal/services/terminalStartup';
 import { useToastStore } from '@ui/feedback/Toast';
 import { t } from '@i18n';
@@ -56,7 +57,8 @@ function LocalFiles({ enabled }: { enabled: boolean }) {
   const rememberedPath = useLocalPathStore((state) => state.remembered);
   // Start with the remembered location, otherwise use the focused terminal directory.
   // Navigation stays decoupled from the terminal afterwards.
-  const { focusedPaneId: focused, activeCwd, sessions } = useActiveWorkspace();
+  const { focusedPaneId: focused, focusedSpec, activeCwd, sessions } = useActiveWorkspace();
+  const shellType = useTerminalStore(state => state.shellTypes?.[focused]) ?? focusedSpec?.shellType;
 
   /** Open a local file with the system default application. */
   const openWithSystemApp = (path: string) => {
@@ -68,8 +70,10 @@ function LocalFiles({ enabled }: { enabled: boolean }) {
   const openFileInTerminal = async (entry: FsEntry) => {
     const addToast = useToastStore.getState().addToast;
     let command = '';
+    const shells = await getAvailableShells();
+    const shellType = preferredShell(useTerminalDefaults.getState().shell, shells);
     try {
-      const result = await openFile(entry.path, (nextCommand) => { command = nextCommand; });
+      const result = await openFile(entry.path, (nextCommand) => { command = nextCommand; }, shellType);
       if (result.via === 'system') {
         if (result.degraded) addToast('未找到可用的终端编辑器，已用系统默认应用打开', 'info');
         return;
@@ -82,8 +86,6 @@ function LocalFiles({ enabled }: { enabled: boolean }) {
     if (!command) return;
 
     const parentDir = parentOf(entry.path) ?? undefined;
-    const shells = await getAvailableShells();
-    const shellType = preferredShell(useTerminalDefaults.getState().shell, shells);
     const tabId = useSessionStore.getState().addTab({ cwd: parentDir, title: entry.name, shellType });
     try {
       const sid = await waitForTerminalStartup(`${tabId}#0`);
@@ -111,7 +113,7 @@ function LocalFiles({ enabled }: { enabled: boolean }) {
           useToastStore.getState().addToast('终端会话未就绪', 'info');
           return;
         }
-        void ptyWrite(sid, `cd ${shellQuote(dir)}\r`).catch((error) =>
+        void Promise.resolve().then(() => ptyWrite(sid, `${directoryCommand(dir, shellType)}\r`)).catch((error) =>
           useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error'));
       }}
       renderIcon={(entry) => {

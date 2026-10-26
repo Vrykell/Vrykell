@@ -55,6 +55,15 @@ it('reports directory-read failures inline and retries', async () => {
   await screen.findByRole('option', { name: 'Documents' });
   expect(mocks.list).toHaveBeenCalledTimes(2);
 });
+
+it('uses the live shell instead of a missing or outdated layout preference', async () => {
+  useTerminalStore.setState({ shellTypes: { pane: 'pwsh' } });
+  render(<DirectoryPicker paneId="pane" dir="/work" />);
+  fireEvent.click(screen.getByRole('button', { name: '切换工作目录' }));
+  await screen.findByRole('option', { name: "it's a folder" });
+  fireEvent.click(screen.getByRole('option', { name: "it's a folder" }));
+  await waitFor(() => expect(mocks.write).toHaveBeenCalledWith('pty', "Set-Location -LiteralPath '/work/it''s a folder'\n"));
+});
 it('uses the remote file interface and ignores a stale listing after the directory changes', async () => {
   let resolve!: (result: FileListResult) => void;
   mocks.list.mockReturnValueOnce(new Promise<FileListResult>(done => { resolve = done; }));

@@ -14,6 +14,7 @@ import { useSessionStore, isSessionTab } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
 import { leaves } from '@features/workspace/model/windowLayout';
 import { normalizePosix, parentPosix, joinPosix } from '@platform/posixPath';
+import { t } from '@i18n';
 
 interface RemotePathState {
   /** 连接 id → 面板路径；null = 连接 home */
@@ -66,5 +67,6 @@ export function sshPaneIdFor(connId: string): string | null {
 
 /** shell 单引号包裹并转义（路径含空格/单引号/特殊字符时安全）。 */
 export function shellQuote(p: string): string {
+  if (/[\x00-\x1f\x7f-\x9f]/.test(p)) throw new Error(t('Files with control characters cannot be opened in a terminal.'));
   return `'${p.replace(/'/g, "'\\''")}'`;
 }

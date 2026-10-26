@@ -140,6 +140,7 @@ describe('useTerminalSession', () => {
     exitResolvers.length = 0;
     useTerminalStore.setState({
       sessions: {},
+      shellTypes: {},
       startupStates: {},
       pendingCommands: {},
       dims: {},
@@ -154,6 +155,19 @@ describe('useTerminalSession', () => {
   it('configures a 10px native scrollbar so fitting uses the same width', () => {
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     expect(terminalInitOptions[0]?.scrollbar).toEqual({ width: 10, overviewRuler: { showTopBorder: false, showBottomBorder: false } });
+  });
+
+  it('records the resolved system shell for a live process and clears it on disposal', async () => {
+    invokeMock.mockImplementation(command => Promise.resolve(command === 'list_shells'
+      ? [{ id: 'pwsh', label: 'Shell', default: true }] : 'sess-x'));
+    try {
+      const view = render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+      await waitFor(() => expect(useTerminalStore.getState().shellTypes.t1).toBe('pwsh'));
+      expect(vi.mocked(mockedPtySpawn)).toHaveBeenCalledWith(expect.any(Number), expect.any(Number), undefined, expect.objectContaining({ shell: 'pwsh' }));
+      view.unmount();
+      expect(useTerminalStore.getState().shellTypes.t1).toBeUndefined();
+      expect(useTerminalStore.getState().sessions.t1).toBeUndefined();
+    } finally { invokeMock.mockResolvedValue('sess-x'); }
   });
 
   it('records the window return with the renderer state of each surface', async () => {

@@ -21,6 +21,9 @@ describe('parentOfRemote', () => {
 });
 
 describe('shellQuote', () => {
+  it.each(['\x15', '\r', '\n', '\x1b', '\x7f', '\x9b'])('rejects terminal control character %j', control => {
+    expect(() => shellQuote(`/tmp/a${control}echo unsafe`)).toThrow();
+  });
   it('单引号包裹普通路径', () => {
     expect(shellQuote('/home/user/proj')).toBe("'/home/user/proj'");
   });

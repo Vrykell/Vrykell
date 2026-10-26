@@ -380,7 +380,8 @@ fn copy_entry(from: &std::path::Path, to: &std::path::Path) -> Result<(), String
     if meta.is_dir() {
         std::fs::create_dir_all(to).map_err(|e| format!("创建 {} 失败: {e}", to.display()))?;
         let rd = std::fs::read_dir(from).map_err(|e| format!("读取 {} 失败: {e}", from.display()))?;
-        for entry in rd.flatten() {
+        for entry in rd {
+            let entry = entry.map_err(|error| error.to_string())?;
             copy_entry(&entry.path(), &to.join(entry.file_name()))?;
         }
         return Ok(());
@@ -413,24 +414,27 @@ fn remove_entry(path: &std::path::Path) -> Result<(), String> {
     }
 }
 
-/// 移动单条路径：同设备 rename；跨设备退化为复制 + 删源。
-/// 删源失败时回滚已复制的内容——移动要么成功，要么不留副本（否则用户看到的是"移动失败却变成复制"）。
+/// Move within a device, or copy before removing the source across devices.
+/// Source removal can partially succeed, so its complete destination copy must survive errors.
 fn move_entry(from: &std::path::Path, to: &std::path::Path) -> Result<(), String> {
     match std::fs::rename(from, to) {
         Ok(()) => Ok(()),
         Err(error) if is_cross_device(&error) => {
             copy_entry(from, to)?;
-            if let Err(remove_error) = remove_entry(from) {
-                let _ = remove_entry(to);
-                return Err(format!(
-                    "移动 {} 失败（已回滚复制的内容）: {remove_error}",
-                    from.display()
-                ));
-            }
-            Ok(())
+            finish_cross_device_move(from, to, remove_entry)
         }
         Err(error) => Err(format!("移动 {} 失败: {error}", from.display())),
     }
+}
+
+fn finish_cross_device_move(
+    from: &std::path::Path,
+    to: &std::path::Path,
+    remove_source: impl FnOnce(&std::path::Path) -> Result<(), String>,
+) -> Result<(), String> {
+    remove_source(from).map_err(|error| format!(
+        "Source cleanup failed. The complete copy is preserved at {}: {error}", to.display()
+    ))
 }
 
 /// 校验并把源解析成目标路径：把目录放进自身子树拒绝；目标重名时自动加序号避让。
@@ -487,17 +491,22 @@ fn undo_dir() -> Result<std::path::PathBuf, String> {
 }
 
 /// 把待删除项移动进暂存目录（返回原始→暂存的映射，供回退）。
-fn stage_delete_into(dir: &std::path::Path, paths: Vec<String>) -> Result<Vec<FileOpPair>, String> {
+fn stage_delete_into(dir: &std::path::Path, paths: Vec<String>) -> Result<FileOpOutcome, String> {
     std::fs::create_dir_all(dir).map_err(|e| format!("无法创建暂存目录: {e}"))?;
     let mut completed = Vec::new();
+    let mut errors = Vec::new();
     for path in paths {
         let from = std::path::PathBuf::from(&path);
-        let name = file_name_of(&from)?;
-        let staged = dir.join(format!("{}-{}", uuid::Uuid::new_v4(), name));
-        move_entry(&from, &staged)?;
-        completed.push(FileOpPair { from: path, to: staged.to_string_lossy().to_string() });
+        let result = file_name_of(&from).and_then(|name| {
+            let staged = dir.join(format!("{}-{}", uuid::Uuid::new_v4(), name));
+            move_entry(&from, &staged).map(|()| staged)
+        });
+        match result {
+            Ok(staged) => completed.push(FileOpPair { from: path, to: staged.to_string_lossy().to_string() }),
+            Err(error) => errors.push(error),
+        }
     }
-    Ok(completed)
+    Ok(FileOpOutcome { completed, errors })
 }
 
 /// 回退删除：把暂存项移回原位（原位置已有同名项时跳过并报错）。
@@ -557,15 +566,18 @@ pub async fn fs_move(paths: Vec<String>, dest_dir: String) -> Result<FileOpOutco
 }
 
 #[tauri::command]
-pub async fn fs_stage_delete(paths: Vec<String>, undo_enabled: Option<bool>) -> Result<Vec<FileOpPair>, String> {
+pub async fn fs_stage_delete(paths: Vec<String>, undo_enabled: Option<bool>) -> Result<FileOpOutcome, String> {
     tauri::async_runtime::spawn_blocking(move || {
         if undo_enabled == Some(false) {
             let mut completed = Vec::new();
+            let mut errors = Vec::new();
             for path in paths {
-                trash::delete(&path).map_err(|e| e.to_string())?;
-                completed.push(FileOpPair { from: path, to: String::new() });
+                match trash::delete(&path) {
+                    Ok(()) => completed.push(FileOpPair { from: path, to: String::new() }),
+                    Err(error) => errors.push(error.to_string()),
+                }
             }
-            return Ok(completed);
+            return Ok(FileOpOutcome { completed, errors });
         }
         let dir = undo_dir()?;
         stage_delete_into(&dir, paths)
@@ -623,12 +635,16 @@ pub(crate) fn which_cmd_sync(cmd: String) -> Result<bool, String> {
 /// 读取文本文件。超过 max_bytes 截断并附截断标记（LLM 消费，默认 256KB）；
 /// 非 UTF-8 直接报错（二进制文件不该喂给模型）。
 fn read_file_text_sync(path: String, max_bytes: Option<usize>) -> Result<String, String> {
-    let max = max_bytes.unwrap_or(256 * 1024);
+    use std::io::Read;
+    let max = max_bytes.unwrap_or(256 * 1024).min(8 * 1024 * 1024);
     let meta = std::fs::metadata(&path).map_err(|e| format!("无法读取 {path}: {e}"))?;
     if meta.is_dir() {
         return Err(format!("{path} 是目录，不是文件"));
     }
-    let bytes = std::fs::read(&path).map_err(|e| format!("无法读取 {path}: {e}"))?;
+    if !meta.is_file() { return Err("Only regular files can be read as text".into()); }
+    let file = std::fs::File::open(&path).map_err(|e| format!("无法读取 {path}: {e}"))?;
+    let mut bytes = Vec::new();
+    file.take(max as u64 + 1).read_to_end(&mut bytes).map_err(|e| format!("无法读取 {path}: {e}"))?;
     let truncated = bytes.len() > max;
     let slice = if truncated { &bytes[..max] } else { &bytes[..] };
     // 截断点可能落在 UTF-8 字符中间，from_utf8 会失败 —— 用 lossy 兜住截断场景，
@@ -664,8 +680,7 @@ pub async fn read_file_text(
         .map_err(|e| e.to_string())?
 }
 
-/// 整文件写入。已存在时先备份到 ~/.vrykell/backups/<epoch秒>_<文件名>（后悔药），
-/// 父目录不存在则创建。
+/// Back up an existing file under a unique name before replacing its content.
 fn write_file_text_sync(path: String, content: String) -> Result<String, String> {
     let p = std::path::PathBuf::from(&path);
     if let Some(parent) = p.parent() {
@@ -688,7 +703,7 @@ fn write_file_text_sync(path: String, content: String) -> Result<String, String>
             .join(".vrykell")
             .join("backups");
         std::fs::create_dir_all(&dir).map_err(|e| format!("无法创建备份目录: {e}"))?;
-        let backup = dir.join(format!("{ts}_{fname}"));
+        let backup = dir.join(format!("{ts}_{}_{fname}", uuid::Uuid::new_v4()));
         std::fs::copy(&p, &backup).map_err(|e| format!("备份失败: {e}"))?;
         backup_note = format!("（原文件已备份到 {}）", backup.to_string_lossy());
     }
@@ -803,12 +818,15 @@ fn fs_search_sync(
             }
             let p = entry.path();
             let name = entry.file_name().to_string_lossy().to_string();
-            if p.is_dir() {
+            let Ok(kind) = entry.file_type() else { continue };
+            if kind.is_symlink() { continue; }
+            if kind.is_dir() {
                 if !SKIP_DIRS.contains(&name.as_str()) {
                     stack.push(p);
                 }
                 continue;
             }
+            if !kind.is_file() { continue; }
             if !content {
                 if name.to_lowercase().contains(&q) {
                     hits.push(FsSearchHit {
@@ -824,7 +842,10 @@ fn fs_search_sync(
             if meta.len() > 1024 * 1024 {
                 continue;
             }
-            let Ok(bytes) = std::fs::read(&p) else { continue };
+            use std::io::Read;
+            let Ok(file) = std::fs::File::open(&p) else { continue };
+            let mut bytes = Vec::new();
+            if file.take(1024 * 1024 + 1).read_to_end(&mut bytes).is_err() || bytes.len() > 1024 * 1024 { continue; }
             if bytes.contains(&0) {
                 continue; // 二进制
             }
@@ -1359,7 +1380,7 @@ mod tests {
             &staging,
             vec![file.to_string_lossy().to_string()],
         )
-        .unwrap();
+        .unwrap().completed;
         assert_eq!(staged.len(), 1);
         assert!(!file.exists(), "暂存后原位置应消失");
         let staged_path = std::path::PathBuf::from(&staged[0].to);
@@ -1372,13 +1393,99 @@ mod tests {
         assert!(!staged_path.exists());
 
         // 原位置被占用时回退报错，暂存项保留
-        let staged = super::stage_delete_into(&staging, vec![file.to_string_lossy().to_string()]).unwrap();
+        let staged = super::stage_delete_into(&staging, vec![file.to_string_lossy().to_string()]).unwrap().completed;
         std::fs::write(&file, "occupied").unwrap();
         let outcome = super::restore_staged_sync(staged.clone()).unwrap();
         assert_eq!(outcome.completed.len(), 0);
         assert!(outcome.errors[0].contains("已存在"));
         assert!(std::path::PathBuf::from(&staged[0].to).exists());
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn stage_delete_reports_successes_even_when_an_item_fails() {
+        let root = temp_workspace("partial-delete");
+        let first = root.join("first.txt");
+        let last = root.join("last.txt");
+        std::fs::write(&first, "first").unwrap();
+        std::fs::write(&last, "last").unwrap();
+        let outcome = super::stage_delete_into(&root.join("staging"), vec![
+            first.to_string_lossy().into(), root.join("missing").to_string_lossy().into(), last.to_string_lossy().into(),
+        ]).unwrap();
+        assert_eq!(outcome.completed.len(), 2);
+        assert_eq!(outcome.errors.len(), 1);
+        let restored = super::restore_staged_sync(outcome.completed).unwrap();
+        assert_eq!(restored.completed.len(), 2);
+        assert_eq!(std::fs::read_to_string(first).unwrap(), "first");
+        assert_eq!(std::fs::read_to_string(last).unwrap(), "last");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn cross_device_cleanup_failure_preserves_the_complete_destination() {
+        let root = temp_workspace("move-cleanup");
+        let source = root.join("source");
+        let destination = root.join("destination");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("first"), "first").unwrap();
+        std::fs::write(source.join("last"), "last").unwrap();
+        super::copy_entry(&source, &destination).unwrap();
+        let error = super::finish_cross_device_move(&source, &destination, |path| {
+            std::fs::remove_file(path.join("first")).unwrap();
+            Err("Access denied".into())
+        }).unwrap_err();
+        assert!(error.contains("preserved"));
+        assert!(!source.join("first").exists());
+        assert_eq!(std::fs::read_to_string(destination.join("first")).unwrap(), "first");
+        assert_eq!(std::fs::read_to_string(destination.join("last")).unwrap(), "last");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn reading_a_sparse_large_file_is_limited_to_the_requested_prefix() {
+        use std::io::{Seek, SeekFrom, Write};
+        let root = temp_workspace("bounded-read");
+        let path = root.join("large.txt");
+        let mut file = std::fs::File::create(&path).unwrap();
+        file.write_all(b"prefix").unwrap();
+        file.seek(SeekFrom::Start(1024 * 1024 * 1024)).unwrap();
+        file.write_all(b"end").unwrap();
+        drop(file);
+        let text = super::read_file_text_sync(path.to_string_lossy().into(), Some(6)).unwrap();
+        assert!(text.starts_with("prefix\n"));
+        assert!(text.len() < 100);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn file_search_skips_link_cycles_and_text_reads_refuse_special_files() {
+        let root = temp_workspace("search-links");
+        std::fs::write(root.join("match.txt"), "needle").unwrap();
+        std::os::unix::fs::symlink(&root, root.join("cycle")).unwrap();
+        let hits = super::fs_search_sync(root.to_string_lossy().into(), "needle".into(), true, None).unwrap();
+        assert_eq!(hits.len(), 1);
+        assert!(super::read_file_text_sync("/dev/null".into(), None).is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn rapid_writes_keep_each_original_backup() {
+        let root = temp_workspace("unique-backups");
+        let path = root.join("note.txt");
+        std::fs::write(&path, "first").unwrap();
+        let write = |content: &str| {
+            let message = super::write_file_text_sync(path.to_string_lossy().into(), content.into()).unwrap();
+            std::path::PathBuf::from(message.split("备份到 ").nth(1).unwrap().trim_end_matches('）'))
+        };
+        let first = write("second");
+        let second = write("third");
+        assert_ne!(first, second);
+        assert_eq!(std::fs::read_to_string(&first).unwrap(), "first");
+        assert_eq!(std::fs::read_to_string(&second).unwrap(), "second");
+        std::fs::remove_file(first).unwrap();
+        std::fs::remove_file(second).unwrap();
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]

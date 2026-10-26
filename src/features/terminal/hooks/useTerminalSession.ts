@@ -612,6 +612,10 @@ export function useTerminalSession(
           return;
         }
         sessionId = id;
+        if (spec?.kind === 'local' && spawnOpts?.shell) {
+          const shell = spawnOpts.shell;
+          useTerminalStore.setState(state => ({ shellTypes: { ...state.shellTypes, [paneId]: shell } }));
+        }
         if (isTerminalDebugEnabled()) terminalDebug('pty-spawn-ready', { paneId, id });
         // 回放 spawn 完成前缓冲的初始输出（shell 启动提示符）
         for (const ev of preSession) {
@@ -1006,6 +1010,7 @@ export function useTerminalSession(
       if (sessionId) {
         // Queued input can no longer reach a session that is closing: drop it before the PTY goes.
         cancelTerminalInput(sessionId);
+        useTerminalStore.getState().clearSession(paneId, sessionId);
         ptyClose(sessionId).catch(() => {});
       }
       useSessionStore.getState().setProgramTitle(paneId, '');

@@ -20,7 +20,7 @@ export function createLocalFileOps(): FileOps {
     rename: (path, newName) => fsRename(path, newName),
     move: (paths, destDir) => fsMove(paths, destDir),
     copy: (paths, destDir) => fsCopy(paths, destDir),
-    stageDelete: (paths) => (useFileUndoSettings.getState().local ? fsStageDelete(paths) : fsStageDelete(paths, false)).then((pairs) => ({ completed: pairs, errors: [] })),
+    stageDelete: (paths) => useFileUndoSettings.getState().local ? fsStageDelete(paths) : fsStageDelete(paths, false),
     restoreStaged: (pairs) => fsRestoreStaged(pairs),
     purgeStaged: (paths) => fsPurgeStaged(paths),
     home: () => fsHome(),

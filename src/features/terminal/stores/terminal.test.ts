@@ -6,11 +6,20 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import { useTerminalStore, registerTerminal, unregisterTerminal, getRecentOutput, getFocusedTerminalId } from '@features/terminal/stores/terminal';
 import { useWorkspaceStore } from '@features/workspace/stores/workspace';
+import { terminalCommandPayload } from '../services/commandSubmission';
 
 const initialTerm = useTerminalStore.getState();
 const initialWs = useWorkspaceStore.getState();
 
 describe('terminal store', () => {
+  it.each([
+    ['cmd', 'echo first\necho second\n'],
+    ['bash', 'eval "$(printf \'%s\\n\' \'echo first\' \'echo second\')"\n'],
+  ])('serializes scripts with the actual %s process instead of an unspecified layout preference', (shell, expected) => {
+    const paneId = `${useWorkspaceStore.getState().activeId}#0`;
+    useTerminalStore.setState({ shellTypes: { [paneId]: shell } });
+    expect(terminalCommandPayload(paneId, 'echo first\necho second')).toBe(expected);
+  });
   beforeEach(() => {
     invokeMock.mockClear();
     useTerminalStore.setState(initialTerm, true);

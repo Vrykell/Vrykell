@@ -19,11 +19,13 @@ const FALLBACK_EDITORS: [&str; 3] = ["vim", "nano", "vi"];
 pub struct FileOpenConfig {
     pub default_editor: String,
     pub templates: HashMap<String, String>,
+    #[serde(default)]
+    pub shell: Option<String>,
 }
 
 /// file_open 命令的返回：terminal 附带最终命令行，system 表示走系统默认应用。
 #[derive(Serialize, Debug, PartialEq)]
-#[serde(tag = "via", rename_all = "camelCase")]
+#[serde(tag = "via", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum FileOpenResult {
     Terminal {
         editor: String,
@@ -71,12 +73,24 @@ fn resolve_target(path: &str, cfg: &FileOpenConfig) -> Target {
 }
 
 /// 模板 → 完整命令行（有 {file} 替换，无则追加引用路径）
-fn build_command(template: &str, path: &str) -> String {
-    let quoted = shell_quote(path);
+fn build_command(template: &str, path: &str, shell: Option<&str>) -> Result<String, String> {
+    if path.chars().any(char::is_control) {
+        return Err("Files with control characters cannot be opened in a terminal.".into());
+    }
+    let quoted = match shell {
+        Some("cmd") => {
+            if path.contains(['"', '%', '!']) {
+                return Err("This path cannot be represented safely in the selected shell.".into());
+            }
+            format!("\"{path}\"")
+        }
+        Some("powershell" | "pwsh") => format!("'{}'", path.replace('\'', "''")),
+        _ => shell_quote(path),
+    };
     if template.contains("{file}") {
-        template.replace("{file}", &quoted)
+        Ok(template.replace("{file}", &quoted))
     } else {
-        format!("{} {}", template, quoted)
+        Ok(format!("{} {}", template, quoted))
     }
 }
 
@@ -130,7 +144,7 @@ where
             if !bin.is_empty() && check(&bin)? {
                 return Ok(FileOpenResult::Terminal {
                     editor: bin,
-                    command: build_command(&template, path),
+                    command: build_command(&template, path, cfg.shell.as_deref())?,
                     fell_back: false,
                 });
             }
@@ -142,7 +156,7 @@ where
             };
             match pick_editor(&preferred, &check)? {
                 Some(editor) => Ok(FileOpenResult::Terminal {
-                    command: build_command(&editor, path),
+                    command: build_command(&editor, path, cfg.shell.as_deref())?,
                     editor: editor.clone(),
                     fell_back: editor != bin,
                 }),
@@ -196,9 +210,23 @@ pub fn file_open_with(path: String) -> Result<(), String> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn commands_use_the_selected_shell_and_refuse_terminal_controls() {
+        assert_eq!(build_command("vim", "C:/it's $HOME.txt", Some("pwsh")).unwrap(), "vim 'C:/it''s $HOME.txt'");
+        assert_eq!(build_command("vim", "D:/a b.txt", Some("cmd")).unwrap(), "vim \"D:/a b.txt\"");
+        assert!(build_command("vim", "D:/%HOME%.txt", Some("cmd")).is_err());
+        for control in ['\u{15}', '\r', '\n', '\u{1b}', '\u{7f}', '\u{9b}'] {
+            let path = format!("/tmp/a{control}echo unsafe");
+            assert!(build_command("vim", &path, None).is_err());
+        }
+        let result = FileOpenResult::Terminal { editor: "vim".into(), command: "vim x".into(), fell_back: true };
+        assert_eq!(serde_json::to_value(result).unwrap()["fellBack"], true);
+    }
+
     fn cfg_with(default_editor: &str, templates: &[(&str, &str)]) -> FileOpenConfig {
         FileOpenConfig {
             default_editor: default_editor.to_string(),
+            shell: None,
             templates: templates
                 .iter()
                 .map(|(k, v)| (k.to_string(), v.to_string()))
@@ -249,9 +277,9 @@ mod tests {
 
     #[test]
     fn build_command_appends_or_substitutes() {
-        assert_eq!(build_command("vim", "/tmp/a b.txt"), "vim '/tmp/a b.txt'");
+        assert_eq!(build_command("vim", "/tmp/a b.txt", None).unwrap(), "vim '/tmp/a b.txt'");
         assert_eq!(
-            build_command("code --reuse-window {file}", "/tmp/a.txt"),
+            build_command("code --reuse-window {file}", "/tmp/a.txt", None).unwrap(),
             "code --reuse-window '/tmp/a.txt'"
         );
     }

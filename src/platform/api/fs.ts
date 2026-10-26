@@ -82,7 +82,7 @@ export interface FileOpOutcome {
 }
 
 function normalizePair(pair: FileOpPair): FileOpPair {
-  return { from: normPath(pair.from), to: normPath(pair.to) };
+  return { from: normPath(pair.from), to: pair.to ? normPath(pair.to) : '' };
 }
 
 function normalizeOutcome(outcome: FileOpOutcome): FileOpOutcome {
@@ -102,9 +102,9 @@ export function fsMove(paths: string[], destDir: string): Promise<FileOpOutcome>
 }
 
 /** 可回退删除：先把内容移动到应用暂存区，返回 原始→暂存 映射。 */
-export function fsStageDelete(paths: string[], undoEnabled = true): Promise<FileOpPair[]> {
-  return invoke<FileOpPair[]>('fs_stage_delete', { paths: paths.map(normPath), ...(undoEnabled ? {} : { undoEnabled: false }) })
-    .then((pairs) => pairs.map(normalizePair));
+export function fsStageDelete(paths: string[], undoEnabled = true): Promise<FileOpOutcome> {
+  return invoke<FileOpOutcome>('fs_stage_delete', { paths: paths.map(normPath), ...(undoEnabled ? {} : { undoEnabled: false }) })
+    .then(normalizeOutcome);
 }
 
 /** 回退删除：把暂存项移回原位（原位置已占用时该项报错）。 */

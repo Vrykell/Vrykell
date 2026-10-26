@@ -61,7 +61,10 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
 
   /** Open a remote file in the terminal associated with this file panel. */
   const remoteEdit = (entry: FsEntry) => {
-    void openPreferredFile({ path: entry.path, connectionId: conn.id }, () => writeTerminalCommand(remoteOpenCommand(loadConfig(), entry.path), 'edit'));
+    try {
+      void Promise.resolve(openPreferredFile({ path: entry.path, connectionId: conn.id }, () => writeTerminalCommand(remoteOpenCommand(loadConfig(), entry.path), 'edit')))
+        .catch(error => toast(String(error), 'error'));
+    } catch (error) { toast(String(error), 'error'); }
   };
 
   /** 上传（菜单与系统拖入共用）：逐个上传并汇总结果 */
@@ -93,7 +96,10 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
       terminalCwd={terminalCwd}
       onPathChange={(next) => useRemotePathStore.getState().set(conn.id, next)}
       openEntry={remoteEdit}
-      onSyncToTerminal={(dir) => writeTerminalCommand(`cd ${shellQuote(dir)}\r`, 'sync-directory')}
+      onSyncToTerminal={(dir) => {
+        try { writeTerminalCommand(`cd -- ${shellQuote(dir)}\r`, 'sync-directory'); }
+        catch (error) { toast(String(error), 'error'); }
+      }}
       pendingLabel={t('Remote files · {{name}}', { name: conn.name })}
       renderError={(error, retry) => {
         const failure = describeFileServiceFailure(error);
