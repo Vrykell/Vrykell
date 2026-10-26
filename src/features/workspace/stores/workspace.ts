@@ -217,6 +217,8 @@ interface WorkspaceState {
   setProgramTitle: (terminalId: string, title: string) => void;
   /** 更新窗口的终端布局（分裂/移除/替换/调比例），并持久化 */
   setWindowLayout: (id: string, layout: WindowLayout) => void;
+  /** 把某个终端窗格移出当前会话标签，放成一个新的会话标签 */
+  detachTerminalPane: (paneId: string) => void;
   /** 直接分裂聚焦终端（继承类型，跳过落点选择；⌘⇧D 用） */
   splitFocusedDirect: (dir: SplitDir) => void;
   /** 关闭指定终端；若只剩一个则关闭窗口 */
@@ -720,6 +722,27 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       tabs: s.tabs.map((t) => (t.id === id && isSessionTab(t) ? { ...t, layout } : t)),
     }));
     sessionManager.saveLayout(id, layout);
+  },
+  detachTerminalPane: (paneId) => {
+    const { tabs } = get();
+    const owner = tabs.find((tab): tab is Extract<Tab, { kind: 'session' }> =>
+      isSessionTab(tab) && layoutLeaves(tab.layout).some(terminal => terminal.id === paneId));
+    if (!owner || countLeaves(owner.layout) < 2) return;
+    const terminal = findLeaf(owner.layout, paneId);
+    const layout = removeLeaf(owner.layout, paneId);
+    if (!terminal || !layout) return;
+    const id = nextTabId();
+    const created: Tab = { id, title: owner.title, kind: 'session', layout: leaf(terminal) };
+    set((s) => {
+      const tabs = s.tabs.flatMap(tab => tab.id === owner.id
+        ? [{ ...owner, layout }, created]
+        : [tab]);
+      return { tabs, activeId: id };
+    });
+    sessionManager.saveLayout(owner.id, layout);
+    const payload = serializeSession(created);
+    if (payload) sessionManager.create(id, created.title, undefined, payload.kind, payload.payload);
+    useTerminalStore.getState().setFocusedPane(paneId);
   },
   splitFocusedDirect: (dir) => {
     const ws = get();

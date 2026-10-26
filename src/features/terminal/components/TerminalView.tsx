@@ -102,6 +102,9 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
     { label: t('terminal.menu.paste'), group: 'clipboard', shortcut: 'Ctrl+V', onClick: pasteIntoPane },
     { label: t(unified ? 'Split tab' : 'Split terminal (choose position)'), group: 'view', onClick: () => requestTerminalSplit(null) },
     { label: t('Choose split type'), group: 'view', onClick: () => useUiStore.getState().openSplitPicker() },
+    ...(!unified && isSession && layoutLeaves(activeTab!.layout).length > 1 ? [
+      { label: t('Move pane to new tab'), group: 'view' as const, onClick: () => useSessionStore.getState().detachTerminalPane(focusedTermId) },
+    ] : []),
     ...(!unified ? [{ label: t('Move terminal'), group: 'view' as const, onClick: () => useUiStore.getState().beginMove(focusedTermId) }] : []),
     ...(unified && canRemovePane ? [
       { label: t(useUnifiedWorkspace.getState().zoomed ? 'Restore panes' : 'Zoom pane'), group: 'view' as const, onClick: () => useUnifiedWorkspace.getState().single() },

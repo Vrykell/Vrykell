@@ -3,7 +3,7 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 import {
   useWorkspaceStore, isSessionTab, getFocusedCwd, firstTerminalOf,
-  terminalsOf, serializeSession, nextTerminalId,
+  terminalsOf, serializeSession, nextTerminalId, type Tab,
 } from '@features/workspace/stores/workspace';
 import { resolveDisplayTitle } from '@features/workspace/model/sessionTitle';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
@@ -39,6 +39,31 @@ describe('workspace store', () => {
     const s = useWorkspaceStore.getState();
     expect(s.tabs).toHaveLength(2);
     expect(s.activeId).toBe(s.tabs[1]!.id);
+  });
+
+  it('moves a terminal pane out into a new session tab without restarting the pane', () => {
+    const layout = {
+      type: 'split' as const, dir: 'row' as const, ratio: 0.5,
+      first: leaf({ id: 'left', kind: 'local', shellType: 'bash' }),
+      second: leaf({ id: 'right', kind: 'local', shellType: 'bash' }),
+    };
+    useWorkspaceStore.setState({ tabs: [{ id: 'owner', title: 'Project', kind: 'session', layout }], activeId: 'owner' });
+    useWorkspaceStore.getState().detachTerminalPane('right');
+
+    const state = useWorkspaceStore.getState();
+    expect(state.tabs).toHaveLength(2);
+    const [owner, detached] = state.tabs as [Tab, Tab];
+    expect(owner).toMatchObject({ id: 'owner', kind: 'session', layout: { type: 'leaf', terminal: { id: 'left' } } });
+    expect(detached).toMatchObject({ kind: 'session', layout: { type: 'leaf', terminal: { id: 'right' } } });
+    expect(state.activeId).toBe(detached.id);
+    expect(useTerminalStore.getState().focusedPaneId).toBe('right');
+  });
+
+  it('keeps a single-pane session together when asked to detach it', () => {
+    const layout = leaf({ id: 'only', kind: 'local' });
+    useWorkspaceStore.setState({ tabs: [{ id: 'owner', title: 'Project', kind: 'session', layout }], activeId: 'owner' });
+    useWorkspaceStore.getState().detachTerminalPane('only');
+    expect(useWorkspaceStore.getState().tabs).toHaveLength(1);
   });
 
   it('closeTab 关闭活跃标签后激活相邻标签', () => {
