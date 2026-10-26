@@ -11,13 +11,59 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufRead, AsyncBufReadExt, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::process::{Child, ChildStdin, ChildStdout, Command};
+use tokio::sync::{watch, Mutex};
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
 const MAX_MCP_ARGS_BYTES: usize = 1024 * 1024; // 工具调用参数上限 1MB
 const MAX_MCP_RESULT_CHARS: usize = 256 * 1024; // 工具结果上限 256KB
+const MAX_MCP_MESSAGE_BYTES: usize = 2 * 1024 * 1024;
+
+async fn exchange(
+    stdin: &mut (impl AsyncWrite + Unpin),
+    stdout: &mut (impl AsyncBufRead + Unpin),
+    id: u64,
+    method: &str,
+    params: serde_json::Value,
+    timeout: Duration,
+) -> Result<serde_json::Value, String> {
+    let operation = async {
+        let message = serde_json::json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params });
+        let mut line = serde_json::to_vec(&message).map_err(|error| error.to_string())?;
+        line.push(b'\n');
+        stdin.write_all(&line).await.map_err(|error| error.to_string())?;
+        stdin.flush().await.map_err(|error| error.to_string())?;
+        let mut buffer = Vec::new();
+        loop {
+            buffer.clear();
+            let count = (&mut *stdout).take(MAX_MCP_MESSAGE_BYTES as u64 + 1)
+                .read_until(b'\n', &mut buffer).await.map_err(|error| error.to_string())?;
+            if count == 0 { return Err("The tool server closed its connection.".into()); }
+            if count > MAX_MCP_MESSAGE_BYTES { return Err("The tool response exceeds its size limit.".into()); }
+            let value: serde_json::Value = serde_json::from_slice(&buffer).map_err(|error| error.to_string())?;
+            if value.get("id").and_then(|value| value.as_u64()) != Some(id) { continue; }
+            if let Some(error) = value.get("error") { return Err(format!("Tool protocol error: {error}")); }
+            return Ok(value.get("result").cloned().unwrap_or(serde_json::Value::Null));
+        }
+    };
+    tokio::time::timeout(timeout, operation).await.map_err(|_| "The tool request timed out.".to_string())?
+}
+
+async fn until_closed<T>(
+    closed: &watch::Sender<bool>,
+    operation: impl std::future::Future<Output = Result<T, String>>,
+) -> Result<T, String> {
+    let mut receiver = closed.subscribe();
+    if *receiver.borrow() { return Err("The tool connection was closed.".into()); }
+    tokio::select! {
+        biased;
+        _ = receiver.changed() => Err("The tool connection was closed.".into()),
+        result = operation => result,
+    }
+}
 
 // ── 配置 ──
 
@@ -135,38 +181,7 @@ impl McpConnection {
     ) -> Result<serde_json::Value, String> {
         let id = self.next_id;
         self.next_id += 1;
-        let msg = serde_json::json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params });
-        let mut line = serde_json::to_string(&msg).map_err(|e| format!("序列化请求失败：{e}"))?;
-        line.push('\n');
-        self.stdin
-            .write_all(line.as_bytes())
-            .await
-            .map_err(|e| format!("写入 MCP 请求失败：{e}"))?;
-        self.stdin
-            .flush()
-            .await
-            .map_err(|e| format!("刷新 MCP 请求失败：{e}"))?;
-
-        let mut buf: Vec<u8> = Vec::new();
-        loop {
-            buf.clear();
-            let n = tokio::time::timeout(REQUEST_TIMEOUT, self.stdout.read_until(b'\n', &mut buf))
-                .await
-                .map_err(|_| "MCP 请求超时（60s）".to_string())?
-                .map_err(|e| format!("读取 MCP 响应失败：{e}"))?;
-            if n == 0 {
-                return Err("MCP 服务器已退出（命令可能不存在或启动失败）".to_string());
-            }
-            let v: serde_json::Value =
-                serde_json::from_slice(&buf).map_err(|e| format!("MCP 响应非法 JSON：{e}"))?;
-            if v.get("id").and_then(|x| x.as_u64()) == Some(id) {
-                if let Some(err) = v.get("error") {
-                    return Err(format!("MCP 错误：{err}"));
-                }
-                return Ok(v.get("result").cloned().unwrap_or(serde_json::Value::Null));
-            }
-            // 非本次请求的响应（通知/日志）——忽略，继续读
-        }
+        exchange(&mut self.stdin, &mut self.stdout, id, method, params, REQUEST_TIMEOUT).await
     }
 
     async fn initialize(&mut self) -> Result<(), String> {
@@ -209,9 +224,7 @@ impl McpConnection {
                 serde_json::json!({ "name": name, "arguments": args }),
             )
             .await?;
-        // 提取文本内容 → 纯文本；非文本块转 JSON
-        let content = resp.get("content").cloned().unwrap_or(serde_json::Value::Null);
-        Ok(content)
+        Ok(tool_result(resp))
     }
 }
 
@@ -219,7 +232,23 @@ impl McpConnection {
 
 struct McpRuntime {
     config: McpConfig,
-    connections: HashMap<String, McpConnection>,
+    connections: HashMap<String, Arc<McpSession>>,
+    connecting: HashMap<String, watch::Sender<bool>>,
+    revisions: HashMap<String, u64>,
+}
+
+struct McpSession {
+    connection: Mutex<McpConnection>,
+    tools: Vec<McpToolInfo>,
+    closed: watch::Sender<bool>,
+}
+
+impl McpRuntime {
+    fn disconnect(&mut self, name: &str) {
+        *self.revisions.entry(name.to_string()).or_default() += 1;
+        if let Some(closed) = self.connecting.remove(name) { closed.send_replace(true); }
+        if let Some(session) = self.connections.remove(name) { session.closed.send_replace(true); }
+    }
 }
 
 impl Default for McpRuntime {
@@ -227,6 +256,8 @@ impl Default for McpRuntime {
         Self {
             config: McpConfig::load(),
             connections: HashMap::new(),
+            connecting: HashMap::new(),
+            revisions: HashMap::new(),
         }
     }
 }
@@ -334,7 +365,7 @@ pub async fn mcp_save_server(
         return Err("command/args 含非法字符".to_string());
     }
     // 配置变更：先断开旧连接，下次按新配置连接
-    rt.connections.remove(&name);
+    rt.disconnect(&name);
     let mut cfg = config;
     cfg.name = name.clone();
     let idx = rt.config.servers.iter().position(|s| s.name == name);
@@ -349,7 +380,7 @@ pub async fn mcp_save_server(
 #[tauri::command]
 pub async fn mcp_remove_server(state: tauri::State<'_, McpState>, name: String) -> Result<(), String> {
     let mut rt = state.0.lock().await;
-    rt.connections.remove(&name);
+    rt.disconnect(&name);
     rt.config.servers.retain(|s| s.name != name);
     rt.config.save()
 }
@@ -362,7 +393,7 @@ pub async fn mcp_toggle_server(
 ) -> Result<(), String> {
     let mut rt = state.0.lock().await;
     if !enabled {
-        rt.connections.remove(&name);
+        rt.disconnect(&name);
     }
     if let Some(s) = rt.config.servers.iter_mut().find(|s| s.name == name) {
         s.enabled = enabled;
@@ -372,29 +403,36 @@ pub async fn mcp_toggle_server(
 
 #[tauri::command]
 pub async fn mcp_connect(state: tauri::State<'_, McpState>, name: String) -> Result<(), String> {
+    let (cfg, revision, closed) = {
+        let mut rt = state.0.lock().await;
+        let cfg = rt.config.servers.iter().find(|server| server.name == name).cloned()
+            .ok_or_else(|| format!("未找到 MCP 服务器「{name}」"))?;
+        if !cfg.enabled {
+            return Err(format!("MCP 服务器「{name}」已禁用"));
+        }
+        if !cfg.url.trim().is_empty() {
+            return Err("远程 HTTP/SSE MCP 服务器暂未支持（v1 仅支持本地 stdio）".to_string());
+        }
+        rt.disconnect(&name);
+        let revision = rt.revisions[&name];
+        let (closed, _) = watch::channel(false);
+        rt.connecting.insert(name.clone(), closed.clone());
+        (cfg, revision, closed)
+    };
+    let result = until_closed(&closed, spawn_server(&cfg)).await;
     let mut rt = state.0.lock().await;
-    let cfg = rt
-        .config
-        .servers
-        .iter()
-        .find(|s| s.name == name)
-        .cloned()
-        .ok_or_else(|| format!("未找到 MCP 服务器「{name}」"))?;
-    if !cfg.enabled {
-        return Err(format!("MCP 服务器「{name}」已禁用"));
-    }
-    if !cfg.url.trim().is_empty() {
-        return Err("远程 HTTP/SSE MCP 服务器暂未支持（v1 仅支持本地 stdio）".to_string());
-    }
-    let conn = spawn_server(&cfg).await?;
-    rt.connections.insert(name, conn);
+    if rt.revisions.get(&name) != Some(&revision) { return Err("The tool connection was closed.".into()); }
+    rt.connecting.remove(&name);
+    let connection = result?;
+    let tools = connection.tools.clone();
+    rt.connections.insert(name, Arc::new(McpSession { connection: Mutex::new(connection), tools, closed }));
     Ok(())
 }
 
 #[tauri::command]
 pub async fn mcp_disconnect(state: tauri::State<'_, McpState>, name: String) -> Result<(), String> {
     let mut rt = state.0.lock().await;
-    rt.connections.remove(&name);
+    rt.disconnect(&name);
     Ok(())
 }
 
@@ -424,10 +462,7 @@ pub async fn mcp_call_tool(
     tool: String,
     args: Option<serde_json::Value>,
 ) -> Result<serde_json::Value, String> {
-    let mut rt = state.0.lock().await;
-    let conn = rt
-        .connections
-        .get_mut(&server)
+    let session = state.0.lock().await.connections.get(&server).cloned()
         .ok_or_else(|| format!("MCP 服务器「{server}」未连接"))?;
     let args = args.unwrap_or(serde_json::Value::Object(Default::default()));
     // 参数体积上限，防止超大 payload 打爆内存/上下文
@@ -436,9 +471,22 @@ pub async fn mcp_call_tool(
             return Err("MCP 调用参数过大（>1MB）".to_string());
         }
     }
-    let raw = conn.call_tool(&tool, args).await?;
-    // content 通常是 [{type:"text",text:"..."}]，抽成纯文本；否则原样 JSON
-    match raw {
+    let result = until_closed(&session.closed, async {
+        session.connection.lock().await.call_tool(&tool, args).await
+    }).await;
+    if result.is_err() {
+        let mut runtime = state.0.lock().await;
+        if runtime.connections.get(&server).is_some_and(|current| Arc::ptr_eq(current, &session)) {
+            runtime.disconnect(&server);
+        }
+    }
+    result
+}
+
+fn tool_result(response: serde_json::Value) -> serde_json::Value {
+    let failed = response.get("isError").and_then(|value| value.as_bool()) == Some(true);
+    let raw = response.get("content").cloned().unwrap_or(serde_json::Value::Null);
+    let content = match raw {
         serde_json::Value::Array(items) => {
             let texts: Vec<String> = items
                 .iter()
@@ -456,18 +504,81 @@ pub async fn mcp_call_tool(
                 if joined.chars().count() > MAX_MCP_RESULT_CHARS {
                     joined = joined.chars().take(MAX_MCP_RESULT_CHARS).collect();
                 }
-                Ok(serde_json::Value::String(joined))
+                serde_json::Value::String(joined)
             } else {
-                Ok(serde_json::Value::Array(items))
+                serde_json::Value::Array(items)
             }
         }
-        other => Ok(other),
+        other => other,
+    };
+    if failed {
+        let error = content.as_str().unwrap_or("The tool reported a failure.");
+        serde_json::json!({ "ok": false, "error": error, "content": content })
+    } else {
+        content
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn tool_errors_are_not_reported_as_successful_text() {
+        let result = tool_result(serde_json::json!({ "isError": true, "content": [{ "type": "text", "text": "Permission denied" }] }));
+        assert_eq!(result["ok"], false);
+        assert_eq!(result["error"], "Permission denied");
+        assert_eq!(tool_result(serde_json::json!({ "content": [{ "type": "text", "text": "Done" }] })), "Done");
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn notifications_cannot_extend_the_total_request_deadline() {
+        let (responses, mut responses_writer) = tokio::io::duplex(8192);
+        let notifications = tokio::spawn(async move {
+            loop {
+                if responses_writer.write_all(b"{\"method\":\"progress\"}\n").await.is_err() { break; }
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        });
+        let start = tokio::time::Instant::now();
+        let error = exchange(&mut tokio::io::sink(), &mut BufReader::new(responses), 1, "tools/call", serde_json::json!({}), Duration::from_millis(100)).await.unwrap_err();
+        assert!(error.contains("timed out"));
+        assert_eq!(start.elapsed(), Duration::from_millis(100));
+        notifications.abort();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_blocked_request_write_has_the_same_deadline() {
+        let (mut writer, _unread_peer) = tokio::io::duplex(1);
+        let error = exchange(&mut writer, &mut &b""[..], 1, "tools/call", serde_json::json!({}), Duration::from_millis(100)).await.unwrap_err();
+        assert!(error.contains("timed out"));
+    }
+
+    #[tokio::test]
+    async fn response_frames_are_bounded_and_matching_ids_are_required() {
+        let valid = b"{\"method\":\"progress\"}\n{\"id\":2,\"result\":0}\n{\"id\":1,\"result\":42}\n";
+        let result = exchange(&mut tokio::io::sink(), &mut &valid[..], 1, "tools/call", serde_json::json!({}), Duration::from_secs(1)).await.unwrap();
+        assert_eq!(result, 42);
+        let frame = vec![b'x'; MAX_MCP_MESSAGE_BYTES + 1];
+        let error = exchange(&mut tokio::io::sink(), &mut frame.as_slice(), 1, "tools/call", serde_json::json!({}), Duration::from_secs(1)).await.unwrap_err();
+        assert!(error.contains("size limit"));
+    }
+
+    #[tokio::test]
+    async fn closing_a_connection_cancels_requests_waiting_for_its_lock() {
+        let (closed, _) = watch::channel(false);
+        let lock = Mutex::new(());
+        let guard = lock.lock().await;
+        let operation = until_closed(&closed, async { let _guard = lock.lock().await; Ok(()) });
+        tokio::pin!(operation);
+        tokio::select! {
+            result = &mut operation => panic!("request finished before cancellation: {result:?}"),
+            _ = tokio::task::yield_now() => {}
+        }
+        closed.send_replace(true);
+        assert!(operation.await.unwrap_err().contains("closed"));
+        drop(guard);
+    }
 
     #[test]
     fn config_roundtrip_serde() {

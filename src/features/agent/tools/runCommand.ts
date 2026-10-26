@@ -197,6 +197,7 @@ function waitForCompletion(
       // 快照（sessionController.finishBlock）——此刻 outputText 多半还是 ''。
       // 给快照提取一个宽限再收口，否则模型会拿到空输出误判「目录为空」。
       doneGraceTimer = setTimeout(() => {
+        doneGraceTimer = null;
         const r = resultFromBlocks();
         if (r) finish(r);
       }, 350);

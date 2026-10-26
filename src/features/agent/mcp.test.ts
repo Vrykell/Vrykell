@@ -28,6 +28,11 @@ const TOOL: McpExposedTool = {
 };
 
 describe('buildMcpTool', () => {
+  it('preserves server-declared tool failures', async () => {
+    const failure = { ok: false, error: 'Permission denied', content: 'Permission denied' };
+    invokeMock.mockResolvedValue(failure);
+    await expect(execOf(buildMcpTool(TOOL, CTX))({ path: '/x' })).resolves.toEqual(failure);
+  });
   it('描述带 MCP 命名空间前缀；execute 转发 mcp_call_tool', async () => {
     invokeMock.mockResolvedValue('file content');
     const t = buildMcpTool(TOOL, CTX);

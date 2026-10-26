@@ -50,6 +50,19 @@ function mkBlock(p: Partial<TermBlock>): TermBlock {
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 describe('runCommandAndWait', () => {
+  it('reschedules completion after a later statement outlives the snapshot grace period', async () => {
+    vi.useFakeTimers();
+    const paneId = setupPane();
+    const pending = runCommandAndWait('first\nsecond', { paneId });
+    await vi.advanceTimersByTimeAsync(0);
+    useBlockStore.getState().addBlock(paneId, mkBlock({ id: 'first', command: 'first' }));
+    useBlockStore.getState().updateBlock(paneId, 'first', { status: 'done', exitCode: 0 });
+    useBlockStore.getState().addBlock(paneId, mkBlock({ id: 'second', command: 'second' }));
+    await vi.advanceTimersByTimeAsync(400);
+    useBlockStore.getState().updateBlock(paneId, 'second', { status: 'done', exitCode: 0, outputText: 'complete' });
+    await vi.advanceTimersByTimeAsync(350);
+    await expect(pending).resolves.toMatchObject({ ok: true, completed: true, output: expect.stringContaining('complete') });
+  });
   it('reports a disconnected execution target before sending a command', async () => {
     const result = await runCommandAndWait('echo test', { paneId: 'missing' });
     expect(result).toMatchObject({ ok: false, completed: false, code: 'TERMINAL_DISCONNECTED', requiresUserAction: true });
