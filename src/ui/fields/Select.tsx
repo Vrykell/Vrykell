@@ -1,8 +1,15 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
+import { forwardRef, useEffect, useId, useLayoutEffect, useRef, useState, type ButtonHTMLAttributes, type CSSProperties, type KeyboardEvent, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { iconSizes, Check, ChevronDown, Plus } from '@ui/icons';
 import '@ui/fields/Select.css';
 import { useListNavigationMode } from '../hooks/useListNavigationMode';
+
+/** Shared field trigger for option lists and richer selection dropdowns. */
+export const SelectTrigger = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement>>(function SelectTrigger({ children, className, onClick, onKeyDown, ...props }, ref) {
+  return <button {...props} ref={ref} type="button" data-subtle onClick={onClick} onKeyDown={onKeyDown} className={className ? `ui-select ${className}` : 'ui-select'}>
+    {children}<ChevronDown size={iconSizes.compact} aria-hidden="true" className="ui-select-chevron" />
+  </button>;
+});
 
 export interface SelectOption<Value extends string | number> {
   value: Value;
@@ -172,7 +179,7 @@ export default function Select<Value extends string | number>({
   };
 
   return <>
-    <button {...navigation.props} ref={trigger} id={id} type="button" data-subtle data-testid={testId} data-tip={tip} data-tip-description={tipDescription} className={triggerClassName ? `ui-select ${triggerClassName}` : 'ui-select'} style={style}
+    <SelectTrigger {...navigation.props} ref={trigger} id={id} data-testid={testId} data-tip={tip} data-tip-description={tipDescription} className={triggerClassName} style={style}
       role="combobox" aria-label={label} aria-describedby={description} aria-haspopup="listbox"
       aria-expanded={expanded} aria-controls={expanded ? listId : undefined}
       aria-activedescendant={expanded ? `${listId}-${activeIndex}` : undefined} disabled={unavailable}
@@ -182,8 +189,7 @@ export default function Select<Value extends string | number>({
         style={{ background: options[selected]!.swatch }} />}
       <span className="ui-select-value">{options[selected]?.triggerLabel ?? options[selected]?.label ?? placeholder}</span>
       {options[selected]?.badge && <span className="ui-select-badge">{options[selected]!.badge}</span>}
-      <ChevronDown size={iconSizes.compact} aria-hidden="true" className="ui-select-chevron" />
-    </button>
+    </SelectTrigger>
     {expanded && createPortal(<div {...navigation.props} ref={menu}
       className="workspace-floating ui-select-menu" style={position} data-placement={placement} data-floating-for={listId}
       onPointerDown={event => event.preventDefault()}>

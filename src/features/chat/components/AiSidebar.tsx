@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
 import { t } from '@i18n';
-import Select from '@ui/fields/Select';
+import Select, { SelectTrigger } from '@ui/fields/Select';
 import { IconButton } from '@ui/actions/IconButton';
 import { SlidersHorizontal } from '@ui/icons';
-import { OutlineButton } from '@ui/actions/OutlineButton';
 import AppMark from '@ui/icons/AppMark';
 import type { MenuAnchor } from '@ui/menus/ContextMenu';
 import SettingsPopover from '@ui/menus/SettingsPopover';
@@ -56,9 +55,9 @@ export default function AiSidebar({ active, onSettingsTarget, settingsSuspended 
       <section className="chat-conversation-settings" aria-label={t('Conversation settings')} data-workspace-focus="ai">
         <div className="chat-setting-row"><span>{t('Recent conversations')}</span><Select aria-label={t('Side panel conversation')} value={sideSelected} options={options}
           onChange={id => useAiWorkspace.getState().selectSide(id)} placeholder={t('AI chat')} /></div>
-        <div className="chat-setting-row"><span>{t('ACP agents')}</span><OutlineButton onClick={event => {
+        <div className="chat-setting-row"><span>{t('ACP agents')}</span><SelectTrigger aria-label={t('Choose agent')} aria-haspopup="dialog" aria-expanded={!!launcher} onClick={event => {
           const bounds = event.currentTarget.getBoundingClientRect(); setLauncher({ anchor: { x: bounds.right, y: bounds.bottom + 4, aboveY: bounds.top, align: 'end' } });
-        }}>{t('Choose agent')}</OutlineButton></div>
+        }}><span className="ui-select-value">{connection?.harness ?? t('Choose agent')}</span></SelectTrigger></div>
         <div ref={onSettingsTarget} />
         <div className="chat-setting-links">
           <button type="button" data-subtle disabled={!sideSelected} onClick={() => { setMenu(null); closeAiWorkspaceSession(sideSelected); }}>{t('Close this conversation')}</button>
