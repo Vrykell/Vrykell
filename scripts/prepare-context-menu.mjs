@@ -27,11 +27,15 @@ if (!translatedUninstall) throw new Error('The uninstall hook needs its Chinese 
 fs.writeFileSync(path.join(output, 'installer-translations.nsh'),
   `LangString ContextMenuUnregisterError 1033 "${uninstallMessage}"\nLangString ContextMenuUnregisterError 2052 "${translatedUninstall}"\n`, 'utf8');
 const resources = path.join(build, 'menu.rc');
-const resourceText = `#include <windows.h>\n101 ICON "${path.join(root, 'src-tauri', 'icons', 'icon.ico').replaceAll('\\', '/')}"\nLANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US\nSTRINGTABLE\nBEGIN\n102 "Open in Vrykell"\nEND\nLANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED\nSTRINGTABLE\nBEGIN\n102 "${title.replaceAll('"', '\\"')}"\nEND\n`;
+// Generate shell resources from the canonical vector, rather than a possibly stale icon bundle.
+const icons = path.join(build, 'icons');
+run(process.execPath, [path.join(root, 'node_modules', '@tauri-apps', 'cli', 'tauri.js'), 'icon', path.join(root, 'src-tauri', 'icons', 'icon.svg'), '--output', icons]);
+const resourceText = `#include <windows.h>\n101 ICON "${path.join(icons, 'icon.ico').replaceAll('\\', '/')}"\nLANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US\nSTRINGTABLE\nBEGIN\n102 "Open in Vrykell"\nEND\nLANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED\nSTRINGTABLE\nBEGIN\n102 "${title.replaceAll('"', '\\"')}"\nEND\n`;
 fs.writeFileSync(resources, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(resourceText, 'utf16le')]));
 run('cmake', ['-S', native, '-B', build, '-A', arch === 'arm64' ? 'ARM64' : 'x64', `-DMENU_RESOURCES=${resources}`]);
 run('cmake', ['--build', build, '--config', 'Release']);
-if (process.argv.includes('--test')) run('ctest', ['--test-dir', build, '-C', 'Release', '--output-on-failure']);
+if (process.argv.includes('--test') || process.argv.includes('--test-native')) run('ctest', ['--test-dir', build, '-C', 'Release', '--output-on-failure']);
+if (process.argv.includes('--test-native')) process.exit(0);
 fs.mkdirSync(path.join(staging, 'windows-context-menu'), { recursive: true });
 const dll = path.join(build, 'Release', 'VrykellExplorerCommand.dll');
 const digest = createHash('sha256').update(fs.readFileSync(dll)).digest('hex');
@@ -52,7 +56,7 @@ const oldDll = path.join(staging, 'VrykellExplorerCommand.dll');
 if (fs.existsSync(oldDll)) fs.unlinkSync(oldDll);
 fs.mkdirSync(path.join(staging, 'Assets'), { recursive: true });
 for (const file of ['StoreLogo.png', 'Square150x150Logo.png', 'Square44x44Logo.png']) {
-  fs.copyFileSync(path.join(root, 'src-tauri', 'icons', '128x128.png'), path.join(staging, 'Assets', file));
+  fs.copyFileSync(path.join(icons, '128x128.png'), path.join(staging, 'Assets', file));
 }
 const version = `${JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).version}.0`;
 const manifest = fs.readFileSync(path.join(native, 'AppxManifest.xml'), 'utf8')

@@ -43,6 +43,11 @@ int wmain(int argc, wchar_t** argv) {
         CHECK(command->GetTitle(nullptr, nullptr) == E_POINTER);
         PWSTR title = nullptr; CHECK(SUCCEEDED(command->GetTitle(nullptr, &title)) && title && *title); CoTaskMemFree(title);
         PWSTR icon = nullptr; CHECK(SUCCEEDED(command->GetIcon(nullptr, &icon)) && icon && wcsstr(icon, L",-101")); CoTaskMemFree(icon);
+        for (const int size : { 16, 32 }) {
+            HICON image = static_cast<HICON>(LoadImageW(dll, MAKEINTRESOURCEW(101), IMAGE_ICON, size, size, LR_DEFAULTCOLOR));
+            CHECK(image);
+            DestroyIcon(image);
+        }
         EXPCMDSTATE state; CHECK(SUCCEEDED(command->GetState(nullptr, FALSE, &state)) && state == ECS_ENABLED);
         ComPtr<IObjectWithSite> site; CHECK(SUCCEEDED(command.As(&site)));
         CHECK(SUCCEEDED(site->SetSite(nullptr)));
