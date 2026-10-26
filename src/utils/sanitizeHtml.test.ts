@@ -2,6 +2,15 @@ import { describe, it, expect } from 'vitest';
 import { sanitizeOutputHtml } from '@utils/sanitizeHtml';
 
 describe('sanitizeOutputHtml', () => {
+  it.each(['u\\72l(https://example.invalid/image)', 'image-set("https://example.invalid/image" 1x)', 'u/**/rl(https://example.invalid/image)'])('rejects encoded or alternate image style sources %s', value => {
+    const span = document.createElement('span');
+    span.setAttribute('style', `background:${value}`);
+    span.textContent = 'safe';
+    expect(sanitizeOutputHtml(span.outerHTML)).toBe('<span>safe</span>');
+  });
+  it('removes every attribute from line breaks', () => {
+    expect(sanitizeOutputHtml('<br onclick="alert(1)" onmouseover="alert(2)" style="color:red" id="target" tabindex="0">')).toBe('<br>');
+  });
   it('保留生成器的 span + 安全 style + br 结构', () => {
     const html = '<span style="color:#cc0000">红</span><br><span style="font-weight:bold;display:inline-block;width:2ch">字</span>';
     expect(sanitizeOutputHtml(html)).toBe(

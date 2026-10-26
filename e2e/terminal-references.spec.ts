@@ -21,7 +21,7 @@ for (const theme of ['深色', '浅色']) {
       const { useChatStore } = await import(chatPath) as typeof import('../src/features/chat/stores/chat');
       const { useComposerDrafts } = await import(draftPath) as typeof import('../src/features/chat/stores/composerDrafts');
       const reference = { id: 'snapshot', paneId: 't1#0', label: 'Build terminal · Windows PowerShell',
-        command: 'npm run build', cwd: 'D:/projects/typescript/Vrykell', output: 'Build succeeded', exitCode: 0, createdAt: 1 };
+        command: 'npm run build', cwd: 'D:/projects/typescript/Vrykell', output: 'Build succeeded: a < b & c <img src=x onerror=alert(1)>', exitCode: 0, createdAt: 1 };
       useChatStore.setState({ conversationsLoaded: true, activeConversationId: 'reference-test',
         conversations: [{ id: 'reference-test', title: 'Reference review', createdAt: 1, updatedAt: 2, environment: null }],
         byTab: { 'reference-test': [
@@ -43,7 +43,8 @@ for (const theme of ['深色', '浅色']) {
     await expect(draft.locator('.chat-reference-toggle')).toHaveAttribute('aria-expanded', 'true');
     await expect(sent.locator('.chat-reference-toggle')).toHaveAttribute('aria-expanded', 'true');
     await expect(draft.locator('.ai-tool-output')).toContainText('无输出');
-    await expect(sent.locator('.ai-tool-output')).toHaveText('Build succeeded');
+    await expect(sent.locator('.ai-tool-output')).toHaveText('Build succeeded: a < b & c <img src=x onerror=alert(1)>');
+    await expect(sent.locator('.ai-tool-output img')).toHaveCount(0);
     const tool = page.locator('.chat-exchange .ai-tool-card:not(.chat-reference):not(.ai-thinking)');
     await tool.locator('.ai-tool-summary').click();
     await page.mouse.move(0, 0);

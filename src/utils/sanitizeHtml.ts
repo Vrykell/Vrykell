@@ -24,7 +24,7 @@ const SAFE_STYLE_PROPS = new Set([
 ]);
 
 /** 样式值黑名单：url()/expression/javascript:/@import 等一律拒绝。 */
-const DANGEROUS_STYLE_VALUE = /url\(|expression|javascript:|@import|behavior|-moz-binding/i;
+const DANGEROUS_STYLE_VALUE = /url\s*\(|expression|javascript:|@import|behavior|-moz-binding|[\\"'{}]|\/\*/i;
 
 function sanitizeStyleValue(style: string): string {
   const decls: string[] = [];
@@ -57,7 +57,7 @@ export function sanitizeOutputHtml(html: string): string {
       walk(child);
       const tag = child.tagName.toLowerCase();
       if (tag === 'br') {
-        child.removeAttribute('style');
+        for (const attr of Array.from(child.attributes)) child.removeAttribute(attr.name);
         continue;
       }
       if (tag === 'span') {

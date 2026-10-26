@@ -302,6 +302,17 @@ describe('plainText HTML 转义', () => {
 // ═══════════════════════════════════════════
 
 describe('BlockOutput 组件', () => {
+  it('displays plain text entities once and highlights every decoded match safely', () => {
+    const text = 'a < b & c < b &amp; <img src=x onerror=alert(1)>';
+    const { container, rerender } = render(<BlockOutput text={text} highlight="< b" />);
+    expect(container.textContent).toBe(text);
+    expect(container.querySelectorAll('mark')).toHaveLength(2);
+    expect(container.querySelector('img')).toBeNull();
+    rerender(<BlockOutput isHtml text={'a &lt; b &amp; <span>a &lt; b</span><br onclick="alert(1)">'} highlight="< b" />);
+    expect(container.textContent).toBe('a < b & a < b');
+    expect(container.querySelectorAll('mark')).toHaveLength(2);
+    expect(container.querySelector('br')?.attributes).toHaveLength(0);
+  });
   it('preserves terminal spacing and wraps historical output without horizontal scrolling', () => {
     const { container } = render(<BlockOutput isHtml text={'mode    length    name<br>-a--    128       file.txt'} maxHeight={120} />);
     const output = container.querySelector<HTMLElement>('[data-selectable]')!;
@@ -344,13 +355,12 @@ describe('BlockOutput 组件', () => {
     // 不产生任何真实元素，全部转义为文本
     expect(container.querySelector('span')).toBeFalsy();
     expect(container.querySelector('img')).toBeFalsy();
-    expect(container.textContent).toContain('&lt;span');
+    expect(container.textContent).toContain('<span');
   });
 
   it('纯文本模式转义 HTML 字符', () => {
     const { container } = render(<BlockOutput text="<b>bold</b>" />);
     expect(container.querySelector('b')).toBeFalsy();
-    // In text mode, < and > are escaped to &lt; and &gt; via plainText()
-    expect(container.textContent).toBe('&lt;b&gt;bold&lt;/b&gt;');
+    expect(container.textContent).toBe('<b>bold</b>');
   });
 });

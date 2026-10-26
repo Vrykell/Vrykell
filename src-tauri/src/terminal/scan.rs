@@ -84,6 +84,12 @@ impl StreamScanner {
                     if j >= len {
                         break; // 不完整 CSI → pending
                     }
+                    // Invalid sequences remain data for the terminal parser. In particular,
+                    // a non-ASCII character must never become a one-byte string slice.
+                    if !(0x40..=0x7e).contains(&bytes[j]) {
+                        i = j;
+                        continue;
+                    }
                     let seq = &s[i..j + 1];
                     if let Some(enter) = alt_dir(seq) {
                         flush_data!(i);
@@ -158,6 +164,18 @@ fn alt_dir(seq: &str) -> Option<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn invalid_csi_preserves_unicode_and_recovers_at_the_next_marker() {
+        for sequence in ["\x1b[中", "\x1b[123😀", "\x1b[?1049界"] {
+            let mut scanner = StreamScanner::new();
+            assert!(scanner.push("\x1b[").is_empty());
+            let input = format!("{}\x1b]133;A\x07", &sequence[2..]);
+            let events = scanner.push(&input);
+            assert!(matches!(&events[0], ScanEvent::Data { text } if text == sequence));
+            assert!(matches!(&events[1], ScanEvent::Osc { code, .. } if code == "133;A"));
+        }
+    }
 
     const A: &str = "\x1b]133;A\x07";
     const C: &str = "\x1b]133;C\x07";

@@ -6,15 +6,32 @@ export function plainText(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
-/** 在 HTML 中高亮匹配文本（跳过标签内部） */
+/** Match decoded text nodes so entities and attributes remain intact. */
 function highlightInHtml(html: string, query: string): string {
   if (!query || query.length < 2) return html;
   const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return html.replace(
-    new RegExp(`(>)([^<]*?)(${escaped})([^<]*?)(<)`, 'gi'),
-    (_, a, before, match, after, b) =>
-      `${a}${before}<mark style="background:var(--search-highlight-bg);color:inherit;border-radius:2px">${match}</mark>${after}${b}`,
-  );
+  const template = document.createElement('template');
+  template.innerHTML = html;
+  const walker = document.createTreeWalker(template.content, NodeFilter.SHOW_TEXT);
+  const nodes: Text[] = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode as Text);
+  for (const node of nodes) {
+    const fragment = document.createDocumentFragment();
+    let end = 0;
+    for (const match of node.data.matchAll(new RegExp(escaped, 'gi'))) {
+      fragment.append(node.data.slice(end, match.index));
+      const mark = document.createElement('mark');
+      mark.style.cssText = 'background:var(--search-highlight-bg);color:inherit;border-radius:2px';
+      mark.textContent = match[0];
+      fragment.append(mark);
+      end = match.index + match[0].length;
+    }
+    if (end) {
+      fragment.append(node.data.slice(end));
+      node.replaceWith(fragment);
+    }
+  }
+  return template.innerHTML;
 }
 
 interface Props {
@@ -23,29 +40,17 @@ interface Props {
   /** Command blocks provide their own content inset. */
   flush?: boolean;
   highlight?: string;
-  /** 显式声明 text 为预渲染 HTML（新管线 outputHtml 恒为 HTML，可能不含 <span，靠嗅探会误判） */
+  /** Explicitly opt into sanitized snapshot HTML. Never infer this from text. */
   isHtml?: boolean;
 }
 
-/**
- * BlockOutput — 渲染历史块的输出内容。
- *
- * 支持两种输入模式：
- *   1. 预渲染的 styled HTML（isHtml=true，由 extractSnapshotFromBuffer 生成）
- *      → 直接 innerHTML 渲染，版式和颜色完全正确
- *   2. 纯文本（outputText）
- *      → HTML 转义后渲染
- *
- * 安全约束：仅当调用方显式传入 isHtml=true 时才走 dangerouslySetInnerHTML。
- * 严禁内容嗅探（如 text.includes('<span')）——历史输出是不可信文本，
- * 用户 cat 过的 HTML 会经嗅探被误判为 HTML 直接注入执行（存储型 XSS）。
- */
+/** Render sanitized snapshots or encoded plain text, followed by safe text highlighting. */
 export default memo(function BlockOutput({ text, maxHeight, flush = false, highlight, isHtml: isHtmlProp }: Props) {
   const isHtml = isHtmlProp === true;
 
   const content = useMemo(() => {
     if (isHtml) {
-      // 落库内容不可信：渲染前再净化一次（防御纵深，覆盖任意来源的 outputHtml）
+      // Persisted snapshots are untrusted regardless of their original producer.
       const safe = sanitizeOutputHtml(text);
       return highlight ? highlightInHtml(safe, highlight) : safe;
     }
@@ -80,8 +85,7 @@ export default memo(function BlockOutput({ text, maxHeight, flush = false, highl
         overflowWrap: 'anywhere',
       }}
     >
-      {/* 内层 div 承载 HTML：React 不允许 children 与 dangerouslySetInnerHTML 并存 */}
-      {isHtml ? <div dangerouslySetInnerHTML={{ __html: content }} /> : content}
+      <div dangerouslySetInnerHTML={{ __html: content }} />
     </div>
   );
 });
