@@ -7,7 +7,7 @@ The terminal, code, AI and common workspaces use the same layout-owning tab, sco
 ```
 domain stores                canonical workspace layer                 shared UI
 terminal tabs / panes   ->   WorkspaceContainer { scope, layout,  ->   useWorkspaceContainerTabs
-documents / comparisons      focused, zoomed, group, history }        FolderTabs -> GroupedTabList
+documents / comparisons      focused, group, history }                FolderTabs -> GroupedTabList
 conversations / agents       WorkbenchSnapshot { tabs, groups,          WorkspacePaneCanvas
                              selected, order }                         ResourceContent slots
                              |
@@ -25,12 +25,12 @@ conversations / agents       WorkbenchSnapshot { tabs, groups,          Workspac
 
 | Concern | Canonical owner | Boundary adapters |
 | --- | --- | --- |
-| Tab identity, scope, title, focused/zoomed pane, group membership | `model/workbench.ts`, `stores/workbench.ts` | Native owners retain process, document and conversation identities |
+| Tab identity, scope, title, focused pane, group membership | `model/workbench.ts`, `stores/workbench.ts` | Native owners retain process, document and conversation identities |
 | Binary pane tree, traversal, replacement, collapsing removal and ratios | `src/core/paneTree.ts` | `WindowLayout` is the terminal-leaf instantiation of the same tree; placement converts it to resource references |
 | Pane geometry and placement | `src/core/paneLayout.ts` | Terminal wire conversion and responsive fitting feed the same canvas |
 | Resource capabilities, activation, guarded closure, deletion and serialization | `model/paneResource.ts`, `services/workspaceResources.ts` | Terminal process/history, document buffers, comparisons, conversations and agent references |
 | Scoped groups, strip order and tab actions | `useWorkspaceContainerTabs`, `GroupedTabList` | Domain providers supply icons, titles, creation and system-page actions |
-| Close, undo, detach, merge, zoom, batch delete/archive and synchronization | `services/workbench.ts` | Native terminal ownership transfer preserves stable pane identities |
+| Close, undo, detach, merge, batch delete/archive and synchronization | `services/workbench.ts` | Native terminal ownership transfer preserves stable pane identities |
 | Versioned snapshots and history write queues | `stores/workbench.ts`, `services/workspaceHistory.ts` | Existing native session rows and reference-only workspace history records |
 
 The shared `workspace-containers-v2` snapshot stores containers, pane references, scoped groups, per-scope selection and interleaved group/loose-tab order. It is the only workspace layout record: development builds do not read older area layout keys or navigation order. Area stores expose the selected container as a read-only projection; they do not own independent area layouts. Native session hydration completes before reconciliation or snapshot writes may discard unavailable references.
@@ -39,33 +39,33 @@ The native terminal session payload is the boundary encoding used by current his
 
 ## Resource presentation routing
 
-Every action that creates or moves a resource into the workspace uses one presentation rule. When the current area is not the unified workspace, the resource is activated in its native area: files open in the code workspace, terminal-backed opens in the terminal workspace, and conversations or agents in the AI workspace. When the current area is the unified workspace, the resource is created natively and a reference is added to the active composition instead; the area stays unified. If the active composition already holds four panes, the reference opens in a new composition tab.
+Every action that creates or moves a resource into the workspace uses one presentation rule. When the current area is not the unified workspace, the resource is activated in its native area: files open in the code workspace, terminal-backed opens in the terminal workspace, and conversations or agents in the AI workspace. In the unified workspace, opening a resource creates its own tab or activates its existing tab, preserving every existing layout. The resource switcher follows the same rule. Only an explicit split action inserts a pane into the selected composition.
 
 This rule covers preferred-editor and terminal file opens, file-panel new tabs, AI side conversations moved back to the workspace, SSH and command-history terminal launches. Resource activation remains the native owner's responsibility after routing.
 
 ## Pane actions and split flow
 
-Pane context menus use one order in every scope: Split tab, Change pane position, Zoom pane / Restore panes, Move pane to new tab, Remove pane. Terminal panes append clipboard, running-command, SSH and terminal-type actions, and show a single-terminal close action when only one pane remains. The tab action menu exposes the same common pane actions.
+Pane context menus use one order in every scope: Split tab, Change pane position, Move pane to new tab, Remove pane. A single pane exposes these actions with invalid movement/removal disabled. Terminal panes append clipboard, running-command and SSH actions, and show a single-terminal close action when only one pane remains. Pane zoom and terminal-type splitting are absent from the context menu. The tab action menu exposes the same common pane actions.
 
-Change pane position is a shared placement mode: the moving pane is removed from the target geometry before the overlay is measured, and `moveWorkspacePane` reinserts the same pane identity at the chosen slot. It clears zoom before opening the overlay, keeps focus on the moved pane and persists the resulting terminal order through the existing workbench projection.
+Change pane position is a shared placement mode: the moving pane is removed from the target geometry before the overlay is measured, and `moveWorkspacePane` reinserts the same pane identity at the chosen slot. It keeps focus on the moved pane and persists the resulting terminal order through the existing workbench projection.
 
 Splitting is always an explicit placement action and stops at four panes. In the unified workspace, splitting a terminal opens the shared split-resource menu (existing unplaced resources, new terminal/file/conversation, file picker or agent) instead of creating a terminal by default. Native terminal splitting still selects a slot first and inherits the focused terminal type; the terminal-type picker remains a native terminal action. Global shortcuts follow the same rule: the unified shortcut opens the split menu, while native terminal shortcuts keep their inheritance/direct-split behavior.
 
 ## Lifecycle and history
 
-Switching a tab restores its entire pane tree, focused pane and zoom state. Choosing an existing resource in a native workspace opens or selects its owning container; the common workspace's switcher moves the reference into the active composition and focuses it when already present. Splitting is an explicit placement action. Detach and merge keep pane/resource identities and live content hosts; terminal effects follow the stable pane identity while reading the current persistence owner.
+Switching a tab restores its entire pane tree and focused pane. Choosing an existing resource opens or selects its owning container, including in the common workspace. Splitting is an explicit placement action. Detach and merge keep pane/resource identities and live content hosts; terminal effects follow the stable pane identity while reading the current persistence owner.
 
 All close guards complete before a batch changes resources. Deleting a group deletes every member through the resource protocol and then removes the group/history metadata. Document deletion closes its view; it does not unlink the file. Conversation deletion does not create a replacement conversation during a batch. Agent deletion forgets the local durable reference. Archive is a separate confirmed action that retains the original group and restorable history. Storage failures retain a persistent error with retry, details and dismissal.
 
 Terminal detach/merge serializes history writes behind ownership transfer. The database transaction moves only the selected pane's command blocks and pane chat. Removing a mixed group's terminal pane deletes that pane's history without deleting siblings. Merged source sessions are removed only after transfer succeeds. In-memory chat follows the same pane identity, and history references locate the transferred pane's current owner.
 
-Workspace history writes serialize by both live container and durable history identity, including restoration into a different live container. Pane and history identities use bounded generated identifiers rather than document paths. Close, autosave, archive and deletion share the queues. Retries retain the captured identity even after closure or reuse of a live container identifier. Suppression checks the queued request's captured identity; reopening clears the appropriate suppression and writer cache. History snapshots contain references and layout metadata, never transcript contents or credentials. Unsaved documents retain their existing save/discard guards; unavailable or discarded draft references report an explicit restoration failure.
+Workspace history writes serialize by both live container and durable history identity, including restoration into a different live container. Pane and history identities use bounded generated identifiers rather than document paths. Close, autosave, archive and deletion share the queues. Retries retain the captured identity even after closure or reuse of a live container identifier. Suppression checks the queued request's captured identity; reopening clears the appropriate suppression and writer cache. Session history contains only terminal, conversation and agent references with layout metadata; it excludes files, comparisons, drafts, transcript contents and credentials. Live workspace restoration retains complete file references and draft guards separately. Both write boundaries exclude file members. Initialization deletes old file-only history and prunes file panes from mixed records while repairing focus. File-only groups do not offer session archival.
 
 ## Refactoring review
 
 | Finding | Resolution |
 | --- | --- |
-| Opening files and moving AI conversations chose navigation targets inconsistently | Added one presentation rule: native areas route to the resource's workspace, unified adds a reference and stays unified |
+| Opening files and moving AI conversations chose navigation targets inconsistently | Added one presentation rule: native areas route to the resource's workspace, unified opens an independent tab and stays unified |
 | Pane menus differed by scope and had no reposition action | Added one common action order and a shared pane-move overlay for terminal, code, AI and unified panes; tab action menus expose the same common actions |
 | Unified terminal split silently inherited a terminal and skipped the split picker | Unified split now opens the shared split-resource menu; the pending-terminal-split path was removed |
 | Terminal pane menus offered split/type actions at four panes | Split and terminal-type entries now follow the same four-pane limit as every other pane menu |
@@ -96,7 +96,7 @@ Workspace history writes serialize by both live container and durable history id
 | Renaming a one-resource conversation tab changed only the label | Delegate the rename to the conversation owner and keep the tab and history title aligned |
 | Group headers were buttons without the shared drag handle, and cross-group drops lost their units | Restore the group-header handle, accept tab/group units across boundaries and append a group dropped on the ungrouped tail |
 | A tab dropped onto a grouped member could be ungrouped again by synchronization | Capture the destination group before the canonical update and persist that group explicitly |
-| The common-workspace switcher opened a second tab instead of extending the active composition | Move the reference into the active composition, release its previous placement and focus it when already present |
+| Resource opening and switching implicitly merged panes | Open or activate the owning tab; only explicit split placement merges references |
 | Area projections still carried an unused tab order and start-open flag | Remove the second order state; the workbench snapshot is the only strip order |
 | Legacy per-area layout keys and the old navigation order were still read | Removed both readers; `workspace-containers-v2` is the only workspace layout record |
 | Session restore still parsed pre-layout `shellType` and `ssh` payloads | Restore requires the current `{ layout }` payload |
@@ -109,6 +109,19 @@ Workspace history writes serialize by both live container and durable history id
 The remaining adapters only convert current domain payloads: terminal session JSON, document and comparison references, and conversation or agent references. They are not alternate tab, tree, group or close implementations, and they do not read older data formats. Native editor and agent pages register resource hosts; content-strip rows come from canonical containers. Utility pages retain singleton routing and use the same ordering mechanism. New workspace behavior belongs in the canonical model/service/provider, with a domain adapter only when process, content or storage behavior differs.
 
 The generic interface scanner also ran in strict mode. Its 64 repository-wide findings require manual interpretation: the selector pattern treats authored `Select` components as native tags, wrapper buttons forward their actions through props, textarea sizing is owned by shared styles, and test fixtures are scanned as product UI. The tab track deliberately hides its native scrollbar while the application has global themed scrollbar rules. No new group or pane surface appears in that report. This is a recorded heuristic report, not a claimed clean scanner result.
+
+## Runtime repair review
+
+- Content placements use a resource-specific external registry. Stale cleanup cannot remove a newer host, and registration no longer updates the entire provider tree.
+- Hidden-canvas cancellation observes visibility and actual placement state, reads the current callback, and avoids publishing unchanged dimensions.
+- Startup restoration shares one asynchronous task with retry after rejection. Draft restoration batches durable identities, suspends reconciliation, and commits restored containers together to prevent replay from multiplying empty tabs.
+- Unvisited conversation content mounts lazily; streaming text does not trigger global workspace reconciliation. The common start page does not automatically collect native resources.
+- Removing or closing the last group member removes active and persistent group metadata. Failures retain retry, and stale deletion retries stop when the group gains a member.
+- File and comparison transport use the authorized invocation wrapper. The architecture guard rejects bypasses outside that wrapper.
+- Memory uses grouped settings rows with aggregate status, reload and an explicit assistant-review action. Review has a short conversation title and normal authorization.
+- Resource menus size to their content and cap at 320 px, truncate labels on one line and retain full accessible names and themed hints. Modal commands own the existing footer row, inherit its typography and keep flexible ancestors so mode text cannot squeeze the input.
+
+See `workspace-runtime-review.md` for incident evidence, regression boundaries and verification results.
 
 ## Verification contract
 

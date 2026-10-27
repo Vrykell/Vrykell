@@ -42,7 +42,7 @@ components:
 
 All four functional workspaces use the same layout-owning tab and scoped group model. `GroupedTabList` owns group cards, reorder feedback, rename input, action menus, color footers and confirmation dialogs. `WorkspacePaneCanvas` owns split geometry, placement and responsive fitting in every scope. Domain providers supply resource presentation and creation tools; they do not add their own group or pane treatment. A resource-picker selection opens or selects the owning container; split placement is an explicit action. Group deletion closes/deletes every member after all guards complete; archive remains a separate history-preserving action.
 
-Each common-workspace tab contains its complete pane layout. Switching tabs preserves that layout and each content host. The start page is an empty-state fallback and disappears when a content tab exists. Zooming never discards siblings. Existing tab-strip controls own split, merge and move actions; panes do not gain another toolbar. Native and external AI conversations share the side panel using the same live content owners as the main workspace. Neither conversation type adds an execution-target or directory strip above its transcript.
+Each common-workspace tab contains its complete pane layout. Switching tabs preserves that layout and each content host. The start page is an empty-state fallback and disappears when a content tab exists. Opening a resource creates or selects its own tab; only an explicit split changes an existing layout. Pane zoom is absent. Existing tab-strip controls own split, merge and move actions; panes do not gain another toolbar. Native and external AI conversations share the side panel using the same live content owners as the main workspace. Neither conversation type adds an execution-target or directory strip above its transcript.
 
 Shell profile identities are owned by `src/ui/icons/shellIcons.tsx`. Both supported command-shell variants use the same blue panel mark. Generic terminal actions use a neutral prompt mark. The blue panel uses theme tokens without document-global gradient identifiers, so hidden copies cannot affect visible icons.
 
@@ -94,13 +94,15 @@ Shared inner corners are 8 px and block corners are 14 px. Favorites and tag fil
 
 ## Components
 
-Memory settings is a compact status surface with aggregate counts and a reload action. It never lists or edits memory bodies and offers no bulk activation. Retrieval and review stay explicit assistant operations. Loading and failures reuse the shared status and persistent notification components.
+Memory settings uses the existing grouped settings rows: a quiet aggregate status row with reload, followed by a review row with an explicit assistant action. The panel has no nested statistic cards, invented switches or bulk activation. It never lists or edits memory bodies. Loading and failures reuse the shared status and persistent notification components. Assistant review opens its own briefly named conversation through the usual authorization path.
 
 The common start page groups terminal profiles and saved hosts, native and external conversations, and file creation and opening as distinct tasks. It reuses the launcher grid and typography rather than promoting the default terminal as the only creation path. Mixed history rows show a shared split icon, pane count and member types; expansion reveals members without loading their transcripts. Terminal panes are individually placed existing hosts, not nested terminal workspaces.
 
 Use `SidebarItem`, `TextInput`, `SegmentedControl`, `TagInput`, `Select`, `CheckboxMenu`, `ContextMenu`, `ErrorBox`, `ConfirmDialog`, `Toggle` and the existing button family. Connection authentication has four explicit parallel modes; settings option groups use authored selects. Opacity uses `RangeInput`, a thin blue track with native range keyboard semantics.
 
 Action-menu labels share a left-aligned inset without an empty icon column. Selection checks sit at the far right, alongside the shared trailing shortcut and submenu affordances. Explicit multi-select checkbox controls retain their checkbox semantics.
+
+Resource-switching menus use the shared 320 px bounded variant, with single-line ellipsis and full accessible names and themed hover hints. Group headers retain their existing connected card geometry and color treatment. Empty groups disappear when their last tab leaves. File-only groups do not offer session archival; files and comparisons remain in live workspace restoration, outside session history.
 
 External conversations select an application execution target with the shared select in the existing composer status row, or in the sidebar settings panel. The default is discussion only. Both sidebar backends share a conversation title and the same history, settings and new actions. Agent selection lives in settings. Tool questions use vertically spaced full-width choices inside the owning transcript; integration adds no separate toolbar or notification stream. Streaming keeps the composer available and shows cancellable queued inputs above it.
 
