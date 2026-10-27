@@ -1,5 +1,8 @@
 import { OutlineButton } from '@ui/actions/OutlineButton';
-import { TERMINAL_FONT_PRESETS, useTypographyStore } from '@config/typography';
+import { useTypographyStore } from '@config/typography';
+import { useMonospaceFontOptions, useUiFontOptions } from './fontOptions';
+import { BUNDLED_MONO_FONT } from '@config/bundledFonts';
+import EditorTypographySettings from './EditorTypographySettings';
 import Select from '@ui/fields/Select';
 import { t } from '@i18n';
 import { SettingsGroup, Field, Toggle } from './ui';
@@ -11,7 +14,9 @@ const weights = Array.from({ length: 17 }, (_, index) => ({ value: 100 + index *
 const lineHeights = Array.from({ length: 7 }, (_, index) => ({ value: Number((1 + index / 10).toFixed(1)), label: `${(1 + index / 10).toFixed(1)}×` }));
 
 export default function FontSettings() {
-  const { uiFontSize, terminalFontSize, chatFontSize, terminalRenderer, terminalFontPreset, terminalFontWeight, terminalLineHeight, commandHighlighting, terminalCursorBlink, compositionCursorBlink, update, reset } = useTypographyStore();
+  const { uiFontSize, uiFontPreset, terminalFontSize, chatFontSize, terminalRenderer, terminalFontPreset, terminalFontWeight, terminalLineHeight, commandHighlighting, terminalCursorBlink, compositionCursorBlink, update, reset } = useTypographyStore();
+  const monoOptions = useMonospaceFontOptions();
+  const uiOptions = useUiFontOptions();
   const { save } = useSettingsSave();
   const rendererOptions = [
     { value: 'webgl' as const, label: t('settings.font.rendererWebgl') },
@@ -19,6 +24,10 @@ export default function FontSettings() {
   ];
   return <div aria-label={t('settings.font.group')}>
     <SettingsGroup title={t('Typography')}>
+      <Field title={t('Interface font family')}>
+        <Select aria-label={t('Interface font family')} value={uiOptions.some(option => option.value === uiFontPreset) ? uiFontPreset : 'Noto Sans SC'} options={uiOptions}
+          onChange={uiFontPreset => { void save(() => update({ uiFontPreset })); }} style={{ width: 220 }} />
+      </Field>
       <Field title={t('settings.font.pageTitle')} description={t('settings.font.pageDescription')}>
         <div className="settings-font-row">
           <Select aria-label={t('settings.font.pageTitle')} value={uiFontSize} options={pageSizes} onChange={uiFontSize => { void save(() => update({ uiFontSize })); }} style={{ width: 110 }} />
@@ -29,9 +38,9 @@ export default function FontSettings() {
           <Select aria-label={t('settings.font.terminalTitle')} value={terminalFontSize} options={terminalSizes} onChange={terminalFontSize => { void save(() => update({ terminalFontSize })); }} style={{ width: 110 }} />
         </div>
       </Field>
-      <Field title={t('Terminal font family')} description={t('Use a font installed on your system; unavailable families use the fallback fonts.')}>
-        <Select aria-label={t('Terminal font family')} value={terminalFontPreset}
-          options={TERMINAL_FONT_PRESETS.map(value => ({ value, label: value === 'system' ? t('System monospace') : value }))}
+      <Field title={t('Terminal font family')}>
+        <Select aria-label={t('Terminal font family')} value={monoOptions.some(option => option.value === terminalFontPreset) ? terminalFontPreset : BUNDLED_MONO_FONT}
+          options={monoOptions}
           onChange={terminalFontPreset => { void save(() => update({ terminalFontPreset })); }} style={{ width: 220 }} />
       </Field>
       <Field title={t('AI chat font size')} description={t('Adjust text size in the AI chat panel. Changes are saved and applied immediately.')}>
@@ -56,6 +65,7 @@ export default function FontSettings() {
           onChange={commandHighlighting => { void save(() => update({ commandHighlighting })); }} />
       </Field>
     </SettingsGroup>
+    <EditorTypographySettings />
     <SettingsGroup title={t('Cursor')}>
       <Field title={t('Terminal cursor blinking')} description={t('Blink the classic terminal cursor. Turn off to keep it steady while typing.')}>
         <Toggle label={t('Terminal cursor blinking')} on={terminalCursorBlink} onChange={terminalCursorBlink => { void save(() => update({ terminalCursorBlink })); }} />

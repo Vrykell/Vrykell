@@ -2,6 +2,14 @@
 
 > Last updated: 2026-10-26
 
+## Bundled typography
+
+- Interface copy, buttons, menus and chat use a selectable local variable sans face. Two interface families and three monospaced families are bundled. Terminal input, output, history, editor text and previews default to a local monospaced face with Chinese, Latin, box-drawing and prompt-symbol coverage. Default regular and bold faces are included; alternatives support variable weights.
+- Default faces finish loading before application mount and renderer measurements. Failed local loads retain system fallback and a usable application. Existing saved font preferences remain compatible; installation-dependent choices fall back to the bundled face.
+- Font binaries together stay below 30,000,000 bytes. Preserve upstream licenses and source/checksum metadata in the distributed font directory. No external font requests or expanded resource permissions are required.
+- Interface, terminal and editor font controls live on the font and display page. Interface choices also include all available monospaced families. Font lists use plain family names and hide non-bundled faces unless explicit local-face probes succeed. Each list also offers an explicit system default using native interface or monospace font selection. Editor behavior preferences remain on their own page. Keep interface family/size and editor family/size/weight/spacing independently persisted, with immediate previews and reset behavior.
+- Verify local face loading without installed fonts, mixed Chinese/Latin cell widths, prompt symbols, unavailable-family filtering, independent interface/editor settings, moved search destinations, keyboard dropdown dismissal, narrow/wide layouts, failed-load recovery and production resource inclusion.
+
 The unified container, pane, scoped group, lifecycle and persistence behavior is specified in [Unified workspace foundation](workspace-foundation.md). The foundation gate requires 100% statements, branches, functions and lines. The shared browser checklist covers group CRUD and confirmation in terminal/code/AI/common scopes, independent multi-pane tabs, stable-process detach/merge, narrow/wide layouts and history restoration.
 
 - Independent native conversations generate concurrently across main, split and sidebar surfaces. Queue, cancellation, execution target, history working badges and editing guards belong to each conversation. Cover three simultaneous owners, independent completion/failure/stop and same-owner FIFO.

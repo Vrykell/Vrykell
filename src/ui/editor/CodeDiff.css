@@ -1,6 +1,7 @@
 .code-diff { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; }
 .code-diff-frame { position: relative; flex: 1; min-height: 0; min-width: 0; overflow: hidden; border-radius: var(--radius-block); clip-path: inset(0 round var(--radius-block)); isolation: isolate; background: var(--xterm-bg); }
 .code-diff-host { position: absolute; inset: 0; overflow: hidden; }
+:is(.code-editor, .code-diff) .monaco-editor { font-family: var(--font-ui); --monaco-monospace-font: var(--editor-font-family); }
 .code-diff .monaco-diff-editor .editor.original, .code-diff .monaco-diff-editor .editor.modified { overflow: hidden; }
 .code-diff .monaco-diff-editor .editor { box-shadow: none; border: 0; }
 .code-diff .monaco-scrollable-element > .shadow { display: none; }

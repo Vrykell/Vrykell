@@ -1,7 +1,39 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { boundedFontSize, boundedTerminalRenderer, terminalFontFamily, useTypographyStore } from '../typography';
+import { boundedFontSize, boundedTerminalRenderer, terminalFontFamily, uiFontFamily, useTypographyStore } from '../typography';
 
 describe('font preferences', () => {
+  it('persists explicit native font choices separately from bundled defaults', async () => {
+    useTypographyStore.getState().update({ uiFontPreset: 'system', terminalFontPreset: 'system-default', editorFontPreset: 'system-default' });
+    await useTypographyStore.persist.rehydrate();
+    expect(useTypographyStore.getState()).toMatchObject({ uiFontPreset: 'system', terminalFontPreset: 'system-default', editorFontPreset: 'system-default' });
+    expect(uiFontFamily('system')).toMatch(/^system-ui,/);
+    expect(uiFontFamily('system')).not.toContain('Noto Sans SC');
+    expect(terminalFontFamily('system-default')).toMatch(/^monospace,/);
+    expect(terminalFontFamily('system-default')).not.toContain('Maple Mono NF CN');
+  });
+  it('persists interface families, migrates older preferences and rejects unknown families', async () => {
+    useTypographyStore.getState().update({ uiFontPreset: 'Inter' });
+    await useTypographyStore.persist.rehydrate();
+    expect(useTypographyStore.getState().uiFontPreset).toBe('Inter');
+    expect(document.documentElement.style.getPropertyValue('--font-ui')).toMatch(/^"Inter",/);
+    useTypographyStore.getState().update({ uiFontPreset: 'Maple Mono NF CN' });
+    await useTypographyStore.persist.rehydrate();
+    expect(useTypographyStore.getState().uiFontPreset).toBe('Maple Mono NF CN');
+    expect(document.documentElement.style.getPropertyValue('--font-ui')).toMatch(/^"Maple Mono NF CN",/);
+    for (const uiFontPreset of [undefined, 'Missing']) {
+      localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { uiFontPreset } }));
+      await useTypographyStore.persist.rehydrate();
+      expect(useTypographyStore.getState().uiFontPreset).toBe('Noto Sans SC');
+    }
+  });
+  it('uses the bundled face by default and before generic fallbacks for custom fonts', () => {
+    expect(terminalFontFamily('system')).toMatch(/^"Maple Mono NF CN",/);
+    expect(terminalFontFamily('Maple Mono NF CN')).toBe(terminalFontFamily('system'));
+    const custom = terminalFontFamily('JetBrains Mono');
+    expect(custom).toMatch(/^"JetBrains Mono", "Maple Mono NF CN",/);
+    expect(custom.indexOf('Maple Mono NF CN')).toBeLessThan(custom.indexOf('monospace'));
+    expect(uiFontFamily('JetBrains Mono')).toBe(terminalFontFamily('JetBrains Mono'));
+  });
   it('persists and validates editor metrics independently of terminal and chat metrics', async () => {
     useTypographyStore.getState().update({ editorFontSize: 18, editorFontPreset: 'Maple Mono', editorFontWeight: 550, editorLineHeight: 1.8 });
     await useTypographyStore.persist.rehydrate();

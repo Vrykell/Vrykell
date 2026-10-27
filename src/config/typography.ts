@@ -1,21 +1,34 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { BUNDLED_MONO_FONT } from './bundledFonts';
 
 export const DEFAULT_UI_FONT_SIZE = 13;
 export const DEFAULT_TERMINAL_FONT_SIZE = 14;
 export const DEFAULT_CHAT_FONT_SIZE = 14;
 export const DEFAULT_TERMINAL_FONT_WEIGHT = 400;
 export const DEFAULT_TERMINAL_LINE_HEIGHT = 1;
-export const TERMINAL_FONT_PRESETS = ['system', 'Sarasa Term SC', 'Sarasa Mono SC', 'Maple Mono NF CN', 'Maple Mono', 'Cascadia Code', 'JetBrains Mono', 'NSimSun'] as const;
+const monoFontFamilies = ['Sarasa Term SC', 'Sarasa Mono SC', 'Maple Mono NF CN', 'Maple Mono', 'Cascadia Code', 'JetBrains Mono', 'NSimSun'] as const;
+export const TERMINAL_FONT_PRESETS = ['system', 'system-default', ...monoFontFamilies] as const;
 export type TerminalFontPreset = typeof TERMINAL_FONT_PRESETS[number];
-const fallbackFonts = '"Cascadia Mono", "Cascadia Code", Menlo, Monaco, "JetBrains Mono", "Sarasa Mono SC", "Noto Sans Mono CJK SC", "Noto Sans Mono", "DejaVu Sans Mono", "Symbols Nerd Font Mono", monospace, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"';
+export const UI_FONT_PRESETS = ['system', 'Noto Sans SC', 'Inter', 'Segoe UI', 'Microsoft YaHei UI', 'PingFang SC', 'Noto Sans CJK SC', ...monoFontFamilies] as const;
+export type UiFontPreset = typeof UI_FONT_PRESETS[number];
+const fallbackFonts = `"${BUNDLED_MONO_FONT}", "Cascadia Mono", "Cascadia Code", Menlo, Monaco, "JetBrains Mono", "Sarasa Mono SC", "Noto Sans Mono CJK SC", "Noto Sans Mono", "DejaVu Sans Mono", "Symbols Nerd Font Mono", monospace, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"`;
 
 export function terminalFontFamily(preset: TerminalFontPreset): string {
-  return preset === 'system' ? fallbackFonts : `"${preset}", ${fallbackFonts}`;
+  if (preset === 'system-default') return 'monospace, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji"';
+  return preset === 'system' || preset === BUNDLED_MONO_FONT ? fallbackFonts : `"${preset}", ${fallbackFonts}`;
 }
 
 function boundedFontPreset(value: unknown): TerminalFontPreset {
   return TERMINAL_FONT_PRESETS.find(preset => preset === value) ?? 'system';
+}
+
+export function uiFontFamily(preset: UiFontPreset): string {
+  if (preset === 'system') return 'system-ui, -apple-system, "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif';
+  const monoPreset = monoFontFamilies.find(font => font === preset);
+  if (monoPreset) return terminalFontFamily(monoPreset);
+  const fallback = '"Noto Sans SC", -apple-system, "Segoe UI", "Microsoft YaHei UI", "PingFang SC", sans-serif';
+  return preset === 'Noto Sans SC' ? fallback : `"${preset}", ${fallback}`;
 }
 
 function boundedNumber(value: unknown, fallback: number, min: number, max: number): number {
@@ -36,6 +49,7 @@ export function boundedTerminalRenderer(value: unknown, fallback: TerminalRender
 }
 
 interface TypographyState {
+  uiFontPreset: UiFontPreset;
   uiFontSize: number;
   terminalFontSize: number;
   chatFontSize: number;
@@ -57,6 +71,7 @@ interface TypographyState {
 
 type TypographyPreferences = Omit<TypographyState, 'update' | 'reset'>;
 const defaults: TypographyPreferences = {
+  uiFontPreset: 'Noto Sans SC',
   uiFontSize: DEFAULT_UI_FONT_SIZE,
   terminalFontSize: DEFAULT_TERMINAL_FONT_SIZE,
   chatFontSize: DEFAULT_CHAT_FONT_SIZE,
@@ -76,6 +91,7 @@ const defaults: TypographyPreferences = {
 
 function sanitize(values: Partial<TypographyPreferences>): TypographyPreferences {
   return {
+    uiFontPreset: UI_FONT_PRESETS.find(font => font === values.uiFontPreset) ?? 'Noto Sans SC',
     uiFontSize: boundedFontSize(values.uiFontSize, DEFAULT_UI_FONT_SIZE, 18),
     terminalFontSize: boundedFontSize(values.terminalFontSize, DEFAULT_TERMINAL_FONT_SIZE),
     chatFontSize: boundedFontSize(values.chatFontSize, DEFAULT_CHAT_FONT_SIZE),
@@ -114,6 +130,7 @@ export const useTypographyStore = create<TypographyState>()(persist((set) => ({
 function applyTypography(state: TypographyState): void {
   if (typeof document === 'undefined') return;
   const root = document.documentElement.style;
+  root.setProperty('--font-ui', uiFontFamily(state.uiFontPreset));
   root.setProperty('--ui-font-scale', String(state.uiFontSize / DEFAULT_UI_FONT_SIZE));
   root.setProperty('--terminal-font-size', `${state.terminalFontSize}px`);
   root.setProperty('--chat-font-size', `${state.chatFontSize}px`);

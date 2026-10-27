@@ -58,6 +58,7 @@ test('shares editor preferences, keeps independent metrics and centers a symmetr
   await expect(editor.locator('.line-numbers').first()).toBeVisible();
   await gotoSetting(page, '编辑器设置');
   await page.getByRole('switch', { name: '显示行号' }).click();
+  await gotoSetting(page, '字体与显示');
   for (const [name, option] of [['编辑器字号', '18px'], ['编辑器字重', '550'], ['编辑器行距', '1.8×']]) {
     await page.getByRole('combobox', { name }).click(); await page.getByRole('option', { name: option, exact: true }).click();
   }

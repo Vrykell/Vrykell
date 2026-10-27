@@ -91,15 +91,16 @@ registerField("opacity", "appearance-theme", "Application opacity", "Background 
 registerField("wallpaper", "appearance-theme", "Application background image", "Wallpaper");
 registerField("theme-import", "appearance-files", "Import / export theme", "Theme JSON");
 registerField("ui-font", "appearance-typography", "settings.font.pageTitle", "settings.font.pageTitle", () => String(useTypographyStore.getState().uiFontSize));
+registerField('ui-font-family', 'appearance-typography', 'Interface font family', 'Typography', () => useTypographyStore.getState().uiFontPreset);
 registerField("terminal-font", "appearance-typography", "settings.font.terminalTitle", "settings.font.terminalTitle", () => String(useTypographyStore.getState().terminalFontSize));
 registerField('chat-font', 'appearance-typography', 'AI chat font size', 'Adjust text size in the AI chat panel. Changes are saved and applied immediately.', () => String(useTypographyStore.getState().chatFontSize));
-registerField('terminal-font-family', 'appearance-typography', 'Terminal font family', 'Use a font installed on your system; unavailable families use the fallback fonts.', () => useTypographyStore.getState().terminalFontPreset);
+registerField('terminal-font-family', 'appearance-typography', 'Terminal font family', 'Typography', () => useTypographyStore.getState().terminalFontPreset);
 registerField('terminal-font-weight', 'appearance-typography', 'Terminal font weight', 'Variable fonts support fine weight adjustments; static fonts use the nearest installed weight.', () => String(useTypographyStore.getState().terminalFontWeight));
 registerField('terminal-line-spacing', 'appearance-typography', 'Terminal line spacing', 'Adjust line spacing for terminal input, live output and command history.', () => String(useTypographyStore.getState().terminalLineHeight));
-registerField('editor-font-family', 'editor-preferences', 'Editor font family', 'Editor typography', () => useTypographyStore.getState().editorFontPreset);
-registerField('editor-font-size', 'editor-preferences', 'Editor font size', 'Editor typography', () => String(useTypographyStore.getState().editorFontSize));
-registerField('editor-font-weight', 'editor-preferences', 'Editor font weight', 'Editor typography', () => String(useTypographyStore.getState().editorFontWeight));
-registerField('editor-line-spacing', 'editor-preferences', 'Editor line spacing', 'Adjust the editor independently of terminal and chat typography.', () => String(useTypographyStore.getState().editorLineHeight));
+registerField('editor-font-family', 'appearance-typography', 'Editor font family', 'Editor typography', () => useTypographyStore.getState().editorFontPreset);
+registerField('editor-font-size', 'appearance-typography', 'Editor font size', 'Editor typography', () => String(useTypographyStore.getState().editorFontSize));
+registerField('editor-font-weight', 'appearance-typography', 'Editor font weight', 'Editor typography', () => String(useTypographyStore.getState().editorFontWeight));
+registerField('editor-line-spacing', 'appearance-typography', 'Editor line spacing', 'Adjust the editor independently of terminal and chat typography.', () => String(useTypographyStore.getState().editorLineHeight));
 registerField("terminal-renderer", "appearance-typography", "settings.font.rendererTitle", "settings.font.rendererTitle", () => String(useTypographyStore.getState().terminalRenderer));
 
 function globalValue(key: keyof AgentSettings): string {

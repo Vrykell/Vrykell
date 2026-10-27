@@ -45,6 +45,11 @@ it('routes the split appearance settings to their owning pages', () => {
     ['wallpaper', 'appearance-theme'],
     ['command-highlighting', 'appearance-typography'],
     ['terminal-font-weight', 'appearance-typography'],
+    ['ui-font-family', 'appearance-typography'],
+    ['editor-font-family', 'appearance-typography'],
+    ['editor-font-size', 'appearance-typography'],
+    ['editor-font-weight', 'appearance-typography'],
+    ['editor-line-spacing', 'appearance-typography'],
     ['theme-import', 'appearance-files'],
   ];
   for (const [id, page] of targets) {

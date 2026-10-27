@@ -14,10 +14,10 @@ colors:
   light-text: "#242B30"
 typography:
   sans:
-    fontFamily: "system-ui, sans-serif"
+    fontFamily: "var(--font-ui)"
     fontSize: "14px"
   mono:
-    fontFamily: "ui-monospace, monospace"
+    fontFamily: "var(--font-mono)"
     fontSize: "14px"
 rounded:
   DEFAULT: "8px"
@@ -52,7 +52,7 @@ The reference is a compact desktop terminal workbench, not an administrative web
 
 The audience manages local shells, remote hosts, files and conversations on desktop. English and Chinese interfaces share the same controls and density. There is no inferred market-specific business policy. Current user-provided prototypes govern host density, blue primary actions, yellow favorites and compact menus.
 
-Runtime tokens remain canonical. `src/config/theme/tokens.ts` maps semantic palette properties through `paletteToCssVars`; `src/app/theme.css` defines component aliases and shared geometry. This document records intent rather than generating a second palette. The complete locale-aware font stacks live in `theme.css`; frontmatter records their system-font roles, not replacement font stacks.
+Runtime tokens remain canonical. `src/config/theme/tokens.ts` maps semantic palette properties through `paletteToCssVars`; `src/app/theme.css` defines component aliases and shared geometry. This document records intent rather than generating a second palette. The complete locale-aware font stacks live in `theme.css`; frontmatter records their roles, not replacement font stacks.
 
 ## Colors
 
@@ -68,7 +68,7 @@ Primary actions, selected sidebar navigation icons and range progress use `--pri
 
 ## Typography
 
-Use existing system UI fonts with Chinese-capable fallbacks. Labels use `--fs-label` (13 px at default scale), captions use 12 px and body text uses 14 px. Terminal output and addresses use the established monospaced stack. Preserve user font scaling and measure clipping at actual display scaling; do not compensate by enlarging every card.
+Interface text uses a selectable bundled variable sans face through `--font-ui`; terminal output, editor text and addresses use the bundled monospaced face through the existing typography tokens. Two interface and three monospaced families are distributed. The default faces cover Chinese and Latin text; terminal resources also cover prompt symbols. Font lists show plain family names, include bundled faces and only offer local alternatives after explicit local-face probes succeed. An explicit system default option selects native interface or monospace fonts instead of bundled faces. Unavailable saved preferences retain the bundled fallback. `src/app/fonts.css` owns local face declarations and `src/config/typography.ts` owns preference resolution. The six compressed font files together stay below 30 MB and load before the application mounts, so the initial terminal and editor measurements use the actual faces. System fonts remain failure and unsupported-script fallbacks. The font and display page owns interface, terminal and editor typography. Labels use `--fs-label` (13 px at default scale), captions use 12 px and body text uses 14 px. Preserve user font scaling and measure clipping at actual display scaling; do not compensate by enlarging every card.
 
 ## Layout
 
@@ -116,7 +116,7 @@ Enabled controls have deliberate gray hover, visible focus, disabled and busy st
 
 All icons come from shared icon components. Do not substitute text symbols or native disclosure triangles. Animation uses the existing 140–260 ms motion scale and respects reduced motion. Existing terminal scrollbar exceptions retain their shared owner.
 
-Persistent errors and transient messages use the same notification card, including typography, padding, semantic icon and centered dismissal. Failures retain details and retry. The editor find strip has four equal corners and a vertically centered close control. Editor typeface, size, weight and line spacing are independent of terminal and conversation metrics. A dedicated editor preferences page owns these controls, modal keybindings, wrapping and optional line numbers; local and remote opening pages contain only target-specific destinations.
+Persistent errors and transient messages use the same notification card, including typography, padding, semantic icon and centered dismissal. Failures retain details and retry. The editor find strip has four equal corners and a vertically centered close control. Editor typeface, size, weight and line spacing are independent of terminal and conversation metrics, and live on the shared font and display page. The editor preferences page owns modal keybindings, wrapping and optional line numbers; local and remote opening pages contain only target-specific destinations.
 
 Agent selection in conversation settings uses the shared dropdown field trigger and existing rich launcher. Refused tool results share the failed badge treatment; cancellation reuses the approval badge palette. Answered questions retain only the selected option or typed answer as inset plain text; no highlighted or inactive options remain. Tool cards never add footer error messages. Live failures and explicit result review use the bottom-right error surface, while restored history stays quiet.
 

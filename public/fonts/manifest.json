@@ -1,0 +1,57 @@
+{
+  "conversion": "Lossless WOFF2 compression; fonttools 4.67.0, brotli 1.2.1; all glyphs and hinting retained.",
+  "sources": {
+    "ui": {
+      "url": "https://raw.githubusercontent.com/google/fonts/a85815a42757630ce188fdad368c2dfc444d4773/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf",
+      "sha256": "a3041811a78c361b1de50f953c805e0244951c21c5bd412f7232ef0d899af0da"
+    },
+    "terminal": {
+      "url": "https://github.com/subframe7536/maple-font/releases/download/v7.9/MapleMono-NF-CN.zip",
+      "sha256": "af913b6322905348b3f50e4397fedc35b3a880db5effcce7969003051dcd3e94"
+    },
+    "code": {
+      "url": "https://raw.githubusercontent.com/JetBrains/JetBrainsMono/v2.304/fonts/variable/JetBrainsMono%5Bwght%5D.ttf",
+      "sha256": "662a196d58f1183bf2d77428b6d5283fe3f45161ab021bea4036bc98e5cac016"
+    },
+    "alternate": {
+      "url": "https://raw.githubusercontent.com/google/fonts/a4c0b21f839d7ac65a7d8b49eb81bddd110774a3/ofl/cascadiacode/CascadiaCode%5Bwght%5D.ttf",
+      "sha256": "30f2e14a5c389b346b1fce110c4ddcf0dc5ce8265faf5eca2ab7323f49dba590"
+    },
+    "interfaceAlternate": {
+      "url": "https://raw.githubusercontent.com/google/fonts/a4c0b21f839d7ac65a7d8b49eb81bddd110774a3/ofl/inter/Inter%5Bopsz,wght%5D.ttf",
+      "sha256": "29160a80ff49ddcab2c97711247e08b1fab27a484a329ce8b813d820dc559031"
+    }
+  },
+  "assets": [
+    {
+      "file": "terminal-alternate.woff2",
+      "bytes": 218456,
+      "sha256": "faa68e110aaf7d43869c40cccfcd3e0e754d771601bd923f1e8060553de241dd"
+    },
+    {
+      "file": "terminal-bold.woff2",
+      "bytes": 6407292,
+      "sha256": "5f00c0e6f7c663d31f6058341ce9eafa0f495fa2ee58acf81896d72e1f550a92"
+    },
+    {
+      "file": "terminal-code.woff2",
+      "bytes": 113444,
+      "sha256": "f26157804668386ebbe9ac92994e12d47fbed7451210734fea0a44ca29909c32"
+    },
+    {
+      "file": "terminal-regular.woff2",
+      "bytes": 6296308,
+      "sha256": "bd0954dba79f53dbef174818370028761661f528a643689833bfcc9dbbbc473e"
+    },
+    {
+      "file": "ui-alternate.woff2",
+      "bytes": 350560,
+      "sha256": "a1886c68a10000a0620779d1cd98ff355df911ee6112d0f55cbb0055bca9ea7e"
+    },
+    {
+      "file": "ui-sans.woff2",
+      "bytes": 7782268,
+      "sha256": "5ed3e1bbbf94a331a8495a9f8c45719e9ec5e81083fa049c1762c45195aa6105"
+    }
+  ]
+}

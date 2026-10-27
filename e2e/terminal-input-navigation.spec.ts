@@ -267,5 +267,5 @@ test('font family, weight and spacing update existing terminal history and persi
   await page.getByRole('button', { name: '恢复默认字体设置' }).click();
   await expect(preview).toHaveCSS('font-weight', '400');
   await expect(preview).toHaveCSS('line-height', `${await terminalRowHeight(page)}px`);
-  await expect(page.getByRole('combobox', { name: '终端字体', exact: true })).toHaveText('系统等宽字体');
+  await expect(page.getByRole('combobox', { name: '终端字体', exact: true })).toHaveText('Maple Mono NF CN');
 });
