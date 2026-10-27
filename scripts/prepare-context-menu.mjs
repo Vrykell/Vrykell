@@ -32,7 +32,7 @@ const icons = path.join(build, 'icons');
 run(process.execPath, [path.join(root, 'node_modules', '@tauri-apps', 'cli', 'tauri.js'), 'icon', path.join(root, 'src-tauri', 'icons', 'icon.svg'), '--output', icons]);
 const resourceText = `#include <windows.h>\n101 ICON "${path.join(icons, 'icon.ico').replaceAll('\\', '/')}"\nLANGUAGE LANG_ENGLISH, SUBLANG_ENGLISH_US\nSTRINGTABLE\nBEGIN\n102 "Open in Vrykell"\nEND\nLANGUAGE LANG_CHINESE, SUBLANG_CHINESE_SIMPLIFIED\nSTRINGTABLE\nBEGIN\n102 "${title.replaceAll('"', '\\"')}"\nEND\n`;
 fs.writeFileSync(resources, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(resourceText, 'utf16le')]));
-run('cmake', ['-S', native, '-B', build, '-A', arch === 'arm64' ? 'ARM64' : 'x64', `-DMENU_RESOURCES=${resources}`]);
+run('cmake', ['-S', native, '-B', build, '-A', arch === 'arm64' ? 'ARM64' : 'x64', `-DMENU_RESOURCES:FILEPATH=${resources.replaceAll('\\', '/')}`]);
 run('cmake', ['--build', build, '--config', 'Release']);
 if (process.argv.includes('--test') || process.argv.includes('--test-native')) run('ctest', ['--test-dir', build, '-C', 'Release', '--output-on-failure']);
 if (process.argv.includes('--test-native')) process.exit(0);

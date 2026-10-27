@@ -162,7 +162,9 @@ fn close_session(session: &Arc<Mutex<PtySession>>, deadline: std::time::Instant)
     signal_foreground_close(&state);
     kill_child_tree(&mut *state.child);
     if std::time::Instant::now() >= deadline { return; }
-    if wait_child_bounded(&mut *state.child, deadline.saturating_duration_since(std::time::Instant::now())).is_some() {
+    // Leave time to reap a child that ignores the graceful signals.
+    let grace = deadline.saturating_duration_since(std::time::Instant::now()) / 2;
+    if wait_child_bounded(&mut *state.child, grace).is_some() {
         return;
     }
     force_kill_foreground(&state);
@@ -1454,6 +1456,32 @@ mod tests {
         assert!(state.child.try_wait().ok().flatten().is_some(), "child must be reaped after close");
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn close_session_reaps_a_child_that_ignores_graceful_signals() {
+        let pair = native_pty_system()
+            .openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 })
+            .expect("openpty");
+        let mut command = CommandBuilder::new("sh");
+        command.args(["-c", "trap '' HUP TERM; printf ready; exec sleep 30"]);
+        let child = pair.slave.spawn_command(command).expect("spawn");
+        drop(pair.slave);
+        let mut reader = pair.master.try_clone_reader().expect("reader");
+        let mut ready = [0; 5];
+        reader.read_exact(&mut ready).expect("child readiness");
+        assert_eq!(&ready, b"ready");
+        let writer = pair.master.take_writer().expect("writer");
+        let session = Arc::new(Mutex::new(PtySession {
+            master: pair.master,
+            writer: Arc::new(Mutex::new(writer)),
+            child,
+            input_pending: Arc::new(AtomicBool::new(false)),
+            closed: Arc::new(AtomicBool::new(false)),
+        }));
+        close_session(&session, std::time::Instant::now() + std::time::Duration::from_secs(2));
+        assert!(lock_unpoisoned(&session).child.try_wait().unwrap().is_some(), "forced child must be reaped within the close budget");
+    }
+
     /// The process-wide sweep must terminate every session in the batch.
     #[test]
     fn close_sessions_terminates_every_child() {
@@ -1514,7 +1542,7 @@ mod tests {
         assert!(out.contains(&expected), "child locale not injected, got: {out:?}");
     }
 
-    /// A long-lived child that never reads stdin, used to fill up the PTY input buffer.
+    /// A long-lived child used by the blocked-writer test.
     fn non_reading_command() -> CommandBuilder {
         #[cfg(windows)]
         {
@@ -1530,11 +1558,9 @@ mod tests {
         }
     }
 
-    /// End-to-end reproduction: while the foreground process is not reading stdin, `write_all`
-    /// stays blocked, and the session lock taken by `pty_resize` / `pty_close` /
-    /// `pty_kill_foreground` must still be available. If it is not, those commands queue behind
-    /// the stuck write, and since they run on the main thread the whole UI freezes with them -
-    /// the stop button included.
+    /// A blocked writer must leave the session lock available for resize, close and signals.
+    /// Synchronize the writer explicitly: terminal input buffers can discard excess input
+    /// instead of blocking, so a large payload alone does not establish this precondition.
     #[test]
     fn session_lock_stays_free_while_a_write_is_stuck() {
         let pair = native_pty_system()
@@ -1542,7 +1568,22 @@ mod tests {
             .expect("openpty");
         let child = pair.slave.spawn_command(non_reading_command()).expect("spawn");
         drop(pair.slave);
-        let writer = pair.master.take_writer().expect("writer");
+        struct BlockedWriter {
+            entered: std::sync::mpsc::Sender<()>,
+            release: std::sync::mpsc::Receiver<()>,
+        }
+        impl Write for BlockedWriter {
+            fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
+                self.entered.send(()).map_err(std::io::Error::other)?;
+                self.release.recv().map_err(std::io::Error::other)?;
+                Ok(data.len())
+            }
+
+            fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
+        }
+        let (entered, waiting) = std::sync::mpsc::channel();
+        let (release, resume) = std::sync::mpsc::channel();
+        let writer: Box<dyn Write + Send> = Box::new(BlockedWriter { entered, release: resume });
         let session = Arc::new(Mutex::new(PtySession {
             master: pair.master,
             writer: Arc::new(Mutex::new(writer)),
@@ -1551,30 +1592,12 @@ mod tests {
             closed: Arc::new(AtomicBool::new(false)),
         }));
 
-        // 8 MiB into a process that never reads stdin: `write_all` blocks once the pipe fills up.
         let pumping = {
             let session = session.clone();
-            let started = Arc::new(AtomicBool::new(false));
-            let flag = started.clone();
-            let handle = std::thread::spawn(move || {
-                flag.store(true, Ordering::Release);
-                let t0 = std::time::Instant::now();
-                let outcome = write_session(&session, &vec![b'x'; 8 * 1024 * 1024]);
-                println!("write_session finished: {outcome:?} after {:?}", t0.elapsed());
-            });
-            (started, handle)
+            std::thread::spawn(move || write_session(&session, b"blocked input"))
         };
-        let (started, pumping) = pumping;
-        while !started.load(Ordering::Acquire) {
-            std::thread::yield_now();
-        }
-        // This payload finishes in milliseconds on a pipe that is being drained, so still writing
-        // after 1s means it really is stuck inside `write_all`.
-        std::thread::sleep(std::time::Duration::from_millis(1000));
-        assert!(
-            !pumping.is_finished(),
-            "write_all never blocked (payload too small, or this platform does not block)"
-        );
+        waiting.recv_timeout(std::time::Duration::from_secs(3)).expect("writer must start");
+        assert!(!pumping.is_finished(), "writer must remain blocked until released");
 
         // The wait is measured by timing the session lock that those three commands take.
         let (tx, rx) = std::sync::mpsc::channel();
@@ -1596,16 +1619,9 @@ mod tests {
             "session lock waited {waited:?} (probe took {:?}), still queued behind a stuck write",
             probe_started.elapsed()
         );
-        println!("OK: session lock free in {waited:?} while write_all is still blocked");
-
-        // Cleanup: end the child process. The stuck `write_all` is not joined - it only returns
-        // once the underlying pipe really breaks, so joining could hang; the thread finishes when
-        // this process exits.
-        if let Ok(mut s) = session.lock() {
-            kill_child_tree(&mut *s.child);
-            let _ = s.child.wait();
-        }
-        std::mem::forget(pumping);
+        release.send(()).expect("release writer");
+        pumping.join().expect("writer thread").expect("write succeeds after release");
+        close_session(&session, std::time::Instant::now() + std::time::Duration::from_secs(5));
     }
 
     #[cfg(unix)]
