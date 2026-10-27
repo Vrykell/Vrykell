@@ -1,4 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
+import { t } from '@i18n';
 import { captureWorkspaceHistory, createWorkspaceHistoryWriter } from '../services/workspaceHistory';
 import { parseWorkspaceHistory, remapWorkspaceHistory, type WorkspaceHistorySnapshot } from '../model/workspaceHistory';
 import { restoreWorkspaceComposition, restoreWorkspaceMember } from '../services/restoreWorkspaceHistory';
@@ -12,11 +13,13 @@ import { currentWorkspaceResources } from '../services/workspaceResources';
 import { leaf } from '../model/windowLayout';
 import { saveWorkspaceHistory } from '@platform/api/historyPage';
 import { getSession } from '@platform/api/session';
+import { groupCreate } from '@platform/api/group';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import { useHarnessStore } from '@features/chat/stores/harness';
 
 vi.mock('@platform/diagnostics', () => ({ invoke: vi.fn(async () => undefined), diagnostic: vi.fn() }));
 vi.mock('@platform/api/historyPage', () => ({ saveWorkspaceHistory: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('@platform/api/group', async original => ({ ...await original<typeof import('@platform/api/group')>(), groupsList: vi.fn(async () => []), groupCreate: vi.fn(async () => undefined), groupRestore: vi.fn(async () => undefined), sessionSetGroup: vi.fn(async () => undefined) }));
 vi.mock('@platform/api/session', async () => ({ ...await vi.importActual<typeof import('@platform/api/session')>('@platform/api/session'), getSession: vi.fn() }));
 vi.mock('@platform/api/conversation', async () => ({ ...await vi.importActual<typeof import('@platform/api/conversation')>('@platform/api/conversation'), listConversationMessages: vi.fn().mockResolvedValue([]) }));
 
@@ -29,7 +32,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   useWorkspaceStore.setState({ tabs: [{ id: 'one', title: 'Shell', kind: 'session', layout: leaf({ id: 'one#0', kind: 'local', shellType: 'zsh' }) }], activeId: 'one' });
   useChatStore.setState({ conversations: [{ id: 'two', title: 'Chat', createdAt: 1, updatedAt: 2, environment: null }], conversationsLoaded: true, conversationsLoading: false, byTab: { two: [] } });
-  useAiWorkspace.setState({ nativeTabs: [], selected: '', order: [] });
+  useAiWorkspace.setState({ nativeTabs: [], selected: '' });
   useHarnessWorkspace.setState({ connections: [], selected: '' });
   useUnifiedWorkspace.setState({ layout: null, focused: '', historyIdentity: undefined, startActive: true });
   useWorkspaceNavigation.setState({ area: 'history', historyDestination: 'unified' });
@@ -135,13 +138,21 @@ it('restores members through their owners and commits the layout without cloning
   expect(captureWorkspaceHistory(snapshot().layout, 'first', currentWorkspaceResources())?.members.map(member => member.kind)).toEqual(['terminal', 'conversation']);
 });
 
+it('re-scopes a restored group without nesting the old scope prefix', async () => {
+  const value = snapshot();
+  value.workspaceScope = 'code';
+  value.group = { id: 'group:code:team', title: 'Team', collapsed: false };
+  await restoreWorkspaceComposition(value, undefined, 'unified');
+  expect(groupCreate).toHaveBeenCalledWith('group:unified:team', 'Team', expect.any(Number));
+});
+
 it('leaves the current layout intact when a member cannot be restored', async () => {
   const existing = { type: 'pane' as const, id: 'existing', resourceId: 'terminal:one' };
   useUnifiedWorkspace.setState({ layout: existing });
   const value = snapshot(); value.members[0]!.id = 'terminal:missing'; value.members[0]!.reference = 'missing';
   if (value.layout.type === 'split' && value.layout.first.type === 'pane') value.layout.first.resourceId = 'terminal:missing';
   vi.mocked(getSession).mockRejectedValueOnce(new Error('Missing'));
-  await expect(restoreWorkspaceComposition(value)).rejects.toThrow('Missing');
+  await expect(restoreWorkspaceComposition(value)).rejects.toThrow(t('The saved terminal is no longer available.'));
   expect(useUnifiedWorkspace.getState().layout).toBe(existing);
 });
 

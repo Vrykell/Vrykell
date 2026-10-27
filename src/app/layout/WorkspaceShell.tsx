@@ -30,6 +30,8 @@ import UnifiedWorkspace from '@features/workspace/components/UnifiedWorkspace';
 import { editorFileKey } from '@core/editor';
 import { gitComparisonKey } from '@core/git';
 import { useGitSelection } from '@features/git';
+import { startWorkbenchRuntime } from '@features/workspace/services/workbench';
+import WorkbenchFeedback from '@features/workspace/components/WorkbenchFeedback';
 
 const StableTerminalView = memoLocalized(TerminalView);
 const StablePanelTabs = memoLocalized(PanelTabs);
@@ -42,6 +44,7 @@ const StableSidePanel = memoLocalized(SidePanel);
 
 /** Compose navigation, auxiliary panels and the terminal workspace. */
 export default function WorkspaceShell() {
+  useEffect(startWorkbenchRuntime, []);
   useSshAuthenticationLifetime();
   useGitContext();
   const settingsOpen = useUiStore(state => state.settingsOpen);
@@ -50,9 +53,8 @@ export default function WorkspaceShell() {
   const sidebarOverlay = useWorkspaceNavigation(state => state.sidebarOverlay);
   const sidebarPreference = useWorkspaceNavigation(state => state.sidebarWidth);
   const sidebarDragWidth = useWorkspaceNavigation(state => state.sidebarDragWidth);
-  const aiPlacement = useWorkspaceNavigation(state => state.aiPlacement);
   const activeTab = useSessionStore(state => state.tabs.find(tab => tab.id === state.activeId));
-  const contentVisible = !!activeTab && activeTab.kind !== 'workspace' && area === workspaceAreaForKind(activeTab.kind);
+  const contentVisible = !!activeTab && area === workspaceAreaForKind(activeTab.kind);
   const codeSplit = useScopedSplitActive('code');
   const gitSelection = useGitSelection();
   const codeResourceId = activeTab?.kind === 'editor' ? `file:${editorFileKey(activeTab.selected)}` : activeTab?.kind === 'git-diff'
@@ -108,11 +110,12 @@ export default function WorkspaceShell() {
     <div className="workspace-layout" data-area={area} data-sidebar-overlay={sidebarOverlay && !collapsed || undefined} data-settings-open={settingsOpen || undefined} style={{ '--workspace-sidebar-width': `${sidebarWidth}px`, '--workspace-sidebar-overlay-width': `${overlayWidth}px` } as CSSProperties}>
       <WorkspaceHeaderProvider>
       <ResourceContentProvider>
-      <AiWorkspaceProvider placement={aiPlacement} mainActive={contentVisible && area === 'ai' && (activeTab?.kind === 'harness' || activeTab?.kind === 'ai-history' || activeTab?.kind === 'usage' || activeTab?.kind === 'start-ai') && !settingsOpen} headerActive={area === 'ai' && !settingsOpen} sideActive={chatOpen && (chatOnLeft ? !collapsed : !sshStatusOwner) && !settingsOpen}>
+      <AiWorkspaceProvider mainActive={contentVisible && area === 'ai' && (activeTab?.kind === 'harness' || activeTab?.kind === 'ai-history' || activeTab?.kind === 'usage' || activeTab?.kind === 'start-ai') && !settingsOpen} headerActive={area === 'ai' && !settingsOpen} sideActive={chatOpen && (chatOnLeft ? !collapsed : !sshStatusOwner) && !settingsOpen}>
       <PanelSurfaces>
       <WorkspaceSidebar maxWidth={Math.max(160, sidebarMaxWidth)} />
       <StableTopDock sidebarOverlayRequired={viewportWidth - mainMinWidth < 160} />
       <SshAuthenticationDialog />
+      <WorkbenchFeedback />
       <StablePanelTabs active={area === 'terminal' && !settingsOpen} />
       <div className="workspace-body" data-settings-open={settingsOpen || undefined} style={{ '--workspace-frame-width': `${frameWidth}px`, '--workspace-terminal-min-width': `${Math.max(360, area === 'terminal' ? terminalMinWidth : MIN_PANE_SIZE)}px`, '--workspace-left-panel-width': '0px', '--workspace-activity-width': `${sidebarWidth}px`, '--workspace-gap': `${WORKSPACE_GAP}px` } as CSSProperties}>
         <div className="workspace-primary" style={{ minWidth: area === 'terminal' ? terminalMinWidth : 0 }}>

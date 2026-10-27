@@ -9,7 +9,7 @@ for (const theme of ['深色', '浅色']) {
     await gotoSetting(page, '主题');
     await page.getByRole('radio', { name: theme, exact: true }).click();
     await page.locator('[data-dock-btn="chat"]').click();
-    await expect(page.locator('[data-chat-composer]')).toBeVisible();
+    await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
     await expect.poll(() => page.evaluate(async () => {
       const path = '/src/features/chat/stores/chat.ts';
       const { useChatStore } = await import(path) as typeof import('../src/features/chat/stores/chat');

@@ -132,7 +132,15 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
   dropRef.current = onDrop;
   const acceptsRef = useRef(accepts);
   acceptsRef.current = accepts;
-  useEffect(() => () => cleanupRef.current?.(), []);
+  useEffect(() => () => {
+    const state = useListReorder.getState();
+    const transferring = (state.pendingScroll?.listId === listId || state.drag?.listId === listId)
+      && Array.from(document.querySelectorAll<HTMLElement>('[data-reorder-list]')).some(element => element.dataset.reorderList === listId
+        && !element.closest('[hidden], [inert]') && element.getBoundingClientRect().width > 0);
+    // Resource-specific headers may hand the same logical list to a new visible host on press.
+    // Its captured gesture owns the listeners until release, cancellation or window blur.
+    if (!transferring) cleanupRef.current?.();
+  }, [listId]);
 
   return (event: ReactPointerEvent<HTMLElement>, item: { id: string; kind: string }) => {
     if (event.button !== 0 || event.isPrimary === false) return;
@@ -439,13 +447,14 @@ export function ListReorderZonePlaceholder({ listId, zoneId }: { listId: string;
 }
 
 /** A preview follows the pointer without intercepting drop targets. */
-export function ListReorderPreview({ listId, variant = 'icon', className = '', children }: {
+export function ListReorderPreview({ listId, variant = 'icon', className = '', children, owner }: {
   listId: string; variant?: 'icon' | 'item'; className?: string; children: (drag: ListReorderDrag) => ReactNode;
+  owner?: { readonly current: HTMLElement | null };
 }) {
   const drag = useListReorder(state => state.drag?.listId === listId ? state.drag : null);
   const position = useListReorder(state => state.position);
   const content = useMemo(() => drag ? children(drag) : null, [drag, children]);
-  if (!drag || !position) return null;
+  if (!drag || !position || owner?.current?.closest('[hidden], [inert]')) return null;
   const style = variant === 'item' && drag.origin ? {
     left: 0, top: 0, transform: `translate3d(${horizontalPreviewLeft(position.x, drag.origin)}px, ${drag.origin.top}px, 0)`,
     width: drag.width, height: drag.height,

@@ -104,7 +104,7 @@ test('sending only a pasted attachment renders the attachment without an empty q
   await setupTauriMock(page);
   await page.goto('/');
   await page.locator('[data-dock-btn="chat"]').click();
-  const composer = page.locator('[data-chat-composer]');
+  const composer = page.locator('[data-chat-composer]:visible');
   await composer.evaluate(element => {
     const data = new DataTransfer();
     data.setData('text/plain', 'pasted diagnostic line\n'.repeat(80));

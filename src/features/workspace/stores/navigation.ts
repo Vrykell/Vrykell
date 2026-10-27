@@ -24,9 +24,8 @@ interface NavigationState {
   lastTabs: Partial<Record<WorkspaceArea, string>>;
   groupColors: Record<string, HistoryGroupColor>;
   workspaceOrder: WorkspaceArea[];
-  codeOrder: string[];
-  /** Top-level terminal strip order: group:<id> and tab:<id> entities. */
-  sessionLayoutOrder: string[];
+  /** Read-only migration input; live strip order belongs to the workbench. */
+  readonly sessionLayoutOrder: string[];
   aiPlacement: 'main' | 'side';
   historyPreset: HistoryTypePreset;
   historyPresetRevision: number;
@@ -43,9 +42,6 @@ interface NavigationState {
   resetSidebarWidth: () => void;
   setGroupColor: (id: string, color: HistoryGroupColor | null) => void;
   moveWorkspaceArea: (id: WorkspaceArea, over: WorkspaceArea, after: boolean) => void;
-  moveCodeTab: (ids: string[], id: string, over: string, after: boolean) => void;
-  moveSessionLayoutItem: (id: string, over?: string, after?: boolean) => void;
-  reconcileSessionLayout: (ids: string[]) => void;
   setAiPlacement: (placement: 'main' | 'side') => void;
 }
 
@@ -69,7 +65,7 @@ const workspaceOrder = [...new Set([...savedWorkspaceOrder, ...DEFAULT_WORKSPACE
 export const useWorkspaceNavigation = create<NavigationState>((set) => ({
   area: 'terminal', previousArea: 'terminal', collapsed: saved?.collapsed === true || window.innerWidth <= WORKSPACE_COMPACT_BREAKPOINT,
   sidebarWidth: normalizeSidebarWidth(saved?.sidebarWidth), sidebarDragWidth: null, sidebarOverlay: false,
-  lastTabs: {}, groupColors, workspaceOrder, codeOrder: [], sessionLayoutOrder: Array.isArray(saved?.sessionLayoutOrder)
+  lastTabs: {}, groupColors, workspaceOrder, sessionLayoutOrder: Array.isArray(saved?.sessionLayoutOrder)
     ? saved.sessionLayoutOrder.filter((id): id is string => typeof id === 'string' && !id.startsWith('page:')) : [], aiPlacement: 'main',
   historyPreset: 'all', historyPresetRevision: 0, historyLoading: false, historyDestination: 'native',
   selectArea: area => set(state => ({ area, previousArea: state.area !== 'ai' ? state.area : state.previousArea,
@@ -106,37 +102,15 @@ export const useWorkspaceNavigation = create<NavigationState>((set) => ({
     order.splice(index + (after ? 1 : 0), 0, id);
     return { workspaceOrder: order };
   }),
-  moveCodeTab: (ids, id, over, after) => set(state => {
-    const order = orderedWorkspaceIds(ids, state.codeOrder).filter(key => key !== id);
-    const index = order.indexOf(over);
-    if (!ids.includes(id) || index < 0 || id === over) return state;
-    order.splice(index + (after ? 1 : 0), 0, id);
-    return { codeOrder: order };
-  }),
-  moveSessionLayoutItem: (id, over, after) => set(state => {
-    if (id === over) return state;
-    const order = state.sessionLayoutOrder.filter(item => item !== id);
-    if (over) {
-      const index = order.indexOf(over);
-      if (index < 0) return state;
-      order.splice(index + (after ? 1 : 0), 0, id);
-    } else order.push(id);
-    return { sessionLayoutOrder: order };
-  }),
-  reconcileSessionLayout: ids => set(state => {
-    const order = orderedWorkspaceIds(ids, state.sessionLayoutOrder);
-    return order.length === state.sessionLayoutOrder.length && order.every((id, index) => id === state.sessionLayoutOrder[index])
-      ? state : { sessionLayoutOrder: order };
-  }),
   setAiPlacement: aiPlacement => set({ aiPlacement }),
 }));
 
 useWorkspaceNavigation.subscribe((state, previous) => {
   if (state.collapsed !== previous.collapsed || state.sidebarOverlay !== previous.sidebarOverlay || state.groupColors !== previous.groupColors
-    || state.sidebarWidth !== previous.sidebarWidth || state.sessionLayoutOrder !== previous.sessionLayoutOrder
+    || state.sidebarWidth !== previous.sidebarWidth
     || state.workspaceOrder !== previous.workspaceOrder) {
     safeLocalStorageSet(STORAGE_KEY, JSON.stringify({ collapsed: state.collapsed || state.sidebarOverlay, groupColors: state.groupColors,
-      sidebarWidth: state.sidebarWidth, sessionLayoutOrder: state.sessionLayoutOrder.filter(id => !id.startsWith('page:')), workspaceOrder: state.workspaceOrder }));
+      sidebarWidth: state.sidebarWidth, workspaceOrder: state.workspaceOrder }));
   }
 });
 

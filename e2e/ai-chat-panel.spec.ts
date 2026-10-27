@@ -26,7 +26,7 @@ test.describe('AI 对话面板', () => {
     await boot(page, 'OK');
     const trigger = page.locator('[data-dock-btn="chat"]');
     await trigger.click();
-    const composer = page.locator('[data-chat-composer]');
+    const composer = page.locator('[data-chat-composer]:visible');
     await expect(composer).toBeVisible();
     await expect(composer).not.toBeFocused();
   });
@@ -45,7 +45,7 @@ test.describe('AI 对话面板', () => {
   test('打开面板发送消息，流式渲染回复', async ({ page }) => {
     await boot(page, '面板回复内容');
     await page.locator('[data-dock-btn="chat"]').click();
-    const input = page.getByPlaceholder(/自然语言描述/);
+    const input = page.locator('[data-chat-composer]:visible');
     await expect(input).toBeVisible({ timeout: 3000 });
     await input.fill('帮我看看');
     await input.press('Enter');
@@ -58,7 +58,7 @@ test.describe('AI 对话面板', () => {
     await paceLlmStream(page, 30);
     await boot(page, '这是一段足够长的流式回复内容。'.repeat(12), {});
     await page.locator('[data-dock-btn="chat"]').click();
-    const input = page.getByPlaceholder(/自然语言描述/);
+    const input = page.locator('[data-chat-composer]:visible');
     await expect(input).toBeVisible({ timeout: 3000 });
     // The panel needs an active conversation before sending: without one the request falls back to
     // the workspace tab and the stop button has nothing to match.
@@ -86,7 +86,7 @@ test.describe('AI 对话面板', () => {
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
     await page.locator('[data-dock-btn="chat"]').click();
-    const input = page.getByPlaceholder(/自然语言描述/);
+    const input = page.locator('[data-chat-composer]:visible');
     await expect(input).toBeVisible({ timeout: 3000 });
     // run_command needs the conversation's terminal, and it waits on the approval card.
     await ensureChatSettingsOpen(page);
@@ -108,7 +108,7 @@ test.describe('AI 对话面板', () => {
     await paceLlmStream(page, 60);
     await boot(page, '这是一段足够长的流式回复内容。'.repeat(40), {});
     await page.locator('[data-dock-btn="chat"]').click();
-    const input = page.getByPlaceholder(/自然语言描述/);
+    const input = page.locator('[data-chat-composer]:visible');
     await expect(input).toBeVisible({ timeout: 3000 });
     await page.waitForFunction(async () => {
       const mod = await import('/src/features/chat/stores/chat.ts') as typeof import('../src/features/chat/stores/chat');
@@ -132,17 +132,17 @@ test.describe('AI 对话面板', () => {
   test('opening the AI assistant leaves command input available', async ({ page }) => {
     await boot(page, '好的');
     await page.locator('[data-dock-btn="chat"]').click();
-    await expect(page.locator('[data-chat-composer]')).toBeVisible();
+    await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
     await expect(page.locator('[data-terminal-input]')).toBeVisible();
     await expect(page.getByRole('button', { name: '询问 AI', exact: true })).toBeEnabled();
     await page.locator('[data-terminal-input]').fill('echo command');
-    await expect(page.locator('[data-chat-composer]')).toHaveValue('');
+    await expect(page.locator('[data-chat-composer]:visible')).toHaveValue('');
   });
 
   test('模型选择窗口：搜索过滤 + 能力标签过滤 + 点击选中', async ({ page }) => {
     await boot(page, '好的');
     await page.locator('[data-dock-btn="chat"]').click();
-    await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
+    await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
     // 打开模型选择窗口
     await ensureChatSettingsOpen(page);
     await page.locator('[data-tip="切换模型"]').click();
@@ -179,7 +179,7 @@ test.describe('AI 对话面板', () => {
   test('模型选择窗口：思考强度只在模型配置页调整', async ({ page }) => {
     await boot(page, '好的');
     await page.locator('[data-dock-btn="chat"]').click();
-    await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
+    await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
     await ensureChatSettingsOpen(page);
     await page.locator('[data-tip="切换模型"]').click();
     const row = page.getByTestId('model-pick-m-main');
@@ -195,7 +195,7 @@ test.describe('AI 对话面板', () => {
   test('the unified chat and approval menu persists model and permission choices', async ({ page }) => {
     await boot(page, '好的');
     await page.locator('[data-dock-btn="chat"]').click();
-    await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
+    await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
     const mode = page.getByRole('button', { name: '对话与审批模式' });
     await ensureChatSettingsOpen(page);
     await mode.click();
@@ -210,7 +210,7 @@ test.describe('AI 对话面板', () => {
     await page.getByRole('option', { name: /^严格权限/ }).click();
     await expect(mode).toHaveAttribute('data-mode', 'strict');
     await page.reload();
-    await expect(page.locator('[data-chat-composer]')).toBeVisible();
+    await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
     await ensureChatSettingsOpen(page);
     await expect(mode).toHaveAttribute('data-mode', 'strict');
     await expect(page.locator('[data-tip="深度思考（reasoning effort）"]')).toHaveCount(0);

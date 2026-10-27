@@ -208,8 +208,8 @@ test('the more menu stages a command snapshot for AI analysis while preserving t
   await block.getByRole('button', { name: '更多操作' }).hover();
   await block.getByRole('button', { name: '更多操作' }).click();
   await page.getByRole('menuitem', { name: '发给 AI 分析' }).click();
-  await expect(page.locator('[data-chat-composer]')).toHaveValue('帮我分析这条命令的执行结果。');
-  await page.locator('[data-chat-composer]').press('Enter');
+  await expect(page.locator('[data-chat-composer]:visible')).toHaveValue('帮我分析这条命令的执行结果。');
+  await page.locator('[data-chat-composer]:visible').press('Enter');
   await expect(page.getByRole('menu', { name: '命令块操作' })).toHaveCount(0);
   await expect(page.locator('.ai-chat-panel')).toContainText('帮我分析这条命令的执行结果');
   await expect(page.getByText('Analysis complete.').first()).toBeVisible();

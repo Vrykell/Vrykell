@@ -1,5 +1,7 @@
 # Vrykell Architecture
 
+The shared workspace ownership map, persistence boundary and refactoring audit are documented in [Unified workspace foundation](workspace-foundation.md). Every functional strip uses the same container, tree operations, scoped group model, lifecycle and pane canvas.
+
 > The actual architecture of the current v2 chat-first implementation (branch `dev`). The terminal surface abstracts terminal output into **command blocks (Block)**, organized around "synchronous Rust StreamScanner scanning + the SessionController three-scene state machine + one offscreen xterm per block".
 >
 > This document records the actual architecture of the current implementation. (Last updated: 2026-10-13; see §16-§19 for split panes, Agent, themes, and independent AI conversations.)
@@ -78,7 +80,9 @@ The titlebar uses `useBalancedTitlebar` to observe the action zone, navigation o
 
 ## 4. End-to-End Layering
 
-Shared interface code is packaged under `src/ui/actions`, `fields`, `menus`, `feedback`, `layout`, `editor`, `history`, `icons` and `hooks`; tests and styles stay with their owner. Root compatibility components are not retained, and the architecture guard rejects root-level interface source files. Terminal and mixed-resource workspaces share the flat split renderer, pane surface, divider and placement picker. Existing domain tab stores remain authoritative; the mixed workspace keeps references and placement only. Its sidebar row opens an independently composed start page using the existing launcher design. Focused-resource actions stay in the tab toolbar, not an extra row.
+Shared interface code is packaged under `src/ui/actions`, `fields`, `menus`, `feedback`, `layout`, `editor`, `history`, `icons` and `hooks`; tests and styles stay with their owner. The architecture guard rejects root-level interface source files. All functional workspaces share the generic tree algorithms, flat pane canvas, divider and placement picker. The workbench store owns containers, layouts, focus, selection, groups and strip order; domain stores own resources. The common workspace's sidebar row opens the existing start-page design. Focused-resource actions stay in the tab toolbar.
+
+Every content row is a real layout-owning container presented through the shared `TabHandle`. `useWorkspaceContainerTabs` provides scoped groups, ordering and the common lifecycle; code, AI, terminal and common-workspace providers supply resource titles, icons and creation tools. `GroupedTabList` owns rendering and menus. Utility pages retain explicit singleton routing in `TAB_KIND_AREA`. Named groups have the same member deletion/archive semantics in every functional scope.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────┐

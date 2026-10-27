@@ -3,6 +3,7 @@ import type { BackendSessionEntry } from '@platform/api/types';
 import * as sessionManager from '@features/workspace/services/sessionManager';
 import { isSessionTab, isStartTab, serializeSession, useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { useStartupSettings, type StartupMode } from '@features/settings/stores/startup';
+import { t } from '@i18n';
 
 export interface WorkspaceSession {
   id: string;
@@ -49,11 +50,11 @@ export async function restoreWorkspaceWithDependencies(
   const mode = dependencies.startupMode ?? 'restore';
   if (mode !== 'restore' && dependencies.archiveSession) {
     const saved = await dependencies.listSessions().catch((error: unknown) => {
-      onError('整理上次的会话记录失败', error);
+      onError(t('Failed to tidy previous session records'), error);
       return [];
     });
     for (const session of saved.filter((item) => item.status === 'active')) {
-      await dependencies.archiveSession(session.id).catch((error: unknown) => onError(`归档上次的会话失败：${session.id}`, error));
+      await dependencies.archiveSession(session.id).catch((error: unknown) => onError(t('Failed to archive previous session {{id}}', { id: session.id }), error));
     }
   }
   if (mode === 'empty') return;
@@ -61,12 +62,12 @@ export async function restoreWorkspaceWithDependencies(
     if (dependencies.hasTabs()) return;
     const session = dependencies.createDefaultSession();
     if (session && dependencies.persistSession) await Promise.resolve(dependencies.persistSession(session)).catch((error: unknown) => {
-      onError(`持久化默认会话失败：${session.id}`, error);
+      onError(t('Failed to persist the default session {{id}}', { id: session.id }), error);
     });
     return;
   }
   const sessions = await dependencies.listSessions().catch((error: unknown) => {
-    onError('读取会话列表失败', error);
+    onError(t('Failed to read session list'), error);
     return [];
   });
   const activeSessions = sessions
@@ -75,11 +76,11 @@ export async function restoreWorkspaceWithDependencies(
 
   if (activeSessions.length > 0) {
     await dependencies.loadGroups().catch((error: unknown) => {
-      onError('加载会话分组失败，将继续恢复会话', error);
+      onError(t('Failed to load session groups; continuing with saved sessions'), error);
     });
     for (const session of activeSessions) {
       await dependencies.restoreSession(session).catch((error: unknown) => {
-        onError(`恢复会话失败：${session.id}`, error);
+        onError(t('Failed to restore session {{id}}', { id: session.id }), error);
       });
     }
   }
@@ -90,7 +91,7 @@ export async function restoreWorkspaceWithDependencies(
 
   if (!dependencies.persistSession) return;
   await Promise.resolve(dependencies.persistSession(defaultSession)).catch((error: unknown) => {
-    onError(`持久化默认会话失败：${defaultSession.id}`, error);
+    onError(t('Failed to persist the default session {{id}}', { id: defaultSession.id }), error);
   });
 }
 

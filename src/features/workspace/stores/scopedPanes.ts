@@ -1,7 +1,7 @@
-import { createPaneWorkspaceStore } from './paneWorkspace';
+import { workspaceAreaStores } from './paneWorkspace';
 
 export type PaneWorkspaceScope = 'code' | 'ai';
 export const scopedPaneStores = {
-  code: createPaneWorkspaceStore('code-pane-workspace-v1'),
-  ai: createPaneWorkspaceStore('ai-pane-workspace-v1'),
+  code: workspaceAreaStores.code,
+  ai: workspaceAreaStores.ai,
 };

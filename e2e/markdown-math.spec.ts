@@ -30,7 +30,7 @@ for (const scale of [1, 1.25, 1.5]) {
       await page.goto('/');
       await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
       await page.getByRole('button', { name: '询问 AI', exact: true }).click();
-      const input = page.getByPlaceholder(/自然语言描述/);
+      const input = page.locator('[data-chat-composer]:visible');
       await page.waitForFunction(async () => {
         const { useChatStore } = await import('/src/features/chat/stores/chat.ts') as typeof import('../src/features/chat/stores/chat');
         const state = useChatStore.getState();

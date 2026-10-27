@@ -22,7 +22,7 @@ it('keeps conversation history available on the empty start page', () => {
 it('hides the connected session behind a system page without dropping its draft or remounting', () => {
   useUiStore.setState({ settingsOpen: false });
   useHarnessWorkspace.setState({ connections: [{ id: 'agent', harness: 'Agent', cwd: '', fresh: false }], selected: 'agent' });
-  useAiWorkspace.setState({ nativeTabs: [], selected: 'acp:agent', order: [] });
+  useAiWorkspace.setState({ nativeTabs: [], selected: 'acp:agent' });
   useSessionStore.getState().openHarnessTab(); const harnessPage = useSessionStore.getState().activeId!;
   render(<HarnessWorkspace active />);
   const draft = screen.getByRole('textbox', { name: 'Agent draft' });

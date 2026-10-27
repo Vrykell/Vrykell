@@ -5,19 +5,13 @@ import { isDocumentDirty, type DocumentState } from '@features/editor/stores/doc
 import { iconSizes } from '@ui/icons';
 import { tabCapabilities, type TabHandle } from '@ui/layout/tabHandle';
 import type { Tab } from '../stores/workspace';
-import { orderProjected } from './tabStrip';
 
 export type CodeTabTarget =
   | { handle: TabHandle; file: EditorFile }
   | { handle: TabHandle; comparisonId: string };
 
-/**
- * Project editor files and git comparisons into one ordered strip.
- *
- * A code row is either a file inside an editor page or one comparison inside a review page;
- * neither maps one-to-one to a `Tab`, so the handle carries the row identity.
- */
-export function projectCodeTabs(tabs: Tab[], documents: Record<string, DocumentState>, order: string[]): CodeTabTarget[] {
+/** Present resources; the common container provider owns strip rows and ordering. */
+export function projectCodeTabs(tabs: Tab[], documents: Record<string, DocumentState>): CodeTabTarget[] {
   const targets: CodeTabTarget[] = [];
   for (const tab of tabs) {
     if (tab.kind === 'editor') {
@@ -56,5 +50,5 @@ export function projectCodeTabs(tabs: Tab[], documents: Record<string, DocumentS
       }
     }
   }
-  return orderProjected(targets, order);
+  return targets;
 }

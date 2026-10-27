@@ -47,7 +47,7 @@ for (const theme of ['dark', 'light']) test(`keeps layouts inside tabs and shows
   await bar.getByRole('button', { name: '关闭标签', exact: true }).last().click();
   await bar.getByRole('button', { name: '关闭标签', exact: true }).last().click();
   await expect(workspace.getByTestId('unified-start-page')).toBeVisible();
-  await expect(bar.getByRole('tab')).toHaveCount(1);
+  await expect(bar.getByRole('tab')).toHaveCount(0);
 });
 
 test('starts ACP in the side panel and moves the same connection back to the workspace', async ({ page }, info) => {

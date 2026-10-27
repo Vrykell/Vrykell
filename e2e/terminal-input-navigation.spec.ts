@@ -110,7 +110,7 @@ test('AI entry shares the command control size and the outer border follows wind
   await expect(askAi.locator('svg')).toHaveCSS('width', '18px');
   const commandBounds = (await askAi.boundingBox())!;
   await askAi.click();
-  await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
+  await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
   await expect(askAi.locator('svg')).toHaveCSS('width', '18px');
   const aiBounds = (await askAi.boundingBox())!;
   expect([aiBounds.width, aiBounds.height]).toEqual([commandBounds.width, commandBounds.height]);

@@ -4,15 +4,16 @@ import { useHarnessWorkspace } from '../stores/harnessWorkspace';
 import { useChatStore } from '../stores/chat';
 import { useDockStore } from '@features/workspace/stores/dock';
 import { selectWorkspaceArea } from '@features/workspace/services/selectWorkspaceArea';
-import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { scopedPaneStores } from '@features/workspace/stores/scopedPanes';
 import { workspacePaneCells } from '@features/workspace/model/workspaceResources';
+import { useWorkbenchStore } from '@features/workspace/stores/workbench';
+import { panesOf, reconcileContainers } from '@features/workspace/model/workbench';
 
 export function availableSideConversationIds(placedIds?: readonly string[]): Set<string> {
   const ai = useAiWorkspace.getState();
   const layout = scopedPaneStores.ai.getState().layout;
   const reserved = new Set([ai.selected, ...(placedIds ?? [
-    ...useWorkspaceStore.getState().tabs.flatMap(tab => tab.kind === 'workspace' && tab.paneLayout ? workspacePaneCells(tab.paneLayout).map(cell => cell.resourceId) : []),
+    ...useWorkbenchStore.getState().snapshot.tabs.filter(tab => tab.scope === 'unified' || tab.scope === 'ai' && panesOf(tab).length > 1).flatMap(panesOf).map(pane => pane.resourceId),
     ...(layout && (scopedPaneStores.ai.getState().choosingSplit || workspacePaneCells(layout).length > 1) ? workspacePaneCells(layout).map(cell => cell.resourceId) : []),
   ])]);
   const resources = new Set([...ai.nativeTabs.map(id => `chat:${id}`), ...useHarnessWorkspace.getState().connections.map(item => `acp:${item.id}`)]);
@@ -33,11 +34,11 @@ export function moveSideConversationToMain() {
 }
 
 export function moveMainConversationToSide(id: string) {
-  const panes = scopedPaneStores.ai.getState();
-  if (panes.layout) for (const cell of workspacePaneCells(panes.layout)) {
-    if (cell.resourceId === id) scopedPaneStores.ai.getState().removePane(cell.id);
-  }
   useAiWorkspace.getState().selectSide(id);
+  useWorkbenchStore.getState().update(state => {
+    const valid = new Set(state.tabs.flatMap(panesOf).map(pane => pane.resourceId).filter(resourceId => resourceId !== id));
+    return reconcileContainers(reconcileContainers(state, 'ai', valid), 'unified', valid);
+  });
   useAiWorkspace.getState().select('');
 }
 

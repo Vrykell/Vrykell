@@ -56,8 +56,19 @@ impl HistoryDb {
             return Err("Invalid workspace history".into());
         }
         let payload: Value = serde_json::from_str(&request.payload).map_err(|_| "Invalid workspace history")?;
-        if !payload.as_object().is_some_and(|object| object.keys().all(|key| ["version", "layout", "focused", "members"].contains(&key.as_str()))) {
+        if !payload.as_object().is_some_and(|object| object.keys().all(|key| ["version", "layout", "focused", "members", "workspaceScope", "group"].contains(&key.as_str()))) {
             return Err("Invalid workspace history fields".into());
+        }
+        if payload.get("workspaceScope").is_some_and(|scope| !matches!(scope.as_str(), Some("terminal" | "code" | "ai" | "unified"))) {
+            return Err("Invalid workspace scope".into());
+        }
+        if let Some(group) = payload.get("group") {
+            if !group.as_object().is_some_and(|object| object.keys().all(|key| ["id", "title", "collapsed"].contains(&key.as_str())))
+                || !group["id"].as_str().is_some_and(|id| !id.is_empty() && id.len() <= 256)
+                || !group["title"].as_str().is_some_and(|title| !title.is_empty() && title.chars().count() <= 320)
+                || !group["collapsed"].is_boolean() {
+                return Err("Invalid workspace group".into());
+            }
         }
         let mut panes = HashSet::new();
         let mut resources = HashSet::new();
@@ -66,7 +77,7 @@ impl HistoryDb {
             return Err("Invalid workspace layout".into());
         }
         let members = payload["members"].as_array().ok_or("Invalid workspace members")?;
-        if members.len() < 2 || members.len() != resources.len() { return Err("Invalid workspace members".into()); }
+        if members.is_empty() || members.len() != resources.len() { return Err("Invalid workspace members".into()); }
         let fields = ["id", "title", "kind", "reference", "paneCount", "local", "ssh", "cwd", "connectionId", "draftId", "remoteId", "paneId", "shellType", "scope", "modes", "empty"];
         for member in members {
             let object = member.as_object().ok_or("Invalid workspace member")?;
@@ -151,6 +162,32 @@ mod tests {
         db.create_session(&input.id, "Original", 1, "", "session", "{}").unwrap();
         assert!(db.save_workspace_history(&input).is_err());
         assert_eq!(db.get_session(&input.id).unwrap().title, "Original");
+    }
+
+    #[test]
+    fn scoped_single_pane_groups_are_validated_and_remain_metadata_when_restored() {
+        let db = HistoryDb::open_in_memory();
+        let mut input = request();
+        let mut payload: Value = serde_json::from_str(&input.payload).unwrap();
+        payload["layout"] = payload["layout"]["first"].clone();
+        payload["focused"] = payload["layout"]["id"].clone();
+        payload["members"] = serde_json::json!([payload["members"][0].clone()]);
+        payload["workspaceScope"] = "unified".into();
+        payload["group"] = serde_json::json!({"id":"group", "title":"Work", "collapsed":false});
+        input.payload = payload.to_string();
+        db.create_group("group", "Work", 1).unwrap();
+        db.save_workspace_history(&input).unwrap();
+        db.session_set_group(&input.id, Some("group")).unwrap();
+        db.restore_group("group").unwrap();
+        assert_eq!(db.get_session(&input.id).unwrap().status, "historical");
+        for invalid in [serde_json::json!(null), serde_json::json!({}), serde_json::json!({"id":"", "title":"Work", "collapsed":false}),
+            serde_json::json!({"id":"g", "title":"", "collapsed":false}), serde_json::json!({"id":"g", "title":"Work", "collapsed":"yes"}),
+            serde_json::json!({"id":"g", "title":"Work", "collapsed":false,"content":"private"})] {
+            let mut changed = payload.clone(); changed["group"] = invalid; input.payload = changed.to_string();
+            assert!(db.save_workspace_history(&input).is_err());
+        }
+        payload["workspaceScope"] = "unknown".into(); input.payload = payload.to_string();
+        assert!(db.save_workspace_history(&input).is_err());
     }
 
     #[test]

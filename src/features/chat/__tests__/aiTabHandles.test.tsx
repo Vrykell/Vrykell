@@ -23,7 +23,6 @@ it('projects conversations, agents and system pages in one ordered strip', () =>
     systemPages: pages,
     sideSelected: '',
     sideSessions: [],
-    order: [],
   });
   expect(targets.map(target => target.handle.id)).toEqual([
     'chat:c1', 'acp:agent-1', 'page:usage', 'page:history', 'page:start-ai',
@@ -46,7 +45,6 @@ it('removes conversation and agent rows docked to the side or selected for the s
     systemPages: pages,
     sideSelected: 'chat:c1',
     sideSessions: ['acp:agent-1', 'page:usage'],
-    order: [],
   });
   expect(targets.map(target => target.handle.id)).toEqual(['chat:c2', 'acp:agent-2', 'page:usage', 'page:history', 'page:start-ai']);
   expect(targets[1]!.handle.tip).toBe('Other · /other');
@@ -60,12 +58,11 @@ it('keeps an agent without a directory on a single-line tip', () => {
     systemPages: [],
     sideSelected: '',
     sideSessions: [],
-    order: [],
   });
   expect(target?.handle.tip).toBe('Agent');
 });
 
-it('applies the saved order and ignores stale or unsupported rows', () => {
+it('presents only supported resource and utility page kinds', () => {
   const targets = projectAiTabs({
     nativeTabs: ['c1'],
     conversations,
@@ -73,8 +70,7 @@ it('applies the saved order and ignores stale or unsupported rows', () => {
     systemPages: [...pages, { id: 'editor', title: 'Editor', kind: 'editor', files: [], selected: { path: '/repo/a.ts' } }],
     sideSelected: '',
     sideSessions: [],
-    order: ['page:start-ai', 'stale', 'chat:c1', 'page:usage'],
   });
-  expect(targets.map(target => target.handle.id)).toEqual(['page:start-ai', 'chat:c1', 'page:usage', 'page:history']);
+  expect(targets.map(target => target.handle.id)).toEqual(['chat:c1', 'page:usage', 'page:history', 'page:start-ai']);
   expect(targets.some(target => target.handle.id === 'page:editor')).toBe(false);
 });

@@ -11,7 +11,7 @@ test('AI controls belong to the conversation while terminal input stays in comma
   await expect(page.getByTestId('ai-status-bar')).toHaveCount(0);
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.locator('[data-dock-btn="chat"]').click();
-  await expect(page.locator('[data-chat-composer]')).not.toBeVisible();
+  await expect(page.locator('[data-chat-composer]:visible')).not.toBeVisible();
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
 });
 
@@ -20,7 +20,7 @@ test('pasted image attachments can be sent without a text question', async ({ pa
   await setupTauriMock(page);
   await page.goto('/');
   await page.getByRole('button', { name: '询问 AI', exact: true }).click();
-  await page.locator('[data-chat-composer]').evaluate(element => {
+  await page.locator('[data-chat-composer]:visible').evaluate(element => {
     const transfer = new DataTransfer();
     transfer.items.add(new File(['image'], 'screenshot.png', { type: 'image/png' }));
     const event = new ClipboardEvent('paste', { bubbles: true, cancelable: true });

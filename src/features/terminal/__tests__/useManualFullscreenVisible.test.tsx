@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
+import { workspaceAreaStores } from '@features/workspace/stores/paneWorkspace';
 import { useTerminalStore } from '../stores/terminal';
 import { useManualFullscreenVisible } from '../hooks/useManualFullscreenVisible';
 import { useUnifiedWorkspace } from '@features/workspace/stores/unifiedWorkspace';
@@ -8,7 +9,6 @@ import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { leaf } from '@features/workspace/model/windowLayout';
 
 const session = { id: 'window', title: 'Terminal', kind: 'session' as const, layout: leaf({ id: 'pane-a', kind: 'local' as const }) };
-const composition = { id: 'combo', title: 'Workspace', kind: 'workspace' as const, paneLayout: null, focusedPane: '', zoomedPane: null };
 
 describe('useManualFullscreenVisible', () => {
   const terminalSnapshot = useTerminalStore.getState();
@@ -18,7 +18,7 @@ describe('useManualFullscreenVisible', () => {
 
   beforeEach(() => {
     useTerminalStore.setState({ sessions: { 'pane-a': 'session-a' }, focusedPaneId: 'pane-a', manualFullscreen: { 'pane-a': true } });
-    useWorkspaceStore.setState({ tabs: [session, composition], activeId: session.id });
+    useWorkspaceStore.setState({ tabs: [session], activeId: session.id });
     useUnifiedWorkspace.setState({ layout: null, activeTabId: '', startActive: false });
     useWorkspaceNavigation.setState({ area: 'terminal' });
   });
@@ -31,7 +31,6 @@ describe('useManualFullscreenVisible', () => {
   });
 
   it('reveals a placed pane while its composition tab owns the unified workspace', () => {
-    useWorkspaceStore.setState({ activeId: composition.id });
     useUnifiedWorkspace.setState({ layout: { type: 'pane', id: 'cell-a', resourceId: 'terminal:pane-a' }, startActive: false });
     useWorkspaceNavigation.setState({ area: 'unified' });
     useTerminalStore.setState({ focusedPaneId: 'pane-a' });
@@ -42,7 +41,6 @@ describe('useManualFullscreenVisible', () => {
   });
 
   it('keeps an unplaced pane hidden when its session tab is inactive', () => {
-    useWorkspaceStore.setState({ activeId: composition.id });
     useWorkspaceNavigation.setState({ area: 'unified' });
 
     const { result } = renderHook(() => useManualFullscreenVisible('pane-a'));
@@ -55,6 +53,15 @@ describe('useManualFullscreenVisible', () => {
 
     const { result } = renderHook(() => useManualFullscreenVisible('pane-a'));
 
+    expect(result.current).toBe(true);
+  });
+
+  it('lets the shared merge placement remain visible above fullscreen terminal content', () => {
+    const { result } = renderHook(() => useManualFullscreenVisible('pane-a'));
+    expect(result.current).toBe(true);
+    act(() => workspaceAreaStores.terminal.getState().chooseMerge('source'));
+    expect(result.current).toBe(false);
+    act(() => workspaceAreaStores.terminal.getState().chooseMerge());
     expect(result.current).toBe(true);
   });
 });

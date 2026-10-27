@@ -2,6 +2,7 @@ import { useTerminalStore } from '../stores/terminal';
 import { useDockDragStore, useSessionStore, useUiStore, useUnifiedWorkspace, useWorkspaceNavigation } from '@features/workspace';
 import { leaves } from '@features/workspace/model/windowLayout';
 import { workspacePaneCells } from '@features/workspace/model/workspaceResources';
+import { useWorkspacePlacementActive } from '@features/workspace/hooks/useWorkspaceContainer';
 
 export function useManualFullscreenVisible(paneId: string): boolean {
   const requested = useTerminalStore(state => !!state.manualFullscreen[paneId]);
@@ -14,7 +15,8 @@ export function useManualFullscreenVisible(paneId: string): boolean {
     .some(cell => cell.resourceId === `terminal:${paneId}`));
   const area = useWorkspaceNavigation(state => state.area);
   const terminalArea = area === 'terminal' || area === 'unified';
+  const placing = useWorkspacePlacementActive(area === 'unified' ? 'unified' : 'terminal');
   const blocked = useUiStore(state => state.settingsOpen || state.splitPlacement.open || state.movePlacement.open || state.splitPickerOpen);
   const dragging = useDockDragStore(state => state.draggingTerminalId !== null);
-  return requested && focused && (activePane || area === 'unified' && placed) && terminalArea && !blocked && !dragging;
+  return requested && focused && (area === 'unified' ? placed : activePane) && terminalArea && !blocked && !dragging && !placing;
 }

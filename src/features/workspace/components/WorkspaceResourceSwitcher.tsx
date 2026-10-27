@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useWorkspaceResources } from '../hooks/useWorkspaceResources';
-import { focusUnifiedResource } from '../services/unifiedWorkspace';
+import { addUnifiedResource } from '../services/unifiedWorkspace';
 import { activateWorkspaceResource } from '../services/workspaceResources';
 import { IconButton } from '@ui/actions/IconButton';
 import ContextMenu, { type MenuAnchor } from '@ui/menus/ContextMenu';
@@ -17,6 +17,6 @@ export default function WorkspaceResourceSwitcher({ destination = 'native' }: { 
       setMenu(current => current ? null : { x: bounds.right, y: bounds.bottom + 4, trigger, align: 'end' });
     }}><Grid size={iconSizes.control} /></IconButton>
     {menu && <ContextMenu anchor={menu} label={t('All workspace tabs')} itemRole="menuitem" onClose={() => setMenu(null)} items={resources.map(resource => ({
-      label: resource.title, onClick: () => destination === 'unified' ? focusUnifiedResource(resource.id) : activateWorkspaceResource(resource),
+      label: resource.title, onClick: () => destination === 'unified' ? addUnifiedResource(resource.id) : activateWorkspaceResource(resource),
     }))} />}</>;
 }

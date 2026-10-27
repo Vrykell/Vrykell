@@ -57,7 +57,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.screenshot({ path: testInfo.outputPath(`history-menu-clean-edges-${theme}.png`), animations: 'disabled' });
     await menu.getByRole('menuitemradio', { name: '自动配色', exact: true }).click();
 
-    if (!await page.locator('[data-chat-composer]').isVisible()) await page.locator('[data-dock-btn="chat"]').click();
+    if (!await page.locator('[data-chat-composer]:visible').isVisible()) await page.locator('[data-dock-btn="chat"]').click();
     await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
     const aiCard = page.getByTestId('unified-history-page').locator('.history-group-card').first();
     await expect(aiCard).toHaveCSS('border-top-width', '0px');

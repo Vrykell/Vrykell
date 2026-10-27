@@ -11,10 +11,9 @@ import { Columns2, FolderOpen, History, Plus } from '@ui/icons';
 import { useWorkspaceResources } from '../hooks/useWorkspaceResources';
 import { detachCompositionPane, mergeCompositionTab, useUnifiedWorkspace } from '../stores/unifiedWorkspace';
 import { useWorkspaceNavigation } from '../stores/navigation';
-import { useWorkspaceStore } from '../stores/workspace';
 import { useUiStore } from '../stores/ui';
 import { measureWorkspacePanes, rebindWorkspaceResources, workspacePaneCells, type WorkspaceResource } from '../model/workspaceResources';
-import { connectUnifiedAgent, createUnifiedResource, createUnifiedTerminal, focusUnifiedResource, removeUnifiedPane } from '../services/unifiedWorkspace';
+import { connectUnifiedAgent, createUnifiedResource, createUnifiedTerminal, focusUnifiedResource, reconcileUnifiedResources, removeUnifiedPane } from '../services/unifiedWorkspace';
 import { openWorkspaceFile, pickWorkspaceFile } from '../services/workspaceActions';
 import WorkspaceResourceSwitcher from './WorkspaceResourceSwitcher';
 import SshResourcesAction from './SshResourcesAction';
@@ -29,6 +28,7 @@ import WorkspacePaneCanvas from './WorkspacePaneCanvas';
 import { createScopedResource } from '../services/scopedPanes';
 import { useUnifiedWorkspaceTabs } from '../hooks/useUnifiedWorkspaceTabs';
 import type { EditorFile } from '@core/editor';
+import { useWorkbenchStore } from '../stores/workbench';
 
 type Creation = 'terminal' | 'document' | 'conversation';
 type Addition = { kind: 'tab'; id: string } | { kind: 'existing'; id: string } | { kind: 'new'; resource: Creation } | { kind: 'agent'; harness: string; cwd?: string } | { kind: 'terminal'; spec: TerminalSpec } | { kind: 'file'; file: EditorFile };
@@ -39,7 +39,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
   const all = useWorkspaceResources(); const resources = all.filter(resource => resource.kind !== 'page');
   useWorkspaceHistory(resources);
   const state = useUnifiedWorkspace(); const ids = resources.map(resource => resource.id); const key = JSON.stringify(ids);
-  const tabs = useWorkspaceStore(store => store.tabs).filter(tab => tab.kind === 'workspace');
+  const ready = useWorkbenchStore(store => store.ready);
   const strip = useUnifiedWorkspaceTabs(resources, resourceIcon);
   const settingsOpen = useUiStore(store => store.settingsOpen); const visible = active && !settingsOpen;
   const splitButton = useRef<HTMLButtonElement>(null);
@@ -49,13 +49,13 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
   const [terminalPicker, setTerminalPicker] = useState<{ source: 'shell' | 'ssh'; split: boolean; anchor?: DropdownAnchor } | null>(null);
   const [resourceToolbar, setResourceToolbar] = useState<HTMLSpanElement | null>(null);
   useEffect(() => {
-    if (!active) return;
+    if (!active || !ready) return;
     if (state.layout) {
       const layout = rebindWorkspaceResources(state.layout, resources);
       if (layout !== state.layout) useUnifiedWorkspace.setState({ layout });
     }
-    state.reconcile(ids);
-  }, [active, key]);
+    reconcileUnifiedResources(ids);
+  }, [active, key, ready]);
   const geometry = state.layout && measureWorkspacePanes(state.layout);
   const cells = state.layout ? workspacePaneCells(state.layout) : [];
   const focused = cells.find(cell => cell.id === state.focused) ?? cells[0];
@@ -73,13 +73,11 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
     setPlacement({ kind: 'terminal', spec: state.pendingTerminalSplit });
     useUnifiedWorkspace.setState({ pendingTerminalSplit: undefined });
   }, [visible, state.pendingTerminalSplit]);
+  useEffect(() => { if (state.pendingMergeTab) setPlacement({ kind: 'tab', id: state.pendingMergeTab }); }, [state.pendingMergeTab]);
   useEffect(() => { if (!visible) { setMenu(null); setPlacement(null); setLauncher(null); setTerminalPicker(null); } }, [visible]);
   useEffect(() => { setMenu(null); setPlacement(null); setLauncher(null); setTerminalPicker(null); }, [state.activeTabId]);
   const newItem = (kind: Creation) => createUnifiedResource(kind);
   const history = () => useWorkspaceNavigation.getState().selectHistory('all');
-  const remove = () => {
-    if (focused) removeUnifiedPane(focused.resourceId);
-  };
   const commit = (target: PaneTarget) => {
     if (!placement) return;
     if (placement.kind === 'tab') mergeCompositionTab(placement.id, target);
@@ -89,6 +87,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
     else if (placement.kind === 'file') { const id = createScopedResource({ file: placement.file }); if (id) { state.place(id, target); focusUnifiedResource(id); } }
     else connectUnifiedAgent(placement.harness, target, placement.cwd);
     setPlacement(null);
+    state.chooseMerge();
   };
   const beginPlacement = (addition: Addition) => { useUnifiedWorkspace.setState({ zoomed: null }); setPlacement(addition); };
   const pickerOrigin = () => ({ split: menu?.split ?? false, anchor: menu ? { x: menu.anchor.x, y: menu.anchor.y, aboveY: menu.anchor.y - 4, align: menu.anchor.align } : undefined });
@@ -103,12 +102,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
     <WorkspaceHeader active={visible}><FolderTabs label={t('All workspace tabs')} listId="unified-resources"
       items={strip.handles}
       selected={state.activeTabId} onSelect={strip.onSelect} onClose={strip.onClose}
-      onMove={strip.onMove} onRename={(id, title) => useWorkspaceStore.getState().renameTab(id, title)} menuItems={[
-        { label: t(state.zoomed ? 'Restore panes' : 'Zoom pane'), disabled: cells.length < 2, onClick: state.single },
-        ...(cells.length > 1 && focused ? [{ label: t('Move pane to new tab'), onClick: () => detachCompositionPane(focused.resourceId) }] : []),
-        ...(tabs.some(tab => tab.id !== state.activeTabId && tab.paneLayout && workspacePaneCells(tab.paneLayout).length + cells.length <= 4) && cells.length ? [{ label: t('Merge tab into this tab'), submenu: { items: tabs.filter(tab => tab.id !== state.activeTabId && tab.paneLayout && workspacePaneCells(tab.paneLayout).length + cells.length <= 4).map(tab => ({ label: strip.handles.find(handle => handle.id === tab.id)!.tip, onClick: () => beginPlacement({ kind: 'tab', id: tab.id }) })) } }] : []),
-        ...(cells.length > 1 ? [{ label: t('Remove pane'), onClick: remove }] : []),
-      ]} toolbar={<>
+      onMove={strip.onMove} grouping={strip.grouping} onRename={strip.onRename} tabActions={strip.tabActions} menuItems={strip.tabActions?.(state.activeTabId) ?? []} toolbar={<>
         <WorkspaceResourceSwitcher destination="unified" />
         {!state.startActive && resources.find(resource => resource.id === focused?.resourceId)?.kind === 'terminal' && <SshResourcesAction />}
         <IconButton compact aria-label={t('All history')} data-tip={t('All history')} onClick={history}><History size={16} /></IconButton>
@@ -121,7 +115,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
       onNew={kind => kind === 'terminal' ? setTerminalPicker({ source: 'shell', split: false }) : newItem(kind)} onOpen={() => void openWorkspaceFile()}
       onConnect={() => setTerminalPicker({ source: 'ssh', split: false })} onAgent={() => setLauncher({ split: false })} onHistory={history} />}
     <WorkspacePaneCanvas layout={state.layout} focused={state.focused} zoomed={state.zoomed} resources={resources} visible={visible && !state.startActive} toolbarTarget={resourceToolbar}
-      onFocus={focusUnifiedResource} onRatio={state.ratio} placing={!!placement} onPlace={commit} onCancel={() => setPlacement(null)}
+      onFocus={focusUnifiedResource} onRatio={state.ratio} placing={!!placement} onPlace={commit} onCancel={() => { setPlacement(null); state.chooseMerge(); }}
       onSplit={id => { useUnifiedWorkspace.setState({ zoomed: null }); focusUnifiedResource(id); useUnifiedWorkspace.setState({ choosingSplit: true }); }}
       onRemove={removeUnifiedPane} onDetach={detachCompositionPane} onZoom={state.single} />
     {menu && <ContextMenu anchor={menu.anchor} label={t(menu.split ? 'Choose a tab to split' : 'New workspace tab')} itemRole="menuitem" onClose={() => setMenu(null)} items={flattenSingleSubmenu<ContextMenuItem>(menu.split

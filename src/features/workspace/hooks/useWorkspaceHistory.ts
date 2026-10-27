@@ -1,77 +1,48 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useUnifiedWorkspace } from '../stores/unifiedWorkspace';
+import { workspaceAreaStores } from '../stores/paneWorkspace';
+import { useWorkbenchStore } from '../stores/workbench';
 import { currentWorkspaceResources } from '../services/workspaceResources';
-import { captureWorkspaceHistory, createWorkspaceHistoryWriter } from '../services/workspaceHistory';
-import { useToastStore } from '@ui/feedback/Toast';
-import { t } from '@i18n';
-import { workspacePaneIds } from '../model/workspaceResources';
+import { captureContainerHistory, containerHistoryIdentity, persistContainerHistory } from '../services/workspaceHistory';
+import { panesOf, type WorkspaceContainer, type WorkspaceScope } from '../model/workbench';
+import { reportWorkbenchFailure } from '../stores/workbenchFeedback';
 import type { WorkspaceResource } from '../model/workspaceResources';
 import { useHarnessStore } from '@features/chat/stores/harness';
 import { useChatStore } from '@features/chat/stores/chat';
 import { hasChatContent } from '@features/chat/model/chatContent';
 import { useBlockStore } from '@features/terminal/stores/blocks';
-import { useWorkspaceStore } from '../stores/workspace';
-import { compositionTabs, type CompositionTab } from '../stores/unifiedWorkspace';
 
+/** Every scope saves the same tab snapshot through one serialized history writer. */
 export function useWorkspaceHistory(resources: WorkspaceResource[], store = useUnifiedWorkspace) {
+  const scope = (Object.entries(workspaceAreaStores).find(([, value]) => value === store)?.[0] ?? 'unified') as WorkspaceScope;
   const agentRevision = useHarnessStore(state => JSON.stringify(Object.entries(state.byTab).map(([id, session]) => [id, session.sessionId, session.messages.some(hasChatContent)])));
   const chatRevision = useChatStore(state => JSON.stringify(Object.entries(state.byTab).map(([id, messages]) => [id, messages.some(hasChatContent)])));
   const terminalRevision = useBlockStore(state => JSON.stringify(Object.entries(state.byTab).map(([id, blocks]) => [id, blocks.some(block => block.command.trim() || block.outputText.trim() || block.outputRaw.trim())])));
-  const writer = useRef<ReturnType<typeof createWorkspaceHistoryWriter> | null>(null);
-  const compositionSave = useRef<((tab: CompositionTab) => void) | null>(null);
-  if (!writer.current) writer.current = createWorkspaceHistoryWriter(error => useToastStore.getState().addToast(t('Could not save workspace history: {{error}}', { error: String(error) }), 'error'), historyIdentity => store.setState({ historyIdentity }));
   useEffect(() => {
-    if (store === useUnifiedWorkspace) {
-      const writers = new Map<string, ReturnType<typeof createWorkspaceHistoryWriter>>();
-      const timers = new Map<string, ReturnType<typeof setTimeout>>();
-      const save = (tab: CompositionTab) => {
-        let write = writers.get(tab.id);
-        if (!write) {
-          write = createWorkspaceHistoryWriter(error => useToastStore.getState().addToast(t('Could not save workspace history: {{error}}', { error: String(error) }), 'error'), historyIdentity => {
-            useWorkspaceStore.setState(state => ({ tabs: state.tabs.map(item => item.id === tab.id && item.kind === 'workspace' ? { ...item, historyIdentity } : item) }));
-          });
-          writers.set(tab.id, write);
-        }
-        void write(captureWorkspaceHistory(tab.paneLayout, tab.focusedPane, currentWorkspaceResources()), tab.historyIdentity,
-          tab.titleSource === 'manual' ? tab.title : undefined);
+    const timers = new Map<string, ReturnType<typeof setTimeout>>();
+    const save = (tab: WorkspaceContainer) => {
+      if (tab.scope !== scope || tab.scope === 'terminal') return;
+      if (panesOf(tab).length < 2 && !tab.groupId && !tab.historyIdentity) return;
+      const snapshot = captureContainerHistory(tab, currentWorkspaceResources());
+      let target = tab;
+      const retry = () => {
+        const operation = persistContainerHistory(target, snapshot);
+        target = { ...target, historyIdentity: containerHistoryIdentity(target) };
+        void operation.catch(error => reportWorkbenchFailure(error, retry));
       };
-      compositionSave.current = save;
-      for (const tab of compositionTabs()) save(tab);
-      const unsubscribe = useWorkspaceStore.subscribe((state, previous) => {
-        if (state.tabs === previous.tabs) return;
-        for (const tab of compositionTabs()) {
-          const before = previous.tabs.find(item => item.id === tab.id);
-          if (before === tab) continue;
-          clearTimeout(timers.get(tab.id));
-          const beforeIds = before?.kind === 'workspace' && before.paneLayout ? workspacePaneIds(before.paneLayout) : [];
-          const nextIds = tab.paneLayout ? workspacePaneIds(tab.paneLayout) : [];
-          if (JSON.stringify(beforeIds.sort()) !== JSON.stringify(nextIds.sort())) save(tab);
-          else timers.set(tab.id, setTimeout(() => { save(tab); timers.delete(tab.id); }, 200));
-        }
-        for (const tab of previous.tabs) if (tab.kind === 'workspace' && !state.tabs.some(item => item.id === tab.id)) {
-          clearTimeout(timers.get(tab.id)); timers.delete(tab.id); save(tab);
-        }
-      });
-      return () => { unsubscribe(); compositionSave.current = null; for (const timer of timers.values()) clearTimeout(timer); };
-    }
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let previous = '';
-    const save = () => {
-      const state = store.getState();
-      return writer.current!(captureWorkspaceHistory(state.layout, state.focused, currentWorkspaceResources()), state.historyIdentity);
+      retry();
     };
-    const unsubscribe = store.subscribe((state, before) => {
-      if (state.layout === before.layout && state.focused === before.focused) return;
-      const signature = state.layout ? JSON.stringify(workspacePaneIds(state.layout).sort()) : '';
-      clearTimeout(timer);
-      if (signature !== previous) { previous = signature; void save(); }
-      else timer = setTimeout(() => { void save(); }, 200);
+    for (const tab of useWorkbenchStore.getState().snapshot.tabs) save(tab);
+    const unsubscribe = useWorkbenchStore.subscribe((state, previous) => {
+      for (const tab of state.snapshot.tabs) {
+        if (tab.scope !== scope || previous.snapshot.tabs.find(item => item.id === tab.id) === tab) continue;
+        clearTimeout(timers.get(tab.id));
+        timers.set(tab.id, setTimeout(() => { save(tab); timers.delete(tab.id); }, 200));
+      }
+      for (const tab of previous.snapshot.tabs) if (!state.snapshot.tabs.some(item => item.id === tab.id)) {
+        clearTimeout(timers.get(tab.id)); timers.delete(tab.id);
+      }
     });
-    return () => { unsubscribe(); clearTimeout(timer); };
-  }, [store]);
-  useEffect(() => {
-    if (store === useUnifiedWorkspace) { for (const tab of compositionTabs()) compositionSave.current?.(tab); return; }
-    const state = store.getState();
-    void writer.current!(captureWorkspaceHistory(state.layout, state.focused, resources), state.historyIdentity);
-  }, [resources, agentRevision, chatRevision, terminalRevision, store]);
+    return () => { unsubscribe(); for (const timer of timers.values()) clearTimeout(timer); };
+  }, [scope, resources.map(resource => resource.id).join('|'), agentRevision, chatRevision, terminalRevision]);
 }

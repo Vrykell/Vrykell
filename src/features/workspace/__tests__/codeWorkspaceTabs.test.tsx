@@ -7,6 +7,8 @@ import { useSessionStore } from '../model/session/store';
 import { useWorkspaceNavigation } from '../stores/navigation';
 import { useCodeWorkspaceTabs } from '../hooks/useCodeWorkspaceTabs';
 import type { Tab } from '../stores/workspace';
+import { useWorkbenchStore } from '../stores/workbench';
+import { workspaceStripEntities } from '../model/workbench';
 
 const first: EditorFile = { path: '/repo/one.ts' };
 const second: EditorFile = { path: '/repo/two.ts' };
@@ -19,13 +21,12 @@ const openEditorFile = vi.fn();
 const closeEditorFile = vi.fn();
 const activateGitComparison = vi.fn();
 const closeGitComparison = vi.fn();
-const moveCodeTab = vi.fn();
 
 beforeEach(() => {
   vi.clearAllMocks();
   useSessionStore.setState({ tabs, activeId: 'page', openEditorFile, closeEditorFile, activateGitComparison, closeGitComparison });
   useEditorDocuments.setState({ documents: {} });
-  useWorkspaceNavigation.setState({ codeOrder: [], moveCodeTab });
+  useWorkspaceNavigation.setState({ area: 'code' });
 });
 
 it('exposes ordered handles and routes activation through the owning document', () => {
@@ -42,16 +43,16 @@ it('exposes ordered handles and routes activation through the owning document', 
 it('routes close through the same file and comparison guards', () => {
   const { result } = renderHook(() => useCodeWorkspaceTabs());
   act(() => result.current.onClose(`file:${editorFileKey(first)}`));
-  expect(closeEditorFile).toHaveBeenCalledWith(first);
+  expect(closeEditorFile).toHaveBeenCalledWith(first, true);
   act(() => result.current.onClose('diff:cmp'));
   expect(closeGitComparison).toHaveBeenCalledWith('cmp');
 });
 
 it('moves using the currently projected ids so stale saved ids never leak in', () => {
-  useWorkspaceNavigation.setState({ codeOrder: ['stale', 'diff:cmp'] });
+  useWorkbenchStore.getState().update(state => ({ ...state, order: { code: ['stale', 'tab:diff:cmp'] } }));
   const { result } = renderHook(() => useCodeWorkspaceTabs());
   act(() => result.current.onMove('diff:cmp', `file:${editorFileKey(first)}`, false));
-  expect(moveCodeTab).toHaveBeenCalledWith([
-    'diff:cmp', `file:${editorFileKey(first)}`, `file:${editorFileKey(second)}`,
-  ], 'diff:cmp', `file:${editorFileKey(first)}`, false);
+  expect(workspaceStripEntities(useWorkbenchStore.getState().snapshot, 'code')).toEqual([
+    'tab:diff:cmp', `tab:file:${editorFileKey(first)}`, `tab:file:${editorFileKey(second)}`,
+  ]);
 });

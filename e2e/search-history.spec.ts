@@ -13,7 +13,7 @@ test.describe('重新生成标题（标签右键菜单）', () => {
 
     // 发一条 AI 消息（触发首条消息命名）
     await page.getByRole('button', { name: '询问 AI', exact: true }).click();
-    const input = page.getByPlaceholder(/自然语言描述/);
+    const input = page.locator('[data-chat-composer]:visible');
     await input.fill('帮我部署服务');
     await input.press('Enter');
     await expect(page.locator('.chat-conversation-title:visible')).toHaveText('帮我部署服务', { timeout: 10000 });

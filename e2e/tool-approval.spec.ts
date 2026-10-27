@@ -4,7 +4,7 @@ import { setupTauriMock } from './tauri-mock';
 test('compact AI cards keep their color on disclosure, react to hover and review edited commands', async ({ page }, info) => {
   await setupTauriMock(page); await page.goto('/');
   await page.locator('[data-dock-btn="chat"]').click();
-  await expect(page.locator('[data-chat-composer]')).toBeVisible();
+  await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
   await page.evaluate(async () => {
     const chatPath = '/src/features/chat/stores/chat.ts';
     const permissionsPath = '/src/features/agent/stores/permissions.ts';

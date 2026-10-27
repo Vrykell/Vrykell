@@ -55,7 +55,7 @@ test('model shape, approval hover and attachment chip hover share one visual lan
   await page.keyboard.press('Escape');
 
   // The attachment chip highlights as a whole instead of a small inner label background.
-  const composer = page.locator('[data-chat-composer]');
+  const composer = page.locator('[data-chat-composer]:visible');
   await composer.evaluate(element => {
     const clipboard = new DataTransfer();
     clipboard.items.add(new File(['image'], 'screenshot.png', { type: 'image/png' }));
@@ -123,7 +123,7 @@ test('AI composer uses the original terminal composer height with a small blue s
   expect((await terminal.boundingBox())!.height).toBe(terminalHeight);
   await expect(page.getByTestId('chat-context-usage')).toHaveCount(0);
   const send = page.getByRole('button', { name: '发送', exact: true });
-  await page.locator('[data-chat-composer]').fill('Review this');
+  await page.locator('[data-chat-composer]:visible').fill('Review this');
   expect((await send.boundingBox())!.height).toBe((await page.getByRole('button', { name: '添加附件', exact: true }).boundingBox())!.height);
   const blue = await send.evaluate(element => getComputedStyle(element).getPropertyValue('--primary-action').trim());
   await expect(send).toHaveCSS('background-color', blue.startsWith('#')
@@ -134,7 +134,7 @@ test('AI composer uses the original terminal composer height with a small blue s
 test('footer matches attachment, approval, model and send order without wrapping at narrow and wide sizes', async ({ page }) => {
   await setupTauriMock(page); await page.goto('/');
   await page.locator('[data-dock-btn="chat"]').click();
-  const composer = page.locator('[data-chat-composer]');
+  const composer = page.locator('[data-chat-composer]:visible');
   await composer.fill('Explain this screenshot');
   await composer.evaluate(element => {
     const clipboard = new DataTransfer();
@@ -244,7 +244,7 @@ for (const theme of ['深色', '浅色'] as const) {
     await ensureChatSettingsOpen(page);
     await page.getByRole('region', { name: '会话设置' }).screenshot({ path: `.cache/chat-settings-${theme === '深色' ? 'dark' : 'light'}.png` });
     await page.getByRole('button', { name: '会话设置', exact: true }).click();
-    await page.locator('[data-chat-composer]').click();
+    await page.locator('[data-chat-composer]:visible').click();
     await page.mouse.move(0, 0);
     const composer = page.locator('.chat-composer');
     const input = (await page.locator('.chat-composer-input').boundingBox())!;

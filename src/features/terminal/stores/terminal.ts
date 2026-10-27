@@ -45,7 +45,6 @@ export function getFocusedTerminalId(): string {
     }
     return firstLeaf(tab.layout).id;
   }
-  if (tab?.kind === 'workspace') return '';
   return ws.activeId;
 }
 

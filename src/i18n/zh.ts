@@ -1,5 +1,22 @@
 ﻿/** Simplified Chinese messages for shared UI and feature namespaces. */
 const zh: Record<string, string> = {
+  'Tab actions': '标签页操作',
+  'Move to tab group': '移至标签组',
+  'Delete tab group': '删除标签组',
+  'Delete group': '删除分组',
+  'Delete group "{{name}}" and every item in it?': '删除分组“{{name}}”及其中的每个标签页？',
+  'Could not update workspace': '无法更新工作区',
+  'Could not restore workspace': '无法恢复工作区',
+  'The conversation could not be deleted.': '无法删除该对话。',
+  'Session "{{name}}" restored incompletely; some content could not be loaded.': '会话“{{name}}”恢复不完整：部分内容未能加载',
+  'Failed to tidy previous session records': '整理上次的会话记录失败',
+  'Failed to archive previous session {{id}}': '归档上次的会话失败：{{id}}',
+  'Failed to persist the default session {{id}}': '持久化默认会话失败：{{id}}',
+  'Failed to read session list': '读取会话列表失败',
+  'Failed to load session groups; continuing with saved sessions': '加载会话分组失败，将继续恢复会话',
+  'Failed to restore session {{id}}': '恢复会话失败：{{id}}',
+  'Start with a command': '从一条命令开始',
+  'Type a command below, or open the AI assistant in the top right.': '在底部输入命令，或打开右上角 AI 助手。',
   'Memory access': '记忆访问',
   'Updates a durable memory fact used by future retrieval': '更新供后续按需检索的持久记忆条目',
   'Adds a durable memory fact used by future retrieval': '新增供后续按需检索的持久记忆条目',
@@ -2286,6 +2303,8 @@ const zh: Record<string, string> = {
   'Application tool failed.': '应用工具调用失败。',
   'The model request failed.': '模型请求失败。',
   'Could not connect to the model service: {{message}}': '无法连接模型服务：{{message}}',
+  'The agent closed the connection.': '代理已关闭连接。',
+  'The agent did not respond in time; the turn was stopped.': '代理长时间没有响应，本轮已停止。',
 };
 
 export default zh;

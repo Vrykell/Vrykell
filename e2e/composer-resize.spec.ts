@@ -18,7 +18,7 @@ test('AI composer recovers its compact height after narrowing, widening and reop
   await setupTauriMock(page);
   await page.goto('/');
   await page.locator('[data-dock-btn="chat"]').click();
-  const input = page.getByPlaceholder(/自然语言描述/);
+  const input = page.locator('[data-chat-composer]:visible');
   const composer = page.locator('.workspace-side-panel[data-side="right"] .terminal-composer');
   await expect(input).toBeVisible();
   await resizeChat(page, 480);

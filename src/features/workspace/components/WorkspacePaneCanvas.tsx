@@ -8,16 +8,17 @@ import { t } from '@i18n';
 import ContextMenu from '@ui/menus/ContextMenu';
 import { fitWorkspacePanes, measureWorkspacePanes, workspacePaneCells, workspaceSplitDirection, type WorkspacePaneLayout, type WorkspaceResource } from '../model/workspaceResources';
 
-export default function WorkspacePaneCanvas({ layout, focused, zoomed, resources, visible, toolbarTarget, retainHeader, onFocus, onRatio, placing, onPlace, onCancel, onSplit, onRemove, onDetach, onZoom }: {
+export default function WorkspacePaneCanvas({ layout, focused, zoomed, resources, visible, toolbarTarget, retainHeader, dividerTestPrefix, onFocus, onRatio, placing, onPlace, onCancel, onSplit, onRemove, onDetach, onZoom }: {
   layout: WorkspacePaneLayout | null; focused: string; resources: WorkspaceResource[]; visible: boolean; toolbarTarget?: HTMLElement | null; retainHeader?: boolean;
   onFocus: (id: string) => void; onRatio: (first: string, second: string, ratio: number) => void; placing?: boolean; onPlace: (target: PaneTarget) => void; onCancel: () => void;
   onSplit?: (id: string) => void; onRemove?: (id: string) => void;
   zoomed?: string | null; onDetach?: (id: string) => void; onZoom?: () => void;
+  dividerTestPrefix?: string;
 }) {
   const body = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 1000, height: 600 });
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
-  useEffect(() => { if (!visible) setMenu(null); }, [visible]);
+  useEffect(() => { if (!visible) { setMenu(null); if (placing) onCancel(); } }, [visible, placing, onCancel]);
   useEffect(() => {
     const element = body.current; if (!element || !visible) return;
     const update = () => { if (element.clientWidth > 0 && element.clientHeight > 0) setSize({ width: element.clientWidth, height: element.clientHeight }); };
@@ -36,7 +37,7 @@ export default function WorkspacePaneCanvas({ layout, focused, zoomed, resources
     onRatio(aId, bId, ratio);
   };
   return <div className="unified-pane-canvas" ref={body} style={{ display: visible ? undefined : 'none' }}>
-    {geometry && <SplitPaneLayout {...geometry} style={{ height: fitted!.height }} minHeight={200} onRatio={persistRatio} renderPane={cell => {
+    {geometry && <SplitPaneLayout {...geometry} dividerTestPrefix={dividerTestPrefix} style={{ height: fitted!.height }} minHeight={200} onRatio={persistRatio} renderPane={cell => {
       const resourceId = cells.find(item => item.id === cell.id)?.resourceId;
       const resource = resources.find(item => item.id === resourceId);
       return resource && <WorkspacePaneHost resource={resource} cell={cell} visible={visible} focused={cell.id === focused} toolbarTarget={toolbarTarget} retainHeader={retainHeader} onFocus={onFocus}

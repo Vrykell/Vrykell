@@ -4,14 +4,15 @@ import { t } from '@i18n';
 import { pickPath } from '@platform/api/fs';
 import { useToastStore } from '@ui/feedback/Toast';
 import { useAiWorkspace, useChatStore } from '@features/chat';
-import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { availableSideConversationIds } from '@features/chat/services/aiWorkspace';
 import { useWorkspaceStore } from '../stores/workspace';
-import { orderedWorkspaceIds, useWorkspaceNavigation, workspaceAreaForKind, type WorkspaceArea } from '../stores/navigation';
-import { compositionTabs, useUnifiedWorkspace } from '../stores/unifiedWorkspace';
-import { activateCompositionTab } from './compositionTabs';
+import { useWorkspaceNavigation, workspaceAreaForKind, type WorkspaceArea } from '../stores/navigation';
+import { useUnifiedWorkspace } from '../stores/unifiedWorkspace';
 import { workspacePaneCells } from '../model/workspaceResources';
 import { createUnifiedResource, createUnifiedTerminal, focusUnifiedResource } from './unifiedWorkspace';
+import { useWorkbenchStore } from '../stores/workbench';
+import { activateContainer, synchronizeWorkbench } from './workbench';
+import { workspaceStripEntities } from '../model/workbench';
 
 export function sideAiHasFocus(element: Element | null = document.activeElement): boolean {
   return !!element?.closest('[data-testid="ai-surface-side"], [data-workspace-focus="ai-side"]');
@@ -60,59 +61,31 @@ export function newWorkspaceItem() {
 
 /** Numeric selection follows the displayed group and mixed-document order. */
 export function activateWorkspaceInstance(index: number): boolean {
-  const workspace = useWorkspaceStore.getState();
-  const navigation = useWorkspaceNavigation.getState();
   const area = focusedWorkspaceArea();
-  if (area === 'unified') {
-    const tab = compositionTabs()[index];
-    if (!tab) return false;
-    activateCompositionTab(tab.id); return true;
+  if (!sideAiHasFocus() && (area === 'terminal' || area === 'code' || area === 'ai' || area === 'unified')) {
+    synchronizeWorkbench();
+    const state = useWorkbenchStore.getState().snapshot;
+    const tabs = state.tabs.filter(tab => tab.scope === area && tab.layout);
+    const pages = area === 'ai' && useWorkspaceNavigation.getState().aiPlacement === 'side' ? [] : useWorkspaceStore.getState().tabs.filter(tab => workspaceAreaForKind(tab.kind) === area && ['history', 'ai-history', 'usage', 'start', 'start-code', 'start-ai'].includes(tab.kind));
+    const utilityId = (id: string) => area === 'ai' ? `page:${id}` : id;
+    const ordered = workspaceStripEntities(state, area, pages.map(page => utilityId(page.id))).flatMap(entity => entity.startsWith('group:') ? tabs.filter(tab => tab.groupId === entity.slice(6)).map(tab => tab.id) : [entity.slice(4)]);
+    const id = ordered[index];
+    const tab = tabs.find(tab => tab.id === id);
+    if (tab) { activateContainer(tab.id); return true; }
+    const page = pages.find(page => utilityId(page.id) === id);
+    if (page) { useWorkspaceStore.getState().activate(page.id); return true; }
+    return false;
   }
-  if (area === 'terminal') {
-    const tabs = [...workspace.groups.flatMap(group => workspace.tabs.filter(tab => tab.kind === 'session' && tab.groupId === group.id)),
-      ...workspace.tabs.filter(tab => workspaceAreaForKind(tab.kind) === 'terminal' && (tab.kind !== 'session' || !tab.groupId || !workspace.groups.some(group => group.id === tab.groupId)))];
-    const tab = tabs[index];
-    if (!tab) return false;
-    if (tab.kind === 'session' && tab.groupId && workspace.groups.some(group => group.id === tab.groupId && group.collapsed)) workspace.toggleGroupCollapse(tab.groupId);
-    workspace.activate(tab.id); return true;
-  }
-  if (area === 'code') {
-    const entries = workspace.tabs.flatMap(tab => {
-      if (tab.kind === 'editor') return tab.files.map(file => ({ id: `file:${editorFileKey(file)}`, activate: () => workspace.openEditorFile(file) }));
-      if (tab.kind === 'git-diff') return (tab.comparisons ?? [{ id: tab.id, selection: tab.selection }]).map(item => ({ id: `diff:${item.id}`, activate: () => workspace.activateGitComparison(item.id) }));
-      return [];
-    });
-    const id = orderedWorkspaceIds(entries.map(item => item.id), navigation.codeOrder)[index];
-    const entry = entries.find(item => item.id === id);
-    if (!entry) return false;
-    entry.activate(); return true;
-  }
-  if (area === 'ai') {
-    const ai = useAiWorkspace.getState();
-    const connections = useHarnessWorkspace.getState();
-    const side = sideAiHasFocus();
-    const ids = [...ai.nativeTabs.filter(id => useChatStore.getState().conversations.some(item => item.id === id)).map(id => `chat:${id}`),
-      ...connections.connections.map(item => `acp:${item.id}`)];
-    const available = side ? availableSideConversationIds() : null;
-    const id = orderedWorkspaceIds(available ? ids.filter(id => available.has(id)) : ids, ai.order)[index];
-    if (!id) return false;
-    if (side) {
-      ai.selectSide(id);
-      requestAnimationFrame(() => {
-        if (useAiWorkspace.getState().sideSelected !== id) return;
-        [...document.querySelectorAll<HTMLTextAreaElement>('[data-testid="ai-surface-side"] [data-chat-composer]')]
-          .find(element => element.getClientRects().length > 0 && !element.closest('[inert]'))?.focus({ preventScroll: true });
-      });
-      return true;
-    }
-    if (id.startsWith('page:')) workspace.activate(id.slice(5));
-    else {
-      ai.select(id);
-      if (id.startsWith('chat:')) void useChatStore.getState().selectConversation(id.slice(5));
-      else connections.select(id.slice(4));
-      workspace.openHarnessTab();
-    }
-    return true;
-  }
-  return false;
+  if (area !== 'ai') return false;
+  const ai = useAiWorkspace.getState();
+  const available = availableSideConversationIds();
+  const ids = [...available];
+  const id = ids[index]; if (!id) return false;
+  ai.selectSide(id);
+  requestAnimationFrame(() => {
+    if (useAiWorkspace.getState().sideSelected !== id) return;
+    [...document.querySelectorAll<HTMLTextAreaElement>('[data-testid="ai-surface-side"] [data-chat-composer]')]
+      .find(element => element.getClientRects().length > 0 && !element.closest('[inert]'))?.focus({ preventScroll: true });
+  });
+  return true;
 }

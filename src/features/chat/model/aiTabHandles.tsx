@@ -4,7 +4,6 @@ import { DataUsage, History } from '@ui/icons';
 import { tabCapabilities, type TabHandle } from '@ui/layout/tabHandle';
 import { harnessMark } from '@features/agent/components/HarnessBadge';
 import type { Tab } from '@features/workspace';
-import { orderProjected } from '@features/workspace/model/tabStrip';
 import type { Conversation } from './conversation';
 
 /** The subset of a harness connection the strip needs. */
@@ -21,7 +20,6 @@ export interface AiTabInput {
   systemPages: Tab[];
   sideSelected: string;
   sideSessions: string[];
-  order: string[];
 }
 
 export type AiTabTarget =
@@ -29,13 +27,9 @@ export type AiTabTarget =
   | { kind: 'agent'; connectionId: string; handle: TabHandle }
   | { kind: 'page'; pageId: string; handle: TabHandle };
 
-/**
- * Project native conversations, ACP connections and system pages into one AI strip.
- *
- * Rows come from three stores, so the handle id is the only identity the strip shares.
- */
+/** Present resources and utility pages; the common provider owns containers and ordering. */
 export function projectAiTabs(input: AiTabInput): AiTabTarget[] {
-  const { nativeTabs, conversations, connections, systemPages, sideSelected, sideSessions, order } = input;
+  const { nativeTabs, conversations, connections, systemPages, sideSelected, sideSessions } = input;
   const targets: AiTabTarget[] = [];
 
   for (const id of nativeTabs) {
@@ -92,5 +86,5 @@ export function projectAiTabs(input: AiTabInput): AiTabTarget[] {
     });
   }
 
-  return orderProjected(targets, order);
+  return targets;
 }

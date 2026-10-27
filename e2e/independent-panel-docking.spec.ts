@@ -18,7 +18,7 @@ for (const theme of ['深色', '浅色']) test(`left and right panels retain the
   await gotoSetting(page, '主题'); await page.getByRole('radio', { name: theme, exact: true }).click();
   await page.keyboard.press('Escape');
   await page.locator('[data-dock-btn="chat"]').click();
-  const composer = page.locator('[data-chat-composer]');
+  const composer = page.locator('[data-chat-composer]:visible');
   await composer.fill('Preserve across both sides');
   await composer.evaluate(element => { (window as unknown as { savedPanelComposer: Element }).savedPanelComposer = element; });
   await dragPanel(page, 'chat', 'left');

@@ -1,99 +1,139 @@
 import { create } from 'zustand';
-import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
-import { orderedWorkspaceIds } from './navigation';
-import { mapWorkspacePane, parseWorkspacePaneLayout, pruneWorkspacePanes, splitWorkspacePane, workspacePaneCells, type WorkspacePaneLayout } from '../model/workspaceResources';
+import { safeJsonParse, safeLocalStorageGet } from '@utils/errorHandler';
 import type { PaneTarget } from '@core/paneLayout';
+import { parseWorkspacePaneLayout, pruneWorkspacePanes, setWorkspacePaneRatio, workspacePaneCells, type WorkspacePaneLayout } from '../model/workspaceResources';
 import type { TerminalSpec } from '../model/windowLayout';
 import type { WorkspaceHistoryIdentity } from '../model/workspaceHistory';
+import { acceptsWorkspaceResource, detachContainerPane, focusContainerResource, mergeContainers, moveContainer, panesOf, placeContainerResource, putContainer, reconcileContainers, releaseContainerResources, selectContainer, type WorkspaceContainer, type WorkspaceScope } from '../model/workbench';
+import { createWorkbenchStore, useWorkbenchStore } from './workbench';
 
 let sequence = 0;
+export const newContainerId = () => `workspace-${crypto.randomUUID()}`;
 const pane = (resourceId: string): Extract<WorkspacePaneLayout, { type: 'pane' }> => ({ type: 'pane', id: `pane-${Date.now()}-${sequence++}`, resourceId });
 
 export interface PaneWorkspaceState {
-  activeTabId: string;
-  zoomed: string | null;
-  layout: WorkspacePaneLayout | null; focused: string; order: string[];
-  startOpen: boolean; startActive: boolean; choosingSplit: boolean;
-  splitAnchor?: { x: number; y: number };
-  pendingTerminalSplit?: TerminalSpec;
+  activeTabId: string; zoomed: string | null;
+  layout: WorkspacePaneLayout | null; focused: string;
+  startActive: boolean; choosingSplit: boolean;
+  splitAnchor?: { x: number; y: number }; pendingTerminalSplit?: TerminalSpec;
+  pendingMergeTab?: string;
+  chooseMerge: (sourceId?: string) => void;
   historyIdentity?: WorkspaceHistoryIdentity;
-  openStart: () => void; closeStart: () => void;
-  reconcile: (ids: string[]) => void;
-  show: (id: string) => void;
+  openStart: () => void;
+  reconcile: (ids: string[]) => void; show: (id: string) => void;
   split: (id: string, direction: 'row' | 'col') => void;
   place: (id: string, target: PaneTarget) => void;
-  removePane: (id: string) => void;
-  single: () => void;
+  removePane: (id: string) => void; single: () => void;
   move: (ids: string[], id: string, over: string, after: boolean) => void;
   ratio: (firstId: string, secondId: string, ratio: number) => void;
   restore: (layout: WorkspacePaneLayout, focused: string, identity?: WorkspaceHistoryIdentity) => void;
+  selectTab: (id: string) => void;
+  detach: (resourceId: string) => string | undefined;
+  merge: (sourceId: string, target: PaneTarget) => void;
 }
 
-export function createPaneWorkspaceStore(storageKey: string, persist = true) {
-  const saved = safeJsonParse<{ layout?: unknown; order?: unknown; focused?: unknown; historyIdentity?: WorkspaceHistoryIdentity }>(safeLocalStorageGet(storageKey) ?? '{}');
-  const store = create<PaneWorkspaceState>((set) => ({
-    activeTabId: '', zoomed: null,
-    startOpen: true, startActive: true, choosingSplit: false,
-    restore: (layout, focused, historyIdentity) => {
-      const parsed = parseWorkspacePaneLayout(layout);
-      if (!parsed) return;
-      const cells = workspacePaneCells(parsed);
-      set({ layout: parsed, focused: cells.some(cell => cell.id === focused) ? focused : cells[0]!.id, startActive: false, historyIdentity });
+/** An area exposes its selected container, never an area-owned split layout. */
+export function createPaneWorkspaceStore(storageKey: string, scope: WorkspaceScope = 'unified', workbench = createWorkbenchStore(`${storageKey}-containers-v2`)) {
+  const saved = safeJsonParse<{ layout?: unknown; focused?: string; historyIdentity?: WorkspaceHistoryIdentity }>(safeLocalStorageGet(storageKey) ?? '{}');
+  const legacy = parseWorkspacePaneLayout(saved?.layout);
+  if (legacy && !workbench.getState().snapshot.tabs.some(tab => tab.scope === scope)) {
+    const id = newContainerId();
+    workbench.getState().update(state => selectContainer(putContainer(state, { id, scope, layout: legacy, focused: saved?.focused ?? '', zoomed: null, historyIdentity: saved?.historyIdentity }), id));
+  }
+  const current = () => {
+    const state = workbench.getState().snapshot;
+    return state.tabs.find(tab => tab.id === state.selected[scope] && tab.scope === scope);
+  };
+  const open = (layout: WorkspacePaneLayout | null, focused = '', historyIdentity?: WorkspaceHistoryIdentity) => {
+    const tab: WorkspaceContainer = { id: newContainerId(), scope, layout, focused, zoomed: null, historyIdentity };
+    workbench.getState().update(state => selectContainer(putContainer(state, tab), tab.id));
+    return tab.id;
+  };
+  const change = (apply: (tab: WorkspaceContainer) => WorkspaceContainer) => {
+    const tab = current();
+    if (tab) workbench.getState().update(state => putContainer(state, apply(tab)));
+  };
+  const store = create<PaneWorkspaceState>(set => ({
+    activeTabId: '', zoomed: null, layout: null, focused: '', startActive: true, choosingSplit: false,
+    chooseMerge: pendingMergeTab => set({ pendingMergeTab }),
+    selectTab: id => workbench.getState().update(state => state.tabs.some(tab => tab.scope === scope && tab.id === id) ? selectContainer(state, id) : state),
+    openStart: () => {
+      const tab = current() ?? workbench.getState().snapshot.tabs.find(tab => tab.scope === scope);
+      if (tab) store.getState().selectTab(tab.id); else open(null);
     },
-    openStart: () => set({ startOpen: true, startActive: true }),
-    closeStart: () => set(state => state.layout ? { startOpen: false, startActive: false } : state),
-    layout: parseWorkspacePaneLayout(saved?.layout), focused: typeof saved?.focused === 'string' ? saved.focused : '',
-    historyIdentity: saved?.historyIdentity?.id?.startsWith('workspace:') && Number.isFinite(saved.historyIdentity.createdAt) ? saved.historyIdentity : undefined,
-    order: Array.isArray(saved?.order) ? saved.order.filter((id): id is string => typeof id === 'string') : [],
-    reconcile: ids => set(state => {
-      let layout = pruneWorkspacePanes(state.layout, new Set(ids));
-      if (!layout && ids[0]) layout = pane(ids[0]);
-      const cells = layout ? workspacePaneCells(layout) : [];
-      const focused = cells.some(cell => cell.id === state.focused) ? state.focused : cells[0]?.id ?? '';
-      const order = orderedWorkspaceIds(ids, state.order);
-      const startActive = !layout || state.startActive; const startOpen = !layout || state.startOpen;
-      if (JSON.stringify(layout) === JSON.stringify(state.layout) && focused === state.focused && JSON.stringify(order) === JSON.stringify(state.order) && startActive === state.startActive && startOpen === state.startOpen) return state;
-      return { layout, focused, order, startActive, startOpen, ...(layout !== state.layout ? { historyIdentity: undefined } : {}) };
+    reconcile: ids => {
+      if (!workbench.getState().ready) return;
+      workbench.getState().update(state => reconcileContainers(state, scope, new Set(ids)));
+      const placed = new Set(workbench.getState().snapshot.tabs.filter(tab => tab.scope === scope).flatMap(tab => panesOf(tab).map(pane => pane.resourceId)));
+      for (const id of ids) if (!placed.has(id)) { const layout = pane(id); open(layout, layout.id); }
+      if (!current()) open(null);
+    },
+    show: id => {
+      const state = workbench.getState().snapshot;
+      const existing = state.tabs.find(tab => tab.scope === scope && panesOf(tab).some(pane => pane.resourceId === id));
+      if (existing) workbench.getState().update(state => focusContainerResource(state, scope, id));
+      else { const layout = pane(id); open(layout, layout.id); }
+    },
+    split: (id, direction) => {
+      const tab = current(); if (!tab?.layout) { store.getState().show(id); return; }
+      store.getState().place(id, { leafId: tab.focused, dir: direction, position: 'second', rect: { x: 0, y: 0, w: 1, h: 1 } });
+    },
+    place: (id, target) => {
+      const tab = workbench.getState().snapshot.tabs.find(tab => tab.scope === scope && panesOf(tab).some(pane => pane.id === target.leafId)); if (!tab) return;
+      const existing = workbench.getState().snapshot.tabs.filter(tab => tab.scope === scope).flatMap(panesOf).find(pane => pane.resourceId === id);
+      const next = existing ? { type: 'pane' as const, id: existing.id, resourceId: id } : pane(id);
+      workbench.getState().update(state => placeContainerResource(state, tab.id, next, target));
+    },
+    removePane: id => change(tab => {
+      if (panesOf(tab).length < 2) return tab;
+      const ids = new Set(panesOf(tab).filter(pane => pane.id !== id).map(pane => pane.resourceId));
+      return { ...tab, layout: pruneWorkspacePanes(tab.layout, ids) };
     }),
-    show: id => set(state => {
-      const existing = state.layout && workspacePaneCells(state.layout).find(cell => cell.resourceId === id);
-      if (existing) return { focused: existing.id, startActive: false };
-      if (!state.layout) { const next = pane(id); return { layout: next, focused: next.id, startActive: false }; }
-      return { layout: mapWorkspacePane(state.layout, state.focused, node => node.type === 'pane' ? { ...node, resourceId: id } : node), startActive: false, historyIdentity: undefined };
+    single: () => change(tab => ({ ...tab, zoomed: tab.zoomed ? null : tab.focused })),
+    move: (_ids, id, over, after) => workbench.getState().update(state => moveContainer(state, id, over, after)),
+    ratio: (firstId, secondId, ratio) => change(tab => {
+      return tab.layout ? { ...tab, layout: setWorkspacePaneRatio(tab.layout, firstId, secondId, ratio) } : tab;
     }),
-    split: (id, direction) => set(state => {
-      if (!state.layout) { const next = pane(id); return { layout: next, focused: next.id }; }
-      const next = pane(id); const layout = splitWorkspacePane(state.layout, state.focused, next, direction);
-      return layout === state.layout ? state : { layout, focused: next.id, historyIdentity: undefined };
-    }),
-    place: (id, target) => set(state => {
-      if (!state.layout) return state;
-      const next = pane(id); const layout = splitWorkspacePane(state.layout, target.leafId, next, target.dir, target.position);
-      return layout === state.layout ? state : { layout, focused: next.id, startActive: false, historyIdentity: undefined };
-    }),
-    removePane: id => set(state => {
-      if (!state.layout || workspacePaneCells(state.layout).length < 2) return state;
-      const cells = workspacePaneCells(state.layout).filter(cell => cell.id !== id);
-      const layout = pruneWorkspacePanes(state.layout, new Set(cells.map(cell => cell.resourceId)));
-      return { layout, focused: cells.some(cell => cell.id === state.focused) ? state.focused : cells[0]?.id ?? '', historyIdentity: undefined, ...(!layout ? { startOpen: true, startActive: true } : {}) };
-    }),
-    single: () => set(state => {
-      const current = state.layout && workspacePaneCells(state.layout).find(cell => cell.id === state.focused);
-      return current ? { layout: { type: 'pane', id: current.id, resourceId: current.resourceId }, historyIdentity: undefined } : state;
-    }),
-    move: (ids, id, over, after) => set(state => {
-      const order = orderedWorkspaceIds(ids, state.order).filter(item => item !== id); const index = order.indexOf(over);
-      if (!ids.includes(id) || id === over || index < 0) return state;
-      order.splice(index + (after ? 1 : 0), 0, id); return { order };
-    }),
-    ratio: (firstId, secondId, ratio) => set(state => {
-      const update = (node: WorkspacePaneLayout): WorkspacePaneLayout => node.type === 'pane' ? node : {
-        ...node, ratio: workspacePaneCells(node.first)[0]?.id === firstId && workspacePaneCells(node.second)[0]?.id === secondId ? Math.max(0.2, Math.min(0.8, ratio)) : node.ratio,
-        first: update(node.first), second: update(node.second),
-      };
-      return state.layout ? { layout: update(state.layout) } : state;
-    }),
+    restore: (layout, focused, identity) => {
+      const parsed = parseWorkspacePaneLayout(layout); if (!parsed || workspacePaneCells(parsed).some(pane => !acceptsWorkspaceResource(scope, pane.resourceId))) return;
+      const existing = workbench.getState().snapshot.tabs.find(tab => tab.scope === scope && (identity ? tab.historyIdentity?.id === identity.id : JSON.stringify(panesOf(tab).map(pane => pane.resourceId).sort()) === JSON.stringify(workspacePaneCells(parsed).map(pane => pane.resourceId).sort())));
+      const ids = new Set(workspacePaneCells(parsed).map(pane => pane.resourceId));
+      const id = existing?.id ?? newContainerId();
+      workbench.getState().update(state => selectContainer(putContainer(releaseContainerResources(state, scope, ids, id), { ...existing, id, scope, layout: parsed, focused, zoomed: null, historyIdentity: identity }), id));
+    },
+    detach: resourceId => {
+      const tab = current(); const cell = tab && panesOf(tab).find(pane => pane.resourceId === resourceId);
+      if (!tab || !cell || panesOf(tab).length < 2) return;
+      const id = newContainerId(); workbench.getState().update(state => detachContainerPane(state, tab.id, cell.id, id)); return id;
+    },
+    merge: (sourceId, target) => {
+      const tab = current(); if (tab) workbench.getState().update(state => mergeContainers(state, sourceId, tab.id, target));
+    },
   }));
-  if (persist) store.subscribe(state => safeLocalStorageSet(storageKey, JSON.stringify({ version: 1, layout: state.layout, focused: state.focused, order: state.order, historyIdentity: state.historyIdentity })));
+  let projecting = false;
+  const project = () => {
+    const tab = current();
+    const changed = store.getState().activeTabId !== (tab?.id ?? '');
+    projecting = true;
+    store.setState({ activeTabId: tab?.id ?? '', layout: tab?.layout ?? null, focused: tab?.focused ?? '', zoomed: tab?.zoomed ?? null, historyIdentity: tab?.historyIdentity, startActive: !tab?.layout,
+      ...(changed ? { choosingSplit: false, splitAnchor: undefined, pendingTerminalSplit: undefined, pendingMergeTab: undefined } : {}) });
+    projecting = false;
+  };
+  workbench.subscribe(project);
+  store.subscribe((state, previous) => {
+    if (projecting) return;
+    if (state.layout !== previous.layout || state.focused !== previous.focused || state.zoomed !== previous.zoomed || state.historyIdentity !== previous.historyIdentity) {
+      if (!current() && state.layout) open(state.layout, state.focused, state.historyIdentity);
+      else change(tab => ({ ...tab, layout: state.layout, focused: state.focused, zoomed: state.zoomed, historyIdentity: state.historyIdentity }));
+    }
+  });
+  project();
   return store;
 }
+
+export const workspaceAreaStores = {
+  terminal: createPaneWorkspaceStore('terminal-pane-workspace-v1', 'terminal', useWorkbenchStore),
+  code: createPaneWorkspaceStore('code-pane-workspace-v1', 'code', useWorkbenchStore),
+  ai: createPaneWorkspaceStore('ai-pane-workspace-v1', 'ai', useWorkbenchStore),
+  unified: createPaneWorkspaceStore('unified-workspace-v1', 'unified', useWorkbenchStore),
+};

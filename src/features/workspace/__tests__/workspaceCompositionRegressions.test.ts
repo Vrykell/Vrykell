@@ -16,7 +16,7 @@ beforeEach(() => {
   useWorkspaceStore.setState({ tabs: [], activeId: '' });
   useWorkspaceNavigation.setState({ area: 'unified' });
   useUnifiedWorkspace.setState({ layout: null, focused: '', startActive: true });
-  useAiWorkspace.setState({ nativeTabs: [], selected: '', order: [] });
+  useAiWorkspace.setState({ nativeTabs: [], selected: '' });
   useChatStore.setState({ conversations: [], byTab: {} });
   useHarnessWorkspace.setState({ connections: [] });
   useUiStore.setState({ splitPlacement: { open: false, spec: null } });

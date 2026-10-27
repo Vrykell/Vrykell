@@ -10,6 +10,9 @@ import { useToastStore } from '@ui/feedback/Toast';
 import { getShellLaunchDirectory } from '@platform/contextMenu';
 import { ptyCloseAll } from '@platform/pty';
 import { t } from '@i18n';
+import { restoreWorkbench } from '@features/workspace/services/workbench';
+import { useStartupSettings } from '@features/settings/stores/startup';
+import { reportWorkbenchFailure } from '@features/workspace/stores/workbenchFeedback';
 
 /** Page-scope sweep: a strict-mode replay must share one close call, not race a second one. */
 let staleSessionsClosed: Promise<void> | null = null;
@@ -46,6 +49,9 @@ export function startDefaultApplication(): () => void {
         return null;
       });
       await restoreWorkspace({ onError: reportFailure, launchDirectory });
+      const mode = launchDirectory ? 'default' : useStartupSettings.getState().mode;
+      const restore = () => restoreWorkbench(mode, error => reportWorkbenchFailure(error, () => { void restore(); }));
+      await restore();
       // Subscribe only after the explicit launch is placed: a redirect that arrived meanwhile
       // waits in the queue and becomes its own tab instead of hiding the requested directory.
       await initForwardedLaunch(reportFailure);

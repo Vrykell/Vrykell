@@ -138,7 +138,7 @@ test('AI history groups by working directory and conversation type and uses sett
   await page.reload();
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.locator('[data-dock-btn="chat"]').click();
-  await expect(page.locator('[data-chat-composer]')).toBeVisible();
+  await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
   await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
   const history = page.getByTestId('unified-history-page');
   await expect(history).toBeVisible();

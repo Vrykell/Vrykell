@@ -1,4 +1,9 @@
 import '@testing-library/jest-dom/vitest';
+import { beforeEach } from 'vitest';
+import { useWorkbenchStore } from '@features/workspace/stores/workbench';
+import { emptyWorkbench } from '@features/workspace/model/workbench';
+
+beforeEach(() => { useWorkbenchStore.setState({ snapshot: emptyWorkbench(), ready: true, lastClosed: null }); });
 
 // xterm.js needs matchMedia (not available in jsdom)
 Object.defineProperty(window, 'matchMedia', {

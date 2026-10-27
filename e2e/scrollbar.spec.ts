@@ -202,8 +202,8 @@ test('settings and long chat transcripts share visible themed scrollbars', async
   await expect.poll(() => settings.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
   await page.keyboard.press('Meta+1');
   await page.locator('[data-dock-btn="chat"]').click();
-  await page.getByPlaceholder(/自然语言描述/).fill('测试长对话');
-  await page.getByPlaceholder(/自然语言描述/).press('Enter');
+  await page.locator('[data-chat-composer]:visible').fill('测试长对话');
+  await page.locator('[data-chat-composer]:visible').press('Enter');
   await expect(page.getByText('对话内容第 99 行。', { exact: true })).toBeVisible();
   const transcript = page.locator('.workspace-side-panel[data-side="right"] .scroll-region');
   await expectOverlayScrollbar(page, transcript);

@@ -6,6 +6,9 @@ import { useListReorder } from '@ui/layout/listReorder';
 import { useTerminalDefaults } from '@config/terminalDefaults';
 import { getAvailableShells } from '@platform/shells';
 import { useWorkspaceNavigation } from '../stores/navigation';
+import { groupRename } from '@platform/api/group';
+
+vi.mock('@platform/api/group', async original => ({ ...await original<typeof import('@platform/api/group')>(), groupRename: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock('@platform/shells', async original => ({ ...await original<typeof import('@platform/shells')>(), getAvailableShells: vi.fn().mockResolvedValue([
   { id: 'zsh', label: 'Zsh', default: true }, { id: 'bash', label: 'Bash', default: false },
@@ -172,8 +175,8 @@ it('keeps group rows intact through renaming and reordering', () => {
 });
 
 it('renames groups in a styled menu input, commits on dismissal and cancels on Escape', async () => {
-  const renameGroup = vi.fn();
-  useSessionStore.setState({ groups: [{ id: 'work', title: 'Work', collapsed: false }], renameGroup });
+  const renameGroup = vi.mocked(groupRename); renameGroup.mockClear();
+  useSessionStore.setState({ groups: [{ id: 'work', title: 'Work', collapsed: false }] });
   render(<PanelTabs />);
   const header = screen.getByTestId('group-header-work');
   expect(header).toHaveClass('folder-tab');
@@ -190,7 +193,7 @@ it('renames groups in a styled menu input, commits on dismissal and cancels on E
   expect(renameGroup).not.toHaveBeenCalled();
   fireEvent.contextMenu(header);
   fireEvent.change(screen.getByRole('textbox', { name: '分组名称' }), { target: { value: 'Production' } });
-  fireEvent.keyDown(screen.getByRole('textbox', { name: '分组名称' }), { key: 'Enter' });
+  await act(async () => { fireEvent.keyDown(screen.getByRole('textbox', { name: '分组名称' }), { key: 'Enter' }); });
   expect(renameGroup).toHaveBeenCalledExactlyOnceWith('work', 'Production');
   fireEvent.contextMenu(header);
   fireEvent.change(screen.getByRole('textbox', { name: '分组名称' }), { target: { value: 'On blur' } });
@@ -220,21 +223,20 @@ it('keeps group actions and color controls keyboard-accessible without changing 
 });
 
 it('keeps a filtered nonempty group protected by the archive confirmation', () => {
-  const archiveGroup = vi.fn();
-  const deleteGroup = vi.fn();
   const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
   useSessionStore.setState(state => ({
     tabs: state.tabs.map(tab => tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab),
-    groups: [{ id: 'group-a', title: 'Group', collapsed: false }], archiveGroup, deleteGroup,
+    groups: [{ id: 'group-a', title: 'Group', collapsed: false }],
   }));
   render(<PanelTabs />);
   fireEvent.click(screen.getByTestId('tab-search-toggle'));
   fireEvent.change(screen.getByTestId('tab-search'), { target: { value: 'History' } });
   fireEvent.contextMenu(screen.getByTestId('group-header-group-a'));
   fireEvent.click(screen.getByText('归档分组'));
-  expect(confirm).toHaveBeenCalledOnce();
-  expect(deleteGroup).not.toHaveBeenCalled();
-  expect(archiveGroup).not.toHaveBeenCalled();
+  expect(confirm).not.toHaveBeenCalled();
+  expect(screen.getByRole('dialog', { name: '归档分组' })).toBeVisible();
+  fireEvent.click(screen.getByTestId('confirm-cancel'));
+  expect(useSessionStore.getState().groups).toHaveLength(1);
   confirm.mockRestore();
 });
 

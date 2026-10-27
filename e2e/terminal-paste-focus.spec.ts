@@ -61,7 +61,7 @@ test('returning to an idle session focuses command input', async ({ page }) => {
 test('opening chat does not autofocus it, and switching sessions still focuses terminal input', async ({ page }) => {
   await ready(page);
   await page.locator('[data-dock-btn="chat"]').click();
-  const composer = page.locator('[data-chat-composer]');
+  const composer = page.locator('[data-chat-composer]:visible');
   await expect(composer).toBeVisible();
   await expect(composer).not.toBeFocused();
   await switchBack(page);

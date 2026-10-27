@@ -10,6 +10,7 @@ import { SESSION_DATE_OPTIONS } from '../model/sessionHistoryModel';
 import {
   DEFAULT_UNIFIED_FILTER, HISTORY_TYPES, UNIFIED_GROUP_BY_OPTIONS, UNIFIED_SORT_OPTIONS,
   filterUnifiedHistory, unifiedHistoryGroupIdentity, unifiedHistoryRecords, type UnifiedHistoryFilter, type UnifiedHistoryRecord,
+  originalWorkspaceGroupId,
 } from '../model/unifiedHistory';
 import { useSessionHistory } from './useSessionHistory';
 import { useHistoryPages } from './useHistoryPages';
@@ -71,7 +72,8 @@ export function useUnifiedHistory(preset?: HistoryTypePreset, destinationOverrid
     return unifiedHistoryRecords(sessions, chats, { notes, starred }, agents).map(record => {
       const identity = unifiedHistoryGroupIdentity(record, filter.groupBy);
       const groupKey = historyGroupKey('session', `unified-${filter.groupBy}`, identity.id);
-      const originalTitle = record.kind === 'terminal' && record.session.group_id ? titles.get(record.session.group_id) : undefined;
+      const groupId = originalWorkspaceGroupId(record);
+      const originalTitle = groupId ? titles.get(groupId) : undefined;
       return { ...record, searchText: [record.searchText, identity.title, groupTitles[groupKey], groupNotes[groupKey], originalTitle]
         .filter(Boolean).join(' ').toLocaleLowerCase() };
     });

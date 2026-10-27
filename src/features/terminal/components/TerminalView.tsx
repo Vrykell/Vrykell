@@ -9,10 +9,14 @@
 
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import { SplitPaneSurface } from '@ui/layout/SplitPane';
-import SplitPaneLayout from '@ui/layout/SplitPaneLayout';
+import WorkspacePaneCanvas from '@features/workspace/components/WorkspacePaneCanvas';
+import { useWorkspaceResources } from '@features/workspace/hooks/useWorkspaceResources';
+import { terminalWorkspaceLayout } from '@features/workspace/model/workspaceResources';
+import { useWorkspaceContainer, useWorkspacePaneControls } from '@features/workspace/hooks/useWorkspaceContainer';
+import { detachWorkspacePane, mergeWorkspaceContainers, zoomWorkspaceContainer } from '@features/workspace/services/workbench';
 import { showsPaneChatHistory } from '../model/paneHistory';
 import { useTypographyStore } from '@config/typography';
-import { useRef, useEffect, useLayoutEffect, useMemo, useState, useId, useCallback } from 'react';
+import { useRef, useEffect, useLayoutEffect, useState, useId, useCallback } from 'react';
 import OverlayScrollbar from '@ui/layout/OverlayScrollbar';
 import { CircleX, Minimize2, Square } from '@ui/icons';
 import TerminalLauncher from '@features/workspace/components/TerminalLauncher';
@@ -30,7 +34,7 @@ import { useTerminalFocus } from '@features/terminal/hooks/useTerminalFocus';
 import { useTerminalPaneDrag } from '@features/terminal/hooks/useTerminalPaneDrag';
 import { useRunningCommandActions } from '@features/terminal/hooks/useRunningCommandActions';
 import {
-  leaves as layoutLeaves, firstLeaf, dividers, collectLayoutCells, fitLayoutWidth, MIN_PANE_SIZE, MIN_PANE_WIDTH, DIVIDER_SIZE,
+  leaves as layoutLeaves, firstLeaf, collectLayoutCells,
   type WindowLayout, type TerminalSpec,
 } from '@features/workspace/model/windowLayout';
 import InputEditor from '@features/terminal/components/InputEditor';
@@ -115,6 +119,13 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
 
   return (
     <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
+      {tabs.flatMap(tab => tab.kind === 'session' ? layoutLeaves(tab.layout).map(terminal => ({ terminal, tab })) : [])
+        .sort((a, b) => a.terminal.id.localeCompare(b.terminal.id)).map(({ terminal, tab }) => <ResourceContent key={terminal.id} id={`terminal:${terminal.id}`} active={active && tab.id === activeId}>
+          {state => <TerminalPane terminal={terminal} windowId={tab.id} focused={state.visible && state.focused} placed={state.placed && unified}
+            setSession={setSession} setFocusedPane={setFocusedPane} onContextMenu={(event, sshActions) => { event.preventDefault(); setCtxMenu({ x: event.clientX, y: event.clientY, sshActions }); }}
+            inner={unified ? { left: false, right: false, top: false, bottom: false } : collectLayoutCells(tab.layout).find(cell => cell.terminalId === terminal.id)!.inner}
+            reorderable={!unified && layoutLeaves(tab.layout).length > 1} />}
+        </ResourceContent>)}
       {/* 所有 session tab 保持挂载，非活跃 tab 隐藏而非卸载 ——
           卸载会触发 useTerminalSession cleanup 里的 ptyClose，杀掉运行中的命令。
           切走再切回时 PTY/块列表/离屏终端全部存活。 */}
@@ -125,9 +136,6 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
               key={tab.id}
               tab={tab}
               active={active && tab.id === activeId}
-              setSession={setSession}
-              setFocusedPane={setFocusedPane}
-              onPaneContextMenu={(e, sshActions) => { e.preventDefault(); setCtxMenu({ x: e.clientX, y: e.clientY, sshActions }); }}
             />
           );
         }
@@ -181,11 +189,8 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
 function SessionTabView(props: {
   tab: Extract<Tab, { kind: 'session' }>;
   active: boolean;
-  setSession: (id: string, sid: string) => void;
-  setFocusedPane: (id: string) => void;
-  onPaneContextMenu: (e: React.MouseEvent, sshActions?: ContextMenuItem[]) => void;
 }) {
-  const { tab, active, setSession, setFocusedPane, onPaneContextMenu } = props;
+  const { tab, active } = props;
   const windowId = tab.id;
   const layout = tab.layout;
   const focusedPaneId = useTerminalStore((s) => s.focusedPaneId);
@@ -220,14 +225,11 @@ function SessionTabView(props: {
         {/* 平面渲染：pane 按终端 id 作 key，绝对定位落位 ——
             拖动重排只改几何，不重挂 TerminalPane（重挂会 ptyClose 杀掉运行中命令）。 */}
         <PaneLayout
-          layout={layout}
           windowId={windowId}
+          layout={layout}
           focusedTermId={focusedTermId}
           active={active}
-          setSession={setSession}
-          setFocusedPane={setFocusedPane}
           setRatioNode={setRatioNode}
-          onPaneContextMenu={onPaneContextMenu}
         />
 
         {/* Split slot picker (anchored to the layout area so it mirrors the future regions). */}
@@ -260,42 +262,22 @@ function SessionTabView(props: {
 
 interface InnerEdges { left: boolean; right: boolean; top: boolean; bottom: boolean; }
 
-/**
- * PaneLayout — 窗口布局的平面渲染。
- *
- * 所有 pane 按终端 id 作 key 一次性绝对定位（百分比几何），而非递归 flex 嵌套。
- * 拖动终端重排（removeLeaf + splitLeaf）会重构布局树；若用递归渲染，React 按
- * 位置对账会让 TerminalPane 被复用/重挂，触发 useTerminalSession cleanup 的
- * ptyClose —— 运行中命令立刻被杀。平面渲染下实例身份 = 终端 id，移动只改样式。
- */
-function PaneLayout(props: {
-  layout: WindowLayout;
-  windowId: string;
-  focusedTermId: string;
-  active: boolean;
-  setSession: (id: string, sid: string) => void;
-  setFocusedPane: (id: string) => void;
+/** Terminal sessions render the same reference canvas as every other container. */
+function PaneLayout({ layout, windowId, focusedTermId, active, setRatioNode }: {
+  layout: WindowLayout; windowId: string; focusedTermId: string; active: boolean;
   setRatioNode: (aId: string, bId: string, ratio: number) => void;
-  onPaneContextMenu: (e: React.MouseEvent, sshActions?: ContextMenuItem[]) => void;
 }) {
-  const { layout: savedLayout, windowId, focusedTermId, active, setSession, setFocusedPane, setRatioNode, onPaneContextMenu } = props;
-  const layoutRef = useRef<HTMLDivElement>(null);
-  const [layoutWidth, setLayoutWidth] = useState(0);
-  useEffect(() => {
-    const element = layoutRef.current;
-    if (!element) return;
-    const observer = new ResizeObserver(() => setLayoutWidth(element.clientWidth));
-    observer.observe(element);
-    setLayoutWidth(element.clientWidth);
-    return () => observer.disconnect();
-  }, []);
-  const layout = useMemo(() => layoutWidth > 0 ? fitLayoutWidth(savedLayout, layoutWidth) : savedLayout, [savedLayout, layoutWidth]);
-  const geometry = useMemo(() => ({ cells: collectLayoutCells(layout).map(({ terminalId, ...cell }) => ({ id: terminalId, ...cell })), dividers: dividers(layout) }), [layout]);
-  return <SplitPaneLayout ref={layoutRef} {...geometry} onRatio={setRatioNode} minWidth={MIN_PANE_WIDTH} minHeight={MIN_PANE_SIZE} thickness={DIVIDER_SIZE} dividerTestPrefix="terminal-divider"
-    renderPane={cell => <ResourceContent id={`terminal:${cell.id}`} active={active}
-      >{state => <TerminalPane terminal={layoutLeaves(layout).find(terminal => terminal.id === cell.id)!} windowId={windowId}
-        focused={state.placed ? state.focused : active && cell.id === focusedTermId} placed={state.placed} setSession={setSession} setFocusedPane={setFocusedPane} onContextMenu={onPaneContextMenu}
-        inner={state.placed ? { left: false, right: false, top: false, bottom: false } : cell.inner} reorderable={!state.placed && geometry.cells.length > 1} />}</ResourceContent>} />;
+  const resources = useWorkspaceResources();
+  const canonical = useWorkspaceContainer('terminal', windowId);
+  const controls = useWorkspacePaneControls('terminal');
+  return <WorkspacePaneCanvas layout={canonical?.layout ?? terminalWorkspaceLayout(layout)} focused={focusedTermId} zoomed={canonical?.zoomed} resources={resources} visible={active} retainHeader
+    dividerTestPrefix="terminal-divider" onFocus={id => useTerminalStore.getState().setFocusedPane(id.slice('terminal:'.length))}
+    placing={active && !!controls.pendingMergeTab} onRatio={setRatioNode} onPlace={target => {
+      if (controls.pendingMergeTab) void mergeWorkspaceContainers(controls.pendingMergeTab, windowId, target);
+      controls.chooseMerge();
+    }} onCancel={() => controls.chooseMerge()} onSplit={() => requestTerminalSplit(null)}
+    onRemove={id => closeTerminalPane(id.slice('terminal:'.length))} onDetach={id => detachWorkspacePane('terminal', id)}
+    onZoom={() => zoomWorkspaceContainer(windowId)} />;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -543,8 +525,8 @@ function PaneEmptyHint({ paneId }: { paneId: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', padding: '32px 28px', color: 'var(--text-muted)', fontSize: 'calc(12px * var(--ui-font-scale))', userSelect: 'none', gap: 8 }}>
       <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'calc(24px * var(--ui-font-scale))', color: 'var(--text-secondary)', fontWeight: 'var(--fw-medium)', marginBottom: 4 }}>$</div>
-      <div style={{ color: 'var(--text-primary)', fontSize: 'calc(15px * var(--ui-font-scale))', fontWeight: 'var(--fw-medium)' }}>从一条命令开始</div>
-      <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)' }}>在底部输入命令，或打开右上角 AI 助手。</div>
+      <div style={{ color: 'var(--text-primary)', fontSize: 'calc(15px * var(--ui-font-scale))', fontWeight: 'var(--fw-medium)' }}>{t('Start with a command')}</div>
+      <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)' }}>{t('Type a command below, or open the AI assistant in the top right.')}</div>
     </div>
   );
 }

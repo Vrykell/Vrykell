@@ -28,7 +28,7 @@ test('auxiliary actions reorder horizontally and retain their order and open pan
 
 test('reordering and hiding the assistant keep its conversation draft and right placement', async ({ page }) => {
   await button(page, 'chat').click();
-  const composer = page.locator('[data-chat-composer]');
+  const composer = page.locator('[data-chat-composer]:visible');
   await composer.fill('Preserve this draft');
   await button(page, 'chat').dragTo(button(page, 'files'), { targetPosition: { x: 4, y: 16 } });
   expect((await order(page))[0]).toBe('chat');

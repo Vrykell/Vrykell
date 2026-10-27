@@ -22,7 +22,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   useWorkspaceStore.setState({ tabs: [{ id: 'one', title: 'Shell', kind: 'session', layout: leaf({ id: 'one#0', kind: 'local', shellType: 'zsh' }) }], activeId: 'one' });
   useChatStore.setState({ conversations: [{ id: 'two', title: 'Chat', createdAt: 1, updatedAt: 2, environment: null }], conversationsLoaded: true, conversationsLoading: false, byTab: { two: [] } });
-  useAiWorkspace.setState({ nativeTabs: [], selected: '', order: [] });
+  useAiWorkspace.setState({ nativeTabs: [], selected: '' });
   useHarnessWorkspace.setState({ connections: [], selected: '' });
 });
 

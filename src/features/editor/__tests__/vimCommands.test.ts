@@ -1,13 +1,13 @@
 import { beforeEach, afterEach, expect, it, vi } from 'vitest';
 import { editorFileKey, type EditorFile, type EditorVimCommand } from '@core/editor';
 import { useSessionStore } from '@features/workspace';
-import { useWorkspaceNavigation } from '@features/workspace/stores/navigation';
+import { useWorkbenchStore } from '@features/workspace/stores/workbench';
 import { useEditorDocuments } from '../stores/documents';
 import { saveDocument } from '../services/documentActions';
 import { executeEditorVimCommand } from '../services/vimCommands';
 
 vi.mock('../services/documentActions', () => ({ saveDocument: vi.fn() }));
-const workspace = useSessionStore.getState(); const documents = useEditorDocuments.getState(); const navigation = useWorkspaceNavigation.getState();
+const workspace = useSessionStore.getState(); const documents = useEditorDocuments.getState();
 const file: EditorFile = { path: '/note.txt' }; const other: EditorFile = { path: '/other.txt' };
 const key = editorFileKey(file); const close = vi.fn(); const open = vi.fn(); const load = vi.fn().mockResolvedValue(undefined);
 const command = (action: EditorVimCommand['action'], force = false): EditorVimCommand => ({ action, force, args: '', ranged: false });
@@ -15,9 +15,10 @@ beforeEach(() => {
   vi.clearAllMocks();
   useEditorDocuments.setState({ load, documents: { [key]: { file, kind: 'text', text: 'saved', value: 'draft', revision: 'r1', loading: false, saving: false, error: '', request: 1 } } });
   useSessionStore.setState({ tabs: [{ id: 'editor', kind: 'editor', title: 'Editor', files: [file, other], selected: file }], closeEditorFile: close, openEditorFile: open });
-  useWorkspaceNavigation.setState({ codeOrder: [`file:${editorFileKey(other)}`, `file:${key}`] });
+  useWorkbenchStore.getState().update(state => ({ ...state, tabs: [other, file].map((file, index) => ({ id: `container-${index}`, scope: 'code', focused: `pane-${index}`, zoomed: null,
+    layout: { type: 'pane', id: `pane-${index}`, resourceId: `file:${editorFileKey(file)}` } })) }));
 });
-afterEach(() => { useSessionStore.setState(workspace, true); useEditorDocuments.setState(documents, true); useWorkspaceNavigation.setState(navigation, true); });
+afterEach(() => { useSessionStore.setState(workspace, true); useEditorDocuments.setState(documents, true); });
 
 it('keeps normal quit behind the close guard and only discards when explicitly forced', async () => {
   await executeEditorVimCommand(file, command('quit')); expect(close).toHaveBeenLastCalledWith(file, false);

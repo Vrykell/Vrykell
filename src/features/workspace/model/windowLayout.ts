@@ -16,6 +16,9 @@
 export type SplitDir = 'row' | 'col'; // row = 左右，col = 上下
 import type { SshOptions } from '@core/ssh';
 import { measurePaneTree } from '@core/paneLayout';
+import { paneTreeOperations, type PaneTree } from '@core/paneTree';
+import { clampPaneRatio } from '@core/paneTree';
+import { z } from 'zod';
 
 export interface TerminalSpec {
   id: string;
@@ -28,11 +31,41 @@ export interface TerminalSpec {
   openMode?: 'classic' | 'block';
 }
 
-export type WindowLayout =
-  | { type: 'leaf'; terminal: TerminalSpec }
-  | { type: 'split'; dir: SplitDir; ratio: number; first: WindowLayout; second: WindowLayout };
+export type WindowLayout = PaneTree<{ type: 'leaf'; terminal: TerminalSpec }, 'dir'>;
 
-export const measureWindowLayout = (layout: WindowLayout) => measurePaneTree(layout, node => node.type === 'leaf' ? { id: node.terminal.id } : node);
+const terminalSpecSchema = z.object({
+  id: z.string().min(1).max(256), kind: z.enum(['local', 'ssh']), shellType: z.string().max(64).optional(),
+  cwd: z.string().max(8192).optional(), useProfileDirectory: z.boolean().optional(), openMode: z.enum(['classic', 'block']).optional(),
+  ssh: z.object({ name: z.string().max(320), host: z.string().min(1).max(2048), user: z.string().max(256).optional(), port: z.number().int().min(1).max(65535).optional(), connectionId: z.string().max(256).optional() }).passthrough().optional(),
+});
+
+/** Validate the older native wire encoding before converting it into live pane references. */
+export function parseWindowLayout(value: unknown): WindowLayout | null {
+  const ids = new Set<string>();
+  const parse = (input: unknown, depth: number): WindowLayout | null => {
+    if (!input || typeof input !== 'object' || depth > 3) return null;
+    const node = input as Record<string, unknown>;
+    if (node.type === 'leaf') {
+      const result = terminalSpecSchema.safeParse(node.terminal);
+      if (!result.success || ids.has(result.data.id) || result.data.kind === 'ssh' && !result.data.ssh) return null;
+      ids.add(result.data.id); return { type: 'leaf', terminal: result.data };
+    }
+    if (node.type !== 'split' || node.dir !== 'row' && node.dir !== 'col' || typeof node.ratio !== 'number' || !Number.isFinite(node.ratio)) return null;
+    const first = parse(node.first, depth + 1); const second = parse(node.second, depth + 1);
+    return first && second ? { type: 'split', dir: node.dir, ratio: clampPaneRatio(node.ratio), first, second } : null;
+  };
+  const layout = parse(value, 0); return ids.size <= 4 ? layout : null;
+}
+
+const tree = paneTreeOperations<WindowLayout, TerminalSpec>({
+  leaf: node => node.type === 'leaf' ? node.terminal : null,
+  children: node => { const split = node as Extract<WindowLayout, { type: 'split' }>; return [split.first, split.second]; },
+  join: (node, first, second) => ({ ...node, first, second }),
+  withRatio: (node, ratio) => ({ ...node, ratio }),
+  id: terminal => terminal.id,
+});
+
+export const measureWindowLayout = (layout: WindowLayout, rect?: Rect) => measurePaneTree(layout, node => node.type === 'leaf' ? { id: node.terminal.id } : node, rect);
 
 export interface Rect {
   x: number;
@@ -74,8 +107,7 @@ export function leaf(terminal: TerminalSpec): WindowLayout {
 }
 
 export function countLeaves(layout: WindowLayout): number {
-  if (layout.type === 'leaf') return 1;
-  return countLeaves(layout.first) + countLeaves(layout.second);
+  return tree.leaves(layout).length;
 }
 
 /** 同一水平行里最多有多少个终端（row 相加、col 取较大），用于按布局动态计算窗口最小宽度。 */
@@ -92,26 +124,19 @@ export function minTerminalWidth(layout: WindowLayout): number {
   return n * MIN_PANE_WIDTH + (n - 1) * DIVIDER_SIZE;
 }
 
-/** Clamp displayed splits after resizing while preserving the user's saved proportions. */
-export function fitLayoutWidth(layout: WindowLayout, width: number): WindowLayout {
-  if (layout.type === 'leaf') return layout;
-  if (layout.dir === 'col') return { ...layout, first: fitLayoutWidth(layout.first, width), second: fitLayoutWidth(layout.second, width) };
-  const firstMin = minTerminalWidth(layout.first) + DIVIDER_SIZE / 2;
-  const secondMin = minTerminalWidth(layout.second) + DIVIDER_SIZE / 2;
-  const ratio = width >= firstMin + secondMin
-    ? Math.max(firstMin / width, Math.min(1 - secondMin / width, layout.ratio))
-    : firstMin / (firstMin + secondMin);
-  return { ...layout, ratio, first: fitLayoutWidth(layout.first, width * ratio), second: fitLayoutWidth(layout.second, width * (1 - ratio)) };
+export function leaves(layout: WindowLayout): TerminalSpec[] {
+  return tree.leaves(layout);
 }
 
-export function leaves(layout: WindowLayout): TerminalSpec[] {
-  if (layout.type === 'leaf') return [layout.terminal];
-  return [...leaves(layout.first), ...leaves(layout.second)];
+export function mapTerminals(layout: WindowLayout, transform: (terminal: TerminalSpec) => TerminalSpec): WindowLayout {
+  return tree.map(layout, (terminal, node) => {
+    const next = transform(terminal);
+    return next === terminal ? node : leaf(next);
+  })!;
 }
 
 export function firstLeaf(layout: WindowLayout): TerminalSpec {
-  if (layout.type === 'leaf') return layout.terminal;
-  return firstLeaf(layout.first);
+  return tree.leaves(layout)[0]!;
 }
 
 export function findLeaf(layout: WindowLayout, id: string): TerminalSpec | null {
@@ -135,40 +160,24 @@ export function splitLeaf(
   newTerminal: TerminalSpec,
   ratio = 0.5,
 ): WindowLayout {
-  if (root.type === 'leaf') {
-    if (root.terminal.id !== leafId) return root;
-    const nl = leaf(newTerminal);
+  const terminals = tree.leaves(root);
+  if (terminals.length >= 4 || terminals.some(terminal => terminal.id === newTerminal.id)) return root;
+  return tree.update(root, leafId, node => {
+    const next = leaf(newTerminal);
     return position === 'first'
-      ? { type: 'split', dir, ratio, first: nl, second: root }
-      : { type: 'split', dir, ratio, first: root, second: nl };
-  }
-  return {
-    ...root,
-    first: splitLeaf(root.first, leafId, dir, position, newTerminal, ratio),
-    second: splitLeaf(root.second, leafId, dir, position, newTerminal, ratio),
-  };
+      ? { type: 'split', dir, ratio, first: next, second: node }
+      : { type: 'split', dir, ratio, first: node, second: next };
+  });
 }
 
 /** 替换某个叶子里的终端。 */
 export function replaceLeaf(root: WindowLayout, leafId: string, newTerminal: TerminalSpec): WindowLayout {
-  if (root.type === 'leaf') {
-    return root.terminal.id === leafId ? leaf(newTerminal) : root;
-  }
-  return {
-    ...root,
-    first: replaceLeaf(root.first, leafId, newTerminal),
-    second: replaceLeaf(root.second, leafId, newTerminal),
-  };
+  return tree.update(root, leafId, () => leaf(newTerminal));
 }
 
 /** 移除某个叶子；父节点若只剩一个孩子则提升该孩子。 */
 export function removeLeaf(root: WindowLayout, leafId: string): WindowLayout | null {
-  if (root.type === 'leaf') return root.terminal.id === leafId ? null : root;
-  const first = removeLeaf(root.first, leafId);
-  const second = removeLeaf(root.second, leafId);
-  if (first === null) return second; // 只剩 second
-  if (second === null) return first; // 只剩 first
-  return { ...root, first, second };
+  return tree.remove(root, leafId);
 }
 
 /** 每个叶子的几何矩形（0..1 相对窗口）。 */
@@ -176,18 +185,7 @@ export function leafRects(
   layout: WindowLayout,
   rect: Rect = { x: 0, y: 0, w: 1, h: 1 },
 ): { terminalId: string; rect: Rect }[] {
-  if (layout.type === 'leaf') return [{ terminalId: layout.terminal.id, rect }];
-  const r = Math.max(0, Math.min(1, layout.ratio));
-  if (layout.dir === 'row') {
-    return [
-      ...leafRects(layout.first, { x: rect.x, y: rect.y, w: rect.w * r, h: rect.h }),
-      ...leafRects(layout.second, { x: rect.x + rect.w * r, y: rect.y, w: rect.w * (1 - r), h: rect.h }),
-    ];
-  }
-  return [
-    ...leafRects(layout.first, { x: rect.x, y: rect.y, w: rect.w, h: rect.h * r }),
-    ...leafRects(layout.second, { x: rect.x, y: rect.y + rect.h * r, w: rect.w, h: rect.h * (1 - r) }),
-  ];
+  return measureWindowLayout(layout, rect).cells.map(({ id, rect: cell }) => ({ terminalId: id, rect: cell }));
 }
 
 /** 可停靠落点（按上面的停靠规则）。 */
@@ -228,15 +226,7 @@ export function dividers(layout: WindowLayout): Divider[] {
 
 /** 调整分隔线比例（用 aId/bId 定位 split 节点）。 */
 export function setRatio(root: WindowLayout, aId: string, bId: string, ratio: number): WindowLayout {
-  if (root.type === 'leaf') return root;
-  if (firstLeaf(root.first).id === aId && firstLeaf(root.second).id === bId) {
-    return { ...root, ratio: Math.max(0.1, Math.min(0.9, ratio)) };
-  }
-  return {
-    ...root,
-    first: setRatio(root.first, aId, bId, ratio),
-    second: setRatio(root.second, aId, bId, ratio),
-  };
+  return tree.ratio(root, aId, bId, ratio);
 }
 
 /** 终端的几何矩形 + 面向相邻终端的内侧边框标记（左/右/上/下）。 */

@@ -9,10 +9,12 @@ import { useUnifiedWorkspace } from '@features/workspace/stores/unifiedWorkspace
 import { leaf, removeLeaf, splitLeaf } from '@features/workspace/model/windowLayout';
 import { ResourceContentProvider, ResourceContentSlot } from '@ui/layout/ResourceContent';
 import TerminalView from '../components/TerminalView';
+import { detachWorkspacePane, mergeWorkspaceContainers, synchronizeWorkbench } from '@features/workspace/services/workbench';
+import { useWorkbenchStore } from '@features/workspace/stores/workbench';
 
 const { mounts, disposals } = vi.hoisted(() => ({ mounts: vi.fn(), disposals: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue(undefined) }));
-vi.mock('@features/workspace/services/sessionManager', () => ({ saveLayout: vi.fn() }));
+vi.mock('@features/workspace/services/sessionManager', () => ({ saveLayout: vi.fn(), create: vi.fn(), transferPanes: vi.fn(async () => {}), close: vi.fn(async () => {}), remove: vi.fn(async () => {}) }));
 vi.mock('../components/TerminalPanel', () => ({ default: ({ paneId }: { paneId: string }) => {
   useEffect(() => { mounts(paneId); return () => disposals(paneId); }, [paneId]);
   return <div data-testid={`session-${paneId}`} />;
@@ -52,6 +54,19 @@ it('keeps live terminal hosts mounted through split, move, resize and close', ()
   expect(screen.getByTestId('session-pane-a')).toBe(original);
   expect(mounts.mock.calls.filter(([paneId]) => paneId === 'pane-a')).toHaveLength(1);
   expect(disposals.mock.calls).toEqual([['pane-b']]);
+});
+
+it('retains the exact live content host across detach and merge of native containers', async () => {
+  const split = splitLeaf(leaf({ id: 'pane-a', kind: 'local' }), 'pane-a', 'row', 'second', { id: 'pane-b', kind: 'local' });
+  useWorkspaceStore.setState({ tabs: [{ id: 'window', title: 'Window', kind: 'session', layout: split }], activeId: 'window' });
+  synchronizeWorkbench(); render(<ResourceContentProvider><TerminalView /></ResourceContentProvider>);
+  const original = screen.getByTestId('session-pane-b');
+  act(() => detachWorkspacePane('terminal', 'terminal:pane-b'));
+  expect(screen.getByTestId('session-pane-b')).toBe(original); expect(disposals).not.toHaveBeenCalled();
+  const detached = useWorkbenchStore.getState().snapshot.selected.terminal!;
+  await act(async () => { await mergeWorkspaceContainers(detached, 'window', { leafId: 'pane-a', dir: 'row', position: 'second' }); });
+  expect(screen.getByTestId('session-pane-b')).toBe(original); expect(disposals).not.toHaveBeenCalled();
+  expect(mounts.mock.calls.filter(([paneId]) => paneId === 'pane-b')).toHaveLength(1);
 });
 
 it('reveals a manually fullscreened live block when a split moves focus to another pane', () => {

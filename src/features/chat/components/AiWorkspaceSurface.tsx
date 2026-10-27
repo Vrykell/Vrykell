@@ -1,4 +1,4 @@
-import { useContext, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
+import { useContext, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { memoLocalized } from '@ui/hooks/memoLocalized';
 import { createPortal } from 'react-dom';
 import ResourceContent from '@ui/layout/ResourceContent';
@@ -16,8 +16,8 @@ const StablePanelChat = memoLocalized(PanelChat);
 type Placement = 'main' | 'side';
 
 /** Content owners stay mounted while their visible slots move between surfaces. */
-export function AiWorkspaceProvider({ placement, mainActive, headerActive, sideActive, children }: {
-  placement: Placement; mainActive: boolean; headerActive: boolean; sideActive: boolean; children: ReactNode;
+export function AiWorkspaceProvider({ mainActive, headerActive, sideActive, children }: {
+  mainActive: boolean; headerActive: boolean; sideActive: boolean; children: ReactNode;
 }) {
   const [main, setMain] = useState<HTMLDivElement | null>(null);
   const [side, setSide] = useState<HTMLDivElement | null>(null);
@@ -33,9 +33,6 @@ export function AiWorkspaceProvider({ placement, mainActive, headerActive, sideA
   const sideSelected = useAiWorkspace(state => state.sideSelected);
   const sidebarSettings = useMemo(() => ({ resourceId: sideActive ? sideSelected : '', target: sidebarSettingsTarget, suspend: setSettingsSuspended }), [sideActive, sideSelected, sidebarSettingsTarget]);
   const nativeSelected = useChatStore(state => state.activeConversationId);
-  const [visited, setVisited] = useState(nativeTabs.length > 0 || sideActive);
-  useEffect(() => { if (nativeTabs.length || sideActive) setVisited(true); }, [nativeTabs.length, sideActive]);
-  useEffect(() => { if (placement === 'side' && sideActive && nativeSelected) useAiWorkspace.getState().ensureNative(nativeSelected); }, [placement, sideActive, nativeSelected]);
   useLayoutEffect(() => {
     const container = main ?? parking;
     if (container) container.appendChild(host);
@@ -43,7 +40,7 @@ export function AiWorkspaceProvider({ placement, mainActive, headerActive, sideA
   }, [host, main, parking]);
   const target = native;
   const nativeActive = mainActive && selected === `chat:${nativeSelected}`;
-  const mountedNativeIds = [...new Set([...nativeTabs, ...(visited && nativeSelected ? [nativeSelected] : []), ...(sideSelected.startsWith('chat:') ? [sideSelected.slice(5)] : [])])].sort();
+  const mountedNativeIds = [...new Set([...nativeTabs, ...(sideSelected.startsWith('chat:') ? [sideSelected.slice(5)] : [])])].sort();
   return <SidebarSettingsContext.Provider value={sidebarSettings}><SurfaceContext.Provider value={context}>
     {children}
     <div hidden ref={setParking} />

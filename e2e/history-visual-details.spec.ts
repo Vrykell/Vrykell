@@ -115,7 +115,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.screenshot({ path: testInfo.outputPath(`history-palette-${theme}.png`), animations: 'disabled' });
     await page.keyboard.press('Escape');
 
-    if (!await page.locator('[data-chat-composer]').isVisible()) await page.locator('[data-dock-btn="chat"]').click();
+    if (!await page.locator('[data-chat-composer]:visible').isVisible()) await page.locator('[data-dock-btn="chat"]').click();
     await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
     const aiCard = page.getByTestId('unified-history-page').locator('.history-group-card');
     const selected = page.getByTestId('unified-history-conversation:review');
@@ -124,9 +124,9 @@ for (const theme of ['dark', 'light'] as const) {
     await selected.hover();
     await page.getByTestId('unified-history-open-conversation:review').click();
     await expect(page.getByTestId('workspace-area-ai')).toHaveAttribute('aria-current', 'page');
-    await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
+    await page.getByTestId('workspace-instance-bar').getByRole('button', { name: 'AI 对话历史', exact: true }).click();
     await expect(selected).toHaveAttribute('aria-current', 'true');
-    if (await page.locator('[data-chat-composer]').isVisible()) await page.locator('[data-dock-btn="chat"]').click();
+    if (await page.locator('[data-chat-composer]:visible').isVisible()) await page.locator('[data-dock-btn="chat"]').click();
     await selected.hover();
     await expect(selected.getByRole('button')).toHaveCount(3);
     await expect(selected.locator('.sidebar-row-content')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');

@@ -367,7 +367,7 @@ impl HistoryDb {
             .map_err(|e| e.to_string())?;
         self.conn()
             .execute(
-                "INSERT INTO groups (id, title, sort_order, collapsed, created_at) VALUES (?1, ?2, ?3, 0, ?4)",
+                "INSERT INTO groups (id, title, sort_order, collapsed, created_at) VALUES (?1, ?2, ?3, 0, ?4) ON CONFLICT(id) DO NOTHING",
                 params![id, title, next, timestamp as i64],
             )
             .map_err(|e| e.to_string())?;
@@ -423,9 +423,19 @@ impl HistoryDb {
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
 
-    /// 重排分组：按 ids 顺序写回 sort_order。
+    /// Reorder selected groups within saved slots, retaining other scopes and archived groups.
     pub fn groups_reorder(&self, ids: &[String]) -> Result<(), String> {
-        for (i, id) in ids.iter().enumerate() {
+        let mut statement = self.conn().prepare("SELECT id FROM groups ORDER BY sort_order, id")
+            .map_err(|e| e.to_string())?;
+        let current = statement.query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| e.to_string())?
+            .collect::<rusqlite::Result<Vec<_>>>().map_err(|e| e.to_string())?;
+        let current_ids: std::collections::HashSet<_> = current.iter().collect();
+        let mut selected = std::collections::HashSet::new();
+        let requested: Vec<_> = ids.iter().filter(|id| current_ids.contains(id) && selected.insert(*id)).collect();
+        let mut requested = requested.into_iter();
+        let ordered = current.iter().map(|id| if selected.contains(id) { requested.next().unwrap() } else { id });
+        for (i, id) in ordered.enumerate() {
             self.conn()
                 .execute("UPDATE groups SET sort_order = ?1 WHERE id = ?2", params![i as i64, id])
                 .map_err(|e| e.to_string())?;
@@ -479,7 +489,7 @@ impl HistoryDb {
     pub fn restore_group(&self, id: &str) -> Result<(), String> {
         self.conn()
             .execute(
-                "UPDATE sessions SET status = 'active', closed_at = NULL WHERE group_id = ?1 AND status = 'historical'",
+                "UPDATE sessions SET status = 'active', closed_at = NULL WHERE group_id = ?1 AND status = 'historical' AND kind != 'workspace'",
                 params![id],
             )
             .map_err(|e| e.to_string())?;
@@ -626,6 +636,32 @@ fn map_chat_message(row: &rusqlite::Row) -> rusqlite::Result<ChatMessageEntry> {
 #[cfg(test)]
 mod grouping_tests {
     use super::*;
+    #[test]
+    fn group_creation_retries_keep_existing_metadata_and_order() {
+        let db = HistoryDb::open_in_memory();
+        db.create_group("retry", "Original", 1).unwrap();
+        db.set_group_collapsed("retry", true).unwrap();
+        db.create_group("other", "Other", 2).unwrap();
+        db.create_group("retry", "Stale retry", 3).unwrap();
+        let groups = db.list_groups().unwrap();
+        assert_eq!(groups.len(), 2);
+        assert_eq!(groups[0].title, "Original");
+        assert_eq!(groups[0].created_at, 1);
+        assert!(groups[0].collapsed);
+        assert_eq!(groups[1].id, "other");
+    }
+
+    #[test]
+    fn partial_group_reordering_preserves_other_scopes_and_archived_slots() {
+        let db = HistoryDb::open_in_memory();
+        for id in ["one", "hidden", "two"] { db.create_group(id, id, 1).unwrap(); }
+        db.archive_group("hidden", 2).unwrap();
+        db.groups_reorder(&["two".into(), "missing".into(), "two".into(), "one".into()]).unwrap();
+        assert_eq!(db.list_groups().unwrap().iter().map(|group| group.id.as_str()).collect::<Vec<_>>(), ["two", "hidden", "one"]);
+        db.groups_reorder(&[]).unwrap();
+        assert_eq!(db.list_groups().unwrap()[1].id, "hidden");
+    }
+
     #[test]
     fn reviewed_groups_can_hold_only_unpersisted_draft_tabs() {
         let db = HistoryDb::open_in_memory();

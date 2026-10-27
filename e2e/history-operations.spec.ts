@@ -50,7 +50,7 @@ async function groupSessionsByDirectory(page: Page) {
 }
 
 async function openAiHistory(page: Page) {
-  if (!await page.locator('[data-chat-composer]').isVisible()) await page.locator('[data-dock-btn="chat"]').click();
+  if (!await page.locator('[data-chat-composer]:visible').isVisible()) await page.locator('[data-dock-btn="chat"]').click();
   await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
   await expect(page.getByTestId('unified-history-page')).toBeVisible();
 }

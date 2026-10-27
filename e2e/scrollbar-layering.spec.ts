@@ -41,8 +41,8 @@ test('a code block track cannot leave the chat transcript over the composer', as
   await setupTauriMock(page, {});
   await page.goto('/');
   await page.locator('[data-dock-btn="chat"]').click();
-  await page.locator('[data-chat-composer]').fill('show me a long block');
-  await page.locator('[data-chat-composer]').press('Enter');
+  await page.locator('[data-chat-composer]:visible').fill('show me a long block');
+  await page.locator('[data-chat-composer]:visible').press('Enter');
   const transcript = page.locator('.chat-transcript');
   const surface = transcript.locator('.md pre').first();
   await expect(surface).toBeVisible();

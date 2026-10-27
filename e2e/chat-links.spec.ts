@@ -12,7 +12,7 @@ test('a reply link leaves for the system browser instead of taking the window', 
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
   await page.locator('[data-dock-btn="chat"]').click();
-  const composer = page.getByPlaceholder(/自然语言描述/);
+  const composer = page.locator('[data-chat-composer]:visible');
   await expect(composer).toBeVisible({ timeout: 3000 });
   await composer.fill('给我个链接');
   await composer.press('Enter');

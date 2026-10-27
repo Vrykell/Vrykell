@@ -6,6 +6,8 @@ import { useAiWorkspace } from '../stores/aiWorkspace';
 import { useChatStore } from '../stores/chat';
 import { useAiWorkspaceTabs } from '../hooks/useAiWorkspaceTabs';
 import { closeAiWorkspaceSession } from '../services/aiWorkspace';
+import { useWorkbenchStore } from '@features/workspace/stores/workbench';
+import { workspaceStripEntities } from '@features/workspace/model/workbench';
 
 vi.mock('../services/aiWorkspace', () => ({ closeAiWorkspaceSession: vi.fn() }));
 
@@ -37,7 +39,7 @@ beforeEach(() => {
     connections: [{ id: 'agent-1', harness: 'Agent', cwd: '/repo', fresh: false }],
     select: selectConnection,
   });
-  useAiWorkspace.setState({ nativeTabs: ['c1', 'c2'], selected: '', sideSelected: '', sideSessions: [], order: [] });
+  useAiWorkspace.setState({ nativeTabs: ['c1', 'c2'], selected: '', sideSelected: '', sideSessions: [] });
   useChatStore.setState({ conversations, selectConversation });
 });
 
@@ -66,12 +68,12 @@ it('routes close to the owning page or session lifecycle', () => {
   act(() => result.current.onClose('page:usage'));
   expect(closeTab).toHaveBeenCalledWith('usage');
   act(() => result.current.onClose('chat:c1'));
-  expect(closeAiWorkspaceSession).toHaveBeenCalledWith('chat:c1');
+  expect(closeAiWorkspaceSession).toHaveBeenCalledWith('chat:c1', true);
 });
 
 it('moves only the rows currently visible in the strip', () => {
   useAiWorkspace.setState({ nativeTabs: ['c1'], sideSelected: 'chat:c2' });
   const { result } = renderHook(() => useAiWorkspaceTabs());
   act(() => result.current.onMove('acp:agent-1', 'chat:c1', false));
-  expect(useAiWorkspace.getState().order).toEqual(['acp:agent-1', 'chat:c1', 'page:usage', 'page:history', 'page:start-ai']);
+  expect(workspaceStripEntities(useWorkbenchStore.getState().snapshot, 'ai')).toEqual(['tab:acp:agent-1', 'tab:chat:c1']);
 });

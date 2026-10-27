@@ -67,7 +67,6 @@ export default defineConfig(async () => ({
         "src/features/workspace/model/tabStrip.ts",
         "src/features/workspace/model/codeTabHandles.tsx",
         "src/features/workspace/model/terminalTabHandle.tsx",
-        "src/features/workspace/model/unifiedTabHandles.tsx",
         "src/features/chat/model/aiTabHandles.tsx",
       ],
       exclude: [

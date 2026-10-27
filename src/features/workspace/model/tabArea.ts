@@ -7,7 +7,7 @@ import type { TabKind } from '../stores/workspace';
  * The exhaustive record makes a new `TabKind` a compile error until it is assigned an area,
  * instead of silently falling into the terminal strip.
  */
-export const TAB_KIND_AREA: Readonly<Record<TabKind, WorkspaceArea>> = Object.freeze({
+export const TAB_KIND_AREA: Readonly<Record<TabKind | 'workspace', WorkspaceArea>> = Object.freeze({
   session: 'terminal',
   history: 'terminal',
   start: 'terminal',

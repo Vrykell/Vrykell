@@ -3,9 +3,9 @@ import { useWorkspaceNavigation, workspaceAreaForKind } from '../stores/navigati
 import { closeAiWorkspaceSession, useAiWorkspace } from '@features/chat';
 import { focusedWorkspaceArea, sideAiHasFocus } from './workspaceActions';
 import { selectWorkspaceArea } from './selectWorkspaceArea';
-import { useUnifiedWorkspace } from '../stores/unifiedWorkspace';
-import { closeCompositionTab } from './compositionTabs';
 import { gitComparisonKey } from '@core/git';
+import { useWorkbenchStore } from '../stores/workbench';
+import { closeContainer } from './workbench';
 
 /** Close the visible instance instead of the enclosing functional workspace. */
 export function closeWorkspaceItem() {
@@ -16,10 +16,11 @@ export function closeWorkspaceItem() {
     return;
   }
   const navigation = useWorkspaceNavigation.getState();
-  if (navigation.area === 'unified') {
-    const state = useUnifiedWorkspace.getState();
-    closeCompositionTab(state.activeTabId);
-    return;
+  if (navigation.area === 'terminal' || navigation.area === 'code' || navigation.area === 'ai' || navigation.area === 'unified') {
+    const selected = useWorkbenchStore.getState().snapshot.selected[navigation.area];
+    const container = useWorkbenchStore.getState().snapshot.tabs.find(tab => tab.id === selected && tab.layout);
+    const system = tab?.kind === 'history' || tab?.kind === 'ai-history' || tab?.kind === 'usage';
+    if (container && !system) { closeContainer(container.id); return; }
   }
   if (navigation.area === 'history') {
     selectWorkspaceArea(navigation.previousArea === 'history' ? 'terminal' : navigation.previousArea);

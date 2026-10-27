@@ -296,7 +296,7 @@ test('narrow layouts preserve command space and fit the toolbar', async ({ page 
 
 test('AI drafts stay separate when opening the AI assistant', async ({ page }) => {
   await page.getByRole('button', { name: '询问 AI', exact: true }).click();
-  await page.getByPlaceholder(/自然语言描述/).fill('帮我解释这个项目');
+  await page.locator('[data-chat-composer]:visible').fill('帮我解释这个项目');
   await page.locator('[data-dock-btn="chat"]').click();
   const command = page.getByPlaceholder(/输入命令/);
   await expect(command).toHaveValue('');
@@ -304,14 +304,14 @@ test('AI drafts stay separate when opening the AI assistant', async ({ page }) =
   expect(await ptyWrites(page)).not.toContain('帮我解释这个项目\n');
   await page.locator('[data-dock-btn="chat"]').click();
   await page.getByRole('button', { name: '询问 AI', exact: true }).click();
-  await expect(page.getByPlaceholder(/自然语言描述/)).toHaveValue('帮我解释这个项目');
+  await expect(page.locator('[data-chat-composer]:visible')).toHaveValue('帮我解释这个项目');
 });
 
 test('separate command and AI drafts survive repeated switches', async ({ page }) => {
   await page.getByPlaceholder(/输入命令/).fill('git status');
   await page.getByRole('button', { name: '询问 AI', exact: true }).click();
-  await expect(page.getByPlaceholder(/自然语言描述/)).toHaveValue('');
-  await page.getByPlaceholder(/自然语言描述/).fill('解释当前修改');
+  await expect(page.locator('[data-chat-composer]:visible')).toHaveValue('');
+  await page.locator('[data-chat-composer]:visible').fill('解释当前修改');
   await page.locator('[data-dock-btn="chat"]').click();
   await expect(page.getByPlaceholder(/输入命令/)).toHaveValue('git status');
 });
@@ -363,7 +363,7 @@ test('auxiliary navigation shares the right side and AI preserves the main works
 test('panel headings close auxiliary content without hiding the workspace', async ({ page }) => {
   await page.locator('[data-dock-btn="chat"]').click();
   await page.getByRole('button', { name: '关闭AI 助手面板', exact: true }).click();
-  await expect(page.locator('[data-chat-composer]')).toBeHidden();
+  await expect(page.locator('[data-chat-composer]:visible')).toBeHidden();
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.locator('[data-dock-btn="files"]').click();
   await page.getByRole('button', { name: '关闭资源面板', exact: true }).click();

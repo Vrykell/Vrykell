@@ -1,5 +1,15 @@
 use crate::db::{BlockEntry, ChatMessageEntry, HistoryState, SessionEntry};
 
+#[tauri::command]
+pub fn move_terminal_panes(state: tauri::State<'_, HistoryState>, source_id: String, target_id: String, pane_ids: Vec<String>) -> Result<(), String> {
+    state.0.lock().map_err(|error| error.to_string())?.move_terminal_panes(&source_id, &target_id, &pane_ids)
+}
+
+#[tauri::command]
+pub fn delete_terminal_panes(state: tauri::State<'_, HistoryState>, session_id: String, pane_ids: Vec<String>) -> Result<(), String> {
+    state.0.lock().map_err(|error| error.to_string())?.delete_terminal_panes(&session_id, &pane_ids)
+}
+
 /// 创建会话（新建标签页时调用），携带类型判别 kind 与变体专属 JSON payload。
 #[tauri::command]
 pub fn create_session(

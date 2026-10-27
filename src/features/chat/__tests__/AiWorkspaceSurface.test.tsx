@@ -25,7 +25,7 @@ afterEach(() => { cleanup(); lifecycle.mounts = 0; lifecycle.stops = 0; lifecycl
 
 it('keeps each open native conversation mounted independently while the selection changes', () => {
   useAiWorkspace.setState({ nativeTabs: ['native', 'other'], selected: 'chat:native' });
-  render(<AiWorkspaceProvider placement="main" mainActive headerActive sideActive={false}><AiWorkspaceSurface placement="main" /></AiWorkspaceProvider>);
+  render(<AiWorkspaceProvider mainActive headerActive sideActive={false}><AiWorkspaceSurface placement="main" /></AiWorkspaceProvider>);
   const first = document.querySelector<HTMLInputElement>('[data-conversation="native"]')!;
   fireEvent.change(first, { target: { value: 'First draft' } });
   act(() => { useChatStore.setState({ activeConversationId: 'other' }); useAiWorkspace.setState({ selected: 'chat:other' }); });
@@ -39,7 +39,7 @@ it('keeps each open native conversation mounted independently while the selectio
 it('does not rerender connected or native content when an unrelated layout width changes', () => {
   function Layout() {
     const [width, setWidth] = useState(200);
-    return <AiWorkspaceProvider placement="main" mainActive headerActive sideActive={false}>
+    return <AiWorkspaceProvider mainActive headerActive sideActive={false}>
       <button onClick={() => setWidth(value => value + 10)}>Resize</button>
       <div style={{ width }}><AiWorkspaceSurface placement="main" /><AiWorkspaceSurface placement="side" /></div>
     </AiWorkspaceProvider>;
@@ -53,8 +53,18 @@ it('does not rerender connected or native content when an unrelated layout width
   expect(lifecycle.mounts).toBe(1);
 });
 
+it('mounts only explicitly opened resources and does not adopt an unrelated global selection into the sidebar', () => {
+  useChatStore.setState({ activeConversationId: 'unopened-global', conversationsLoaded: true });
+  useAiWorkspace.setState({ nativeTabs: ['side'], selected: '', sideSelected: 'chat:side', sideSessions: ['chat:side'] });
+  render(<ResourceContentProvider><AiWorkspaceProvider mainActive={false} headerActive={false} sideActive>
+    <AiWorkspaceSurface placement="main" /><AiWorkspaceSurface placement="side" />
+  </AiWorkspaceProvider></ResourceContentProvider>);
+  expect(document.querySelector('[data-conversation="unopened-global"]')).toBeNull();
+  expect(useAiWorkspace.getState().nativeTabs).not.toContain('unopened-global');
+});
+
 it('moves the existing conversation node without restarting it or dropping local state', () => {
-  const view = (placement: 'main' | 'side') => <ResourceContentProvider><AiWorkspaceProvider placement={placement} mainActive headerActive sideActive={placement === 'side'}>
+  const view = (placement: 'main' | 'side') => <ResourceContentProvider><AiWorkspaceProvider mainActive headerActive sideActive={placement === 'side'}>
     <AiWorkspaceSurface placement="main" /><AiWorkspaceSurface placement="side" />
   </AiWorkspaceProvider></ResourceContentProvider>;
   const { rerender, unmount } = render(view('main'));
@@ -77,7 +87,7 @@ it('moves the existing conversation node without restarting it or dropping local
 
 it('opens and reopens an independent sidebar without moving the main conversation', () => {
   useChatStore.setState({ conversationsLoaded: true, conversations: [{ id: 'native', title: 'Main', createdAt: 1, updatedAt: 1, environment: null }], byTab: { native: [] } });
-  const view = (sideActive: boolean) => <ResourceContentProvider><AiWorkspaceProvider placement={sideActive ? 'side' : 'main'} mainActive headerActive sideActive={sideActive}>
+  const view = (sideActive: boolean) => <ResourceContentProvider><AiWorkspaceProvider mainActive headerActive sideActive={sideActive}>
     <AiWorkspaceSurface placement="main" /><AiWorkspaceSurface placement="side" />
   </AiWorkspaceProvider></ResourceContentProvider>;
   const { rerender } = render(view(false));

@@ -39,6 +39,14 @@ export function updateSessionPayload(id: string, payload: string): Promise<void>
   return invoke('update_session_payload', { id, payload });
 }
 
+export function moveTerminalPanes(sourceId: string, targetId: string, paneIds: string[]): Promise<void> {
+  return invoke('move_terminal_panes', { sourceId, targetId, paneIds });
+}
+
+export function deleteTerminalPanes(sessionId: string, paneIds: string[]): Promise<void> {
+  return invoke('delete_terminal_panes', { sessionId, paneIds });
+}
+
 export function getSession(id: string): Promise<BackendSessionEntry> {
   return invoke('get_session', { id });
 }

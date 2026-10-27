@@ -20,8 +20,8 @@ test('saved custom Anthropic address is used by the next chat request', async ({
   const previousCalls = (await searchCalls(page)).length;
   await page.keyboard.press('Meta+1');
   await page.locator('[data-dock-btn="chat"]').click();
-  await page.getByPlaceholder(/自然语言描述/).fill('验证地址');
-  await page.getByPlaceholder(/自然语言描述/).press('Enter');
+  await page.locator('[data-chat-composer]:visible').fill('验证地址');
+  await page.locator('[data-chat-composer]:visible').press('Enter');
   await expect(page.getByText('地址设置已生效', { exact: true }).first()).toBeVisible();
   const calls = (await searchCalls(page)).slice(previousCalls).filter(call => call.cmd === 'llm_stream');
   expect(calls.length).toBeGreaterThan(0);

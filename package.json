@@ -11,6 +11,7 @@
     "tauri": "node scripts/tauri-cli.mjs",
     "tauri:cli": "tauri",
     "test": "vitest run",
+    "test:workbench": "vitest run --config vitest.workbench.config.ts src/features/workspace src/core/__tests__/paneLayout.test.ts src/core/__tests__/paneTree.test.ts src/features/chat/__tests__/useAiWorkspaceTabs.test.tsx --coverage",
     "test:e2e": "playwright test",
     "check:architecture": "node scripts/check-architecture.mjs"
   },

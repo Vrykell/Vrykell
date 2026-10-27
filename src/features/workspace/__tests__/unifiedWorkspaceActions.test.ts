@@ -5,7 +5,8 @@ import { compositionTabs, useUnifiedWorkspace } from '../stores/unifiedWorkspace
 import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useChatStore } from '@features/chat/stores/chat';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
-import { addUnifiedResource, closeTerminalPane, connectUnifiedAgent, createUnifiedResource, createUnifiedTerminal, requestTerminalSplit, requestWorkspaceSplit, showUnifiedTerminalGroup } from '../services/unifiedWorkspace';
+import { addUnifiedResource, focusUnifiedResource, closeTerminalPane, connectUnifiedAgent, createUnifiedResource, createUnifiedTerminal, requestTerminalSplit, requestWorkspaceSplit, showUnifiedTerminalGroup } from '../services/unifiedWorkspace';
+import { editorFileKey } from '@core/editor';
 import { renameWorkspaceResource } from '../services/workspaceResources';
 import { workspacePaneCells, workspacePaneIds } from '../model/workspaceResources';
 import { leaf } from '../model/windowLayout';
@@ -16,8 +17,8 @@ vi.mock('@platform/diagnostics', () => ({ invoke: vi.fn(async () => undefined), 
 beforeEach(() => {
   useWorkspaceStore.setState({ tabs: [], activeId: '' });
   useWorkspaceNavigation.setState({ area: 'unified' });
-  useUnifiedWorkspace.setState({ layout: null, focused: '', order: [] });
-  useAiWorkspace.setState({ nativeTabs: [], selected: '', order: [] });
+  useUnifiedWorkspace.setState({ layout: null, focused: '' });
+  useAiWorkspace.setState({ nativeTabs: [], selected: '' });
   useChatStore.setState({ conversations: [], byTab: {} });
   useHarnessWorkspace.setState({ connections: [] });
   for (const store of Object.values(scopedPaneStores)) store.setState({ layout: null, focused: '', choosingSplit: false });
@@ -37,6 +38,18 @@ it('creates and splits new resources without replacing the existing pane or exce
   expect(useWorkspaceStore.getState().tabs).toBe(tabs);
   expect(useUnifiedWorkspace.getState().layout).toBe(layout);
   expect(useWorkspaceNavigation.getState().area).toBe('unified');
+});
+
+it('adds an existing resource to the active composition instead of opening another tab', () => {
+  createUnifiedResource('terminal'); const active = useUnifiedWorkspace.getState().activeTabId;
+  const file = { path: '/repo/notes.txt' }; useWorkspaceStore.getState().openEditorFile(file);
+  const id = `file:${editorFileKey(file)}`;
+  useUnifiedWorkspace.getState().show(id); expect(compositionTabs()).toHaveLength(2);
+  useUnifiedWorkspace.getState().selectTab(active); addUnifiedResource(id);
+  expect(compositionTabs()).toHaveLength(1);
+  expect(compositionTabs()[0]!.id).toBe(active);
+  expect(workspacePaneIds(compositionTabs()[0]!.layout!)).toContain(id);
+  expect(useUnifiedWorkspace.getState().activeTabId).toBe(active);
 });
 
 it('splits an agent through its existing connection model and preserves its directory', () => {
@@ -143,12 +156,12 @@ it('never adds a fifth pane when a switcher selection arrives at a full composit
     second: { type: 'split', direction: 'row', ratio: 0.5, first: panes[2]!, second: panes[3]! },
   } });
 
-  addUnifiedResource('terminal:two#0');
+  focusUnifiedResource('terminal:two#0');
   expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toEqual(['terminal:two#0']);
-  expect(compositionTabs().some(tab => tab.paneLayout && workspacePaneCells(tab.paneLayout).length === 4)).toBe(true);
-  expect(compositionTabs().every(tab => !tab.paneLayout || workspacePaneCells(tab.paneLayout).length <= 4)).toBe(true);
+  expect(compositionTabs().some(tab => tab.layout && workspacePaneCells(tab.layout).length === 4)).toBe(true);
+  expect(compositionTabs().every(tab => !tab.layout || workspacePaneCells(tab.layout).length <= 4)).toBe(true);
 
   const current = useUnifiedWorkspace.getState().layout;
-  addUnifiedResource('page:history');
+  focusUnifiedResource('page:history');
   expect(useUnifiedWorkspace.getState().layout).toBe(current);
 });

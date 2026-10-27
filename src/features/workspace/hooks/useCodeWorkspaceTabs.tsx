@@ -1,32 +1,19 @@
 import { useMemo } from 'react';
+import { editorFileKey } from '@core/editor';
+import { gitComparisonKey } from '@core/git';
 import { useEditorDocuments } from '@features/editor/stores/documents';
-import { useSessionStore } from '@features/workspace';
-import { useWorkspaceNavigation } from '../stores/navigation';
+import { useWorkspaceStore } from '../stores/workspace';
 import { projectCodeTabs } from '../model/codeTabHandles';
-import type { WorkspaceTabStrip } from '../model/tabStrip';
+import { useWorkspaceContainerTabs } from './useWorkspaceContainerTabs';
 
-/** Files and comparisons share ordering while retaining their original close guards. */
-export function useCodeWorkspaceTabs(): WorkspaceTabStrip {
-  const tabs = useSessionStore(state => state.tabs);
+/** Resource presentation feeds the same container provider used by every workspace. */
+export function useCodeWorkspaceTabs() {
+  const tabs = useWorkspaceStore(state => state.tabs);
+  const activeId = useWorkspaceStore(state => state.activeId);
   const documents = useEditorDocuments(state => state.documents);
-  const order = useWorkspaceNavigation(state => state.codeOrder);
-  const targets = useMemo(() => projectCodeTabs(tabs, documents, order), [tabs, documents, order]);
-  const target = (id: string) => targets.find(item => item.handle.id === id);
-  return {
-    handles: targets.map(item => item.handle),
-    onSelect: id => {
-      const item = target(id);
-      if (!item) return;
-      if ('file' in item) useSessionStore.getState().openEditorFile(item.file);
-      else useSessionStore.getState().activateGitComparison(item.comparisonId);
-    },
-    onClose: id => {
-      const item = target(id);
-      if (!item) return;
-      if ('file' in item) useSessionStore.getState().closeEditorFile(item.file);
-      else useSessionStore.getState().closeGitComparison(item.comparisonId);
-    },
-    onMove: (id, over, after) => useWorkspaceNavigation.getState()
-      .moveCodeTab(targets.map(item => item.handle.id), id, over, after),
-  };
+  const targets = useMemo(() => projectCodeTabs(tabs, documents), [tabs, documents]);
+  const tab = tabs.find(tab => tab.id === activeId);
+  const selected = tab?.kind === 'editor' ? `file:${editorFileKey(tab.selected)}` : tab?.kind === 'git-diff'
+    ? `diff:${tab.comparisons?.find(item => gitComparisonKey(item.selection) === gitComparisonKey(tab.selection))?.id ?? tab.id}` : undefined;
+  return useWorkspaceContainerTabs('code', targets.map(target => target.handle), selected);
 }

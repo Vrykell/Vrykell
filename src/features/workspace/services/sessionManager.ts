@@ -10,7 +10,7 @@ import { sanitizeOutputHtml } from '@utils/sanitizeHtml';
 import { useChatStore } from '@features/chat';
 import { deserializeParts } from '@features/agent/model/messageParts';
 import { deserializeAttachments } from '@features/agent/model/attachments';
-import { firstLeaf, leaf, type WindowLayout } from '@features/workspace/model/windowLayout';
+import { firstLeaf, leaf, parseWindowLayout, replaceLeaf, type WindowLayout } from '@features/workspace/model/windowLayout';
 import { groupsList, sessionSetGroup } from '@platform/api/group';
 import {
   createSession,
@@ -24,9 +24,11 @@ import {
   deleteSession,
   recordBlock,
   getSessionBlocks,
+  moveTerminalPanes,
   listChatMessages,
 } from '@platform/api/session';
 import { useToastStore } from '@ui/feedback/Toast';
+import { t } from '@i18n';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import type { BackendBlockEntry, BackendSessionEntry } from '@platform/api/types';
 
@@ -44,9 +46,8 @@ function parseLayout(payload: string, sessionId: string): WindowLayout {
       shellType?: string;
       ssh?: { name?: string; host?: string; user?: string | null; port?: number | null; connectionId?: string | null };
     };
-    if (p.layout && typeof p.layout === 'object' && p.layout !== null) {
-      return p.layout as WindowLayout;
-    }
+    const layout = parseWindowLayout(p.layout);
+    if (layout) return layout;
     if (p.ssh) {
       return leaf({
         id: `${sessionId}#0`, kind: 'ssh',
@@ -64,11 +65,8 @@ function parseLayout(payload: string, sessionId: string): WindowLayout {
 
 /** Older sessions kept one cwd on the session row instead of each terminal pane. */
 function applyLegacyCwd(layout: WindowLayout, cwd: string): WindowLayout {
-  if (layout.type === 'leaf') {
-    if (!layout.terminal || layout.terminal.cwd) return layout;
-    return { ...layout, terminal: { ...layout.terminal, cwd } };
-  }
-  return { ...layout, first: applyLegacyCwd(layout.first, cwd) };
+  const first = firstLeaf(layout);
+  return first.cwd ? layout : replaceLeaf(layout, first.id, { ...first, cwd });
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -88,6 +86,36 @@ export async function create(
 
 const pendingSessions = new Map<string, { title: string; timestamp: number; cwd?: string; kind: string; payload: string }>();
 const sessionWrites = new Map<string, Promise<void>>();
+const paneTransfers = new Map<string, Promise<void>>();
+
+/** Serialize ownership changes with subsequent history writes and session closure. */
+export function transferPanes(sourceId: string, targetId: string, paneIds: string[]): Promise<void> {
+  useChatStore.setState(state => {
+    const messages = state.byTab[sourceId] ?? [];
+    const moves = (paneId?: string) => paneId ? paneIds.includes(paneId) : paneIds.includes(`${sourceId}#0`) || paneIds.includes(sourceId);
+    const transferred = messages.filter(message => moves(message.paneId)).map(message => ({ ...message, paneId: message.paneId ?? paneIds[0] }));
+    if (!transferred.length) return state;
+    const target = state.byTab[targetId] ?? [];
+    return { byTab: { ...state.byTab, [sourceId]: messages.filter(message => !moves(message.paneId)), [targetId]: [...target, ...transferred.filter(message => !target.some(item => item.id === message.id))] } };
+  });
+  const previous = Promise.all([paneTransfers.get(sourceId), paneTransfers.get(targetId)]);
+  const operation = previous.then(async () => {
+    const persisted = await persistedSessionIds([sourceId]);
+    if (!persisted.has(sourceId)) return;
+    await ensureContentSession(targetId);
+    await moveTerminalPanes(sourceId, targetId, paneIds);
+  });
+  paneTransfers.set(sourceId, operation); paneTransfers.set(targetId, operation);
+  void operation.finally(() => {
+    if (paneTransfers.get(sourceId) === operation) paneTransfers.delete(sourceId);
+    if (paneTransfers.get(targetId) === operation) paneTransfers.delete(targetId);
+  }).catch(() => {});
+  return operation;
+}
+
+export async function settlePaneTransfers(ids: readonly string[]) {
+  await Promise.all(ids.map(id => paneTransfers.get(id)));
+}
 /** Group draft tabs in memory without creating empty history records. */
 export async function persistedSessionIds(ids: readonly string[]): Promise<Set<string>> {
   await Promise.all(ids.map(id => sessionWrites.get(id) ?? Promise.resolve()));
@@ -149,6 +177,7 @@ export async function setCwd(tabId: string, cwd: string): Promise<void> {
 
 /** 关闭会话（关闭标签页时调用 — 标记为 historical） */
 export async function close(tabId: string): Promise<void> {
+  await paneTransfers.get(tabId);
   const pending = layoutTimers.get(tabId);
   if (pending) {
     clearTimeout(pending);
@@ -334,7 +363,7 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
   }
 
   if (degraded) {
-    useToastStore.getState().addToast(`会话「${title || sessionId}」恢复不完整：部分内容未能加载`, 'error');
+    useToastStore.getState().addToast(t('Session "{{name}}" restored incompletely; some content could not be loaded.', { name: title || sessionId }), 'error');
   }
 }
 
@@ -372,6 +401,7 @@ export async function record(
 ): Promise<void> {
   if (!block.command.trim() && !block.outputText.trim() && !block.outputRaw.trim()) return;
   try {
+    await paneTransfers.get(tabId);
     await ensureContentSession(tabId);
     await recordBlock(
       block.id,

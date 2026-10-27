@@ -139,6 +139,8 @@ export function useTerminalSession(
   onReady: (sessionId: string) => void,
   onConnectionOutput?: (text: string) => void,
 ) {
+  const ownerTab = useRef(tabId);
+  ownerTab.current = tabId;
   const containerRef = useRef<HTMLDivElement>(null);
   const [attempt, setAttempt] = useState(0);
   const [status, setStatus] = useState<'connecting' | 'ready' | 'closed' | 'error'>('connecting');
@@ -253,7 +255,7 @@ export function useTerminalSession(
       if (disposed || stopped) return;
       stopped = true;
       if (isTerminalDebugEnabled()) {
-        terminalDebug('session-close-request', { paneId, tabId, hasSession: Boolean(sessionId) });
+        terminalDebug('session-close-request', { paneId, tabId: ownerTab.current, hasSession: Boolean(sessionId) });
       }
       const id = sessionId;
       try {
@@ -274,7 +276,7 @@ export function useTerminalSession(
     // ── 管线：controller（扫描已在 Rust 端完成，这里直接消费事件） ──
 
     // 从窗口布局取该终端的打开模式（paneId 即终端 id）
-    const tab = useSessionStore.getState().tabs.find((t) => t.id === tabId);
+    const tab = useSessionStore.getState().tabs.find((t) => t.id === ownerTab.current);
     const spec = tab && tab.kind === 'session'
       ? layoutLeaves(tab.layout).find((t) => t.id === paneId)
       : undefined;
@@ -319,7 +321,7 @@ export function useTerminalSession(
       // A duplicate mount for the same pane means the pane was torn down and
       // rebuilt (SSH would then re-authenticate from scratch); correlate it with
       // the dispose marker to spot an unexpected remount.
-      terminalDebug('session-mount', { paneId, tabId, attempt, kind: spec?.kind ?? 'none', openMode });
+      terminalDebug('session-mount', { paneId, tabId: ownerTab.current, attempt, kind: spec?.kind ?? 'none', openMode });
     }
 
     // The local scene mirror determines whether the PTY uses full or block-list width.
@@ -364,14 +366,14 @@ export function useTerminalSession(
             terminalDebug('manual-fullscreen-cancelled', { paneId, reason: scene });
           }
         }
-        if (useSessionStore.getState().activeId !== tabId || !['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) || useUiStore.getState().settingsOpen) return;
+        if (useSessionStore.getState().activeId !== ownerTab.current || !['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) || useUiStore.getState().settingsOpen) return;
         if (scene === 'blockList') {
           term.reset(); // 清掉 classic 残留
           useTerminalStore.getState().setKeyboardTarget('input');
         } else {
           useTerminalStore.getState().setKeyboardTarget('terminal');
           focusTimer = setTimeout(() => {
-            if (disposed || currentScene !== scene || useSessionStore.getState().activeId !== tabId || !['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) || useUiStore.getState().settingsOpen || document.activeElement?.closest('.ai-workspace-surface')) return;
+            if (disposed || currentScene !== scene || useSessionStore.getState().activeId !== ownerTab.current || !['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) || useUiStore.getState().settingsOpen || document.activeElement?.closest('.ai-workspace-surface')) return;
             term.focus();
             const textarea = term.element?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
             if (isTerminalDebugEnabled()) {
@@ -395,16 +397,16 @@ export function useTerminalSession(
       },
       onBlockStart: (block) => {
         if (spec) captureHistoryCommand(spec, paneId, block);
-        sessionManager.record(tabId, paneId, block, 'start');
+        sessionManager.record(ownerTab.current, paneId, block, 'start');
         // 惯用命名：标题跟随「聚焦终端」的首条命令（未定名时）
         if (block.command && paneId === useTerminalStore.getState().focusedPaneId) {
-          useSessionStore.getState().titleFromCommand(tabId, block.command);
+          useSessionStore.getState().titleFromCommand(ownerTab.current, block.command);
         }
       },
       onBlockComplete: (block) => {
         if (spec) captureHistoryCommand(spec, paneId, block);
         useHistoryStore.getState().record(block.command, block.cwd ?? '', block.exitCode);
-        sessionManager.record(tabId, paneId, block, 'complete');
+        sessionManager.record(ownerTab.current, paneId, block, 'complete');
         // Return a manually fullscreened running block to the block list when it ends.
         const ts = useTerminalStore.getState();
         if (ts.manualFullscreen[paneId]) {
@@ -433,7 +435,7 @@ export function useTerminalSession(
       if (sessionControllers.has(targetPane)) setPendingTerminalCommand(targetPane, command, payload);
     });
     if (isTerminalDebugEnabled()) {
-      terminalDebug('session-controller-register', { paneId, tabId, scene: initialScene, blockEnabled, deferBlockUntilPreexec });
+      terminalDebug('session-controller-register', { paneId, tabId: ownerTab.current, scene: initialScene, blockEnabled, deferBlockUntilPreexec });
     }
     // 初始场景手动落位（无 OSC 133 触发）：
     // blockList → 清 classic 残留、焦点到输入栏；classic → 焦点到 xterm 直接打字
@@ -594,7 +596,7 @@ export function useTerminalSession(
     const spawnCols = term.cols > 0 ? term.cols : 80;
     const spawnRows = term.rows > 0 ? term.rows : 24;
     if (isTerminalDebugEnabled()) {
-      terminalDebug('pty-spawn-request', { paneId, tabId, cols: spawnCols, rows: spawnRows, spawnOpts });
+      terminalDebug('pty-spawn-request', { paneId, tabId: ownerTab.current, cols: spawnCols, rows: spawnRows, spawnOpts });
     }
     const startSession = async () => {
       if (spec?.kind === 'local' && spawnOpts) {
@@ -641,7 +643,7 @@ export function useTerminalSession(
         preSession = [];
         onReadyRef.current(id);
         setStatus('ready');
-        if (currentScene === 'classic' && useSessionStore.getState().activeId === tabId && ['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) && !useUiStore.getState().settingsOpen && !document.activeElement?.closest('.ai-workspace-surface') && !(spec?.kind === 'ssh' && blockEnabled && connectionOutputRef.current)) {
+        if (currentScene === 'classic' && useSessionStore.getState().activeId === ownerTab.current && ['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) && !useUiStore.getState().settingsOpen && !document.activeElement?.closest('.ai-workspace-surface') && !(spec?.kind === 'ssh' && blockEnabled && connectionOutputRef.current)) {
           term.focus();
         }
         // PTY 就绪后按真实布局尺寸重校
@@ -934,7 +936,7 @@ export function useTerminalSession(
     };
     let restoreRaf = 0;
     const unsubscribeActiveTab = useSessionStore.subscribe((state, previous) => {
-      if (state.activeId !== tabId || state.activeId === previous.activeId) return;
+      if (state.activeId !== ownerTab.current || state.activeId === previous.activeId) return;
       // The store changes before React reveals the pane. Repaint after layout even
       // when a rapid tab switch never produces a zero-size ResizeObserver entry.
       cancelAnimationFrame(restoreRaf);
@@ -994,7 +996,7 @@ export function useTerminalSession(
       if (closeSessionRef.current === close) closeSessionRef.current = async () => {};
       startupAbort.abort();
       if (isTerminalDebugEnabled()) {
-        terminalDebug('session-controller-dispose', { paneId, tabId, attempt, kind: spec?.kind ?? 'none', hasSession: Boolean(sessionId) });
+        terminalDebug('session-controller-dispose', { paneId, tabId: ownerTab.current, attempt, kind: spec?.kind ?? 'none', hasSession: Boolean(sessionId) });
       }
       if (focusTimer) {
         clearTimeout(focusTimer);
@@ -1035,7 +1037,7 @@ export function useTerminalSession(
       releaseTerminalRenderer(term);
       term.dispose();
     };
-  }, [paneId, tabId, attempt]);
+  }, [paneId, attempt]);
 
   return { ref: containerRef, closeSession, reconnect, stopReconnect, retry, status, frame, sshAuthenticated, sshLog };
 }

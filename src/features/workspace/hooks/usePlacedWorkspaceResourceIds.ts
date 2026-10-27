@@ -1,15 +1,9 @@
-import { useMemo } from 'react';
-import { useWorkspaceStore } from '../stores/workspace';
-import { scopedPaneStores, type PaneWorkspaceScope } from '../stores/scopedPanes';
-import { workspacePaneCells } from '../model/workspaceResources';
+import { useWorkbenchStore } from '../stores/workbench';
+import { panesOf } from '../model/workbench';
+import type { PaneWorkspaceScope } from '../stores/scopedPanes';
 
-/** Resources assigned to main layouts cannot be borrowed by an auxiliary surface. */
+/** Every inactive tab retains ownership too, so auxiliary views cannot borrow its host. */
 export function usePlacedWorkspaceResourceIds(scope: PaneWorkspaceScope): string[] {
-  const tabs = useWorkspaceStore(state => state.tabs);
-  const layout = scopedPaneStores[scope](state => state.layout);
-  const choosingSplit = scopedPaneStores[scope](state => state.choosingSplit);
-  return useMemo(() => [...new Set([
-    ...tabs.flatMap(tab => tab.kind === 'workspace' && tab.paneLayout ? workspacePaneCells(tab.paneLayout).map(cell => cell.resourceId) : []),
-    ...(layout && (choosingSplit || workspacePaneCells(layout).length > 1) ? workspacePaneCells(layout).map(cell => cell.resourceId) : []),
-  ])], [tabs, layout, choosingSplit]);
+  const tabs = useWorkbenchStore(state => state.snapshot.tabs);
+  return [...new Set(tabs.filter(tab => tab.scope === 'unified' || tab.scope === scope && panesOf(tab).length > 1).flatMap(panesOf).map(pane => pane.resourceId))];
 }

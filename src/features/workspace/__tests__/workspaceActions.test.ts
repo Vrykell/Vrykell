@@ -8,12 +8,14 @@ import { useWorkspaceNavigation } from '../stores/navigation';
 import { useAiWorkspace, useChatStore } from '@features/chat';
 import { activateWorkspaceInstance, focusedWorkspaceArea, newWorkspaceItem, openWorkspaceFile } from '../services/workspaceActions';
 import { closeWorkspaceItem } from '../services/closeWorkspaceItem';
+import { synchronizeWorkbench } from '../services/workbench';
+import { useWorkbenchStore } from '../stores/workbench';
 
 const snapshot = useWorkspaceStore.getState();
 beforeEach(() => {
   useWorkspaceStore.setState({ tabs: [], activeId: '', groups: [] });
-  useWorkspaceNavigation.setState({ area: 'terminal', collapsed: false, codeOrder: [], aiPlacement: 'main' });
-  useAiWorkspace.setState({ nativeTabs: [], selected: '', sideSelected: '', sideSessions: [], order: [] });
+  useWorkspaceNavigation.setState({ area: 'terminal', collapsed: false, aiPlacement: 'main' });
+  useAiWorkspace.setState({ nativeTabs: [], selected: '', sideSelected: '', sideSessions: [] });
 });
 afterEach(() => { useWorkspaceStore.setState(snapshot, true); document.body.replaceChildren(); vi.clearAllMocks(); });
 
@@ -21,7 +23,7 @@ it('restores composer focus after a numeric shortcut switches the side conversat
   useWorkspaceNavigation.setState({ area: 'terminal', aiPlacement: 'side' });
   const first = useChatStore.getState().createConversation();
   const second = useChatStore.getState().createConversation();
-  useAiWorkspace.setState({ nativeTabs: [first, second], sideSelected: `chat:${first}`, sideSessions: [`chat:${first}`, `chat:${second}`], order: [] });
+  useAiWorkspace.setState({ nativeTabs: [first, second], sideSelected: `chat:${first}`, sideSessions: [`chat:${first}`, `chat:${second}`] });
   const surface = document.createElement('div'); surface.dataset.testid = 'ai-surface-side';
   const previous = document.createElement('textarea'); previous.dataset.chatComposer = 'true';
   surface.append(previous); document.body.append(surface); previous.focus();
@@ -63,21 +65,21 @@ it('selects files and comparisons using their mixed strip order', () => {
   const comparison = useWorkspaceStore.getState().tabs.find(tab => tab.kind === 'git-diff')!;
   if (comparison.kind !== 'git-diff') throw new Error('Expected comparison');
   const id = comparison.comparisons?.[0].id ?? comparison.id;
-  useWorkspaceNavigation.setState({ codeOrder: [`diff:${id}`, `file:${editorFileKey(file)}`] });
+  synchronizeWorkbench(); useWorkbenchStore.getState().update(state => ({ ...state, order: { code: [`tab:diff:${id}`, `tab:file:${editorFileKey(file)}`] } }));
   expect(activateWorkspaceInstance(1)).toBe(true);
   expect(useWorkspaceStore.getState().tabs.find(tab => tab.id === useWorkspaceStore.getState().activeId)?.kind).toBe('editor');
   expect(activateWorkspaceInstance(0)).toBe(true);
   expect(useWorkspaceStore.getState().activeId).toBe(comparison.id);
   expect(activateWorkspaceInstance(8)).toBe(false);
 });
-it('selects terminal groups in visual order and expands the selected collapsed group', () => {
+it('selects terminal groups in visual order and expands the selected collapsed group', async () => {
   useWorkspaceStore.setState({ tabs: [
     { id: 'loose', kind: 'session', title: 'Loose', layout: { type: 'leaf', terminal: { id: 'loose#0', kind: 'local' } } },
     { id: 'grouped', kind: 'session', title: 'Grouped', groupId: 'group', layout: { type: 'leaf', terminal: { id: 'grouped#0', kind: 'local' } } },
   ], activeId: 'loose', groups: [{ id: 'group', title: 'Group', collapsed: true }] });
   expect(activateWorkspaceInstance(0)).toBe(true);
   expect(useWorkspaceStore.getState().activeId).toBe('grouped');
-  expect(useWorkspaceStore.getState().groups[0].collapsed).toBe(false);
+  await vi.waitFor(() => expect(useWorkspaceStore.getState().groups[0].collapsed).toBe(false));
 });
 it('creates AI conversations in the focused side surface without replacing the main workspace', () => {
   useWorkspaceNavigation.setState({ area: 'terminal', aiPlacement: 'side' });

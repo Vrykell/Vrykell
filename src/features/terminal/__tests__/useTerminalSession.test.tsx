@@ -117,12 +117,20 @@ function setSshTab(autoReconnect: boolean) {
   });
 }
 
-function TestHarness({ tabId, onReady }: { tabId: string; onReady: (sessionId: string) => void }) {
-  const { ref, closeSession, reconnect, sshAuthenticated, sshLog } = useTerminalSession(tabId, tabId, onReady);
+function TestHarness({ tabId, paneId = tabId, onReady }: { tabId: string; paneId?: string; onReady: (sessionId: string) => void }) {
+  const { ref, closeSession, reconnect, sshAuthenticated, sshLog } = useTerminalSession(paneId, tabId, onReady);
   return <><div ref={ref} data-testid="term-host" /><output data-testid="ssh-auth-state">{sshAuthenticated ? 'authenticated' : 'unconfirmed'}</output><output data-testid="ssh-log">{sshLog.map(entry => entry.text).join(' | ')}</output><button onClick={() => void closeSession()}>关闭连接</button><button onClick={() => void reconnect()}>重连</button></>;
 }
 
 describe('useTerminalSession', () => {
+  it('keeps the process attached when a stable pane moves to a different container', async () => {
+    setTab('block');
+    const ready = vi.fn(); const view = render(<TestHarness tabId="t1" paneId="t1" onReady={ready} />);
+    await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalledOnce());
+    act(() => useWorkspaceStore.setState({ tabs: [{ id: 'moved', title: 'Moved', kind: 'session', layout: leaf({ id: 't1', kind: 'local', openMode: 'block' }) }], activeId: 'moved' }));
+    view.rerender(<TestHarness tabId="moved" paneId="t1" onReady={ready} />);
+    expect(mockedPtySpawn).toHaveBeenCalledOnce(); expect(ptyClose).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     terminalInitOptions.length = 0;
     terminalInstances.length = 0;

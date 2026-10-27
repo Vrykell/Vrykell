@@ -43,8 +43,11 @@ test.describe('侧栏列表拖拽排序', () => {
         const store = useWorkspaceStore.getState();
         const first = store.tabs.find(tab => tab.kind === 'session')!.id;
         const second = store.addTab({ title: 'Grouped second' });
-        const groupId = await store.createGroupForTab(first, 'Regression group');
-        useWorkspaceStore.getState().moveTab(second, groupId, 1);
+        const workbenchPath = '/src/features/workspace/services/workbench.ts';
+        const { synchronizeWorkbench, createContainerGroup, assignWorkspaceGroup } = await import(workbenchPath) as typeof import('../src/features/workspace/services/workbench');
+        synchronizeWorkbench();
+        const groupId = await createContainerGroup(first, 'Regression group');
+        await assignWorkspaceGroup(second, groupId);
         if (withSingleton) store.openHistoryTab();
         return { first, groupId };
       }, singleton);

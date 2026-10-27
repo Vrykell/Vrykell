@@ -94,7 +94,7 @@ interface ChatState {
   createConversation: (environment?: ChatEnvironment | null, options?: { activate?: boolean }) => string;
   setEnvironment: (id: string, environment: ChatEnvironment | null) => void;
   renameConversation: (id: string, title: string) => void;
-  deleteConversation: (id: string) => Promise<void>;
+  deleteConversation: (id: string, options?: { activateNext?: boolean }) => Promise<void>;
   retryPersistence: () => Promise<void>;
   /** Independent conversations and legacy terminal history are keyed by their owning ID. */
   byTab: Record<string, ChatMessage[]>;
@@ -430,7 +430,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     set(state => ({ conversations: state.conversations.map(conversation => conversation.id === id ? updated : conversation) }));
     void persistConversation(updated);
   },
-  deleteConversation: async (id) => {
+  deleteConversation: async (id, options) => {
     if (get().sendingTabs.includes(id) || pendingConversationDeletes.has(id)) return;
     pendingConversationDeletes.add(id);
     try {
@@ -438,6 +438,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       set(state => ({ conversations: state.conversations.filter(conversation => conversation.id !== id) }));
       get().dropTab(id);
       if (get().activeConversationId === id) {
+        if (options?.activateNext === false) { set({ activeConversationId: '' }); return; }
         const next = get().conversations[0]?.id;
         if (next) await get().selectConversation(next);
         else get().createConversation();

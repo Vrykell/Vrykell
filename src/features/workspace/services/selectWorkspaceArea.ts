@@ -1,6 +1,8 @@
 import { useWorkspaceStore } from '../stores/workspace';
 import { useUiStore } from '../stores/ui';
 import { useWorkspaceNavigation, workspaceAreaForKind, type HistoryTypePreset, type WorkspaceArea } from '../stores/navigation';
+import { useWorkbenchStore } from '../stores/workbench';
+import { activateContainer } from './workbench';
 
 export function selectWorkspaceArea(area: WorkspaceArea, historyPreset: HistoryTypePreset = 'all') {
   const navigation = useWorkspaceNavigation.getState();
@@ -11,6 +13,13 @@ export function selectWorkspaceArea(area: WorkspaceArea, historyPreset: HistoryT
     return;
   }
   navigation.selectArea(area);
+  if (area === 'terminal' || area === 'code' || area === 'ai' || area === 'unified') {
+    const id = useWorkbenchStore.getState().snapshot.selected[area];
+    if (id && useWorkbenchStore.getState().snapshot.tabs.some(tab => tab.id === id && tab.layout)) {
+      if (area === 'ai') navigation.setAiPlacement('main');
+      activateContainer(id); return;
+    }
+  }
   if (area === 'ssh' || area === 'forwarding' || area === 'unified') return;
   if (area === 'ai') {
     navigation.setAiPlacement('main');

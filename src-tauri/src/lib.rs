@@ -278,6 +278,8 @@ pub fn run() {
             commands::session::update_session_title,
             commands::session::update_session_cwd,
             commands::session::update_session_payload,
+            commands::session::move_terminal_panes,
+            commands::session::delete_terminal_panes,
             commands::session::get_session,
             commands::session::delete_session,
             commands::session::record_block,

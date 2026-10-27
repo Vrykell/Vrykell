@@ -25,6 +25,8 @@ export interface WorkspaceHistorySnapshot {
   layout: WorkspacePaneLayout;
   focused: string;
   members: WorkspaceHistoryMember[];
+  workspaceScope?: 'terminal' | 'code' | 'ai' | 'unified';
+  group?: { id: string; title: string; collapsed: boolean };
 }
 
 export interface WorkspaceHistoryIdentity { id: string; createdAt: number }
@@ -38,6 +40,12 @@ export function parseWorkspaceHistory(payload: string): WorkspaceHistorySnapshot
     const value: unknown = JSON.parse(payload);
     if (!value || typeof value !== 'object') return null;
     const snapshot = value as Record<string, unknown>;
+    if (snapshot.workspaceScope !== undefined && !['terminal', 'code', 'ai', 'unified'].includes(String(snapshot.workspaceScope))) return null;
+    if (snapshot.group !== undefined) {
+      if (!snapshot.group || typeof snapshot.group !== 'object') return null;
+      const group = snapshot.group as Record<string, unknown>;
+      if (typeof group.id !== 'string' || !group.id || group.id.length > 256 || typeof group.title !== 'string' || !group.title || group.title.length > 320 || typeof group.collapsed !== 'boolean') return null;
+    }
     const layout = parseWorkspacePaneLayout(snapshot.layout);
     if (snapshot.version !== 1 || !layout || typeof snapshot.focused !== 'string' || !Array.isArray(snapshot.members)) return null;
     const cells = workspacePaneCells(layout);
@@ -59,7 +67,9 @@ export function parseWorkspaceHistory(payload: string): WorkspaceHistorySnapshot
       if (member.modes !== undefined && (!Array.isArray(member.modes) || member.modes.some(mode => mode !== 'block' && mode !== 'classic'))) return null;
       ids.add(member.id);
     }
-    return { version: 1, layout, focused: snapshot.focused, members: snapshot.members as WorkspaceHistoryMember[] };
+    return { version: 1, layout, focused: snapshot.focused, members: snapshot.members as WorkspaceHistoryMember[],
+      ...(snapshot.workspaceScope ? { workspaceScope: snapshot.workspaceScope as WorkspaceHistorySnapshot['workspaceScope'] } : {}),
+      ...(snapshot.group ? { group: snapshot.group as WorkspaceHistorySnapshot['group'] } : {}) };
   } catch { return null; }
 }
 

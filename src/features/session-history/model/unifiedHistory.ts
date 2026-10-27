@@ -69,6 +69,10 @@ export type UnifiedHistoryRecord = HistoryRecordBase & (
   | { kind: 'workspace'; session: BackendSessionEntry; snapshot: WorkspaceHistorySnapshot }
 );
 
+export function originalWorkspaceGroupId(record: UnifiedHistoryRecord): string | null {
+  return record.kind === 'terminal' || record.kind === 'workspace' ? record.session.group_id : null;
+}
+
 const timestamp = (value: number, fallback: number) => Number.isFinite(value) ? value : Number.isFinite(fallback) ? fallback : 0;
 
 /** Read both sources without applying either original page's saved filters or changing ownership. */

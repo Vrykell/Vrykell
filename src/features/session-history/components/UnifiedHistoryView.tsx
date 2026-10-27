@@ -30,6 +30,7 @@ import { SESSION_DATE_OPTIONS, SESSION_MODE_OPTIONS } from '../model/sessionHist
 import {
   HISTORY_TYPES, UNIFIED_GROUP_BY_OPTIONS, UNIFIED_SORT_OPTIONS,
   groupUnifiedHistory, unifiedHistoryGroupIdentity, type UnifiedHistoryFilter, type UnifiedHistoryGroup, type UnifiedHistoryRecord,
+  originalWorkspaceGroupId,
 } from '../model/unifiedHistory';
 import { sessionSummaryText } from '../model/sessionHistoryModel';
 import { conversationMarkdown } from '@features/chat/model/conversationHistory';
@@ -80,12 +81,12 @@ export default function UnifiedHistoryView({ preset, destination }: { preset?: H
   const originalPinnedIds = useMemo(() => scopedGroupIds(pinnedGroups, 'session', 'original'), [pinnedGroups]);
   const originalGroupIds = useMemo(() => new Set(history.originalGroups.map(group => group.id)), [history.originalGroups]);
   const groups = useMemo(() => groupUnifiedHistory(history.visible.filter(record =>
-    record.kind !== 'terminal' || !record.session.group_id || !originalGroupIds.has(record.session.group_id)), history.filter.groupBy, pinnedIds, {
+    !originalGroupIds.has(originalWorkspaceGroupId(record) ?? '')), history.filter.groupBy, pinnedIds, {
     groupTitles, groupNotes, collapsedGroups,
   }), [collapsedGroups, groupNotes, groupTitles, history.filter.groupBy, history.visible, originalGroupIds, pinnedIds]);
-  const originalCards = useMemo(() => history.filter.type === 'conversation' ? [] : history.originalGroups.map(group => {
-    const all = history.records.filter(record => record.kind === 'terminal' && record.session.group_id === group.id);
-    const visible = history.visible.filter(record => record.kind === 'terminal' && record.session.group_id === group.id);
+  const originalCards = useMemo(() => history.originalGroups.map(group => {
+    const all = history.records.filter(record => originalWorkspaceGroupId(record) === group.id);
+    const visible = history.visible.filter(record => originalWorkspaceGroupId(record) === group.id);
     return { group, all, visible };
   }).filter(card => card.visible.length > 0), [history.filter.type, history.originalGroups, history.records, history.visible]);
 
@@ -140,7 +141,7 @@ export default function UnifiedHistoryView({ preset, destination }: { preset?: H
     setBatchBusy(true);
     try {
       const all = await history.collect(matching);
-      const targets = id === null ? all : all.filter(record => original ? record.kind === 'terminal' && record.session.group_id === id : unifiedHistoryGroupIdentity(record, history.filter.groupBy).id === id);
+      const targets = id === null ? all : all.filter(record => original ? originalWorkspaceGroupId(record) === id : unifiedHistoryGroupIdentity(record, history.filter.groupBy).id === id);
       setBatchBusy(false);
       await apply(targets);
     } catch (reason) { useToastStore.getState().addToast(String(reason), 'error'); }

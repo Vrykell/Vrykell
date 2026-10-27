@@ -136,9 +136,11 @@ function DocumentContent({ file, active, focused }: { file: EditorFile; active: 
     return () => window.removeEventListener('keydown', onKey, true);
   }, [focused, file]);
   return <section className="editor-pane" data-testid={active ? 'file-editor' : undefined} style={{ display: active ? 'flex' : 'none' }} inert={!active}>
-    <WorkspaceHeader active={active && focused}><FolderTabs items={active ? codeTabs.handles : []} selected={`file:${editorFileKey(file)}`} label={t('Open files and comparisons')} listId="code-documents" className="editor-tabs"
+    <WorkspaceHeader active={active && focused}><FolderTabs items={active ? codeTabs.handles : []} selected={codeTabs.selected ?? ''} grouping={codeTabs.grouping} onRename={codeTabs.onRename} label={t('Open files and comparisons')} listId="code-documents" className="editor-tabs"
       onSelect={codeTabs.onSelect} onClose={codeTabs.onClose}
+      tabActions={codeTabs.tabActions}
       onMove={codeTabs.onMove} menuItems={[
+        ...(codeTabs.tabActions?.(codeTabs.selected ?? '') ?? []),
         { label: t('New file'), onClick: newEditorFile },
         { label: t('Open file'), onClick: () => void openWorkspaceFile() },
         { label: t('Save file'), disabled: !canSave, shortcut: 'Ctrl/Cmd+S', onClick: save },

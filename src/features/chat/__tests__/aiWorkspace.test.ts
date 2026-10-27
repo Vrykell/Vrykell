@@ -18,12 +18,10 @@ it('closes a navigation tab without deleting the saved conversation, draft or me
   expect(useAiWorkspace.getState().selected).toBe('chat:native-a');
 });
 
-it('reuses native navigation tabs and interleaves them with connected sessions', () => {
+it('reuses native conversation registrations without owning another strip order', () => {
   useAiWorkspace.getState().openNative('native-a');
   useAiWorkspace.getState().openNative('native-a');
   expect(useAiWorkspace.getState().nativeTabs).toEqual(['native-a']);
-  useAiWorkspace.getState().move(['chat:native-a', 'acp:agent-a'], 'acp:agent-a', 'chat:native-a', false);
-  expect(useAiWorkspace.getState().order).toEqual(['acp:agent-a', 'chat:native-a']);
 });
 
 it('registers a side conversation without replacing the selected connected session', () => {

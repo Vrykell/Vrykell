@@ -17,10 +17,10 @@ test('command analysis retains the complete command and output through the model
   await block.click({ button: 'right' });
   await page.getByRole('menuitem', { name: '发给 AI 分析', exact: true }).click();
   const reference = await page.evaluate(async () => {
-    const chatPath = '/src/features/chat/stores/chat.ts'; const draftPath = '/src/features/chat/stores/composerDrafts.ts';
-    const { useChatStore } = await import(chatPath) as typeof import('../src/features/chat/stores/chat');
+    const chatPath = '/src/features/chat/stores/aiWorkspace.ts'; const draftPath = '/src/features/chat/stores/composerDrafts.ts';
+    const { useAiWorkspace } = await import(chatPath) as typeof import('../src/features/chat/stores/aiWorkspace');
     const { useComposerDrafts } = await import(draftPath) as typeof import('../src/features/chat/stores/composerDrafts');
-    return useComposerDrafts.getState().byTab[useChatStore.getState().activeConversationId]?.references?.[0];
+    return useComposerDrafts.getState().byTab[useAiWorkspace.getState().sideSelected.slice(5)]?.references?.[0];
   });
   expect(reference?.command).toBe(command);
   expect(reference?.output.length).toBeGreaterThan(2000);

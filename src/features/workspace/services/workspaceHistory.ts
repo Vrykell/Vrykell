@@ -7,6 +7,10 @@ import { useBlockStore } from '@features/terminal/stores/blocks';
 import { hasChatContent } from '@features/chat/model/chatContent';
 import { workspacePaneCells, type WorkspacePaneLayout, type WorkspaceResource } from '../model/workspaceResources';
 import type { WorkspaceHistoryIdentity, WorkspaceHistoryMember, WorkspaceHistorySnapshot } from '../model/workspaceHistory';
+import { useWorkbenchStore } from '../stores/workbench';
+import type { WorkspaceContainer } from '../model/workbench';
+import { putContainer } from '../model/workbench';
+import { sessionSetGroup } from '@platform/api/group';
 
 export function workspaceHistoryMember(resource: WorkspaceResource): WorkspaceHistoryMember | null {
   const base = { id: resource.id, title: resource.title.slice(0, 320), paneCount: 1, local: false, ssh: false,
@@ -73,6 +77,13 @@ export function captureWorkspaceHistory(layout: WorkspacePaneLayout | null, focu
   return { version: 1, layout, focused: cells.some(cell => cell.id === focused) ? focused : cells[0]!.id, members: members as WorkspaceHistoryMember[] };
 }
 
+export function captureContainerHistory(tab: WorkspaceContainer, resources: WorkspaceResource[]): WorkspaceHistorySnapshot | null {
+  const snapshot = captureWorkspaceHistory(tab.layout, tab.focused, resources, true);
+  if (!snapshot) return null;
+  const group = useWorkbenchStore.getState().snapshot.groups.find(group => group.id === tab.groupId && group.scope === tab.scope);
+  return { ...snapshot, workspaceScope: tab.scope, ...(group ? { group: { id: group.id, title: group.title, collapsed: group.collapsed } } : {}) };
+}
+
 export function createWorkspaceHistoryWriter(onError: (error: unknown) => void, onIdentity?: (identity: WorkspaceHistoryIdentity) => void) {
   let signature = '';
   let id = '';
@@ -99,12 +110,53 @@ export function createWorkspaceHistoryWriter(onError: (error: unknown) => void, 
     const request = { id, createdAt, timestamp: Date.now(), title, payload };
     lastPayload = payload;
     lastTitle = title;
-    queue = queue.then(() => {
-      if (suppressedHistoryIds.has(id)) return;
+    queue = queue.catch(() => {}).then(() => {
+      if (suppressedHistoryIds.has(request.id)) return;
       return saveWorkspaceHistory(request);
     }).catch(error => { lastPayload = ''; lastTitle = ''; onError(error); });
     return queue;
   };
+}
+
+const containerWriters = new Map<string, ReturnType<typeof createWorkspaceHistoryWriter>>();
+const containerWrites = new Map<string, Promise<void>>();
+const historyWrites = new Map<string, Promise<void>>();
+
+export const containerHistoryIdentity = (tab: WorkspaceContainer) => tab.historyIdentity ?? useWorkbenchStore.getState().snapshot.tabs.find(item => item.id === tab.id)?.historyIdentity;
+
+/** One queue owns metadata writes across active saves, close, archive and deletion. */
+export function persistContainerHistory(tab: WorkspaceContainer, snapshot: WorkspaceHistorySnapshot | null): Promise<void> {
+  if (!snapshot || tab.scope === 'terminal') return Promise.resolve();
+  const identity = containerHistoryIdentity(tab) ?? { id: `workspace:${crypto.randomUUID()}`, createdAt: Date.now() };
+  if (suppressedHistoryIds.has(identity.id)) return containerWrites.get(tab.id) ?? Promise.resolve();
+  const current = useWorkbenchStore.getState().snapshot.tabs.find(item => item.id === tab.id);
+  if (current && !current.historyIdentity) useWorkbenchStore.getState().update(state => putContainer(state, { ...current, historyIdentity: identity }));
+  let writer = containerWriters.get(tab.id);
+  if (!writer) { writer = createWorkspaceHistoryWriter(error => { throw error; }); containerWriters.set(tab.id, writer); }
+  const previous = Promise.all([containerWrites.get(tab.id), historyWrites.get(identity.id)]);
+  const write = writer;
+  const operation = previous.catch(() => {}).then(() => write(snapshot, identity, tab.title)).then(async () => {
+    if (suppressedHistoryIds.has(identity.id)) return;
+    const group = useWorkbenchStore.getState().snapshot.groups.find(group => group.id === tab.groupId && group.scope === tab.scope);
+    await sessionSetGroup(identity.id, group?.id ?? null);
+  });
+  containerWrites.set(tab.id, operation);
+  historyWrites.set(identity.id, operation);
+  void operation.finally(() => {
+    if (containerWrites.get(tab.id) === operation) containerWrites.delete(tab.id);
+    if (historyWrites.get(identity.id) === operation) historyWrites.delete(identity.id);
+    if (!useWorkbenchStore.getState().snapshot.tabs.some(item => item.id === tab.id)) containerWriters.delete(tab.id);
+  }).catch(() => {});
+  return operation;
+}
+
+export async function settleContainerHistory(ids: readonly string[]) {
+  await Promise.all(ids.map(id => containerWrites.get(id)));
+}
+
+export function releaseContainerHistory(id: string, reopen = false) {
+  containerWriters.delete(id);
+  if (reopen) clearWorkspaceHistorySuppression(`workspace:${id}`);
 }
 
 const suppressedHistoryIds = new Set<string>();

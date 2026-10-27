@@ -9,6 +9,7 @@ import { useWorkspaceStore } from '../stores/workspace';
 import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useChatStore } from '@features/chat/stores/chat';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
+import { useWorkbenchStore } from '../stores/workbench';
 
 const session = (id: string, title: string) => ({
   id, title, kind: 'session' as const,
@@ -23,8 +24,8 @@ function openSwitcher() {
 beforeEach(() => {
   useWorkspaceStore.setState({ tabs: [session('one', 'First shell'), session('two', 'Second shell')], activeId: 'one' });
   useWorkspaceNavigation.setState({ area: 'terminal' });
-  useUnifiedWorkspace.setState({ activeTabId: '', layout: null, focused: '', order: [], startActive: true, startOpen: true });
-  useAiWorkspace.setState({ nativeTabs: [], selected: '', order: [] });
+  useUnifiedWorkspace.setState({ activeTabId: '', layout: null, focused: '', startActive: true });
+  useAiWorkspace.setState({ nativeTabs: [], selected: '' });
   useChatStore.setState({ conversations: [], byTab: {} });
   useHarnessWorkspace.setState({ connections: [] });
 });
@@ -39,25 +40,22 @@ it('navigates to the native pane from a regular workspace', () => {
   expect(useUnifiedWorkspace.getState().layout).toBeNull();
 });
 
-it('focuses the resource in its own composition instead of splitting the current one', () => {
+it('moves an existing reference into the active composition instead of opening another tab', () => {
   useUnifiedWorkspace.getState().reconcile(['terminal:one#0', 'terminal:two#0']);
   useUnifiedWorkspace.setState({ zoomed: useUnifiedWorkspace.getState().focused });
   render(<WorkspaceResourceSwitcher destination="unified" />);
   fireEvent.click(within(openSwitcher()).getByRole('menuitem', { name: 'First shell' }));
 
-  expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toEqual(['terminal:one#0']);
-  expect(useUnifiedWorkspace.getState().activeTabId).toBe(
-    compositionTabs().find(tab => tab.paneLayout && workspacePaneIds(tab.paneLayout).includes('terminal:one#0'))!.id,
-  );
-  expect(compositionTabs()).toHaveLength(2);
-  expect(useWorkspaceStore.getState().activeId).toBe(useUnifiedWorkspace.getState().activeTabId);
+  expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toEqual(['terminal:two#0', 'terminal:one#0']);
+  expect(useUnifiedWorkspace.getState().zoomed).toBeNull();
+  expect(compositionTabs()).toHaveLength(1);
+  expect(useWorkbenchStore.getState().snapshot.selected.unified).toBe(useUnifiedWorkspace.getState().activeTabId);
+  expect(useWorkspaceStore.getState().activeId).toBe('one');
   expect(useWorkspaceNavigation.getState().area).toBe('unified');
 });
 
-it('creates a new composition tab and switches the workspace to it when the resource is unplaced', () => {
+it('places an unplaced resource into the active composition up to the pane limit', () => {
   useUnifiedWorkspace.getState().reconcile(['terminal:one#0', 'terminal:two#0']);
-  const second = compositionTabs().find(tab => tab.paneLayout && workspacePaneIds(tab.paneLayout).includes('terminal:two#0'))!;
-  useWorkspaceStore.setState({ tabs: useWorkspaceStore.getState().tabs.filter(tab => tab.id !== second.id) });
   useUnifiedWorkspace.getState().reconcile(['terminal:one#0']);
   const before = compositionTabs().length;
 
@@ -65,10 +63,11 @@ it('creates a new composition tab and switches the workspace to it when the reso
   fireEvent.click(within(openSwitcher()).getByRole('menuitem', { name: 'Second shell' }));
 
   const active = useUnifiedWorkspace.getState();
-  expect(compositionTabs()).toHaveLength(before + 1);
-  expect(workspacePaneIds(active.layout!)).toEqual(['terminal:two#0']);
-  expect(compositionTabs().find(tab => tab.id === active.activeTabId)?.paneLayout).toBe(active.layout);
-  expect(useWorkspaceStore.getState().activeId).toBe(active.activeTabId);
+  expect(compositionTabs()).toHaveLength(before);
+  expect(workspacePaneIds(active.layout!)).toEqual(['terminal:one#0', 'terminal:two#0']);
+  expect(compositionTabs().find(tab => tab.id === active.activeTabId)?.layout).toBe(active.layout);
+  expect(useWorkbenchStore.getState().snapshot.selected.unified).toBe(active.activeTabId);
+  expect(useWorkspaceStore.getState().activeId).toBe('two');
   expect(useWorkspaceNavigation.getState().area).toBe('unified');
 });
 

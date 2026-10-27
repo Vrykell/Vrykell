@@ -17,6 +17,7 @@ import AcpLauncher from './AcpLauncher';
 import { requestWorkspaceSplit } from '../services/unifiedWorkspace';
 import { pickWorkspaceFile } from '../services/workspaceActions';
 import type { EditorFile } from '@core/editor';
+import { detachWorkspacePane, mergeWorkspaceContainers, removeContainerPane } from '../services/workbench';
 
 export default function ScopedPaneWorkspace({ scope, selected, active }: { scope: PaneWorkspaceScope; selected: string; active: boolean }) {
   const store = scopedPaneStores[scope]; const state = store();
@@ -26,7 +27,7 @@ export default function ScopedPaneWorkspace({ scope, selected, active }: { scope
   const ids = resources.map(resource => resource.id); const key = JSON.stringify(ids);
   const splitting = useScopedSplitActive(scope);
   const settingsOpen = useUiStore(value => value.settingsOpen);
-  const [addition, setAddition] = useState<{ id: string } | { create: 'document' | 'conversation' } | { harness: string; cwd?: string } | { file: EditorFile } | null>(null);
+  const [addition, setAddition] = useState<{ id: string } | { tab: string } | { create: 'document' | 'conversation' } | { harness: string; cwd?: string } | { file: EditorFile } | null>(null);
   const [launcher, setLauncher] = useState<{ anchor: DropdownAnchor } | null>(null);
   const proceeding = useRef(false);
   const visible = active && splitting && !settingsOpen;
@@ -36,15 +37,17 @@ export default function ScopedPaneWorkspace({ scope, selected, active }: { scope
     if (bounds) store.setState({ splitAnchor: { x: bounds.right, y: bounds.bottom + 4 } });
   }, [visible, state.choosingSplit, state.splitAnchor, store]);
   useEffect(() => { state.reconcile(ids); }, [key]);
+  useEffect(() => { if (state.pendingMergeTab) setAddition({ tab: state.pendingMergeTab }); }, [state.pendingMergeTab]);
   useEffect(() => { if (active && splitting && ids.includes(selected)) state.show(selected); }, [active, splitting, selected]);
   useEffect(() => { if (!active || settingsOpen) { setAddition(null); setLauncher(null); store.setState({ choosingSplit: false }); } }, [active, settingsOpen, store]);
   const focus = (id: string) => {
     const resource = resources.find(item => item.id === id); if (!resource) return;
     state.show(id); activateWorkspaceResource(resource); useWorkspaceNavigation.getState().selectArea(scope);
   };
-  const cancel = () => { proceeding.current = false; setAddition(null); store.setState({ choosingSplit: false }); };
+  const cancel = () => { proceeding.current = false; setAddition(null); state.chooseMerge(); store.setState({ choosingSplit: false }); };
   const commit = (target: PaneTarget) => {
     if (!addition) return;
+    if ('tab' in addition) { void mergeWorkspaceContainers(addition.tab, state.activeTabId, target); cancel(); return; }
     let id: string | undefined;
     if ('id' in addition) id = addition.id;
     else id = createScopedResource(addition);
@@ -58,10 +61,7 @@ export default function ScopedPaneWorkspace({ scope, selected, active }: { scope
   };
   const placed = new Set(state.layout ? workspacePaneCells(state.layout).map(cell => cell.resourceId) : []);
   const remove = (id: string) => {
-    const current = store.getState(); const cell = current.layout && workspacePaneCells(current.layout).find(cell => cell.resourceId === id);
-    if (!cell) return; current.removePane(cell.id);
-    const next = store.getState(); const remaining = next.layout && workspacePaneCells(next.layout).find(cell => cell.id === next.focused);
-    if (remaining) focus(remaining.resourceId);
+    removeContainerPane(store.getState().activeTabId, id);
   };
   const menuAnchor = { ...(state.splitAnchor ?? { x: window.innerWidth - 8, y: 48 }), align: 'end' as const };
   const items: ContextMenuItem[] = [
@@ -75,8 +75,9 @@ export default function ScopedPaneWorkspace({ scope, selected, active }: { scope
     ]),
   ];
   return <section className="scoped-pane-workspace" data-testid={`pane-workspace-${scope}`} style={{ display: visible ? 'flex' : 'none' }}>
-    <WorkspacePaneCanvas layout={state.layout} focused={state.focused} resources={resources} visible={visible} retainHeader onFocus={focus} onRatio={state.ratio}
-      placing={!!addition} onPlace={commit} onCancel={cancel} onSplit={id => { focus(id); requestWorkspaceSplit(id); }} onRemove={remove} />
+    <WorkspacePaneCanvas layout={state.layout} focused={state.focused} zoomed={state.zoomed} resources={resources} visible={visible} retainHeader onFocus={focus} onRatio={state.ratio}
+      placing={!!addition} onPlace={commit} onCancel={cancel} onSplit={id => { focus(id); requestWorkspaceSplit(id); }} onRemove={remove}
+      onDetach={id => detachWorkspacePane(scope, id)} onZoom={state.single} />
     {visible && state.choosingSplit && !addition && <ContextMenu anchor={menuAnchor} label={t('Choose a tab to split')} itemRole="menuitem" items={items} onClose={() => { if (!proceeding.current) store.setState({ choosingSplit: false }); proceeding.current = false; }} />}
     <AcpLauncher open={!!launcher} anchor={launcher?.anchor} onClose={() => setLauncher(null)} onPick={(harness, cwd) => {
       setAddition({ harness, cwd }); store.setState({ choosingSplit: true }); setLauncher(null);

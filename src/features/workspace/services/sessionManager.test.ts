@@ -22,6 +22,33 @@ beforeEach(() => {
 });
 
 describe('sessionManager 生命周期', () => {
+  it('moves pane chat ownership immediately and serializes history writes behind the transfer', async () => {
+    let finish!: () => void;
+    invokeMock.mockImplementation((command: string) => command === 'move_terminal_panes' ? new Promise<void>(resolve => { finish = resolve; }) : Promise.resolve(undefined));
+    const message = (id: string, paneId?: string) => ({ id, paneId, role: 'user' as const, content: id, createdAt: 1 });
+    useChatStore.setState({ byTab: { source: [message('legacy'), message('moving', 'source#1'), message('stay', 'source#2')], target: [message('existing', 'target#0')] } });
+    const moving = sessionManager.transferPanes('source', 'target', ['source#0', 'source#1']);
+    expect(useChatStore.getState().byTab.source!.map(message => message.id)).toEqual(['stay']);
+    expect(useChatStore.getState().byTab.target!.map(message => message.id)).toEqual(['existing', 'legacy', 'moving']);
+    expect(useChatStore.getState().byTab.target![1]!.paneId).toBe('source#0');
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+    const closing = sessionManager.close('target');
+    const settled = sessionManager.settlePaneTransfers(['source', 'target']);
+    expect(invokeMock.mock.calls.some(([command]) => command === 'archive_session')).toBe(false);
+    finish(); await Promise.all([moving, closing, settled]);
+    expect(invokeMock.mock.calls.map(([command]) => command)).toEqual(['move_terminal_panes', 'archive_session']);
+  });
+
+  it('keeps a failed transfer retryable and avoids creating history for empty source drafts', async () => {
+    invokeMock.mockResolvedValue(undefined);
+    await sessionManager.create('empty-transfer', 'Draft');
+    await sessionManager.transferPanes('empty-transfer', 'target', ['empty-transfer#0']);
+    expect(invokeMock).not.toHaveBeenCalled();
+    invokeMock.mockRejectedValueOnce(new Error('offline'));
+    await expect(sessionManager.transferPanes('saved-source', 'saved-target', ['pane'])).rejects.toThrow('offline');
+    await sessionManager.transferPanes('saved-source', 'saved-target', ['pane']);
+    expect(invokeMock.mock.calls.filter(([command]) => command === 'move_terminal_panes')).toHaveLength(2);
+  });
   it('classifies drafts without writing them and waits for existing first writes', async () => {
     invokeMock.mockResolvedValue(undefined);
     await sessionManager.create('group-draft', 'Draft');

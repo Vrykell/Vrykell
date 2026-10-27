@@ -176,7 +176,7 @@ test('opening the assistant resizes the PTY and wraps completed output without h
   const before = await grid.evaluate(el => ({ height: el.clientHeight, text: el.textContent, html: el.innerHTML }));
   const beforeCols = (await ptyResizes(page)).at(-1)!.cols;
   await page.locator('[data-dock-btn="chat"]').click();
-  await expect(page.getByPlaceholder(/自然语言描述/)).toBeVisible();
+  await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
   await expect.poll(() => (ptyResizes(page)).then(resizes => resizes.at(-1)!.cols)).toBeLessThan(beforeCols);
   await expect.poll(() => grid.evaluate(el => el.clientHeight)).toBeGreaterThan(before.height);
   expect(await grid.textContent()).toBe(before.text);

@@ -11,6 +11,7 @@ node_modules
 dist
 dist-ssr
 /test-results/
+/coverage-workbench/
 /src-tauri/windows-context-menu/generated/*
 !/src-tauri/windows-context-menu/generated/.gitkeep
 *.pfx

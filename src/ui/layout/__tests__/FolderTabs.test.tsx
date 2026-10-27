@@ -8,7 +8,7 @@ const items: TabHandle[] = ['first', 'second'].map(id => ({ id, label: id, icon:
 
 function setup() {
   const onSelect = vi.fn(); const onClose = vi.fn(); const onMove = vi.fn();
-  render(<FolderTabs items={items} selected="first" label="Open documents" toolbar={null} onSelect={onSelect} onClose={onClose} onMove={onMove} />);
+  const view = render(<FolderTabs items={items} selected="first" label="Open documents" toolbar={null} onSelect={onSelect} onClose={onClose} onMove={onMove} />);
   const tabs = screen.getAllByRole('tab');
   tabs.forEach((tab, index) => {
     vi.spyOn(tab.closest('.folder-tab')!, 'getBoundingClientRect').mockReturnValue({
@@ -19,7 +19,7 @@ function setup() {
     x: 0, y: 0, left: 0, right: 240, top: 0, bottom: 34, width: 240, height: 34, toJSON: () => ({}),
   });
   Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: vi.fn(() => tabs[1]) });
-  return { tabs, onSelect, onClose, onMove };
+  return { tabs, onSelect, onClose, onMove, view };
 }
 
 function dragFirst(tab: HTMLElement) {
@@ -27,7 +27,21 @@ function dragFirst(tab: HTMLElement) {
   fireEvent.pointerMove(window, { pointerId: 1, clientX: 220, clientY: 14 });
 }
 
-afterEach(() => { useListReorder.getState().end(); vi.restoreAllMocks(); });
+afterEach(async () => {
+  useListReorder.getState().end(); vi.restoreAllMocks();
+  await new Promise(resolve => setTimeout(resolve, 0));
+});
+
+it('renders one drag preview when inactive resource hosts retain the same logical strip', () => {
+  const props = { items, selected: 'first', label: 'Resources', toolbar: null, listId: 'shared-resources', onSelect: vi.fn(), onClose: vi.fn(), onMove: vi.fn() };
+  render(<><div hidden><FolderTabs {...props} /></div><FolderTabs {...props} /></>);
+  const tab = screen.getAllByRole('tab')[0]!;
+  Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: vi.fn(() => tab) });
+  fireEvent.pointerDown(tab, { pointerId: 1, button: 0, isPrimary: true, clientX: 20, clientY: 14 });
+  fireEvent.pointerMove(window, { pointerId: 1, clientX: 220, clientY: 14 });
+  expect(document.querySelectorAll('[data-reorder-preview="item"]')).toHaveLength(1);
+  fireEvent.pointerUp(window, { pointerId: 1, clientX: 220, clientY: 14 });
+});
 
 it('reorders the selected first document without removing other tabs or changing selection', () => {
   const { tabs, onSelect, onMove } = setup();
@@ -51,6 +65,19 @@ it('cancels a selected document drag without changing order or selection', () =>
   expect(onMove).not.toHaveBeenCalled(); expect(onSelect).not.toHaveBeenCalled();
   expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['first', 'second']);
   expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+});
+
+it('retains a captured gesture when selection transfers its logical strip to another visible host', () => {
+  const { tabs, onSelect, onClose, onMove, view } = setup();
+  const listId = screen.getByRole('tablist').getAttribute('data-reorder-list')!;
+  fireEvent.pointerDown(tabs[0]!, { pointerId: 1, button: 0, isPrimary: true, clientX: 20, clientY: 14 });
+  const replacement = document.createElement('div'); replacement.dataset.reorderList = listId; document.body.appendChild(replacement);
+  vi.spyOn(replacement, 'getBoundingClientRect').mockReturnValue({ x: 0, y: 0, left: 0, right: 240, top: 0, bottom: 34, width: 240, height: 34, toJSON: () => ({}) });
+  view.rerender(<FolderTabs items={[]} selected="second" label="Open documents" toolbar={null} onSelect={onSelect} onClose={onClose} onMove={onMove} />);
+  fireEvent.pointerMove(window, { pointerId: 1, clientX: 220, clientY: 14 });
+  expect(useListReorder.getState().drag?.id).toBe('first');
+  fireEvent.pointerUp(window, { pointerId: 1, clientX: 220, clientY: 14 });
+  expect(useListReorder.getState().drag).toBeNull(); replacement.remove();
 });
 
 it('keeps close buttons independent of document dragging', () => {

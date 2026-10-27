@@ -22,7 +22,7 @@ test.describe('多标签工作区', () => {
     await expect(output).toBeVisible();
     // The assistant conversation stays independent of terminal instance selection.
     await page.getByRole('button', { name: '询问 AI', exact: true }).click();
-    const input = page.getByPlaceholder(/自然语言描述/);
+    const input = page.locator('[data-chat-composer]:visible');
     await input.fill('第一标签的问题');
     await input.press('Enter');
     await expect(page.getByText('回复一')).toBeVisible({ timeout: 10000 });

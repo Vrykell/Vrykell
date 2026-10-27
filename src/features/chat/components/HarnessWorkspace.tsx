@@ -30,7 +30,7 @@ import { useAiWorkspaceTabs } from '../hooks/useAiWorkspaceTabs';
 /** One workspace page hosts independent sessions through the shared connected tabs. */
 export default function HarnessWorkspace({ active, headerActive = active }: { active: boolean; headerActive?: boolean }) {
   const surface = useContext(AiSurfaceContext);
-  const { nativeTabs, selected, sideSelected } = useAiWorkspace();
+  const { nativeTabs, selected } = useAiWorkspace();
   const { connections } = useHarnessWorkspace();
   const nativeSelected = useChatStore(state => state.activeConversationId);
   const placement = useWorkspaceNavigation(state => state.aiPlacement);
@@ -85,23 +85,15 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
     useSessionStore.getState().openHarnessTab(name, cwd ?? directory);
     setDirectory(undefined);
   };
-  const ids = strip.handles.map(handle => handle.id);
   const activeSystemPage = activePage && (activePage.kind === 'ai-history' || activePage.kind === 'usage' || activePage.kind === 'start-ai') ? activePage : undefined;
-  const stripSelected = activePage?.kind === 'harness' ? selected : activeSystemPage ? `page:${activeSystemPage.id}` : '';
-  useEffect(() => {
-    const sessions = ids.filter(id => !id.startsWith('page:') && id !== sideSelected);
-    if (!sessions.includes(selected) && sessions.length) {
-      const id = sessions[0]!;
-      useAiWorkspace.getState().select(id);
-      if (id.startsWith('chat:')) void useChatStore.getState().selectConversation(id.slice(5));
-    }
-  }, [ids.join('|'), selected, sideSelected]);
+  const stripSelected = strip.selected ?? '';
   const header = <FolderTabs label={t('AI sessions')} selected={stripSelected} listId="harness-sessions"
       items={strip.handles} onSelect={strip.onSelect}
+      grouping={strip.grouping}
+      tabActions={strip.tabActions}
       onMove={strip.onMove} onClose={strip.onClose}
-      onRename={(id, title) => {
-        if (id.startsWith('chat:')) useChatStore.getState().renameConversation(id.slice(5), title);
-      }} menuItems={[
+      onRename={strip.onRename} menuItems={[
+        ...(strip.tabActions?.(strip.selected ?? '') ?? []),
         { label: t('Choose project folder'), onClick: () => void chooseDirectory() },
         { label: t('Usage statistics'), onClick: () => useSessionStore.getState().openUsageTab() },
         ...(selected ? [{ label: t('Dock AI to side'), onClick: relocate }] : []),

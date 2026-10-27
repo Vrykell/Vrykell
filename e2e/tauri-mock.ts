@@ -1418,7 +1418,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'get_session':
             return mockSessions.find((s) => s.id === args.id) ?? createdSessions.get(args.id) ?? null;
           case 'groups_list':
-            return mockGroups.map(group => ({ ...group, session_count: mockSessions.filter(session => session.group_id === group.id && session.status === 'active').length }));
+            return mockGroups.map(group => ({ ...group, session_count: [...new Map([...mockSessions, ...createdSessions.values()].map(row => [row.id, row])).values()].filter(session => session.group_id === group.id && session.status === 'active').length }));
           case 'groups_apply_plan': {
             const plan = args.groups as { id: string; title: string; itemIds: string[] }[];
             if (plan.some(group => group.itemIds.some(id => !mockSessions.some(session => session.id === id && session.status === 'active') && !createdSessions.has(id)))) throw new Error('A session changed.');
@@ -1453,14 +1453,34 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             });
             return undefined;
           case 'group_create':
-          case 'group_set_collapsed':
+            if (!mockGroups.some(group => group.id === args.id)) mockGroups.push({ id: args.id, title: args.title, sort_order: mockGroups.length, collapsed: false, archived: false, created_at: args.timestamp, session_count: 0 });
+            return undefined;
+          case 'group_set_collapsed': {
+            const group = mockGroups.find(item => item.id === args.id); if (group) group.collapsed = args.collapsed;
+            return undefined;
+          }
           case 'group_delete':
-          case 'group_delete_with_sessions':
+          case 'group_delete_with_sessions': {
+            if (cmd === 'group_delete_with_sessions') {
+              for (let index = mockSessions.length - 1; index >= 0; index--) if (mockSessions[index].group_id === args.id) mockSessions.splice(index, 1);
+              for (const [id, session] of createdSessions) if (session.group_id === args.id) createdSessions.delete(id);
+            } else for (const session of [...mockSessions, ...createdSessions.values()]) if (session.group_id === args.id) session.group_id = null;
+            const index = mockGroups.findIndex(item => item.id === args.id); if (index >= 0) mockGroups.splice(index, 1);
+            return undefined;
+          }
           case 'groups_reorder':
-          case 'group_restore':
+            (args.ids as string[]).forEach((id, index) => { const group = mockGroups.find(group => group.id === id); if (group) group.sort_order = index; });
+            return undefined;
+          case 'group_restore': {
+            const group = mockGroups.find(item => item.id === args.id); if (group) group.archived = false;
+            for (const session of mockSessions) if (session.group_id === args.id && session.kind !== 'workspace') { session.status = 'active'; session.closed_at = null; }
+            return undefined;
+          }
+          case 'move_terminal_panes':
+          case 'delete_terminal_panes':
             return undefined;
           case 'session_set_group': {
-            const session = mockSessions.find((item) => item.id === args.sessionId);
+            const session = mockSessions.find((item) => item.id === args.sessionId) ?? createdSessions.get(args.sessionId);
             if (session) session.group_id = args.groupId ?? null;
             return undefined;
           }

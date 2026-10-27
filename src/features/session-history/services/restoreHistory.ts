@@ -17,7 +17,7 @@ export async function restoreHistoryMember(member: WorkspaceHistoryMember, desti
 
 export async function restoreHistoryRecord(record: UnifiedHistoryRecord, destination: 'native' | 'unified') {
   if (record.kind === 'workspace') {
-    const target = destination === 'unified' ? 'unified' : record.snapshot.members.every(member => member.kind === 'conversation' || member.kind === 'agent') ? 'ai'
+    const target = destination === 'unified' ? 'unified' : record.snapshot.workspaceScope && record.snapshot.workspaceScope !== 'terminal' ? record.snapshot.workspaceScope : record.snapshot.members.every(member => member.kind === 'conversation' || member.kind === 'agent') ? 'ai'
       : record.snapshot.members.every(member => member.kind === 'document' || member.kind === 'comparison') ? 'code' : 'unified';
     await restoreWorkspaceComposition(record.snapshot, { id: record.session.id, createdAt: record.createdAt }, target);
     return;

@@ -8,6 +8,7 @@ pub mod conversation;
 pub mod history;
 pub mod history_page;
 pub mod workspace_history;
+pub mod pane_ownership;
 pub mod command_history;
 pub mod session;
 pub mod ssh_connection;
