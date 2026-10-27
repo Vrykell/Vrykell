@@ -1,0 +1,156 @@
+name: CI
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend checks
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run test -- --maxWorkers=4
+      - run: npm run check:architecture
+      - run: npm run build
+
+  e2e:
+    name: Browser interaction tests (${{ matrix.shard }}/4)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
+      - name: Save failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: browser-test-results-${{ matrix.shard }}
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
+
+  backend:
+    name: Backend tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, ubuntu-22.04, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - uses: Swatinem/rust-cache@e9d7b9f1e587218970671bac74e5511ed9506e6a # v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: tests-${{ matrix.os }}
+      - name: Install native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev xvfb
+      - run: npm ci
+      - name: Prepare and test native context menu
+        if: runner.os == 'Windows'
+        run: npm run windows:context-menu:prepare -- --test
+      - name: Check third-party inventory
+        if: runner.os == 'Windows'
+        run: npm run licenses:check
+      - name: Run backend tests
+        if: runner.os != 'Linux'
+        working-directory: src-tauri
+        run: cargo test --locked -- --test-threads=4
+      - name: Run backend tests with a display
+        if: runner.os == 'Linux'
+        working-directory: src-tauri
+        run: xvfb-run -a cargo test --locked -- --test-threads=4
+
+  packages:
+    name: Package (${{ matrix.target }})
+    needs: [frontend, e2e, backend]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+            files: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: deb,appimage
+            files: |
+              src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
+              src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
+          - os: macos-15
+            target: aarch64-apple-darwin
+            bundles: dmg
+            files: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
+          - os: macos-15
+            target: x86_64-apple-darwin
+            bundles: dmg
+            files: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22
+          cache: npm
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@e9d7b9f1e587218970671bac74e5511ed9506e6a # v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: packages-${{ matrix.target }}
+      - name: Install native dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libfuse2
+      - run: npm ci
+      - name: Build installers from main
+        run: npm run tauri -- build --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} -- --locked
+      - name: Save installers
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: vrykell-${{ matrix.target }}-${{ github.sha }}
+          path: ${{ matrix.files }}
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14

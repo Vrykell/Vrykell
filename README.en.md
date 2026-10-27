@@ -172,6 +172,8 @@ npm run build                    # production build
 
 Run typechecking, unit tests and the architecture check before committing. Changes touching the terminal, workspace or AI also need the matching browser regressions.
 
+See [continuous integration and packages](docs/en/ci.md) for automated checks and installer builds from `main`.
+
 ## Documentation
 
 <table>
