@@ -2,6 +2,15 @@
   "name": "vrykell",
   "private": true,
   "version": "0.1.0",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Vrykell/Vrykell.git"
+  },
+  "homepage": "https://github.com/Vrykell/Vrykell#readme",
+  "bugs": {
+    "url": "https://github.com/Vrykell/Vrykell/issues"
+  },
   "type": "module",
   "scripts": {
     "windows:context-menu:prepare": "node scripts/prepare-context-menu.mjs",
@@ -13,7 +22,9 @@
     "test": "vitest run",
     "test:workbench": "vitest run --config vitest.workbench.config.ts src/features/workspace src/core/__tests__/paneLayout.test.ts src/core/__tests__/paneTree.test.ts src/features/chat/__tests__/useAiWorkspaceTabs.test.tsx src/ui/layout/__tests__/resourcePlacements.test.ts src/ui/layout/__tests__/ResourceContent.test.tsx src/app/bootstrap/__tests__/sharedStartupTask.test.ts --coverage",
     "test:e2e": "playwright test",
-    "check:architecture": "node scripts/check-architecture.mjs"
+    "check:architecture": "node scripts/check-architecture.mjs",
+    "licenses:generate": "node scripts/generate-third-party-notices.mjs",
+    "licenses:check": "node scripts/generate-third-party-notices.mjs --check"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.40",

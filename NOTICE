@@ -1,17 +1,19 @@
-# NOTICE
+Vrykell
+Copyright 2026 Vrykell contributors
 
-本项目「Vrykell」（`vrykell`）采用 Tauri 2（Rust 后端）+ React 19 /
-TypeScript / Vite + `@xterm/xterm`（终端模拟器）。
+Original project code and documentation are licensed under the Apache License,
+Version 2.0, except where a file or directory specifies different terms.
+The full project license is provided in LICENSE.
 
-## 第三方许可
+Third-party software, fonts, icons and other assets retain their original
+copyright notices and licenses. The project license does not relicense these
+materials or replace their redistribution requirements.
 
-本项目的运行时依赖遵循各自的开源许可证，均为宽松许可（MIT / BSD / Apache-2.0），例如：
+The distribution includes THIRD_PARTY_NOTICES.txt in its legal resource directory.
+The repository copy is public/legal/THIRD_PARTY_NOTICES.txt. It records component
+versions, license texts, original notices and source locations. Font notices are
+also retained in public/fonts/. See docs/en/licensing.md or docs/zh/licensing.md
+for the distribution procedure and source-availability information.
 
-- `@xterm/xterm`（MIT）、`react` / `react-dom`（MIT）、`zustand`（MIT）
-- `@anthropic-ai/sdk`（MIT）
-- `portable-pty`（MIT）、`ssh2`（BSD-3-Clause）、`rusqlite`（MIT）
-- `tauri`（MIT / Apache-2.0）
-
-## 许可证
-
-本项目尚未指定整体许可证（根目录无 `LICENSE` 文件），默认保留所有权利；如需分发，建议选用与依赖栈兼容的许可证（如 MIT 或 Apache-2.0）。
+Names and marks of external services identify supported integrations. Their
+inclusion does not imply endorsement, affiliation or a grant of trademark rights.

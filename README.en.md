@@ -48,7 +48,7 @@ Most AI terminals put a chat window beside the terminal. Vrykell lets AI referen
 You need Node.js 20+, a Rust toolchain and the [Tauri 2 system dependencies](https://v2.tauri.app/start/prerequisites/) for your platform.
 
 ```bash
-git clone https://github.com/xtr-hub/Vrykell.git
+git clone https://github.com/Vrykell/Vrykell.git
 cd Vrykell
 npm install
 npm run tauri dev      # full desktop app
@@ -157,7 +157,7 @@ Tool permissions live in **Settings → Tool permissions**. Standard asks accord
 - Current version: **0.1.0**, still in early development; UI and behavior may change.
 - Session history restores terminals and conversations only; files, editor buffers and unsaved drafts do not survive a restart.
 - On macOS, SSH/SFTP libraries are built from source by Cargo. Linux needs the Tauri 2 system dependencies.
-- The repository does not ship an overall open-source license yet; all rights are reserved by default. Third-party licenses are listed in [NOTICE](NOTICE).
+- Original project code and documentation are licensed under [Apache-2.0](LICENSE). Third-party software and assets retain their own licenses; see [NOTICE](NOTICE).
 
 ## Local development
 
@@ -207,10 +207,14 @@ More: [Workspace foundation](docs/en/workspace-foundation.md) · [Workspace comp
 
 Issues and pull requests are welcome. Read the [development rules](docs/en/development-rules.md) and the [project conventions](.agents/skills/vrykell-conventions/SKILL.md) before you start.
 
+Unless explicitly stated otherwise, contributions submitted for inclusion are offered under the project license. Preserve the notices and licenses of third-party materials.
+
 ## License
 
-This repository does not ship an overall open-source license yet; all rights are reserved by default. Third-party dependency licenses are listed in [NOTICE](NOTICE).
+Original project code and documentation are licensed under the [Apache License, Version 2.0](LICENSE), except where otherwise stated. Copyright 2026 Vrykell contributors.
+
+Third-party software, fonts and icons retain their respective licenses. See [NOTICE](NOTICE), the [third-party notices](THIRD_PARTY_NOTICES.md) and the [licensing guide](docs/en/licensing.md) for attribution, source locations and distribution requirements.
 
 <p align="center">
-  <a href="https://github.com/xtr-hub/Vrykell/stargazers"><img src="https://img.shields.io/github/stars/xtr-hub/Vrykell?style=social" alt="GitHub stars" /></a>
+  <a href="https://github.com/Vrykell/Vrykell/stargazers"><img src="https://img.shields.io/github/stars/Vrykell/Vrykell?style=social" alt="GitHub stars" /></a>
 </p>

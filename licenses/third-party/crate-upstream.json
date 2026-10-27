@@ -1,0 +1,137 @@
+[
+  {
+    "names": [
+      "serial"
+    ],
+    "revision": null,
+    "file": "dcuddeback-serial-rs-upstream.txt",
+    "source": "https://github.com/dcuddeback/serial-rs/blob/master/LICENSE",
+    "sourcePath": "LICENSE"
+  },
+  {
+    "names": [
+      "clipboard-win"
+    ],
+    "revision": "3b27cf2bfd1adcfa6e0264eb51c1025ddaf0f342",
+    "file": "DoumanAsh-clipboard-win-3b27cf2b.txt",
+    "source": "https://github.com/DoumanAsh/clipboard-win/blob/3b27cf2bfd1adcfa6e0264eb51c1025ddaf0f342/LICENSE",
+    "sourcePath": "LICENSE"
+  },
+  {
+    "names": [
+      "alloc-stdlib"
+    ],
+    "revision": "ae42d22078b98549e987d2f03d12df7b984fde47",
+    "file": "dropbox-rust-alloc-no-stdlib-ae42d220.txt",
+    "source": "https://github.com/dropbox/rust-alloc-no-stdlib/blob/ae42d22078b98549e987d2f03d12df7b984fde47/LICENSE",
+    "sourcePath": "LICENSE"
+  },
+  {
+    "names": [
+      "objc2-app-kit",
+      "objc2-cloud-kit",
+      "objc2-core-data",
+      "objc2-core-foundation",
+      "objc2-core-graphics",
+      "objc2-core-image",
+      "objc2-core-text",
+      "objc2-core-video",
+      "objc2-foundation",
+      "objc2-io-surface",
+      "objc2-quartz-core",
+      "objc2-web-kit"
+    ],
+    "revision": "7b1abfd750a2cacaea71d6a56ecfb83cb7de560b",
+    "file": "madsmtm-objc2-7b1abfd7.txt",
+    "source": "https://github.com/madsmtm/objc2/blob/7b1abfd750a2cacaea71d6a56ecfb83cb7de560b/LICENSE.md",
+    "sourcePath": "LICENSE.md"
+  },
+  {
+    "names": [
+      "dispatch2",
+      "objc2"
+    ],
+    "revision": "8852b424193ca41602281b3d7540d7c8ed51e49a",
+    "file": "madsmtm-objc2-8852b424.txt",
+    "source": "https://github.com/madsmtm/objc2/blob/8852b424193ca41602281b3d7540d7c8ed51e49a/LICENSE.md",
+    "sourcePath": "LICENSE.md"
+  },
+  {
+    "names": [
+      "objc2-encode",
+      "objc2-exception-helper"
+    ],
+    "revision": "8d214f5477365ffcbcbb7de058c86ed9a518efb7",
+    "file": "madsmtm-objc2-8d214f54.txt",
+    "source": "https://github.com/madsmtm/objc2/blob/8d214f5477365ffcbcbb7de058c86ed9a518efb7/LICENSE.md",
+    "sourcePath": "LICENSE.md"
+  },
+  {
+    "names": [
+      "block2"
+    ],
+    "revision": "b4167b582b2f75f9a1be75495c41b765344fd03c",
+    "file": "madsmtm-objc2-b4167b58.txt",
+    "source": "https://github.com/madsmtm/objc2/blob/b4167b582b2f75f9a1be75495c41b765344fd03c/LICENSE.md",
+    "sourcePath": "LICENSE.md"
+  },
+  {
+    "names": [
+      "unic-char-property",
+      "unic-char-range",
+      "unic-common",
+      "unic-ucd-version"
+    ],
+    "revision": "5878605364af97a3358368a6eaef02104af2e016",
+    "file": "open-i18n-rust-unic-58786053.txt",
+    "source": "https://github.com/open-i18n/rust-unic/blob/5878605364af97a3358368a6eaef02104af2e016/LICENSE-APACHE",
+    "sourcePath": "LICENSE-APACHE"
+  },
+  {
+    "names": [
+      "unic-ucd-ident"
+    ],
+    "revision": "8a6ce83063d90b91ae2ce59eddb803edd393fca9",
+    "file": "open-i18n-rust-unic-8a6ce830.txt",
+    "source": "https://github.com/open-i18n/rust-unic/blob/8a6ce83063d90b91ae2ce59eddb803edd393fca9/LICENSE-APACHE",
+    "sourcePath": "LICENSE-APACHE"
+  },
+  {
+    "names": [
+      "dlopen2",
+      "dlopen2_derive"
+    ],
+    "revision": "cc80e4a0a90d499b677fdf7743699b4b3a43a989",
+    "file": "OpenByteDev-dlopen2-cc80e4a0.txt",
+    "source": "https://github.com/OpenByteDev/dlopen2/blob/cc80e4a0a90d499b677fdf7743699b4b3a43a989/LICENSE",
+    "sourcePath": "LICENSE"
+  },
+  {
+    "names": [
+      "tauri-plugin"
+    ],
+    "revision": "6f6ab1207bb3923c2721fbc67d2fdb1c8deb0c7a",
+    "file": "tauri-apps-tauri-6f6ab120.txt",
+    "source": "https://github.com/tauri-apps/tauri/blob/6f6ab1207bb3923c2721fbc67d2fdb1c8deb0c7a/LICENSE_APACHE-2.0",
+    "sourcePath": "LICENSE_APACHE-2.0"
+  },
+  {
+    "names": [
+      "webview2-com",
+      "webview2-com-sys"
+    ],
+    "revision": "b74dc5e2b394044bea5191052868ce7a106c202c",
+    "file": "wravery-webview2-rs-b74dc5e2.txt",
+    "source": "https://github.com/wravery/webview2-rs/blob/b74dc5e2b394044bea5191052868ce7a106c202c/LICENSE",
+    "sourcePath": "LICENSE"
+  },
+  {
+    "names": [
+      "webview2-com-macros"
+    ],
+    "revision": "dffa41a8a46d3f5565eefbff2de57d38d399f158",
+    "file": "wravery-webview2-rs-dffa41a8.txt",
+    "source": "https://github.com/wravery/webview2-rs/blob/dffa41a8a46d3f5565eefbff2de57d38d399f158/LICENSE",
+    "sourcePath": "LICENSE"
+  }
+]

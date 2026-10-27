@@ -48,7 +48,7 @@ Vrykell 是一个终端优先的桌面工作台，面向每天在终端里工作
 需要 Node.js 20+、Rust 工具链，以及当前平台的 [Tauri 2 系统依赖](https://v2.tauri.app/start/prerequisites/)。
 
 ```bash
-git clone https://github.com/xtr-hub/Vrykell.git
+git clone https://github.com/Vrykell/Vrykell.git
 cd Vrykell
 npm install
 npm run tauri dev      # 启动完整桌面应用
@@ -157,7 +157,7 @@ SSH/SFTP 主机管理器支持密码或密钥、端口转发和主机指纹确�
 - 当前版本 **0.1.0**，仍在早期开发，界面和行为可能变化。
 - 会话历史只保存终端和对话；文件、编辑器缓冲区和未保存草稿不会跨重启恢复。
 - macOS 的 SSH/SFTP 依赖由 Cargo 从源码构建；Linux 需要 Tauri 2 系统依赖。
-- 本仓库尚未附带整体开源许可证，默认保留所有权利；第三方依赖许可见 [NOTICE](NOTICE)。
+- 原创代码和文档采用 [Apache-2.0](LICENSE)；第三方软件与资源保留各自许可证，见 [NOTICE](NOTICE)。
 
 ## 本地开发
 
@@ -207,10 +207,14 @@ npm run build                    # 生产构建
 
 欢迎提交 Issue 和 PR。开始之前请阅读[开发规则](docs/zh/development-rules.md)和[项目约定](.agents/skills/vrykell-conventions/SKILL.md)。
 
+除非明确另作说明，为纳入本项目而提交的贡献按项目许可证提供。第三方材料的原始声明和许可证必须保留。
+
 ## 许可
 
-本仓库尚未附带整体开源许可证，默认保留所有权利；第三方依赖许可见 [NOTICE](NOTICE)。
+除另有说明外，原创代码和文档采用 [Apache License 2.0](LICENSE)。版权归属：Copyright 2026 Vrykell contributors。
+
+第三方软件、字体与图标保留各自许可证。署名、源码获取方式及分发要求见 [NOTICE](NOTICE)、[第三方声明](THIRD_PARTY_NOTICES.md)和[许可说明](docs/zh/licensing.md)。
 
 <p align="center">
-  <a href="https://github.com/xtr-hub/Vrykell/stargazers"><img src="https://img.shields.io/github/stars/xtr-hub/Vrykell?style=social" alt="GitHub stars" /></a>
+  <a href="https://github.com/Vrykell/Vrykell/stargazers"><img src="https://img.shields.io/github/stars/Vrykell/Vrykell?style=social" alt="GitHub stars" /></a>
 </p>
