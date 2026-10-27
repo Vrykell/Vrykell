@@ -2515,6 +2515,7 @@ const zh: Record<string, string> = {
   'Could not connect to the model service: {{message}}': '无法连接模型服务：{{message}}',
   'The agent closed the connection.': '代理已关闭连接。',
   'The agent did not respond in time; the turn was stopped.': '代理长时间没有响应，本轮已停止。',
+  'The agent ended the turn without a reply. Check its model, sign-in and service quota, then try again.': '代理已结束本轮，但没有返回回复。请检查模型、登录状态和服务额度后重试。',
 };
 
 export default zh;

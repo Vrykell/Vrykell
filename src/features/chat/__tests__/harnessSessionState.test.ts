@@ -11,6 +11,9 @@ import { t } from '@i18n';
 import { useHarnessSessionRefs } from '@features/chat/stores/harnessSessions';
 import { acpCancel, acpClose, acpOpen, acpPrompt, acpAppToolResult, acpSetConfigOption, acpSetMode, acpSetModel, type HarnessOpenResult } from '@platform/api/acp';
 import { answerUserQuestion, questionKey, useUserQuestions } from '@features/agent/services/userQuestions';
+import { terminalDebug } from '@features/terminal/services/terminalDebug';
+
+vi.mock('@features/terminal/services/terminalDebug', () => ({ terminalDebug: vi.fn() }));
 
 vi.mock('@platform/api/acp', () => ({
   acpAnswerPermission: vi.fn(async () => undefined),
@@ -68,6 +71,105 @@ beforeEach(async () => {
 });
 
 describe('harness session state', () => {
+  it('retains a provider error with its question and keeps it when another turn starts', async () => {
+    await useHarnessStore.getState().prompt(TAB, 'First question');
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'error', payload: {
+      message: '402: Insufficient Balance', details: 'Quota exhausted', authRequired: false,
+    } });
+    const answer = current().messages[1]!;
+    expect(answer).toMatchObject({ role: 'assistant', error: true, errorSummary: '402: Insufficient Balance', errorText: '402: Insufficient Balance\n\nQuota exhausted' });
+    await useHarnessStore.getState().prompt(TAB, 'Next question');
+    expect(current().messages[1]).toBe(answer);
+    expect(current().error).toBeNull();
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'cancelled' } });
+  });
+
+  it('preserves partial output when the provider fails', async () => {
+    await useHarnessStore.getState().prompt(TAB, 'Explain');
+    useHarnessStore.getState().applyEvent(notification({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Partial answer' } }) as never);
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'error', payload: { message: 'Connection lost' } });
+    expect(current().messages).toHaveLength(2);
+    expect(current().messages[1]).toMatchObject({ error: true, errorSummary: 'Connection lost', parts: [{ kind: 'text', text: 'Partial answer' }] });
+  });
+
+  it('reports a successful stop with no reply even when an earlier turn has an answer', async () => {
+    await useHarnessStore.getState().prompt(TAB, 'First');
+    useHarnessStore.getState().applyEvent(notification({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Earlier answer' } }) as never);
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'end_turn' } });
+    expect(current().error).toBeNull();
+    await useHarnessStore.getState().prompt(TAB, 'Second');
+    useHarnessStore.getState().applyEvent(notification({ sessionUpdate: 'usage_update', used: 1, size: 100 }) as never);
+    useHarnessStore.getState().applyEvent(notification({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'Thinking only' } }) as never);
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'end_turn' } });
+    expect(current().messages[3]).toMatchObject({ error: true, errorSummary: t('The agent ended the turn without a reply. Check its model, sign-in and service quota, then try again.') });
+    expect(current().pending).toBe(false);
+  });
+
+  it('accepts a tool-only reply and does not mistake a user cancellation for an empty reply', async () => {
+    await useHarnessStore.getState().prompt(TAB, 'Run a check');
+    useHarnessStore.getState().applyEvent(notification({ sessionUpdate: 'tool_call', toolCallId: 'check', title: 'Check', status: 'completed' }) as never);
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'end_turn' } });
+    expect(current().error).toBeNull();
+    await useHarnessStore.getState().prompt(TAB, 'Cancelled question');
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'cancelled' } });
+    expect(current().error).toBeNull();
+    expect(current().messages).toHaveLength(3);
+  });
+
+  it('retains an IPC send failure and an explicit error stop as failed replies', async () => {
+    vi.mocked(acpPrompt).mockRejectedValueOnce(new Error('Transport unavailable'));
+    await useHarnessStore.getState().prompt(TAB, 'First');
+    expect(current().messages[1]).toMatchObject({ error: true, errorSummary: 'Transport unavailable' });
+    await useHarnessStore.getState().prompt(TAB, 'Second');
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'error' } });
+    expect(current().messages[3]).toMatchObject({ error: true, errorSummary: t('The harness failed.') });
+  });
+
+  it('does not let session metadata or an echoed question disable the response timeout', async () => {
+    vi.useFakeTimers();
+    await useHarnessStore.getState().prompt(TAB, 'No response');
+    for (const update of [{ sessionUpdate: 'usage_update', used: 1, size: 100 },
+      { sessionUpdate: 'available_commands_update', availableCommands: [] },
+      { sessionUpdate: 'session_info_update' },
+      { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'No response' } },
+      { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '  ' } }]) {
+      useHarnessStore.getState().applyEvent(notification(update) as never);
+    }
+    await vi.advanceTimersByTimeAsync(HARNESS_FIRST_RESPONSE_TIMEOUT_MS + 1300);
+    expect(current().pending).toBe(false);
+    expect(current().messages[1]).toMatchObject({ error: true, errorSummary: t('The agent did not respond in time; the turn was stopped.') });
+  });
+
+  it('does not rearm the timeout after reply progress arrives before the send acknowledgement', async () => {
+    vi.useFakeTimers();
+    vi.mocked(acpPrompt).mockImplementationOnce(async () => {
+      useHarnessStore.getState().applyEvent(notification({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Started' } }) as never);
+    });
+    await useHarnessStore.getState().prompt(TAB, 'Start work');
+    vi.mocked(acpCancel).mockClear();
+    await vi.advanceTimersByTimeAsync(HARNESS_FIRST_RESPONSE_TIMEOUT_MS + 1300);
+    expect(acpCancel).not.toHaveBeenCalled();
+    expect(current().pending).toBe(true);
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'end_turn' } });
+  });
+
+  it('traces a delivered reply through its owning session without recording its contents', async () => {
+    await useHarnessStore.getState().prompt(TAB, 'Private question');
+    vi.mocked(terminalDebug).mockClear();
+    useHarnessStore.getState().applyEvent(notification({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Private answer' } }) as never);
+    expect(terminalDebug).toHaveBeenCalledWith('harness-event-received', expect.objectContaining({ sessionId: SESSION, tabId: TAB, updateKind: 'agent_message_chunk' }));
+    expect(terminalDebug).toHaveBeenCalledWith('harness-event-applied', expect.objectContaining({ sessionExists: true, transcriptChanged: true, messageCount: 2 }));
+    expect(JSON.stringify(vi.mocked(terminalDebug).mock.calls)).not.toMatch(/Private question|Private answer/);
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'end_turn' } });
+  });
+
+  it('identifies an event with no owning session and hides unknown protocol values', () => {
+    vi.mocked(terminalDebug).mockClear();
+    useHarnessStore.getState().applyEvent({ sessionId: 'unmapped', kind: 'update', payload: { update: { sessionUpdate: 'Private value', content: { type: 'text', text: 'Private answer' } } } });
+    expect(terminalDebug).toHaveBeenCalledWith('harness-event-unmapped', expect.objectContaining({ sessionId: 'unmapped', opening: false, buffered: false }));
+    expect(JSON.stringify(vi.mocked(terminalDebug).mock.calls)).not.toMatch(/Private value|Private answer/);
+  });
+
   it('keeps empty sessions out of saved history until the first input', async () => {
     expect(useHarnessSessionRefs.getState().refs['Claude Code']).toBeUndefined();
     await useHarnessStore.getState().prompt(TAB, 'First input');

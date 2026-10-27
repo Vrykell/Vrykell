@@ -6,6 +6,14 @@ import type { ChatMessage } from '@features/chat';
 const update = (patch: Record<string, unknown>) => ({ sessionId: 's', update: patch });
 
 describe('applyHarnessUpdate', () => {
+  it('keeps failure text when consecutive assistant fragments are grouped', () => {
+    const messages: ChatMessage[] = [
+      { id: 'partial', role: 'assistant', content: 'Partial output', createdAt: 1 },
+      { id: 'error', role: 'assistant', content: '', error: true, errorSummary: 'Service unavailable', errorText: 'Provider diagnostics', createdAt: 2 },
+    ];
+    expect(groupHarnessMessages(messages)[0]).toMatchObject({ error: true, errorSummary: 'Service unavailable', errorText: 'Provider diagnostics', parts: [{ kind: 'text', text: 'Partial output' }] });
+  });
+
   it('groups thoughts, multiple tools and final text into one answer per user turn', () => {
     let messages: ChatMessage[] = [{ id: 'question', role: 'user', content: 'Inspect', createdAt: 1 }];
     for (const event of [

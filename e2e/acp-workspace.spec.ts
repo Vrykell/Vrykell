@@ -15,6 +15,59 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
 });
 
+for (const width of [1240, 760]) {
+  test(`keeps provider errors and empty replies visible with working retry at ${width}px`, async ({ page }, info) => {
+    await connect(page);
+    await page.setViewportSize({ width, height: 800 });
+    const surface = current(page);
+    await surface.getByTestId('harness-composer').fill('Explain the failure');
+    await surface.getByTestId('harness-send').click();
+    await emitAcpSession(page, { sessionId: 'sess_e2e', kind: 'error', payload: {
+      message: '402: Insufficient Balance', details: 'The provider quota is exhausted.', authRequired: false,
+    } });
+    const first = surface.locator('.chat-exchange').first();
+    await expect(first.getByRole('alert')).toContainText('402: Insufficient Balance');
+    await expect(page.locator('[data-error-notification="true"]')).toHaveCount(0);
+    const disclosure = first.getByRole('button', { expanded: false }).filter({ hasText: /技术/ });
+    await disclosure.click();
+    await expect(first.getByRole('alert')).toContainText('The provider quota is exhausted.');
+    await page.screenshot({ path: info.outputPath(`acp-reply-error-${width}.png`) });
+    await first.getByRole('button', { name: '重试', exact: true }).focus();
+    await page.keyboard.press('Enter');
+    await expect.poll(async () => (await acpCalls(page)).filter(call => call.startsWith('acp_prompt:')).length).toBe(2);
+    await emitAcpSession(page, acpUpdate('sess_e2e', { sessionUpdate: 'usage_update', used: 1, size: 100 }));
+    await emitAcpSession(page, { sessionId: 'sess_e2e', kind: 'stop', payload: { stopReason: 'end_turn' } });
+    const second = surface.locator('.chat-exchange').nth(1);
+    await expect(second.getByRole('alert')).toContainText('没有返回回复');
+    await expect(first.getByRole('alert')).toContainText('402: Insufficient Balance');
+    await second.getByRole('button', { name: '重试', exact: true }).click();
+    await emitAcpSession(page, acpUpdate('sess_e2e', { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Recovered answer.' } }));
+    await emitAcpSession(page, { sessionId: 'sess_e2e', kind: 'stop', payload: { stopReason: 'end_turn' } });
+    await expect(surface.locator('.chat-exchange').nth(2)).toContainText('Recovered answer.');
+    await expect(surface.getByRole('alert')).toHaveCount(2);
+    await expect(surface.getByTestId('harness-send')).toBeVisible();
+  });
+}
+
+test('reports an unanswered turn even when the agent keeps publishing session metadata', async ({ page }) => {
+  await connect(page);
+  await page.clock.install();
+  const surface = current(page);
+  await surface.getByTestId('harness-composer').fill('Waiting for an answer');
+  await surface.getByTestId('harness-send').click();
+  await emitAcpSession(page, acpUpdate('sess_e2e', { sessionUpdate: 'usage_update', used: 1, size: 100 }));
+  const timeout = await page.evaluate(async () => {
+    const path = '/src/features/chat/stores/harness.ts';
+    const { HARNESS_FIRST_RESPONSE_TIMEOUT_MS } = await import(path) as typeof import('../src/features/chat/stores/harness');
+    return HARNESS_FIRST_RESPONSE_TIMEOUT_MS;
+  });
+  await page.clock.fastForward(timeout);
+  await page.clock.fastForward(1300);
+  await expect(surface.getByRole('alert')).toContainText('代理长时间没有响应，本轮已停止。');
+  await expect.poll(() => acpCalls(page)).toContain('acp_cancel:sess_e2e');
+  await expect(surface.getByTestId('harness-send')).toBeVisible();
+});
+
 test('renders thoughts, tool actions and final text as one reply without a directory strip', async ({ page }, info) => {
   await connect(page);
   const send = async (update: Record<string, unknown>) => emitAcpSession(page, acpUpdate('sess_e2e', update));
@@ -28,6 +81,13 @@ test('renders thoughts, tool actions and final text as one reply without a direc
   await expect(surface.locator('.chat-answer-actions')).toHaveCount(1);
   await expect(surface.getByTestId('harness-directory')).toHaveCount(0);
   await expect(surface).toContainText('Terminal is ready.');
+  const probe = await page.evaluate(async () => {
+    const path = '/src/platform/diagnostics.ts';
+    const { diagnosticSnapshot } = await import(path) as typeof import('../src/platform/diagnostics');
+    return diagnosticSnapshot().filter(record => record.event === 'harness-transcript-rendered').at(-1)?.detail;
+  });
+  expect(probe).toMatchObject({ active: true, exchangeCount: 1, assistantCount: 1, textChars: 18 });
+  expect(JSON.stringify(probe)).not.toContain('Terminal is ready.');
   await page.screenshot({ path: info.outputPath('grouped-agent-turn.png') });
 });
 

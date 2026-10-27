@@ -41,6 +41,17 @@ it('keeps failed replies in their exchange when restored instead of replaying no
   }
 });
 
+it('shows an external reply failure immediately and retries through its owning session', () => {
+  const retry = vi.fn();
+  const failed = { ...exchange, answer: { ...exchange.answer!, error: true,
+    errorSummary: 'Service quota exhausted', errorText: '402: Insufficient Balance' } };
+  render(<AiBlock exchange={failed} allowExchangeActions={false} onRetry={retry} presentation="conversation" />);
+  expect(screen.getByRole('alert')).toHaveTextContent('Service quota exhausted');
+  fireEvent.click(screen.getByRole('button', { name: '重试' }));
+  expect(retry).toHaveBeenCalledOnce();
+  expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
+});
+
 it('uses the tool summary treatment for reasoning and keeps its disclosure usable', () => {
   const reasoning = 'Inspect the build configuration first.\n\nThen check the dependencies.';
   const { container } = render(<AiBlock exchange={{ ...exchange, answer: { ...exchange.answer!, reasoning } }}

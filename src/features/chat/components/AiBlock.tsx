@@ -20,8 +20,8 @@ import TerminalReferences from './TerminalReferences';
 import type { ChatExchange } from '../model/exchanges';
 
 /** Shared message content supports conversation flow and terminal block presentation. */
-export default function AiBlock({ exchange, conversationId, toolContextId, onAskAboutTool, allowExchangeActions = true, presentation = 'block', dividerBefore = false, style }: {
-  exchange: ChatExchange; conversationId?: string; toolContextId?: string; onAskAboutTool?: (question: string) => void; allowExchangeActions?: boolean; presentation?: 'block' | 'conversation'; dividerBefore?: boolean; style?: CSSProperties;
+export default function AiBlock({ exchange, conversationId, toolContextId, onAskAboutTool, onRetry, allowExchangeActions = true, presentation = 'block', dividerBefore = false, style }: {
+  exchange: ChatExchange; conversationId?: string; toolContextId?: string; onAskAboutTool?: (question: string) => void; onRetry?: () => void; allowExchangeActions?: boolean; presentation?: 'block' | 'conversation'; dividerBefore?: boolean; style?: CSSProperties;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
@@ -105,7 +105,9 @@ export default function AiBlock({ exchange, conversationId, toolContextId, onAsk
         : answer.content ? <div className="md"><SafeMarkdown content={visibleAssistantText(answer.content)} paneId={executionPane} />{answer.pending && <PendingCursor />}</div> : null}
       {answer.pending && (!answer.content || parts?.[parts.length - 1]?.kind === 'tool') && <div className="ai-block-working"><PendingCursor />{t('Working')}</div>}
       {answer.error && <ErrorBox placement="inline" dismissible={false} title={t('The reply could not be completed')} details={answer.errorText}
-        actions={question && !sending ? <button type="button" onClick={regenerate}>{t('Retry')}</button> : undefined} />}
+        actions={question && !sending && (allowExchangeActions || onRetry) ? <button type="button" onClick={onRetry ?? regenerate}>{t('Retry')}</button> : undefined}>
+        {answer.errorSummary}
+      </ErrorBox>}
       {answer.content && hasLeakedToolCallMarkup(answer.content) && (
         <div className="chat-environment-note" data-testid="chat-leaked-tool-call">
           {t('The provider returned a tool call as plain text, so no tool ran. Use an endpoint or model that reports tool calls in the standard format.')}

@@ -38,6 +38,7 @@ import type { AcpConfigGroup, AcpConfigValue } from '@platform/api/acp';
 import { useExecutionTerminalOptions } from '../hooks/useExecutionTerminalOptions';
 import { environmentForPane } from '../services/conversationContext';
 import { SidebarSettingsContext } from './SidebarSettingsContext';
+import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
 /** One control in the composer's status row. */
 interface SessionSelector {
@@ -156,6 +157,18 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
 
   const agent = session?.agent?.agentInfo;
   const exchanges = toExchanges(groupHarnessMessages(session?.messages ?? []));
+  const lastMessage = session?.messages[session.messages.length - 1];
+  const replyErrorVisible = lastMessage?.error && lastMessage.errorSummary === session?.error;
+  useEffect(() => {
+    terminalDebug('harness-transcript-rendered', {
+      tabId, sessionId: session?.sessionId ?? null, active, pending: session?.pending,
+      messageCount: session?.messages.length ?? 0, exchangeCount: exchanges.length,
+      assistantCount: session?.messages.filter(message => message.role === 'assistant').length ?? 0,
+      textChars: session?.messages.reduce((count, message) => message.role === 'assistant'
+        ? count + message.content.length + (message.parts?.reduce((size, part) => size + (part.kind === 'text' ? part.text.length : 0), 0) ?? 0) : count, 0) ?? 0,
+      hasError: !!session?.error,
+    });
+  }, [tabId, session?.sessionId, session?.messages, session?.pending, session?.error, active, exchanges.length]);
   const canSend = Boolean(session) && text.trim().length > 0;
   const selectors = session ? sessionSelectors(session, tabId) : [];
   const executionSelector = session?.appToolsConnected && <Select aria-label={t('Application execution terminal')} data-testid="harness-execution-target"
@@ -203,7 +216,7 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
         {!session && <p style={{ margin: '10px 4px', color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
           {t('Opening the harness session…')}
         </p>}
-        {session?.error && <ErrorBox title={session.sessionId ? t('The harness failed.') : t('Connection failed')}
+        {session?.error && !replyErrorVisible && <ErrorBox title={session.sessionId ? t('The harness failed.') : t('Connection failed')}
           details={session.errorDetails ?? undefined}
           actions={!session.sessionId && <OutlineButton onClick={() => void useHarnessStore.getState().open(tabId, harness, cwd ?? '', fresh, resumeSessionId)}>{t('Retry')}</OutlineButton>}>
           {session.error}
@@ -220,6 +233,8 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
         </p>}
         {exchanges.map((exchange, index) => (
           <AiBlock key={exchange.id} exchange={exchange.answer && index === exchanges.length - 1 ? { ...exchange, answer: { ...exchange.answer, pending: session?.pending ?? false } } : exchange}
+            onRetry={exchange.question && !session?.pending && !session?.opening && !session?.stopping
+              ? () => { follow.jumpToLatest(); void useHarnessStore.getState().prompt(tabId, exchange.question!.content); } : undefined}
             allowExchangeActions={false} toolContextId={session?.toolContextId ?? tabId} presentation="conversation" onAskAboutTool={question => {
             const drafts = useComposerDrafts.getState(); const previous = drafts.byTab[tabId]?.text;
             drafts.setText(tabId, previous ? `${previous}\n${question}` : question);

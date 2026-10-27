@@ -45,6 +45,8 @@ export interface ChatMessage {
   error?: boolean;
   /** Raw failure text shown with the retry action. */
   errorText?: string;
+  /** A readable failure message when the transport also supplies separate diagnostics. */
+  errorSummary?: string;
 }
 
 /** Tool event callback: run is an upsert patch; undefined fields keep existing values. */

@@ -107,7 +107,8 @@ export function groupHarnessMessages(messages: ChatMessage[]): ChatMessage[] {
     const parts = (value: ChatMessage) => value.parts ?? (value.content ? [{ kind: 'text' as const, text: value.content }] : []);
     grouped[grouped.length - 1] = { ...previous, parts: [...parts(previous), ...parts(message)],
       reasoning: (previous.reasoning ?? '') + (message.reasoning ?? ''), pending: message.pending,
-      error: message.error ?? previous.error, stopped: message.stopped ?? previous.stopped };
+      error: message.error ?? previous.error, errorSummary: message.errorSummary ?? previous.errorSummary,
+      errorText: message.errorText ?? previous.errorText, stopped: message.stopped ?? previous.stopped };
   }
   return grouped;
 }

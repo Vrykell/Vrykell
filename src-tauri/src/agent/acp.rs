@@ -916,8 +916,32 @@ fn note(event: &str, detail: serde_json::Value) {
 }
 
 fn emit<R: tauri::Runtime>(app: &tauri::AppHandle<R>, event: AcpEvent) {
-    // A closed window is not an error worth surfacing; the session is dropped with it.
-    let _ = tauri::Emitter::emit(app, EVENT, event);
+    let mut detail = event_diagnostic(&event);
+    let result = tauri::Emitter::emit(app, EVENT, event);
+    detail["emitted"] = json!(result.is_ok());
+    note("acp-event-emitted", detail);
+}
+
+/// Describe the transport shape without retaining protocol contents or error messages.
+fn event_diagnostic(event: &AcpEvent) -> Value {
+    let update = event.payload.pointer("/params/update").or_else(|| event.payload.get("update"));
+    let update_kind = update.and_then(|value| value.get("sessionUpdate")).and_then(Value::as_str);
+    let update_kind = match update_kind {
+        Some(kind @ ("agent_message_chunk" | "agent_thought_chunk" | "user_message_chunk"
+            | "tool_call" | "tool_call_update" | "plan" | "usage_update" | "current_mode_update"
+            | "config_option_update" | "available_commands_update" | "notice")) => kind,
+        Some(_) => "other",
+        None => "missing",
+    };
+    json!({
+        "sessionId": event.session_id,
+        "kind": event.kind,
+        "updateKind": update_kind,
+        "hasParams": event.payload.get("params").is_some(),
+        "hasUpdate": update.is_some(),
+        "textBytes": update.and_then(|value| value.pointer("/content/text")).and_then(Value::as_str).map(str::len),
+        "code": event.payload.get("code").and_then(Value::as_i64),
+    })
 }
 
 /// Open a session, resuming `resume` when the agent can. A failed load falls back to a new session:
@@ -1268,6 +1292,24 @@ mod tests {
     use super::*;
     use serde_json::json;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[test]
+    fn event_probe_records_shape_without_protocol_contents() {
+        let mut event = AcpEvent {
+            session_id: "local-session".into(), kind: "update".into(),
+            payload: json!({ "params": { "update": { "sessionUpdate": "agent_message_chunk", "content": { "type": "text", "text": "Private answer" } } } }),
+        };
+        let detail = event_diagnostic(&event);
+        assert_eq!(detail["updateKind"], "agent_message_chunk");
+        assert_eq!(detail["textBytes"], 14);
+        assert_eq!(detail["hasParams"], true);
+        assert!(!detail.to_string().contains("Private answer"));
+        event.payload = json!({ "update": { "sessionUpdate": "Private value" }, "message": "Private error", "code": -32603 });
+        let detail = event_diagnostic(&event);
+        assert_eq!(detail["updateKind"], "other");
+        assert_eq!(detail["code"], -32603);
+        assert!(!detail.to_string().contains("Private"));
+    }
 
     #[tokio::test]
     async fn application_server_descriptor_reaches_new_and_loaded_sessions() {
