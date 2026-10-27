@@ -35,14 +35,13 @@ it('splits the active comparison instead of the page first comparison', () => {
   expect(scopedPaneStores.code.getState().choosingSplit).toBe(true);
 });
 
-it('clears a zoom that points at a removed pane', () => {
+it('retains valid focus after removing a pane', () => {
   useUnifiedWorkspace.getState().reconcile([]);
   const start = useUnifiedWorkspace.getState().activeTabId;
   useUnifiedWorkspace.setState({ layout: { type: 'split', direction: 'row', ratio: 0.5,
     first: { type: 'pane', id: 'first', resourceId: 'terminal:one#0' },
     second: { type: 'pane', id: 'second', resourceId: 'terminal:two#0' } }, activeTabId: start, focused: 'first', startActive: false });
-  useUnifiedWorkspace.setState({ zoomed: 'first' });
   useUnifiedWorkspace.getState().removePane('first');
-  expect(useUnifiedWorkspace.getState().zoomed).toBeNull();
+
   expect(workspacePaneCells(useUnifiedWorkspace.getState().layout!)).toHaveLength(1);
 });

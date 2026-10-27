@@ -6,7 +6,7 @@ import { editorFileKey } from '@core/editor';
 import { useWorkspaceStore } from '../stores/workspace';
 import { useWorkspaceNavigation } from '../stores/navigation';
 import { useAiWorkspace, useChatStore } from '@features/chat';
-import { activateWorkspaceInstance, focusedWorkspaceArea, newWorkspaceItem, openWorkspaceFile } from '../services/workspaceActions';
+import { activateWorkspaceInstance, focusedWorkspaceArea, newWorkspaceItem, openWorkspaceFile, organizeMemoryWithAssistant } from '../services/workspaceActions';
 import { closeWorkspaceItem } from '../services/closeWorkspaceItem';
 import { synchronizeWorkbench } from '../services/workbench';
 import { useWorkbenchStore } from '../stores/workbench';
@@ -18,6 +18,17 @@ beforeEach(() => {
   useAiWorkspace.setState({ nativeTabs: [], selected: '', sideSelected: '', sideSessions: [] });
 });
 afterEach(() => { useWorkspaceStore.setState(snapshot, true); document.body.replaceChildren(); vi.clearAllMocks(); });
+
+it('starts memory review in its own briefly named conversation through the normal send path', () => {
+  const send = vi.spyOn(useChatStore.getState(), 'send').mockResolvedValue(undefined);
+  try {
+    organizeMemoryWithAssistant();
+    const id = useAiWorkspace.getState().selected.slice(5);
+    expect(useWorkspaceNavigation.getState().area).toBe('ai');
+    expect(useChatStore.getState().conversations.find(item => item.id === id)?.title).toBe('记忆整理');
+    expect(send).toHaveBeenCalledWith(expect.stringContaining('待确认'), { conversationId: id });
+  } finally { send.mockRestore(); }
+});
 
 it('restores composer focus after a numeric shortcut switches the side conversation', () => {
   useWorkspaceNavigation.setState({ area: 'terminal', aiPlacement: 'side' });

@@ -12,7 +12,6 @@ export interface WorkspaceContainer {
   title?: string;
   layout: WorkspacePaneLayout | null;
   focused: string;
-  zoomed: string | null;
   groupId?: string;
   historyIdentity?: WorkspaceHistoryIdentity;
   restoreSnapshot?: WorkspaceHistorySnapshot;
@@ -44,8 +43,7 @@ export function acceptsWorkspaceResource(scope: WorkspaceScope, id: string): boo
 export function normalizeContainer(tab: WorkspaceContainer): WorkspaceContainer {
   const cells = panesOf(tab);
   const focused = cells.some(pane => pane.id === tab.focused) ? tab.focused : cells[0]?.id ?? '';
-  const zoomed = cells.some(pane => pane.id === tab.zoomed) ? tab.zoomed : null;
-  return focused === tab.focused && zoomed === tab.zoomed ? tab : { ...tab, focused, zoomed };
+  return focused === tab.focused ? tab : { ...tab, focused };
 }
 
 export function selectContainer(state: WorkbenchSnapshot, id: string): WorkbenchSnapshot {
@@ -114,7 +112,7 @@ export function placeContainerResource(state: WorkbenchSnapshot, tabId: string, 
   if (!tab?.layout || !acceptsWorkspaceResource(tab.scope, pane.resourceId)) return state;
   const layout = splitWorkspacePane(tab.layout, target.leafId, pane, target.dir, target.position);
   if (layout === tab.layout) return state;
-  return selectContainer(putContainer(releaseContainerResources(state, tab.scope, new Set([pane.resourceId]), tab.id), { ...tab, layout, focused: pane.id, zoomed: null }), tab.id);
+  return selectContainer(putContainer(releaseContainerResources(state, tab.scope, new Set([pane.resourceId]), tab.id), { ...tab, layout, focused: pane.id }), tab.id);
 }
 
 /** Reorder one pane inside its own container without changing its identity. */
@@ -128,7 +126,7 @@ export function moveContainerPane(state: WorkbenchSnapshot, tabId: string, paneI
   if (!remaining || !workspacePaneCells(remaining).some(cell => cell.id === target.leafId)) return state;
   const layout = splitWorkspacePane(remaining, target.leafId, { type: 'pane', id: pane.id, resourceId: pane.resourceId }, target.dir, target.position);
   if (layout === remaining) return state;
-  return putContainer(state, { ...tab, layout, focused: pane.id, zoomed: null });
+  return putContainer(state, { ...tab, layout, focused: pane.id });
 }
 
 export function detachContainerPane(state: WorkbenchSnapshot, tabId: string, paneId: string, newTabId: string): WorkbenchSnapshot {
@@ -137,8 +135,8 @@ export function detachContainerPane(state: WorkbenchSnapshot, tabId: string, pan
   const cells = panesOf(tab); const pane = cells.find(pane => pane.id === paneId);
   if (!pane || cells.length < 2) return state;
   const layout = pruneWorkspacePanes(tab.layout, new Set(cells.filter(cell => cell.id !== paneId).map(cell => cell.resourceId)));
-  const next = putContainer(state, { ...tab, layout, zoomed: null });
-  return selectContainer(putContainer(next, { id: newTabId, scope: tab.scope, groupId: tab.groupId, layout: { type: 'pane', id: pane.id, resourceId: pane.resourceId }, focused: pane.id, zoomed: null }), newTabId);
+  const next = putContainer(state, { ...tab, layout });
+  return selectContainer(putContainer(next, { id: newTabId, scope: tab.scope, groupId: tab.groupId, layout: { type: 'pane', id: pane.id, resourceId: pane.resourceId }, focused: pane.id }), newTabId);
 }
 
 export function mergeContainers(state: WorkbenchSnapshot, sourceId: string, targetId: string, target: { leafId: string; dir: 'row' | 'col'; position: 'first' | 'second' }): WorkbenchSnapshot {
@@ -148,7 +146,7 @@ export function mergeContainers(state: WorkbenchSnapshot, sourceId: string, targ
     first: target.position === 'first' ? source.layout! : node, second: target.position === 'first' ? node : source.layout! }));
   if (layout === destination.layout) return state;
   if (!parseWorkspacePaneLayout(layout)) return state;
-  return selectContainer(putContainer(removeContainers(state, new Set([sourceId])), { ...destination, layout, zoomed: null }), targetId);
+  return selectContainer(putContainer(removeContainers(state, new Set([sourceId])), { ...destination, layout }), targetId);
 }
 
 export function assignContainerGroup(state: WorkbenchSnapshot, id: string, groupId: string | undefined): WorkbenchSnapshot {
@@ -197,7 +195,7 @@ const restoreSchema = z.unknown().optional().transform((value, context) => {
   if (!snapshot) { context.addIssue({ code: 'custom', message: 'Invalid workspace references' }); return z.NEVER; }
   return snapshot;
 });
-const tabSchema = z.object({ id: identity, scope: scopeSchema, title: z.string().max(320).optional(), layout: layoutSchema, focused: z.string().max(256), zoomed: z.string().max(256).nullable(), groupId: identity.optional(), historyIdentity: z.object({ id: identity.startsWith('workspace:'), createdAt: z.number().finite().nonnegative() }).optional(), restoreSnapshot: restoreSchema });
+const tabSchema = z.object({ id: identity, scope: scopeSchema, title: z.string().max(320).optional(), layout: layoutSchema, focused: z.string().max(256), groupId: identity.optional(), historyIdentity: z.object({ id: identity.startsWith('workspace:'), createdAt: z.number().finite().nonnegative() }).optional(), restoreSnapshot: restoreSchema });
 const snapshotSchema = z.object({ version: z.literal(2), tabs: z.array(tabSchema).max(4096), groups: z.array(z.object({ id: identity, scope: scopeSchema, title: z.string().min(1).max(320), collapsed: z.boolean() })).max(1024), selected: z.partialRecord(scopeSchema, identity), order: z.partialRecord(scopeSchema, z.array(identity).max(8192)).default({}) });
 
 /** Stored state contains references only and cannot launch a resource by parsing it. */

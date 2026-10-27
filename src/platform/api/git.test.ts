@@ -1,10 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { invoke } from '@tauri-apps/api/core';
-import { diagnostic } from '@platform/diagnostics';
+import { diagnostic, invoke } from '@platform/diagnostics';
 import { changeGitFile, getGitDiff, getGitSnapshot, operateGit, getGitCommitContext } from './git';
 
-vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn() }));
-vi.mock('@platform/diagnostics', () => ({ diagnostic: vi.fn() }));
+vi.mock('@platform/diagnostics', () => ({ diagnostic: vi.fn(), invoke: vi.fn() }));
 beforeEach(() => vi.resetAllMocks());
 
 describe('repository transport', () => {

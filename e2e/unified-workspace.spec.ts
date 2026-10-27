@@ -1,8 +1,13 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 import { pickPlacementZone } from './placement';
 
-test('opens a file with the terminal preference into the active unified composition', async ({ page }) => {
+async function openFirstResource(page: Page) {
+  await page.getByTestId('workspace-instance-bar').getByTestId('workspace-resource-switcher').click();
+  await page.getByRole('menu', { name: '全部工作区标签' }).getByRole('menuitem').first().click();
+}
+
+test('opens a file with the terminal preference in its own unified tab', async ({ page }) => {
   await setupTauriMock(page, {});
   await page.addInitScript(() => {
     localStorage.setItem('vrykell-editor-preferences', JSON.stringify({ state: { localOpenMode: 'terminal' }, version: 0 }));
@@ -11,27 +16,32 @@ test('opens a file with the terminal preference into the active unified composit
   await page.getByTestId('workspace-area-unified').click();
   const mixed = page.getByTestId('unified-workspace');
   const bar = page.getByTestId('workspace-instance-bar');
-  if (await bar.getByRole('tab').count()) await bar.getByRole('tab').first().click();
-  const before = await mixed.locator('.unified-pane').count();
+  await openFirstResource(page);
+  const before = await bar.getByRole('tab').count();
   await page.locator('[data-dock-btn="files"]').click();
   await page.getByTestId('local-file-tree').getByText('notes.txt', { exact: true }).dblclick();
   await expect(page.getByTestId('workspace-area-unified')).toHaveAttribute('aria-current', 'page');
-  await expect(mixed.locator('.unified-pane')).toHaveCount(before + 1);
-  await expect(mixed.locator('.terminal-pane:visible')).toHaveCount(before + 1);
+  await expect(bar.getByRole('tab')).toHaveCount(before + 1);
+  await expect(mixed.locator('.unified-pane')).toHaveCount(1);
+  await expect(mixed.locator('.terminal-pane:visible')).toHaveCount(1);
 });
 
-test('opens a picked file into the active unified composition without leaving it', async ({ page }) => {
+test('opens a picked file in a separate unified tab and reuses it when reopened', async ({ page }) => {
   await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-unified').click();
   const mixed = page.getByTestId('unified-workspace');
   const bar = page.getByTestId('workspace-instance-bar');
-  await bar.getByRole('tab').first().click();
-  const before = await mixed.locator('.unified-pane').count();
+  await openFirstResource(page);
+  const before = await bar.getByRole('tab').count();
   await page.evaluate(() => { (window as unknown as { __PICK_PATHS__: string[] }).__PICK_PATHS__ = ['/home/e2e/project/routed.txt']; });
   await bar.getByRole('button', { name: '打开文件', exact: true }).click();
   await expect(page.getByTestId('workspace-area-unified')).toHaveAttribute('aria-current', 'page');
-  await expect(mixed.locator('.unified-pane')).toHaveCount(before + 1);
+  await expect(bar.getByRole('tab')).toHaveCount(before + 1);
+  await expect(mixed.locator('.unified-pane')).toHaveCount(1);
   await expect(mixed.locator('.monaco-editor')).toBeVisible();
+  await page.evaluate(() => { (window as unknown as { __PICK_PATHS__: string[] }).__PICK_PATHS__ = ['/home/e2e/project/routed.txt']; });
+  await bar.getByRole('button', { name: '打开文件', exact: true }).click();
+  await expect(bar.getByRole('tab')).toHaveCount(before + 1);
 });
 
 test('opens the split-resource menu when splitting a terminal in the unified workspace', async ({ page }) => {
@@ -40,7 +50,7 @@ test('opens the split-resource menu when splitting a terminal in the unified wor
   await page.getByTestId('workspace-area-unified').click();
   const mixed = page.getByTestId('unified-workspace');
   const bar = page.getByTestId('workspace-instance-bar');
-  await bar.getByRole('tab').first().click();
+  await openFirstResource(page);
   const terminal = mixed.locator('.terminal-pane:visible').first();
   await expect(terminal).toBeVisible();
   await terminal.click({ button: 'right' });
@@ -70,6 +80,7 @@ test('creates directly into a split and preserves the initial live resource', as
   const terminal = await page.locator('.terminal-pane').first().elementHandle();
   await page.getByTestId('workspace-area-unified').click();
   const mixed = page.getByTestId('unified-workspace'); const bar = page.getByTestId('workspace-instance-bar');
+  await openFirstResource(page);
   await expect(mixed.getByTestId('unified-start-page')).toHaveCount(0);
   await bar.getByRole('tab').nth(0).click();
   await bar.getByRole('button', { name: '拆分标签页' }).click();
@@ -96,6 +107,7 @@ test('shares mixed tabs and split panes without restarting terminals or discardi
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   const terminal = page.locator('.terminal-pane').first(); const terminalNode = await terminal.elementHandle();
+  const terminalTitle = await page.getByTestId('workspace-instance-bar').getByRole('tab').first().innerText();
   const spawns = await page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: unknown[] }).__PTY_SPAWNS__.length);
   await page.getByTestId('workspace-area-code').click();
   await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '新建文件', exact: true }).click();
@@ -114,11 +126,12 @@ test('shares mixed tabs and split panes without restarting terminals or discardi
   await page.getByTestId('workspace-area-unified').click();
   const mixed = page.getByTestId('unified-workspace');
   const strip = page.getByTestId('workspace-instance-bar').getByRole('tablist', { name: '全部工作区标签' });
-  await expect(strip.getByRole('tab')).toHaveCount(4);
+  await page.getByTestId('workspace-instance-bar').getByTestId('workspace-resource-switcher').click();
+  await page.getByRole('menuitem', { name: '未命名 1.txt', exact: true }).click();
+  await expect(strip.getByRole('tab')).toHaveCount(1);
   await strip.getByRole('tab', { name: /未命名 1.txt/ }).click();
   await expect(mixed.locator('.view-lines')).toContainText('mixed editor draft');
   expect(await editorNode!.evaluate(element => element.isConnected && !!element.closest('[data-testid="unified-workspace"]'))).toBe(true);
-  const terminalTitle = await strip.getByRole('tab').nth(0).innerText();
   await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '拆分标签页' }).click();
   await page.getByRole('menuitem', { name: terminalTitle, exact: true }).click();
   await pickPlacementZone(page, mixed.locator('.unified-pane').first(), 'right');
@@ -146,7 +159,7 @@ test('shares mixed tabs and split panes without restarting terminals or discardi
   }
   await page.setViewportSize({ width: 1240, height: 800 });
   await mixed.locator('.unified-pane').filter({ has: page.locator('.monaco-editor') }).locator('textarea.inputarea').focus();
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
+  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '工作区操作' }).click();
   await page.getByRole('menu').locator('button').filter({ hasText: '移除此分屏' }).click();
   const confirm = page.getByRole('dialog', { name: '未保存的更改' }); await expect(confirm).toBeVisible();
   await confirm.getByRole('button', { name: '取消', exact: true }).click();
@@ -160,7 +173,7 @@ test('shares mixed tabs and split panes without restarting terminals or discardi
   expect(await page.evaluate(() => (window as unknown as { __PTY_CLOSES__: unknown[] }).__PTY_CLOSES__.length)).toBe(0);
 });
 
-test('adds a resource to the active composition from the unified switcher and keeps native navigation', async ({ page }) => {
+test('opens or selects resource tabs from the unified switcher and keeps native navigation', async ({ page }) => {
   await setupTauriMock(page, {});
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
@@ -177,14 +190,15 @@ test('adds a resource to the active composition from the unified switcher and ke
   await page.getByRole('menuitem', { name: 'notes.txt', exact: true }).click();
   await expect(page.getByTestId('workspace-area-code')).toHaveAttribute('aria-current', 'page');
 
-  // The common workspace adds the selected pane reference to its active composition.
+  // The common workspace opens an independent tab without an implicit split.
   await page.getByTestId('workspace-area-unified').click();
   const mixed = page.getByTestId('unified-workspace');
   const bar = page.getByTestId('workspace-instance-bar');
-  await bar.getByRole('tab').nth(0).click();
+  await openFirstResource(page);
   await expect(mixed.locator('.unified-pane')).toHaveCount(1);
   await bar.getByTestId('workspace-resource-switcher').click();
   await page.getByRole('menuitem', { name: 'notes.txt', exact: true }).click();
-  await expect(mixed.locator('.unified-pane')).toHaveCount(2);
+  await expect(mixed.locator('.unified-pane')).toHaveCount(1);
+  await expect(bar.getByRole('tab')).toHaveCount(2);
   await expect(page.getByTestId('workspace-area-unified')).toHaveAttribute('aria-current', 'page');
 });

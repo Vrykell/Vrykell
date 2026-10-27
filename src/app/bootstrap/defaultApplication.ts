@@ -13,9 +13,11 @@ import { t } from '@i18n';
 import { restoreWorkbench } from '@features/workspace/services/workbench';
 import { useStartupSettings } from '@features/settings/stores/startup';
 import { reportWorkbenchFailure } from '@features/workspace/stores/workbenchFeedback';
+import { createSharedStartupTask } from './sharedStartupTask';
 
 /** Page-scope sweep: a strict-mode replay must share one close call, not race a second one. */
 let staleSessionsClosed: Promise<void> | null = null;
+let restoreTask: ReturnType<typeof createSharedStartupTask> | undefined;
 
 function closeStalePtySessions(): Promise<void> {
   staleSessionsClosed ??= ptyCloseAll()
@@ -26,7 +28,7 @@ function closeStalePtySessions(): Promise<void> {
   return staleSessionsClosed;
 }
 
-/** 默认应用运行时依赖，集中在 app 层，业务组件不再承担启动编排。 */
+/** Application startup orchestration stays outside business components. */
 export function startDefaultApplication(): () => void {
   const reportFailure = (message: string, error: unknown) => {
     console.warn(`[application] ${message}:`, error);
@@ -40,21 +42,23 @@ export function startDefaultApplication(): () => void {
     refreshAiConfig,
     refreshToolPolicy,
     subscribeAutoTitle: initAutoTitle,
-    restoreWorkspace: async () => {
-      // A page reload keeps the Rust process and its PTY sessions alive; terminate the
-      // previous page's shells before the restored tabs start their own.
-      await closeStalePtySessions();
-      const launchDirectory = await getShellLaunchDirectory().catch(error => {
-        reportFailure(t('Could not open the requested directory'), error);
-        return null;
+    restoreWorkspace: () => {
+      restoreTask ??= createSharedStartupTask(async () => {
+        // A page reload keeps the backend and its PTY sessions alive; terminate the
+        // previous page's shells before the restored tabs start their own.
+        await closeStalePtySessions();
+        const launchDirectory = await getShellLaunchDirectory().catch(error => {
+          reportFailure(t('Could not open the requested directory'), error);
+          return null;
+        });
+        await restoreWorkspace({ onError: reportFailure, launchDirectory });
+        const mode = launchDirectory ? 'default' : useStartupSettings.getState().mode;
+        const restore = () => restoreWorkbench(mode, error => reportWorkbenchFailure(error, () => { void restore(); }));
+        await restore();
+        // Subscribe after the explicit launch is placed so queued redirects get their own tab.
+        await initForwardedLaunch(reportFailure);
       });
-      await restoreWorkspace({ onError: reportFailure, launchDirectory });
-      const mode = launchDirectory ? 'default' : useStartupSettings.getState().mode;
-      const restore = () => restoreWorkbench(mode, error => reportWorkbenchFailure(error, () => { void restore(); }));
-      await restore();
-      // Subscribe only after the explicit launch is placed: a redirect that arrived meanwhile
-      // waits in the queue and becomes its own tab instead of hiding the requested directory.
-      await initForwardedLaunch(reportFailure);
+      return restoreTask();
     },
     loadWorkspaceDirs: () => useWorkspaceDirsStore.getState().load(),
     hydrateHistory: () => useHistoryStore.getState().hydrate(),

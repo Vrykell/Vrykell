@@ -31,7 +31,7 @@ beforeEach(() => {
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
   useUiStore.setState({ settingsOpen: false, splitPlacement: { open: false, spec: null }, paneMove: { open: false, containerId: '', paneId: '' }, splitPickerOpen: false });
   useWorkspaceNavigation.setState({ area: 'terminal' });
-  useUnifiedWorkspace.setState({ activeTabId: '', layout: null, focused: '', zoomed: null, startActive: true });
+  useUnifiedWorkspace.setState({ activeTabId: '', layout: null, focused: '', startActive: true });
   useWorkspaceStore.setState({ tabs: [{ id: 'window', title: 'Terminal', kind: 'session', layout: leaf({ id: 'pane-a', kind: 'local', openMode: 'block' }) }], activeId: 'window' });
   useTerminalStore.setState({ sessions: { 'pane-a': 'session-a' }, scenes: { 'pane-a': 'altScreen' }, focusedPaneId: 'pane-a', manualFullscreen: {} });
 });

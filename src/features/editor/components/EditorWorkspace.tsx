@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { EDITOR_ENCODINGS, editorFileKey, registerEditorCloseGuard, type EditorEncoding, type EditorFile } from '@core/editor';
 import SafeMarkdown from '@features/chat/components/SafeMarkdown';
 import ContextMenu, { type MenuAnchor } from '@ui/menus/ContextMenu';
-import { useSessionStore, useWorkspaceNavigation, useScopedSplitActive, WorkspaceResourceSwitcher, WorkspaceSplitAction, type Tab } from '@features/workspace';
+import { useSessionStore, useWorkspaceNavigation, useScopedPaneActive, WorkspaceResourceSwitcher, WorkspaceSplitAction, type Tab } from '@features/workspace';
 import { openInTerminal } from '@features/files';
 import CodeEditor, { type CodeEditorHandle, type EditorCommand } from '@ui/editor/CodeEditor';
 import { useEditorPreferences } from '@config/editor';
@@ -36,7 +36,7 @@ export default function EditorWorkspace({ children }: { children: ReactNode }) {
   const tabs = useSessionStore(state => state.tabs); const activeId = useSessionStore(state => state.activeId);
   const documents = useEditorDocuments(state => state.documents);
   const area = useWorkspaceNavigation(state => state.area);
-  const splitActive = useScopedSplitActive('code');
+  const paneActive = useScopedPaneActive('code');
   const page = area === 'code' ? tabs.find(tab => tab.id === activeId && tab.kind === 'editor') : undefined;
   const startTab = tabs.find(tab => tab.kind === 'start-code');
   const startActive = !!startTab && area === 'code' && activeId === startTab.id;
@@ -67,7 +67,7 @@ export default function EditorWorkspace({ children }: { children: ReactNode }) {
   };
   return <>
     <div className="editor-content-host" style={{ display: page || startActive ? 'none' : 'flex' }} inert={!!page || startActive}>{children}</div>
-    {panes.map(({ file, pageId }) => <DocumentPane key={editorFileKey(file)} file={file} active={!splitActive && pageId === activeId && page?.kind === 'editor' && editorFileKey(page.selected) === editorFileKey(file)} />)}
+    {panes.map(({ file, pageId }) => <DocumentPane key={editorFileKey(file)} file={file} active={!paneActive && pageId === activeId && page?.kind === 'editor' && editorFileKey(page.selected) === editorFileKey(file)} />)}
     {startTab && <CodeStartPane tab={startTab} active={startActive} />}
     {closing && <ToolDialog label={t('Unsaved changes')} onClose={() => { if (!saving) setClosing(null); }} busy={saving} width={520}>
       <div className="editor-close-dialog"><p>{t('Save your changes before closing?')}</p><div className="editor-file-list">{closing.files.filter(file => isDocumentDirty(documents[editorFileKey(file)])).map(file => <span key={editorFileKey(file)}>{file.path}</span>)}</div>

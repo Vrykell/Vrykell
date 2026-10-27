@@ -37,6 +37,17 @@ export async function openWorkspaceFile() {
   presentWorkspaceResource(`file:${editorFileKey(file)}`);
 }
 
+/** An explicit settings action starts a dedicated, normally authorized memory review. */
+export function organizeMemoryWithAssistant() {
+  const chat = useChatStore.getState();
+  const id = chat.createConversation();
+  chat.renameConversation(id, t('Memory review'));
+  useAiWorkspace.getState().openNative(id);
+  useWorkspaceNavigation.getState().selectArea('ai');
+  useWorkspaceStore.getState().openHarnessTab();
+  void chat.send(t('Review my saved memories, including pending and expired records, using the memory tool. Organize duplicates and outdated facts, and ask me before activating facts that cannot be verified. Do not assume old records are still correct.'), { conversationId: id });
+}
+
 export function newWorkspaceItem() {
   const area = focusedWorkspaceArea();
   if (area === 'unified') {

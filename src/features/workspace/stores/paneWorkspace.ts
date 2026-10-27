@@ -10,7 +10,7 @@ export const newContainerId = () => `workspace-${crypto.randomUUID()}`;
 const pane = (resourceId: string): Extract<WorkspacePaneLayout, { type: 'pane' }> => ({ type: 'pane', id: `pane-${Date.now()}-${sequence++}`, resourceId });
 
 export interface PaneWorkspaceState {
-  activeTabId: string; zoomed: string | null;
+  activeTabId: string;
   layout: WorkspacePaneLayout | null; focused: string;
   startActive: boolean; choosingSplit: boolean;
   splitAnchor?: { x: number; y: number };
@@ -21,7 +21,7 @@ export interface PaneWorkspaceState {
   reconcile: (ids: string[]) => void; show: (id: string) => void;
   split: (id: string, direction: 'row' | 'col') => void;
   place: (id: string, target: PaneTarget) => void;
-  removePane: (id: string) => void; single: () => void;
+  removePane: (id: string) => void;
   move: (ids: string[], id: string, over: string, after: boolean) => void;
   ratio: (firstId: string, secondId: string, ratio: number) => void;
   restore: (layout: WorkspacePaneLayout, focused: string, identity?: WorkspaceHistoryIdentity) => void;
@@ -37,7 +37,7 @@ export function createPaneWorkspaceStore(scope: WorkspaceScope = 'unified', work
     return state.tabs.find(tab => tab.id === state.selected[scope] && tab.scope === scope);
   };
   const open = (layout: WorkspacePaneLayout | null, focused = '', historyIdentity?: WorkspaceHistoryIdentity) => {
-    const tab: WorkspaceContainer = { id: newContainerId(), scope, layout, focused, zoomed: null, historyIdentity };
+    const tab: WorkspaceContainer = { id: newContainerId(), scope, layout, focused, historyIdentity };
     workbench.getState().update(state => selectContainer(putContainer(state, tab), tab.id));
     return tab.id;
   };
@@ -46,7 +46,7 @@ export function createPaneWorkspaceStore(scope: WorkspaceScope = 'unified', work
     if (tab) workbench.getState().update(state => putContainer(state, apply(tab)));
   };
   const store = create<PaneWorkspaceState>(set => ({
-    activeTabId: '', zoomed: null, layout: null, focused: '', startActive: true, choosingSplit: false,
+    activeTabId: '', layout: null, focused: '', startActive: true, choosingSplit: false,
     chooseMerge: pendingMergeTab => set({ pendingMergeTab }),
     selectTab: id => workbench.getState().update(state => state.tabs.some(tab => tab.scope === scope && tab.id === id) ? selectContainer(state, id) : state),
     openStart: () => {
@@ -56,8 +56,6 @@ export function createPaneWorkspaceStore(scope: WorkspaceScope = 'unified', work
     reconcile: ids => {
       if (!workbench.getState().ready) return;
       workbench.getState().update(state => reconcileContainers(state, scope, new Set(ids)));
-      const placed = new Set(workbench.getState().snapshot.tabs.filter(tab => tab.scope === scope).flatMap(tab => panesOf(tab).map(pane => pane.resourceId)));
-      for (const id of ids) if (!placed.has(id)) { const layout = pane(id); open(layout, layout.id); }
       if (!current()) open(null);
     },
     show: id => {
@@ -81,7 +79,6 @@ export function createPaneWorkspaceStore(scope: WorkspaceScope = 'unified', work
       const ids = new Set(panesOf(tab).filter(pane => pane.id !== id).map(pane => pane.resourceId));
       return { ...tab, layout: pruneWorkspacePanes(tab.layout, ids) };
     }),
-    single: () => change(tab => ({ ...tab, zoomed: tab.zoomed ? null : tab.focused })),
     move: (_ids, id, over, after) => workbench.getState().update(state => moveContainer(state, id, over, after)),
     ratio: (firstId, secondId, ratio) => change(tab => {
       return tab.layout ? { ...tab, layout: setWorkspacePaneRatio(tab.layout, firstId, secondId, ratio) } : tab;
@@ -91,7 +88,7 @@ export function createPaneWorkspaceStore(scope: WorkspaceScope = 'unified', work
       const existing = workbench.getState().snapshot.tabs.find(tab => tab.scope === scope && (identity ? tab.historyIdentity?.id === identity.id : JSON.stringify(panesOf(tab).map(pane => pane.resourceId).sort()) === JSON.stringify(workspacePaneCells(parsed).map(pane => pane.resourceId).sort())));
       const ids = new Set(workspacePaneCells(parsed).map(pane => pane.resourceId));
       const id = existing?.id ?? newContainerId();
-      workbench.getState().update(state => selectContainer(putContainer(releaseContainerResources(state, scope, ids, id), { ...existing, id, scope, layout: parsed, focused, zoomed: null, historyIdentity: identity }), id));
+      workbench.getState().update(state => selectContainer(putContainer(releaseContainerResources(state, scope, ids, id), { ...existing, id, scope, layout: parsed, focused, historyIdentity: identity }), id));
     },
     detach: resourceId => {
       const tab = current(); const cell = tab && panesOf(tab).find(pane => pane.resourceId === resourceId);
@@ -107,16 +104,16 @@ export function createPaneWorkspaceStore(scope: WorkspaceScope = 'unified', work
     const tab = current();
     const changed = store.getState().activeTabId !== (tab?.id ?? '');
     projecting = true;
-    store.setState({ activeTabId: tab?.id ?? '', layout: tab?.layout ?? null, focused: tab?.focused ?? '', zoomed: tab?.zoomed ?? null, historyIdentity: tab?.historyIdentity, startActive: !tab?.layout,
+    store.setState({ activeTabId: tab?.id ?? '', layout: tab?.layout ?? null, focused: tab?.focused ?? '', historyIdentity: tab?.historyIdentity, startActive: !tab?.layout,
       ...(changed ? { choosingSplit: false, splitAnchor: undefined, pendingMergeTab: undefined } : {}) });
     projecting = false;
   };
   workbench.subscribe(project);
   store.subscribe((state, previous) => {
     if (projecting) return;
-    if (state.layout !== previous.layout || state.focused !== previous.focused || state.zoomed !== previous.zoomed || state.historyIdentity !== previous.historyIdentity) {
+    if (state.layout !== previous.layout || state.focused !== previous.focused || state.historyIdentity !== previous.historyIdentity) {
       if (!current() && state.layout) open(state.layout, state.focused, state.historyIdentity);
-      else change(tab => ({ ...tab, layout: state.layout, focused: state.focused, zoomed: state.zoomed, historyIdentity: state.historyIdentity }));
+      else change(tab => ({ ...tab, layout: state.layout, focused: state.focused, historyIdentity: state.historyIdentity }));
     }
   });
   project();

@@ -1,6 +1,12 @@
 ﻿/** Simplified Chinese messages for shared UI and feature namespaces. */
 const zh: Record<string, string> = {
   'Tab actions': '标签页操作',
+  'Workspace actions': '工作区操作',
+  'Organize with AI': '让 AI 整理',
+  'Memory review': '记忆整理',
+  'Review memories': '整理记忆',
+  'Review pending and expired memories, combine duplicates, and check outdated facts with the assistant.': '让 AI 检查待确认和已过期的记忆，合并重复条目，核实过时的事实。',
+  'Review my saved memories, including pending and expired records, using the memory tool. Organize duplicates and outdated facts, and ask me before activating facts that cannot be verified. Do not assume old records are still correct.': '请使用记忆工具检查我保存的记忆，包括待确认和已过期的条目。整理重复和过时的事实；无法核实的内容，请先向我确认，再启用。不要默认旧记录仍然正确。',
   'Move to tab group': '移至标签组',
   'Delete tab group': '删除标签组',
   'Delete group': '删除分组',
@@ -52,8 +58,6 @@ const zh: Record<string, string> = {
   'Stopping also cancels queued messages for this conversation.': '停止也会取消此对话中等待发送的消息。',
   'The selected execution terminal disconnected. The command was not confirmed as completed. Ask the user to reconnect or select another terminal; do not switch targets or retry automatically.': '选定的执行终端已断开，无法确认命令执行完成。请用户重新连接或选择其他终端，不要自动切换目标或重试。',
   'Choose agent': '选择智能体',
-  'Zoom pane': '放大当前窗格',
-  'Restore panes': '还原窗格布局',
   'Move pane to new tab': '将窗格移至新标签页',
   'Merge tab into this tab': '合并标签页到当前标签',
   'Side panel conversation': '侧栏对话',

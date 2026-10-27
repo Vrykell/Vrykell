@@ -684,7 +684,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       isSessionTab(tab) && layoutLeaves(tab.layout).some(terminal => terminal.id === paneId));
     if (!owner || countLeaves(owner.layout) < 2) return;
     const id = nextTabId();
-    const snapshot = putContainer(useWorkbenchStore.getState().snapshot, { id: owner.id, scope: 'terminal', layout: terminalWorkspaceLayout(owner.layout), focused: paneId, zoomed: null, groupId: owner.groupId });
+    const snapshot = putContainer(useWorkbenchStore.getState().snapshot, { id: owner.id, scope: 'terminal', layout: terminalWorkspaceLayout(owner.layout), focused: paneId, groupId: owner.groupId });
     const detached = detachContainerPane(snapshot, owner.id, paneId, id);
     const specs = layoutLeaves(owner.layout);
     const layout = terminalResourceLayout(detached.tabs.find(tab => tab.id === owner.id)!.layout, specs)!;
@@ -758,7 +758,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       set({
         // 只加载未归档且含活跃会话的分组（空分组不进入标签面板）
         groups: list
-          .filter((g: BackendGroupEntry) => !g.archived && g.session_count > 0)
+          .filter((g: BackendGroupEntry) => !g.archived && g.session_count > 0 && (!g.id.startsWith('group:') || g.id.startsWith('group:terminal:')))
           .map((g: BackendGroupEntry) => ({ id: g.id, title: g.title, collapsed: g.collapsed })),
       });
     } catch {
@@ -797,6 +797,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       .map((g) => g.id);
     if (emptyIds.length === 0) return;
     set((s) => ({ groups: s.groups.filter((g) => !emptyIds.includes(g.id)) }));
+    const removed: WorkspaceGroup[] = groups.filter(group => emptyIds.includes(group.id)).map(group => ({ ...group, scope: 'terminal' }));
+    const retry = () => {
+      void import('../services/workbench').then(module => module.pruneEmptyWorkspaceGroups(removed)).catch(error => reportWorkbenchFailure(error, retry));
+    };
+    retry();
   },
 
 }));

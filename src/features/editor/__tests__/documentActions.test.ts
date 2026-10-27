@@ -43,7 +43,7 @@ it('keeps a saved draft in its existing split placement', async () => {
   const draft = page.selected; const other = { path: '/notes/other.txt' };
   useSessionStore.getState().openEditorFile(other);
   const draftId = `file:${editorFileKey(draft)}`; const otherId = `file:${editorFileKey(other)}`;
-  useWorkbenchStore.setState({ ready: false, snapshot: { ...emptyWorkbench(), selected: { code: 'page' }, tabs: [{ id: 'page', scope: 'code', focused: 'left', zoomed: null,
+  useWorkbenchStore.setState({ ready: false, snapshot: { ...emptyWorkbench(), selected: { code: 'page' }, tabs: [{ id: 'page', scope: 'code', focused: 'left',
     layout: { type: 'split', direction: 'row', ratio: 0.5, first: { type: 'pane', id: 'left', resourceId: draftId }, second: { type: 'pane', id: 'right', resourceId: otherId } } }] } });
   useEditorDocuments.getState().edit(draft, 'note'); vi.mocked(pickPath).mockResolvedValueOnce(['/notes/note.txt']);
   expect(await saveDocument(draft)).toBe(true);

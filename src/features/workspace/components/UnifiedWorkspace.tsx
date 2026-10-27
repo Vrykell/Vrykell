@@ -62,7 +62,6 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
   const focused = cells.find(cell => cell.id === state.focused) ?? cells[0];
   const placed = new Set(cells.map(cell => cell.resourceId));
   const anchor = (trigger: HTMLButtonElement, split: boolean) => {
-    if (split) useUnifiedWorkspace.setState({ zoomed: null });
     const box = trigger.getBoundingClientRect(); setMenu({ anchor: { x: box.right, y: box.bottom + 4, trigger, align: 'end' }, split });
   };
   useEffect(() => {
@@ -85,7 +84,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
     setPlacement(null);
     state.chooseMerge();
   };
-  const beginPlacement = (addition: Addition) => { useUnifiedWorkspace.setState({ zoomed: null }); setPlacement(addition); };
+  const beginPlacement = (addition: Addition) => { setPlacement(addition); };
   const pickerOrigin = () => ({ split: menu?.split ?? false, anchor: menu ? { x: menu.anchor.x, y: menu.anchor.y, aboveY: menu.anchor.y - 4, align: menu.anchor.align } : undefined });
   const creation: ContextMenuItem[] = [
     { label: t('New terminal'), onClick: () => setTerminalPicker({ source: 'shell', ...pickerOrigin() }) },
@@ -98,7 +97,11 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
     <WorkspaceHeader active={visible}><FolderTabs label={t('All workspace tabs')} listId="unified-resources"
       items={strip.handles}
       selected={state.activeTabId} onSelect={strip.onSelect} onClose={strip.onClose}
-      onMove={strip.onMove} grouping={strip.grouping} onRename={strip.onRename} tabActions={strip.tabActions} menuItems={strip.tabActions?.(state.activeTabId) ?? []} toolbar={<>
+      onMove={strip.onMove} grouping={strip.grouping} onRename={strip.onRename} tabActions={strip.tabActions} menuLabel={t('Workspace actions')} menuItems={[
+        ...(strip.tabActions?.(state.activeTabId) ?? []), ...creation,
+        { label: t('Open file'), onClick: () => void openWorkspaceFile() },
+        { label: t('All history'), onClick: history },
+      ]} toolbar={<>
         <WorkspaceResourceSwitcher destination="unified" />
         {!state.startActive && resources.find(resource => resource.id === focused?.resourceId)?.kind === 'terminal' && <SshResourcesAction />}
         <IconButton compact aria-label={t('All history')} data-tip={t('All history')} onClick={history}><History size={16} /></IconButton>
@@ -110,11 +113,11 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
     {state.startActive && <UnifiedStartPage resources={resources} icon={resourceIcon} onSelect={focusUnifiedResource}
       onNew={kind => kind === 'terminal' ? setTerminalPicker({ source: 'shell', split: false }) : newItem(kind)} onOpen={() => void openWorkspaceFile()}
       onConnect={() => setTerminalPicker({ source: 'ssh', split: false })} onAgent={() => setLauncher({ split: false })} onHistory={history} />}
-    <WorkspacePaneCanvas containerId={state.activeTabId} layout={state.layout} focused={state.focused} zoomed={state.zoomed} resources={resources} visible={visible && !state.startActive} toolbarTarget={resourceToolbar}
+    <WorkspacePaneCanvas containerId={state.activeTabId} layout={state.layout} focused={state.focused} resources={resources} visible={visible && !state.startActive} toolbarTarget={resourceToolbar}
       onFocus={focusUnifiedResource} onRatio={state.ratio} placing={!!placement} onPlace={commit} onCancel={() => { setPlacement(null); state.chooseMerge(); }}
-      onSplit={id => { useUnifiedWorkspace.setState({ zoomed: null }); focusUnifiedResource(id); useUnifiedWorkspace.setState({ choosingSplit: true }); }}
+      onSplit={id => { focusUnifiedResource(id); useUnifiedWorkspace.setState({ choosingSplit: true }); }}
       onMovePane={(paneId, target) => moveWorkspacePane(state.activeTabId, paneId, target)}
-      onRemove={removeUnifiedPane} onDetach={detachCompositionPane} onZoom={state.single} />
+      onRemove={removeUnifiedPane} onDetach={detachCompositionPane} />
     {menu && <ContextMenu anchor={menu.anchor} label={t(menu.split ? 'Choose a tab to split' : 'New workspace tab')} itemRole="menuitem" onClose={() => setMenu(null)} items={flattenSingleSubmenu<ContextMenuItem>(menu.split
       ? [...resources.filter(resource => !placed.has(resource.id)).map(resource => ({ label: resource.title, onClick: () => beginPlacement({ kind: 'existing', id: resource.id }) })), { label: t('New workspace tab'), group: 'edit', submenu: { items: creation } }]
       : creation)} />}

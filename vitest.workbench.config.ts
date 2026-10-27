@@ -6,6 +6,8 @@ export default defineConfig(async environment => {
   const config = await applicationConfig(environment);
   return { ...config, test: { ...config.test, coverage: { ...config.test?.coverage,
     include: [
+      'src/ui/layout/resourcePlacements.ts',
+      'src/app/bootstrap/sharedStartupTask.ts',
       'src/core/paneTree.ts',
       'src/core/paneLayout.ts',
       'src/features/workspace/model/workbench.ts',

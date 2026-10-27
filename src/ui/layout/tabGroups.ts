@@ -1,4 +1,4 @@
-export interface TabGroupHandle { id: string; title: string; collapsed: boolean; members: string[] }
+export interface TabGroupHandle { id: string; title: string; collapsed: boolean; members: string[]; archivable?: boolean }
 
 /** The strip owns presentation; providers implement the shared group operations. */
 export interface TabGroupController {

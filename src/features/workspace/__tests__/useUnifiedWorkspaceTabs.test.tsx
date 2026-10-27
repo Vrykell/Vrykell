@@ -5,7 +5,7 @@ import { useUnifiedWorkspace } from '../stores/unifiedWorkspace';
 import { useWorkbenchStore } from '../stores/workbench';
 import { currentWorkspaceResources } from '../services/workspaceResources';
 import { useUnifiedWorkspaceTabs } from '../hooks/useUnifiedWorkspaceTabs';
-import { workspaceStripEntities } from '../model/workbench';
+import { emptyWorkbench, workspaceStripEntities } from '../model/workbench';
 import { editorFileKey } from '@core/editor';
 
 vi.mock('@platform/diagnostics', () => ({ invoke: vi.fn(async () => undefined), diagnostic: vi.fn() }));
@@ -28,7 +28,10 @@ it('projects real layout containers and selects, moves and closes through their 
 });
 
 it('leaves the fallback to the start surface when a scope has no content tab', () => {
+  useWorkbenchStore.setState({ snapshot: emptyWorkbench() });
   useUnifiedWorkspace.getState().openStart();
   const { result } = renderHook(() => useUnifiedWorkspaceTabs([], () => null));
-  expect(result.current.handles).toEqual([]);
+  expect(result.current.handles).toHaveLength(1);
+  expect(result.current.handles[0]!.label).toBe('开始');
+  expect(result.current.handles[0]!.capabilities.groupable).toBe(false);
 });

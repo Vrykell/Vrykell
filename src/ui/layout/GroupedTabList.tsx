@@ -31,9 +31,13 @@ export default function GroupedTabList({ items, selected, label, listId, classNa
   const dwell = useListReorder(state => state.drag?.listId === listId ? state.dwellZoneId : null);
   useHorizontalWheel(strip, true);
   useActiveTabVisibility(strip, '[data-active="true"], [data-group-anchor="true"]', `${selected}:${items.length}:${JSON.stringify(groups)}`);
-  const groupFor = (id: string) => groups.find(group => group.members.includes(id));
+  const itemsById = new Map(items.map(item => [item.id, item]));
+  const groupsById = new Map(groups.map(group => [group.id, group]));
+  const groupsByMember = new Map(groups.flatMap(group => group.members.map(id => [id, group] as const)));
+  const groupFor = (id: string) => groupsByMember.get(id);
   const knownEntities = [...groups.map(group => `group:${group.id}`), ...items.filter(item => !groupFor(item.id)).map(item => `tab:${item.id}`)];
-  const entities = [...new Set([...(grouping?.order ?? []).filter(id => knownEntities.includes(id)), ...knownEntities])];
+  const entityIds = new Set(knownEntities);
+  const entities = [...new Set([...(grouping?.order ?? []).filter(id => entityIds.has(id)), ...knownEntities])];
   const start = useListReorderDrag({ listId, axis: 'horizontal', grouped: groups.length > 0, endZoneId: 'ungrouped',
     accepts: () => true, onDrop: (moving, target) => {
     if (moving.kind === 'group') {
@@ -91,7 +95,7 @@ export default function GroupedTabList({ items, selected, label, listId, classNa
   const groupActions = (group: TabGroupHandle): ContextMenuItem[] => [
     ...(grouping?.add ? [{ label: t('Add terminal to group'), onClick: () => grouping.add?.(group.id) }] : []),
     { label: t(group.collapsed ? 'Expand group' : 'Collapse group'), onClick: () => grouping?.collapse(group.id, !group.collapsed) },
-    { label: t('Archive tab group'), group: 'danger', onClick: () => setConfirmation({ group, mode: 'archive' }) },
+    ...(group.archivable === false ? [] : [{ label: t('Archive tab group'), group: 'danger' as const, onClick: () => setConfirmation({ group, mode: 'archive' }) }]),
     { label: t('Delete tab group'), group: 'danger', danger: true, onClick: () => setConfirmation({ group, mode: 'delete' }) },
   ];
   return <>
@@ -106,8 +110,8 @@ export default function GroupedTabList({ items, selected, label, listId, classNa
         buttons[next]?.focus(); buttons[next]?.click();
       }}>
       {entities.map(entity => {
-        if (entity.startsWith('tab:')) { const item = items.find(item => item.id === entity.slice(4)); return item && row(item); }
-        const group = groups.find(group => group.id === entity.slice(6)); if (!group) return null;
+        if (entity.startsWith('tab:')) { const item = itemsById.get(entity.slice(4)); return item && row(item); }
+        const group = groupsById.get(entity.slice(6)); if (!group) return null;
         const color = grouping?.colors[group.id] ?? historyGroupColor(group.id);
         const collapsed = group.collapsed || drag?.id === group.id;
         return <Fragment key={group.id}>
@@ -116,14 +120,14 @@ export default function GroupedTabList({ items, selected, label, listId, classNa
             onMouseEnter={() => setHovered(group.id)} onMouseLeave={() => setHovered(null)}
             style={{ '--terminal-group-color': color === 'neutral' ? 'var(--text-secondary)' : `var(--group-${color})` } as CSSProperties}>
             <div className="tab-group-container" data-reorder-container="" data-group-id={group.id} data-reorder-zone={group.id} data-reorder-kind="tab">
-              <button className="folder-tab tab-group-header" data-reorder-handle data-group-header-id={group.id} data-group-anchor={group.members.includes(selected) || undefined} data-testid={`group-header-${group.id}`}
+              <div role="button" tabIndex={0} className="folder-tab tab-group-header" data-reorder-handle data-group-header-id={group.id} data-group-anchor="true" data-testid={`group-header-${group.id}`}
                 data-reorder-item={group.id} data-reorder-kind="group" data-reorder-measure="container" data-tab-surface={collapsed && (group.members.includes(selected) || hovered === group.id || drag?.id === group.id) ? 'true' : undefined}
                 aria-label={group.title} aria-expanded={!collapsed} data-tip={t('Collapse or expand group · Right-click to rename · Drag to reorder')}
-                onClick={() => grouping?.collapse(group.id, !group.collapsed)} onPointerDown={event => { if (event.button === 0) start(event, { id: group.id, kind: 'group' }); }}
+                onClick={event => { const header = event.currentTarget; const left = header.getBoundingClientRect().left; const scroll = strip.current; const before = scroll?.scrollLeft ?? 0; grouping?.collapse(group.id, !group.collapsed); requestAnimationFrame(() => { if (scroll && header.isConnected) scroll.scrollLeft = before + header.getBoundingClientRect().left - left; }); }} onPointerDown={event => { if (event.button === 0) start(event, { id: group.id, kind: 'group' }); }}
                 onContextMenu={event => { event.preventDefault(); event.stopPropagation(); openGroup(group, { x: event.clientX, y: event.clientY, trigger: event.currentTarget }); }}
-                onKeyDown={event => { if (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10') { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); openGroup(group, { x: box.left, y: box.bottom, trigger: event.currentTarget }); } }}>
+                onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); event.currentTarget.click(); return; } if (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10') { event.preventDefault(); const box = event.currentTarget.getBoundingClientRect(); openGroup(group, { x: box.left, y: box.bottom, trigger: event.currentTarget }); } }}>
                 <span className="terminal-group-chip" data-testid={`group-title-${group.id}`}><span>{group.title}</span></span>
-              </button>
+              </div>
               {!collapsed && items.filter(item => group.members.includes(item.id)).map(row)}
             </div>
           </div>
@@ -137,7 +141,12 @@ export default function GroupedTabList({ items, selected, label, listId, classNa
     <ListReorderPreview listId={listId} variant="item" owner={strip} className="terminal-group-reorder-preview">{moving => {
       const item = items.find(item => item.id === moving.id);
       if (item) return <div className="folder-tab folder-tab-preview" data-active={selected === item.id} data-tab-surface={item.surface}>{render(item, true)}</div>;
-      return <div className="terminal-tab-group terminal-group-preview"><div className="folder-tab tab-group-header" data-tab-surface="true"><span className="terminal-group-chip">{groups.find(group => group.id === moving.id)?.title}</span></div></div>;
+      const group = groupsById.get(moving.id);
+      const color = grouping?.colors[moving.id] ?? historyGroupColor(moving.id);
+      return <div className="terminal-tab-group terminal-group-preview" data-group-card="true" data-group-collapsed="true" data-group-color={color}
+        style={{ '--terminal-group-color': color === 'neutral' ? 'var(--text-secondary)' : `var(--group-${color})` } as CSSProperties}>
+        <div className="folder-tab tab-group-header" data-tab-surface="true"><span className="terminal-group-chip"><span>{group?.title}</span></span></div>
+      </div>;
     }}</ListReorderPreview>
     {menu && <ContextMenu anchor={menu.anchor} label={t(menu.group ? 'Group actions' : 'Tab actions')} onClose={closeMenu} onCancel={() => setMenu(null)}
       header={menu.group && <InlineRenameInput variant="field" aria-label={t('Group title')} value={name} onChange={event => setName(event.target.value)} onFocus={event => event.currentTarget.select()}

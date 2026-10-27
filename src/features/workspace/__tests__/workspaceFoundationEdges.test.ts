@@ -27,7 +27,8 @@ const chat: WorkspaceResource = { id: 'chat:c', title: 'C', kind: 'conversation'
 const agent: WorkspaceResource = { id: 'acp:a', title: 'Agent', kind: 'agent', sessionId: 'a' };
 const term: WorkspaceResource = { id: 'terminal:s#0', title: 'Shell', kind: 'terminal', tabId: 's', paneId: 's#0' };
 const snapshot = (): WorkspaceHistorySnapshot => ({ version: 1, focused: 'a', layout: { type: 'pane', id: 'a', resourceId: doc.id }, members: [workspaceHistoryMember(doc)!] });
-const container = (id: string): WorkspaceContainer => ({ id, scope: 'code', layout: snapshot().layout, focused: 'a', zoomed: null });
+const historySnapshot = (): WorkspaceHistorySnapshot => ({ version: 1, focused: 'a', layout: { type: 'pane', id: 'a', resourceId: chat.id }, members: [workspaceHistoryMember(chat)!] });
+const container = (id: string): WorkspaceContainer => ({ id, scope: 'ai', layout: historySnapshot().layout, focused: 'a' });
 beforeEach(() => {
   vi.clearAllMocks();
   useWorkspaceStore.setState({ tabs: [], activeId: '', groups: [] });
@@ -115,15 +116,15 @@ it('counts legacy terminal content by owner and keeps starter panes out of histo
 
 it('checks queued suppression against each immutable request identity', async () => {
   const writer = createWorkspaceHistoryWriter(vi.fn());
-  const first = writer(snapshot(), { id: 'workspace:queued-a', createdAt: 1 });
-  const second = writer(snapshot(), { id: 'workspace:queued-b', createdAt: 1 });
+  const first = writer(historySnapshot(), { id: 'workspace:queued-a', createdAt: 1 });
+  const second = writer(historySnapshot(), { id: 'workspace:queued-b', createdAt: 1 });
   suppressWorkspaceHistory('workspace:queued-a'); await Promise.all([first, second]);
   expect(vi.mocked(saveWorkspaceHistory).mock.calls.map(([request]) => request.id)).toEqual(['workspace:queued-b']);
   clearWorkspaceHistorySuppression('workspace:queued-a'); await writer(null);
 });
 
 it('serializes concurrent saves, suppresses pending writes during deletion and recovers after storage failures', async () => {
-  const tab = { ...container('edge'), historyIdentity: { id: 'workspace:edge', createdAt: 1 } }; const value = snapshot();
+  const tab = { ...container('edge'), historyIdentity: { id: 'workspace:edge', createdAt: 1 } }; const value = historySnapshot();
   useWorkbenchStore.getState().update(state => ({ ...state, tabs: [tab] }));
   let finish!: () => void;
   vi.mocked(saveWorkspaceHistory).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
@@ -147,19 +148,19 @@ it('serializes one history identity across a close and restoration into a differ
   const next = { ...container('after-restore'), historyIdentity: identity, title: 'Latest restored title' };
   let finish!: () => void;
   vi.mocked(saveWorkspaceHistory).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
-  const pending = persistContainerHistory(first, snapshot());
+  const pending = persistContainerHistory(first, historySnapshot());
   await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
-  const restored = persistContainerHistory(next, snapshot());
+  const restored = persistContainerHistory(next, historySnapshot());
   await Promise.resolve(); await Promise.resolve(); expect(saveWorkspaceHistory).toHaveBeenCalledOnce();
   finish(); await Promise.all([pending, restored]);
-  expect(vi.mocked(saveWorkspaceHistory).mock.calls.map(([request]) => [request.id, request.title])).toEqual([[identity.id, 'A'], [identity.id, next.title]]);
+  expect(vi.mocked(saveWorkspaceHistory).mock.calls.map(([request]) => [request.id, request.title])).toEqual([[identity.id, 'C'], [identity.id, next.title]]);
 });
 
 it('retains a closed save identity when the same container identifier is reused', async () => {
   const old = { ...container('reused-owner'), historyIdentity: { id: 'workspace:old-owner', createdAt: 1 } };
   const next = { ...old, historyIdentity: { id: 'workspace:new-owner', createdAt: 2 } };
   useWorkbenchStore.getState().update(state => ({ ...state, tabs: [next] }));
-  await persistContainerHistory(old, snapshot());
+  await persistContainerHistory(old, historySnapshot());
   expect(vi.mocked(saveWorkspaceHistory).mock.calls[0]![0].id).toBe(old.historyIdentity.id);
   expect(useWorkbenchStore.getState().snapshot.tabs[0]!.historyIdentity).toEqual(next.historyIdentity);
 });

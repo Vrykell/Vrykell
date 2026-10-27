@@ -11,8 +11,10 @@ async function createTwo(page: Page, scope: string) {
   else if (scope === 'code') { await bar(page).getByRole('button', { name: '新建文件', exact: true }).click(); await bar(page).getByRole('button', { name: '新建文件', exact: true }).click(); }
   else {
     await expect(rows(page, scope)).toHaveCount(1);
-    await bar(page).getByRole('button', { name: '新建工作区标签', exact: true }).click();
-    await page.getByRole('menuitem', { name: '新建文件', exact: true }).click();
+    for (let index = 0; index < 2; index++) {
+      await bar(page).getByRole('button', { name: '新建工作区标签', exact: true }).click();
+      await page.getByRole('menuitem', { name: '新建文件', exact: true }).click();
+    }
   }
   await expect(rows(page, scope)).toHaveCount(2);
 }
@@ -51,27 +53,27 @@ for (const scope of ['terminal', 'code', 'ai', 'unified']) for (const theme of [
   await expect(rows(page, scope)).toHaveCount(2);
   await header.click({ button: 'right' }); await page.getByRole('button', { name: '删除标签组', exact: true }).click();
   await confirm.getByRole('button', { name: '删除分组', exact: true }).click();
-  await expect(rows(page, scope)).toHaveCount(0); await expect(header).toHaveCount(0);
+  await expect(rows(page, scope)).toHaveCount(scope === 'unified' ? 1 : 0); await expect(header).toHaveCount(0);
+  if (scope === 'unified') await expect(bar(page).getByRole('tab', { name: '开始', exact: true })).toBeVisible();
 });
 
-test('archives a code group and restores its original scope and membership from history', async ({ page }) => {
-  test.setTimeout(60_000); await setupTauriMock(page); await page.goto('/');
+test('keeps file groups out of session history and removes a group after its last file closes', async ({ page }) => {
+  await setupTauriMock(page); await page.goto('/');
   await page.getByTestId('workspace-area-code').click();
-  await page.evaluate(() => { (window as unknown as { __PICK_PATHS__: string[] }).__PICK_PATHS__ = ['/home/e2e/project/archived.txt']; });
-  await bar(page).getByRole('button', { name: '打开文件', exact: true }).click();
+  await bar(page).getByRole('button', { name: '新建文件', exact: true }).click();
   await expect(rows(page, 'code')).toHaveCount(1);
   await rows(page, 'code').first().click({ button: 'right' }); await page.getByRole('button', { name: '新建分组', exact: true }).click();
-  await page.getByRole('textbox', { name: '分组名称' }).fill('Archived code'); await page.getByRole('textbox', { name: '分组名称' }).press('Enter');
-  const header = bar(page).getByRole('button', { name: 'Archived code', exact: true }); await expect(header).toBeVisible();
-  const groupId = await header.getAttribute('data-group-header-id');
-  await header.click({ button: 'right' }); await page.getByRole('button', { name: '归档分组', exact: true }).click();
-  await page.getByRole('dialog', { name: '归档分组', exact: true }).getByRole('button', { name: '归档分组', exact: true }).click();
-  await expect(rows(page, 'code')).toHaveCount(0); await page.getByTestId('workspace-history').click();
-  const card = page.getByTestId(`history-group-card-source:${groupId}`); await expect(card).toContainText('Archived code');
-  await card.getByRole('button', { name: '分组操作', exact: true }).click(); await page.getByRole('menuitem', { name: '恢复整组', exact: true }).click();
-  await expect(page.getByTestId('workspace-area-code')).toHaveAttribute('aria-current', 'page');
-  await expect(rows(page, 'code')).toHaveCount(1); await expect(header).toBeVisible();
-  await expect(bar(page).getByRole('tab', { name: 'archived.txt', exact: true })).toBeVisible();
+  await page.getByRole('textbox', { name: '分组名称' }).fill('Files'); await page.getByRole('textbox', { name: '分组名称' }).press('Enter');
+  const header = bar(page).getByRole('button', { name: 'Files', exact: true }); await expect(header).toBeVisible();
+  await header.click({ button: 'right' });
+  await expect(page.getByRole('button', { name: '归档分组', exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await rows(page, 'code').first().getByRole('button', { name: /关闭文件/ }).click();
+  await expect(header).toHaveCount(0);
+  await page.getByTestId('workspace-history').click();
+  await expect(page.getByTestId('unified-history-page')).toBeVisible();
+  await expect(page.locator('.history-group-card').filter({ hasText: 'Files' })).toHaveCount(0);
+  await expect(page.locator('.history-item').filter({ hasText: '未命名' })).toHaveCount(0);
 });
 
 test('merges and detaches terminal tabs without restarting live processes', async ({ page }) => {

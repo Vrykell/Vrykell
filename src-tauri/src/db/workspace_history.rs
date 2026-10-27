@@ -26,6 +26,49 @@ pub fn init_history_metadata(connection: &Connection) -> Result<(), String> {
     transaction.commit().map_err(|error| error.to_string())
 }
 
+/** Remove file references from legacy session history without changing live workspace storage. */
+pub fn remove_file_history(connection: &Connection) -> Result<(), String> {
+    let transaction = connection.unchecked_transaction().map_err(|error| error.to_string())?;
+    let rows = transaction.prepare("SELECT id,payload FROM sessions WHERE kind='workspace' AND CASE WHEN json_valid(payload) THEN
+        EXISTS(SELECT 1 FROM json_each(payload,'$.members') WHERE CASE WHEN type='object' THEN json_extract(value,'$.kind') ELSE '' END IN ('document','comparison')) ELSE 0 END")
+        .map_err(|error| error.to_string())?.query_map([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)))
+        .map_err(|error| error.to_string())?.collect::<Result<Vec<_>, _>>().map_err(|error| error.to_string())?;
+    for (id, raw) in rows {
+        let mut payload: Value = serde_json::from_str(&raw).map_err(|error| error.to_string())?;
+        let members: Vec<Value> = payload["members"].as_array().into_iter().flatten()
+            .filter(|member| matches!(member["kind"].as_str(), Some("terminal" | "conversation" | "agent"))).cloned().collect();
+        let resources: HashSet<String> = members.iter().filter_map(|member| member["id"].as_str().map(String::from)).collect();
+        if let Some(layout) = prune_history_layout(&payload["layout"], &resources, 0) {
+            let mut panes = HashSet::new(); let mut layout_resources = HashSet::new();
+            if !layout_ids(&layout, 0, &mut panes, &mut layout_resources) { continue; }
+            if !payload["focused"].as_str().is_some_and(|id| panes.contains(id)) {
+                let mut first = &layout;
+                while first["type"] == "split" { first = &first["first"]; }
+                payload["focused"] = first["id"].clone();
+            }
+            payload["layout"] = layout;
+            let title = members.iter().filter_map(|member| member["title"].as_str()).collect::<Vec<_>>().join(" + ").chars().take(320).collect::<String>();
+            payload["members"] = Value::Array(members);
+            transaction.execute("UPDATE sessions SET payload=?1,title=?2 WHERE id=?3", params![payload.to_string(), title, id]).map_err(|error| error.to_string())?;
+        } else {
+            transaction.execute("DELETE FROM sessions WHERE id=?1 AND kind='workspace'", [id]).map_err(|error| error.to_string())?;
+        }
+    }
+    transaction.commit().map_err(|error| error.to_string())
+}
+
+fn prune_history_layout(node: &Value, resources: &HashSet<String>, depth: usize) -> Option<Value> {
+    if depth > 3 { return None; }
+    if node["type"] == "pane" {
+        return node["resourceId"].as_str().filter(|id| resources.contains(*id)).map(|_| node.clone());
+    }
+    if node["type"] != "split" { return None; }
+    match (prune_history_layout(&node["first"], resources, depth + 1), prune_history_layout(&node["second"], resources, depth + 1)) {
+        (Some(first), Some(second)) => { let mut result = node.clone(); result["first"] = first; result["second"] = second; Some(result) }
+        (first, second) => first.or(second),
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct WorkspaceHistorySave {
@@ -85,7 +128,7 @@ impl HistoryDb {
                 || !member["id"].as_str().is_some_and(|id| resources.remove(id))
                 || !member["title"].as_str().is_some_and(|title| title.chars().count() <= 320)
                 || !member["reference"].as_str().is_some_and(|reference| !reference.is_empty() && reference.len() <= 8192)
-                || !matches!(member["kind"].as_str(), Some("terminal" | "conversation" | "agent" | "document" | "comparison"))
+                || !matches!(member["kind"].as_str(), Some("terminal" | "conversation" | "agent"))
                 || !member["paneCount"].as_u64().is_some_and(|count| (1..=4).contains(&count))
                 || !member["local"].is_boolean() || !member["ssh"].is_boolean() {
                 return Err("Invalid workspace member".into());
@@ -95,7 +138,6 @@ impl HistoryDb {
             }
             if object.contains_key("shellType") && !member["shellType"].as_str().is_some_and(|value| value.len() <= 64) { return Err("Invalid terminal profile".into()); }
             if object.contains_key("empty") && !member["empty"].is_boolean() { return Err("Invalid empty pane marker".into()); }
-            if member["kind"] == "comparison" && !matches!(member["scope"].as_str(), Some("staged" | "unstaged" | "untracked" | "conflicts")) { return Err("Invalid comparison reference".into()); }
             if object.contains_key("modes") && !member["modes"].as_array().is_some_and(|modes| modes.len() <= 2 && modes.iter().all(|mode| matches!(mode.as_str(), Some("block" | "classic")))) { return Err("Invalid workspace modes".into()); }
         }
         let changed = self.conn().execute("INSERT INTO sessions(id,title,status,created_at,closed_at,cwd,kind,payload)
@@ -110,6 +152,36 @@ impl HistoryDb {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejects_files_in_session_history_and_migrates_legacy_groups_idempotently() {
+        let db = HistoryDb::open_in_memory();
+        let mut input = request();
+        let mut value: Value = serde_json::from_str(&input.payload).unwrap();
+        value["members"][0]["kind"] = "document".into();
+        value["members"][0]["reference"] = "Untitled.txt".into();
+        value["members"][0]["draftId"] = "draft".into();
+        input.payload = value.to_string();
+        assert!(db.save_workspace_history(&input).is_err());
+        db.create_session("workspace:mixed", "Untitled + Chat", 1, "", "workspace", &input.payload).unwrap();
+        value["members"][1]["kind"] = "comparison".into();
+        input.payload = value.to_string();
+        assert!(db.save_workspace_history(&input).is_err());
+        db.create_session("workspace:files", "Files", 1, "", "workspace", &input.payload).unwrap();
+        db.create_session("terminal:retained", "Shell", 1, "", "local", "{}").unwrap();
+        remove_file_history(db.conn()).unwrap();
+        assert!(db.get_session("workspace:files").is_err());
+        let saved = db.get_session("workspace:mixed").unwrap();
+        let payload: Value = serde_json::from_str(&saved.payload).unwrap();
+        assert_eq!(payload["members"].as_array().unwrap().len(), 1);
+        assert_eq!(payload["layout"]["resourceId"], "chat:two");
+        assert_eq!(payload["focused"], "two");
+        assert_eq!(saved.title, "Chat");
+        assert!(!saved.payload.contains("Untitled"));
+        assert_eq!(db.get_session("terminal:retained").unwrap().title, "Shell");
+        remove_file_history(db.conn()).unwrap();
+        assert_eq!(db.get_session("workspace:mixed").unwrap().payload, saved.payload);
+    }
 
     pub fn request() -> WorkspaceHistorySave {
         WorkspaceHistorySave { id: "workspace:test".into(), title: "Work".into(), created_at: 10, timestamp: 20,

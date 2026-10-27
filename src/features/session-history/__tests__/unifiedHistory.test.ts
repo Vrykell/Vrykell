@@ -24,6 +24,20 @@ it('matches every member type of a mixed combination without splitting the histo
   expect(filterUnifiedHistory(records, { ...DEFAULT_UNIFIED_FILTER, layout: 'single' }).map(record => record.kind)).toEqual(['terminal']);
 });
 
+it('hides old file-only groups and excludes file members from mixed session history', () => {
+  const file = { id: 'file:draft', title: 'Untitled.txt', reference: 'Untitled.txt', kind: 'document', local: true, ssh: false, paneCount: 1 };
+  const chat = { id: 'chat:chat', title: 'Discussion', reference: 'chat', kind: 'conversation', local: false, ssh: false, paneCount: 1 };
+  const first = { type: 'pane', id: 'file', resourceId: file.id };
+  const second = { type: 'pane', id: 'chat', resourceId: chat.id };
+  const onlyFiles = { ...session('workspace:file', 'local', 200), kind: 'workspace', payload: JSON.stringify({ version: 1, focused: 'file', layout: first, members: [file] }) };
+  const mixed = { ...session('workspace:mixed', 'local', 201), kind: 'workspace', payload: JSON.stringify({ version: 1, focused: 'file',
+    layout: { type: 'split', direction: 'row', ratio: 0.5, first, second }, members: [file, chat] }) };
+  const records = unifiedHistoryRecords([onlyFiles, mixed], [], { notes: {}, starred: {} });
+  expect(records).toHaveLength(1);
+  expect(records[0]).toMatchObject({ title: 'Discussion', paneCount: 1, snapshot: { focused: 'chat', members: [chat] } });
+  expect(records[0]!.searchText).not.toContain('untitled');
+});
+
 it('recovers profile icons for old composition metadata from the matching parent pane', () => {
   const parent = { ...session('owner', 'local', 100), payload: JSON.stringify({ layout: { type: 'split',
     first: { type: 'leaf', terminal: { id: 'one', kind: 'local', shellType: 'powershell' } },

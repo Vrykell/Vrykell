@@ -29,6 +29,7 @@ export function InputBtn({ title, onClick, children }: HBtnProps) {
 interface MenuItemProps {
   role?: 'menuitem';
   label: string;
+  tip?: string;
   onClick: (event: MouseEvent<HTMLButtonElement>) => void;
   danger?: boolean;
   disabled?: boolean;
@@ -43,7 +44,7 @@ interface MenuItemProps {
   onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
 }
 
-export function MenuItem({ label, onClick, danger, shortcut, role, disabled, checked, submenu, expanded, controls, onPointerEnter, onKeyDown }: MenuItemProps) {
+export function MenuItem({ label, tip, onClick, danger, shortcut, role, disabled, checked, submenu, expanded, controls, onPointerEnter, onKeyDown }: MenuItemProps) {
   const style: CSSProperties = { ...menuItemStyle, display: 'flex', alignItems: 'center', gap: 16 };
   return (
     <button
@@ -57,11 +58,12 @@ export function MenuItem({ label, onClick, danger, shortcut, role, disabled, che
       aria-expanded={submenu ? expanded : undefined}
       aria-controls={expanded ? controls : undefined}
       data-submenu-open={expanded || undefined}
+      data-tip={tip}
       data-subtle
       className="workspace-floating-row"
       style={danger ? { ...style, color: 'var(--control-danger-color)' } : style}
     >
-      <span data-menu-label style={{ flex: 1, minWidth: 0 }}>{label}</span>
+      <span data-menu-label style={{ flex: 1, minWidth: 0, ...(tip ? { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const : {}) }}>{label}</span>
       {shortcut && <KeyHint shortcut={shortcut} />}
       {checked === true && <span aria-hidden="true" data-check-slot style={checkSlotStyle}><Check size={12} /></span>}
       {submenu && <ChevronRight size={14} aria-hidden="true" style={{ flexShrink: 0 }} />}

@@ -39,6 +39,9 @@ for (const width of [640, 1440]) {
     await page.setViewportSize({ width, height: 900 }); await gotoSetting(page, '记忆');
     await expect(page.getByTestId('memory-count-pending')).toHaveText('1');
     await expect(page.getByRole('button', { name: '重新加载', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: '让 AI 整理', exact: true })).toBeVisible();
+    await expect(page.getByText('整理记忆', { exact: true })).toBeVisible();
+    expect(await page.locator('.settings-group-panel').evaluateAll(elements => elements.every(element => element.scrollWidth <= element.clientWidth + 1))).toBe(true);
     await page.screenshot({ path: test.info().outputPath(`memory-${width}.png`), fullPage: true });
   });
 }

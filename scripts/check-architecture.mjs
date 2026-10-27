@@ -66,6 +66,11 @@ for (const file of collectFiles(root)) {
   }
 
   const source = fs.readFileSync(file, 'utf8');
+  if (relativeFile !== 'platform/diagnostics.ts') {
+    for (const declaration of source.matchAll(/import\s+(?!type\b)([^;]*?)\s+from\s+['"]@tauri-apps\/api\/core['"]/g)) {
+      if (/\binvoke\b|\*\s+as\b/.test(declaration[1])) violations.push(`${relativeFile}: Raw IPC imports must use the authorized transport`);
+    }
+  }
   const isView = /(^|\/)(components|pages)\//.test(relativeFile);
   const lines = source.split(/\r?\n/);
 

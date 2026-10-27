@@ -1,4 +1,4 @@
-import { parseWorkspacePaneLayout, workspacePaneCells, type WorkspacePaneLayout } from './workspaceResources';
+import { parseWorkspacePaneLayout, pruneWorkspacePanes, workspacePaneCells, type WorkspacePaneLayout } from './workspaceResources';
 
 export interface WorkspaceHistoryMember {
   id: string;
@@ -30,6 +30,17 @@ export interface WorkspaceHistorySnapshot {
 }
 
 export interface WorkspaceHistoryIdentity { id: string; createdAt: number }
+
+/** Session history excludes file references; live restoration keeps its complete snapshot. */
+export function sessionHistorySnapshot(snapshot: WorkspaceHistorySnapshot | null): WorkspaceHistorySnapshot | null {
+  if (!snapshot) return null;
+  const members = snapshot.members.filter(member => member.kind !== 'document' && member.kind !== 'comparison');
+  if (members.length === snapshot.members.length) return snapshot;
+  const layout = pruneWorkspacePanes(snapshot.layout, new Set(members.map(member => member.id)));
+  if (!layout) return null;
+  const cells = workspacePaneCells(layout);
+  return { ...snapshot, layout, members, focused: cells.some(cell => cell.id === snapshot.focused) ? snapshot.focused : cells[0]!.id };
+}
 
 const kinds = new Set(['terminal', 'conversation', 'agent', 'document', 'comparison']);
 const scopes = new Set(['staged', 'unstaged', 'untracked', 'conflicts']);

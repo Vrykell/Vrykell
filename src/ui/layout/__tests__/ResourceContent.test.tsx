@@ -1,8 +1,24 @@
-import { useEffect, useState } from 'react';
+import { StrictMode, useEffect, useState } from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
 import ResourceContent, { ResourceContentProvider, ResourceContentSlot } from '@ui/layout/ResourceContent';
 import WorkspaceHeader, { WorkspaceHeaderProvider, WorkspaceHeaderSlot } from '@ui/layout/WorkspaceHeader';
+
+it('does not recursively rebuild a resource when another resource registers its slot', () => {
+  const mounted = vi.fn();
+  function Owner() {
+    return <ResourceContent id="owner" active>{() => {
+      function OtherSlot() {
+        useEffect(() => { mounted(); }, []);
+        return <ResourceContentSlot id="other" visible focused />;
+      }
+      return <OtherSlot />;
+    }}</ResourceContent>;
+  }
+  expect(() => render(<StrictMode><ResourceContentProvider><Owner /></ResourceContentProvider></StrictMode>)).not.toThrow();
+  expect(mounted).toHaveBeenCalled();
+  expect(document.querySelectorAll('.resource-content-slot')).toHaveLength(1);
+});
 
 it('moves a mounted resource and its actions between domain and mixed panes without losing local state', () => {
   const mounted = vi.fn(); const disposed = vi.fn();

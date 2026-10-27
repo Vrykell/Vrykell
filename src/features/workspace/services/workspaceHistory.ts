@@ -6,7 +6,7 @@ import { useHarnessStore } from '@features/chat/stores/harness';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import { hasChatContent } from '@features/chat/model/chatContent';
 import { workspacePaneCells, type WorkspacePaneLayout, type WorkspaceResource } from '../model/workspaceResources';
-import type { WorkspaceHistoryIdentity, WorkspaceHistoryMember, WorkspaceHistorySnapshot } from '../model/workspaceHistory';
+import { sessionHistorySnapshot, type WorkspaceHistoryIdentity, type WorkspaceHistoryMember, type WorkspaceHistorySnapshot } from '../model/workspaceHistory';
 import { useWorkbenchStore } from '../stores/workbench';
 import type { WorkspaceContainer } from '../model/workbench';
 import { putContainer } from '../model/workbench';
@@ -92,6 +92,7 @@ export function createWorkspaceHistoryWriter(onError: (error: unknown) => void, 
   let lastTitle = '';
   let queue = Promise.resolve();
   return (snapshot: WorkspaceHistorySnapshot | null, identity?: WorkspaceHistoryIdentity, titleOverride?: string) => {
+    snapshot = sessionHistorySnapshot(snapshot);
     if (!snapshot) { signature = ''; return queue; }
     const nextSignature = JSON.stringify(snapshot.members.map(member => member.id).sort());
     if (identity && identity.id !== id) {
@@ -126,6 +127,7 @@ export const containerHistoryIdentity = (tab: WorkspaceContainer) => tab.history
 
 /** One queue owns metadata writes across active saves, close, archive and deletion. */
 export function persistContainerHistory(tab: WorkspaceContainer, snapshot: WorkspaceHistorySnapshot | null): Promise<void> {
+  snapshot = sessionHistorySnapshot(snapshot);
   if (!snapshot || tab.scope === 'terminal') return Promise.resolve();
   const identity = containerHistoryIdentity(tab) ?? { id: `workspace:${crypto.randomUUID()}`, createdAt: Date.now() };
   if (suppressedHistoryIds.has(identity.id)) return containerWrites.get(tab.id) ?? Promise.resolve();

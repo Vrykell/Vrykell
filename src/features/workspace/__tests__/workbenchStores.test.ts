@@ -5,7 +5,7 @@ import { emptyWorkbench, putContainer, selectContainer, type WorkspaceContainer 
 import { workspacePaneCells, workspacePaneIds, type WorkspacePaneLayout } from '../model/workspaceResources';
 
 const pane = (id: string): Extract<WorkspacePaneLayout, { type: 'pane' }> => ({ type: 'pane', id, resourceId: `file:${id}` });
-const tab = (id: string, layout: WorkspacePaneLayout | null = pane(id)): WorkspaceContainer => ({ id, scope: 'code', layout, focused: id, zoomed: null });
+const tab = (id: string, layout: WorkspacePaneLayout | null = pane(id)): WorkspaceContainer => ({ id, scope: 'code', layout, focused: id });
 const target = (id: string) => ({ leafId: id, dir: 'row' as const, position: 'second' as const, rect: { x: 0, y: 0, w: 1, h: 1 } });
 const setup = () => { const workbench = createWorkbenchStore('test-containers'); const area = createPaneWorkspaceStore('code', workbench); return { workbench, area }; };
 
@@ -35,12 +35,13 @@ it('does not overwrite a saved snapshot while native resources are still hydrati
 });
 
 it('shows the empty fallback once, repairs selection and preserves every independent tab', () => {
-  const { workbench, area } = setup();
-  area.getState().single(); area.getState().ratio('a', 'b', 0.3); area.getState().removePane('a'); area.getState().merge('missing', target('a')); area.getState().detach('file:a');
+  const { workbench, area } = setup(); area.getState().ratio('a', 'b', 0.3); area.getState().removePane('a'); area.getState().merge('missing', target('a')); area.getState().detach('file:a');
   area.getState().openStart(); const initial = area.getState().activeTabId;
   area.getState().openStart(); expect(area.getState().activeTabId).toBe(initial);
   area.getState().ratio('a', 'b', 0.4);
   area.getState().reconcile(['file:a', 'file:b']);
+  expect(area.getState().startActive).toBe(true);
+  area.getState().show('file:a'); area.getState().show('file:b');
   expect(workbench.getState().snapshot.tabs).toHaveLength(2);
   const ids = workbench.getState().snapshot.tabs.map(tab => tab.id);
   area.getState().selectTab(ids[0]!); area.getState().openStart(); expect(area.getState().activeTabId).toBe(ids[0]);
@@ -68,8 +69,8 @@ it('retains the placement target when opening a new resource changes native sele
   area.getState().split('file:c', 'col');
   expect(workspacePaneIds(area.getState().layout!)).toEqual(['file:a', 'file:b', 'file:c']);
   area.getState().place('file:missing', target('stale')); expect(workspacePaneIds(area.getState().layout!)).toHaveLength(3);
-  area.getState().single(); expect(area.getState().zoomed).toBe(area.getState().focused);
-  area.getState().single(); expect(area.getState().zoomed).toBeNull();
+
+
   const cells = workspacePaneCells(area.getState().layout!);
   area.getState().ratio(cells[1]!.id, cells[2]!.id, 10);
   expect(JSON.stringify(area.getState().layout)).toContain('0.8');
@@ -83,7 +84,7 @@ it('retains the placement target when opening a new resource changes native sele
 
 it('moves, detaches and merges complete tabs without resetting the moved pane identity', () => {
   const { workbench, area } = setup();
-  area.getState().reconcile(['file:a', 'file:b']);
+  area.getState().show('file:a'); area.getState().show('file:b');
   const [first, second] = workbench.getState().snapshot.tabs;
   area.getState().move([], second!.id, first!.id, false);
   expect(workbench.getState().snapshot.tabs[0]!.id).toBe(second!.id);
@@ -122,12 +123,12 @@ it('rejects restoring resources into a scope that cannot own them', () => {
   expect(workbench.getState().snapshot.tabs).toEqual([]);
 });
 
-it('projects external layout, focus, zoom and history updates into the canonical owner', () => {
+it('projects external layout, focus and history updates into the canonical owner', () => {
   const { workbench, area } = setup();
   area.setState({ layout: pane('a'), focused: 'a' });
   expect(workbench.getState().snapshot.tabs[0]!.layout).toEqual(pane('a'));
   area.setState({ focused: 'missing' }); expect(area.getState().focused).toBe('a');
-  area.setState({ zoomed: 'a' }); expect(workbench.getState().snapshot.tabs[0]!.zoomed).toBe('a');
+
   area.setState({ historyIdentity: { id: 'workspace:saved', createdAt: 1 } }); expect(workbench.getState().snapshot.tabs[0]!.historyIdentity?.id).toBe('workspace:saved');
   workbench.getState().update(state => selectContainer(putContainer(state, tab('foreign', null)), 'foreign'));
   area.setState({ layout: pane('b'), focused: 'b' }); expect(workbench.getState().snapshot.tabs.find(tab => tab.id === 'foreign')!.layout).toEqual(pane('b'));

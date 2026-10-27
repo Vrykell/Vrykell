@@ -21,6 +21,8 @@ dist-ssr
 # Local tool caches and agent state
 /.cache/
 /.commandcode/
+/.tmp/
+/coverage-*/
 
 # Editor directories and files
 .vscode/*

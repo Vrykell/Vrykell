@@ -57,7 +57,7 @@ export {
 } from '@features/workspace/model/tabTypes';
 export { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 export { useCanRemoveWorkspacePane } from './hooks/useCanRemoveWorkspacePane';
-export { useScopedSplitActive } from './hooks/useScopedSplitActive';
+export { useScopedPaneActive } from './hooks/useScopedPaneActive';
 export { usePlacedWorkspaceResourceIds } from './hooks/usePlacedWorkspaceResourceIds';
 export { default as ScopedPaneWorkspace } from './components/ScopedPaneWorkspace';
 export { useTabDisplayTitle } from '@features/workspace/hooks/useTabDisplayTitle';

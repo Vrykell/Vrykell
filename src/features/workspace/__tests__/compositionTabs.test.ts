@@ -33,9 +33,11 @@ it('uses the start page only when no content tab exists, including after closing
   expect(useUnifiedWorkspace.getState().startActive).toBe(true);
 });
 
-it('adopts existing content without Start and collapses externally emptied tabs to one Start', () => {
+it('keeps available resources out of Start and prunes only explicitly opened references', () => {
   const store = useUnifiedWorkspace.getState();
   store.reconcile(['file:first', 'file:second']);
+  expect(useUnifiedWorkspace.getState().startActive).toBe(true);
+  store.show('file:first'); store.show('file:second');
   expect(compositionTabs()).toHaveLength(2);
   expect(compositionTabs().every(tab => tab.layout)).toBe(true);
   expect(useUnifiedWorkspace.getState().startActive).toBe(false);
@@ -44,20 +46,17 @@ it('adopts existing content without Start and collapses externally emptied tabs 
   expect(useUnifiedWorkspace.getState().startActive).toBe(true);
 });
 
-it('switches complete independent layouts and zooms without discarding sibling resources', () => {
+it('switches complete independent layouts without discarding sibling resources', () => {
   createUnifiedResource('conversation'); createUnifiedResource('document', 'row');
   const first = compositionTabs()[0]!;
   const original = first.layout;
-  useUnifiedWorkspace.getState().single();
-  expect(useUnifiedWorkspace.getState().zoomed).toBe(first.focused);
+
   expect(compositionTabs()[0]!.layout).toBe(original);
   createUnifiedResource('conversation');
   expect(compositionTabs()).toHaveLength(2);
   const second = compositionTabs()[1]!;
   selectCompositionTab(first.id);
   expect(useUnifiedWorkspace.getState().layout).toBe(original);
-  expect(useUnifiedWorkspace.getState().zoomed).toBe(first.focused);
-  useUnifiedWorkspace.getState().single();
   expect(useUnifiedWorkspace.getState().layout).toBe(original);
   selectCompositionTab(second.id);
   expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toHaveLength(1);

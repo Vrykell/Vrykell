@@ -33,7 +33,7 @@ export function requestTerminalSplit(spec: TerminalSpec | null) {
   if (useWorkspaceNavigation.getState().area !== 'unified') { useUiStore.getState().beginSplit(spec); return; }
   const state = useUnifiedWorkspace.getState();
   if (!state.layout || workspacePaneCells(state.layout).length >= 4) return;
-  useUnifiedWorkspace.setState({ choosingSplit: true, startActive: false, zoomed: null });
+  useUnifiedWorkspace.setState({ choosingSplit: true, startActive: false });
 }
 
 export function closeTerminalPane(paneId: string) {
@@ -73,25 +73,11 @@ export function createUnifiedResource(kind: 'terminal' | 'document' | 'conversat
 /** Route a newly created or moved resource by the current workspace. */
 export function presentWorkspaceResource(id: string) {
   if (useWorkspaceNavigation.getState().area === 'unified') {
-    addUnifiedResource(id);
+    focusUnifiedResource(id);
     return;
   }
   const resource = resolveWorkspaceResource(id, currentWorkspaceResources());
   if (resource) activateWorkspaceResource(resource);
-}
-
-/** Place a reference into the active composition, releasing it from another unified tab. */
-export function addUnifiedResource(id: string) {
-  const resource = resolveWorkspaceResource(id, currentWorkspaceResources());
-  if (!resource || resource.kind === 'page') return;
-  useUnifiedWorkspace.setState({ zoomed: null });
-  const state = useUnifiedWorkspace.getState();
-  const cells = state.layout ? workspacePaneCells(state.layout) : [];
-  if (!cells.some(cell => cell.resourceId === resource.id)) {
-    if (!state.layout || cells.length >= 4) state.show(resource.id);
-    else state.split(resource.id, 'row');
-  }
-  focusUnifiedResource(resource.id);
 }
 
 export function focusUnifiedResource(id: string) {
@@ -126,12 +112,6 @@ export function openUnifiedWorkspace() {
 
 export function reconcileUnifiedResources(ids: string[]) {
   const workbench = useWorkbenchStore.getState(); if (!workbench.ready) return;
-  if (!workbench.snapshot.tabs.some(tab => tab.scope === 'unified' && tab.layout)) {
-    const valid = new Set(ids);
-    for (const tab of useWorkspaceStore.getState().tabs) if (tab.kind === 'session' && leaves(tab.layout).length > 1 && leaves(tab.layout).every(pane => valid.has(`terminal:${pane.id}`))) {
-      useUnifiedWorkspace.getState().restore(terminalWorkspaceLayout(tab.layout), firstLeaf(tab.layout).id);
-    }
-  }
   useUnifiedWorkspace.getState().reconcile(ids);
 }
 
@@ -156,7 +136,7 @@ export function requestWorkspaceSplit(resourceId?: string, anchor?: { x: number;
   if (navigation.area !== 'unified') return;
   openUnifiedWorkspace();
   if (resourceId) focusUnifiedResource(resourceId);
-  useUnifiedWorkspace.setState({ choosingSplit: true, startActive: false, zoomed: null });
+  useUnifiedWorkspace.setState({ choosingSplit: true, startActive: false });
 }
 
 export function connectUnifiedAgent(harness: string, target?: PaneTarget, directory?: string) {

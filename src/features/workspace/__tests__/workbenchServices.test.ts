@@ -16,14 +16,15 @@ import { useWorkspaceStore } from '../stores/workspace';
 import { useWorkbenchStore } from '../stores/workbench';
 import { workspaceAreaStores } from '../stores/paneWorkspace';
 import { useWorkspaceNavigation } from '../stores/navigation';
-import { activateContainer, assignWorkspaceGroup, closeContainer, createContainerGroup, detachWorkspacePane, focusNativeContainerResource, mergeWorkspaceContainers, moveWorkspacePane, persistWorkspaceOrder, rebindWorkspaceResourceId, removeContainerPane, removeWorkspaceGroup, renameContainer, requestCloseContainers, restoreWorkbench, runWithoutWorkbenchSync, startWorkbenchRuntime, synchronizeWorkbench, terminalLayoutFromContainer, undoCloseContainer, updateWorkspaceGroup, zoomWorkspaceContainer } from '../services/workbench';
+import { activateContainer, assignWorkspaceGroup, closeContainer, createContainerGroup, detachWorkspacePane, focusNativeContainerResource, mergeWorkspaceContainers, moveWorkspacePane, persistWorkspaceOrder, pruneEmptyWorkspaceGroups, rebindWorkspaceResourceId, removeContainerPane, removeWorkspaceGroup, renameContainer, requestCloseContainers, restoreWorkbench, runWithoutWorkbenchSync, startWorkbenchRuntime, synchronizeWorkbench, terminalLayoutFromContainer, undoCloseContainer, updateWorkspaceGroup } from '../services/workbench';
 import { panesOf } from '../model/workbench';
 import * as restoreService from '../services/restoreWorkspaceHistory';
 import * as sessionManager from '../services/sessionManager';
 import { useWorkbenchFeedback } from '../stores/workbenchFeedback';
 import { useUiStore } from '../stores/ui';
 import { parseWorkbench } from '../model/workbench';
-import { captureContainerHistory, persistContainerHistory } from '../services/workspaceHistory';
+import { captureContainerHistory, createWorkspaceHistoryWriter, persistContainerHistory } from '../services/workspaceHistory';
+import { currentWorkspaceResources } from '../services/workspaceResources';
 
 vi.mock('@platform/diagnostics', () => ({ invoke: vi.fn(async () => undefined), diagnostic: vi.fn() }));
 vi.mock('@platform/api/group', () => ({ groupsList: vi.fn(async () => []), groupCreate: vi.fn(async () => {}), groupRename: vi.fn(async () => {}), groupSetCollapsed: vi.fn(async () => {}), groupDelete: vi.fn(async () => {}), groupDeleteWithSessions: vi.fn(async () => {}), groupsReorder: vi.fn(async () => {}), sessionSetGroup: vi.fn(async () => {}), sessionsReorder: vi.fn(async () => {}), groupRestore: vi.fn(async () => {}), groupArchive: vi.fn(async () => {}) }));
@@ -85,8 +86,8 @@ it('adopts every native resource once, retains multi-pane terminal containers an
   expect(state.tabs.some(tab => tab.id === 'acp:agent')).toBe(true);
   synchronizeWorkbench(); expect(useWorkbenchStore.getState().snapshot).toBe(state);
   useTerminalStore.setState({ focusedPaneId: 'gone' }); synchronizeWorkbench(); expect(current('native').focused).toBe('native#1');
-  useWorkbenchStore.getState().update(state => putContainer(state, { ...current('native'), zoomed: 'native#1' }));
-  synchronizeWorkbench(); expect(current('native').zoomed).toBe('native#1');
+  useWorkbenchStore.getState().update(state => putContainer(state, { ...current('native') }));
+
   useWorkspaceStore.setState({ tabs: [] }); synchronizeWorkbench(); expect(useWorkbenchStore.getState().snapshot.tabs.some(tab => tab.scope === 'terminal')).toBe(false);
   useWorkbenchStore.setState({ ready: false }); document(); synchronizeWorkbench(); useWorkspaceStore.setState({ tabs: [] }); synchronizeWorkbench();
   expect(useWorkbenchStore.getState().snapshot.tabs.some(tab => tab.scope === 'code')).toBe(true);
@@ -95,8 +96,8 @@ it('adopts every native resource once, retains multi-pane terminal containers an
 it('leaves unrelated placements untouched when rebinding a resource', () => {
   useWorkbenchStore.setState({ ready: true, snapshot: emptyWorkbench(), lastClosed: null });
   useWorkbenchStore.getState().update(state => putContainer(putContainer(state, {
-    id: 'layout', scope: 'code', layout: { type: 'pane', id: 'pane-a', resourceId: 'file:a' }, focused: 'pane-a', zoomed: null,
-  }), { id: 'empty', scope: 'code', layout: null, focused: '', zoomed: null }));
+    id: 'layout', scope: 'code', layout: { type: 'pane', id: 'pane-a', resourceId: 'file:a' }, focused: 'pane-a',
+  }), { id: 'empty', scope: 'code', layout: null, focused: '' }));
   const snapshot = useWorkbenchStore.getState().snapshot;
   rebindWorkspaceResourceId('file:a', 'file:a');
   expect(useWorkbenchStore.getState().snapshot).toBe(snapshot);
@@ -134,7 +135,7 @@ it('follows native terminal insertion order after a grouped restore', () => {
   terminal('three'); synchronizeWorkbench();
   expect(useWorkbenchStore.getState().snapshot.tabs.filter(tab => tab.scope === 'terminal').map(tab => tab.id)).toEqual(['two', 'one', 'three']);
   expect(useWorkbenchStore.getState().snapshot.tabs.some(tab => tab.scope === 'code')).toBe(true);
-  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'orphan', scope: 'terminal', layout: { type: 'pane', id: 'orphan-pane', resourceId: 'terminal:one#0' }, focused: 'orphan-pane', zoomed: null }));
+  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'orphan', scope: 'terminal', layout: { type: 'pane', id: 'orphan-pane', resourceId: 'terminal:one#0' }, focused: 'orphan-pane' }));
   useWorkspaceStore.setState(state => ({ tabs: [...state.tabs, { id: 'four', title: 'four', kind: 'session', layout: leaf({ id: 'four#0', kind: 'local' }) }] }));
   synchronizeWorkbench();
   const terminals = useWorkbenchStore.getState().snapshot.tabs.filter(tab => tab.scope === 'terminal');
@@ -157,10 +158,10 @@ it('moves a pane inside its container and projects the terminal order', () => {
   const invalid = useWorkbenchStore.getState().snapshot;
   moveWorkspacePane('missing', 'missing', { leafId: 'missing', dir: 'row', position: 'first' });
   expect(useWorkbenchStore.getState().snapshot).toBe(invalid);
-  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'code-move', scope: 'code', layout: { type: 'split', direction: 'row', ratio: 0.5, first: { type: 'pane', id: 'a', resourceId: 'file:a' }, second: { type: 'pane', id: 'b', resourceId: 'file:b' } }, focused: 'b', zoomed: null }));
+  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'code-move', scope: 'code', layout: { type: 'split', direction: 'row', ratio: 0.5, first: { type: 'pane', id: 'a', resourceId: 'file:a' }, second: { type: 'pane', id: 'b', resourceId: 'file:b' } }, focused: 'b' }));
   moveWorkspacePane('code-move', 'b', { leafId: 'a', dir: 'col', position: 'first' });
   expect(panesOf(current('code-move')).map(pane => pane.id)).toEqual(['b', 'a']);
-  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'ghost', scope: 'terminal', layout: { type: 'split', direction: 'row', ratio: 0.5, first: { type: 'pane', id: 'ga', resourceId: 'terminal:ga' }, second: { type: 'pane', id: 'gb', resourceId: 'terminal:gb' } }, focused: 'gb', zoomed: null }));
+  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'ghost', scope: 'terminal', layout: { type: 'split', direction: 'row', ratio: 0.5, first: { type: 'pane', id: 'ga', resourceId: 'terminal:ga' }, second: { type: 'pane', id: 'gb', resourceId: 'terminal:gb' } }, focused: 'gb' }));
   expect(() => moveWorkspacePane('ghost', 'gb', { leafId: 'ga', dir: 'col', position: 'first' })).not.toThrow();
   expect(panesOf(current('ghost')).map(pane => pane.id)).toEqual(['gb', 'ga']);
 });
@@ -179,7 +180,7 @@ it('activates layout containers through native owners and ignores missing tabs a
   terminal(); synchronizeWorkbench(); renameContainer('native', 'Renamed'); expect(useWorkspaceStore.getState().tabs.find(tab => tab.id === 'native')!.title).toBe('Renamed');
   renameContainer(chat, 'Named conversation'); expect(useChatStore.getState().conversations.find(item => item.id === 'chat-one')!.title).toBe('Named conversation');
   workspaceAreaStores.unified.getState().openStart();
-  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'empty', scope: 'unified', layout: null, focused: '', zoomed: null }));
+  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'empty', scope: 'unified', layout: null, focused: '' }));
   activateContainer('empty'); expect(useWorkbenchStore.getState().snapshot.selected.unified).toBe('empty');
   useWorkbenchStore.getState().update(state => ({ ...state, tabs: state.tabs.map(tab => tab.id === selected ? { ...tab, focused: 'missing' } : tab) }));
   activateContainer(selected); expect(useWorkspaceNavigation.getState().area).toBe('unified');
@@ -234,7 +235,7 @@ it('creates, assigns, renames and collapses groups using one persisted protocol'
   document(); synchronizeWorkbench();
   expect(await createContainerGroup('missing')).toBe('');
   workspaceAreaStores.code.getState().openStart();
-  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'empty', scope: 'code', layout: null, focused: '', zoomed: null }));
+  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'empty', scope: 'code', layout: null, focused: '' }));
   expect(await createContainerGroup('empty')).toBe('');
   const id = await createContainerGroup(fileId); expect(id).toMatch(/^group:code:/); expect(current(fileId).groupId).toBe(id);
   expect(groupApi.groupCreate).toHaveBeenCalledWith(id, expect.any(String), expect.any(Number));
@@ -242,7 +243,9 @@ it('creates, assigns, renames and collapses groups using one persisted protocol'
   await updateWorkspaceGroup(id, {}); await updateWorkspaceGroup('missing', { title: 'Unknown' });
   useWorkbenchStore.getState().update(state => putContainer(state, { ...current(fileId), historyIdentity: { id: 'workspace:one', createdAt: 1 } }));
   await assignWorkspaceGroup(fileId); expect(current(fileId).groupId).toBeUndefined(); expect(groupApi.sessionSetGroup).toHaveBeenCalledWith('workspace:one', null);
-  await assignWorkspaceGroup(fileId, id); expect(current(fileId).groupId).toBe(id);
+  expect(groupApi.groupDelete).toHaveBeenCalledWith(id);
+  expect(useWorkbenchStore.getState().snapshot.groups).toHaveLength(0);
+  await createContainerGroup(fileId, 'Restored', id); expect(current(fileId).groupId).toBe(id);
   await assignWorkspaceGroup('missing', id);
   activateContainer(fileId); await vi.waitFor(() => expect(useWorkbenchStore.getState().snapshot.groups[0]!.collapsed).toBe(false));
 });
@@ -255,7 +258,8 @@ it('adapts terminal groups, naming and focus without introducing another group s
   synchronizeWorkbench(); activateContainer('native'); await vi.waitFor(() => expect(useWorkspaceStore.getState().groups[0]!.collapsed).toBe(false));
   await updateWorkspaceGroup('g', { title: 'Shells', collapsed: true }); expect(useWorkspaceStore.getState().groups[0]).toMatchObject({ title: 'Shells', collapsed: true });
   await assignWorkspaceGroup('native'); expect(current('native').groupId).toBeUndefined();
-  await assignWorkspaceGroup('native', 'g'); expect(current('native').groupId).toBe('g');
+  expect(groupApi.groupDelete).toHaveBeenCalledWith('g');
+  await createContainerGroup('native', 'Shells', 'g'); expect(current('native').groupId).toBe('g');
 });
 
 it('archives every member with its original group and keeps a failed batch reviewable', async () => {
@@ -315,6 +319,47 @@ it('binds canonical layouts and native focus for one disposable runtime lifetime
   stop(); useWorkbenchStore.setState({ snapshot: emptyWorkbench() }); conversation('after'); expect(useWorkbenchStore.getState().snapshot.tabs).toEqual([]);
 });
 
+it('ignores streaming text and unrelated UI changes until resource presence or identity changes', () => {
+  const chat = conversation('streaming'); synchronizeWorkbench();
+  const stop = startWorkbenchRuntime();
+  const updates = vi.fn(); const unsubscribe = useWorkbenchStore.subscribe(updates);
+  try {
+    useWorkspaceStore.setState({ lastLocalPaneId: 'unrelated' });
+    useAiWorkspace.setState({ selected: chat });
+    useHarnessWorkspace.setState({ selected: 'unrelated' });
+    useChatStore.setState({ activeConversationId: 'streaming' });
+    expect(updates).not.toHaveBeenCalled();
+    const message = { id: 'message', role: 'assistant' as const, content: 'first token', createdAt: 1 };
+    useChatStore.setState({ byTab: { streaming: [message] } });
+    updates.mockClear();
+    useChatStore.setState({ byTab: { streaming: [{ ...message, content: 'more tokens' }] } });
+    expect(updates).not.toHaveBeenCalled();
+    useChatStore.setState({ byTab: { streaming: [] } });
+    expect(current(chat).restoreSnapshot?.members[0]?.empty).toBe(true);
+    useChatStore.setState({ byTab: {} });
+    useAiWorkspace.setState({ sideSessions: [chat], sideSelected: chat });
+    useAiWorkspace.setState({ sideSelected: '' });
+    useHarnessWorkspace.setState({ connections: [{ id: 'agent-runtime', harness: 'Agent', cwd: '/repo', fresh: true }] });
+    expect(current('acp:agent-runtime')).toBeTruthy();
+  } finally { unsubscribe(); stop(); }
+});
+
+it('deletes an empty group persistently and cancels a stale retry after it gains a member', async () => {
+  const chat = conversation(); synchronizeWorkbench(); group('untouched', 'ai', [chat]); group('empty-retry', 'ai');
+  useWorkbenchStore.getState().update(state => ({ ...state, order: { ai: ['group:untouched', `tab:${chat}`, 'group:empty-retry'] } }));
+  vi.mocked(groupApi.groupDelete).mockRejectedValueOnce(new Error('group storage failed'));
+  pruneEmptyWorkspaceGroups();
+  await vi.waitFor(() => expect(useWorkbenchFeedback.getState().failure?.error).toEqual(new Error('group storage failed')));
+  expect(useWorkbenchStore.getState().snapshot.groups.map(group => group.id)).toEqual(['untouched']);
+  expect(useWorkbenchStore.getState().snapshot.order.ai).toEqual(['group:untouched', `tab:${chat}`]);
+  group('empty-retry', 'ai', [chat]);
+  useWorkbenchFeedback.getState().failure!.retry();
+  expect(groupApi.groupDelete).toHaveBeenCalledTimes(1);
+  useWorkbenchStore.getState().update(state => ({ ...state, tabs: state.tabs.map(tab => ({ ...tab, groupId: undefined })) }));
+  useWorkbenchFeedback.getState().failure!.retry();
+  await vi.waitFor(() => expect(groupApi.groupDelete).toHaveBeenCalledTimes(2));
+});
+
 it('clears all reference snapshots for non-restoring startup and ignores an absent undo entry', async () => {
   await restoreWorkbench('empty', vi.fn());
   document(); synchronizeWorkbench(); await undoCloseContainer();
@@ -329,7 +374,7 @@ it('restores saved containers by resource identity without removing previously r
   const code = saved.tabs.find(tab => tab.id === fileId)!;
   code.id = 'saved-code'; saved.selected.code = 'saved-code';
   saved.tabs.push({ ...code, id: 'mixed', scope: 'unified' });
-  saved.tabs.push({ id: 'without-snapshot', scope: 'ai', layout: null, focused: '', zoomed: null });
+  saved.tabs.push({ id: 'without-snapshot', scope: 'ai', layout: null, focused: '' });
   saved.tabs.push({ ...code, id: 'missing-draft', restoreSnapshot: { ...code.restoreSnapshot!, members: [{ ...code.restoreSnapshot!.members[0]!, id: 'file:missing', draftId: 'lost', reference: 'untitled' }], layout: { type: 'pane', id: code.focused, resourceId: 'file:missing' } } });
   const error = vi.fn(); await restoreWorkbench('restore', error, saved);
   expect(error).toHaveBeenCalledOnce();
@@ -349,6 +394,31 @@ it('activates the selected container after restoring later peers with different 
   expect(useUiStore.getState().settingsOpen).toBe(true);
   useUiStore.setState({ settingsOpen: false });
   useWorkspaceNavigation.setState({ area: 'history' }); await restoreWorkbench('empty', vi.fn());
+});
+
+it('restores empty conversation references in one batch without activating or duplicating background owners', async () => {
+  useWorkbenchStore.setState({ snapshot: emptyWorkbench(), ready: false });
+  const saved = emptyWorkbench();
+  for (let index = 0; index < 40; index++) {
+    const resourceId = `chat:restored-${index}`;
+    const layout = { type: 'pane' as const, id: `pane-${index}`, resourceId };
+    saved.tabs.push({ id: resourceId, scope: 'ai', layout, focused: layout.id, restoreSnapshot: {
+      version: 1, layout, focused: layout.id, members: [{ id: resourceId, kind: 'conversation', reference: `restored-${index}`, title: 'Draft', paneCount: 1, local: false, ssh: false, empty: true }],
+    } });
+  }
+  const stop = startWorkbenchRuntime();
+  const updates = vi.fn(); const unsubscribe = useWorkbenchStore.subscribe(updates);
+  const error = vi.fn();
+  await restoreWorkbench('restore', error, saved);
+  expect(error).not.toHaveBeenCalled();
+  expect(useChatStore.getState().activeConversationId).toBe('');
+  expect(useWorkbenchStore.getState().snapshot.tabs.filter(tab => tab.scope === 'ai')).toHaveLength(40);
+  expect(useChatStore.getState().conversations).toHaveLength(40);
+  expect(updates.mock.calls.length).toBeLessThan(6);
+  await restoreWorkbench('restore', error, saved);
+  expect(useChatStore.getState().conversations).toHaveLength(40);
+  expect(useWorkbenchStore.getState().snapshot.tabs.filter(tab => tab.scope === 'ai')).toHaveLength(40);
+  unsubscribe(); stop();
 });
 
 it('restores a closed container with its title and existing group and leaves a failed undo available', async () => {
@@ -399,10 +469,23 @@ it('keeps native closure and group operations isolated from unrelated groups and
 });
 
 it('reports history-write failure before group archival and does not close the live members', async () => {
-  document(); synchronizeWorkbench(); group('g', 'code', [fileId]);
+  const chat = conversation(); synchronizeWorkbench(); group('g', 'ai', [chat]);
   vi.mocked(saveWorkspaceHistory).mockRejectedValueOnce(new Error('storage unavailable'));
   const error = vi.fn(); removeWorkspaceGroup('g', 'archive', error); await vi.waitFor(() => expect(error).toHaveBeenCalledOnce());
-  expect(current(fileId)).toBeTruthy(); expect(groupApi.groupArchive).not.toHaveBeenCalled();
+  expect(current(chat)).toBeTruthy(); expect(groupApi.groupArchive).not.toHaveBeenCalled();
+});
+
+it('releases history suppression when deleting group metadata fails', async () => {
+  const chat = conversation(); synchronizeWorkbench(); group('failed-delete', 'ai', [chat]);
+  const identity = { id: 'workspace:failed-group-delete', createdAt: 1 };
+  const tab = { ...current(chat), historyIdentity: identity };
+  const snapshot = captureContainerHistory(tab, currentWorkspaceResources());
+  useWorkbenchStore.getState().update(state => putContainer(state, tab));
+  vi.mocked(groupApi.groupDeleteWithSessions).mockRejectedValueOnce(new Error('group delete failed'));
+  const failure = vi.fn(); removeWorkspaceGroup('failed-delete', 'delete', failure);
+  await vi.waitFor(() => expect(failure).toHaveBeenCalledWith(new Error('group delete failed')));
+  await createWorkspaceHistoryWriter(vi.fn())(snapshot, identity);
+  expect(saveWorkspaceHistory).toHaveBeenCalledWith(expect.objectContaining({ id: identity.id }));
 });
 
 it('keeps pane and history identifiers bounded even when a document path is long', async () => {
@@ -411,13 +494,17 @@ it('keeps pane and history identifiers bounded even when a document path is long
   expect(tab.focused.length).toBeLessThan(256); expect(parseWorkbench(useWorkbenchStore.getState().snapshot), JSON.stringify(useWorkbenchStore.getState().snapshot)).not.toBeNull();
   const captured = captureContainerHistory(tab, [{ id, title: 'file.ts', kind: 'document', file }]);
   await Promise.all([persistContainerHistory(tab, captured), persistContainerHistory(tab, captured)]);
+  expect(saveWorkspaceHistory).not.toHaveBeenCalled();
+  const chat = conversation(); const mixedId = mixed(id, chat); synchronizeWorkbench();
+  const combined = current(mixedId);
+  await persistContainerHistory(combined, captureContainerHistory(combined, currentWorkspaceResources()));
   expect(vi.mocked(saveWorkspaceHistory).mock.calls[0]![0].id.length).toBeLessThan(256);
   expect(saveWorkspaceHistory).toHaveBeenCalledOnce();
 });
 
 it('retries a failed close save under the same captured history identity after its live owner is gone', async () => {
-  document(); synchronizeWorkbench(); vi.mocked(saveWorkspaceHistory).mockRejectedValueOnce(new Error('close storage failed'));
-  closeContainer(fileId);
+  const chat = conversation(); synchronizeWorkbench(); vi.mocked(saveWorkspaceHistory).mockRejectedValueOnce(new Error('close storage failed'));
+  closeContainer(chat);
   await vi.waitFor(() => expect(useWorkbenchFeedback.getState().failure?.error).toEqual(new Error('close storage failed')));
   const id = vi.mocked(saveWorkspaceHistory).mock.calls[0]![0].id;
   useWorkbenchFeedback.getState().failure!.retry(); await vi.waitFor(() => expect(saveWorkspaceHistory).toHaveBeenCalledTimes(2));
@@ -428,7 +515,7 @@ it('handles reentrant observers and missing native projections without recursive
   terminal(); const stop = startWorkbenchRuntime();
   const unsubscribe = useWorkbenchStore.subscribe(() => synchronizeWorkbench());
   document(); synchronizeWorkbench();
-  useWorkbenchStore.getState().update(state => ({ ...state, tabs: [...state.tabs, { id: 'missing', scope: 'terminal', layout: null, focused: '', zoomed: null }] }));
+  useWorkbenchStore.getState().update(state => ({ ...state, tabs: [...state.tabs, { id: 'missing', scope: 'terminal', layout: null, focused: '' }] }));
   useWorkbenchStore.getState().update(state => ({ ...state, tabs: state.tabs.map(tab => tab.id === fileId ? { ...tab, title: 'Changed' } : tab) }));
   useTerminalStore.setState({ focusedPaneId: 'native#0' });
   expect(useWorkbenchStore.getState().snapshot.selected.terminal).toBe('native');
@@ -450,8 +537,8 @@ it('merges native session containers without closing their live pane resources',
   expect(native).toMatchObject({ layout: { type: 'split', second: { terminal: { id: 'two#0' } } } });
   expect(deleteSession).toHaveBeenCalledWith('two');
   expect(useWorkbenchStore.getState().snapshot.tabs.some(tab => tab.id === 'two')).toBe(false);
-  zoomWorkspaceContainer('one'); expect(current('one').zoomed).toBeTruthy(); zoomWorkspaceContainer('one'); expect(current('one').zoomed).toBeNull(); zoomWorkspaceContainer('missing');
-  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'ghost', scope: 'terminal', focused: 'ghost', zoomed: null, layout: { type: 'pane', id: 'ghost', resourceId: 'terminal:missing' } }));
+
+  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'ghost', scope: 'terminal', focused: 'ghost', layout: { type: 'pane', id: 'ghost', resourceId: 'terminal:missing' } }));
   expect(await mergeWorkspaceContainers('ghost', 'one', { leafId: 'one#0', dir: 'col', position: 'first' })).toBe(false);
 });
 
@@ -467,7 +554,7 @@ it('merges document and AI containers through the same tree operation', async ()
   removeContainerPane(id, 'missing');
   vi.mocked(interceptEditorClose).mockReturnValue(false); removeContainerPane(id, chat); expect(panesOf(current(id))).toHaveLength(1);
   const ghost = { type: 'pane' as const, id: 'ghost', resourceId: 'acp:missing' };
-  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'ghost-tab', scope: 'unified', focused: ghost.id, zoomed: null, layout: { type: 'split', direction: 'row', ratio: 0.5, first: ghost, second: { ...ghost, id: 'other', resourceId: 'acp:other' } } }));
+  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'ghost-tab', scope: 'unified', focused: ghost.id, layout: { type: 'split', direction: 'row', ratio: 0.5, first: ghost, second: { ...ghost, id: 'other', resourceId: 'acp:other' } } }));
   removeContainerPane('ghost-tab', ghost.resourceId); expect(current('ghost-tab')).toBeTruthy();
 });
 
@@ -491,7 +578,7 @@ it('persists draft-aware terminal order and refuses a group from a different sco
   expect(groupApi.sessionSetGroup).not.toHaveBeenCalledWith('native', null);
   await persistWorkspaceOrder('terminal'); expect(groupApi.sessionsReorder).toHaveBeenCalledWith(null, []);
   const created = await createContainerGroup('native', 'First'); await createContainerGroup('native', 'Second');
-  expect(useWorkbenchStore.getState().snapshot.groups.some(group => group.id === created)).toBe(true);
+  expect(useWorkbenchStore.getState().snapshot.groups.some(group => group.id === created)).toBe(false);
   useWorkspaceStore.setState(state => ({ tabs: [...state.tabs.filter(tab => tab.kind !== 'session'), ...state.tabs.filter(tab => tab.kind === 'session')] }));
   await persistWorkspaceOrder('terminal');
 });

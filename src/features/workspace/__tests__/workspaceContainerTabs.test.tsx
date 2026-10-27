@@ -12,10 +12,10 @@ import * as service from '../services/workbench';
 import { requestWorkspaceSplit } from '../services/unifiedWorkspace';
 import { useWorkbenchFeedback } from '../stores/workbenchFeedback';
 
-vi.mock('../services/workbench', () => ({ synchronizeWorkbench: vi.fn(), focusNativeContainerResource: vi.fn(), activateContainer: vi.fn(), closeContainer: vi.fn(), renameContainer: vi.fn(), assignWorkspaceGroup: vi.fn(), createContainerGroup: vi.fn(), updateWorkspaceGroup: vi.fn(), removeWorkspaceGroup: vi.fn(), detachWorkspacePane: vi.fn(), removeContainerPane: vi.fn(), zoomWorkspaceContainer: vi.fn(), persistWorkspaceOrder: vi.fn() }));
+vi.mock('../services/workbench', () => ({ synchronizeWorkbench: vi.fn(), focusNativeContainerResource: vi.fn(), activateContainer: vi.fn(), closeContainer: vi.fn(), renameContainer: vi.fn(), assignWorkspaceGroup: vi.fn(), createContainerGroup: vi.fn(), updateWorkspaceGroup: vi.fn(), removeWorkspaceGroup: vi.fn(), detachWorkspacePane: vi.fn(), removeContainerPane: vi.fn(), persistWorkspaceOrder: vi.fn() }));
 vi.mock('../services/unifiedWorkspace', () => ({ requestWorkspaceSplit: vi.fn() }));
 const pane = (id: string) => ({ type: 'pane' as const, id, resourceId: `file:${id}` });
-const tab = (id: string): WorkspaceContainer => ({ id, scope: 'code', layout: pane(id), focused: id, zoomed: null });
+const tab = (id: string): WorkspaceContainer => ({ id, scope: 'code', layout: pane(id), focused: id });
 const handle = (id: string): TabHandle => ({ id: `file:${id}`, label: id, tip: id, icon: null, closeLabel: 'Close', capabilities: tabCapabilities() });
 const flush = async () => { await act(async () => { await Promise.resolve(); await Promise.resolve(); }); };
 
@@ -38,7 +38,20 @@ it('derives labels, capabilities and group order from real containers and tolera
   expect(useWorkbenchStore.getState().snapshot.tabs[0]!.id).toBe('two');
 });
 
-it('exposes the same split, pane position, merge, zoom, detach and remove actions on every container', () => {
+it('offers group archival only when at least one member has session history', () => {
+  const one = { ...tab('one'), groupId: 'g' };
+  useWorkbenchStore.getState().update(state => ({ ...state, tabs: [one] }));
+  const { result } = renderHook(() => useWorkspaceContainerTabs('code', [handle('one')]));
+  expect(result.current.grouping!.groups[0]!.archivable).toBe(false);
+  for (const kind of ['document', 'terminal', 'conversation', 'agent'] as const) {
+    act(() => useWorkbenchStore.getState().update(state => ({ ...state, tabs: [{ ...one, restoreSnapshot: {
+      version: 1, focused: one.focused, layout: one.layout!, members: [{ id: 'file:one', title: 'Member', reference: 'one', kind, paneCount: 1, local: true, ssh: false }],
+    } }] })));
+    expect(result.current.grouping!.groups[0]!.archivable).toBe(kind !== 'document');
+  }
+});
+
+it('exposes the same split, pane position, merge, detach and remove actions on every container', () => {
   const { result } = renderHook(() => useWorkspaceContainerTabs('code', [handle('one'), handle('two')]));
   expect(result.current.tabActions!('missing')).toEqual([]);
   let actions = result.current.tabActions!('one');
@@ -46,34 +59,30 @@ it('exposes the same split, pane position, merge, zoom, detach and remove action
   expect(requestWorkspaceSplit).toHaveBeenCalledWith('file:one');
   actions.find(item => item.label === t('Merge tab into this tab'))!.submenu!.items[0]!.onClick!();
   expect(workspaceAreaStores.code.getState().pendingMergeTab).toBe('two');
-  act(() => useWorkbenchStore.getState().update(state => ({ ...state, tabs: [{ ...tab('one'), layout: { type: 'split', direction: 'row', ratio: 0.5, first: pane('one'), second: pane('three') }, focused: 'missing', zoomed: 'one' }, { ...tab('two'), title: 'Peer' }, { ...tab('empty'), layout: null }] })));
+  act(() => useWorkbenchStore.getState().update(state => ({ ...state, tabs: [{ ...tab('one'), layout: { type: 'split', direction: 'row', ratio: 0.5, first: pane('one'), second: pane('three') }, focused: 'missing' }, { ...tab('two'), title: 'Peer' }, { ...tab('empty'), layout: null }] })));
   actions = result.current.tabActions!('one');
   actions.find(item => item.label === t('Change pane position'))!.onClick!();
   expect(useUiStore.getState().paneMove).toMatchObject({ open: true, containerId: 'one', paneId: 'one' });
   act(() => useUiStore.getState().cancelPaneMove());
-  actions.find(item => item.label === t('Restore panes'))!.onClick!();
   actions.find(item => item.label === t('Move pane to new tab'))!.onClick!();
   actions.find(item => item.label === t('Remove pane'))!.onClick!();
-  expect(service.zoomWorkspaceContainer).toHaveBeenCalledWith('one');
   expect(service.detachWorkspacePane).toHaveBeenCalledWith('code', 'file:one');
   expect(service.removeContainerPane).toHaveBeenCalledWith('one', 'file:one');
   expect(actions.find(item => item.submenu)!.submenu!.items[0]!.label).toBe('Peer');
   expect(result.current.tabActions!('empty')).toEqual([]);
   act(() => useWorkbenchStore.getState().update(state => ({ ...state, tabs: [{ ...tab('one'), layout: { type: 'split', direction: 'col', ratio: 0.5, first: { type: 'split', direction: 'row', ratio: 0.5, first: pane('one'), second: pane('two') }, second: { type: 'split', direction: 'row', ratio: 0.5, first: pane('three'), second: pane('four') } } }] })));
   expect(result.current.tabActions!('one').some(item => item.label === t('Split tab'))).toBe(false);
-  expect(result.current.tabActions!('one').some(item => item.label === t('Zoom pane'))).toBe(true);
+  expect(result.current.tabActions!('one').some(item => item.label === t('Zoom pane'))).toBe(false);
 });
 
-it('starts pane repositioning from the focused pane and clears zoom first', () => {
+it('starts pane repositioning from the focused pane and preserves pane identity', () => {
   const layout = { type: 'split' as const, direction: 'row' as const, ratio: 0.5, first: pane('one'), second: pane('three') };
   useWorkbenchStore.setState(state => ({ ...state, snapshot: { ...state.snapshot, tabs: [{ ...tab('one'), layout, focused: 'three' }], selected: { code: 'one' } } }));
   const { result } = renderHook(() => useWorkspaceContainerTabs('code', [handle('one')]));
   act(() => result.current.tabActions!('one').find(item => item.label === t('Change pane position'))!.onClick!());
   expect(useUiStore.getState().paneMove).toMatchObject({ open: true, containerId: 'one', paneId: 'three' });
   act(() => useUiStore.getState().cancelPaneMove());
-  act(() => useWorkbenchStore.setState(state => ({ ...state, snapshot: { ...state.snapshot, tabs: state.snapshot.tabs.map(tab => tab.id === 'one' ? { ...tab, zoomed: 'three' } : tab) } })));
   act(() => result.current.tabActions!('one').find(item => item.label === t('Change pane position'))!.onClick!());
-  expect(service.zoomWorkspaceContainer).toHaveBeenCalledWith('one');
   expect(useUiStore.getState().paneMove).toMatchObject({ open: true, containerId: 'one', paneId: 'three' });
 });
 

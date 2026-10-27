@@ -8,7 +8,7 @@ import { useWorkbenchStore } from '../stores/workbench';
 import { useWorkspaceNavigation } from '../stores/navigation';
 import { moveContainer, moveWorkspaceEntity, panesOf, workspaceStripEntities, type WorkspaceScope } from '../model/workbench';
 import type { WorkspaceTabStrip } from '../model/tabStrip';
-import { activateContainer, assignWorkspaceGroup, closeContainer, createContainerGroup, detachWorkspacePane, focusNativeContainerResource, persistWorkspaceOrder, removeContainerPane, removeWorkspaceGroup, renameContainer, synchronizeWorkbench, updateWorkspaceGroup, zoomWorkspaceContainer } from '../services/workbench';
+import { activateContainer, assignWorkspaceGroup, closeContainer, createContainerGroup, detachWorkspacePane, focusNativeContainerResource, persistWorkspaceOrder, removeContainerPane, removeWorkspaceGroup, renameContainer, synchronizeWorkbench, updateWorkspaceGroup } from '../services/workbench';
 import { reportWorkbenchFailure } from '../stores/workbenchFeedback';
 import { workspaceAreaStores } from '../stores/paneWorkspace';
 import { useUiStore } from '../stores/ui';
@@ -25,14 +25,16 @@ export function useWorkspaceContainerTabs(scope: WorkspaceScope, resourceHandles
   }, [scope, selectedResource]);
   const tabs = snapshot.tabs.filter(tab => tab.scope === scope);
   const groups = snapshot.groups.filter(group => group.scope === scope);
+  const handlesById = new Map(resourceHandles.map(handle => [handle.id, handle]));
   const run = (operation: () => void | Promise<unknown>) => {
     const retry = () => { void Promise.resolve().then(operation).catch(error => reportWorkbenchFailure(error, retry)); };
     retry();
   };
   return {
     selected: snapshot.selected[scope],
-    handles: tabs.filter(tab => tab.layout).map(tab => {
-      const members = panesOf(tab).flatMap(pane => resourceHandles.filter(handle => handle.id === pane.resourceId));
+    handles: tabs.filter(tab => tab.layout || scope === 'unified').map(tab => {
+      if (!tab.layout) return { id: tab.id, label: t('Start'), tip: t('Start'), icon: <Grid size={16} />, closeLabel: t('Close this tab'), surface: 'canvas' as const, capabilities: tabCapabilities(), dataAttributes: { 'data-tab-row-id': tab.id, 'data-workspace-scope': scope } };
+      const members = panesOf(tab).flatMap(pane => { const handle = handlesById.get(pane.resourceId); return handle ? [handle] : []; });
       const first = members[0];
       const title = tab.title || members.map(handle => handle.label).join(' + ') || t('Start');
       return { ...first, id: tab.id, label: title, tip: title,
@@ -60,18 +62,20 @@ export function useWorkspaceContainerTabs(scope: WorkspaceScope, resourceHandles
       const peers = tabs.filter(peer => peer.id !== id && peer.layout && panesOf(peer).length + cells.length <= 4);
       return [
         ...(cells.length < 4 ? [{ label: t('Split tab'), onClick: () => { activateContainer(id); requestWorkspaceSplit(focused.resourceId); } }] : []),
-        ...(cells.length > 1 ? [
-          { label: t('Change pane position'), onClick: () => { activateContainer(id); if (tab.zoomed) zoomWorkspaceContainer(id); useUiStore.getState().beginPaneMove(id, focused.id); } },
-          { label: t(tab.zoomed ? 'Restore panes' : 'Zoom pane'), onClick: () => zoomWorkspaceContainer(id) },
-          { label: t('Move pane to new tab'), onClick: () => { activateContainer(id); detachWorkspacePane(scope, focused.resourceId); } },
-          { label: t('Remove pane'), onClick: () => removeContainerPane(id, focused.resourceId) },
-        ] : []),
-        ...(peers.length ? [{ label: t('Merge tab into this tab'), submenu: { items: peers.map(peer => ({ label: peer.title || panesOf(peer).map(pane => resourceHandles.find(handle => handle.id === pane.resourceId)?.label ?? '').join(' + '),
+        ...[
+          { label: t('Change pane position'), disabled: cells.length < 2, onClick: () => { activateContainer(id); useUiStore.getState().beginPaneMove(id, focused.id); } },
+          { label: t('Move pane to new tab'), disabled: cells.length < 2, onClick: () => { activateContainer(id); detachWorkspacePane(scope, focused.resourceId); } },
+          { label: t('Remove pane'), disabled: cells.length < 2, onClick: () => removeContainerPane(id, focused.resourceId) },
+        ],
+        ...(peers.length ? [{ label: t('Merge tab into this tab'), submenu: { items: peers.map(peer => ({ label: peer.title || panesOf(peer).map(pane => handlesById.get(pane.resourceId)?.label ?? '').join(' + '),
           onClick: () => { activateContainer(id); workspaceAreaStores[scope].getState().chooseMerge(peer.id); } })) } }] : []),
       ];
     },
     grouping: {
-      groups: groups.map(group => ({ ...group, members: tabs.filter(tab => tab.groupId === group.id).map(tab => tab.id) })), colors,
+      groups: groups.map(group => {
+        const members = tabs.filter(tab => tab.groupId === group.id);
+        return { ...group, members: members.map(tab => tab.id), archivable: members.some(tab => tab.restoreSnapshot?.members.some(member => member.kind === 'terminal' || member.kind === 'conversation' || member.kind === 'agent')) };
+      }), colors,
       order: workspaceStripEntities(snapshot, scope, [...utilityIds, ...resourceHandles.filter(handle => handle.surface === 'canvas').map(handle => handle.id)]),
       create: async id => {
         const groupId = `group:${scope}:${crypto.randomUUID()}`;

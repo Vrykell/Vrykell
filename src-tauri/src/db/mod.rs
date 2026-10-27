@@ -188,6 +188,7 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
     }
     conversation::init_conversations(conn)?;
     workspace_history::init_history_metadata(conn)?;
+    workspace_history::remove_file_history(conn)?;
     command_history::init(conn)?;
     // Keep the existing schema version to avoid resetting compatible databases.
     conn.execute_batch("PRAGMA user_version = 2;")

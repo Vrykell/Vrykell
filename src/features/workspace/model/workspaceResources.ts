@@ -15,6 +15,7 @@ export type WorkspaceResource = ResourceOwner & { id: string; title: string; dir
 
 export function workspaceResources(tabs: Tab[], nativeIds: string[], conversations: { id: string; title: string }[], agents: { id: string; harness: string }[]): WorkspaceResource[] {
   const resources: WorkspaceResource[] = [];
+  const conversationsById = new Map(conversations.map(conversation => [conversation.id, conversation]));
   for (const tab of tabs) {
     if (tab.kind === 'editor') for (const file of tab.files) resources.push({ id: `file:${editorFileKey(file)}`, title: file.path.split(/[\\/]/).pop() || file.path, kind: 'document', file });
     else if (tab.kind === 'git-diff') for (const comparison of tab.comparisons ?? [{ id: tab.id, selection: tab.selection }]) resources.push({ id: `diff:${comparison.id}`, title: comparison.selection.path, kind: 'comparison', comparisonId: comparison.id });
@@ -22,7 +23,7 @@ export function workspaceResources(tabs: Tab[], nativeIds: string[], conversatio
     else if (tab.kind !== 'harness' && !tab.kind.startsWith('start')) resources.push({ id: `page:${tab.id}`, title: tab.title, kind: 'page', tabId: tab.id });
   }
   for (const id of nativeIds) {
-    const conversation = conversations.find(item => item.id === id);
+    const conversation = conversationsById.get(id);
     if (conversation) resources.push({ id: `chat:${id}`, title: conversation.title, kind: 'conversation', sessionId: id });
   }
   for (const agent of agents) resources.push({ id: `acp:${agent.id}`, title: agent.harness, kind: 'agent', sessionId: agent.id });

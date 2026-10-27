@@ -11,7 +11,7 @@ import { registerHarnessCloseGuard } from '@core/harness';
 import { pickPath } from '@platform/api/fs';
 import { useToastStore } from '@ui/feedback/Toast';
 import AcpLauncher from '@features/workspace/components/AcpLauncher';
-import { useSessionStore, useUiStore, ScopedPaneWorkspace, useScopedSplitActive, WorkspaceResourceSwitcher, WorkspaceSplitAction } from '@features/workspace';
+import { useSessionStore, useUiStore, ScopedPaneWorkspace, useScopedPaneActive, WorkspaceResourceSwitcher, WorkspaceSplitAction } from '@features/workspace';
 import { UnifiedHistoryView } from '@features/session-history';
 import UsageView from '@features/agent/components/UsageView';
 import { useHarnessStore } from '../stores/harness';
@@ -50,7 +50,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
   }, [nativeSelected, nativeVisited, nativeTabs.length, placement]);
   const settingsOpen = useUiStore(state => state.settingsOpen);
   const visible = active && !settingsOpen;
-  const splitActive = useScopedSplitActive('ai');
+  const paneActive = useScopedPaneActive('ai');
   const [directory, setDirectory] = useState<string | undefined>(undefined);
   const [launcherOpen, setLauncherOpen] = useState(false);
   const [closing, setClosing] = useState<(() => void) | null>(null);
@@ -92,7 +92,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
       grouping={strip.grouping}
       tabActions={strip.tabActions}
       onMove={strip.onMove} onClose={strip.onClose}
-      onRename={strip.onRename} menuItems={[
+      onRename={strip.onRename} menuLabel={t('Conversation actions')} menuItems={[
         ...(strip.tabActions?.(strip.selected ?? '') ?? []),
         { label: t('Choose project folder'), onClick: () => void chooseDirectory() },
         { label: t('Usage statistics'), onClick: () => useSessionStore.getState().openUsageTab() },
@@ -119,7 +119,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
         : activeSystemPage.kind === 'start-ai' ? <div className="ai-start-page" data-testid="ai-start-page"><AcpLauncher embedded suspended={launcherOpen} open={visible} onClose={() => {}} onPick={pick} onNewConversation={newConversation} /></div>
         : <UnifiedHistoryView preset="conversation" destination="native" />}
     </div>}
-    {nativeVisited && <div className="ai-native-surface" inert={!visible || splitActive || activePage?.kind !== 'harness' || !selected.startsWith('chat:')} style={{ display: visible && !splitActive && activePage?.kind === 'harness' && selected.startsWith('chat:') ? 'flex' : 'none' }}>
+    {nativeVisited && <div className="ai-native-surface" inert={!visible || paneActive || activePage?.kind !== 'harness' || !selected.startsWith('chat:')} style={{ display: visible && !paneActive && activePage?.kind === 'harness' && selected.startsWith('chat:') ? 'flex' : 'none' }}>
       <NativeConversationSurface />
     </div>}
     {connections.map(item => <ResourceContent key={item.id} id={`acp:${item.id}`} active={visible && activePage?.kind === 'harness' && `acp:${item.id}` === selected}>

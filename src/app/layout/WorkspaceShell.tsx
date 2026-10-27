@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from 'react';
 import { memoLocalized } from '@ui/hooks/memoLocalized';
-import { selectActiveSessionTab, useSessionStore, useDockStore, useUiStore, ScopedPaneWorkspace, useScopedSplitActive } from '@features/workspace';
+import { selectActiveSessionTab, useSessionStore, useDockStore, useUiStore, ScopedPaneWorkspace, useScopedPaneActive } from '@features/workspace';
 import SettingsScreen from '@features/settings/components/SettingsScreen';
 import { MIN_PANE_SIZE, minTerminalWidth } from '@features/workspace/model/windowLayout';
 import TopDock from '@features/workspace/components/TopDock';
@@ -55,7 +55,7 @@ export default function WorkspaceShell() {
   const sidebarDragWidth = useWorkspaceNavigation(state => state.sidebarDragWidth);
   const activeTab = useSessionStore(state => state.tabs.find(tab => tab.id === state.activeId));
   const contentVisible = !!activeTab && area === workspaceAreaForKind(activeTab.kind);
-  const codeSplit = useScopedSplitActive('code');
+  const codePaneActive = useScopedPaneActive('code');
   const gitSelection = useGitSelection();
   const codeResourceId = activeTab?.kind === 'editor' ? `file:${editorFileKey(activeTab.selected)}` : activeTab?.kind === 'git-diff'
     ? `diff:${activeTab.comparisons?.find(item => gitSelection && gitComparisonKey(item.selection) === gitComparisonKey(gitSelection))?.id ?? activeTab.id}` : '';
@@ -121,7 +121,7 @@ export default function WorkspaceShell() {
         <div className="workspace-primary" style={{ minWidth: area === 'terminal' ? terminalMinWidth : 0 }}>
         <WorkspaceHeaderSlot visible={!settingsOpen && (area === 'terminal' || area === 'code' || area === 'ai' || area === 'unified')} />
         <main className="workspace-main" inert={settingsOpen} aria-hidden={settingsOpen || undefined} style={{ flex: 1, minWidth: area === 'terminal' ? terminalMinWidth : 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
-          <div className="workspace-content-host" style={{ display: contentVisible && !(area === 'code' && codeSplit && codeResourceId) ? 'flex' : 'none' }} inert={!contentVisible}>
+          <div className="workspace-content-host" style={{ display: contentVisible && !(area === 'code' && codePaneActive && codeResourceId) ? 'flex' : 'none' }} inert={!contentVisible}>
             <EditorWorkspace><GitWorkspace><StableTerminalView active={contentVisible && !settingsOpen} /></GitWorkspace></EditorWorkspace>
           </div>
           <div className="workspace-resource-page" data-testid="ssh-workspace" style={{ display: area === 'ssh' ? 'flex' : 'none' }} inert={area !== 'ssh'}><StableHosts active={area === 'ssh' && !settingsOpen} /></div>

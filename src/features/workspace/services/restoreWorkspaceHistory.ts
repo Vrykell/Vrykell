@@ -36,12 +36,12 @@ function payloadContainsPane(payload: string, paneId: string): boolean {
   } catch { return false; }
 }
 
-export function restoreWorkspaceMember(member: WorkspaceHistoryMember): Promise<string> {
-  const key = JSON.stringify([member.kind, member.reference, member.paneId, member.remoteId, member.cwd, member.connectionId, member.draftId, member.scope, member.empty]);
+export function restoreWorkspaceMember(member: WorkspaceHistoryMember, activate = true): Promise<string> {
+  const key = JSON.stringify([member.kind, member.reference, member.paneId, member.remoteId, member.cwd, member.connectionId, member.draftId, member.scope, member.empty, activate]);
   const pending = pendingMembers.get(key);
   if (pending) return pending;
   const area = useWorkspaceNavigation.getState().area;
-  const operation = restoreMemberResource(member).finally(() => {
+  const operation = restoreMemberResource(member, activate).finally(() => {
     pendingMembers.delete(key);
     useWorkspaceNavigation.getState().selectArea(area);
   });
@@ -49,7 +49,7 @@ export function restoreWorkspaceMember(member: WorkspaceHistoryMember): Promise<
   return operation;
 }
 
-async function restoreMemberResource(member: WorkspaceHistoryMember): Promise<string> {
+async function restoreMemberResource(member: WorkspaceHistoryMember, activate: boolean): Promise<string> {
   const existing = resolveWorkspaceResource(member.id, currentWorkspaceResources());
   if (existing && existing.kind === member.kind && (member.kind !== 'terminal' || !member.paneId || existing.kind === 'terminal' && existing.paneId === member.paneId)) return existing.id;
   const workspace = useWorkspaceStore.getState();
@@ -77,11 +77,14 @@ async function restoreMemberResource(member: WorkspaceHistoryMember): Promise<st
   }
   if (member.kind === 'conversation') {
     if (member.empty && !useChatStore.getState().conversations.some(item => item.id === member.reference)) {
-      const id = useChatStore.getState().createConversation(null, { activate: false });
+      const id = useChatStore.getState().createConversation(null, { activate: false, id: activate ? undefined : member.reference });
       useChatStore.getState().renameConversation(id, member.title);
-      useAiWorkspace.getState().openNative(id);
-      await useChatStore.getState().selectConversation(id);
-      workspace.openHarnessTab();
+      useAiWorkspace.getState().ensureNative(id);
+      if (activate) {
+        useAiWorkspace.getState().openNative(id);
+        await useChatStore.getState().selectConversation(id);
+        workspace.openHarnessTab();
+      }
       return `chat:${id}`;
     }
     if (!useChatStore.getState().conversations.some(conversation => conversation.id === member.reference)) {
@@ -91,9 +94,12 @@ async function restoreMemberResource(member: WorkspaceHistoryMember): Promise<st
       }] }));
     }
     if (!useChatStore.getState().conversations.some(conversation => conversation.id === member.reference)) throw new Error(t('The saved conversation is no longer available.'));
-    useAiWorkspace.getState().openNative(member.reference);
-    await useChatStore.getState().selectConversation(member.reference);
-    workspace.openHarnessTab();
+    useAiWorkspace.getState().ensureNative(member.reference);
+    if (activate) {
+      useAiWorkspace.getState().openNative(member.reference);
+      await useChatStore.getState().selectConversation(member.reference);
+      workspace.openHarnessTab();
+    }
     return `chat:${member.reference}`;
   }
   if (member.kind === 'agent') {

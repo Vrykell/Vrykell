@@ -63,6 +63,15 @@ it('mounts only explicitly opened resources and does not adopt an unrelated glob
   expect(useAiWorkspace.getState().nativeTabs).not.toContain('unopened-global');
 });
 
+it('defers restored conversation composers until first shown', () => {
+  useAiWorkspace.setState({ nativeTabs: Array.from({ length: 100 }, (_, index) => `restored-${index}`), selected: '' });
+  render(<ResourceContentProvider><AiWorkspaceProvider mainActive={false} headerActive={false} sideActive={false}>
+    <AiWorkspaceSurface placement="main" />
+  </AiWorkspaceProvider></ResourceContentProvider>);
+  expect(lifecycle.mounts).toBe(0);
+  expect(document.querySelector('[data-conversation]')).toBeNull();
+});
+
 it('moves the existing conversation node without restarting it or dropping local state', () => {
   const view = (placement: 'main' | 'side') => <ResourceContentProvider><AiWorkspaceProvider mainActive headerActive sideActive={placement === 'side'}>
     <AiWorkspaceSurface placement="main" /><AiWorkspaceSurface placement="side" />

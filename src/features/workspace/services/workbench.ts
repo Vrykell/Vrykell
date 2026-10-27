@@ -2,11 +2,12 @@ import { interceptEditorClose } from '@core/editor';
 import { interceptHarnessClose } from '@core/harness';
 import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useChatStore } from '@features/chat/stores/chat';
+import { hasChatContent } from '@features/chat/model/chatContent';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
 import * as groupApi from '@platform/api/group';
 import { t } from '@i18n';
-import { assignContainerGroup, emptyWorkbench, focusContainerResource, mergeContainers, moveContainerPane, panesOf, putContainer, reconcileContainers, releaseContainerResources, removeContainers, selectContainer, workspaceStripEntities, WORKSPACE_SCOPES, type WorkspaceContainer, type WorkspaceScope } from '../model/workbench';
+import { assignContainerGroup, emptyWorkbench, focusContainerResource, mergeContainers, moveContainerPane, panesOf, putContainer, reconcileContainers, releaseContainerResources, removeContainers, selectContainer, workspaceStripEntities, WORKSPACE_SCOPES, type WorkspaceContainer, type WorkspaceGroup, type WorkspaceScope } from '../model/workbench';
 import { replaceWorkspacePaneResource, terminalResourceLayout, terminalWorkspaceLayout } from '../model/workspaceResources';
 import { leaves, type WindowLayout } from '../model/windowLayout';
 import { useWorkbenchStore } from '../stores/workbench';
@@ -55,14 +56,16 @@ export function synchronizeWorkbench() {
         const existing = state.tabs.find(item => item.id === tab.id);
         if (!existing) addedTerminal = true;
         const focused = useTerminalStore.getState().focusedPaneId;
-        state = putContainer(state, { ...existing, id: tab.id, scope: 'terminal', title: tab.title, layout: terminalWorkspaceLayout(tab.layout), focused: leaves(tab.layout).some(pane => pane.id === focused) ? focused! : existing?.focused ?? leaves(tab.layout)[0]!.id, zoomed: existing?.zoomed ?? null, groupId: tab.groupId });
+        state = putContainer(state, { ...existing, id: tab.id, scope: 'terminal', title: tab.title, layout: terminalWorkspaceLayout(tab.layout), focused: leaves(tab.layout).some(pane => pane.id === focused) ? focused! : existing?.focused ?? leaves(tab.layout)[0]!.id, groupId: tab.groupId });
       }
+      const placedResources = new Set(state.tabs.flatMap(tab => panesOf(tab).map(pane => `${tab.scope}:${pane.resourceId}`)));
       for (const resource of mainResources) {
         const scope = nativeScope(resource.kind);
-        if (scope === 'terminal' || state.tabs.some(tab => tab.scope === scope && panesOf(tab).some(pane => pane.resourceId === resource.id))) continue;
+        if (scope === 'terminal' || placedResources.has(`${scope}:${resource.id}`)) continue;
         releaseContainerHistory(resource.id, true);
         const paneId = `pane:${crypto.randomUUID()}`;
-        state = putContainer(state, { id: resource.id, scope, layout: { type: 'pane', id: paneId, resourceId: resource.id }, focused: paneId, zoomed: null });
+        state = putContainer(state, { id: resource.id, scope, layout: { type: 'pane', id: paneId, resourceId: resource.id }, focused: paneId });
+        placedResources.add(`${scope}:${resource.id}`);
       }
       if (addedTerminal) {
         const nativeOrder = new Map(workspace.tabs.filter(tab => tab.kind === 'session').map((tab, index) => [tab.id, index]));
@@ -72,9 +75,18 @@ export function synchronizeWorkbench() {
         state = { ...state, tabs: state.tabs.map(tab => tab.scope === 'terminal' ? terminalTabs[terminalIndex++]! : tab) };
       }
       const groups = [...state.groups.filter(group => group.scope !== 'terminal'), ...workspace.groups.map(group => ({ ...group, scope: 'terminal' as const }))];
+      const resourceMap = new Map(resources.map(resource => [resource.id, resource]));
+      const membersById = new Map<string, ReturnType<typeof workspaceHistoryMember>>();
+      const memberFor = (id: string) => {
+        if (!membersById.has(id)) {
+          const resource = resourceMap.get(id);
+          membersById.set(id, resource ? workspaceHistoryMember(resource) : null);
+        }
+        return membersById.get(id)!;
+      };
       state = { ...state, groups, tabs: state.tabs.map(tab => {
         const cells = panesOf(tab); if (!cells.length) return tab;
-        const members = cells.map(pane => resources.find(resource => resource.id === pane.resourceId)).map(resource => resource ? workspaceHistoryMember(resource) : null);
+        const members = cells.map(pane => memberFor(pane.resourceId));
         if (members.some(member => !member)) return tab;
         return { ...tab, restoreSnapshot: { version: 1 as const, layout: tab.layout!, focused: tab.focused, members: members.filter((member): member is NonNullable<typeof member> => !!member) } };
       }) };
@@ -151,6 +163,7 @@ function requestResourceClose(resources: WorkspaceResource[], complete: () => vo
 
 export function closeContainer(id: string, force = false) {
   requestCloseContainers([id], tabs => {
+    const groups = useWorkbenchStore.getState().snapshot.groups;
     const all = currentWorkspaceResources();
     const ids = new Set(tabs.flatMap(panesOf).map(pane => pane.resourceId));
     const scope = tabs[0]!.scope;
@@ -165,11 +178,30 @@ export function closeContainer(id: string, force = false) {
     if (scope !== 'terminal') useWorkbenchStore.setState({ lastClosed: { ...tab, historyIdentity: useWorkbenchStore.getState().snapshot.tabs.find(item => item.id === tab.id)?.historyIdentity ?? tab.historyIdentity, restoreSnapshot: snapshot ?? tab.restoreSnapshot } });
     for (const resource of all.filter(resource => ids.has(resource.id))) workspacePaneResource(resource).requestClose(true);
     useWorkbenchStore.getState().update(state => removeContainers(state, new Set([id])));
+    pruneEmptyWorkspaceGroups(groups);
     releaseContainerHistory(id);
     synchronizeWorkbench();
     const next = useWorkbenchStore.getState().snapshot.selected[scope];
     if (next) activateContainer(next); else workspaceAreaStores[scope].getState().openStart();
   }, force);
+}
+
+/** Empty groups have no workspace destination; remove metadata without deleting history. */
+export function pruneEmptyWorkspaceGroups(candidates: readonly WorkspaceGroup[] = useWorkbenchStore.getState().snapshot.groups) {
+  const snapshot = useWorkbenchStore.getState().snapshot;
+  const empty = candidates.filter(group => !snapshot.tabs.some(tab => tab.scope === group.scope && tab.groupId === group.id && tab.layout));
+  if (!empty.length) return;
+  const ids = new Set(empty.map(group => group.id));
+  useWorkbenchStore.getState().update(state => ({ ...state, groups: state.groups.filter(group => !ids.has(group.id)),
+    order: Object.fromEntries(Object.entries(state.order).map(([scope, order]) => [scope, order.filter(id => !ids.has(id.slice(6)) || !id.startsWith('group:'))])) }));
+  useWorkspaceStore.setState(state => ({ groups: state.groups.filter(group => !ids.has(group.id)) }));
+  for (const group of empty) {
+    const retry = () => {
+      if (useWorkbenchStore.getState().snapshot.tabs.some(tab => tab.groupId === group.id && tab.layout)) return;
+      void groupApi.groupDelete(group.id).catch(error => reportWorkbenchFailure(error, retry));
+    };
+    retry();
+  }
 }
 
 export async function undoCloseContainer() {
@@ -203,11 +235,6 @@ export function moveWorkspacePane(tabId: string, paneId: string, target: Omit<Pa
     const layout = terminalLayoutFromContainer(tab);
     if (layout) useWorkspaceStore.getState().setWindowLayout(tabId, layout);
   }
-}
-
-export function zoomWorkspaceContainer(id: string) {
-  const tab = useWorkbenchStore.getState().snapshot.tabs.find(tab => tab.id === id); if (!tab) return;
-  const store = workspaceAreaStores[tab.scope]; store.getState().selectTab(id); store.getState().single();
 }
 
 export async function mergeWorkspaceContainers(sourceId: string, targetId: string, target: Omit<PaneTarget, 'rect'>): Promise<boolean> {
@@ -256,6 +283,7 @@ export async function assignWorkspaceGroup(tabId: string, groupId?: string) {
     useWorkspaceStore.setState(state => ({ tabs: state.tabs.map(tab => tab.id === tabId && tab.kind === 'session' ? { ...tab, groupId } : tab) }));
   } else if (tab.historyIdentity) await groupApi.sessionSetGroup(tab.historyIdentity.id, groupId ?? null);
   useWorkbenchStore.getState().update(state => assignContainerGroup(state, tabId, groupId));
+  pruneEmptyWorkspaceGroups();
   await persistWorkspaceOrder(tab.scope);
 }
 
@@ -341,7 +369,17 @@ export function terminalLayoutFromContainer(tab: WorkspaceContainer): WindowLayo
 export function startWorkbenchRuntime() {
   synchronizeWorkbench();
   const update = () => synchronizeWorkbench();
-  const disposers = [useWorkspaceStore.subscribe(update), useAiWorkspace.subscribe(update), useChatStore.subscribe(update), useHarnessWorkspace.subscribe(update)];
+  const disposers = [
+    useWorkspaceStore.subscribe((state, previous) => { if (state.tabs !== previous.tabs || state.groups !== previous.groups) update(); }),
+    useAiWorkspace.subscribe((state, previous) => {
+      if (state.nativeTabs !== previous.nativeTabs || state.sideSessions !== previous.sideSessions || state.sideSelected !== previous.sideSelected) update();
+    }),
+    useChatStore.subscribe((state, previous) => {
+      if (state.conversations !== previous.conversations || Object.keys({ ...previous.byTab, ...state.byTab }).some(id =>
+        state.byTab[id] !== previous.byTab[id] && !!state.byTab[id]?.some(hasChatContent) !== !!previous.byTab[id]?.some(hasChatContent))) update();
+    }),
+    useHarnessWorkspace.subscribe((state, previous) => { if (state.connections !== previous.connections) update(); }),
+  ];
   disposers.push(useWorkbenchStore.subscribe((state, previous) => {
     if (synchronizing || state.snapshot === previous.snapshot) return;
     for (const tab of state.snapshot.tabs) {
@@ -370,27 +408,43 @@ export function startWorkbenchRuntime() {
 
 /** Restore references after native session hydration, preserving tab and group identities. */
 export async function restoreWorkbench(mode: 'restore' | 'default' | 'empty', onError: (error: unknown) => void, saved = savedWorkbench) {
-  if (mode !== 'restore') useWorkbenchStore.getState().update(() => emptyWorkbench());
-  else {
-    const { restoreWorkspaceMember } = await import('./restoreWorkspaceHistory');
-    const { remapWorkspaceHistory } = await import('../model/workspaceHistory');
-    const references = new Map<string, string>();
-    for (const tab of saved.tabs) {
-      if (tab.scope === 'terminal' || !tab.restoreSnapshot) continue;
-      try {
-        for (const member of tab.restoreSnapshot.members) if (!references.has(member.id)) references.set(member.id, await restoreWorkspaceMember(member));
-        const layout = remapWorkspaceHistory(tab.restoreSnapshot, references);
-        useWorkbenchStore.getState().update(state => {
-          const restoredIds = new Set(panesOf({ ...tab, layout }).map(pane => pane.resourceId));
-          return putContainer(releaseContainerResources(state, tab.scope, restoredIds, tab.id), { ...tab, layout });
-        });
-      } catch (error) { onError(error); }
+  suspended += 1;
+  try {
+    if (mode !== 'restore') useWorkbenchStore.getState().update(() => emptyWorkbench());
+    else {
+      const { restoreWorkspaceMember } = await import('./restoreWorkspaceHistory');
+      const { remapWorkspaceHistory } = await import('../model/workspaceHistory');
+      const conversations = saved.tabs.flatMap(tab => tab.restoreSnapshot?.members ?? []).filter(member => member.kind === 'conversation');
+      useChatStore.getState().restoreDraftConversations(conversations.filter(member => member.empty).map(member => ({ id: member.reference, title: member.title })));
+      useAiWorkspace.setState(state => ({ nativeTabs: [...new Set([...state.nativeTabs, ...conversations.map(member => member.reference)])] }));
+      const available = new Map(currentWorkspaceResources().map(resource => [resource.id, resource]));
+      const references = new Map<string, string>();
+      const restored: WorkspaceContainer[] = [];
+      for (const tab of saved.tabs) {
+        if (tab.scope === 'terminal' || !tab.restoreSnapshot) continue;
+        try {
+          for (const member of tab.restoreSnapshot.members) if (!references.has(member.id)) {
+            const existing = available.get(member.id);
+            references.set(member.id, existing?.kind === member.kind ? existing.id : await restoreWorkspaceMember(member, false));
+          }
+          const layout = remapWorkspaceHistory(tab.restoreSnapshot, references);
+          restored.push({ ...tab, layout });
+        } catch (error) { onError(error); }
+      }
+      useWorkbenchStore.getState().update(state => {
+        let next = state;
+        for (const tab of restored) {
+          const ids = new Set(panesOf(tab).map(pane => pane.resourceId));
+          next = putContainer(releaseContainerResources(next, tab.scope, ids, tab.id), tab);
+        }
+        for (const scope of WORKSPACE_SCOPES) {
+          const id = saved.selected[scope];
+          if (id) next = selectContainer(next, id);
+        }
+        return next;
+      });
     }
-    for (const scope of WORKSPACE_SCOPES) {
-      const id = saved.selected[scope];
-      if (id) useWorkbenchStore.getState().update(state => selectContainer(state, id));
-    }
-  }
+  } finally { suspended -= 1; }
   useWorkbenchStore.setState({ ready: true });
   synchronizeWorkbench();
   const area = useWorkspaceNavigation.getState().area;

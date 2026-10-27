@@ -7,7 +7,7 @@ test('an unavailable side dock keeps the same conversation visible in the main w
   await page.setViewportSize({ width: 500, height: 800 });
   const composer = page.locator('[data-chat-composer]:visible');
   await composer.fill('keep my visible draft');
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
+  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '对话操作' }).click();
   await page.getByRole('menuitem', { name: '将 AI 停靠到侧栏', exact: true }).click();
   await expect(page.getByTestId('ai-surface-main').locator('[data-chat-composer]')).toHaveValue('keep my visible draft');
   await expect(page.getByTestId('workspace-area-ai')).toHaveAttribute('aria-current', 'page');
@@ -25,17 +25,17 @@ test('AI utility pages become singleton tabs while docked conversations keep the
   const side = page.getByTestId('ai-surface-side');
   await side.getByRole('button', { name: '会话设置', exact: true }).click();
   await page.getByRole('region', { name: '会话设置' }).getByTestId('chat-usage-entry').click();
-  // Usage is a singleton tab in the AI strip, so the workspace returns to main and the panel closes.
+  // Utility pages are singleton tabs; the side conversation remains independently placed.
   await expect(page.locator('[data-testid="usage-page"]:visible')).toBeVisible();
   await expect(page.locator('[data-tab-kind="usage"]')).toHaveCount(1);
   const main = page.getByTestId('ai-surface-main');
   const strip = page.locator('[data-reorder-list="harness-sessions"]');
-  await expect(strip.locator('[data-reorder-item]')).toHaveCount(2);
-  // Selecting the conversation tab brings the docked conversation back with its draft.
-  await strip.locator('[data-reorder-item]:not([data-reorder-item^="page:"])').first().click();
+  await expect(strip.locator('[data-reorder-item]')).toHaveCount(1);
+  await page.getByTestId('workspace-instance-bar').getByTestId('workspace-resource-switcher').click();
+  await page.getByRole('menu', { name: '全部工作区标签' }).getByRole('menuitem', { name: '新对话', exact: true }).click();
   await expect(main.locator('[data-chat-composer]')).toHaveValue('keep the docked draft');
   // The AI history entry adds one more singleton page tab and renders the history page.
-  await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
+  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: 'AI 对话历史', exact: true }).click();
   await expect(page.locator('[data-testid="unified-history-page"]:visible')).toBeVisible();
   await expect(strip.locator('[data-reorder-item^="page:"]')).toHaveCount(2);
 });

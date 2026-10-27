@@ -1,5 +1,4 @@
-import { invoke as rawInvoke } from '@tauri-apps/api/core';
-import { diagnostic } from '@platform/diagnostics';
+import { diagnostic, invoke as rawInvoke } from '@platform/diagnostics';
 import { normPath } from '@platform/path';
 import type { GitDiff, GitFileAction, GitOperation, GitScope, GitSnapshot, GitTarget, GitWorktree, GitReference, GitReferenceAction } from '@core/git';
 

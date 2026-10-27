@@ -34,12 +34,15 @@ export function useWorkspaceHistory(resources: WorkspaceResource[], store = useU
     };
     for (const tab of useWorkbenchStore.getState().snapshot.tabs) save(tab);
     const unsubscribe = useWorkbenchStore.subscribe((state, previous) => {
+      if (state.snapshot === previous.snapshot) return;
+      const previousTabs = new Map(previous.snapshot.tabs.map(tab => [tab.id, tab]));
+      const currentIds = new Set(state.snapshot.tabs.map(tab => tab.id));
       for (const tab of state.snapshot.tabs) {
-        if (tab.scope !== scope || previous.snapshot.tabs.find(item => item.id === tab.id) === tab) continue;
+        if (tab.scope !== scope || previousTabs.get(tab.id) === tab) continue;
         clearTimeout(timers.get(tab.id));
         timers.set(tab.id, setTimeout(() => { save(tab); timers.delete(tab.id); }, 200));
       }
-      for (const tab of previous.snapshot.tabs) if (!state.snapshot.tabs.some(item => item.id === tab.id)) {
+      for (const tab of previous.snapshot.tabs) if (!currentIds.has(tab.id)) {
         clearTimeout(timers.get(tab.id)); timers.delete(tab.id);
       }
     });

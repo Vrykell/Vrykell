@@ -296,7 +296,10 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
             disabled={!session?.sessionId || session.pending}
             onClick={() => {
               if (useWorkspaceNavigation.getState().aiPlacement === 'side' && useAiWorkspace.getState().sideSelected === `acp:${tabId}`) createSideAgent(harness, session?.cwd || cwd);
-              else useHarnessWorkspace.getState().connect(harness, session?.cwd || cwd, true);
+              else {
+                const id = useHarnessWorkspace.getState().connect(harness, session?.cwd || cwd, true);
+                useAiWorkspace.getState().select(`acp:${id}`);
+              }
             }}>
             <Plus size={iconSizes.compact} />
           </IconButton>

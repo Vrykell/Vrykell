@@ -4,7 +4,7 @@ import { historyRecordKey, type HistoryMetaState } from '@utils/historyMeta';
 import { t } from '@i18n';
 import { sessionHistoryTerminals } from './sessionMetadata';
 import { sessionTerminalModes, sshTargetOf, type SessionDateFilter, type SessionModeFilter } from './filter';
-import { parseWorkspaceHistory, type WorkspaceHistorySnapshot } from '@features/workspace/model/workspaceHistory';
+import { parseWorkspaceHistory, sessionHistorySnapshot, type WorkspaceHistorySnapshot } from '@features/workspace/model/workspaceHistory';
 
 export const HISTORY_TYPES = ['all', 'terminal', 'conversation'] as const;
 export type UnifiedHistoryType = typeof HISTORY_TYPES[number];
@@ -116,7 +116,8 @@ export function unifiedHistoryRecords(sessions: readonly BackendSessionEntry[], 
   const terminalMetadata = new Map(sessions.filter(session => session.kind !== 'workspace').map(session => [session.id, sessionHistoryTerminals(session)]));
   const workspaces: UnifiedHistoryRecord[] = sessions.flatMap(session => {
     if (session.kind !== 'workspace' || session.status !== 'historical') return [];
-    const snapshot = parseWorkspaceHistory(session.payload);
+    const parsed = parseWorkspaceHistory(session.payload);
+    const snapshot = sessionHistorySnapshot(parsed);
     if (!snapshot) return [];
     snapshot.members = snapshot.members.map(member => {
       if (member.kind !== 'terminal' || member.shellType) return member;
@@ -134,11 +135,12 @@ export function unifiedHistoryRecords(sessions: readonly BackendSessionEntry[], 
     if (snapshot.members.some(member => member.kind === 'terminal')) types.push('terminal');
     if (snapshot.members.some(member => member.kind === 'conversation' || member.kind === 'agent')) types.push('conversation');
     const description = snapshot.members.map(member => member.title).join(' + ');
-    return [{ kind: 'workspace' as const, session, snapshot, key, title: session.title, timestamp: timestamp(session.closed_at ?? session.created_at, session.created_at),
+    const title = parsed && snapshot.members.length !== parsed.members.length ? description : session.title;
+    return [{ kind: 'workspace' as const, session, snapshot, key, title, timestamp: timestamp(session.closed_at ?? session.created_at, session.created_at),
       createdAt: session.created_at, description, cwd, connectionTarget: '', connection: local && ssh ? 'mixed' as const : ssh ? 'ssh' as const : local ? 'local' as const : 'discussion' as const,
       terminalType: 'workspace', modes: [...new Set(snapshot.members.flatMap(member => member.modes ?? []))], local, ssh, note, starred: !!meta.starred[key],
       paneCount: snapshot.members.reduce((count, member) => count + member.paneCount, 0), types,
-      searchText: [session.title, description, cwd, note, ...snapshot.members.map(member => member.kind)].join(' ').toLocaleLowerCase() }];
+      searchText: [title, description, cwd, note, ...snapshot.members.map(member => member.kind)].join(' ').toLocaleLowerCase() }];
   });
   return [...terminals, ...chats, ...external, ...workspaces].sort((a, b) => b.timestamp - a.timestamp || a.key.localeCompare(b.key));
 }

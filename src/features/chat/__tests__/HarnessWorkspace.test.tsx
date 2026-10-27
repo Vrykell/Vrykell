@@ -1,5 +1,5 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import HarnessWorkspace from '../components/HarnessWorkspace';
 import { useHarnessWorkspace } from '../stores/harnessWorkspace';
 import { useAiWorkspace } from '../stores/aiWorkspace';
@@ -8,7 +8,8 @@ import { useSessionStore, useUiStore } from '@features/workspace';
 vi.mock('../components/HarnessView', () => ({ default: ({ active }: { active: boolean }) => <input aria-label="Agent draft" data-active={active} defaultValue="" /> }));
 vi.mock('@features/agent/components/UsageView', () => ({ default: () => <div>Usage page</div> }));
 const workspace = useSessionStore.getState(); const harness = useHarnessWorkspace.getState(); const ai = useAiWorkspace.getState();
-afterEach(() => { cleanup(); useSessionStore.setState(workspace, true); useHarnessWorkspace.setState(harness, true); useAiWorkspace.setState(ai, true); });
+beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} }));
+afterEach(() => { cleanup(); useSessionStore.setState(workspace, true); useHarnessWorkspace.setState(harness, true); useAiWorkspace.setState(ai, true); vi.unstubAllGlobals(); });
 
 it('keeps conversation history available on the empty start page', () => {
   useHarnessWorkspace.setState({ connections: [], selected: '' });

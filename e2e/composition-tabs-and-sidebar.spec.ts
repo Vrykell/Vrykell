@@ -32,10 +32,8 @@ for (const theme of ['dark', 'light']) test(`keeps layouts inside tabs and shows
   await expect(bar.getByRole('tab')).toHaveCount(1);
   await expect(workspace.locator('.unified-pane')).toHaveCount(2);
   await bar.locator('.folder-more-button').click();
-  await page.getByRole('menuitem', { name: '放大当前窗格', exact: true }).click();
-  await expect(workspace.locator('.unified-pane')).toHaveCount(1);
-  await bar.locator('.folder-more-button').click();
-  await page.getByRole('menuitem', { name: '还原窗格布局', exact: true }).click();
+  await expect(page.getByRole('menuitem', { name: '放大当前窗格', exact: true })).toHaveCount(0);
+  await page.keyboard.press('Escape');
   await expect(workspace.locator('.unified-pane')).toHaveCount(2);
   expect(await first!.evaluate(element => element.isConnected && element.getAttribute('data-chat-composer') !== null)).toBe(true);
   await bar.locator('.folder-more-button').click();
@@ -47,7 +45,7 @@ for (const theme of ['dark', 'light']) test(`keeps layouts inside tabs and shows
   await bar.getByRole('button', { name: '关闭标签', exact: true }).last().click();
   await bar.getByRole('button', { name: '关闭标签', exact: true }).last().click();
   await expect(workspace.getByTestId('unified-start-page')).toBeVisible();
-  await expect(bar.getByRole('tab')).toHaveCount(0);
+  await expect(bar.getByRole('tab', { name: '开始', exact: true })).toBeVisible();
 });
 
 test('starts ACP in the side panel and moves the same connection back to the workspace', async ({ page }, info) => {

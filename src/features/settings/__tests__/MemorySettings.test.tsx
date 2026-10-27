@@ -1,9 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemorySettings } from '../pages/MemorySettings';
 
-const storage = vi.hoisted(() => ({ memoryStats: vi.fn() }));
+const storage = vi.hoisted(() => ({ memoryStats: vi.fn(), organize: vi.fn() }));
 vi.mock('@features/agent/services/platform', () => storage);
+vi.mock('@features/workspace/services/workspaceActions', () => ({ organizeMemoryWithAssistant: storage.organize }));
 afterEach(() => { cleanup(); storage.memoryStats.mockReset(); });
 
 it('shows bounded aggregate status without loading or displaying memory content', async () => {
@@ -12,6 +13,9 @@ it('shows bounded aggregate status without loading or displaying memory content'
   await waitFor(() => expect(screen.getByTestId('memory-count-total')).toHaveTextContent('100000'));
   expect(screen.queryByRole('textbox')).toBeNull();
   expect(storage.memoryStats).toHaveBeenCalledTimes(1);
+  expect(document.querySelector('dl')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: '让 AI 整理' }));
+  expect(storage.organize).toHaveBeenCalledTimes(1);
 });
 it('keeps read failures in the shared error surface with retry', async () => {
   storage.memoryStats.mockRejectedValue(new Error('Storage unavailable'));

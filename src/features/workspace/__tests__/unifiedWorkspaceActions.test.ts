@@ -6,7 +6,7 @@ import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useChatStore } from '@features/chat/stores/chat';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { createSideConversation, moveSideConversationToMain } from '@features/chat/services/aiWorkspace';
-import { addUnifiedResource, focusUnifiedResource, closeTerminalPane, connectUnifiedAgent, createUnifiedResource, createUnifiedTerminal, presentWorkspaceResource, requestTerminalSplit, requestWorkspaceSplit, showUnifiedTerminalGroup } from '../services/unifiedWorkspace';
+import { focusUnifiedResource, closeTerminalPane, connectUnifiedAgent, createUnifiedResource, createUnifiedTerminal, presentWorkspaceResource, requestTerminalSplit, requestWorkspaceSplit, showUnifiedTerminalGroup } from '../services/unifiedWorkspace';
 import { editorFileKey } from '@core/editor';
 import { renameWorkspaceResource } from '../services/workspaceResources';
 import { workspacePaneCells, workspacePaneIds } from '../model/workspaceResources';
@@ -41,26 +41,27 @@ it('creates and splits new resources without replacing the existing pane or exce
   expect(useWorkspaceNavigation.getState().area).toBe('unified');
 });
 
-it('adds an existing resource to the active composition instead of opening another tab', () => {
+it('selects an existing resource tab without changing either tab layout', () => {
   createUnifiedResource('terminal'); const active = useUnifiedWorkspace.getState().activeTabId;
   const file = { path: '/repo/notes.txt' }; useWorkspaceStore.getState().openEditorFile(file);
   const id = `file:${editorFileKey(file)}`;
   useUnifiedWorkspace.getState().show(id); expect(compositionTabs()).toHaveLength(2);
-  useUnifiedWorkspace.getState().selectTab(active); addUnifiedResource(id);
-  expect(compositionTabs()).toHaveLength(1);
+  useUnifiedWorkspace.getState().selectTab(active); presentWorkspaceResource(id);
+  expect(compositionTabs()).toHaveLength(2);
   expect(compositionTabs()[0]!.id).toBe(active);
-  expect(workspacePaneIds(compositionTabs()[0]!.layout!)).toContain(id);
-  expect(useUnifiedWorkspace.getState().activeTabId).toBe(active);
+  expect(workspacePaneIds(compositionTabs()[0]!.layout!)).not.toContain(id);
+  expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toEqual([id]);
+  expect(useUnifiedWorkspace.getState().activeTabId).not.toBe(active);
 });
 
-it('moves a side conversation into the active unified composition without switching areas', async () => {
+it('opens a moved side conversation in its own unified tab without switching areas', async () => {
   createUnifiedResource('terminal'); const active = useUnifiedWorkspace.getState().activeTabId;
   const id = `chat:${createSideConversation()}`;
   moveSideConversationToMain();
   await vi.waitFor(() => expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toContain(id));
   expect(useWorkspaceNavigation.getState().area).toBe('unified');
-  expect(useUnifiedWorkspace.getState().activeTabId).toBe(active);
-  expect(compositionTabs()).toHaveLength(1);
+  expect(useUnifiedWorkspace.getState().activeTabId).not.toBe(active);
+  expect(compositionTabs()).toHaveLength(2);
   expect(useAiWorkspace.getState().sideSelected).toBe('');
 });
 
@@ -70,9 +71,9 @@ it('routes a presentation by the current workspace instead of leaving the area a
   const id = `file:${editorFileKey(file)}`;
   presentWorkspaceResource(id);
   expect(useWorkspaceNavigation.getState().area).toBe('unified');
-  expect(useUnifiedWorkspace.getState().activeTabId).toBe(active);
+  expect(useUnifiedWorkspace.getState().activeTabId).not.toBe(active);
   expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toContain(id);
-  expect(compositionTabs()).toHaveLength(1);
+  expect(compositionTabs()).toHaveLength(2);
   useWorkspaceNavigation.setState({ area: 'terminal' });
   presentWorkspaceResource(id);
   expect(useWorkspaceNavigation.getState().area).toBe('code');

@@ -16,9 +16,8 @@ it('retains each tab layout while switching resources and pruning missing conten
   state.show(first.resourceId); expect(useUnifiedWorkspace.getState().focused).toBe(first.id);
   state.show('file:five'); expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toEqual(['file:five']);
   selectCompositionTab(tabId); expect(useUnifiedWorkspace.getState().layout).toBe(original);
-  state.reconcile(['file:two', 'chat:three']); expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toEqual(['file:two', 'chat:three']);
-  state.single(); expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toHaveLength(2);
-  expect(useUnifiedWorkspace.getState().zoomed).toBe(useUnifiedWorkspace.getState().focused);
+  state.reconcile(['file:two', 'chat:three']); expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toEqual(['file:two', 'chat:three']); expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toHaveLength(2);
+
 });
 
 it('validates restored layouts, rejects duplicate owners and clamps resize ratios', () => {

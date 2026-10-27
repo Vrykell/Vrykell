@@ -15,7 +15,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   useEditorDocuments.setState({ load, documents: { [key]: { file, kind: 'text', text: 'saved', value: 'draft', revision: 'r1', loading: false, saving: false, error: '', request: 1 } } });
   useSessionStore.setState({ tabs: [{ id: 'editor', kind: 'editor', title: 'Editor', files: [file, other], selected: file }], closeEditorFile: close, openEditorFile: open });
-  useWorkbenchStore.getState().update(state => ({ ...state, tabs: [other, file].map((file, index) => ({ id: `container-${index}`, scope: 'code', focused: `pane-${index}`, zoomed: null,
+  useWorkbenchStore.getState().update(state => ({ ...state, tabs: [other, file].map((file, index) => ({ id: `container-${index}`, scope: 'code', focused: `pane-${index}`,
     layout: { type: 'pane', id: `pane-${index}`, resourceId: `file:${editorFileKey(file)}` } })) }));
 });
 afterEach(() => { useSessionStore.setState(workspace, true); useEditorDocuments.setState(documents, true); });

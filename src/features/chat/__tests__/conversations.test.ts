@@ -44,6 +44,27 @@ afterEach(() => {
 });
 
 describe('independent conversations', () => {
+  it('restores draft batches once without activating them or overwriting existing work', () => {
+    const id = useChatStore.getState().createConversation();
+    useChatStore.getState().restoreDraftConversations([{ id, title: 'Replacement' }, { id: 'restored', title: 'Draft' }, { id: 'restored', title: 'Duplicate' }]);
+    expect(useChatStore.getState().conversations).toHaveLength(2);
+    expect(useChatStore.getState().conversations.find(item => item.id === id)?.title).not.toBe('Replacement');
+    expect(useChatStore.getState().conversations.find(item => item.id === 'restored')?.title).toBe('Draft');
+    expect(useChatStore.getState().byTab.restored).toEqual([]);
+    expect(useChatStore.getState().activeConversationId).toBe(id);
+    const previous = useChatStore.getState();
+    useChatStore.getState().restoreDraftConversations([{ id: 'restored', title: 'Duplicate' }]);
+    expect(useChatStore.getState()).toBe(previous);
+  });
+  it('reuses a restored draft identity without replacing its messages or draft', () => {
+    const first = useChatStore.getState().createConversation(null, { id: 'restored-draft', activate: false });
+    useComposerDrafts.getState().setText(first, 'Keep this draft');
+    const again = useChatStore.getState().createConversation(null, { id: first, activate: false });
+    expect(again).toBe(first);
+    expect(useChatStore.getState().conversations).toHaveLength(1);
+    expect(useComposerDrafts.getState().byTab[first].text).toBe('Keep this draft');
+    expect(useChatStore.getState().activeConversationId).toBe('');
+  });
   it('streams three owners concurrently and drains each queue without waiting for other owners', async () => {
     const ids = Array.from({ length: 3 }, () => useChatStore.getState().createConversation());
     const releases = new Map<string, () => void>();

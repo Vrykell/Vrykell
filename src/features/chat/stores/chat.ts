@@ -91,7 +91,8 @@ interface ChatState {
   loadConversations: () => Promise<void>;
   selectConversation: (id: string) => Promise<void>;
   ensureConversationMessages: (id: string) => Promise<void>;
-  createConversation: (environment?: ChatEnvironment | null, options?: { activate?: boolean }) => string;
+  createConversation: (environment?: ChatEnvironment | null, options?: { activate?: boolean; id?: string }) => string;
+  restoreDraftConversations: (drafts: readonly { id: string; title: string }[]) => void;
   setEnvironment: (id: string, environment: ChatEnvironment | null) => void;
   renameConversation: (id: string, title: string) => void;
   deleteConversation: (id: string, options?: { activateNext?: boolean }) => Promise<void>;
@@ -404,7 +405,8 @@ export const useChatStore = create<ChatState>((set, get) => {
     catch (error) { set({ conversationError: error instanceof Error ? error.message : String(error) }); }
   },
   createConversation: (environment = null, options) => {
-    const id = `conversation-${nextId()}`;
+    const id = options?.id ?? `conversation-${nextId()}`;
+    if (get().conversations.some(conversation => conversation.id === id)) return id;
     const now = Date.now();
     const conversation: Conversation = { id, title: t('New conversation'), createdAt: now, updatedAt: now, environment };
     const activate = options?.activate !== false;
@@ -413,6 +415,17 @@ export const useChatStore = create<ChatState>((set, get) => {
     void persistConversation(conversation);
     return id;
   },
+  restoreDraftConversations: drafts => set(state => {
+    const known = new Set(state.conversations.map(conversation => conversation.id));
+    const now = Date.now();
+    const restored: Conversation[] = [];
+    for (const draft of drafts) if (!known.has(draft.id)) {
+      known.add(draft.id);
+      restored.push({ id: draft.id, title: draft.title, createdAt: now, updatedAt: now, environment: null });
+    }
+    return restored.length ? { conversations: [...state.conversations, ...restored],
+      byTab: { ...state.byTab, ...Object.fromEntries(restored.map(conversation => [conversation.id, []])) } } : state;
+  }),
   setEnvironment: (id, environment) => {
     if (get().sendingTabs.includes(id) || pendingConversationDeletes.has(id)) return;
     const current = get().conversations.find(conversation => conversation.id === id);

@@ -13,7 +13,7 @@ import WorkspacePaneCanvas from '@features/workspace/components/WorkspacePaneCan
 import { useWorkspaceResources } from '@features/workspace/hooks/useWorkspaceResources';
 import { terminalWorkspaceLayout, workspacePaneCells } from '@features/workspace/model/workspaceResources';
 import { useWorkspaceContainer, useWorkspacePaneControls } from '@features/workspace/hooks/useWorkspaceContainer';
-import { detachWorkspacePane, mergeWorkspaceContainers, moveWorkspacePane, zoomWorkspaceContainer } from '@features/workspace/services/workbench';
+import { detachWorkspacePane, mergeWorkspaceContainers, moveWorkspacePane } from '@features/workspace/services/workbench';
 import { showsPaneChatHistory } from '../model/paneHistory';
 import { useTypographyStore } from '@config/typography';
 import { useRef, useEffect, useLayoutEffect, useState, useId, useCallback } from 'react';
@@ -74,10 +74,7 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
 
   const activeTab = tabs.find((t) => t.id === activeId);
   const isSession = activeTab?.kind === 'session';
-  const activeContainer = useWorkspaceContainer('terminal', activeId);
-  const unifiedZoomed = useUnifiedWorkspace(state => state.zoomed);
   const unifiedPaneCount = useUnifiedWorkspace(state => state.layout ? workspacePaneCells(state.layout).length : 0);
-  const zoomed = unified ? !!unifiedZoomed : !!activeContainer?.zoomed;
 
   const focusedTermId = isSession
     ? (focusedPaneId && sessions[focusedPaneId] && layoutLeaves(activeTab!.layout).some((t) => t.id === focusedPaneId)
@@ -107,27 +104,19 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
       ? unifiedState.layout && workspacePaneCells(unifiedState.layout).find(cell => cell.resourceId === `terminal:${focusedTermId}`)?.id
       : focusedTermId;
     if (!paneId) return;
-    if (zoomed) {
-      if (unified) unifiedState.single();
-      else zoomWorkspaceContainer(activeId);
-    }
     useUiStore.getState().beginPaneMove(unified ? unifiedState.activeTabId : activeId, paneId);
   };
   const commonActions: ContextMenuItem[] = [
     ...(canSplit ? [{ label: t('Split tab'), group: 'view' as const, onClick: () => unified ? requestWorkspaceSplit(`terminal:${focusedTermId}`) : requestTerminalSplit(null) }] : []),
-    ...(multiPane ? [{
-      label: t('Change pane position'), group: 'view' as const,
+    ...[{
+      label: t('Change pane position'), group: 'view' as const, disabled: !multiPane,
       onClick: beginPaneMoveAction,
     }, {
-      label: t(zoomed ? 'Restore panes' : 'Zoom pane'), group: 'view' as const,
-      onClick: () => unified ? useUnifiedWorkspace.getState().single() : zoomWorkspaceContainer(activeId),
-    }, {
-      label: t('Move pane to new tab'), group: 'view' as const,
+      label: t('Move pane to new tab'), group: 'view' as const, disabled: !multiPane,
       onClick: () => unified ? detachCompositionPane(`terminal:${focusedTermId}`) : useSessionStore.getState().detachTerminalPane(focusedTermId),
     }, {
-      label: t('Remove pane'), group: 'view' as const, onClick: () => closeTerminalPane(focusedTermId),
-    }] : []),
-    ...(!unified && canSplit ? [{ label: t('Choose split type'), group: 'view' as const, onClick: () => useUiStore.getState().openSplitPicker() }] : []),
+      label: t('Remove pane'), group: 'view' as const, disabled: !multiPane, onClick: () => closeTerminalPane(focusedTermId),
+    }],
     ...(!unified && !multiPane ? [{ label: t('Close this terminal'), group: 'view' as const, danger: true, onClick: () => closeTerminalPane(focusedTermId) }] : []),
   ];
   const paneActions: ContextMenuItem[] = [
@@ -278,7 +267,7 @@ function PaneLayout({ layout, windowId, focusedTermId, active, setRatioNode }: {
   const resources = useWorkspaceResources();
   const canonical = useWorkspaceContainer('terminal', windowId);
   const controls = useWorkspacePaneControls('terminal');
-  return <WorkspacePaneCanvas containerId={windowId} layout={canonical?.layout ?? terminalWorkspaceLayout(layout)} focused={focusedTermId} zoomed={canonical?.zoomed} resources={resources} visible={active} retainHeader
+  return <WorkspacePaneCanvas containerId={windowId} layout={canonical?.layout ?? terminalWorkspaceLayout(layout)} focused={focusedTermId} resources={resources} visible={active} retainHeader
     dividerTestPrefix="terminal-divider" onFocus={id => useTerminalStore.getState().setFocusedPane(id.slice('terminal:'.length))}
     placing={active && !!controls.pendingMergeTab} onRatio={setRatioNode} onPlace={target => {
       if (controls.pendingMergeTab) void mergeWorkspaceContainers(controls.pendingMergeTab, windowId, target);
@@ -287,7 +276,7 @@ function PaneLayout({ layout, windowId, focusedTermId, active, setRatioNode }: {
     onSplit={id => useWorkspaceNavigation.getState().area === 'unified' ? requestWorkspaceSplit(id) : requestTerminalSplit(null)}
     onMovePane={(paneId, target) => moveWorkspacePane(windowId, paneId, target)}
     onRemove={id => closeTerminalPane(id.slice('terminal:'.length))} onDetach={id => detachWorkspacePane('terminal', id)}
-    onZoom={() => zoomWorkspaceContainer(windowId)} />;
+    />;
 }
 
 // ═══════════════════════════════════════════════════════════
