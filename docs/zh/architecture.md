@@ -1,10 +1,10 @@
 # Vrykell 架构
 
-共享工作区的归属图、持久化边界和重构审查见[工作区统一底层](workspace-foundation.md)。各功能标签栏使用同一套容器、树操作、区域分组模型、生命周期与窗格画布。
+共享工作区的归属图与持久化边界见[工作区统一底层](workspace-foundation.md)。各功能标签栏使用同一套容器、树操作、区域分组模型、生命周期与窗格画布。
 
-> 当前 v2 chat-first 实现（分支 `dev`）的实际架构。终端主体把终端输出抽象为**命令块（Block）**，用「Rust StreamScanner 同步扫描 + SessionController 三场景状态机 + 每 block 单离屏 xterm」组织。
+> 当前终端优先实现（分支 `dev`）的实际架构。终端主体把终端输出抽象为**命令块（Block）**，用「Rust StreamScanner 同步扫描 + SessionController 三场景状态机 + 每 block 单离屏 xterm」组织。
 >
-> 本文记录当前实现的实际架构。（最近更新：2026-10-13；分屏、Agent、主题与独立 AI 对话见 §16-§19。）
+> 本文记录当前实现的实际架构。（最近更新：2026-10-27；分屏、Agent、主题与独立 AI 对话见 §16-§19；工作区统一、ACP、字体与安全边界见对应文档。）
 
 ---
 
@@ -47,7 +47,7 @@
 | 前端 | React 19 + TypeScript + Vite |
 | 终端 | `@xterm/xterm`（主终端 + 每块离屏 xterm） |
 | 状态 | zustand |
-| AI | `@anthropic-ai/sdk`（BYOK）+ react-markdown + KaTeX |
+| AI | AI SDK + 服务商目录（Anthropic / Gemini / OpenAI 兼容 / OpenCode）+ react-markdown + KaTeX |
 | 测试 | vitest（单测）、Playwright（e2e） |
 
 ## 3. 顶层布局
@@ -219,7 +219,7 @@ pending ──(输入栏提交 / 133;C)──▶ executing ──(133;D)──�
 4. 默认                  → 可见
 ```
 
-暂未实现 agent 控制、共享会话、对话墓碑、AI block 确认等条件。长运行命令隐藏输入框时，`getLongRunningHint` 提供 "● <命令> 运行中 · 按 End 回到输入栏" 提示。
+输入可见性保持这四个条件；agent 控制或标记的长时间命令通过例外保留输入栏。新增条件必须同步 `inputVisibility.test.ts` 与对应终端场景测试。长运行命令隐藏输入框时，`getLongRunningHint` 提供 "● <命令> 运行中 · 按 End 回到输入栏" 提示。
 
 ## 10. 渲染管线
 

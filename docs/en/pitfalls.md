@@ -13,7 +13,7 @@
 - **Lesson**: betting the critical path on a known and unfixable upstream bug is fatal. Post-install patches, an ESM→CJS bridge (`main-wrapper.mjs`), and module-resolution patches were all tried, and all failed.
 - **Conclusion**: migrated entirely to Tauri 2 (Rust backend + system WebView), reusing ~85% of the frontend. After the migration, all Electron remnants, debug scripts, and the `sdk/` placeholder directory were deleted (`5256b25`, `87804b2`).
 
-### 1.2 Home-Grown Terminal Emulator — Abandoned After Two Rewrites (Phase 2 → `9557cc0`/`78be803`/`6459ab1` → v2 falls back to xterm.js)
+### 1.2 Home-Grown Terminal Emulator — Abandoned After Two Rewrites (`9557cc0`/`78be803`/`6459ab1` → v2 falls back to xterm.js)
 - **Process**: first `TerminalBuffer + react-virtuoso` was used to replace xterm.js, then a complete CSI parser was written from scratch, then the buffer was rewritten as a VT screen model (screen + scrollback), implementing the DEC 1047/1048/1049 alt screen. Each round fixed one batch of artifacts and produced a fresh one (see the many entries in §2 and §4 — most of those pitfalls were hit precisely during the home-grown period).
 - **Conclusion**: written into Development Rules item 12, "**home-grown terminal emulators are forbidden**"; v2 delegates to xterm.js, with the constraint that "xterm.js is invisible" (it only does PTY session management and VT parsing; the UI is a Block list). That approach was archived to `archive/v1-dom-terminal`.
 - **Lesson**: a terminal emulator is an exercise in "reconciling the line-accounting models of countless TUIs": wide characters, pendingWrap, alt screen, reflow, and resize semantics can each independently create ghost bugs, and three rounds of patches can only narrow the problem, never eliminate it (the words of `6459ab1`).
@@ -114,7 +114,7 @@
 ## 3. PTY / resize / Dimensions
 
 ### 3.1 Adding and Reverting the resize debounce — Symptom Treatment vs Root Cause (`83913b6` → `9f7e8ae` revert → `9966540`)
-- **First version**: ResizeObserver fired resizePTY on every pixel change, flooding SIGWINCH, and text wrapped at the old column width → added a 200ms debounce.
+- **Initial implementation**: ResizeObserver fired resizePTY on every pixel change, flooding SIGWINCH, and text wrapped at the old column width → added a 200ms debounce.
 - **Reversal**: the debounce was reverted. The true root cause was **in-flight output mismatched with the buffer dimensions**: while dragging the window, output already on the IPC path had been generated at the old width but was applied to the new, already-resized buffer, so its wrapping didn't match the writer's intent, and the phantom lines permanently desynced the TUI's frame accounting.
 - **Final fix**: Rust **tags every `pty:output` batch with the cols/rows at generation time** (per-session dimensions are updated atomically, written only after the PTY resize succeeds); before applying an event the frontend first resizes the buffer to the batch's tag value, and it no longer resizes the buffer directly in onResize.
 - **Lesson**: "which dimensions the output belongs to" must flow with the data, rather than each end guessing the timing on its own.
@@ -129,12 +129,12 @@
 - **Two rounds of fixes**: first clamp `cx`, then discover that the CUP/CHA target column **likewise** had to be clamped, and that it had to be fixed on **both paths** — the structured events and the `write()` CSI table.
 - **Lesson**: when the same semantics are implemented on multiple code paths, fixing a bug requires searching out every path.
 
-### 3.4 A Collapsed Panel's Host Width Read as 0 → the PTY Squeezed Down to 2 Columns (`useTerminalSession.ts` comment; Phase 8 "full-screen TUI width collapses to 2 columns")
+### 3.4 A Collapsed Panel's Host Width Read as 0 → the PTY Squeezed Down to 2 Columns (`useTerminalSession.ts` comment)
 - **Root cause**: the mirrored scene state (synced via onSceneChanged) lagged behind the store — manual full-screen only wrote `store.scene` without calling back, so the local mirror stayed at blockList and took the card-width branch, while the host had `clientWidth≈0` when `display:none`.
 - **Fix**: take the store's scene as authoritative; when the host width is ≤0, fall back to the main xterm's full width and correct once the ResizeObserver settles.
-- **Related**: the same applies to a blank split pane — the PTY started at 0×0 → fall back to 80×24 (Phase 10).
+- **Related**: the same applies to a blank split pane — the PTY started at 0×0 → fall back to 80×24.
 
-### 3.5 pty_write Holding the Lock for Blocking Writes → the "End" Button Also Hangs When the Buffer Is Full (`code-audit.md`, high priority)
+### 3.5 pty_write Holding the Lock for Blocking Writes → the "End" Button Also Hangs When the Buffer Is Full (high priority)
 - **Symptom**: a write held the session lock with no timeout, so when the PTY buffer filled up every operation on that session (kill included) hung; those commands were synchronous (main thread), so the whole UI froze and force-quitting the app was the only way out.
 - **Root cause**: one session lock was shared by a write that may block indefinitely and by resize / close / kill, and the latter three ran synchronously on the main thread.
 - **Fix**: the writer moved out of the session lock into its own `Arc<Mutex<..>>`, so a blocking write never occupies it; `pty_resize` / `pty_close` / `pty_kill_foreground` became `async` + `spawn_blocking` so a blocking pseudo-console call no longer runs on the main thread.
@@ -145,7 +145,7 @@
 - **Symptom**: launching from Finder/Dock left `TERM` empty, zsh degraded to dumb, and full-screen TUIs that rely on terminal capability detection (truecolor apps) hung/went black. Launching from a terminal was fine — **only the GUI cold-start path reproduces it**.
 - **Fix**: in `pty_spawn`, if either is empty, fill in `xterm-256color` + truecolor, with an explicit user setting taking precedence.
 
-### 3.7 GUI Startup Missing User bin Directories → PATH Inconsistent with a Terminal (Phase 14, `pty.rs` `merge_user_bin_paths`)
+### 3.7 GUI Startup Missing User bin Directories → PATH Inconsistent with a Terminal (`pty.rs` `merge_user_bin_paths`)
 - The GUI process doesn't go through a login shell, so `/usr/local/bin` and the Homebrew directories aren't on PATH. Fixed by merging them in while preserving the inherited PATH and de-duplicating.
 
 ---
@@ -299,12 +299,12 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 ### 7.2 The Tauri 2 Config Key Is `windowEffects`, Not `effects` (`7e84e63`)
 - Getting it wrong doesn't error until schema validation; only `cargo tauri dev` reveals it.
 
-### 7.3 serde snake_case Not Matching the Frontend's camelCase → History Grouping "Invisible" (Phase 9)
+### 7.3 serde snake_case Not Matching the Frontend's camelCase → History Grouping "Invisible"
 - Fields were silently serialized under a different naming, the frontend read undefined, and the feature failed entirely with no error at all. The AI model config likewise requires camelCase alignment (with a dedicated comment at `ai.rs:27`).
 - **Lesson**: every struct at the Rust↔TS boundary needs an explicit `#[serde(rename_all)]`, locked down via shared types/tests.
 
 ### 7.4 UTF-8 Multi-Byte Characters Cut Across Boundaries
-- **PTY output side**: streaming decode across read boundaries produced U+FFFD garbage (fixed in Phase 7); invalid bytes require "drop n bytes, insert U+FFFD, continue the loop" (`pty.rs:37`).
+- **PTY output side**: streaming decode across read boundaries produced U+FFFD garbage; invalid bytes require "drop n bytes, insert U+FFFD, continue the loop" (`pty.rs:37`).
 - **AI SSE side**: running `from_utf8_lossy` independently per chunk caused garbling → a byte buffer splits complete lines on `\n` before decoding (`ai.rs:454`).
 - **Search side**: content-match context slicing wasn't aligned to UTF-8 boundaries, so **searching Chinese files panicked outright** → `floor/ceil_char_boundary` (`search.rs:172`).
 - **Rust scan side**: the end of a flushed text event must be a character boundary (`scan.rs:43`).
@@ -344,20 +344,20 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 
 ## 8. SQLite / Persistence
 
-### 8.1 Wrong Migration Order → Startup panic `no such column: group_id` (Phase 9)
+### 8.1 Wrong Migration Order → Startup panic `no such column: group_id`
 - The index was created before the ALTER. ALTER first, then create the index.
 
-### 8.2 Migrations Relying on "Swallowing ALTER TABLE Errors" and Hoping for the Best (`code-audit.md` → `security-review.md`)
+### 8.2 Migrations Relying on "Swallowing ALTER TABLE Errors" and Hoping for the Best
 - Couldn't distinguish "the column already exists" from a real failure. → `PRAGMA user_version` versioning + `ensure_column` checking column by column.
 
 ### 8.3 Column-by-Column Migration Still Not Enough: an Old DB Missing a Column → History Blocks Silently Vanished (`c64a24d`)
 - A v1 database was missing the `output_html` column, `record_block`/`get_session_blocks` SQL failed, but the failure was swallowed → blocks weren't persisted and disappeared after reloading the session, and **all the user saw was "the history is gone"**.
 - **Conclusion**: a local cache-type database doesn't get archaeological migrations — when `user_version < 2`, the whole database is dropped and the tables are created from scratch. When data is reproducible, "drop and recreate" is far cheaper and more reliable than a "migration matrix".
 
-### 8.4 `INSERT OR IGNORE` Silently Discarding Real Information (`code-audit.md`, `db/session.rs:10`)
+### 8.4 `INSERT OR IGNORE` Silently Discarding Real Information (`db/session.rs:10`)
 - A fallback row (placeholder) written first caused the later real title/cwd/created_at to be IGNOREd entirely. → `ON CONFLICT DO UPDATE`. Similar: keeping the fallback INSERT OR IGNORE before record_block to preserve the foreign key, so blocks aren't silently dropped (`session.rs:176`).
 
-### 8.5 `HistoryDb::open().expect()` → panic on Startup (`code-audit.md`)
+### 8.5 `HistoryDb::open().expect()` → panic on Startup
 - If the DB file is corrupt or has permission problems, the app simply won't start. → degrade to an in-memory DB: history is unavailable, but the app keeps running.
 - **Lesson**: a failure in a non-core subsystem (history/cache) must never take down startup.
 
@@ -367,17 +367,17 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 ### 8.7 Archiving active Sessions on Exit → All "Last Opened Tabs" Lost (`d61b5a1`, `lib.rs:30/191`)
 - The semantics of active should be "opened last time and not closed", restored by the frontend on startup; auto-archiving on exit turned it into "start from scratch on every restart". Removed exit archiving.
 
-### 8.8 Restoring a Session Losing Metadata (`code-audit.md`)
+### 8.8 Restoring a Session Losing Metadata
 - `restore()` writes only `{id,title,kind,cwd}`, so the shellType/ssh metadata is lost → an SSH/a specified-shell tab comes back spawning the default shell. `RestoreMeta` was added to fill this in; blocks in the old persistence that lack a paneId are "visible only in the panel and don't enter the block stream" (`sessionManager.ts:178`).
 
-### 8.9 API Keys Plaintext in config.json with Fully Open Permissions (`security-review.md`)
+### 8.9 API Keys Plaintext in config.json with Fully Open Permissions
 - Fixed: API keys now join SSH passwords in the platform secret store (`secret.rs`) — DPAPI-sealed into `secrets.json` on Windows (only the current user can unseal), the system keychain on macOS, and a 0600 file elsewhere (no system keyring there; a documented limitation). `config.json` uses `skip_serializing` and no longer carries keys; there is no plaintext migration - the runtime reads decryptable sealed values only, and unsealed (legacy plaintext) or tampered values count as missing until entered again, which seals them; the directory stays 0700 and the file 0600 as defence in depth. An older build cannot read migrated keys (it shows "not configured"), so the key has to be entered again there.
 
 ---
 
 ## 9. Security
 
-> For the full list see `docs/en/security-review.md`; here we record only the "almost never thought of" pitfalls.
+> This section records only the "almost never thought of" pitfalls.
 
 ### 9.1 DNS Rebinding Bypassing the SSRF Check (`6c94150`)
 - In the window of "resolve → validate the IP → issue the request (re-resolve)", an attacker alternating responses can make the second resolution return an internal IP.
@@ -417,7 +417,7 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 - **Windows production builds need `http://asset.localhost` in `img-src`**: on Windows the asset protocol is served from `http://asset.localhost` while the CSP source `asset:` only matches `asset://` (macOS); omitting it blocks even authorized wallpapers.
 - **Remaining trade-offs**: script-src includes `'unsafe-inline'` (needed by Vite HMR in dev mode); remote images in markdown are all downgraded to link text (exfiltration/tracking surface).
 
-### 9.11 LIKE Wildcards Not Escaped (`code-audit.md`)
+### 9.11 LIKE Wildcards Not Escaped
 - User input `%`/`_` was concatenated straight into the LIKE pattern. The same file had another near SQL injection: `filter_session_status` concatenated SQL → parameterized (`session.rs:222`).
 
 ### 9.12 Agent File Tools Can Be Driven by Prompt Injection to Read Secrets (`sensitivePathReason`)
@@ -438,13 +438,13 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 ### 10.2 zustand selector Returning a New Object → useSyncExternalStore Infinite Loop (`AiStatusBar.tsx:41`)
 - `resolve()` returned a new object each time, so putting it in a selector made every frame decide it "changed" → infinite re-render. A selector must return a stable reference/primitive value.
 
-### 10.3 Module-Level Variables Used as State → Not Reactive (`code-audit.md`, two places)
+### 10.3 Module-Level Variables Used as State → Not Reactive (two places)
 - The set of enabled search filter sources and the AI model name were both module-level caches, so after switching, the UI didn't update until input was re-entered. → put everything in the zustand store.
 
 ### 10.4 Module-Level store State Accumulating After a Tab Is Closed (`2114f6c`, `workspace.ts:299/426`)
 - Closing a tab closed only the tab, leaving per-terminal blocks/chat/cwd/PTY records behind → slow growth with long-term use. dropTab must clean up **all** per-tab/per-terminal derived state; the AbortController of a streaming request must also be aborted in dropTab to prevent leaks (`store/chat.ts:63`).
 
-### 10.5 Closing a Tab Mid-Stream → Ghost Empty Entry (`code-audit.md`)
+### 10.5 Closing a Tab Mid-Stream → Ghost Empty Entry
 - Both `appendChunk`/`finally` must check whether the tab still exists, or they revive entries for an already-closed tab.
 
 ### 10.6 Fast Panel Dragging Not Keeping Up — a Stale Closure Swallowing the Delta (`store/dock.ts:235`)
@@ -589,10 +589,10 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 ## 14. Process Management
 
 ### 14.1 Closing a Session Without force-kill → Child Processes Left Behind (`29f5d41`)
-### 14.2 KillState Entries Never Cleaned Up → Unbounded Growth with Long-Term Use (`code-audit.md`, `pty.rs:496/517`)
+### 14.2 KillState Entries Never Cleaned Up → Unbounded Growth with Long-Term Use (`pty.rs:496/517`)
 - `pty_close`/`reap_session` must synchronously delete the "terminate escalation" state.
-### 14.3 pty_spawn Partial Failure Leaking Child Processes (`code-audit.md`, high priority)
-### 14.4 reap_session's emit Failure Path Blocking wait (`code-audit.md`)
+### 14.3 pty_spawn Partial Failure Leaking Child Processes (high priority)
+### 14.4 reap_session's emit Failure Path Blocking wait
 ### 14.5 the Order of Killing the Process Tree (`pty.rs:611`)
 - Collect the descendants first, then kill, to avoid the parent dying first and the children being re-parented under a different parent and thus missed.
 ### 14.6 the Output pending Buffer Trapping the Last Segment When a Session Closes (`pty.rs:353`)
@@ -610,7 +610,7 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 - Related trade-off: only confirm closing when a foreground process is running (an idle shell closes directly, `3bc60eb`).
 
 ### 15.2 a Default Theme with a Hue Bias Rejected (`ee356b1`, following the cyan-green theme just done in `40c862a`)
-- The conclusion converged on after many rounds of theme experiments (a whole day in Phase 5: ink & violet / graphite & amber / frosted-glass…) was: **neutral by default**, with colored schemes demoted to optional presets (the theme.json override mechanism). Functional semantic colors (success/error/warning) are the exception.
+- The conclusion converged on after many rounds of theme experiments (ink & violet / graphite & amber / frosted-glass…) was: **neutral by default**, with colored schemes demoted to optional presets (the theme.json override mechanism). Functional semantic colors (success/error/warning) are the exception.
 - Lesson: aesthetic exploration needs a mechanized escape hatch to "fall back to the neutral default", rather than flip-flopping on the default value.
 
 ### 15.3 Search Race: a Request ID Discarding Stale Results (`search/engine.ts:51/91`)
@@ -624,13 +624,13 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 - A Windows drive-letter root must keep its root slash `C:/`: `C:\` is "the current directory on that drive", and `fs_list('C:')` isn't necessarily the root.
 - Backend entry paths carry native backslashes, and entering a subdirectory from a terminal cwd (already normalized) produces mixed paths like `C:/Users/foo\.android`. Fix: path semantics consolidated into `@platform/path`, with `@platform/api/fs` (and workspace/search) normalizing in both directions at the IPC boundary; the business layer must no longer hand-write `normPath` on `entry.path`.
 
-### 15.6 waitForSession's 8s Timeout Silently Dropping Commands (`code-audit.md`)
+### 15.6 waitForSession's 8s Timeout Silently Dropping Commands
 - Cross-panel operations like "sync to terminal" fail silently while the PTY isn't ready, and users think the button is broken. A timeout needs user-visible feedback.
 
 ### 15.7 Empty-State Buttons With No Feedback / Sync Operations Popping Needless Notifications
-- "Send output to AI" and "Clear conversation" gave silent, feedback-free results in the empty state → added a toast (`code-audit.md`); conversely, a deterministic operation like directory sync **shouldn't** pop a success notification (`d7c569c`). The principle of feedback: prompt only when the outcome is uncertain.
+- "Send output to AI" and "Clear conversation" gave silent, feedback-free results in the empty state → added a toast; conversely, a deterministic operation like directory sync **shouldn't** pop a success notification (`d7c569c`). The principle of feedback: prompt only when the outcome is uncertain.
 
-### 15.8 i18n in Name Only (`code-audit.md`)
+### 15.8 i18n in Name Only
 - A large number of keys had no references and most UI copy was hardcoded Chinese; a missing key displayed the key string directly (`dock.ssh`). Half-baked i18n is worse than none — either complete it or delete it. This project first chose "UI always in Chinese", written into Development Rules item 3, then moved to "English key in code plus a Chinese entry in `src/i18n`"; the lesson stands either way.
 
 ### 15.9 Minimum Animation Duration (Development Rules item 19; `2114f6c` fixed animation durations)

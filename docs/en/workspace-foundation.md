@@ -33,7 +33,7 @@ conversations / agents       WorkbenchSnapshot { tabs, groups,          Workspac
 | Close, undo, detach, merge, batch delete/archive and synchronization | `services/workbench.ts` | Native terminal ownership transfer preserves stable pane identities |
 | Versioned snapshots and history write queues | `stores/workbench.ts`, `services/workspaceHistory.ts` | Existing native session rows and reference-only workspace history records |
 
-The shared `workspace-containers-v2` snapshot stores containers, pane references, scoped groups, per-scope selection and interleaved group/loose-tab order. It is the only workspace layout record: development builds do not read older area layout keys or navigation order. Area stores expose the selected container as a read-only projection; they do not own independent area layouts. Native session hydration completes before reconciliation or snapshot writes may discard unavailable references.
+The shared `workspace-containers-v2` snapshot stores containers, pane references, scoped groups, per-scope selection and interleaved group/loose-tab order. It is the only workspace layout record: older area layout keys and navigation order are not read. Area stores expose the selected container as a read-only projection; they do not own independent area layouts. Native session hydration completes before reconciliation or snapshot writes may discard unavailable references.
 
 The native terminal session payload is the boundary encoding used by current history. It is validated for finite ratios, bounded depth/count, valid terminal metadata and unique pane identities. Its traversal, ratio updates and geometry use the shared algorithms. The `workspace` row kind is metadata, never a native page or a process owner. Resource repositories and singleton utility pages remain domain concerns; the side panel remains a placement of an existing conversation host.
 
@@ -60,68 +60,6 @@ All close guards complete before a batch changes resources. Deleting a group del
 Terminal detach/merge serializes history writes behind ownership transfer. The database transaction moves only the selected pane's command blocks and pane chat. Removing a mixed group's terminal pane deletes that pane's history without deleting siblings. Merged source sessions are removed only after transfer succeeds. In-memory chat follows the same pane identity, and history references locate the transferred pane's current owner.
 
 Workspace history writes serialize by both live container and durable history identity, including restoration into a different live container. Pane and history identities use bounded generated identifiers rather than document paths. Close, autosave, archive and deletion share the queues. Retries retain the captured identity even after closure or reuse of a live container identifier. Suppression checks the queued request's captured identity; reopening clears the appropriate suppression and writer cache. Session history contains only terminal, conversation and agent references with layout metadata; it excludes files, comparisons, drafts, transcript contents and credentials. Live workspace restoration retains complete file references and draft guards separately. Both write boundaries exclude file members. Initialization deletes old file-only history and prunes file panes from mixed records while repairing focus. File-only groups do not offer session archival.
-
-## Refactoring review
-
-| Finding | Resolution |
-| --- | --- |
-| Opening files and moving AI conversations chose navigation targets inconsistently | Added one presentation rule: native areas route to the resource's workspace, unified opens an independent tab and stays unified |
-| Pane menus differed by scope and had no reposition action | Added one common action order and a shared pane-move overlay for terminal, code, AI and unified panes; tab action menus expose the same common actions |
-| Unified terminal split silently inherited a terminal and skipped the split picker | Unified split now opens the shared split-resource menu; the pending-terminal-split path was removed |
-| Terminal pane menus offered split/type actions at four panes | Split and terminal-type entries now follow the same four-pane limit as every other pane menu |
-| Resource-projection rows could masquerade as tabs | Removed the projection-only tab model and native composition-page variant; every content row comes from a canonical container |
-| Terminal, scoped and common trees repeated mutation/geometry code | Shared generic tree operations, ratio updates, geometry and pane canvas; retained only wire/domain adapters |
-| Terminal store retained unused group mutation/archive APIs | Removed those APIs and their obsolete semantics; group actions use the common lifecycle service |
-| Scoped and common pane removal bypassed the common batch guards | Routed both through `removeContainerPane` |
-| Restoring an existing container changed its strip position | Release peer resource references while retaining the destination's identity and position |
-| Startup reconciliation could erase a not-yet-hydrated layout | Added the hydration/write barrier and reruns the common workspace effect when hydration finishes |
-| Visible group reordering could disturb other scopes or archived history | Persist partial order within saved slots; retain hidden and unrelated groups |
-| Terminal detach could lose history or restart a process | Transactional pane ownership transfer, serialized writes, stable content hosts and owner references |
-| Closing/deleting a mixed terminal member could remove sibling history | Added bounded pane-specific deletion and delete the owner only when no live sibling remains |
-| Batch conversation deletion could create a new unwanted member | Added resource-owned deletion without automatic fallback activation |
-| Pending merge placement could be covered by fullscreen output | Fullscreen visibility observes shared placement state |
-| Corrupt terminal layout could reach live hydration unchecked | Added bounded validation before conversion/restoration |
-| Navigation and AI stores still exposed independent strip ordering | Removed live ordering APIs and resource-projection ordering; editor command navigation reads the canonical container order |
-| Utility-page dragging was omitted from the common ordering path | Utility identities participate in the same persisted strip order and numeric selection, while retaining singleton routing |
-| Resource focus could unmount the header controlling an active drag | Transfer the captured gesture to the same visible logical list until release or cancellation |
-| Visiting the AI sidebar could register an unwanted default conversation | Mount only explicitly registered main and side resources |
-| Startup activation could replace settings or an explicitly selected utility page | Preserve those destinations while aligning restored resource selection |
-| Long paths could invalidate pane or history identifiers | Generate bounded identities and validate long-path snapshot round trips |
-| Closing and restoring the same history record could race across container queues | Serialize by durable history identity and retain immutable retry identities |
-| Retrying partial group creation could create duplicate groups | Retain the generated group identity across retries and make database creation idempotent |
-| Merge, cloning and directory updates retained local recursive tree walkers | Route them through the shared tree update/map operations |
-| History could target the former owner after a pane moved out while its siblings remained | Find the pane's current persisted owner before restoration |
-| Replacing a start placeholder could leave selection on a removed container | Route placeholder removal through the same selection-repair path as other removals |
-| A native terminal activation that kept the same focused pane could leave the strip on another container | Follow the native active session identity separately from pane focus |
-| Renaming a one-resource conversation tab changed only the label | Delegate the rename to the conversation owner and keep the tab and history title aligned |
-| Group headers were buttons without the shared drag handle, and cross-group drops lost their units | Restore the group-header handle, accept tab/group units across boundaries and append a group dropped on the ungrouped tail |
-| A tab dropped onto a grouped member could be ungrouped again by synchronization | Capture the destination group before the canonical update and persist that group explicitly |
-| Resource opening and switching implicitly merged panes | Open or activate the owning tab; only explicit split placement merges references |
-| Area projections still carried an unused tab order and start-open flag | Remove the second order state; the workbench snapshot is the only strip order |
-| Legacy per-area layout keys and the old navigation order were still read | Removed both readers; `workspace-containers-v2` is the only workspace layout record |
-| Session restore still parsed pre-layout `shellType` and `ssh` payloads | Restore requires the current `{ layout }` payload |
-| History metadata parsed pre-layout terminal payloads | History reads only the current terminal pane tree |
-| Pane transfer and deletion still handled null legacy pane rows | Both operate on explicit pane ids only |
-| The old native `workspace` tab kind still had a routing entry | Removed the route and its stale tests |
-| Dock layout still read v3-v5 records and renamed legacy entries | Read only the current `dock-layout-v6` record; unknown versions reset to defaults |
-| Foundation copy was hardcoded in Chinese inside code | Route default titles, limits, empty hints, restore failures and degraded-restore notices through the i18n catalog |
-
-The remaining adapters only convert current domain payloads: terminal session JSON, document and comparison references, and conversation or agent references. They are not alternate tab, tree, group or close implementations, and they do not read older data formats. Native editor and agent pages register resource hosts; content-strip rows come from canonical containers. Utility pages retain singleton routing and use the same ordering mechanism. New workspace behavior belongs in the canonical model/service/provider, with a domain adapter only when process, content or storage behavior differs.
-
-The generic interface scanner also ran in strict mode. Its 64 repository-wide findings require manual interpretation: the selector pattern treats authored `Select` components as native tags, wrapper buttons forward their actions through props, textarea sizing is owned by shared styles, and test fixtures are scanned as product UI. The tab track deliberately hides its native scrollbar while the application has global themed scrollbar rules. No new group or pane surface appears in that report. This is a recorded heuristic report, not a claimed clean scanner result.
-
-## Runtime repair review
-
-- Content placements use a resource-specific external registry. Stale cleanup cannot remove a newer host, and registration no longer updates the entire provider tree.
-- Hidden-canvas cancellation observes visibility and actual placement state, reads the current callback, and avoids publishing unchanged dimensions.
-- Startup restoration shares one asynchronous task with retry after rejection. Draft restoration batches durable identities, suspends reconciliation, and commits restored containers together to prevent replay from multiplying empty tabs.
-- Unvisited conversation content mounts lazily; streaming text does not trigger global workspace reconciliation. The common start page does not automatically collect native resources.
-- Removing or closing the last group member removes active and persistent group metadata. Failures retain retry, and stale deletion retries stop when the group gains a member.
-- File and comparison transport use the authorized invocation wrapper. The architecture guard rejects bypasses outside that wrapper.
-- Memory uses grouped settings rows with aggregate status, reload and an explicit assistant-review action. Review has a short conversation title and normal authorization.
-- Resource menus size to their content and cap at 320 px, truncate labels on one line and retain full accessible names and themed hints. Modal commands own the existing footer row, inherit its typography and keep flexible ancestors so mode text cannot squeeze the input.
-
-See `workspace-runtime-review.md` for incident evidence, regression boundaries and verification results.
 
 ## Verification contract
 

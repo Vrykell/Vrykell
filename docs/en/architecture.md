@@ -1,10 +1,10 @@
 # Vrykell Architecture
 
-The shared workspace ownership map, persistence boundary and refactoring audit are documented in [Unified workspace foundation](workspace-foundation.md). Every functional strip uses the same container, tree operations, scoped group model, lifecycle and pane canvas.
+The shared workspace ownership map and persistence boundary are documented in [Unified workspace foundation](workspace-foundation.md). Every functional strip uses the same container, tree operations, scoped group model, lifecycle and pane canvas.
 
-> The actual architecture of the current v2 chat-first implementation (branch `dev`). The terminal surface abstracts terminal output into **command blocks (Block)**, organized around "synchronous Rust StreamScanner scanning + the SessionController three-scene state machine + one offscreen xterm per block".
+> The actual architecture of the current terminal-first implementation (branch `dev`). The terminal surface abstracts terminal output into **command blocks (Block)**, organized around "synchronous Rust StreamScanner scanning + the SessionController three-scene state machine + one offscreen xterm per block".
 >
-> This document records the actual architecture of the current implementation. (Last updated: 2026-10-13; see §16-§19 for split panes, Agent, themes, and independent AI conversations.)
+> This document records the actual architecture of the current implementation. (Last updated: 2026-10-27; see §16-§19 for split panes, Agent, themes, and independent AI conversations; workspace foundation, ACP, typography and security boundaries have dedicated documents.)
 
 ---
 
@@ -47,7 +47,7 @@ The shared workspace ownership map, persistence boundary and refactoring audit a
 | Frontend | React 19 + TypeScript + Vite |
 | Terminal | `@xterm/xterm` (main terminal + per-block offscreen xterm) |
 | State | zustand |
-| AI | `@anthropic-ai/sdk` (BYOK) + react-markdown + KaTeX |
+| AI | AI SDK + provider catalog (Anthropic / Gemini / OpenAI-compatible / OpenCode) + react-markdown + KaTeX |
 | Testing | vitest (unit tests), Playwright (e2e) |
 
 ## 3. Top-Level Layout
@@ -219,7 +219,7 @@ Corresponds to §7. `isInputBoxVisible` in `inputVisibility.ts` (simplified to 4
 4. default               → visible
 ```
 
-Conditions such as agent control, shared sessions, conversation tombstones, and AI block confirmation are not yet implemented. When a long-running command hides the input box, `getLongRunningHint` provides the hint "● <command> running · press End to return to the input bar".
+The input box keeps these four conditions; agent-controlled or tagged long-running commands preserve it through the exception. New conditions must update `inputVisibility.test.ts` and the matching terminal scenarios. When a long-running command hides the input box, `getLongRunningHint` provides the hint "● <command> running · press End to return to the input bar".
 
 ## 10. Rendering Pipeline
 
@@ -458,7 +458,7 @@ chat store send → agentStream (AI SDK streamText)
   └─ stepCountIs(maxSteps) loop; run_command targets the pane captured when the request starts
 ```
 
-- **Tool authorization** (frontend `permissions.ts` + backend `src-tauri/src/agent/permissions.rs`): the backend owns the level table, danger/credential checks and durable-write confirmation. Dedicated file handlers consume single-use command/argument leases. Shared privileged UI commands also consume leases through the dispatch registry; interface leases additionally bind the native webview. Tool-to-command mappings are validated. The frontend retains the level mirror and approval interface. The main renderer remains trusted; leases do not isolate callers inside one webview. See [agent and memory review](agent-memory-review.md).
+- **Tool authorization** (frontend `permissions.ts` + backend `src-tauri/src/agent/permissions.rs`): the backend owns the level table, danger/credential checks and durable-write confirmation. Dedicated file handlers consume single-use command/argument leases. Shared privileged UI commands also consume leases through the dispatch registry; interface leases additionally bind the native webview. Tool-to-command mappings are validated. The frontend retains the level mirror and approval interface. The main renderer remains trusted; leases do not isolate callers inside one webview. See the [security model](security-model.md).
 - **Permission modes** (`permissions.ts`): standard (decided per tool per the settings page) / strict (ask every time) / allow (dangerous commands still ask every time); the Shield status-bar chip cycles through them.
 - **Context strategy** (`context.ts`): off (full) / window (token budget) / compact (budget + automatic summary compaction), with estimates from `estimateTokens`.
 - **Settings layering** (`agentSettings.ts`): global defaults + per-model overrides (merged by `resolve(modelId)`), persisted in localStorage; connection settings such as provider/model remain in the Rust `config.json`, while API keys join the SSH passwords in the platform secret store (`secret.rs`: DPAPI-sealed on Windows, the system keychain on macOS, a 0600 file elsewhere). `config.json` no longer carries keys, and older plaintext values migrate automatically.

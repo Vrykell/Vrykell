@@ -158,8 +158,8 @@ fn launch_command(command: &str, args: &[String]) -> (String, Vec<String>) {
     (command.to_string(), args.to_vec())
 }
 /// What we tell an agent we can do. Small on purpose: a capability we advertise but cannot gate is
-/// a capability we should not have. The `fs` handlers (which must run our path policy and approval
-/// chain) are not implemented yet, so they are not claimed; `terminal` is a later phase.
+/// a capability we should not have. The `fs` and `terminal` handlers are not advertised: harnesses
+/// use their own tools, and every permission request still goes through our approval chain.
 pub fn client_capabilities() -> Value {
     json!({
         "session": { "notices": {} },
@@ -170,7 +170,6 @@ pub fn client_capabilities() -> Value {
 
 /// How a permission request was answered.
 #[derive(Clone, Debug, PartialEq)]
-#[allow(dead_code)] // the card that answers with `Selected` arrives with the session UI (phase 1)
 pub enum PermissionOutcome {
     /// One of the options the agent offered was picked (its `optionId`).
     Selected(String),
@@ -977,7 +976,7 @@ pub async fn acp_open<R: tauri::Runtime>(
         .ok_or_else(|| format!("no enabled harness named {name}"))?
         .clone();
 
-    // Phase 1 shows the request in the transcript; the answer comes back through
+    // The request is shown in the transcript; the answer comes back through
     // `acp_answer_permission`, and an unanswered request refuses itself when the deadline passes.
     let permission_app = app.clone();
     let connection_id = format!("acp_{}", uuid::Uuid::new_v4().simple());

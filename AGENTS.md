@@ -101,4 +101,4 @@ Docs are bilingual: Chinese in `docs/zh/`, English in `docs/en/` - keep both in 
 - `docs/zh/security-model.md` (mirror `docs/en/security-model.md`) - the security model, its defences and the checklist every new IPC command, rendering path or third-party integration must answer
 - `docs/zh/feature-spec.md` (mirror `docs/en/feature-spec.md`) - feature specifications and test checklist
 - `docs/zh/pitfalls.md` (mirror `docs/en/pitfalls.md`) - known traps
-- `docs/audit-evidence/` - screenshots referenced by the audit docs (not translated)
+- `docs/images/` - current product screenshots used by the READMEs and feature docs

@@ -1,6 +1,6 @@
 # Security model
 
-Local memory uses scoped, expiring records and bounded retrieval; legacy files remain pending and never enter prompts wholesale. Shared privileged UI operations consume single-use leases at the dispatch boundary. Interface leases bind the native webview and exact payload; dedicated tool leases retain their authorization path. Tool-to-command mappings are validated, and complete tool results/leases are excluded from diagnostics. No new network service, model, capability or CSP origin is added. The main renderer remains trusted: an interface lease is not a physical user gesture or isolation within one webview. See [agent and memory review](agent-memory-review.md) for lifecycle and remaining limits.
+Local memory uses scoped, expiring records and bounded retrieval; legacy files remain pending and never enter prompts wholesale. Shared privileged UI operations consume single-use leases at the dispatch boundary. Interface leases bind the native webview and exact payload; dedicated tool leases retain their authorization path. Tool-to-command mappings are validated, and complete tool results/leases are excluded from diagnostics. No new network service, model, capability or CSP origin is added. The main renderer remains trusted: an interface lease is not a physical user gesture or isolation within one webview. See §5 for lifecycle and remaining limits.
 
 Conversation streams run concurrently under separate owner IDs, cancellation controllers, queues and approval scopes. Existing terminal busy guards still reject conflicting command execution. The model proxy marks only failures while establishing a request as potentially retryable; the client never replays a started response or a whole tool turn. Retries retain the same validated endpoint and credential path, use a bounded abortable delay, and add no IPC command or capability.
 
@@ -12,9 +12,8 @@ The internal tool adapter uses authenticated, ephemeral loopback framing and a s
 
 > Readers: **read this page before adding any feature to Vrykell**, especially when integrating
 > third-party code (MCP servers, skills, external harnesses) or adding a new IPC command.
-> Companion documents: `security-review.md` (reviews and open items), `acp-harness-integration.md`
-> (the external-harness design), `architecture.md` (layering).
-> Last updated 2026-10-14.
+> Companion documents: `application-tools.md` (session tool boundaries), `architecture.md` (layering).
+> Last updated 2026-10-27.
 
 ## Reference-only compositions and tool recovery
 
@@ -34,14 +33,14 @@ AI tool denials end tool access for the current turn, including further question
 | **Model output** (this app's agent) | **Untrusted content** | The rendering path (Markdown) and tool arguments (constrained by approvals and leases) |
 | **Fetched pages, search snippets, skill text, MCP tool results** | **Untrusted content** | The same, and they are the **prompt-injection** entry point (content may say "send X to Y") |
 | **Remote SSH hosts** | **Untrusted content** | Terminal output, remote file names; sessions are persisted and rendered again |
-| **Third-party harnesses (ACP, planned)** | **A program the user adds** | Its own process rights (cannot be stopped); operations that come through the capabilities we advertised (can be stopped) |
+| **Third-party harnesses (ACP, integrated)** | **A program the user adds** | Its own process rights (cannot be stopped); operations that come through the capabilities we advertised (can be stopped) |
 | **A fully compromised renderer** | Worst case | Everything the UI can do — **including typing into the PTY** (§3) |
 
 In one line: we protect "**untrusted content must not become a rendering-layer or execution-layer
 instruction**", and "**dangerous operations require a confirmation the page cannot forge**". We do
 not pretend to protect "the renderer itself" or "the programs the user installs".
 
-## 2. The seven lines of defence (state, evidence, verification)
+## 2. The security lines of defence (state, evidence, verification)
 
 | Line | State | Evidence | How it is verified |
 | --- | --- | --- | --- |
@@ -87,39 +86,18 @@ not pretend to protect "the renderer itself" or "the programs the user installs"
    only.)
 8. **Tests**: does this line of defence have a unit or e2e test? (See the last column of §2.)
 
-## 5. Known gaps and their cost (excerpt; the full table is in `security-review.md`)
+## 5. Known gaps and their cost
 
 | Gap | Cost |
 | --- | --- |
 | `opener`'s `open_path` scope is `**` (the file panel must be able to open any user file; by design, and no worse than the PTY) | — |
-| Starting an external harness (`acp_handshake`) | A **documented class**, not a gap: it only starts a program the user **enabled** in `~/.vrykell/harnesses.json`, a probe **runs no tools** (every permission request is refused), and it does not widen the surface — the same webview can already run anything through the PTY. The phase-1 settings copy says that adding a harness is the authorization |
+| Starting an external harness (`acp_handshake`) | A **documented class**, not a gap: it only starts a program the user **enabled** in `~/.vrykell/harnesses.json`, a probe **runs no tools** (every permission request is refused), and it does not widen the surface — the same webview can already run anything through the PTY. The ACP settings section states that adding a harness is the authorization |
 | Capability-based file access for the whole panel (paths must come from a user gesture or the shell's cwd) | 3–6 weeks, changes product semantics, still does not stop the PTY → not doing it |
 | Moving the agent out of the webview | 2–4 months (Rust) / 2–4 weeks (sidecar), still does not stop the PTY → not doing it |
 
-## 6. History
-
-- Selective host metrics, 2026-10-22: the existing resource command accepts only typed boolean selections. Its script is assembled from fixed internal sections, never caller-supplied command text; disabling every section returns before connection/authentication. Saved-profile address matching, host-key checks, credential handling, timeouts and output limits remain unchanged. No new IPC command, capability, CSP exception or resource scope is added. Tests cover section exclusion, no connection when disabled, input rejection and compatibility with existing terminal monitoring.
-
-- File access menu, 2026-10-22: the read-only path control opens the shared action menu; elevation still requires a separate explicit click and uses the existing native administrator or terminal editing path. Opening the menu performs no file write or elevation. Read-only/save guards and credential handling remain unchanged; no new IPC, capability, CSP or resource scope is added.
-
-- Interface materials, 2026-10-22: platform selection uses the existing native window-effects permission. Unsupported systems use the themed opaque fallback. This adds no IPC command, capability, CSP relaxation, external content, filesystem access or authorization path; preview masks and blur operate only on existing UI surfaces.
-
-- Native close, 2026-10-21: the main window adds `core:window:allow-destroy` because the registered close callback completes an approved close through the native destroy operation. Unsaved documents still prevent the request until saving or discarding succeeds; cancelling and failed saves retain the window and draft. No own IPC commands, CSP relaxation or resource scope changes are introduced. Browser mocks read the actual capability list and cover titlebar and system close requests.
-
-- Workspace navigation, 2026-10-21: main/side AI placement moves one existing content host within the same webview. It does not duplicate a session, add a renderer, interpret HTML, or change IPC, capabilities, CSP, resource scope or approval ownership. File opening uses the existing native picker and path-grant chain. ACP close guards and process cleanup remain on the original close path; transcript and dock movement are covered by unit and browser regressions.
-- Integration fixes, 2026-10-21: temporary tool and command-shape grants are scoped to conversation identity throughout approval, authorization and revocation. Requests without an identity cannot reuse grants, and revoking one conversation leaves others intact. Danger rules, native confirmation and single-use execution leases retain the existing authorization chain.
-- ACP runtime connections use local IDs for isolation; remote session IDs are used only for protocol requests and resume records. Closing an established connection stops its process tree, I/O tasks and waiting requests; probes and failed opens also clean up. Configuration read failures do not return an empty list. Diagnostics record metadata without directories or raw protocol errors. Credential migration retains legacy values until all target writes succeed. This change adds no IPC commands, capabilities or CSP scope.
-- `8ddffb1`: authorization decided in Rust, single-use leases
-- `f3ca94f`: keys and passwords encrypted at rest
-- `ab34159` / `5ee61b9`: danger rules (wrapper passthrough, Windows paths and shell family)
-- `e026f96` / `e506d69`: approval deadlines and the bounds of the native confirmation
-- `ee4c70e` / `0e83644`: per-shape session approvals
-- Production CSP split, links that stay in the app, SSH screen sanitizing: see the matching entries in
-  `security-review.md`
-
 ## Saved connection extensions
 
-Workspace foundation, 2026-10-27: pane transfer and deletion accept bounded, distinct identifiers and at most four pane references. Transfers require existing terminal-session owners and run in a database transaction; values use bound SQL parameters. Deletion targets only selected pane content, including mapped legacy primary-pane rows. Snapshots validate scope, groups, tree shape/count, ratios and unique references before restoration; parsing alone starts no process or file operation. Resource adapters reuse existing close guards and process cleanup. No file grant, capability, network origin, HTML interpretation or approval path is added. Transaction, malformed-input, sibling-preservation and live-host tests cover the boundary.
+Workspace foundation: pane transfer and deletion accept bounded, distinct identifiers and at most four pane references. Transfers require existing terminal-session owners and run in a database transaction; values use bound SQL parameters. Deletion targets only selected pane content, including mapped legacy primary-pane rows. Snapshots validate scope, groups, tree shape/count, ratios and unique references before restoration; parsing alone starts no process or file operation. Resource adapters reuse existing close guards and process cleanup. No file grant, capability, network origin, HTML interpretation or approval path is added. Transaction, malformed-input, sibling-preservation and live-host tests cover the boundary.
 
 Independent forwarding adds three explicit lifecycle commands: start accepts only a saved connection identifier and a saved rule identifier, stop addresses that pair, and status returns only runtime metadata. The backend reloads and validates the saved endpoints and reuses existing authentication, proxy and strict host-key checks; the renderer cannot supply shell text or credential arguments. Loopback is the default bind address. A user-selected public listener exposes the configured network endpoint, so automatic start remains an explicit per-rule preference. Session and client counts, protocol handshakes and buffers are bounded. Stop, endpoint changes, profile deletion and application exit close the managed listeners. No CSP, capability or path scope is broadened; no new HTML rendering or diagnostic payload is introduced.
 

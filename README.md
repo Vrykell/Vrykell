@@ -105,7 +105,7 @@ npm run tauri build    # 构建安装包
 
 ### 4. 远程主机也在同一工作区
 
-SSH/SFTP 主机管理器支持密码或密钥、跳板机、端口转发和主机指纹确认。远程目录可以直接浏览、上传、下载、打开编辑，也可以和本地终端一样使用命令块与 AI。
+SSH/SFTP 主机管理器支持密码或密钥、端口转发和主机指纹确认；跳板机可用于交互终端，但文件浏览和资源监控暂不支持跳板机。直连主机的远程目录可以浏览、上传、下载和打开编辑，远程终端与本地终端一样使用命令块和 AI。
 
 <p align="center">
   <a href="docs/images/feature-ssh.png"><img src="docs/images/feature-ssh.png" width="100%" alt="SSH 主机管理" /></a>
@@ -135,7 +135,7 @@ SSH/SFTP 主机管理器支持密码或密钥、跳板机、端口转发和主�
 <td width="50%" valign="top">
   <img src="docs/images/icons/remote.svg" width="44" alt="" /><br /><br />
   <b>远程、文件与编辑器</b><br />
-  SSH/SFTP、主机管理、跳板、端口转发和指纹确认；本地与远程文件面板共享浏览、拖放、上传下载和撤销。内置编辑器、Markdown 预览、Git 差异和命令面板。
+  SSH/SFTP、主机管理、端口转发和指纹确认；跳板机用于交互终端。本地与远程文件面板共享浏览、拖放、上传下载和撤销；远程文件暂不支持跳板机。内置编辑器、Markdown 预览、Git 差异和命令面板。
 </td>
 </tr>
 </table>
@@ -201,7 +201,7 @@ npm run build                    # 生产构建
 </tr>
 </table>
 
-其他文档：[工作区底层](docs/zh/workspace-foundation.md) · [运行修复复查](docs/zh/workspace-runtime-review.md) · [ACP 接入](docs/zh/acp-harness-integration.md) · [SSH 配置](docs/zh/ssh-profiles.md) · [踩坑记录](docs/zh/pitfalls.md)
+其他文档：[工作区底层](docs/zh/workspace-foundation.md) · [工作区组合](docs/zh/workspace-compositions.md) · [应用工具](docs/zh/application-tools.md) · [SSH 配置](docs/zh/ssh-profiles.md) · [踩坑记录](docs/zh/pitfalls.md)
 
 ## 贡献
 

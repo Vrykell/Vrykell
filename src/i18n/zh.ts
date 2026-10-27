@@ -1069,8 +1069,6 @@ const zh: Record<string, string> = {
   "A harness is a program you add to the list. Adding it is the authorization: it runs with your account, like a command typed into the terminal.": "harness 是你自己加进列表的程序——加进来就等于授权：它和你在终端里敲的命令一样，以你的身份运行。",
   "Reload the list": "重新读取列表",
   "Approvals": "授权审批",
-  "Harness permissions are refused until the approval card is wired to them in the next phase; nothing a harness asks for runs unnoticed.": "harness 的权限请求在下一阶段接上审批卡之前一律自动拒绝；它请求了什么都会显示出来，不会有悄悄执行的操作。",
-  "Refused automatically for now.": "当前一律自动拒绝。",
   "Harness name": "harness 名称",
   "Arguments": "参数",
   "Arguments, separated by spaces": "参数，空格分隔",

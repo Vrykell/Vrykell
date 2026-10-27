@@ -13,7 +13,7 @@
 - **教训**：在核心链路上押注一个已知且无解的上游 Bug 是致命的。前后尝试了后安装补丁、ESM→CJS 桥接（`main-wrapper.mjs`）、模块解析补丁均失败。
 - **结论**：整体迁移 Tauri 2（Rust 后端 + 系统 WebView），前端 ~85% 复用。迁移后删除了全部 Electron 残留、调试脚本与 `sdk/` 占位目录（`5256b25`、`87804b2`）。
 
-### 1.2 自研终端模拟器 —— 两轮重写后放弃（Phase 2 → `9557cc0`/`78be803`/`6459ab1` → v2 回归 xterm.js）
+### 1.2 自研终端模拟器 —— 两轮重写后放弃（`9557cc0`/`78be803`/`6459ab1` → v2 回归 xterm.js）
 - **过程**：先用 `TerminalBuffer + react-virtuoso` 替换 xterm.js，再自写完整 CSI 解析器，又把 buffer 重写为 VT screen model（screen + scrollback）、实现 DEC 1047/1048/1049 alt screen。每一轮都修掉一批 artifact，又冒出新一批（详见 §2、§4 的大量条目——其中多数坑正是自研期间踩出来的）。
 - **结论**：写入开发规则第 12 条「**禁止自研终端模拟器**」，v2 委托 xterm.js，且约束「xterm.js 不可见」（只做 PTY 会话管理与 VT 解析，UI 是 Block 列表）。该路线归档至 `archive/v1-dom-terminal`。
 - **教训**：终端模拟器是「与无数 TUI 的行数记账模型对账」的工程，宽字符、pendingWrap、alt screen、reflow、resize 语义每一项都能独立造出幽灵 bug；三轮补丁只能收窄、不能根除（`6459ab1` 原话）。
@@ -114,7 +114,7 @@
 ## 三、PTY / resize / 尺寸
 
 ### 3.1 resize debounce 的加与撤 —— 症状治理 vs 根因（`83913b6` → `9f7e8ae` revert → `9966540`）
-- **第一版**：ResizeObserver 每像素变化都发 resizePTY，SIGWINCH 洪泛，文本按旧列宽折行 → 加 200ms debounce。
+- **最初实现**：ResizeObserver 每像素变化都发 resizePTY，SIGWINCH 洪泛，文本按旧列宽折行 → 加 200ms debounce。
 - **反转**：debounce 被 revert。真根因是**在途输出与 buffer 维度错位**：窗口拖动时，已在 IPC 路上的输出按旧宽度生成，却被应用到已 resize 的新 buffer，折行与写入方意图不符，幻影行使 TUI 帧记账永久脱同步。
 - **最终修复**：Rust 给每个 `pty:output` 批次**打上生成时的 cols/rows 标签**（每会话维度原子更新，仅在 PTY resize 成功后写入）；前端应用事件前先把 buffer resize 到批次标签值，且不再在 onResize 里直接 resize buffer。
 - **教训**：「输出属于哪个维度」必须随数据流动，而不是靠两端各自猜时序。
@@ -129,12 +129,12 @@
 - **两轮修复**：先 clamp `cx`，后发现 CUP/CHA 的目标列**同样**要 clamp，且要在结构化事件与 `write()` CSI 表**两条路径**都修。
 - **教训**：同一个语义在多条代码路径上实现时，修 bug 必须搜齐所有路径。
 
-### 3.4 折叠面板宿主宽度读成 0 → PTY 挤成 2 列（`useTerminalSession.ts` 注释；Phase 8「全屏 TUI 宽度塌缩为 2 列」）
+### 3.4 折叠面板宿主宽度读成 0 → PTY 挤成 2 列（`useTerminalSession.ts` 注释）
 - **根因**：场景镜像状态（onSceneChanged 同步）滞后于 store——手动全屏只写 `store.scene` 不回调，本地镜像停在 blockList，走了卡片宽分支，而宿主 `display:none` 时 `clientWidth≈0`。
 - **修复**：以 store 场景为准；宿主宽 ≤0 时退回主 xterm 全宽，等 ResizeObserver 落位后再校正。
-- **相关**：分屏 pane 空白同理，PTY 用 0×0 启动 → 兜底 80×24（Phase 10）。
+- **相关**：分屏 pane 空白同理，PTY 用 0×0 启动 → 兜底 80×24。
 
-### 3.5 pty_write 持锁阻塞写 → 缓冲区满时「结束」按钮也卡死（`code-audit.md` 高优）
+### 3.5 pty_write 持锁阻塞写 → 缓冲区满时「结束」按钮也卡死（高优）
 - **现象**：写入持会话锁且无超时，PTY 缓冲满时整个会话的所有操作（包括 kill）被卡死；这些 command 又是同步的（跑在主线程）→ 整个 UI 冻结，只能强杀应用。
 - **根因**：会话锁同时被「可能无限阻塞的写」与「resize / close / kill」争用，且后三者同步跑在主线程。
 - **修复**：writer 从会话锁里拆出来（独立 `Arc<Mutex<..>>`），阻塞写不再占用会话锁；`pty_resize` / `pty_close` / `pty_kill_foreground` 改 `async` + `spawn_blocking`，阻塞调用不再跑在主线程。
@@ -145,7 +145,7 @@
 - **现象**：从 Finder/Dock 启动时 `TERM` 为空，zsh 退化为 dumb，依赖终端能力检测的全屏 TUI（truecolor 应用）挂起/黑屏。终端里启动则正常——**只有 GUI 冷启动路径能复现**。
 - **修复**：`pty_spawn` 时两者为空则补 `xterm-256color` + truecolor，用户显式设置优先。
 
-### 3.7 GUI 启动缺用户 bin 目录 → PATH 与终端不一致（Phase 14，`pty.rs` `merge_user_bin_paths`）
+### 3.7 GUI 启动缺用户 bin 目录 → PATH 与终端不一致（`pty.rs` `merge_user_bin_paths`）
 - GUI 进程不经过登录 shell，`/usr/local/bin`、Homebrew 目录不在 PATH。修复为合并注入且不丢继承 PATH、去重。
 
 ---
@@ -299,12 +299,12 @@
 ### 7.2 Tauri 2 配置键名是 `windowEffects` 不是 `effects`（`7e84e63`）
 - 写错不报错直到 schema 校验；`cargo tauri dev` 才能发现。
 
-### 7.3 serde snake_case 与前端 camelCase 不匹配 → 历史分组「不可见」（Phase 9）
+### 7.3 serde snake_case 与前端 camelCase 不匹配 → 历史分组「不可见」
 - 字段静默序列化成另一种命名，前端读到 undefined，功能整体失效但无任何报错。AI 模型配置同样要求 camelCase 对齐（`ai.rs:27` 专门注释）。
 - **教训**：Rust↔TS 边界每个 struct 都要显式 `#[serde(rename_all)]`，并靠共享类型/测试锁死。
 
 ### 7.4 UTF-8 多字节字符跨边界被切断
-- **PTY 输出侧**：流式解码跨 read 边界产生 U+FFFD 乱码（Phase 7 修复）；非法字节需「丢 n 字节补 U+FFFD 继续循环」（`pty.rs:37`）。
+- **PTY 输出侧**：流式解码跨 read 边界产生 U+FFFD 乱码；非法字节需「丢 n 字节补 U+FFFD 继续循环」（`pty.rs:37`）。
 - **AI SSE 侧**：按 chunk 独立 `from_utf8_lossy` 导致乱码 → 字节缓冲按 `\n` 切完整行再解码（`ai.rs:454`）。
 - **搜索侧**：内容匹配上下文切片未对齐 UTF-8 边界，**中文文件搜索直接 panic** → `floor/ceil_char_boundary`（`search.rs:172`）。
 - **Rust scan 侧**：flush 文本事件的 end 必须是字符边界（`scan.rs:43`）。
@@ -344,20 +344,20 @@
 
 ## 八、SQLite / 持久化
 
-### 8.1 迁移顺序错误 → 启动 panic `no such column: group_id`（Phase 9）
+### 8.1 迁移顺序错误 → 启动 panic `no such column: group_id`
 - 索引建在 ALTER 之前。先 ALTER 后建索引。
 
-### 8.2 迁移靠「吞 ALTER TABLE 错误」碰运气（`code-audit.md` → `security-review.md`）
+### 8.2 迁移靠「吞 ALTER TABLE 错误」碰运气
 - 无法区分「列已存在」与真失败。→ `PRAGMA user_version` 版本化 + `ensure_column` 逐列检查。
 
 ### 8.3 逐列迁移仍不够：旧库缺列 → 历史块静默消失（`c64a24d`）
 - v1 库缺 `output_html` 列，`record_block`/`get_session_blocks` SQL 失败，但失败被吞 → 块不落库、重载会话后块消失，**用户只看到「历史没了」**。
 - **结论**：本地缓存型数据库不做考古式迁移——`user_version < 2` 整库删除从零建表。数据可再生时，「删库重建」比「迁移矩阵」便宜且可靠得多。
 
-### 8.4 `INSERT OR IGNORE` 静默丢真信息（`code-audit.md`、`db/session.rs:10`）
+### 8.4 `INSERT OR IGNORE` 静默丢真信息（`db/session.rs:10`）
 - 先落库的兜底行（占位）让后续真 title/cwd/created_at 全部被 IGNORE 掉。→ `ON CONFLICT DO UPDATE`。同类：record_block 前兜底 INSERT OR IGNORE 保外键，块才不会被静默丢弃（`session.rs:176`）。
 
-### 8.5 `HistoryDb::open().expect()` → 启动即 panic（`code-audit.md`）
+### 8.5 `HistoryDb::open().expect()` → 启动即 panic
 - 库文件损坏/权限问题时应用直接起不来。→ 降级为内存库：历史不可用，应用继续跑。
 - **教训**：非核心子系统（历史/缓存）故障绝不允许击穿启动。
 
@@ -367,17 +367,17 @@
 ### 8.7 退出时归档 active 会话 → 「上次打开的标签」全丢（`d61b5a1`、`lib.rs:30/191`）
 - active 的语义应是「上次打开未关闭」，启动由前端恢复；退出自动归档把它变成了「每次重启都从零开始」。移除退出归档。
 
-### 8.8 恢复会话丢元数据（`code-audit.md`）
+### 8.8 恢复会话丢元数据
 - `restore()` 只写 `{id,title,kind,cwd}`，shellType/ssh 元数据丢失 → SSH/指定 shell 标签恢复后 spawn 成默认 shell。`RestoreMeta` 补齐；旧持久化没有 paneId 的块「仅面板可见，不进块流」（`sessionManager.ts:178`）。
 
-### 8.9 API key 明文落 config.json 且权限全开（`security-review.md`）
+### 8.9 API key 明文落 config.json 且权限全开
 - 已修：API Key 与 SSH 密码统一进平台密钥存储（`secret.rs`）——Windows 用 DPAPI 加密后写 `secrets.json`（只有当前用户能解），macOS 进钥匙串，其它平台回退 0600 文件（无系统密钥环，属已知限制）。`config.json` 用 `skip_serializing` 不再包含 key；不做明文迁移——运行时只接受能解密的密文，未封存（旧明文）或损坏的值一律按缺失处理、不作密钥使用，重新输入一次即会加密覆盖；文件权限仍收紧为目录 0700 / 文件 0600 作为纵深防御。旧版本构建读不到迁移后的 key（会显示「未配置」），需要重新填入。
 
 ---
 
 ## 九、安全
 
-> 完整清单见 `docs/zh/security-review.md`，此处只记「差点没想到」的坑。
+> 这里只记录「差点没想到」的坑。
 
 ### 9.1 DNS 重绑定绕过 SSRF 校验（`6c94150`）
 - 「解析 → 校验 IP → 再发起请求（重新解析）」的窗口里，攻击者交替应答即可让第二次解析返回内网 IP。
@@ -417,7 +417,7 @@
 - **Windows 生产构建的 `img-src` 需要 `http://asset.localhost`**：Windows 上 asset 协议地址是 `http://asset.localhost`，CSP 的 `asset:` 只匹配 `asset://`（macOS），漏写会让已授权的壁纸同样被拦截。
 - **残留取舍**：script-src 含 `'unsafe-inline'`（dev 模式 Vite HMR 需要）；markdown 远程图片一律降级为链接文本（外带/追踪面）。
 
-### 9.11 LIKE 通配符未转义（`code-audit.md`）
+### 9.11 LIKE 通配符未转义
 - 用户输入 `%`/`_` 直接拼进 LIKE 模式。同文件还有一处差点 SQL 注入：`filter_session_status` 拼 SQL → 参数化（`session.rs:222`）。
 
 ### 9.12 Agent 文件工具可被提示注入驱动读密钥（`sensitivePathReason`）
@@ -438,13 +438,13 @@
 ### 10.2 zustand selector 返回新对象 → useSyncExternalStore 无限循环（`AiStatusBar.tsx:41`）
 - `resolve()` 每次返回新对象，放进 selector 每帧都判「变了」→ 无限重渲染。selector 必须返回稳定引用/原始值。
 
-### 10.3 模块级变量当状态 → 非响应式（`code-audit.md` 两处）
+### 10.3 模块级变量当状态 → 非响应式（两处）
 - 搜索筛选源启用集合、AI 模型名都是模块级缓存，切换后 UI 不更新直到重新输入。→ 一律进 zustand store。
 
 ### 10.4 模块级 store 状态在关 tab 后累积（`2114f6c`、`workspace.ts:299/426`）
 - 关 tab 只关了标签，per-terminal 的 blocks/chat/cwd/PTY 记录残留 → 长期使用慢性增长。dropTab 必须清理**所有** per-tab/per-terminal 派生状态；流式请求的 AbortController 也要在 dropTab 时中止防泄漏（`store/chat.ts:63`）。
 
-### 10.5 流式中关标签 → 幽灵空条目（`code-audit.md`）
+### 10.5 流式中关标签 → 幽灵空条目
 - `appendChunk`/`finally` 都要判 tab 是否还存在，否则给已关闭 tab 复活条目。
 
 ### 10.6 快速拖动面板不跟手 —— 闭包陈旧吞增量（`store/dock.ts:235`）
@@ -589,10 +589,10 @@
 ## 十四、进程管理
 
 ### 14.1 关会话不 force-kill → 子进程残留（`29f5d41`）
-### 14.2 KillState 条目从不清理 → 长时间使用无限增长（`code-audit.md`、`pty.rs:496/517`）
+### 14.2 KillState 条目从不清理 → 长时间使用无限增长（`pty.rs:496/517`）
 - `pty_close`/`reap_session` 必须同步删除「结束升级」状态。
-### 14.3 pty_spawn 部分失败泄漏子进程（`code-audit.md` 高优）
-### 14.4 reap_session 的 emit 失败路径阻塞 wait（`code-audit.md`）
+### 14.3 pty_spawn 部分失败泄漏子进程（高优）
+### 14.4 reap_session 的 emit 失败路径阻塞 wait
 ### 14.5 杀进程树的顺序（`pty.rs:611`）
 - 先收集后代再杀，避免父进程先死导致子进程被重新挂到别的父进程下而漏杀。
 ### 14.6 输出 pending 缓冲在会话关闭时卡住最后一段（`pty.rs:353`）
@@ -610,7 +610,7 @@
 - 相关取舍：只有前台进程在跑才确认关闭（idle shell 直接关，`3bc60eb`）。
 
 ### 15.2 默认主题带色相倾向被否（`ee356b1`，此前 `40c862a` 刚做的青绿主题）
-- 多轮主题实验（Phase 5 一整天：ink & violet / graphite & amber / frosted-glass…）后收敛的结论：**默认中性**，彩色方案降级为可选预设（theme.json 覆盖机制）。功能性语义色（success/error/warning）除外。
+- 多轮主题实验（ink & violet / graphite & amber / frosted-glass…）后收敛的结论：**默认中性**，彩色方案降级为可选预设（theme.json 覆盖机制）。功能性语义色（success/error/warning）除外。
 - 教训：审美探索要留「回退到中性默认」的机制化出口，而不是在默认值上反复横跳。
 
 ### 15.3 搜索竞态：请求 ID 丢弃过期结果（`search/engine.ts:51/91`）
@@ -624,13 +624,13 @@
 - Windows 盘符根必须保留根斜杠 `C:/`：`C:` 是「该驱动器当前目录」，`fs_list('C:')` 不一定是根。
 - 后端条目路径带原生反斜杠，而从终端 cwd（已规范化）进入子目录时会拼出 `C:/Users/foo\.android` 这类混合路径。修复：路径语义收敛到 `@platform/path`，`@platform/api/fs`（以及 workspace/search）在 IPC 边界双向归一化；业务层不得再对 `entry.path` 手写 `normPath`。
 
-### 15.6 waitForSession 8s 超时静默丢弃命令（`code-audit.md`）
+### 15.6 waitForSession 8s 超时静默丢弃命令
 - 「同步到终端」等跨面板操作在 PTY 未就绪时静默失败，用户以为按钮坏了。超时要有用户可见反馈。
 
 ### 15.7 空状态按钮无反馈 / 同步操作弹多余通知
-- 「输出发给 AI」「清除对话」空状态静默无反馈 → toast（`code-audit.md`）；反过来，目录同步这种确定性操作**不该**弹成功通知（`d7c569c`）。反馈的原则：不确定结果才提示。
+- 「输出发给 AI」「清除对话」空状态静默无反馈 → toast；反过来，目录同步这种确定性操作**不该**弹成功通知（`d7c569c`）。反馈的原则：不确定结果才提示。
 
-### 15.8 i18n 名存实亡（`code-audit.md`）
+### 15.8 i18n 名存实亡
 - 大量 key 无引用、多数 UI 文案硬编码中文；缺 key 时直接显示 key 字符串（`dock.ssh`）。半吊子 i18n 比没有更糟——要么补齐要么删掉。本项目一度选择「UI 一律中文」写入开发规则第 3 条，后又改为「代码内用英文 key + `src/i18n` 补中文条目」；教训不变：i18n 要么彻底执行，要么不要引入。
 
 ### 15.9 动画时长下限（开发规则第 19 条；`2114f6c` 修动画时长）

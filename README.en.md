@@ -105,7 +105,7 @@ Session history restores terminals and conversations only. Editor buffers, unsav
 
 ### 4. Remote hosts stay in the same workspace
 
-The SSH/SFTP host manager supports passwords or keys, jump hosts, port forwarding and host-key confirmation. Remote directories can be browsed, uploaded, downloaded and opened for editing, and remote terminals use the same command blocks and AI as local ones.
+The SSH/SFTP host manager supports passwords or keys, port forwarding and host-key confirmation; jump hosts work for interactive terminals, while file browsing and resource monitoring do not support jump hosts yet. Direct connections can browse, upload, download and edit remote directories, and remote terminals use the same command blocks and AI as local ones.
 
 <p align="center">
   <a href="docs/images/feature-ssh-en.png"><img src="docs/images/feature-ssh-en.png" width="100%" alt="SSH host management" /></a>
@@ -135,7 +135,7 @@ The SSH/SFTP host manager supports passwords or keys, jump hosts, port forwardin
 <td width="50%" valign="top">
   <img src="docs/images/icons/remote.svg" width="44" alt="" /><br /><br />
   <b>Remote, files and editor</b><br />
-  SSH/SFTP, host management, jump hosts, port forwarding and host-key confirmation. Local and remote file panels share browsing, drag and drop, upload/download and undo. Built-in editor, Markdown preview, Git comparisons and a command palette.
+  SSH/SFTP, host management, port forwarding and host-key confirmation; jump hosts work for interactive terminals. Local and remote file panels share browsing, drag and drop, upload/download and undo; remote files do not support jump hosts yet. Built-in editor, Markdown preview, Git comparisons and a command palette.
 </td>
 </tr>
 </table>
@@ -201,7 +201,7 @@ Run typechecking, unit tests and the architecture check before committing. Chang
 </tr>
 </table>
 
-More: [Workspace foundation](docs/en/workspace-foundation.md) · [Runtime review](docs/en/workspace-runtime-review.md) · [ACP integration](docs/en/acp-harness-integration.md) · [SSH profiles](docs/en/ssh-profiles.md) · [Pitfalls](docs/en/pitfalls.md)
+More: [Workspace foundation](docs/en/workspace-foundation.md) · [Workspace compositions](docs/en/workspace-compositions.md) · [Application tools](docs/en/application-tools.md) · [SSH profiles](docs/en/ssh-profiles.md) · [Pitfalls](docs/en/pitfalls.md)
 
 ## Contributing
 

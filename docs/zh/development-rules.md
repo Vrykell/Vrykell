@@ -1,6 +1,6 @@
 ﻿# Vrykell 开发规则
 
-> 最后更新: 2026-10-17
+> 最后更新: 2026-10-27
 >
 > 规则 43 补充：工具卡保留状态和已存结果，不在底部显示错误。实时工具失败使用公共右下角 ErrorBox；主动查看结果时也在同一区域展示。恢复或重新挂载历史不得发布通知，审批结果不自动发布通知。AI 回复错误保留公共 ErrorBox 内联模式；人类主动操作的通知行为不变。
 >
@@ -82,7 +82,7 @@
 43. **公共组件优先** — 侧栏列表项统一走 `src/ui/layout/sidebarItem.tsx`（会话标签行与 SSH 连接行共用同一外观与交互）；列表拖拽排序统一走 `src/ui/layout/listReorder.tsx` 的「占位空位」交互（拖起的行让出槽位、落点用虚线占位、跟随指针的图标预览、Esc 取消、抑制拖拽后的点击），新列表通过 `data-reorder-list` / `data-reorder-item` / `data-reorder-kind` 接入，不得另造一套观感；错误展示统一走 `src/ui/feedback/ErrorBox.tsx` 与 `ErrorDetails.tsx`（数据加载失败通过 ErrorBox 显示右下角持久通知，保留重试、技术详情、关闭及弹窗键盘访问；临时动作结果使用同一通知区域中的 Toast；全局错误页仍为整页）；设置项选择器统一用 `src/ui/fields/Select.tsx` 下拉框；悬停提示统一走 `data-tip` + `src/ui/feedback/TooltipLayer.tsx`（组件里不写 `title`：系统原生提示无法改样式；纯图标控件同时保留 `aria-label` 作为无障碍名称）；多选列表统一走 `src/ui/menus/CheckboxMenu.tsx`（逐项切换后保持展开，失焦或 Esc 才关闭）。新增同类界面时先抽公共组件再接入。
 44. **测试钩子稳定** — 重构移动标记时保留既有测试钩子（`data-testid`、`data-tab-row-id`、`data-tab-group`、ARIA 名称等），或在同一提交内更新全部引用它的单测 / e2e。
 45. **文档分层** — 规则正本 = `docs/zh/development-rules.md`（英文镜像 `docs/en/development-rules.md`，两者保持同步）；常驻摘要 = `AGENTS.md`（Codex 等 agent 先读它）；agent 规范入口 = `.agents/skills/vrykell-conventions/SKILL.md`（Command Code 与 Codex 直接读取，`.claude/skills/vrykell-conventions/SKILL.md` 是 Claude Code 的桥接）。规则变化时同步这几处，不再新增副本。
-46. **双语文档** — `docs/` 下的文档保持中英双语：中文放 `docs/zh/`、英文放 `docs/en/`，两侧文件名一一对应。新增文档必须同时提供两种语言；修改任一语言版本时同步更新另一种。`docs/audit-evidence/` 下的截图等原始证据不翻译。
+46. **双语文档** — `docs/` 下的文档保持中英双语：中文放 `docs/zh/`、英文放 `docs/en/`，两侧文件名一一对应。新增文档必须同时提供两种语言；修改任一语言版本时同步更新另一种。原始证据截图不翻译，按所属文档存放。
 47. **安装包按需构建** — 只有用户明确要求构建安装包时，才运行 `npm run tauri build` 或其他安装包构建命令。修复、审查、测试或验证应用行为本身不代表授权构建安装包；这类任务使用测试、类型检查、架构检查或开发模式验证。
 48. **优先沿用现有设计** — 修改界面前先查看最接近的现有页面和交互，沿用其组件、间距、输入框、菜单、悬停与焦点样式。确有缺口时扩展或抽取现有实现，不为已有交互另造视觉样式；在实际运行界面的窄、宽尺寸检查结果。
 
