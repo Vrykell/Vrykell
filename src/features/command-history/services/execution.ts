@@ -3,6 +3,7 @@ import { t } from '@i18n';
 import { terminalCommandPayload, writeTerminalCommand } from '@features/terminal/services/commandSubmission';
 import { getAvailableShells, SHELL_TYPES, type ShellType } from '@platform/shells';
 import { useSessionStore } from '@features/workspace';
+import { presentWorkspaceResource } from '@features/workspace/services/unifiedWorkspace';
 import type { TerminalSpec } from '@features/workspace/model/windowLayout';
 import { leaves } from '@features/workspace/model/windowLayout';
 import { useBlockStore, useTerminalStore } from '@features/terminal';
@@ -59,6 +60,7 @@ export async function runHistoryCommand(context: ExecutionContext, item: Command
     const tabId = useSessionStore.getState().addTab({ kind: context.spec.kind, ssh: context.spec.ssh,
       cwd: item.cwd, shellType: context.spec.kind === 'local' && item.shell !== 'system' ? item.shell as ShellType : undefined, title: item.name });
     paneId = `${tabId}#0`;
+    presentWorkspaceResource(`terminal:${paneId}`);
     await waitForTerminalStartup(paneId);
   }
   const targetContext = { ...context, paneId };

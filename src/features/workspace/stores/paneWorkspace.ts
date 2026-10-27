@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import type { PaneTarget } from '@core/paneLayout';
 import { parseWorkspacePaneLayout, pruneWorkspacePanes, setWorkspacePaneRatio, workspacePaneCells, type WorkspacePaneLayout } from '../model/workspaceResources';
-import type { TerminalSpec } from '../model/windowLayout';
 import type { WorkspaceHistoryIdentity } from '../model/workspaceHistory';
 import { acceptsWorkspaceResource, detachContainerPane, focusContainerResource, mergeContainers, moveContainer, panesOf, placeContainerResource, putContainer, reconcileContainers, releaseContainerResources, selectContainer, type WorkspaceContainer, type WorkspaceScope } from '../model/workbench';
 import { createWorkbenchStore, useWorkbenchStore } from './workbench';
@@ -14,7 +13,7 @@ export interface PaneWorkspaceState {
   activeTabId: string; zoomed: string | null;
   layout: WorkspacePaneLayout | null; focused: string;
   startActive: boolean; choosingSplit: boolean;
-  splitAnchor?: { x: number; y: number }; pendingTerminalSplit?: TerminalSpec;
+  splitAnchor?: { x: number; y: number };
   pendingMergeTab?: string;
   chooseMerge: (sourceId?: string) => void;
   historyIdentity?: WorkspaceHistoryIdentity;
@@ -109,7 +108,7 @@ export function createPaneWorkspaceStore(scope: WorkspaceScope = 'unified', work
     const changed = store.getState().activeTabId !== (tab?.id ?? '');
     projecting = true;
     store.setState({ activeTabId: tab?.id ?? '', layout: tab?.layout ?? null, focused: tab?.focused ?? '', zoomed: tab?.zoomed ?? null, historyIdentity: tab?.historyIdentity, startActive: !tab?.layout,
-      ...(changed ? { choosingSplit: false, splitAnchor: undefined, pendingTerminalSplit: undefined, pendingMergeTab: undefined } : {}) });
+      ...(changed ? { choosingSplit: false, splitAnchor: undefined, pendingMergeTab: undefined } : {}) });
     projecting = false;
   };
   workbench.subscribe(project);

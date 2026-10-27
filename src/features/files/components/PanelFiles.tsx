@@ -16,6 +16,7 @@ import { useLocalPathStore } from '@features/files/services/localPath';
 import type { FileOpsTarget } from '@features/files/model/fileOps';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
 import { useDockStore, useSessionStore } from '@features/workspace';
+import { presentWorkspaceResource } from '@features/workspace/services/unifiedWorkspace';
 import { ptyWrite } from '@platform/pty';
 import { getAvailableShells } from '@platform/shells';
 import { parentOf } from '@platform/path';
@@ -87,6 +88,7 @@ function LocalFiles({ enabled }: { enabled: boolean }) {
 
     const parentDir = parentOf(entry.path) ?? undefined;
     const tabId = useSessionStore.getState().addTab({ cwd: parentDir, title: entry.name, shellType });
+    presentWorkspaceResource(`terminal:${tabId}#0`);
     try {
       const sid = await waitForTerminalStartup(`${tabId}#0`);
       await ptyWrite(sid, command.endsWith('\n') ? command : `${command}\n`);
@@ -144,7 +146,7 @@ function LocalFiles({ enabled }: { enabled: boolean }) {
         onOpenSystem: (entry) => openWithSystemApp(entry.path),
         onOpenWith: (entry) => void fileOpenWith(entry.path).catch((error) =>
           useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error')),
-        onOpenTab: (entry) => useSessionStore.getState().addTab({ cwd: entry.path, title: entry.name }),
+        onOpenTab: (entry) => { const id = useSessionStore.getState().addTab({ cwd: entry.path, title: entry.name }); presentWorkspaceResource(`terminal:${id}#0`); },
         onWorkspaceToggle: (entry, inWorkspace) => {
           if (inWorkspace) {
             const workspace = workspaceDirs.dirs.find((item) => item.path === entry.path);
@@ -153,7 +155,7 @@ function LocalFiles({ enabled }: { enabled: boolean }) {
             void workspaceDirs.add(entry.path, entry.name);
           }
         },
-        onNewTabHere: (dir) => useSessionStore.getState().addTab({ cwd: dir, title: dir.split(/[\\/]/).filter(Boolean).pop() ?? dir }),
+        onNewTabHere: (dir) => { const id = useSessionStore.getState().addTab({ cwd: dir, title: dir.split(/[\\/]/).filter(Boolean).pop() ?? dir }); presentWorkspaceResource(`terminal:${id}#0`); },
         onOpenDownloads: () => setTransferPage('download'),
         onOpenUploads: () => setTransferPage('upload'),
         onReveal: (entry) => void fileRevealInDir(entry.path).catch((error) =>

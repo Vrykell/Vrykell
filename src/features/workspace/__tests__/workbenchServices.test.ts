@@ -11,12 +11,12 @@ import * as groupApi from '@platform/api/group';
 import { deleteSession } from '@platform/api/session';
 import { saveWorkspaceHistory } from '@platform/api/historyPage';
 import { emptyWorkbench, putContainer, type WorkspaceContainer } from '../model/workbench';
-import { leaf, splitLeaf } from '../model/windowLayout';
+import { leaf, leaves, splitLeaf } from '../model/windowLayout';
 import { useWorkspaceStore } from '../stores/workspace';
 import { useWorkbenchStore } from '../stores/workbench';
 import { workspaceAreaStores } from '../stores/paneWorkspace';
 import { useWorkspaceNavigation } from '../stores/navigation';
-import { activateContainer, assignWorkspaceGroup, closeContainer, createContainerGroup, detachWorkspacePane, focusNativeContainerResource, mergeWorkspaceContainers, persistWorkspaceOrder, rebindWorkspaceResourceId, removeContainerPane, removeWorkspaceGroup, renameContainer, requestCloseContainers, restoreWorkbench, runWithoutWorkbenchSync, startWorkbenchRuntime, synchronizeWorkbench, terminalLayoutFromContainer, undoCloseContainer, updateWorkspaceGroup, zoomWorkspaceContainer } from '../services/workbench';
+import { activateContainer, assignWorkspaceGroup, closeContainer, createContainerGroup, detachWorkspacePane, focusNativeContainerResource, mergeWorkspaceContainers, moveWorkspacePane, persistWorkspaceOrder, rebindWorkspaceResourceId, removeContainerPane, removeWorkspaceGroup, renameContainer, requestCloseContainers, restoreWorkbench, runWithoutWorkbenchSync, startWorkbenchRuntime, synchronizeWorkbench, terminalLayoutFromContainer, undoCloseContainer, updateWorkspaceGroup, zoomWorkspaceContainer } from '../services/workbench';
 import { panesOf } from '../model/workbench';
 import * as restoreService from '../services/restoreWorkspaceHistory';
 import * as sessionManager from '../services/sessionManager';
@@ -92,6 +92,20 @@ it('adopts every native resource once, retains multi-pane terminal containers an
   expect(useWorkbenchStore.getState().snapshot.tabs.some(tab => tab.scope === 'code')).toBe(true);
 });
 
+it('leaves unrelated placements untouched when rebinding a resource', () => {
+  useWorkbenchStore.setState({ ready: true, snapshot: emptyWorkbench(), lastClosed: null });
+  useWorkbenchStore.getState().update(state => putContainer(putContainer(state, {
+    id: 'layout', scope: 'code', layout: { type: 'pane', id: 'pane-a', resourceId: 'file:a' }, focused: 'pane-a', zoomed: null,
+  }), { id: 'empty', scope: 'code', layout: null, focused: '', zoomed: null }));
+  const snapshot = useWorkbenchStore.getState().snapshot;
+  rebindWorkspaceResourceId('file:a', 'file:a');
+  expect(useWorkbenchStore.getState().snapshot).toBe(snapshot);
+  rebindWorkspaceResourceId('file:missing', 'file:b');
+  expect(useWorkbenchStore.getState().snapshot).toBe(snapshot);
+  runWithoutWorkbenchSync(() => runWithoutWorkbenchSync(() => {}));
+  useWorkbenchStore.setState({ ready: false, snapshot: emptyWorkbench(), lastClosed: null });
+});
+
 it('keeps a saved draft in its code and common split placements', () => {
   useWorkbenchStore.setState({ ready: true, snapshot: emptyWorkbench(), lastClosed: null });
   const draft = { path: 'Untitled.txt', draftId: 'draft' };
@@ -125,6 +139,30 @@ it('follows native terminal insertion order after a grouped restore', () => {
   synchronizeWorkbench();
   const terminals = useWorkbenchStore.getState().snapshot.tabs.filter(tab => tab.scope === 'terminal');
   expect(terminals[terminals.length - 1]?.id).toBe('orphan');
+});
+
+it('moves a pane inside its container and projects the terminal order', () => {
+  terminal('one'); synchronizeWorkbench();
+  const native = useWorkspaceStore.getState().tabs.find(tab => tab.id === 'one')!;
+  if (native.kind !== 'session') throw new Error('Expected terminal');
+  useWorkspaceStore.getState().setWindowLayout('one', splitLeaf(native.layout, 'one#0', 'row', 'second', { id: 'one#1', kind: 'local' }));
+  synchronizeWorkbench();
+  moveWorkspacePane('one', 'one#1', { leafId: 'one#0', dir: 'col', position: 'first' });
+  const order = panesOf(current('one')).map(pane => pane.id);
+  expect(order[0]).toBe('one#1');
+  expect(current('one').focused).toBe('one#1');
+  const projected = terminalLayoutFromContainer(current('one'));
+  expect(projected?.type).toBe('split');
+  expect(projected && leaves(projected)[0]?.id).toBe('one#1');
+  const invalid = useWorkbenchStore.getState().snapshot;
+  moveWorkspacePane('missing', 'missing', { leafId: 'missing', dir: 'row', position: 'first' });
+  expect(useWorkbenchStore.getState().snapshot).toBe(invalid);
+  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'code-move', scope: 'code', layout: { type: 'split', direction: 'row', ratio: 0.5, first: { type: 'pane', id: 'a', resourceId: 'file:a' }, second: { type: 'pane', id: 'b', resourceId: 'file:b' } }, focused: 'b', zoomed: null }));
+  moveWorkspacePane('code-move', 'b', { leafId: 'a', dir: 'col', position: 'first' });
+  expect(panesOf(current('code-move')).map(pane => pane.id)).toEqual(['b', 'a']);
+  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'ghost', scope: 'terminal', layout: { type: 'split', direction: 'row', ratio: 0.5, first: { type: 'pane', id: 'ga', resourceId: 'terminal:ga' }, second: { type: 'pane', id: 'gb', resourceId: 'terminal:gb' } }, focused: 'gb', zoomed: null }));
+  expect(() => moveWorkspacePane('ghost', 'gb', { leafId: 'ga', dir: 'col', position: 'first' })).not.toThrow();
+  expect(panesOf(current('ghost')).map(pane => pane.id)).toEqual(['gb', 'ga']);
 });
 
 it('activates layout containers through native owners and ignores missing tabs and resources', () => {

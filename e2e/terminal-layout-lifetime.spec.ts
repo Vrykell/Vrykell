@@ -70,7 +70,7 @@ for (const manual of [false, true]) test(`split and relocation retain the live $
   await expect(page.locator('.terminal-pane:visible')).toHaveCount(2);
   await preserved(1);
   await originalPane.click({ button: 'right', position: { x: 16, y: 12 } });
-  await page.getByRole('button', { name: '更换位置', exact: true }).click();
+  await page.getByRole('button', { name: '更换窗格位置', exact: true }).click();
   await expect(page.getByTestId('placement-overlay')).toBeVisible();
   await pickPlacementZone(page, page.locator('.terminal-pane:visible').first(), 'bottom');
   await preserved(1);

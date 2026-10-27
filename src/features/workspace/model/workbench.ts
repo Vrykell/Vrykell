@@ -117,6 +117,20 @@ export function placeContainerResource(state: WorkbenchSnapshot, tabId: string, 
   return selectContainer(putContainer(releaseContainerResources(state, tab.scope, new Set([pane.resourceId]), tab.id), { ...tab, layout, focused: pane.id, zoomed: null }), tab.id);
 }
 
+/** Reorder one pane inside its own container without changing its identity. */
+export function moveContainerPane(state: WorkbenchSnapshot, tabId: string, paneId: string, target: { leafId: string; dir: 'row' | 'col'; position: 'first' | 'second' }): WorkbenchSnapshot {
+  const tab = state.tabs.find(tab => tab.id === tabId);
+  if (!tab?.layout) return state;
+  const cells = panesOf(tab);
+  const pane = cells.find(cell => cell.id === paneId);
+  if (!pane || target.leafId === paneId) return state;
+  const remaining = pruneWorkspacePanes(tab.layout, new Set(cells.filter(cell => cell.id !== paneId).map(cell => cell.resourceId)));
+  if (!remaining || !workspacePaneCells(remaining).some(cell => cell.id === target.leafId)) return state;
+  const layout = splitWorkspacePane(remaining, target.leafId, { type: 'pane', id: pane.id, resourceId: pane.resourceId }, target.dir, target.position);
+  if (layout === remaining) return state;
+  return putContainer(state, { ...tab, layout, focused: pane.id, zoomed: null });
+}
+
 export function detachContainerPane(state: WorkbenchSnapshot, tabId: string, paneId: string, newTabId: string): WorkbenchSnapshot {
   const tab = state.tabs.find(tab => tab.id === tabId);
   if (!tab || state.tabs.some(tab => tab.id === newTabId)) return state;

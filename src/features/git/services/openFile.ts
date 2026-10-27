@@ -1,6 +1,7 @@
 import type { GitSelection } from '@core/git';
 import { openFile, loadFileOpenConfig, remoteOpenCommand, openPreferredFile } from '@features/files';
 import { useSessionStore, terminalsOf } from '@features/workspace';
+import { presentWorkspaceResource } from '@features/workspace/services/unifiedWorkspace';
 import { waitForTerminalStartup } from '@features/terminal/services/terminalStartup';
 import { ptyWrite } from '@platform/pty';
 import { t } from '@i18n';
@@ -26,6 +27,7 @@ async function openGitFileInTerminal(selection: GitSelection): Promise<void> {
     if (result.via === 'system' || !command) return;
     tabId = store.addTab({ cwd: selection.target.cwd, title });
   }
+  presentWorkspaceResource(`terminal:${tabId}#0`);
   const sessionId = await waitForTerminalStartup(`${tabId}#0`);
   await ptyWrite(sessionId, command.endsWith('\n') ? command : `${command}\n`);
 }

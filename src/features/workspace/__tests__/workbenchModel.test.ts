@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { acceptsWorkspaceResource, assignContainerGroup, detachContainerPane, emptyWorkbench, focusContainerResource, mergeContainers, moveContainer, moveWorkspaceEntity, normalizeContainer, panesOf, parseWorkbench, placeContainerResource, putContainer, reconcileContainers, removeContainers, selectContainer, workspaceStripEntities, WORKSPACE_SCOPES, type WorkbenchSnapshot, type WorkspaceContainer, type WorkspaceScope } from '../model/workbench';
+import { acceptsWorkspaceResource, assignContainerGroup, detachContainerPane, emptyWorkbench, focusContainerResource, mergeContainers, moveContainer, moveContainerPane, moveWorkspaceEntity, normalizeContainer, panesOf, parseWorkbench, placeContainerResource, putContainer, reconcileContainers, removeContainers, selectContainer, workspaceStripEntities, WORKSPACE_SCOPES, type WorkbenchSnapshot, type WorkspaceContainer, type WorkspaceScope } from '../model/workbench';
 import { workspacePaneIds, type WorkspacePaneLayout } from '../model/workspaceResources';
 
 const pane = (id: string, resourceId = `file:${id}`): Extract<WorkspacePaneLayout, { type: 'pane' }> => ({ type: 'pane', id, resourceId });
@@ -90,6 +90,24 @@ describe('layout-owning workspace containers', () => {
     const four = state(tab('full', 'code', full));
     expect(placeContainerResource(four, 'full', pane('fifth'), target)).toBe(four);
     expect(placeContainerResource(state(tab('one', 'code', pair)), 'one', pane('new', 'file:b'), target).tabs[0]!.layout).toBe(pair);
+  });
+
+  it('moves one pane inside its container while retaining pane identity', () => {
+    const original = state({ ...tab('one', 'code', pair), focused: 'a', zoomed: 'b' });
+    const moved = moveContainerPane(original, 'one', 'b', target);
+    expect(panesOf(moved.tabs[0]!).map(pane => pane.id)).toEqual(['b', 'a']);
+    expect(moved.tabs[0]).toMatchObject({ focused: 'b', zoomed: null });
+    expect(panesOf(moved.tabs[0]!).find(pane => pane.id === 'b')?.resourceId).toBe('file:b');
+    expect(moveContainerPane(original, 'one', 'b', { ...target, leafId: 'b' })).toBe(original);
+    expect(moveContainerPane(original, 'one', 'missing', target)).toBe(original);
+    expect(moveContainerPane(original, 'one', 'b', { ...target, leafId: 'missing' })).toBe(original);
+    expect(moveContainerPane(original, 'missing', 'b', target)).toBe(original);
+    const single = state(tab('one'));
+    expect(moveContainerPane(single, 'one', 'a', target)).toBe(single);
+    const empty = state(tab('empty', 'code', null));
+    expect(moveContainerPane(empty, 'empty', 'a', target)).toBe(empty);
+    const duplicate = state(tab('one', 'code', { ...pair, second: pane('b', 'file:a') }));
+    expect(moveContainerPane(duplicate, 'one', 'b', target)).toBe(duplicate);
   });
 
   it('detaches into the same scope and group with the exact pane identity', () => {

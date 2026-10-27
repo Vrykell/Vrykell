@@ -6,7 +6,7 @@ import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
 import * as groupApi from '@platform/api/group';
 import { t } from '@i18n';
-import { assignContainerGroup, emptyWorkbench, focusContainerResource, mergeContainers, panesOf, putContainer, reconcileContainers, releaseContainerResources, removeContainers, selectContainer, workspaceStripEntities, WORKSPACE_SCOPES, type WorkspaceContainer, type WorkspaceScope } from '../model/workbench';
+import { assignContainerGroup, emptyWorkbench, focusContainerResource, mergeContainers, moveContainerPane, panesOf, putContainer, reconcileContainers, releaseContainerResources, removeContainers, selectContainer, workspaceStripEntities, WORKSPACE_SCOPES, type WorkspaceContainer, type WorkspaceScope } from '../model/workbench';
 import { replaceWorkspacePaneResource, terminalResourceLayout, terminalWorkspaceLayout } from '../model/workspaceResources';
 import { leaves, type WindowLayout } from '../model/windowLayout';
 import { useWorkbenchStore } from '../stores/workbench';
@@ -91,10 +91,8 @@ export function rebindWorkspaceResourceId(previousId: string, nextId: string) {
     let changed = false;
     const tabs = state.tabs.map(tab => {
       if (!tab.layout || !panesOf(tab).some(pane => pane.resourceId === previousId)) return tab;
-      const layout = replaceWorkspacePaneResource(tab.layout, previousId, nextId);
-      if (layout === tab.layout) return tab;
       changed = true;
-      return { ...tab, layout };
+      return { ...tab, layout: replaceWorkspacePaneResource(tab.layout, previousId, nextId) };
     });
     return changed ? { ...state, tabs } : state;
   });
@@ -193,6 +191,18 @@ export function detachWorkspacePane(scope: WorkspaceScope, resourceId: string) {
   }
   const id = workspaceAreaStores[scope].getState().detach(resourceId);
   if (id) activateContainer(id);
+}
+
+export function moveWorkspacePane(tabId: string, paneId: string, target: Omit<PaneTarget, 'rect'>) {
+  const state = useWorkbenchStore.getState().snapshot;
+  const next = moveContainerPane(state, tabId, paneId, target);
+  if (next === state) return;
+  useWorkbenchStore.getState().update(() => next);
+  const tab = next.tabs.find(tab => tab.id === tabId);
+  if (tab?.scope === 'terminal') {
+    const layout = terminalLayoutFromContainer(tab);
+    if (layout) useWorkspaceStore.getState().setWindowLayout(tabId, layout);
+  }
 }
 
 export function zoomWorkspaceContainer(id: string) {

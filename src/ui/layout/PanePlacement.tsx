@@ -23,7 +23,7 @@ export function ZonePreview({ target, testId, hint }: { target: PanePlacementTar
   </DropPlacementPreview>;
 }
 
-export function PlacementOverlay({ targets, onPick, onCancel, hint, emptyMessage }: { targets: PanePlacementTarget[]; onPick: (target: PanePlacementTarget) => void; onCancel: () => void; hint?: string; emptyMessage?: string }) {
+export function PlacementOverlay({ targets, onPick, onCancel, hint, emptyMessage, zIndex }: { targets: PanePlacementTarget[]; onPick: (target: PanePlacementTarget) => void; onCancel: () => void; hint?: string; emptyMessage?: string; zIndex?: number }) {
   const [hovered, setHovered] = useState<number | null>(null); const ref = useRef<HTMLDivElement>(null);
   const emptyReported = useRef(false);
   useEffect(() => {
@@ -43,7 +43,7 @@ export function PlacementOverlay({ targets, onPick, onCancel, hint, emptyMessage
     onKeyDown={event => {
       if (['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'].includes(event.key)) { event.preventDefault(); setHovered(index => ((index ?? -1) + (event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1) + targets.length) % targets.length); }
       if ((event.key === 'Enter' || event.key === ' ') && hovered !== null) { event.preventDefault(); onPick(targets[hovered]!); }
-    }} style={{ position: 'absolute', inset: 0, zIndex: 80, outline: 'none' }}>
+    }} style={{ position: 'absolute', inset: 0, zIndex: zIndex ?? 80, outline: 'none' }}>
     {hovered !== null && targets[hovered] && <ZonePreview testId={`placement-zone-${hovered}`} target={targets[hovered]!} hint={hint} />}
   </div>;
 }

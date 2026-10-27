@@ -2,6 +2,69 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 import { pickPlacementZone } from './placement';
 
+test('opens a file with the terminal preference into the active unified composition', async ({ page }) => {
+  await setupTauriMock(page, {});
+  await page.addInitScript(() => {
+    localStorage.setItem('vrykell-editor-preferences', JSON.stringify({ state: { localOpenMode: 'terminal' }, version: 0 }));
+  });
+  await page.goto('/');
+  await page.getByTestId('workspace-area-unified').click();
+  const mixed = page.getByTestId('unified-workspace');
+  const bar = page.getByTestId('workspace-instance-bar');
+  if (await bar.getByRole('tab').count()) await bar.getByRole('tab').first().click();
+  const before = await mixed.locator('.unified-pane').count();
+  await page.locator('[data-dock-btn="files"]').click();
+  await page.getByTestId('local-file-tree').getByText('notes.txt', { exact: true }).dblclick();
+  await expect(page.getByTestId('workspace-area-unified')).toHaveAttribute('aria-current', 'page');
+  await expect(mixed.locator('.unified-pane')).toHaveCount(before + 1);
+  await expect(mixed.locator('.terminal-pane:visible')).toHaveCount(before + 1);
+});
+
+test('opens a picked file into the active unified composition without leaving it', async ({ page }) => {
+  await setupTauriMock(page, {}); await page.goto('/');
+  await page.getByTestId('workspace-area-unified').click();
+  const mixed = page.getByTestId('unified-workspace');
+  const bar = page.getByTestId('workspace-instance-bar');
+  await bar.getByRole('tab').first().click();
+  const before = await mixed.locator('.unified-pane').count();
+  await page.evaluate(() => { (window as unknown as { __PICK_PATHS__: string[] }).__PICK_PATHS__ = ['/home/e2e/project/routed.txt']; });
+  await bar.getByRole('button', { name: '打开文件', exact: true }).click();
+  await expect(page.getByTestId('workspace-area-unified')).toHaveAttribute('aria-current', 'page');
+  await expect(mixed.locator('.unified-pane')).toHaveCount(before + 1);
+  await expect(mixed.locator('.monaco-editor')).toBeVisible();
+});
+
+test('opens the split-resource menu when splitting a terminal in the unified workspace', async ({ page }) => {
+  await setupTauriMock(page, {}); await page.goto('/');
+  await expect(page.locator('.terminal-pane').first()).toBeVisible();
+  await page.getByTestId('workspace-area-unified').click();
+  const mixed = page.getByTestId('unified-workspace');
+  const bar = page.getByTestId('workspace-instance-bar');
+  await bar.getByRole('tab').first().click();
+  const terminal = mixed.locator('.terminal-pane:visible').first();
+  await expect(terminal).toBeVisible();
+  await terminal.click({ button: 'right' });
+  await page.getByRole('menu', { name: '操作菜单', exact: true }).getByRole('button', { name: '拆分标签页', exact: true }).click();
+  const chooser = page.getByRole('menu', { name: '选择分屏标签', exact: true });
+  await expect(chooser).toBeVisible();
+  await expect(chooser).toContainText('新终端');
+  await expect(page.getByTestId('placement-overlay')).toHaveCount(0);
+  await page.keyboard.press('Escape');
+  await bar.getByRole('button', { name: '拆分标签页', exact: true }).click();
+  await page.getByRole('menuitem', { name: '新建文件', exact: true }).click();
+  await pickPlacementZone(page, mixed.locator('.unified-pane').first(), 'right');
+  const terminalPane = mixed.locator('.unified-pane').filter({ has: page.locator('.terminal-pane') });
+  const filePane = mixed.locator('.unified-pane').filter({ has: page.locator('.monaco-editor') });
+  await expect(filePane).toBeVisible();
+  await terminalPane.locator('.terminal-pane').click({ button: 'right' });
+  await page.getByRole('button', { name: '更换窗格位置', exact: true }).click();
+  await expect(page.getByTestId('placement-overlay')).toBeVisible();
+  await pickPlacementZone(page, filePane, 'bottom');
+  const terminalBounds = (await terminalPane.boundingBox())!;
+  const fileBounds = (await filePane.boundingBox())!;
+  expect(terminalBounds.y).toBeGreaterThan(fileBounds.y);
+});
+
 test('creates directly into a split and preserves the initial live resource', async ({ page }, info) => {
   await setupTauriMock(page, {}); await page.goto('/');
   const terminal = await page.locator('.terminal-pane').first().elementHandle();

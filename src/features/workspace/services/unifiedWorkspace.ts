@@ -33,12 +33,7 @@ export function requestTerminalSplit(spec: TerminalSpec | null) {
   if (useWorkspaceNavigation.getState().area !== 'unified') { useUiStore.getState().beginSplit(spec); return; }
   const state = useUnifiedWorkspace.getState();
   if (!state.layout || workspacePaneCells(state.layout).length >= 4) return;
-  const resourceId = workspacePaneCells(state.layout).find(cell => cell.id === state.focused)?.resourceId;
-  const resource = resourceId ? resolveWorkspaceResource(resourceId, currentWorkspaceResources()) : undefined;
-  const tab = useWorkspaceStore.getState().tabs.find(tab => resource?.kind === 'terminal' && tab.id === resource.tabId);
-  const focused = useTerminalStore.getState().focusedPaneId;
-  const inherited = tab?.kind === 'session' ? leaves(tab.layout).find(terminal => terminal.id === focused) ?? firstLeaf(tab.layout) : undefined;
-  useUnifiedWorkspace.setState({ pendingTerminalSplit: spec ?? inherited ?? { id: '', kind: 'local' } });
+  useUnifiedWorkspace.setState({ choosingSplit: true, startActive: false, zoomed: null });
 }
 
 export function closeTerminalPane(paneId: string) {
@@ -75,6 +70,16 @@ export function createUnifiedResource(kind: 'terminal' | 'document' | 'conversat
   useWorkspaceNavigation.getState().selectArea('unified');
 }
 
+/** Route a newly created or moved resource by the current workspace. */
+export function presentWorkspaceResource(id: string) {
+  if (useWorkspaceNavigation.getState().area === 'unified') {
+    addUnifiedResource(id);
+    return;
+  }
+  const resource = resolveWorkspaceResource(id, currentWorkspaceResources());
+  if (resource) activateWorkspaceResource(resource);
+}
+
 /** Place a reference into the active composition, releasing it from another unified tab. */
 export function addUnifiedResource(id: string) {
   const resource = resolveWorkspaceResource(id, currentWorkspaceResources());
@@ -83,8 +88,8 @@ export function addUnifiedResource(id: string) {
   const state = useUnifiedWorkspace.getState();
   const cells = state.layout ? workspacePaneCells(state.layout) : [];
   if (!cells.some(cell => cell.resourceId === resource.id)) {
-    if (!state.layout) state.show(resource.id);
-    else if (cells.length < 4) state.split(resource.id, 'row');
+    if (!state.layout || cells.length >= 4) state.show(resource.id);
+    else state.split(resource.id, 'row');
   }
   focusUnifiedResource(resource.id);
 }

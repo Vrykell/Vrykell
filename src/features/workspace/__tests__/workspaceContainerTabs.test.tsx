@@ -7,6 +7,7 @@ import { emptyWorkbench, type WorkspaceContainer } from '../model/workbench';
 import { useWorkbenchStore } from '../stores/workbench';
 import { useWorkspaceNavigation } from '../stores/navigation';
 import { workspaceAreaStores } from '../stores/paneWorkspace';
+import { useUiStore } from '../stores/ui';
 import * as service from '../services/workbench';
 import { requestWorkspaceSplit } from '../services/unifiedWorkspace';
 import { useWorkbenchFeedback } from '../stores/workbenchFeedback';
@@ -37,7 +38,7 @@ it('derives labels, capabilities and group order from real containers and tolera
   expect(useWorkbenchStore.getState().snapshot.tabs[0]!.id).toBe('two');
 });
 
-it('exposes the same split, merge, zoom, detach and remove actions on every container', () => {
+it('exposes the same split, pane position, merge, zoom, detach and remove actions on every container', () => {
   const { result } = renderHook(() => useWorkspaceContainerTabs('code', [handle('one'), handle('two')]));
   expect(result.current.tabActions!('missing')).toEqual([]);
   let actions = result.current.tabActions!('one');
@@ -47,6 +48,9 @@ it('exposes the same split, merge, zoom, detach and remove actions on every cont
   expect(workspaceAreaStores.code.getState().pendingMergeTab).toBe('two');
   act(() => useWorkbenchStore.getState().update(state => ({ ...state, tabs: [{ ...tab('one'), layout: { type: 'split', direction: 'row', ratio: 0.5, first: pane('one'), second: pane('three') }, focused: 'missing', zoomed: 'one' }, { ...tab('two'), title: 'Peer' }, { ...tab('empty'), layout: null }] })));
   actions = result.current.tabActions!('one');
+  actions.find(item => item.label === t('Change pane position'))!.onClick!();
+  expect(useUiStore.getState().paneMove).toMatchObject({ open: true, containerId: 'one', paneId: 'one' });
+  act(() => useUiStore.getState().cancelPaneMove());
   actions.find(item => item.label === t('Restore panes'))!.onClick!();
   actions.find(item => item.label === t('Move pane to new tab'))!.onClick!();
   actions.find(item => item.label === t('Remove pane'))!.onClick!();
@@ -58,6 +62,19 @@ it('exposes the same split, merge, zoom, detach and remove actions on every cont
   act(() => useWorkbenchStore.getState().update(state => ({ ...state, tabs: [{ ...tab('one'), layout: { type: 'split', direction: 'col', ratio: 0.5, first: { type: 'split', direction: 'row', ratio: 0.5, first: pane('one'), second: pane('two') }, second: { type: 'split', direction: 'row', ratio: 0.5, first: pane('three'), second: pane('four') } } }] })));
   expect(result.current.tabActions!('one').some(item => item.label === t('Split tab'))).toBe(false);
   expect(result.current.tabActions!('one').some(item => item.label === t('Zoom pane'))).toBe(true);
+});
+
+it('starts pane repositioning from the focused pane and clears zoom first', () => {
+  const layout = { type: 'split' as const, direction: 'row' as const, ratio: 0.5, first: pane('one'), second: pane('three') };
+  useWorkbenchStore.setState(state => ({ ...state, snapshot: { ...state.snapshot, tabs: [{ ...tab('one'), layout, focused: 'three' }], selected: { code: 'one' } } }));
+  const { result } = renderHook(() => useWorkspaceContainerTabs('code', [handle('one')]));
+  act(() => result.current.tabActions!('one').find(item => item.label === t('Change pane position'))!.onClick!());
+  expect(useUiStore.getState().paneMove).toMatchObject({ open: true, containerId: 'one', paneId: 'three' });
+  act(() => useUiStore.getState().cancelPaneMove());
+  act(() => useWorkbenchStore.setState(state => ({ ...state, snapshot: { ...state.snapshot, tabs: state.snapshot.tabs.map(tab => tab.id === 'one' ? { ...tab, zoomed: 'three' } : tab) } })));
+  act(() => result.current.tabActions!('one').find(item => item.label === t('Change pane position'))!.onClick!());
+  expect(service.zoomWorkspaceContainer).toHaveBeenCalledWith('one');
+  expect(useUiStore.getState().paneMove).toMatchObject({ open: true, containerId: 'one', paneId: 'three' });
 });
 
 it('moves utility pages and content through the same persisted strip order', async () => {

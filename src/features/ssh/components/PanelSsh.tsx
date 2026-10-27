@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { t } from '@i18n';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import { useSessionStore, terminalsOf, useWorkspaceNavigation } from '@features/workspace';
+import { presentWorkspaceResource } from '@features/workspace/services/unifiedWorkspace';
 import { useTerminalStore } from '@features/terminal';
 import { useSshStore } from '../stores/store';
 import { connectionTarget, type SshConnection } from '../services/api';
@@ -21,7 +22,8 @@ function openSshConnection(conn: SshConnection) {
     workspace.closeTab(tab.id);
   }
   useSshStore.getState().touch(conn.id).catch(() => {});
-  useSessionStore.getState().addTab({ kind: 'ssh', ssh: connectionTarget(conn) });
+  const id = useSessionStore.getState().addTab({ kind: 'ssh', ssh: connectionTarget(conn) });
+  presentWorkspaceResource(`terminal:${id}#0`);
 }
 
 export default function PanelSsh({ active = true }: { active?: boolean }) {
@@ -35,7 +37,8 @@ export default function PanelSsh({ active = true }: { active?: boolean }) {
       onQuickConnect={() => useHostEditor.getState().setQuickOpen(true)} onDelete={setDeleting} onOpenTerminal={openSshConnection} />
     <SshImportModal open={importOpen} onClose={() => setImportOpen(false)} />
     <SshFormModal open={quickOpen} initial={null} onClose={() => useHostEditor.getState().setQuickOpen(false)} onConnect={connection => {
-      useSessionStore.getState().addTab({ kind: 'ssh', ssh: { ...connectionTarget(connection), connectionId: undefined } });
+      const id = useSessionStore.getState().addTab({ kind: 'ssh', ssh: { ...connectionTarget(connection), connectionId: undefined } });
+      presentWorkspaceResource(`terminal:${id}#0`);
     }} />
     <ConfirmDialog open={!!deleting} danger title={t('Delete SSH connection?')} message={deleting?.name} confirmLabel={t('Delete')} cancelLabel={t('Cancel')}
       onConfirm={async () => { if (deleting) await useSshStore.getState().remove(deleting.id); setDeleting(null); }} onCancel={() => setDeleting(null)} />

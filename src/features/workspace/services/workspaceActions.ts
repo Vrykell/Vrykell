@@ -9,7 +9,7 @@ import { useWorkspaceStore } from '../stores/workspace';
 import { useWorkspaceNavigation, workspaceAreaForKind, type WorkspaceArea } from '../stores/navigation';
 import { useUnifiedWorkspace } from '../stores/unifiedWorkspace';
 import { workspacePaneCells } from '../model/workspaceResources';
-import { createUnifiedResource, createUnifiedTerminal, focusUnifiedResource } from './unifiedWorkspace';
+import { createUnifiedResource, createUnifiedTerminal, presentWorkspaceResource } from './unifiedWorkspace';
 import { useWorkbenchStore } from '../stores/workbench';
 import { activateContainer, synchronizeWorkbench } from './workbench';
 import { workspaceStripEntities } from '../model/workbench';
@@ -31,11 +31,10 @@ export async function pickWorkspaceFile() {
 }
 
 export async function openWorkspaceFile() {
-  const unified = focusedWorkspaceArea() === 'unified';
   const file = await pickWorkspaceFile();
   if (!file) return;
   useWorkspaceStore.getState().openEditorFile(file);
-  if (unified) focusUnifiedResource(`file:${editorFileKey(file)}`);
+  presentWorkspaceResource(`file:${editorFileKey(file)}`);
 }
 
 export function newWorkspaceItem() {

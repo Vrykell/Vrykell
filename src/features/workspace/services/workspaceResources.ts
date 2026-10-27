@@ -3,7 +3,7 @@ import { useWorkspaceStore } from '../stores/workspace';
 import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useChatStore } from '@features/chat/stores/chat';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
-import { closeAiWorkspaceSession } from '@features/chat/services/aiWorkspace';
+import { closeAiWorkspaceSession } from '@features/chat/services/aiSessionClose';
 import { workspaceResources } from '../model/workspaceResources';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
 import { useWorkbenchStore } from '../stores/workbench';

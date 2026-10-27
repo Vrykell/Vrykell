@@ -12,6 +12,7 @@ import { describeFileServiceFailure } from '@features/ssh/model/fileServiceState
 import { useRemotePathStore, sshPaneIdFor, shellQuote } from '@features/ssh/utils/remotePath';
 import { useTerminalStore, termInstances } from '@features/terminal';
 import { useDockStore, useSessionStore } from '@features/workspace';
+import { presentWorkspaceResource } from '@features/workspace/services/unifiedWorkspace';
 import { ptyWrite } from '@platform/pty';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { getPaneTerminal } from '@features/terminal/services/terminalClipboard';
@@ -56,6 +57,7 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
       if (sshPaneIdFor(conn.id) !== currentPaneId) return;
       useTerminalStore.getState().setFocusedPane(currentPaneId);
       getPaneTerminal(currentPaneId)?.focus();
+      if (action === 'edit') presentWorkspaceResource(`terminal:${currentPaneId}`);
     }).catch((error) => toast(String((error as Error)?.message ?? error), 'error'));
   };
 

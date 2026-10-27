@@ -3,7 +3,7 @@ import { act, renderHook } from '@testing-library/react';
 import { useSessionStore, type Tab } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
 import { useUiStore } from '@features/workspace';
-import { countLeaves, leaf, leaves, splitLeaf } from '@features/workspace/model/windowLayout';
+import { countLeaves, leaf, leaves, moveTargets, splitLeaf } from '@features/workspace/model/windowLayout';
 import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
 
 describe('useTerminalLayoutActions', () => {
@@ -39,29 +39,27 @@ describe('useTerminalLayoutActions', () => {
     expect(useUiStore.getState().splitPlacement.open).toBe(false);
   });
 
-  it('moves a pane, updates the ratio, and closes the placement state', () => {
+  it('moves a dragged pane and updates the ratio', () => {
     const first = { id: 'window-2#0', kind: 'local' as const };
     const second = { id: 'window-2#1', kind: 'local' as const };
     const layout = splitLeaf(leaf(first), first.id, 'row', 'second', second);
     const tab: Tab = { id: 'window-2', title: '测试窗口', kind: 'session', layout };
     useSessionStore.setState({ tabs: [tab], activeId: tab.id });
     useTerminalStore.setState({ focusedPaneId: second.id });
-    useUiStore.setState({ movePlacement: { open: true, terminalId: second.id } });
 
     const { result, rerender } = renderHook(
       ({ currentLayout }) => useTerminalLayoutActions({ windowId: tab.id, layout: currentLayout }),
       { initialProps: { currentLayout: layout } },
     );
-    const target = result.current.movePlacementTargets[0];
-    expect(target?.leafId).toBe(first.id);
+    const target = moveTargets(layout, second.id)[0]!;
+    expect(target.leafId).toBe(first.id);
 
-    act(() => result.current.completeMove(target!));
+    act(() => result.current.commitMove(second.id, target));
     const movedTab = useSessionStore.getState().tabs[0];
     expect(movedTab?.kind).toBe('session');
     if (movedTab?.kind !== 'session') return;
     expect(countLeaves(movedTab.layout)).toBe(2);
     expect(useTerminalStore.getState().focusedPaneId).toBe(second.id);
-    expect(useUiStore.getState().movePlacement.open).toBe(false);
 
     rerender({ currentLayout: movedTab.layout });
     act(() => result.current.setRatioNode(second.id, first.id, 0.7));

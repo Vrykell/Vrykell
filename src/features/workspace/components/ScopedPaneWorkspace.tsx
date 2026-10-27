@@ -17,7 +17,7 @@ import AcpLauncher from './AcpLauncher';
 import { requestWorkspaceSplit } from '../services/unifiedWorkspace';
 import { pickWorkspaceFile } from '../services/workspaceActions';
 import type { EditorFile } from '@core/editor';
-import { detachWorkspacePane, mergeWorkspaceContainers, removeContainerPane } from '../services/workbench';
+import { detachWorkspacePane, mergeWorkspaceContainers, moveWorkspacePane, removeContainerPane } from '../services/workbench';
 
 export default function ScopedPaneWorkspace({ scope, selected, active }: { scope: PaneWorkspaceScope; selected: string; active: boolean }) {
   const store = scopedPaneStores[scope]; const state = store();
@@ -75,8 +75,9 @@ export default function ScopedPaneWorkspace({ scope, selected, active }: { scope
     ]),
   ];
   return <section className="scoped-pane-workspace" data-testid={`pane-workspace-${scope}`} style={{ display: visible ? 'flex' : 'none' }}>
-    <WorkspacePaneCanvas layout={state.layout} focused={state.focused} zoomed={state.zoomed} resources={resources} visible={visible} retainHeader onFocus={focus} onRatio={state.ratio}
+    <WorkspacePaneCanvas containerId={state.activeTabId} layout={state.layout} focused={state.focused} zoomed={state.zoomed} resources={resources} visible={visible} retainHeader onFocus={focus} onRatio={state.ratio}
       placing={!!addition} onPlace={commit} onCancel={cancel} onSplit={id => { focus(id); requestWorkspaceSplit(id); }} onRemove={remove}
+      onMovePane={(paneId, target) => moveWorkspacePane(state.activeTabId, paneId, target)}
       onDetach={id => detachWorkspacePane(scope, id)} onZoom={state.single} />
     {visible && state.choosingSplit && !addition && <ContextMenu anchor={menuAnchor} label={t('Choose a tab to split')} itemRole="menuitem" items={items} onClose={() => { if (!proceeding.current) store.setState({ choosingSplit: false }); proceeding.current = false; }} />}
     <AcpLauncher open={!!launcher} anchor={launcher?.anchor} onClose={() => setLauncher(null)} onPick={(harness, cwd) => {

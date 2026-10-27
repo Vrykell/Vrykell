@@ -16,7 +16,7 @@ export function useManualFullscreenVisible(paneId: string): boolean {
   const area = useWorkspaceNavigation(state => state.area);
   const terminalArea = area === 'terminal' || area === 'unified';
   const placing = useWorkspacePlacementActive(area === 'unified' ? 'unified' : 'terminal');
-  const blocked = useUiStore(state => state.settingsOpen || state.splitPlacement.open || state.movePlacement.open || state.splitPickerOpen);
+  const blocked = useUiStore(state => state.settingsOpen || state.splitPlacement.open || state.paneMove.open || state.splitPickerOpen);
   const dragging = useDockDragStore(state => state.draggingTerminalId !== null);
   return requested && focused && (area === 'unified' ? placed : activePane) && terminalArea && !blocked && !dragging && !placing;
 }

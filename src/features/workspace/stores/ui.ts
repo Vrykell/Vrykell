@@ -7,10 +7,11 @@ interface SplitPlacement {
   spec: TerminalSpec | null;
 }
 
-/** 「更换位置」落点选择器：open=true 时把 terminalId 这个终端重排到点选落点。 */
-interface MovePlacement {
+/** Shared pane reposition placement: one pane moves inside its current container. */
+interface PaneMovePlacement {
   open: boolean;
-  terminalId: string | null;
+  containerId: string;
+  paneId: string;
 }
 
 interface UiState {
@@ -28,10 +29,10 @@ interface UiState {
   splitPlacement: SplitPlacement;
   beginSplit: (spec: TerminalSpec | null) => void;
   cancelSplit: () => void;
-  /** 更换位置落点选择器 */
-  movePlacement: MovePlacement;
-  beginMove: (terminalId: string) => void;
-  cancelMove: () => void;
+  /** Shared pane reposition placement. */
+  paneMove: PaneMovePlacement;
+  beginPaneMove: (containerId: string, paneId: string) => void;
+  cancelPaneMove: () => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
@@ -47,7 +48,7 @@ export const useUiStore = create<UiState>((set) => ({
   splitPlacement: { open: false, spec: null },
   beginSplit: (spec) => set({ splitPlacement: { open: true, spec: spec ?? null } }),
   cancelSplit: () => set({ splitPlacement: { open: false, spec: null } }),
-  movePlacement: { open: false, terminalId: null },
-  beginMove: (terminalId) => set({ movePlacement: { open: true, terminalId } }),
-  cancelMove: () => set({ movePlacement: { open: false, terminalId: null } }),
+  paneMove: { open: false, containerId: '', paneId: '' },
+  beginPaneMove: (containerId, paneId) => set({ paneMove: { open: true, containerId, paneId } }),
+  cancelPaneMove: () => set({ paneMove: { open: false, containerId: '', paneId: '' } }),
 }));

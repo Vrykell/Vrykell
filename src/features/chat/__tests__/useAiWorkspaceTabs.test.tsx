@@ -9,7 +9,9 @@ import { closeAiWorkspaceSession } from '../services/aiWorkspace';
 import { useWorkbenchStore } from '@features/workspace/stores/workbench';
 import { workspaceStripEntities } from '@features/workspace/model/workbench';
 
-vi.mock('../services/aiWorkspace', () => ({ closeAiWorkspaceSession: vi.fn() }));
+const closeMock = vi.hoisted(() => vi.fn());
+vi.mock('../services/aiSessionClose', () => ({ closeAiWorkspaceSession: closeMock }));
+vi.mock('../services/aiWorkspace', () => ({ closeAiWorkspaceSession: closeMock }));
 
 const conversations = [
   { id: 'c1', title: 'Investigation', createdAt: 1, updatedAt: 1, environment: null },

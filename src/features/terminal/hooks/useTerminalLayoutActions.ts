@@ -6,7 +6,6 @@ import { defaultOpenModeForShell } from '@features/agent';
 import {
   dropTargets,
   findLeaf,
-  moveTargets,
   removeLeaf,
   setRatio,
   splitLeaf,
@@ -30,19 +29,10 @@ export function useTerminalLayoutActions({ windowId, layout }: UseTerminalLayout
   const setFocusedPane = useTerminalStore((state) => state.setFocusedPane);
   const splitPlacement = useUiStore((state) => state.splitPlacement);
   const cancelSplit = useUiStore((state) => state.cancelSplit);
-  const movePlacement = useUiStore((state) => state.movePlacement);
-  const cancelMove = useUiStore((state) => state.cancelMove);
 
   const placementTargets = useMemo(
     () => (splitPlacement.open ? dropTargets(layout) : []),
     [layout, splitPlacement.open],
-  );
-
-  const movePlacementTargets = useMemo(
-    () => (movePlacement.open && movePlacement.terminalId
-      ? moveTargets(layout, movePlacement.terminalId)
-      : []),
-    [layout, movePlacement.open, movePlacement.terminalId],
   );
 
   const commitPlacement = useCallback((zone: DropTarget) => {
@@ -74,12 +64,6 @@ export function useTerminalLayoutActions({ windowId, layout }: UseTerminalLayout
     setFocusedPane(dragId);
   }, [layout, setFocusedPane, setWindowLayout, windowId]);
 
-  const completeMove = useCallback((zone: DropTarget) => {
-    const dragId = movePlacement.terminalId;
-    if (dragId) commitMove(dragId, zone);
-    cancelMove();
-  }, [cancelMove, commitMove, movePlacement.terminalId]);
-
   const setRatioNode = useCallback((aId: string, bId: string, ratio: number) => {
     setWindowLayout(windowId, setRatio(layout, aId, bId, ratio));
   }, [layout, setWindowLayout, windowId]);
@@ -87,13 +71,9 @@ export function useTerminalLayoutActions({ windowId, layout }: UseTerminalLayout
   return {
     splitPlacement,
     cancelSplit,
-    movePlacement,
-    cancelMove,
     placementTargets,
-    movePlacementTargets,
     commitPlacement,
     commitMove,
-    completeMove,
     setRatioNode,
   };
 }

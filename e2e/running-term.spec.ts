@@ -246,7 +246,7 @@ test('真 alt 屏 TUI 的窗格右键菜单提供顶栏快捷操作', async ({ p
   await page.locator('.terminal-pane .xterm').first().click({ button: 'right' });
   const menu = page.getByRole('menu', { name: '操作菜单' });
   await expect(menu).toBeVisible();
-  const labels = ['重绘终端', '终止命令', '结束前台应用', '复制', '粘贴', '分裂终端（选位置）'];
+  const labels = ['重绘终端', '终止命令', '结束前台应用', '复制', '粘贴', '拆分标签页'];
   for (const [index, label] of labels.entries()) {
     await expect(menu.getByRole('button').nth(index)).toContainText(label);
   }

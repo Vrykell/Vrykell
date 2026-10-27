@@ -1,5 +1,6 @@
 import type { EditorFile } from '@core/editor';
 import { useSessionStore, terminalsOf } from '@features/workspace';
+import { presentWorkspaceResource } from '@features/workspace/services/unifiedWorkspace';
 import { waitForTerminalStartup } from '@features/terminal/services/terminalStartup';
 import { ptyWrite } from '@platform/pty';
 import { parentOf } from '@platform/path';
@@ -26,5 +27,6 @@ export async function openInTerminal(file: EditorFile, elevated = false) {
     else { const result = await openFile(file.path, next => { command = next; }, shellType); if (result.via === 'system' || !command) return; }
     tabId = store.addTab({ cwd: parentOf(file.path) ?? undefined, title, shellType });
   }
+  presentWorkspaceResource(`terminal:${tabId}#0`);
   const session = await waitForTerminalStartup(`${tabId}#0`); await ptyWrite(session, command.endsWith('\n') ? command : `${command}\n`);
 }

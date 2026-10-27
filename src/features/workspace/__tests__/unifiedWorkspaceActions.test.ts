@@ -5,7 +5,8 @@ import { compositionTabs, useUnifiedWorkspace } from '../stores/unifiedWorkspace
 import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useChatStore } from '@features/chat/stores/chat';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
-import { addUnifiedResource, focusUnifiedResource, closeTerminalPane, connectUnifiedAgent, createUnifiedResource, createUnifiedTerminal, requestTerminalSplit, requestWorkspaceSplit, showUnifiedTerminalGroup } from '../services/unifiedWorkspace';
+import { createSideConversation, moveSideConversationToMain } from '@features/chat/services/aiWorkspace';
+import { addUnifiedResource, focusUnifiedResource, closeTerminalPane, connectUnifiedAgent, createUnifiedResource, createUnifiedTerminal, presentWorkspaceResource, requestTerminalSplit, requestWorkspaceSplit, showUnifiedTerminalGroup } from '../services/unifiedWorkspace';
 import { editorFileKey } from '@core/editor';
 import { renameWorkspaceResource } from '../services/workspaceResources';
 import { workspacePaneCells, workspacePaneIds } from '../model/workspaceResources';
@@ -52,6 +53,31 @@ it('adds an existing resource to the active composition instead of opening anoth
   expect(useUnifiedWorkspace.getState().activeTabId).toBe(active);
 });
 
+it('moves a side conversation into the active unified composition without switching areas', async () => {
+  createUnifiedResource('terminal'); const active = useUnifiedWorkspace.getState().activeTabId;
+  const id = `chat:${createSideConversation()}`;
+  moveSideConversationToMain();
+  await vi.waitFor(() => expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toContain(id));
+  expect(useWorkspaceNavigation.getState().area).toBe('unified');
+  expect(useUnifiedWorkspace.getState().activeTabId).toBe(active);
+  expect(compositionTabs()).toHaveLength(1);
+  expect(useAiWorkspace.getState().sideSelected).toBe('');
+});
+
+it('routes a presentation by the current workspace instead of leaving the area ambiguous', () => {
+  createUnifiedResource('terminal'); const active = useUnifiedWorkspace.getState().activeTabId;
+  const file = { path: '/repo/routed.txt' }; useWorkspaceStore.getState().openEditorFile(file);
+  const id = `file:${editorFileKey(file)}`;
+  presentWorkspaceResource(id);
+  expect(useWorkspaceNavigation.getState().area).toBe('unified');
+  expect(useUnifiedWorkspace.getState().activeTabId).toBe(active);
+  expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toContain(id);
+  expect(compositionTabs()).toHaveLength(1);
+  useWorkspaceNavigation.setState({ area: 'terminal' });
+  presentWorkspaceResource(id);
+  expect(useWorkspaceNavigation.getState().area).toBe('code');
+});
+
 it('splits an agent through its existing connection model and preserves its directory', () => {
   const source = useHarnessWorkspace.getState().connect('agent', '/work/project');
   useUnifiedWorkspace.setState({ layout: { type: 'pane', id: 'source', resourceId: `acp:${source}` }, focused: 'source' });
@@ -78,8 +104,9 @@ it('projects existing terminal panes into one layout and splits through a separa
   expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toEqual(['terminal:source#0', 'terminal:source#1']);
   const before = useWorkspaceStore.getState().tabs[0];
   requestTerminalSplit({ id: '', kind: 'local', shellType: 'cmd' });
-  expect(useUnifiedWorkspace.getState().pendingTerminalSplit).toMatchObject({ shellType: 'cmd' });
-  createUnifiedTerminal(useUnifiedWorkspace.getState().pendingTerminalSplit, { leafId: 'source#0', dir: 'col', position: 'second', rect: { x: 0, y: 0.5, w: 0.5, h: 0.5 } });
+  expect(useUnifiedWorkspace.getState().choosingSplit).toBe(true);
+  useUnifiedWorkspace.setState({ choosingSplit: false });
+  createUnifiedTerminal({ id: '', kind: 'local', shellType: 'cmd' }, { leafId: 'source#0', dir: 'col', position: 'second', rect: { x: 0, y: 0.5, w: 0.5, h: 0.5 } });
   expect(useWorkspaceStore.getState().tabs[0]).toBe(before);
   expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toHaveLength(3);
   closeTerminalPane('source#1');

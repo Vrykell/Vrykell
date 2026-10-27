@@ -11,5 +11,5 @@ export function useWorkspacePaneControls(scope: WorkspaceScope) {
 }
 
 export function useWorkspacePlacementActive(scope: WorkspaceScope) {
-  return workspaceAreaStores[scope](state => !!(state.pendingMergeTab || state.pendingTerminalSplit || state.choosingSplit));
+  return workspaceAreaStores[scope](state => !!(state.pendingMergeTab || state.choosingSplit));
 }

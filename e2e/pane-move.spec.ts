@@ -65,7 +65,7 @@ test('拖动终端重排：运行中块的 PTY 保活（不重挂、命令不退
   await expectAnyTermContains(page, 'keep-alive-marker', 3000);
 });
 
-test('更换位置：悬停目标落点后点击即可移动窗格', async ({ page }) => {
+test('更换窗格位置：悬停目标落点后点击即可移动窗格', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
@@ -74,26 +74,26 @@ test('更换位置：悬停目标落点后点击即可移动窗格', async ({ pa
   const panes = page.locator('.terminal-pane:visible');
   await expect(panes).toHaveCount(2);
 
-  // 右键第一个窗格 → 更换位置：被移动的窗格在剩余区域的落点里悬停并点击
+  // Right-click the first pane and choose reposition; the moving pane is absent from its targets.
   const movedId = await panes.first().getAttribute('data-testid');
   await panes.first().click({ button: 'right' });
-  await page.getByText('更换位置', { exact: true }).click();
+  await page.getByRole('button', { name: '更换窗格位置', exact: true }).click();
   await expect(page.getByTestId('placement-overlay')).toBeVisible();
   await pickPlacementZone(page, panes.first(), 'bottom');
 
-  // 原窗格换到下方并重新获得焦点
+  // The original pane moves below and keeps focus.
   const moved = (await page.locator(`[data-testid="${movedId}"]`).boundingBox())!;
   const other = (await panes.first().boundingBox())!;
   expect(moved.y).toBeGreaterThan(other.y);
   await expect(page.locator(`[data-testid="${movedId}"]`)).toHaveAttribute('data-focused', 'true');
 });
 
-test('更换位置在只有一个终端时提示并保持原状', async ({ page }) => {
+test('a single terminal omits reposition while split remains available', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.locator('.terminal-pane:visible').first().click({ button: 'right' });
-  await page.getByText('更换位置', { exact: true }).click();
-  await expect(page.getByText('只有一个终端，无法更换位置')).toBeVisible();
+  await expect(page.getByRole('button', { name: '更换窗格位置', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '拆分标签页', exact: true })).toBeVisible();
   await expect(page.getByTestId('placement-overlay')).toHaveCount(0);
 });

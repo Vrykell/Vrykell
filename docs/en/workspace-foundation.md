@@ -37,6 +37,20 @@ The shared `workspace-containers-v2` snapshot stores containers, pane references
 
 The native terminal session payload is the boundary encoding used by current history. It is validated for finite ratios, bounded depth/count, valid terminal metadata and unique pane identities. Its traversal, ratio updates and geometry use the shared algorithms. The `workspace` row kind is metadata, never a native page or a process owner. Resource repositories and singleton utility pages remain domain concerns; the side panel remains a placement of an existing conversation host.
 
+## Resource presentation routing
+
+Every action that creates or moves a resource into the workspace uses one presentation rule. When the current area is not the unified workspace, the resource is activated in its native area: files open in the code workspace, terminal-backed opens in the terminal workspace, and conversations or agents in the AI workspace. When the current area is the unified workspace, the resource is created natively and a reference is added to the active composition instead; the area stays unified. If the active composition already holds four panes, the reference opens in a new composition tab.
+
+This rule covers preferred-editor and terminal file opens, file-panel new tabs, AI side conversations moved back to the workspace, SSH and command-history terminal launches. Resource activation remains the native owner's responsibility after routing.
+
+## Pane actions and split flow
+
+Pane context menus use one order in every scope: Split tab, Change pane position, Zoom pane / Restore panes, Move pane to new tab, Remove pane. Terminal panes append clipboard, running-command, SSH and terminal-type actions, and show a single-terminal close action when only one pane remains. The tab action menu exposes the same common pane actions.
+
+Change pane position is a shared placement mode: the moving pane is removed from the target geometry before the overlay is measured, and `moveWorkspacePane` reinserts the same pane identity at the chosen slot. It clears zoom before opening the overlay, keeps focus on the moved pane and persists the resulting terminal order through the existing workbench projection.
+
+Splitting is always an explicit placement action and stops at four panes. In the unified workspace, splitting a terminal opens the shared split-resource menu (existing unplaced resources, new terminal/file/conversation, file picker or agent) instead of creating a terminal by default. Native terminal splitting still selects a slot first and inherits the focused terminal type; the terminal-type picker remains a native terminal action. Global shortcuts follow the same rule: the unified shortcut opens the split menu, while native terminal shortcuts keep their inheritance/direct-split behavior.
+
 ## Lifecycle and history
 
 Switching a tab restores its entire pane tree, focused pane and zoom state. Choosing an existing resource in a native workspace opens or selects its owning container; the common workspace's switcher moves the reference into the active composition and focuses it when already present. Splitting is an explicit placement action. Detach and merge keep pane/resource identities and live content hosts; terminal effects follow the stable pane identity while reading the current persistence owner.
@@ -51,6 +65,10 @@ Workspace history writes serialize by both live container and durable history id
 
 | Finding | Resolution |
 | --- | --- |
+| Opening files and moving AI conversations chose navigation targets inconsistently | Added one presentation rule: native areas route to the resource's workspace, unified adds a reference and stays unified |
+| Pane menus differed by scope and had no reposition action | Added one common action order and a shared pane-move overlay for terminal, code, AI and unified panes; tab action menus expose the same common actions |
+| Unified terminal split silently inherited a terminal and skipped the split picker | Unified split now opens the shared split-resource menu; the pending-terminal-split path was removed |
+| Terminal pane menus offered split/type actions at four panes | Split and terminal-type entries now follow the same four-pane limit as every other pane menu |
 | Resource-projection rows could masquerade as tabs | Removed the projection-only tab model and native composition-page variant; every content row comes from a canonical container |
 | Terminal, scoped and common trees repeated mutation/geometry code | Shared generic tree operations, ratio updates, geometry and pane canvas; retained only wire/domain adapters |
 | Terminal store retained unused group mutation/archive APIs | Removed those APIs and their obsolete semantics; group actions use the common lifecycle service |

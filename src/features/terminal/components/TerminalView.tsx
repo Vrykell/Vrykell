@@ -11,9 +11,9 @@ import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import { SplitPaneSurface } from '@ui/layout/SplitPane';
 import WorkspacePaneCanvas from '@features/workspace/components/WorkspacePaneCanvas';
 import { useWorkspaceResources } from '@features/workspace/hooks/useWorkspaceResources';
-import { terminalWorkspaceLayout } from '@features/workspace/model/workspaceResources';
+import { terminalWorkspaceLayout, workspacePaneCells } from '@features/workspace/model/workspaceResources';
 import { useWorkspaceContainer, useWorkspacePaneControls } from '@features/workspace/hooks/useWorkspaceContainer';
-import { detachWorkspacePane, mergeWorkspaceContainers, zoomWorkspaceContainer } from '@features/workspace/services/workbench';
+import { detachWorkspacePane, mergeWorkspaceContainers, moveWorkspacePane, zoomWorkspaceContainer } from '@features/workspace/services/workbench';
 import { showsPaneChatHistory } from '../model/paneHistory';
 import { useTypographyStore } from '@config/typography';
 import { useRef, useEffect, useLayoutEffect, useState, useId, useCallback } from 'react';
@@ -22,7 +22,7 @@ import { CircleX, Minimize2, Square } from '@ui/icons';
 import TerminalLauncher from '@features/workspace/components/TerminalLauncher';
 import { STATUS_ACTION_ICON_SIZE, StatusActionButton, TerminalStatusBar } from '@features/terminal/components/TerminalStatusBar';
 import { MoveDragLayer, PlacementOverlay } from './TerminalPlacementOverlay';
-import { useCanRemoveWorkspacePane, useSessionStore, useWorkspaceNavigation, type Tab } from '@features/workspace';
+import { useSessionStore, useWorkspaceNavigation, type Tab } from '@features/workspace';
 import { useTerminalStore, useInputStore } from '@features/terminal';
 import { useUiStore, useDockDragStore } from '@features/workspace';
 import { useBlockStore, selectBlocks } from '@features/terminal';
@@ -57,14 +57,13 @@ import SshStatusPanel from '@features/ssh/components/SshStatusPanel';
 import type { SshSessionStatus } from '@core/ssh';
 import { useManualFullscreenVisible } from '../hooks/useManualFullscreenVisible';
 import ResourceContent from '@ui/layout/ResourceContent';
-import { closeTerminalPane, requestTerminalSplit } from '@features/workspace/services/unifiedWorkspace';
+import { closeTerminalPane, requestTerminalSplit, requestWorkspaceSplit } from '@features/workspace/services/unifiedWorkspace';
 import { detachCompositionPane, useUnifiedWorkspace } from '@features/workspace';
 
 export default function TerminalView({ active = true }: { active?: boolean }) {
   const area = useWorkspaceNavigation(state => state.area);
   const unified = area === 'unified';
   const nativeTerminal = area === 'terminal';
-  const canRemovePane = useCanRemoveWorkspacePane();
   const tabs = useSessionStore((s) => s.tabs);
   const activeId = useSessionStore((s) => s.activeId);
   const setSession = useTerminalStore((s) => s.setSession);
@@ -75,6 +74,10 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
 
   const activeTab = tabs.find((t) => t.id === activeId);
   const isSession = activeTab?.kind === 'session';
+  const activeContainer = useWorkspaceContainer('terminal', activeId);
+  const unifiedZoomed = useUnifiedWorkspace(state => state.zoomed);
+  const unifiedPaneCount = useUnifiedWorkspace(state => state.layout ? workspacePaneCells(state.layout).length : 0);
+  const zoomed = unified ? !!unifiedZoomed : !!activeContainer?.zoomed;
 
   const focusedTermId = isSession
     ? (focusedPaneId && sessions[focusedPaneId] && layoutLeaves(activeTab!.layout).some((t) => t.id === focusedPaneId)
@@ -95,27 +98,46 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
   const runningActions = useRunningCommandActions(focusedTermId, fullscreenMenu ? 'fullscreen' : tuiInPane ? 'altScreen' : 'block');
   const copySelection = () => { void copyTerminalSelection(getPaneTerminal(focusedTermId)); };
   const pasteIntoPane = () => { void pasteClipboardIntoTerminal(focusedTermId); };
-  const ctxMenuItems: ContextMenuItem[] = !ctxMenu ? [] : fullscreenMenu ? [
-    ...runningActions,
-    { label: t('terminal.menu.copy'), group: 'clipboard', shortcut: 'Ctrl+C', onClick: copySelection },
-    { label: t('terminal.menu.paste'), group: 'clipboard', shortcut: 'Ctrl+V', onClick: pasteIntoPane },
-  ] : [
-    ...(hasRunningCommand ? runningActions : []),
-    ...(ctxMenu.sshActions ?? []),
-    { label: t('terminal.menu.copy'), group: 'clipboard', shortcut: 'Ctrl+C', onClick: copySelection },
-    { label: t('terminal.menu.paste'), group: 'clipboard', shortcut: 'Ctrl+V', onClick: pasteIntoPane },
-    { label: t(unified ? 'Split tab' : 'Split terminal (choose position)'), group: 'view', onClick: () => requestTerminalSplit(null) },
-    { label: t('Choose split type'), group: 'view', onClick: () => useUiStore.getState().openSplitPicker() },
-    ...(!unified && isSession && layoutLeaves(activeTab!.layout).length > 1 ? [
-      { label: t('Move pane to new tab'), group: 'view' as const, onClick: () => useSessionStore.getState().detachTerminalPane(focusedTermId) },
-    ] : []),
-    ...(!unified ? [{ label: t('Move terminal'), group: 'view' as const, onClick: () => useUiStore.getState().beginMove(focusedTermId) }] : []),
-    ...(unified && canRemovePane ? [
-      { label: t(useUnifiedWorkspace.getState().zoomed ? 'Restore panes' : 'Zoom pane'), group: 'view' as const, onClick: () => useUnifiedWorkspace.getState().single() },
-      { label: t('Move pane to new tab'), group: 'view' as const, onClick: () => detachCompositionPane(`terminal:${focusedTermId}`) },
-    ] : []),
-    ...(!unified || canRemovePane ? [{ label: t(unified ? 'Remove pane' : 'Close this terminal'), danger: !unified, onClick: () => closeTerminalPane(focusedTermId) }] : []),
+  const paneCount = unified ? unifiedPaneCount : isSession ? layoutLeaves(activeTab!.layout).length : 0;
+  const multiPane = paneCount > 1;
+  const canSplit = paneCount > 0 && paneCount < 4;
+  const beginPaneMoveAction = () => {
+    const unifiedState = useUnifiedWorkspace.getState();
+    const paneId = unified
+      ? unifiedState.layout && workspacePaneCells(unifiedState.layout).find(cell => cell.resourceId === `terminal:${focusedTermId}`)?.id
+      : focusedTermId;
+    if (!paneId) return;
+    if (zoomed) {
+      if (unified) unifiedState.single();
+      else zoomWorkspaceContainer(activeId);
+    }
+    useUiStore.getState().beginPaneMove(unified ? unifiedState.activeTabId : activeId, paneId);
+  };
+  const commonActions: ContextMenuItem[] = [
+    ...(canSplit ? [{ label: t('Split tab'), group: 'view' as const, onClick: () => unified ? requestWorkspaceSplit(`terminal:${focusedTermId}`) : requestTerminalSplit(null) }] : []),
+    ...(multiPane ? [{
+      label: t('Change pane position'), group: 'view' as const,
+      onClick: beginPaneMoveAction,
+    }, {
+      label: t(zoomed ? 'Restore panes' : 'Zoom pane'), group: 'view' as const,
+      onClick: () => unified ? useUnifiedWorkspace.getState().single() : zoomWorkspaceContainer(activeId),
+    }, {
+      label: t('Move pane to new tab'), group: 'view' as const,
+      onClick: () => unified ? detachCompositionPane(`terminal:${focusedTermId}`) : useSessionStore.getState().detachTerminalPane(focusedTermId),
+    }, {
+      label: t('Remove pane'), group: 'view' as const, onClick: () => closeTerminalPane(focusedTermId),
+    }] : []),
+    ...(!unified && canSplit ? [{ label: t('Choose split type'), group: 'view' as const, onClick: () => useUiStore.getState().openSplitPicker() }] : []),
+    ...(!unified && !multiPane ? [{ label: t('Close this terminal'), group: 'view' as const, danger: true, onClick: () => closeTerminalPane(focusedTermId) }] : []),
   ];
+  const paneActions: ContextMenuItem[] = [
+    ...(fullscreenMenu ? runningActions : hasRunningCommand ? runningActions : []),
+    ...(!fullscreenMenu ? ctxMenu?.sshActions ?? [] : []),
+    { label: t('terminal.menu.copy'), group: 'clipboard', shortcut: 'Ctrl+C', onClick: copySelection },
+    { label: t('terminal.menu.paste'), group: 'clipboard', shortcut: 'Ctrl+V', onClick: pasteIntoPane },
+    ...commonActions,
+  ];
+  const ctxMenuItems: ContextMenuItem[] = !ctxMenu ? [] : paneActions;
 
   return (
     <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column', position: 'relative' }}>
@@ -204,13 +226,9 @@ function SessionTabView(props: {
   const {
     splitPlacement,
     cancelSplit,
-    movePlacement,
-    cancelMove,
     placementTargets,
-    movePlacementTargets,
     commitPlacement,
     commitMove,
-    completeMove,
     setRatioNode,
   } = useTerminalLayoutActions({ windowId, layout });
 
@@ -237,16 +255,6 @@ function SessionTabView(props: {
           <PlacementOverlay targets={placementTargets} onPick={commitPlacement} onCancel={cancelSplit} hint={t('Click here to split the terminal')} />
         )}
 
-        {/* Replace-position picker (menu entry, same slots as dragging a pane). */}
-        {active && movePlacement.open && (
-          <PlacementOverlay
-            targets={movePlacementTargets}
-            emptyMessage={t('A single terminal cannot be moved')}
-            onPick={completeMove}
-            onCancel={cancelMove}
-          />
-        )}
-
         {/* Pane drag placement layer. */}
         {active && draggingId && (
           <MoveDragLayer layout={layout} draggingId={draggingId} onCommit={commitMove} />
@@ -270,12 +278,14 @@ function PaneLayout({ layout, windowId, focusedTermId, active, setRatioNode }: {
   const resources = useWorkspaceResources();
   const canonical = useWorkspaceContainer('terminal', windowId);
   const controls = useWorkspacePaneControls('terminal');
-  return <WorkspacePaneCanvas layout={canonical?.layout ?? terminalWorkspaceLayout(layout)} focused={focusedTermId} zoomed={canonical?.zoomed} resources={resources} visible={active} retainHeader
+  return <WorkspacePaneCanvas containerId={windowId} layout={canonical?.layout ?? terminalWorkspaceLayout(layout)} focused={focusedTermId} zoomed={canonical?.zoomed} resources={resources} visible={active} retainHeader
     dividerTestPrefix="terminal-divider" onFocus={id => useTerminalStore.getState().setFocusedPane(id.slice('terminal:'.length))}
     placing={active && !!controls.pendingMergeTab} onRatio={setRatioNode} onPlace={target => {
       if (controls.pendingMergeTab) void mergeWorkspaceContainers(controls.pendingMergeTab, windowId, target);
       controls.chooseMerge();
-    }} onCancel={() => controls.chooseMerge()} onSplit={() => requestTerminalSplit(null)}
+    }} onCancel={() => controls.chooseMerge()}
+    onSplit={id => useWorkspaceNavigation.getState().area === 'unified' ? requestWorkspaceSplit(id) : requestTerminalSplit(null)}
+    onMovePane={(paneId, target) => moveWorkspacePane(windowId, paneId, target)}
     onRemove={id => closeTerminalPane(id.slice('terminal:'.length))} onDetach={id => detachWorkspacePane('terminal', id)}
     onZoom={() => zoomWorkspaceContainer(windowId)} />;
 }

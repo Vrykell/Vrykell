@@ -1,5 +1,5 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { availableSideConversationIds, createSideAgent, createSideConversation, moveMainConversationToSide } from '../services/aiWorkspace';
+import { availableSideConversationIds, createSideAgent, createSideConversation, moveMainConversationToSide, moveSideConversationToMain } from '../services/aiWorkspace';
 import { useAiWorkspace } from '../stores/aiWorkspace';
 import { useChatStore } from '../stores/chat';
 import { useHarnessWorkspace } from '../stores/harnessWorkspace';
@@ -37,6 +37,14 @@ it('keeps previous side conversations assigned to the sidebar until explicitly m
   expect(availableSideConversationIds()).toEqual(new Set([`chat:${second}`]));
   expect(useAiWorkspace.getState().sideSelected).toBe(`chat:${second}`);
   expect(useAiWorkspace.getState().sideSessions).toEqual([`chat:${second}`]);
+});
+
+it('moves the selected side conversation into the AI workspace when the current area is native', () => {
+  const id = createSideConversation();
+  moveSideConversationToMain();
+  expect(useWorkspaceNavigation.getState().area).toBe('ai');
+  expect(useAiWorkspace.getState().nativeTabs).toContain(id);
+  expect(useAiWorkspace.getState().sideSelected).toBe('');
 });
 
 it('detaches only the explicitly moved conversation from a main split', () => {

@@ -6,19 +6,24 @@ import { PlacementOverlay } from '@ui/layout/PanePlacement';
 import type { PaneTarget } from '@core/paneLayout';
 import { t } from '@i18n';
 import ContextMenu from '@ui/menus/ContextMenu';
-import { fitWorkspacePanes, measureWorkspacePanes, workspacePaneCells, workspaceSplitDirection, type WorkspacePaneLayout, type WorkspaceResource } from '../model/workspaceResources';
+import { fitWorkspacePanes, measureWorkspacePanes, pruneWorkspacePanes, workspacePaneCells, workspaceSplitDirection, type WorkspacePaneLayout, type WorkspaceResource } from '../model/workspaceResources';
+import { useUiStore } from '../stores/ui';
 
-export default function WorkspacePaneCanvas({ layout, focused, zoomed, resources, visible, toolbarTarget, retainHeader, dividerTestPrefix, onFocus, onRatio, placing, onPlace, onCancel, onSplit, onRemove, onDetach, onZoom }: {
-  layout: WorkspacePaneLayout | null; focused: string; resources: WorkspaceResource[]; visible: boolean; toolbarTarget?: HTMLElement | null; retainHeader?: boolean;
+export default function WorkspacePaneCanvas({ containerId, layout, focused, zoomed, resources, visible, toolbarTarget, retainHeader, dividerTestPrefix, onFocus, onRatio, placing, onPlace, onCancel, onSplit, onRemove, onDetach, onMovePane, onZoom }: {
+  containerId: string; layout: WorkspacePaneLayout | null; focused: string; resources: WorkspaceResource[]; visible: boolean; toolbarTarget?: HTMLElement | null; retainHeader?: boolean;
   onFocus: (id: string) => void; onRatio: (first: string, second: string, ratio: number) => void; placing?: boolean; onPlace: (target: PaneTarget) => void; onCancel: () => void;
   onSplit?: (id: string) => void; onRemove?: (id: string) => void;
-  zoomed?: string | null; onDetach?: (id: string) => void; onZoom?: () => void;
+  zoomed?: string | null; onDetach?: (id: string) => void; onMovePane?: (paneId: string, target: PaneTarget) => void; onZoom?: () => void;
   dividerTestPrefix?: string;
 }) {
   const body = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 1000, height: 600 });
   const [menu, setMenu] = useState<{ id: string; x: number; y: number } | null>(null);
-  useEffect(() => { if (!visible) { setMenu(null); if (placing) onCancel(); } }, [visible, placing, onCancel]);
+  const paneMove = useUiStore(state => state.paneMove);
+  const beginPaneMove = useUiStore(state => state.beginPaneMove);
+  const cancelPaneMove = useUiStore(state => state.cancelPaneMove);
+  const moving = paneMove.open && paneMove.containerId === containerId ? paneMove.paneId : '';
+  useEffect(() => { if (!visible) { setMenu(null); if (placing) onCancel(); if (moving) cancelPaneMove(); } }, [visible, placing, onCancel, moving, cancelPaneMove]);
   useEffect(() => {
     const element = body.current; if (!element || !visible) return;
     const update = () => { if (element.clientWidth > 0 && element.clientHeight > 0) setSize({ width: element.clientWidth, height: element.clientHeight }); };
@@ -29,6 +34,13 @@ export default function WorkspacePaneCanvas({ layout, focused, zoomed, resources
   const fitted = useMemo(() => displayLayout && fitWorkspacePanes(displayLayout, size.width, size.height), [displayLayout, size]);
   const geometry = useMemo(() => fitted && measureWorkspacePanes(fitted.layout), [fitted]);
   const cells = layout ? workspacePaneCells(layout) : [];
+  const movingTargets = useMemo(() => {
+    if (!layout || !moving) return [];
+    const current = workspacePaneCells(layout);
+    if (!current.some(cell => cell.id === moving)) return [];
+    const remaining = pruneWorkspacePanes(layout, new Set(current.filter(cell => cell.id !== moving).map(cell => cell.resourceId)));
+    return remaining ? measureWorkspacePanes(remaining).targets : [];
+  }, [layout, moving]);
   // A narrow window may stack a horizontal split. Dragging the adapted divider must not
   // write its vertical ratio back into the saved horizontal layout.
   const persistRatio = (aId: string, bId: string, ratio: number) => {
@@ -43,8 +55,16 @@ export default function WorkspacePaneCanvas({ layout, focused, zoomed, resources
       return resource && <WorkspacePaneHost resource={resource} cell={cell} visible={visible} focused={cell.id === focused} toolbarTarget={toolbarTarget} retainHeader={retainHeader} onFocus={onFocus}
         onMenu={(event) => { onFocus(resource.id); setMenu({ id: resource.id, x: event.clientX, y: event.clientY }); }} />;
     }}>{placing && <PlacementOverlay targets={geometry.targets} onPick={onPlace} onCancel={onCancel} hint={t('Choose a split position')} />}</SplitPaneLayout>}
+    {moving && visible && <PlacementOverlay targets={movingTargets} onPick={target => { onMovePane?.(moving, target); cancelPaneMove(); }} onCancel={cancelPaneMove} zIndex={110}
+      hint={t('Choose a pane position')} emptyMessage={t('A single pane cannot be moved')} />}
     {menu && visible && <ContextMenu anchor={menu} label={t('Pane actions')} itemRole="menuitem" onClose={() => setMenu(null)} items={[
       ...(onSplit && cells.length < 4 ? [{ label: t('Split tab'), onClick: () => onSplit(menu.id) }] : []),
+      ...(onMovePane && cells.length > 1 ? [{ label: t('Change pane position'), onClick: () => {
+        const cell = cells.find(cell => cell.resourceId === menu.id);
+        if (zoomed) onZoom?.();
+        if (cell) beginPaneMove(containerId, cell.id);
+        setMenu(null);
+      } }] : []),
       ...(onZoom && cells.length > 1 ? [{ label: t(zoomed ? 'Restore panes' : 'Zoom pane'), onClick: onZoom }] : []),
       ...(onDetach && cells.length > 1 ? [{ label: t('Move pane to new tab'), onClick: () => onDetach(menu.id) }] : []),
       ...(onRemove && cells.length > 1 ? [{ label: t('Remove pane'), onClick: () => onRemove(menu.id) }] : []),

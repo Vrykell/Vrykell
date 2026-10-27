@@ -26,6 +26,28 @@ test('splits files inside the editor workspace and preserves independent buffers
   await expect(page.locator('.monaco-editor:visible')).toHaveCount(1);
 });
 
+test('repositions a file pane through the shared pane menu', async ({ page }) => {
+  await setupTauriMock(page, {}); await page.goto('/');
+  await page.getByTestId('workspace-area-code').click();
+  await page.getByTestId('code-start-page-content').getByRole('button', { name: '新建文件', exact: true }).click();
+  const bar = page.getByTestId('workspace-instance-bar');
+  await bar.getByRole('button', { name: '拆分标签页', exact: true }).click();
+  await page.getByRole('menuitem', { name: '新建文件', exact: true }).click();
+  const workspace = page.getByTestId('pane-workspace-code');
+  await pickPlacementZone(page, workspace.locator('.unified-pane').first(), 'right');
+  await expect(workspace.locator('.monaco-editor')).toHaveCount(2);
+  const moved = workspace.locator('.unified-pane').first();
+  const other = workspace.locator('.unified-pane').last();
+  await moved.locator('.monaco-editor').click({ button: 'right', position: { x: 80, y: 50 } });
+  await page.getByRole('menu', { name: '窗格操作', exact: true }).getByRole('menuitem', { name: '更换窗格位置', exact: true }).click();
+  await expect(page.getByTestId('placement-overlay')).toBeVisible();
+  await pickPlacementZone(page, other, 'bottom');
+  await expect(workspace.locator('.monaco-editor')).toHaveCount(2);
+  const movedBounds = (await workspace.locator('.unified-pane').last().boundingBox())!;
+  const otherBounds = (await workspace.locator('.unified-pane').first().boundingBox())!;
+  expect(movedBounds.y).toBeGreaterThan(otherBounds.y);
+});
+
 test('opens an existing file as a split only after choosing its position', async ({ page }) => {
   await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-code').click();

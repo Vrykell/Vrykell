@@ -14,6 +14,7 @@ import { useWorkspaceNavigation } from '../stores/navigation';
 import { useUiStore } from '../stores/ui';
 import { measureWorkspacePanes, rebindWorkspaceResources, workspacePaneCells, type WorkspaceResource } from '../model/workspaceResources';
 import { connectUnifiedAgent, createUnifiedResource, createUnifiedTerminal, focusUnifiedResource, reconcileUnifiedResources, removeUnifiedPane } from '../services/unifiedWorkspace';
+import { moveWorkspacePane } from '../services/workbench';
 import { openWorkspaceFile, pickWorkspaceFile } from '../services/workspaceActions';
 import WorkspaceResourceSwitcher from './WorkspaceResourceSwitcher';
 import SshResourcesAction from './SshResourcesAction';
@@ -68,11 +69,6 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
     if (!state.choosingSplit || !visible || !splitButton.current) return;
     anchor(splitButton.current, true); useUnifiedWorkspace.setState({ choosingSplit: false });
   }, [state.choosingSplit, visible]);
-  useEffect(() => {
-    if (!visible || !state.pendingTerminalSplit) return;
-    setPlacement({ kind: 'terminal', spec: state.pendingTerminalSplit });
-    useUnifiedWorkspace.setState({ pendingTerminalSplit: undefined });
-  }, [visible, state.pendingTerminalSplit]);
   useEffect(() => { if (state.pendingMergeTab) setPlacement({ kind: 'tab', id: state.pendingMergeTab }); }, [state.pendingMergeTab]);
   useEffect(() => { if (!visible) { setMenu(null); setPlacement(null); setLauncher(null); setTerminalPicker(null); } }, [visible]);
   useEffect(() => { setMenu(null); setPlacement(null); setLauncher(null); setTerminalPicker(null); }, [state.activeTabId]);
@@ -114,9 +110,10 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
     {state.startActive && <UnifiedStartPage resources={resources} icon={resourceIcon} onSelect={focusUnifiedResource}
       onNew={kind => kind === 'terminal' ? setTerminalPicker({ source: 'shell', split: false }) : newItem(kind)} onOpen={() => void openWorkspaceFile()}
       onConnect={() => setTerminalPicker({ source: 'ssh', split: false })} onAgent={() => setLauncher({ split: false })} onHistory={history} />}
-    <WorkspacePaneCanvas layout={state.layout} focused={state.focused} zoomed={state.zoomed} resources={resources} visible={visible && !state.startActive} toolbarTarget={resourceToolbar}
+    <WorkspacePaneCanvas containerId={state.activeTabId} layout={state.layout} focused={state.focused} zoomed={state.zoomed} resources={resources} visible={visible && !state.startActive} toolbarTarget={resourceToolbar}
       onFocus={focusUnifiedResource} onRatio={state.ratio} placing={!!placement} onPlace={commit} onCancel={() => { setPlacement(null); state.chooseMerge(); }}
       onSplit={id => { useUnifiedWorkspace.setState({ zoomed: null }); focusUnifiedResource(id); useUnifiedWorkspace.setState({ choosingSplit: true }); }}
+      onMovePane={(paneId, target) => moveWorkspacePane(state.activeTabId, paneId, target)}
       onRemove={removeUnifiedPane} onDetach={detachCompositionPane} onZoom={state.single} />
     {menu && <ContextMenu anchor={menu.anchor} label={t(menu.split ? 'Choose a tab to split' : 'New workspace tab')} itemRole="menuitem" onClose={() => setMenu(null)} items={flattenSingleSubmenu<ContextMenuItem>(menu.split
       ? [...resources.filter(resource => !placed.has(resource.id)).map(resource => ({ label: resource.title, onClick: () => beginPlacement({ kind: 'existing', id: resource.id }) })), { label: t('New workspace tab'), group: 'edit', submenu: { items: creation } }]

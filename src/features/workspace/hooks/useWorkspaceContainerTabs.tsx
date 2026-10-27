@@ -11,6 +11,7 @@ import type { WorkspaceTabStrip } from '../model/tabStrip';
 import { activateContainer, assignWorkspaceGroup, closeContainer, createContainerGroup, detachWorkspacePane, focusNativeContainerResource, persistWorkspaceOrder, removeContainerPane, removeWorkspaceGroup, renameContainer, synchronizeWorkbench, updateWorkspaceGroup, zoomWorkspaceContainer } from '../services/workbench';
 import { reportWorkbenchFailure } from '../stores/workbenchFeedback';
 import { workspaceAreaStores } from '../stores/paneWorkspace';
+import { useUiStore } from '../stores/ui';
 import { requestWorkspaceSplit } from '../services/unifiedWorkspace';
 
 /** Every strip row is a layout-owning container, including a one-resource tab. */
@@ -60,6 +61,7 @@ export function useWorkspaceContainerTabs(scope: WorkspaceScope, resourceHandles
       return [
         ...(cells.length < 4 ? [{ label: t('Split tab'), onClick: () => { activateContainer(id); requestWorkspaceSplit(focused.resourceId); } }] : []),
         ...(cells.length > 1 ? [
+          { label: t('Change pane position'), onClick: () => { activateContainer(id); if (tab.zoomed) zoomWorkspaceContainer(id); useUiStore.getState().beginPaneMove(id, focused.id); } },
           { label: t(tab.zoomed ? 'Restore panes' : 'Zoom pane'), onClick: () => zoomWorkspaceContainer(id) },
           { label: t('Move pane to new tab'), onClick: () => { activateContainer(id); detachWorkspacePane(scope, focused.resourceId); } },
           { label: t('Remove pane'), onClick: () => removeContainerPane(id, focused.resourceId) },

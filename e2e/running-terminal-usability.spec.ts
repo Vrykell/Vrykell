@@ -58,7 +58,7 @@ test('运行中块右键菜单前置工具栏快捷操作并可直接触发', as
   await expect(menu).toBeVisible();
 
   // The toolbar actions come first, then copy/paste and the pane actions.
-  const labels = ['重绘终端', '终止命令', '结束前台应用', '进入全屏交互', '复制', '粘贴', '分裂终端（选位置）'];
+  const labels = ['重绘终端', '终止命令', '结束前台应用', '进入全屏交互', '复制', '粘贴', '拆分标签页'];
   for (const [index, label] of labels.entries()) {
     await expect(menu.getByRole('button').nth(index)).toContainText(label);
   }

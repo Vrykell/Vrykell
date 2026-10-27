@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
 import WorkspacePaneCanvas from '../components/WorkspacePaneCanvas';
 import type { WorkspacePaneLayout, WorkspaceResource } from '../model/workspaceResources';
+import { useUiStore } from '../stores/ui';
 
 vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
 afterEach(cleanup);
@@ -14,7 +15,7 @@ const resources: WorkspaceResource[] = [
 
 it('provides shared editor and agent pane menus without exposing removal for the last pane', () => {
   const remove = vi.fn(); const focus = vi.fn();
-  const props = { focused: 'first', resources, visible: true, onFocus: focus, onRatio: vi.fn(), onPlace: vi.fn(), onCancel: vi.fn(), onSplit: vi.fn(), onRemove: remove };
+  const props = { containerId: 'container', focused: 'first', resources, visible: true, onFocus: focus, onRatio: vi.fn(), onPlace: vi.fn(), onCancel: vi.fn(), onSplit: vi.fn(), onRemove: remove, onMovePane: vi.fn() };
   const layout: WorkspacePaneLayout = { type: 'split', direction: 'row', ratio: 0.5, first, second };
   const view = render(<WorkspacePaneCanvas {...props} layout={layout} />);
   const preventNative = (event: MouseEvent) => event.preventDefault();
@@ -25,6 +26,10 @@ it('provides shared editor and agent pane menus without exposing removal for the
     expect(remove).toHaveBeenLastCalledWith(resource.id);
     expect(focus).toHaveBeenLastCalledWith(resource.id);
   }
+  fireEvent.contextMenu(view.container.querySelector('[data-resource-id="file:first"]')!, { clientX: 20, clientY: 20 });
+  fireEvent.click(screen.getByRole('menuitem', { name: '更换窗格位置' }));
+  expect(useUiStore.getState().paneMove).toMatchObject({ open: true, containerId: 'container', paneId: 'first' });
+  useUiStore.getState().cancelPaneMove();
   view.rerender(<WorkspacePaneCanvas {...props} layout={first} />);
   fireEvent.contextMenu(view.container.querySelector('[data-resource-id="file:first"]')!, { clientX: 20, clientY: 20 });
   expect(screen.queryByRole('menuitem', { name: '移除此分屏' })).toBeNull();
