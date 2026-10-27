@@ -16,7 +16,7 @@ import { useWorkspaceStore } from '../stores/workspace';
 import { useWorkbenchStore } from '../stores/workbench';
 import { workspaceAreaStores } from '../stores/paneWorkspace';
 import { useWorkspaceNavigation } from '../stores/navigation';
-import { activateContainer, assignWorkspaceGroup, closeContainer, createContainerGroup, detachWorkspacePane, focusNativeContainerResource, mergeWorkspaceContainers, persistWorkspaceOrder, removeContainerPane, removeWorkspaceGroup, renameContainer, requestCloseContainers, restoreWorkbench, startWorkbenchRuntime, synchronizeWorkbench, terminalLayoutFromContainer, undoCloseContainer, updateWorkspaceGroup, zoomWorkspaceContainer } from '../services/workbench';
+import { activateContainer, assignWorkspaceGroup, closeContainer, createContainerGroup, detachWorkspacePane, focusNativeContainerResource, mergeWorkspaceContainers, persistWorkspaceOrder, rebindWorkspaceResourceId, removeContainerPane, removeWorkspaceGroup, renameContainer, requestCloseContainers, restoreWorkbench, runWithoutWorkbenchSync, startWorkbenchRuntime, synchronizeWorkbench, terminalLayoutFromContainer, undoCloseContainer, updateWorkspaceGroup, zoomWorkspaceContainer } from '../services/workbench';
 import { panesOf } from '../model/workbench';
 import * as restoreService from '../services/restoreWorkspaceHistory';
 import * as sessionManager from '../services/sessionManager';
@@ -90,6 +90,27 @@ it('adopts every native resource once, retains multi-pane terminal containers an
   useWorkspaceStore.setState({ tabs: [] }); synchronizeWorkbench(); expect(useWorkbenchStore.getState().snapshot.tabs.some(tab => tab.scope === 'terminal')).toBe(false);
   useWorkbenchStore.setState({ ready: false }); document(); synchronizeWorkbench(); useWorkspaceStore.setState({ tabs: [] }); synchronizeWorkbench();
   expect(useWorkbenchStore.getState().snapshot.tabs.some(tab => tab.scope === 'code')).toBe(true);
+});
+
+it('keeps a saved draft in its code and common split placements', () => {
+  useWorkbenchStore.setState({ ready: true, snapshot: emptyWorkbench(), lastClosed: null });
+  const draft = { path: 'Untitled.txt', draftId: 'draft' };
+  const draftId = `file:${editorFileKey(draft)}`;
+  document(); useWorkspaceStore.getState().openEditorFile(draft); synchronizeWorkbench();
+  workspaceAreaStores.code.getState().show(draftId); workspaceAreaStores.code.getState().split(fileId, 'row');
+  const codeContainer = workspaceAreaStores.code.getState().activeTabId;
+  const mixedId = mixed(draftId, fileId);
+  const target = { path: '/repo/saved.txt' }; const targetId = `file:${editorFileKey(target)}`;
+  runWithoutWorkbenchSync(() => {
+    rebindWorkspaceResourceId(draftId, targetId);
+    useWorkspaceStore.getState().replaceEditorFile(draft, target);
+  });
+  expect(panesOf(current(codeContainer)).map(pane => pane.resourceId)).toEqual([targetId, fileId]);
+  expect(panesOf(current(mixedId)).map(pane => pane.resourceId)).toEqual([targetId, fileId]);
+  expect(useWorkbenchStore.getState().snapshot.selected.code).toBe(codeContainer);
+  expect(useWorkbenchStore.getState().snapshot.selected.unified).toBe(mixedId);
+  expect(useWorkbenchStore.getState().snapshot.tabs.some(tab => panesOf(tab).some(pane => pane.resourceId === draftId))).toBe(false);
+  useWorkbenchStore.setState({ ready: false, snapshot: emptyWorkbench(), lastClosed: null });
 });
 
 it('follows native terminal insertion order after a grouped restore', () => {

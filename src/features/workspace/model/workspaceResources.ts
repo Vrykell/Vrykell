@@ -68,6 +68,15 @@ export function rebindWorkspaceResources(layout: WorkspacePaneLayout, resources:
   return first === layout.first && second === layout.second ? layout : { ...layout, first, second };
 }
 
+/** Swap one pane reference while preserving the rest of the layout and its pane identity. */
+export function replaceWorkspacePaneResource(layout: WorkspacePaneLayout, previousId: string, nextId: string): WorkspacePaneLayout {
+  if (previousId === nextId) return layout;
+  if (layout.type === 'pane') return layout.resourceId === previousId ? { ...layout, resourceId: nextId } : layout;
+  const first = replaceWorkspacePaneResource(layout.first, previousId, nextId);
+  const second = replaceWorkspacePaneResource(layout.second, previousId, nextId);
+  return first === layout.first && second === layout.second ? layout : { ...layout, first, second };
+}
+
 export const measureWorkspacePanes = (layout: WorkspacePaneLayout, rect?: { x: number; y: number; w: number; h: number }) => measurePaneTree(layout, node => node.type === 'pane' ? { id: node.id } : { ...node, dir: node.direction }, rect);
 
 export function workspaceSplitDirection(layout: WorkspacePaneLayout, aId: string, bId: string): 'row' | 'col' | undefined {

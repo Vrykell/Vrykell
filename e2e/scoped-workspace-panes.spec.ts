@@ -66,6 +66,30 @@ test('keeps terminal splitting native and badges the original terminal icon', as
   await page.screenshot({ path: info.outputPath('native-terminal-count-badge.png') });
 });
 
+test('keeps a saved new file in its split pane instead of exiting the editor', async ({ page }) => {
+  await setupTauriMock(page, {}); await page.goto('/');
+  await page.getByTestId('workspace-area-code').click();
+  await page.getByTestId('code-start-page-content').getByRole('button', { name: '新建文件', exact: true }).click();
+  const bar = page.getByTestId('workspace-instance-bar');
+  await bar.getByRole('button', { name: '拆分标签页', exact: true }).click();
+  await page.getByRole('menuitem', { name: '新建文件', exact: true }).click();
+  const workspace = page.getByTestId('pane-workspace-code');
+  await pickPlacementZone(page, workspace.locator('.unified-pane').first(), 'right');
+  await expect(workspace.locator('.monaco-editor')).toHaveCount(2);
+  const first = workspace.locator('.unified-pane').first();
+  await first.locator('textarea.inputarea').focus(); await page.keyboard.insertText('split draft');
+  await page.evaluate(() => {
+    (window as unknown as { __PICK_PATHS__: string[] }).__PICK_PATHS__ = ['/home/e2e/notes/split.txt'];
+    localStorage.setItem('mock-editor-missing', JSON.stringify(['/home/e2e/notes/split.txt']));
+  });
+  await page.keyboard.press('Control+s');
+  await expect(first.locator('.folder-path')).toContainText('/home/e2e/notes/split.txt');
+  await expect(workspace.locator('.monaco-editor')).toHaveCount(2);
+  await first.locator('textarea.inputarea').focus(); await page.keyboard.press('Control+End'); await page.keyboard.insertText(' more');
+  await expect(first.locator('.view-lines')).toHaveText('split draft more');
+  await expect(page.locator('.workspace-layout')).toHaveAttribute('data-area', 'code');
+});
+
 test('keeps split conversation tools in the existing tab strip, not extra pane headers', async ({ page }, info) => {
   await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-ai').click();

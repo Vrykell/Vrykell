@@ -7,7 +7,7 @@ import { useTerminalStore } from '@features/terminal/stores/terminal';
 import * as groupApi from '@platform/api/group';
 import { t } from '@i18n';
 import { assignContainerGroup, emptyWorkbench, focusContainerResource, mergeContainers, panesOf, putContainer, reconcileContainers, releaseContainerResources, removeContainers, selectContainer, workspaceStripEntities, WORKSPACE_SCOPES, type WorkspaceContainer, type WorkspaceScope } from '../model/workbench';
-import { terminalResourceLayout, terminalWorkspaceLayout } from '../model/workspaceResources';
+import { replaceWorkspacePaneResource, terminalResourceLayout, terminalWorkspaceLayout } from '../model/workspaceResources';
 import { leaves, type WindowLayout } from '../model/windowLayout';
 import { useWorkbenchStore } from '../stores/workbench';
 import { workspaceAreaStores } from '../stores/paneWorkspace';
@@ -22,12 +22,23 @@ import type { PaneTarget } from '@core/paneLayout';
 import type { WorkspaceResource } from '../model/workspaceResources';
 
 let synchronizing = false;
+let suspended = 0;
 const savedWorkbench = useWorkbenchStore.getState().snapshot;
 const nativeScope = (kind: string): WorkspaceScope => kind === 'terminal' ? 'terminal' : kind === 'document' || kind === 'comparison' ? 'code' : 'ai';
 
+/**
+ * Apply paired native and workbench changes before the subscription observes either half.
+ * A resource identity change would otherwise prune the old pane before its replacement exists.
+ */
+export function runWithoutWorkbenchSync(operation: () => void) {
+  suspended += 1;
+  try { operation(); }
+  finally { suspended -= 1; if (!suspended) synchronizeWorkbench(); }
+}
+
 /** Native stores are resource repositories; only the workbench owns tab placement. */
 export function synchronizeWorkbench() {
-  if (synchronizing) return;
+  if (synchronizing || suspended) return;
   synchronizing = true;
   try {
     const workspace = useWorkspaceStore.getState(); const resources = currentWorkspaceResources().filter(resource => resource.kind !== 'page');
@@ -71,6 +82,22 @@ export function synchronizeWorkbench() {
       return JSON.stringify(state) === JSON.stringify(snapshot) ? snapshot : state;
     });
   } finally { synchronizing = false; }
+}
+
+/** Keep every placement when a resource changes identity, such as a saved draft. */
+export function rebindWorkspaceResourceId(previousId: string, nextId: string) {
+  if (previousId === nextId) return;
+  useWorkbenchStore.getState().update(state => {
+    let changed = false;
+    const tabs = state.tabs.map(tab => {
+      if (!tab.layout || !panesOf(tab).some(pane => pane.resourceId === previousId)) return tab;
+      const layout = replaceWorkspacePaneResource(tab.layout, previousId, nextId);
+      if (layout === tab.layout) return tab;
+      changed = true;
+      return { ...tab, layout };
+    });
+    return changed ? { ...state, tabs } : state;
+  });
 }
 
 export function activateContainer(id: string) {
