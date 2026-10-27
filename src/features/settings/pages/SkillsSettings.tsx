@@ -130,7 +130,7 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
   };
   const del = async () => {
     await removeSkill(skill.name);
-    toast(`已删除 ${skill.name}`, 'success');
+    toast(t('Deleted {{name}}.', { name: skill.name }), 'success');
     onChanged();
     onClose();
   };
@@ -142,31 +142,31 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <OutlineButton onClick={onClose}><ArrowLeft size={16} aria-hidden="true" />{t('Back')}</OutlineButton>
         <div style={{ flex: 1 }} />
-        <OutlineButton onClick={() => void fileOpenWith(skill.dir)} style={btn}>打开文件夹</OutlineButton>
+        <OutlineButton onClick={() => void fileOpenWith(skill.dir)} style={btn}>{t('Open folder')}</OutlineButton>
         <OutlineButton onClick={() => void toggleTrust()} style={btn}>
-          {skill.trusted ? '取消信任' : '信任'}
+          {skill.trusted ? t('Untrust') : t('Trust')}
         </OutlineButton>
         <OutlineButton onClick={() => void toggleEnabled()} style={btn}>
-          {skill.enabled ? '禁用' : '启用'}
+          {skill.enabled ? t('Disable') : t('Enable')}
         </OutlineButton>
         <OutlineButton onClick={() => void del()} style={{ ...btn, color: 'var(--control-danger-color)' }}>{t('Delete')}</OutlineButton>
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)' }}>{skill.name}</span>
-        {skill.trusted ? <Badge text="已信任" tone="ok" /> : <Badge text="未信任" tone="warn" />}
-        {!skill.enabled && <Badge text="已禁用" tone="muted" />}
-        {skill.hasScripts && <Badge text="含脚本" tone="danger" />}
-        {skill.modified && <Badge text="已修改" tone="warn" />}
-        <Badge text={skill.source || '本地'} tone="muted" />
+        {skill.trusted ? <Badge text={t('Trusted')} tone="ok" /> : <Badge text={t('Untrusted')} tone="warn" />}
+        {!skill.enabled && <Badge text={t('Disabled')} tone="muted" />}
+        {skill.hasScripts && <Badge text={t('Contains scripts')} tone="danger" />}
+        {skill.modified && <Badge text={t('Modified')} tone="warn" />}
+        <Badge text={skill.source || t('Local')} tone="muted" />
       </div>
 
       <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)', marginTop: 8 }}>
-        {skill.description || '无描述'}
+        {skill.description || t('No description')}
       </div>
       {skill.allowedTools && (
         <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', marginTop: 6 }}>
-          允许工具：<span style={{ fontFamily: 'var(--font-ui)' }}>{skill.allowedTools}</span>
+          {t('Allowed tools:')} <span style={{ fontFamily: 'var(--font-ui)' }}>{skill.allowedTools}</span>
         </div>
       )}
       <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', marginTop: 6, wordBreak: 'break-all' }}>
@@ -174,7 +174,7 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
       </div>
 
       <div style={{ marginTop: 12 }}>
-        <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', marginBottom: 6 }}>文件</div>
+        <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', marginBottom: 6 }}>{t('Files')}</div>
         <SkillFileBrowser skillName={skill.name} files={skill.files} />
       </div>
 
@@ -186,7 +186,7 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
           fontSize: 'calc(11px * var(--ui-font-scale))', fontFamily: 'var(--font-ui)', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
           color: 'var(--text-secondary)',
         }}>
-          {skill.prompt || '正文为空'}
+          {skill.prompt || t('Empty prompt')}
         </pre>
       </div>
     </div>
@@ -314,7 +314,7 @@ export default function SkillsSettings() {
           background: 'var(--accent-warm-dim)', fontSize: 'calc(11px * var(--ui-font-scale))', lineHeight: 1.5, color: 'var(--accent-warm)',
         }}>
           <ShieldAlert size={14} style={{ flexShrink: 0 }} />
-          <span style={{ flex: 1 }}>技能可能包含脚本，启用即信任其内容；脚本执行仍受 AI 权限管控。导入的第三方技能默认未信任。</span>
+          <span style={{ flex: 1 }}>{t('Skills may contain scripts; enabling one trusts its content. Script execution still follows AI permission rules. Imported third-party skills are untrusted by default.')}</span>
           <IconButton compact onClick={() => setWarnDismissed(true)} data-tip={t('Close')} aria-label={t('Close')}><X size={16} /></IconButton>
         </div>
       )}
@@ -322,24 +322,24 @@ export default function SkillsSettings() {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <TextInput
           value={importUrl}
-          placeholder="从 URL 导入技能清单"
+          placeholder={t('Import a skill manifest from a URL')}
           onChange={(e) => setImportUrl(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void doImportUrl(); }}
           style={input}
         />
         <OutlineButton onClick={() => void doImportUrl()} disabled={importing} style={{ ...btn, flexShrink: 0 }}>
-          {importing ? '导入中…' : '导入'}
+          {importing ? t('Importing…') : t('Import')}
         </OutlineButton>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <OutlineButton onClick={() => void doImportPath(true)} disabled={importing} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <Download size={13} /> 导入文件夹
+          <Download size={13} /> {t('Import folder')}
         </OutlineButton>
         <OutlineButton onClick={() => void doImportPath(false)} disabled={importing} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <Download size={13} /> 导入压缩包
+          <Download size={13} /> {t('Import archive')}
         </OutlineButton>
         <OutlineButton onClick={() => setMarket(true)} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <Store size={13} /> 技能市场
+          <Store size={13} /> {t('Skill marketplace')}
         </OutlineButton>
       </div>
 
@@ -355,7 +355,7 @@ export default function SkillsSettings() {
       <SettingsGroup title={t('Installed skills')}><div className="settings-record-list">
       {metas.length === 0 && (
         <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: '6px 0' }}>
-          还没有技能，可从 URL、文件夹或压缩包导入。
+          {t('No skills yet. Import from a URL, folder or archive.')}
         </div>
       )}
 
@@ -371,23 +371,23 @@ export default function SkillsSettings() {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>{m.name}</span>
-            {m.trusted ? <Badge text="已信任" tone="ok" /> : <Badge text="未信任" tone="warn" />}
-            {!m.enabled && <Badge text="禁用" tone="muted" />}
-            {m.hasScripts && <Badge text="含脚本" tone="danger" />}
-            {m.modified && <Badge text="已修改" tone="warn" />}
-            <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{m.source || '本地'}</span>
-            <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{m.files.length} 个文件</span>
+            {m.trusted ? <Badge text={t('Trusted')} tone="ok" /> : <Badge text={t('Untrusted')} tone="warn" />}
+            {!m.enabled && <Badge text={t('Disabled')} tone="muted" />}
+            {m.hasScripts && <Badge text={t('Contains scripts')} tone="danger" />}
+            {m.modified && <Badge text={t('Modified')} tone="warn" />}
+            <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{m.source || t('Local')}</span>
+            <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{t('{{count}} files', { count: m.files.length })}</span>
             <div style={{ flex: 1 }} />
             <OutlineButton onClick={(e) => { e.stopPropagation(); void toggleTrust(m); }} style={btn}>
-              {m.trusted ? '取消信任' : '信任'}
+              {m.trusted ? t('Untrust') : t('Trust')}
             </OutlineButton>
             <OutlineButton onClick={(e) => { e.stopPropagation(); void toggleEnabled(m); }} style={btn}>
-              {m.enabled ? '禁用' : '启用'}
+              {m.enabled ? t('Disable') : t('Enable')}
             </OutlineButton>
             <IconButton compact tone="danger" onClick={(e) => { e.stopPropagation(); void del(m.name); }} data-tip={t('Delete skill')} aria-label={t('Delete skill')}><Trash2 size={16} /></IconButton>
           </div>
           <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)', marginTop: 4 }}>
-            {m.description || '无描述'}
+            {m.description || t('No description')}
           </div>
         </div>
       ))}

@@ -1,5 +1,6 @@
 import { SquareTerminal } from '@ui/icons';
 import { registerSource } from '@features/search/services/registry';
+import { t } from '@i18n';
 import type { BackendBlockEntry } from '@platform/api/types';
 import type { SearchResult, BlockResultData } from '@features/search/types';
 import { searchBlocks } from '@platform/api/search';
@@ -40,7 +41,7 @@ function extractSnippet(
 
 registerSource({
   id: 'block',
-  label: '终端输出',
+  label: t('Terminal output'),
   icon: SquareTerminal,
   search: async (query: string): Promise<SearchResult[]> => {
     if (!query.trim()) return [];
@@ -60,7 +61,7 @@ registerSource({
         title: b.command || '(no command)',
         subtitle: cmdMatch ? undefined : (snippet?.text ?? stripAnsi(displayOutput).slice(0, 80)),
         detail: b.started_at
-          ? `${b.session_title} · ${fmtDuration(Date.now() - b.started_at)}前`
+          ? t('{{title}} · {{duration}} ago', { title: b.session_title, duration: fmtDuration(Date.now() - b.started_at) })
           : b.session_title,
         data: {
           blockId: b.id,

@@ -69,7 +69,7 @@ export function activeModelProfile(): ModelProfile {
     s.models.find((m) => m.id === s.activeModel) ??
     s.models[0] ?? {
       id: 'default',
-      name: '默认模型',
+      name: t('Default model'),
       provider: s.provider,
       baseUrl: s.baseUrl,
       model: s.model,

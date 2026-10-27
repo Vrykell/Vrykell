@@ -83,7 +83,7 @@ export function NumberInput({ value, onChange, min, max }: {
         const n = Math.round(Number(next));
         if (Number.isFinite(n)) return onChange(Math.min(max, Math.max(min, n)));
       }}
-      validate={next => next.trim() && Number.isFinite(Number(next)) ? undefined : '请输入有效数字'}
+      validate={next => next.trim() && Number.isFinite(Number(next)) ? undefined : t('Enter a valid number')}
       style={{ width: 120 }}
     />
   );
@@ -119,7 +119,7 @@ export function TemplateListEditor({ value, onChange, placeholder }: {
         <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
           <TextInput
             value={r.ext}
-            placeholder="扩展名，如 md"
+            placeholder={t('Extension, e.g. md')}
             onChange={(e) => updateRow(i, { ext: e.target.value })}
             style={{ ...inputStyle, width: 120, flexShrink: 0 }}
           />
@@ -136,7 +136,7 @@ export function TemplateListEditor({ value, onChange, placeholder }: {
         onClick={() => sync([...rows, { ext: '', cmd: '' }])}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
       >
-        <Plus size={iconSizes.compact} /> 添加
+        <Plus size={iconSizes.compact} /> {t('Add')}
       </OutlineButton>
       <div><SaveStatus inline status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} /></div>
     </div>

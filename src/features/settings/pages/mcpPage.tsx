@@ -50,7 +50,7 @@ export function McpPage() {
     setBusy(name);
     try {
       await connectMcp(name);
-      toast(`已连接 ${name}`, 'success');
+      toast(t('Connected to {{name}}', { name }), 'success');
     } catch (e) {
       toast(String((e as Error)?.message ?? e), 'error');
     } finally {
@@ -74,7 +74,7 @@ export function McpPage() {
   const del = async (name: string) => {
     try {
       await removeMcpServer(name);
-      toast(`已删除 ${name}`, 'success');
+      toast(t('Deleted {{name}}.', { name }), 'success');
       refresh();
     } catch (e) {
       toast(String((e as Error)?.message ?? e), 'error');
@@ -87,18 +87,18 @@ export function McpPage() {
   return (
     <SettingsGroup title={t('External tools')}><Field
       layout="stacked"
-      title="MCP 服务器"
+      title={t('MCP servers')}
       description={t('Connect external tools using a command and arguments or a server URL.')}
     >
       <div className="settings-record-list">
         {listError && (
-          <ErrorBox actions={<button onClick={refresh} style={{ minHeight: 32 }}>重试</button>}>
+          <ErrorBox actions={<button onClick={refresh} style={{ minHeight: 32 }}>{t('Retry')}</button>}>
             {listError}
           </ErrorBox>
         )}
         {!listError && servers.length === 0 && drafts.length === 0 && (
           <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: '6px 0' }}>
-            还没有 MCP 服务器，点下方「添加服务器」创建一个。
+            {t('No MCP servers yet. Use Add server below to create one.')}
           </div>
         )}
         {servers.map((s) => (
@@ -128,7 +128,7 @@ export function McpPage() {
           onClick={addNew}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 4, alignSelf: 'flex-start' }}
         >
-          <Plus size={12} /> 添加服务器
+          <Plus size={12} /> {t('Add server')}
         </OutlineButton>
       </div>
     </Field></SettingsGroup>
@@ -157,14 +157,14 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
     }
     if (savedName.current !== name) {
       const existing = await listMcpServers();
-      if (existing.some(server => server.name === name)) throw new Error('服务器名已存在');
+      if (existing.some(server => server.name === name)) throw new Error(t('A server with this name already exists.'));
     }
     await saveMcpServer({ name, command: next.command.trim(), args: next.args.split(/\s+/).filter(Boolean),
       env: parseEnvLines(next.env), url: next.url.trim(), enabled: next.enabled });
     if (savedName.current && savedName.current !== name) await removeMcpServer(savedName.current);
     savedName.current = name;
     onSaved();
-  }, next => !next.name.trim() ? '请填写服务器名' : !next.command.trim() && !next.url.trim() ? '请填写命令或远程地址' : undefined);
+  }, next => !next.name.trim() ? t('Enter a server name') : !next.command.trim() && !next.url.trim() ? t('Enter a command or a remote address') : undefined);
   const { name, command, args, url, env, enabled } = saving.value;
   const change = (patch: Partial<typeof initial>, immediate = false) => saving.setValue(previous => ({ ...previous, ...patch }), immediate);
   const discard = async (operation: () => void) => { await saving.cancel(); operation(); };
@@ -180,7 +180,7 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <TextInput
           value={name}
-          placeholder="服务器名"
+          placeholder={t('Server name')}
           onChange={(e) => change({ name: e.target.value })}
           style={{ ...inputStyle, flex: 1, fontWeight: 'var(--fw-semibold)', minWidth: 120 }}
         />
@@ -190,21 +190,21 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
             color: s.connected ? 'var(--success)' : 'var(--text-muted)',
             background: s.connected ? 'var(--success-bg)' : 'var(--hover)',
           }}>
-            {s.connected ? `已连接 · ${s.toolCount} 工具` : '未连接'}
+            {s.connected ? t('Connected · {{count}} tools', { count: s.toolCount }) : t('Not connected')}
           </span>
         )}
         {s && <Toggle on={enabled} onChange={enabled => change({ enabled }, true)} />}
         <SaveStatus inline status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} />
         {s && s.connected && (
-          <OutlineButton onClick={() => { void saving.flush().then(() => { if (!saving.hasPending()) onDisconnect(savedName.current); }); }} disabled={busy} style={{ flexShrink: 0 }}>断开</OutlineButton>
+          <OutlineButton onClick={() => { void saving.flush().then(() => { if (!saving.hasPending()) onDisconnect(savedName.current); }); }} disabled={busy} style={{ flexShrink: 0 }}>{t('Disconnect')}</OutlineButton>
         )}
         {s && !s.connected && (
           <OutlineButton onClick={() => { void saving.flush().then(() => { if (!saving.hasPending()) onConnect(savedName.current); }); }} disabled={busy} style={{ flexShrink: 0 }}>
-            {busy ? '连接中…' : '连接'}
+            {busy ? t('Connecting…') : t('Connect')}
           </OutlineButton>
         )}
         {draft && onCancel && (
-          <OutlineButton onClick={() => { void discard(onCancel); }} style={{ flexShrink: 0 }}>取消</OutlineButton>
+          <OutlineButton onClick={() => { void discard(onCancel); }} style={{ flexShrink: 0 }}>{t('Cancel')}</OutlineButton>
         )}
         {s && (
           <IconButton compact tone="danger" onClick={() => { void discard(() => onDelete(savedName.current)); }} data-tip={t('Delete server')} aria-label={t('Delete server')}><X size={16} /></IconButton>
@@ -213,20 +213,20 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
         <TextInput
           value={command}
-          placeholder="command，如 npx"
+          placeholder={t('Command, e.g. npx')}
           onChange={(e) => change({ command: e.target.value })}
           style={{ ...inputStyle, flex: 1 }}
         />
         <TextInput
           value={args}
-          placeholder="args，空格分隔"
+          placeholder={t('Arguments, space-separated')}
           onChange={(e) => change({ args: e.target.value })}
           style={{ ...inputStyle, flex: 1 }}
         />
       </div>
       <TextInput
         value={url}
-        placeholder="远程 URL，可选"
+        placeholder={t('Remote URL, optional')}
         onChange={(e) => change({ url: e.target.value })}
         style={{ ...inputStyle, marginTop: 8 }}
       />

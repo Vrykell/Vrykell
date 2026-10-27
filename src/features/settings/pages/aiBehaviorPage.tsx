@@ -35,7 +35,7 @@ export function AiBehaviorPage() {
     <>
       <SettingsGroup title={t('Instructions')}>
         <Field
-          title="配置作用域"
+          title={t('Configuration scope')}
           description={t("Apply these options globally or to one model.")}
         >
           <ModelScopeBar
@@ -52,11 +52,11 @@ export function AiBehaviorPage() {
             background: hasOverride ? 'var(--accent-warm-dim)' : 'var(--hover)',
             fontSize: 'calc(11px * var(--ui-font-scale))', color: hasOverride ? 'var(--accent-warm)' : 'var(--text-muted)',
           }}>
-            <span>{hasOverride ? `已覆盖 ${overrideKeys.length} 项` : '跟随全局默认'}</span>
+            <span>{hasOverride ? t('Overrides {{count}} settings', { count: overrideKeys.length }) : t('Uses global defaults')}</span>
             <div style={{ flex: 1 }} />
             {hasOverride && (
               <OutlineButton data-subtle onClick={() => agentSettings.resetModel(model.id)} >
-                重置为全局默认
+                {t('Reset to global defaults')}
               </OutlineButton>
             )}
           </div>
@@ -64,7 +64,7 @@ export function AiBehaviorPage() {
 
         <Field
           layout="stacked"
-          title="系统提示词"
+          title={t('System prompt')}
           description={t('AI instructions. Leave empty for the default.')}
         >
           <AutoSaveInput
@@ -73,7 +73,7 @@ export function AiBehaviorPage() {
             aria-label={t('System prompt')}
             trim={false}
             value={eff.systemPrompt ?? ''}
-            placeholder="留空使用内置默认提示词"
+            placeholder={t('Leave empty for the built-in prompt')}
             onCommit={systemPrompt => update({ systemPrompt })}
             rows={8}
             style={{
@@ -88,19 +88,19 @@ export function AiBehaviorPage() {
 
       </SettingsGroup>
       <SettingsGroup title={t('Tools and context')}>
-        <Field title="Agent 模式" description={t("Allow AI to use tools.")}>
+        <Field title={t('Agent mode')} description={t("Allow AI to use tools.")}>
           <Toggle on={eff.agentMode} onChange={(v) => update({ agentMode: v })} />
         </Field>
-        <Field title="最大迭代步数" description={t("Maximum tool rounds per response, from 1 to 100.")}>
+        <Field title={t('Maximum iterations')} description={t("Maximum tool rounds per response, from 1 to 100.")}>
           <NumberInput key={scope} value={eff.maxSteps} min={1} max={100} onChange={(v) => update({ maxSteps: v })} />
         </Field>
-        <Field title="上下文策略" description={t("Keep all messages, recent messages or a summary of older messages.")}>
+        <Field title={t('Context strategy')} description={t("Keep all messages, recent messages or a summary of older messages.")}>
           <Select
-            aria-label="上下文策略"
+            aria-label={t('Context strategy')}
             options={[
-              { value: 'off', label: '全量' },
-              { value: 'window', label: '窗口' },
-              { value: 'compact', label: '摘要' },
+              { value: 'off', label: t('All messages') },
+              { value: 'window', label: t('Window') },
+              { value: 'compact', label: t('Summary') },
             ]}
             value={eff.contextStrategy}
             onChange={(v) => { void save(() => update({ contextStrategy: v })); }}
@@ -110,7 +110,7 @@ export function AiBehaviorPage() {
           <NumberInput key={scope} value={eff.contextMaxTokens} min={0} max={1000000} onChange={(v) => update({ contextMaxTokens: v })} />
         </Field>
         {(eff.contextStrategy === 'compact' || targetField === t('Summary length limit')) && (
-          <Field title="摘要长度上限" description={t('Maximum tokens in a context summary.')}>
+          <Field title={t('Summary length limit')} description={t('Maximum tokens in a context summary.')}>
             <NumberInput key={scope} value={eff.contextSummaryTokens} min={64} max={8000} onChange={(v) => update({ contextSummaryTokens: v })} />
           </Field>
         )}
@@ -119,10 +119,10 @@ export function AiBehaviorPage() {
         </Field>
       </SettingsGroup>
       <SettingsGroup title={t('Responses')}>
-        <Field title="回复 Token 上限" description={t('Maximum reply tokens. Use 0 for the provider default.')}>
+        <Field title={t('Reply token limit')} description={t('Maximum reply tokens. Use 0 for the provider default.')}>
           <NumberInput key={scope} value={eff.maxOutputTokens} min={0} max={32768} onChange={(v) => update({ maxOutputTokens: v })} />
         </Field>
-        <Field title="采样温度" description={t("Response randomness. Turn off to use the provider default.")}>
+        <Field title={t('Sampling temperature')} description={t("Response randomness. Turn off to use the provider default.")}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <Toggle on={eff.temperature != null} onChange={(v) => update({ temperature: v ? 0.7 : null })} />
             {eff.temperature != null && (
@@ -147,29 +147,29 @@ export function AiBehaviorPage() {
       {isGlobal && (
         <>
           <SettingsGroup title={t('Session titles')}>
-            <Field title="智能会话标题" description={t('Generate titles without replacing custom names.')}>
+            <Field title={t('Automatic session titles')} description={t('Generate titles without replacing custom names.')}>
               <Toggle on={eff.autoTitle} onChange={(v) => update({ autoTitle: v })} />
             </Field>
-            <Field title="标题模型" description={t("Model for titles. Leave empty to use the chat model.")}>
+            <Field title={t('Title model')} description={t("Model for titles. Leave empty to use the chat model.")}>
               <AutoSaveInput
                 value={eff.titleModel}
-                placeholder="沿用聊天模型"
+                placeholder={t('Use the chat model')}
                 onCommit={titleModel => update({ titleModel })}
                 style={inputStyle}
               />
             </Field>
           </SettingsGroup>
           <SettingsGroup title={t('Completion preferences')}>
-            <Field title="命令自动补全" description={<>{t('Suggest completions while typing commands.')}<span className="composer-key-hints settings-completion-keys"><KeyHint shortcut="Tab" />{t('Accept')}<KeyHint shortcut="Escape" />{t('Dismiss')}</span></>}>
+            <Field title={t('Command completion')} description={<>{t('Suggest completions while typing commands.')}<span className="composer-key-hints settings-completion-keys"><KeyHint shortcut="Tab" />{t('Accept')}<KeyHint shortcut="Escape" />{t('Dismiss')}</span></>}>
               <Toggle on={eff.completeEnabled} onChange={(v) => update({ completeEnabled: v })} />
             </Field>
-            <Field title="补全防抖" description={t('Wait 100–2000 ms before suggesting completions.')}>
+            <Field title={t('Completion debounce')} description={t('Wait 100–2000 ms before suggesting completions.')}>
               <NumberInput key={scope} value={eff.completeDebounceMs} min={100} max={2000} onChange={(v) => update({ completeDebounceMs: v })} />
             </Field>
-            <Field title="补全模型" description={t("Model for completion. Leave empty to use the chat model.")}>
+            <Field title={t('Completion model')} description={t("Model for completion. Leave empty to use the chat model.")}>
               <AutoSaveInput
                 value={eff.completeModel}
-                placeholder="沿用聊天模型"
+                placeholder={t('Use the chat model')}
                 onCommit={completeModel => update({ completeModel })}
                 style={inputStyle}
               />

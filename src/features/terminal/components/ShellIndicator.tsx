@@ -1,7 +1,7 @@
 /**
- * ShellIndicator — 的 Shell 类型胶囊徽章。
+ * ShellIndicator — shell type pill badge.
  *
- * 显示为圆角 pill：连接状态点 + shell 名称，带淡淡的背景色。
+ * Rounded pill with a connection status dot and the shell name on a faint background.
  */
 
 export interface ShellInfo {
@@ -9,7 +9,7 @@ export interface ShellInfo {
   label: string;
 }
 
-/** 根据 shell 路径推断类型 */
+/** Infer the shell type from its path */
 export function detectShell(shellPath?: string): ShellInfo {
   const path = (shellPath ?? '').toLowerCase();
   if (path.includes('zsh')) return { type: 'zsh', label: 'zsh' };
@@ -20,7 +20,7 @@ export function detectShell(shellPath?: string): ShellInfo {
   return { type: 'unknown', label: 'sh' };
 }
 
-/** Shell 类型 → 徽章背景色（：淡色胶囊） */
+/** Shell type → badge background color (faint pill) */
 const SHELL_BG: Record<ShellInfo['type'], string> = {
   zsh: 'var(--hover)',
   bash: 'var(--hover)',
@@ -43,13 +43,13 @@ const SHELL_FG: Record<ShellInfo['type'], string> = {
 
 interface Props {
   shell?: ShellInfo;
-  /** 是否显示连接状态点 */
+  /** Show the connection status dot */
   connected?: boolean;
-  /** 该终端是否为当前聚焦终端（聚焦态点亮绿灯） */
+  /** Whether this terminal is focused (a focused terminal lights the dot green) */
   focused?: boolean;
-  /** 仅显示点 + 名称（无胶囊背景，用于紧凑布局） */
+  /** Show only the dot and name, without a pill background, for compact layouts */
   compact?: boolean;
-  /** 覆盖显示名（终端类型 / SSH 连接名） */
+  /** Override label (terminal type or SSH connection name) */
   label?: string;
 }
 
@@ -57,7 +57,7 @@ export default function ShellIndicator({ shell, connected, focused, compact, lab
   const info = shell ?? { type: 'unknown' as const, label: 'sh' };
   const fg = SHELL_FG[info.type];
   const bg = SHELL_BG[info.type];
-  // 状态点：未连接=红；已连接且聚焦=绿；已连接未聚焦=灰
+  // Status dot: disconnected = red; connected and focused = green; connected but unfocused = muted
   const dotColor = connected === false
     ? 'var(--shell-disconnected)'
     : focused

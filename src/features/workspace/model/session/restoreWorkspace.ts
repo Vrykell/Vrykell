@@ -119,7 +119,7 @@ function createDefaultSession(): PersistableSession | null {
     : null;
 }
 
-/** 默认生产适配器：连接现有 IPC、Store 和 sessionManager。 */
+/** Default production adapter: wires the real IPC layer, stores and sessionManager. */
 export function restoreWorkspace(
   options: { onError?: (message: string, error: unknown) => void; launchDirectory?: string | null } = {},
 ): Promise<void> {

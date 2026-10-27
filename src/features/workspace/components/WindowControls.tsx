@@ -29,7 +29,7 @@ export default function WindowControls() {
         const value = await appWindow.isMaximized();
         if (!disposed) setMaximized(value);
       } catch {
-        // 浏览器预览环境没有窗口状态时保持默认图标。
+        // Keep the default icon when a preview environment exposes no window state.
       }
     };
 
@@ -72,7 +72,7 @@ export default function WindowControls() {
       try {
         setMaximized(await appWindow.isMaximized());
       } catch {
-        // resize 事件会再次同步状态。
+        // The resize event synchronizes the state again.
       }
     });
   }, [withWindow]);

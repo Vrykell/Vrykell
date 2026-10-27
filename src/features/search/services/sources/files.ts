@@ -3,22 +3,23 @@ import { registerSource } from '@features/search/services/registry';
 import { searchFiles as backendSearchFiles } from '@platform/api/search';
 import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
 import { fmtSize } from '@ui/actions/UiBtn';
+import { t } from '@i18n';
 import type { SearchResult, FileResultData } from '@features/search/types';
 import type { BackendFileMatch } from '@platform/api/types';
 
 function fmtTimeAgo(ts: number): string {
   const ms = Date.now() - ts;
-  if (ms < 60000) return '刚刚';
-  if (ms < 3600000) return `${Math.floor(ms / 60000)}分前`;
-  if (ms < 86400000) return `${Math.floor(ms / 3600000)}时前`;
-  return `${Math.floor(ms / 86400000)}天前`;
+  if (ms < 60000) return t('Just now');
+  if (ms < 3600000) return t('{{count}} min ago', { count: Math.floor(ms / 60000) });
+  if (ms < 86400000) return t('{{count}} h ago', { count: Math.floor(ms / 3600000) });
+  return t('{{count}} d ago', { count: Math.floor(ms / 86400000) });
 }
 
 /** File icons are rendered uniformly by SearchResultCard from FileResultData (lib/fileIcon) */
 
 registerSource({
   id: 'file',
-  label: '文件',
+  label: t('Files'),
   icon: FileText,
   search: async (query, options): Promise<SearchResult[]> => {
     try {

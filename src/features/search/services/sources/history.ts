@@ -1,12 +1,13 @@
 import { History } from '@ui/icons';
 import { registerSource } from '@features/search/services/registry';
 import { searchHistory as backendSearchHistory } from '@platform/api/search';
+import { t } from '@i18n';
 import type { SearchResult, HistoryResultData } from '@features/search/types';
 import { useHistoryStore } from '@features/terminal/stores/history';
 
 registerSource({
   id: 'history',
-  label: '命令历史',
+  label: t('Command history'),
   icon: History,
   search: async (query: string): Promise<SearchResult[]> => {
     const lower = query.toLowerCase();

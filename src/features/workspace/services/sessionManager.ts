@@ -1,8 +1,8 @@
 /**
- * sessionManager — 统一会话生命周期管理
+ * Unified session lifecycle management.
  *
- * 所有会话/块的持久化操作都通过此模块，封装后端 invoke + 前端 store 同步。
- * 后续添加会话管理 UI 时，只需接入同一套 API。
+ * Every persistence operation for sessions and blocks goes through this module, which
+ * wraps backend invoke calls and keeps the frontend stores in sync.
  */
 import { useSessionStore, type Tab } from '@features/workspace';
 import { useBlockStore } from '@features/terminal';
@@ -32,9 +32,9 @@ import { t } from '@i18n';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import type { BackendBlockEntry, BackendSessionEntry } from '@platform/api/types';
 
-/** 恢复会话时用于重建 tab 的元数据（kind/payload 已由后端持久化）。 */
+/** Metadata used to rebuild a tab when restoring a session (kind/payload are persisted by the backend). */
 export interface RestoreMeta {
-  /** 恢复为标签时归属的分组 id（恢复整组时保持嵌套关系） */
+  /** Group id the restored tab belongs to (keeps nesting when a whole group is restored). */
   groupId?: string | null;
 }
 
@@ -57,10 +57,10 @@ function applySessionCwd(layout: WindowLayout, cwd: string): WindowLayout {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 会话生命周期
+// Session lifecycle
 // ═══════════════════════════════════════════════════════════════
 
-/** 创建会话（新建标签页时调用），携带类型判别与变体专属 JSON。 */
+/** Create a session (called when a tab is opened), carrying its kind discriminator and kind-specific JSON. */
 export async function create(
   tabId: string,
   title: string,
@@ -131,10 +131,10 @@ export function ensureContentSession(tabId: string): Promise<void> {
   return write;
 }
 
-/** 布局持久化的去抖计时器（分隔线拖拽会高频调整 ratio）。 */
+/** Debounce timers for layout persistence (divider drags adjust the ratio at high frequency). */
 const layoutTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-/** 持久化窗口布局到会话 payload（去抖）。 */
+/** Persist a window layout into the session payload (debounced). */
 export function saveLayout(tabId: string, layout: WindowLayout): void {
   const draft = pendingSessions.get(tabId);
   if (draft) { pendingSessions.set(tabId, { ...draft, payload: JSON.stringify({ layout }) }); return; }
@@ -151,7 +151,7 @@ export function saveLayout(tabId: string, layout: WindowLayout): void {
   );
 }
 
-/** 更新会话当前工作目录（cd 后 OSC 7 上报） */
+/** Update the session working directory (reported through OSC 7 after cd). */
 export async function setCwd(tabId: string, cwd: string): Promise<void> {
   const draft = pendingSessions.get(tabId);
   if (draft) { pendingSessions.set(tabId, { ...draft, cwd }); return; }
@@ -162,7 +162,7 @@ export async function setCwd(tabId: string, cwd: string): Promise<void> {
   }
 }
 
-/** 关闭会话（关闭标签页时调用 — 标记为 historical） */
+/** Close a session (called when a tab is closed - marks it historical). */
 export async function close(tabId: string): Promise<void> {
   await paneTransfers.get(tabId);
   const pending = layoutTimers.get(tabId);
@@ -179,13 +179,13 @@ export async function close(tabId: string): Promise<void> {
   }
 }
 
-/** 恢复会话（撤销关闭 / 搜索恢复 — 标记 active + 加载 blocks + 添加 tab）。 */
+/** Restore a session (undo close / restore from search - mark active, load blocks, add tab). */
 export async function restore(sessionId: string, title: string, meta?: RestoreMeta): Promise<void> {
   let degraded = false;
   // Persist restoration before changing the visible workspace.
   await restoreSession(sessionId);
 
-  // 2. 加载该会话所有 block
+  // 2. Load every block of this session
   let backendBlocks: BackendBlockEntry[] = [];
   try {
     backendBlocks = await getSessionBlocks(sessionId);
@@ -194,7 +194,8 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
     console.warn('sessionManager.restore: get_session_blocks failed:', e);
   }
 
-  // 3. 填充 block store（按终端归属：pane_id 为 null/主 id → 首终端 #0；其余原样）
+  // 3. Fill the block store (terminal ownership: a null pane_id or the main id maps to the
+  // first terminal #0; anything else is kept as is)
   if (backendBlocks.length > 0) {
     const bs = useBlockStore.getState();
     bs.clearBlocks(sessionId);
@@ -217,7 +218,8 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
         endedAt: b.ended_at,
         status,
         wasLongRunning: false,
-        // 落库内容不可信（DB 可能被篡改）：取出的 HTML 快照必须先净化再进渲染管线
+        // Stored content is untrusted (the database may have been tampered with): the
+        // extracted HTML snapshot must be sanitized before it enters the render pipeline.
         outputHtml: sanitizeOutputHtml(b.output_html || ''),
         outputText: b.output_clean || '',
         outputRaw: b.output_raw,
@@ -227,7 +229,7 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
     }
   }
 
-  // 3.5 恢复 AI 对话消息（会话状态的一部分，非命令块）
+  // 3.5 Restore AI conversation messages (part of session state, not command blocks)
   try {
     const backendChat = await listChatMessages(sessionId);
     if (backendChat.length > 0) {
@@ -237,7 +239,7 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
         content: c.content,
         // Empty or malformed parts fall back to plain text rendering.
         parts: deserializeParts(c.parts),
-        // 附件元数据（M5；'' / 脏数据 → undefined）
+        // Attachment metadata (empty or malformed data -> undefined)
         attachments: deserializeAttachments(c.attachments),
         paneId: c.pane_id ?? undefined,
         createdAt: c.created_at,
@@ -253,7 +255,7 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
     console.warn('sessionManager.restore: list_chat_messages failed:', e);
   }
 
-  // 3.6 取回会话完整信息（cwd / kind / payload / group_id）
+  // 3.6 Fetch the full session record (cwd / kind / payload / group_id)
   let info: BackendSessionEntry | null = null;
   try {
     info = await getSession(sessionId);
@@ -305,7 +307,8 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
     });
   }
 
-  // 4. 重建窗口 tab（含布局），设置为 active —— 恢复会话 = 恢复窗口布局
+  // 4. Rebuild the window tab (including its layout) and make it active - restoring a
+  // session restores its window layout.
   const tab: Tab = {
     id: sessionId,
     title: title || info?.title || '',
@@ -354,7 +357,7 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
   }
 }
 
-/** 重命名会话 */
+/** Rename a session. */
 export async function rename(tabId: string, title: string): Promise<void> {
   const draft = pendingSessions.get(tabId);
   if (draft) { pendingSessions.set(tabId, { ...draft, title }); return; }
@@ -365,7 +368,7 @@ export async function rename(tabId: string, title: string): Promise<void> {
   }
 }
 
-/** 删除会话（级联删除 block / 聊天消息）。仅对历史会话调用。 */
+/** Delete a session (cascading to its blocks and chat messages). Only call this for historical sessions. */
 export async function remove(sessionId: string): Promise<void> {
   try {
     await deleteSession(sessionId);
@@ -376,10 +379,10 @@ export async function remove(sessionId: string): Promise<void> {
 }
 
 // ═══════════════════════════════════════════════════════════════
-// 块持久化
+// Block persistence
 // ═══════════════════════════════════════════════════════════════
 
-/** 记录 block（start 和 complete 各调一次 — 后端 UPSERT） */
+/** Record a block (called once on start and once on complete - the backend upserts). */
 export async function record(
   tabId: string,
   paneId: string,
@@ -409,13 +412,4 @@ export async function record(
   }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// 删除（预留）
-// ═══════════════════════════════════════════════════════════════
-
-/**
- * ⚠ 暂不实现
- * 删除会话及所有关联 block（级联删除）。
- * 若该会话仍有活跃 tab，需先关闭 tab。
- */
 export { };

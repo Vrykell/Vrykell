@@ -1,8 +1,6 @@
 import { t } from '@i18n';
 /**
- * inputVisibility — 输入框可见性状态机（对应文档 §7）。
- *
- * 决定输入框在六种条件下是否应该显示。
+ * inputVisibility — decides when the composer is visible (see documentation §7).
  */
 
 export interface InputVisibilityContext {
@@ -14,29 +12,23 @@ export interface InputVisibilityContext {
 }
 
 /**
- * 判断输入框是否可见。
+ * Whether the composer is visible.
  *
- * 条件优先级（§7 简化版，对应 is_input_box_visible() 的 10+ 条件）：
- *   1. 只读 → 隐藏
- *   2. 全屏 TUI 活跃 → 隐藏
- *   3. 长运行命令（非 agent 控制/tagged）→ 隐藏
- *   4. 默认 → 可见
- *
- * 暂不实现：agent 控制、共享会话、对话墓碑、AI block 等待确认。
+ * Priority (simplified §7 version of the full condition set):
+ *   1. read-only → hidden
+ *   2. full-screen TUI active → hidden
+ *   3. long-running command (not agent-controlled/tagged) → hidden
+ *   4. default → visible
  */
 export function isInputBoxVisible(ctx: InputVisibilityContext): boolean {
-  // 1. 只读模式
   if (ctx.isReadOnly) return false;
 
-  // 2. 全屏 TUI 活跃
   if (ctx.isAltScreenActive) return false;
 
-  // 3. 长运行命令 — 默认隐藏（除非 agent 介入）
   if (ctx.isLongRunning && !ctx.isAgentInControl && !ctx.isAgentTaggedIn) {
     return false;
   }
 
-  // 4. 默认可见
   return true;
 }
 

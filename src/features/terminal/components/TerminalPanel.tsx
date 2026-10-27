@@ -21,7 +21,7 @@ import { useSessionStore, useUiStore, useWorkspaceNavigation } from '@features/w
 /** Render an interactive SSH session with xterm so screen contents and cursor stay in sync. */
 interface TerminalPanelProps {
   paneId: string; tabId: string; onReady: (sessionId: string) => void; connectionInput?: boolean;
-  /** 连接页状态行显示的目标（用户@主机），由标签的 SSH 目标传入。 */
+  /** Target shown in the connection page status row (user@host), passed from the tab's SSH target. */
   sshTarget?: string;
   connectionId?: string;
   toolbarHost?: HTMLDivElement | null;
@@ -69,7 +69,7 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
   const exitNotice = t('terminal.processExited');
   const exitNoticeShown = (frame?.plainText ?? '').includes(exitNotice);
   const focusTerminal = () => {
-    // 密码框开着时终端不接受输入：否则切回「密码输入」后仍能点进屏幕里打字
+    // While the secret prompt is open the terminal takes no input; otherwise switching back to password entry would still let the user type into the screen.
     if (inputDisabled || secret) return;
     ref.current?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus();
   };
@@ -85,14 +85,14 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
     setCancelledAuthentication(secret && !sshAuthenticated);
     setCancellation('pending'); setResponse(''); setError('');
     try { await closeSession(); setCancellation('done'); }
-    catch (reason) { cancellingRef.current = false; setCancellation('idle'); setError(`取消失败：${String(reason)}`); }
+    catch (reason) { cancellingRef.current = false; setCancellation('idle'); setError(t('Cancel failed: {{error}}', { error: String(reason) })); }
   };
   const restart = async () => {
     if (cancellation === 'pending') return;
     setCancellation('pending'); setResponse(''); setError(''); setManualSecret(false); setDirectInput(false); setDismissedPrompt(null);
     terminalDebug('ssh-reconnect-request', { paneId });
     try { await reconnect(); cancellingRef.current = false; setCancellation('idle'); }
-    catch (reason) { setCancellation('idle'); setError(`重连失败：${String(reason)}`); }
+    catch (reason) { setCancellation('idle'); setError(t('Reconnect failed: {{error}}', { error: String(reason) })); }
   };
   useEffect(() => {
     if (!connectionInput) return;
@@ -104,7 +104,7 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
     onReconnectReady?.(restart);
     return () => onReconnectReady?.(null);
   }, [connectionInput, onReconnectReady, restart]);
-  // 只要密码框开着就把屏幕冻结成快照：live xterm 会画自己的光标，看着像还有输入焦点
+  // Freeze the screen into a snapshot while the secret prompt is open: a live terminal draws its own cursor and looks like it still has input focus.
   const showSnapshot = !disconnected && secret;
   // Diagnostics: record the rendered snapshot geometry so a width mismatch between the
   // canvas grid and the DOM frame can be traced from the recorded log.
@@ -155,11 +155,11 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
   useEffect(() => {
     if (connectionInput) onSshStateChange?.({ phase: connectionPhase, reconnectAttempt: retry.attempt, retrying: retry.phase === 'waiting' || retry.phase === 'connecting', log: sshLog });
   }, [connectionInput, connectionPhase, retry.attempt, retry.phase, onSshStateChange, sshLog]);
-  // 断线后把最后几行输出直接印在屏幕上（就是 ssh 给出的原因），不做卡片、也不回放整屏历史
+  // After a disconnect, print the last output lines directly on the screen (the reason the connection ended), with no card and no full-screen replay.
   const outputTail = disconnected
     ? [text.split('\n').map((line) => line.trimEnd()).filter((line) => line.trim().length > 0).slice(-8).join('\n'), exitNoticeShown ? '' : exitNotice].filter(Boolean).join('\n')
     : '';
-  // 选择器显示「现在用哪种输入」：输密码框可见就是密码输入，否则是直接输入
+  // The selector shows which input mode is active: password entry while the secret prompt is visible, direct input otherwise.
   const inputMode = secret ? 'secret' : 'direct';
   const connectionStatus = <><span aria-hidden="true" className="ssh-status-dot" style={{ background: stateColor }} />
     <span role="status" className="ssh-session-toolbar-state" style={{ color: 'var(--text-primary)' }}>{retryWaiting ? t('Retry {{n}}/5 in {{seconds}} seconds', { n: retry.attempt, seconds: retry.seconds }) : retryConnecting ? t('Reconnecting ({{n}}/5)…', { n: retry.attempt }) : retryPhase === 'exhausted' ? t('Automatic reconnect ended after 5 attempts') : retryPhase === 'stopped' ? t('Automatic reconnect stopped') : stateLabel}</span></>;
@@ -199,17 +199,18 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
     {/* Keep the sizing host measurable while block output owns the visible pane. */}
     {connectionInput && <div data-testid="ssh-connection-input" inert={!interactive} aria-hidden={!interactive || undefined} style={{ position: 'absolute', inset: 0, display: 'flex', visibility: interactive ? 'visible' : 'hidden', flexDirection: 'column', gap: 8 }}>
       {showToolbar && !toolbarHost && toolbar}
-      {/* 终端区常驻：xterm 宿主必须一直在，否则重连时没有宿主可挂载；断开后宿主隐藏、原因直接印在屏幕上 */}
-      <div role="textbox" aria-label="SSH 交互终端" aria-multiline="true"
+      {/* The terminal area stays mounted: the terminal host must remain so a reconnect has somewhere to mount, and after a disconnect the host hides while the reason is printed on screen. */}
+      <div role="textbox" aria-label={t('SSH interactive terminal')} aria-multiline="true"
         aria-disabled={inputDisabled || secret} tabIndex={inputDisabled || secret ? -1 : 0}
         onFocus={focusTerminal} onMouseDown={focusTerminal} style={{ flex: 1, minHeight: 0, position: 'relative', overflowX: 'hidden', overflowY: 'auto', outline: 'none', cursor: 'text' }}>
-        {/* 密码框开着（secret）时屏幕只读，点它也不会把输入交给终端 */}
+        {/* While the secret prompt is open the screen is read-only, so clicking it never routes input to the terminal. */}
         <div ref={ref} data-testid={showSnapshot ? undefined : 'ssh-terminal-screen'} style={{ position: 'absolute', inset: 0, overflowX: 'hidden', overflowY: 'auto', visibility: !interactive || showSnapshot || disconnected ? 'hidden' : 'visible', pointerEvents: !interactive || showSnapshot || disconnected || secret ? 'none' : 'auto', paddingLeft: 8 }} />
-          {/* data-selectable：页面整体禁选，但屏幕内容必须能选中，否则连不上时无法复制报错。
-              Rows advance at the renderer's own cell width and never scroll sideways; a
-              horizontal scrollbar would steal height and make the terminal bounce. */}
+          {/* data-selectable: the page disables selection globally, but screen content must stay
+              selectable so an error can be copied when the connection fails. Rows advance at the
+              renderer's own cell width and never scroll sideways; a horizontal scrollbar would
+              steal height and make the terminal bounce. */}
           {showSnapshot && frameHtml && <pre ref={snapshotRef} data-selectable data-testid="ssh-terminal-screen" className="ssh-terminal-frame" style={{ position: 'absolute', inset: 0, overflowX: 'hidden', overflowY: 'auto', letterSpacing: frame?.snapshotSpacing != null ? `calc(var(--terminal-letter-spacing, 0px) + ${frame.snapshotSpacing}px)` : undefined, margin: 0, whiteSpace: 'pre', color: 'var(--text-primary)', paddingLeft: 8 }} dangerouslySetInnerHTML={{ __html: frameHtml }} />}
-        {/* 连接中：居中转圈 + 细进度条（不写解释性小字） */}
+        {/* Connecting: centered spinner and thin progress bar, with no explanatory copy. */}
         {!disconnected && status === 'connecting' && (
           <div data-testid="ssh-connecting" aria-hidden="true" style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, pointerEvents: 'none' }}>
             <span className="ssh-connect-spinner" />
@@ -217,12 +218,12 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
             <span className="ssh-connect-progress"><i /></span>
           </div>
         )}
-        {/* 连接已结束：原因就当终端输出印在屏幕上，不加卡片、不回放整屏 */}
+        {/* Connection ended: print the reason as terminal output, without a card or a full-screen replay. */}
         {disconnected && (
           <pre data-selectable data-testid="ssh-terminal-ended" className="ssh-terminal-frame" style={{ position: 'absolute', inset: 0, overflow: 'auto', margin: 0, padding: '0 8px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>{outputTail}</pre>
         )}
       </div>
-      {/* 认证输入条：与终端区左右保持一致的 8px 边距（对称，不再贴边或被单侧推偏） */}
+      {/* Authentication input row: the same 8px inset on both sides as the terminal area, so it stays centered. */}
       {interactive && secret && !disconnected && <div style={{ padding: '0 8px 8px', flexShrink: 0 }}>
         <form onSubmit={e => {
           e.preventDefault();
@@ -230,11 +231,11 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
           const value = response;
           if (responseRef.current) responseRef.current.value = '';
           setResponse(''); setError(''); setManualSecret(false); setDirectInput(false); setDismissedPrompt(secretPrompt ?? text);
-          void ptyWrite(sessionId, `${value}\r`).catch(reason => { setManualSecret(true); setError(`发送失败：${String(reason)}`); });
+          void ptyWrite(sessionId, `${value}\r`).catch(reason => { setManualSecret(true); setError(t('Send failed: {{error}}', { error: String(reason) })); });
         }} className="terminal-composer" style={{ display: 'flex', gap: 8, alignItems: 'center', padding: 12, width: '100%' }}>
-          <TextInput ref={responseRef} type={reveal ? 'text' : 'password'} autoComplete="off" aria-label="SSH 认证响应" placeholder="输入密码、密钥口令或验证响应" value={response} onChange={e => setResponse(e.target.value)} disabled={inputDisabled} className="ssh-auth-response" style={{ flex: 1, minWidth: 0, height: 36, background: 'transparent', border: 'none', outline: 'none' }} />
+          <TextInput ref={responseRef} type={reveal ? 'text' : 'password'} autoComplete="off" aria-label={t('SSH authentication response')} placeholder={t('Enter a password, key passphrase or verification response')} value={response} onChange={e => setResponse(e.target.value)} disabled={inputDisabled} className="ssh-auth-response" style={{ flex: 1, minWidth: 0, height: 36, background: 'transparent', border: 'none', outline: 'none' }} />
           <IconButton compact data-subtle className="ssh-auth-reveal" data-testid="ssh-auth-reveal" aria-pressed={reveal} aria-label={t(reveal ? 'Hide password' : 'Show password')} data-tip={t(reveal ? 'Hide password' : 'Show password')} onClick={() => { setReveal(value => !value); responseRef.current?.focus(); }}>{reveal ? <EyeOff size={iconSizes.compact} /> : <Eye size={iconSizes.compact} />}</IconButton>
-          <button type="submit" className="ssh-auth-submit" disabled={inputDisabled} style={{ padding: '8px 16px' }}>发送</button>
+          <button type="submit" className="ssh-auth-submit" disabled={inputDisabled} style={{ padding: '8px 16px' }}>{t('Send')}</button>
         </form>
       </div>}
       {error && <ErrorBox compact style={{ flexShrink: 0 }}>{error}</ErrorBox>}

@@ -1,4 +1,4 @@
-/** 终端领域公开入口。 */
+/** Public entry point for the terminal domain. */
 export { watchShellCommandCompletion, type ShellCommandCompletion } from './services/commandCompletion';
 export {
   useTerminalStore,

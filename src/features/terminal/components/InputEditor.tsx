@@ -26,9 +26,9 @@ import { useRef, useLayoutEffect, useCallback, type ReactNode } from 'react';
 
 
 interface Props {
-  /** 该输入栏绑定的 pane（决定读写哪个终端） */
+  /** Pane this composer is bound to (decides which terminal it reads and writes) */
   paneId: string;
-  /** 该 pane 是否为当前聚焦终端（未传时回退到 focusedPaneId 判定） */
+  /** Whether this pane is focused (falls back to focusedPaneId when omitted) */
   focused?: boolean;
   isLongRunning?: boolean;
   runningCommand?: string;
@@ -38,7 +38,7 @@ interface Props {
   onSessionStatusReady?: (trigger: HTMLButtonElement | null) => void;
   sessionNotice?: ReactNode;
   sessionStatusOpen?: boolean;
-  /** 左右缩进（与命令块一致：内边 4 / 外缘 8） */
+  /** Horizontal insets, matched to command blocks (4 inside, 8 outside) */
   insetLeft?: number;
   insetRight?: number;
 }
@@ -177,7 +177,7 @@ export default function InputEditor({
           <span className="composer-key-hints"><KeyHint shortcut="Enter" />{t('Run')}<KeyHint shortcut="Shift+Enter" />{t('New line')}</span>
         </div>
 
-        {/* 输入行 — $/⚡ prompt + textarea + ghost overlay */}
+        {/* Input row — prompt, textarea and ghost overlay */}
         <div
           style={{
             display: 'flex',
@@ -187,8 +187,9 @@ export default function InputEditor({
         >
           <span className="terminal-command-prompt" aria-hidden="true"><DollarSign size={iconSizes.control} /></span>
 
-          {/* textarea + ghost overlay（绝对定位同字体同内边距，透明已输入 + muted 建议后缀）
-              display:flex 让 textarea 成为 flex item，消除 inline-block 基线下方空隙（否则容器比 textarea 高 7px） */}
+          {/* Textarea plus ghost overlay: absolutely positioned with the same font and padding,
+              transparent typed text and a muted suggestion suffix. display:flex makes the textarea
+              a flex item, removing the inline-block baseline gap that makes the container 7px taller. */}
           <div style={{ position: 'relative', flex: 1, minWidth: 0, display: 'flex' }}>
             <TextArea
               ref={inputRef}
@@ -299,9 +300,9 @@ function InputActionBtn({ title, onClick, children }: {
   return <IconButton data-subtle data-tip={title} aria-label={title} onClick={onClick}>{children}</IconButton>;
 }
 
-// ── 工作目录 ──
+// ── Working directory ──
 
-/** 当前目录标签（mono 11px）；导出给 PanelChat 的 prompt 行复用，保证两处一致 */
+/** Current directory chip (mono 11px), exported so the chat prompt row can reuse it and stay consistent */
 export function CurrentDir({ dir }: { dir?: string }) {
   const path = dir ? normalizeWorkingDirectory(dir) : undefined;
   const label = path

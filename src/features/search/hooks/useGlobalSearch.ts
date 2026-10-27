@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent as ReactKeyboardEvent } from 'react';
 import type { AppIcon } from '@ui/icons';
 import { getCommands } from '@app/commands';
+import { t } from '@i18n';
 import { useSessionStore } from '@features/workspace';
 import { useTerminalStore } from '@features/terminal';
 import type {
@@ -130,7 +131,7 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
           const data = result.data as BlockResultData;
           if (data.sessionStatus === 'historical') {
             sessionManager.restore(data.tabId, data.tabTitle ?? '').catch((error) => {
-              notifyRestoreFailure('恢复历史区块所属会话失败', error);
+              notifyRestoreFailure(t('Could not restore the session of the historical block'), error);
             });
             return;
           }
@@ -163,7 +164,7 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
           const data = result.data as SessionResultData;
           if (data.status === 'historical') {
             sessionManager.restore(data.sessionId, data.title).catch((error) => {
-              notifyRestoreFailure('恢复历史会话失败', error);
+              notifyRestoreFailure(t('Could not restore the historical session'), error);
             });
           } else {
             useSessionStore.getState().activate(data.sessionId);
@@ -210,7 +211,7 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
 
   const handleRestore = useCallback((sessionId: string, sessionTitle: string) => {
     sessionManager.restore(sessionId, sessionTitle).catch((error) => {
-      notifyRestoreFailure('恢复历史会话失败', error);
+      notifyRestoreFailure(t('Could not restore the historical session'), error);
     });
   }, []);
 

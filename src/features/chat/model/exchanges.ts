@@ -1,16 +1,18 @@
 /**
- * exchanges — 把扁平的 ChatMessage 流折叠为「问答交换」，并与命令块按时间归并。
+ * exchanges — folds the flat ChatMessage stream into question/answer exchanges and
+ * merges them with command blocks by time.
  *
- * 内联 AI 块与命令块共享同一条时间线：问 = 一次"输入"，答 = 它的"输出"。
- * 归并是纯渲染层操作，不改 block store，也不改终端管线。
+ * Inline AI blocks and command blocks share one timeline: a question is an "input",
+ * its answer is the "output". Merging is a pure render-layer operation; it touches
+ * neither the block store nor the terminal pipeline.
  */
 
 import type { ChatMessage } from '@features/chat';
 import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 
-/** 一次问答交换：用户问题 + 可选的 AI 回答（流式中回答可能为空） */
+/** One question/answer exchange: a user question plus an optional AI answer (empty while streaming) */
 export interface ChatExchange {
-  /** 取问题的消息 id（无问题则取回答 id） */
+  /** Question message id, or the answer id when there is no question */
   id: string;
   paneId?: string;
   createdAt: number;
@@ -18,7 +20,7 @@ export interface ChatExchange {
   answer?: ChatMessage;
 }
 
-/** 扁平消息 → 问答交换序列。未配对的消息各自成为独立交换（旧数据/异常兜底）。 */
+/** Flat messages → exchange sequence. Unpaired messages become standalone exchanges (legacy data / defensive fallback). */
 export function toExchanges(messages: ChatMessage[]): ChatExchange[] {
   const out: ChatExchange[] = [];
   for (const m of messages) {
@@ -38,10 +40,12 @@ export type FlowItem =
   | { type: 'block'; block: TermBlock; ts: number }
   | { type: 'ai'; exchange: ChatExchange; ts: number };
 
-/** 命令块与 AI 交换按时间戳归并排序（稳定：同时间块在前；无 startedAt 的块视为最早）。
+/** Merges command blocks and AI exchanges by timestamp (stable: blocks win ties; blocks
+ *  without startedAt count as earliest).
  *
- *  agent 发起的命令块不进入本流程 —— 调用方（TerminalBlockList）预先过滤，
- *  它们由 AiBlock 内嵌渲染在 run_command 节点之下，不再是独立时间线条目。 */
+ *  Agent-issued command blocks never enter this flow — the caller filters them out
+ *  beforehand, because they render nested under run_command nodes inside AiBlock
+ *  rather than as standalone timeline entries. */
 export function mergeFlow(blocks: TermBlock[], exchanges: ChatExchange[]): FlowItem[] {
   const items: FlowItem[] = [
     ...blocks.map((block) => ({ type: 'block' as const, block, ts: block.startedAt ?? 0 })),

@@ -5,10 +5,10 @@ import type { ShellOption, ShellType } from '@platform/shells';
 import type { SshConnection } from '@features/ssh/services/api';
 
 /**
- * 新建标签页弹窗的候选类型与「最近打开」排序。
+ * Candidate types for the new-tab dialog and their "recently opened" ordering.
  *
- * 候选 = 机器可用的本地 shell + 已配置的 SSH 连接。
- * 排序键持久化在 localStorage，最近打开的类型排最前。
+ * Candidates are the locally available shells plus the configured SSH connections.
+ * Sort keys live in localStorage so the most recently opened type comes first.
  */
 
 export type NewTabOption =
@@ -51,14 +51,14 @@ export function saveRecentOpen(map: Record<string, number>): void {
   safeLocalStorageSet(RECENT_KEY, JSON.stringify(map));
 }
 
-/** 记录某类型最近打开时间。 */
+/** Record when a candidate type was last opened. */
 export function touchRecentOpen(key: string, at = Date.now()): void {
   const map = loadRecentOpen();
   map[key] = at;
   saveRecentOpen(map);
 }
 
-/** 用 shell 列表 + SSH 连接列表构建候选，按最近打开时间倒序（未打开过的排最后，按原始顺序稳定）。 */
+/** Build candidates from the shell and SSH connection lists, sorted by most recent opening (never opened last, stable original order). */
 export function buildNewTabOptions(
   shells: ShellOption[],
   sshs: SshConnection[],
@@ -88,7 +88,8 @@ export function buildNewTabOptions(
     });
   }
 
-  // 稳定排序：先按 lastOpenedAt 倒序；同为 0（从未打开）时保持插入顺序
+  // Stable sort: most recent first; entries with the same timestamp (never opened) keep
+  // their insertion order.
   return opts
     .map((o, i) => ({ o, i }))
     .sort((a, b) => (b.o.lastOpenedAt - a.o.lastOpenedAt) || (a.i - b.i))

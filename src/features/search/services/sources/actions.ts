@@ -1,11 +1,12 @@
 import { Command } from '@ui/icons';
 import { registerSource } from '@features/search/services/registry';
 import { searchCommands } from '@app/commands';
+import { t } from '@i18n';
 import type { SearchResult, ActionResultData } from '@features/search/types';
 
 registerSource({
   id: 'action',
-  label: '快捷操作',
+  label: t('Quick actions'),
   icon: Command,
   search: async (query: string): Promise<SearchResult[]> => {
     const matches = searchCommands(query);

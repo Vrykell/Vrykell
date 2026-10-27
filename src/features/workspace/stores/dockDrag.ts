@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 
 /**
- * useDockDragStore — 拖动终端调整位置的全局状态。
- * 拖动某个终端（把手）时写入 draggingTerminalId，TerminalView 据此渲染落点覆盖层；
- * 松手/取消时清除。具体悬停落点由 MoveDragLayer 内部状态维护。
+ * Global state for dragging a terminal to a new position.
+ * Dragging a terminal (by its handle) writes draggingTerminalId, which TerminalView uses to
+ * render the drop overlay; releasing or cancelling clears it. The hovered drop target itself
+ * is held in MoveDragLayer's local state.
  */
 
 interface DockDragState {

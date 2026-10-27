@@ -1,9 +1,10 @@
 /**
- * AttachmentChips — 附件 chips 行 + 预览浮层（M5）。
+ * AttachmentChips — attachment chip row plus a preview popover.
  *
- * 两处复用：PanelChat 输入栏（可删除，onRemove 存在）与 AiBlock 问题行
- * （只读展示持久化附件，onRemove 缺省）。预览 = chip 上方浮层：
- * 图片读 dataUrl 显示，文本显示头部 2000 字。
+ * Reused in two places: the PanelChat composer (removable, onRemove provided) and the
+ * AiBlock question row (read-only persisted attachments, onRemove omitted). The preview
+ * is a popover above the chip: images render from their data URL, text shows the first
+ * 2000 characters.
  */
 
 import { useEffect, useState } from 'react';
@@ -15,7 +16,7 @@ export default function AttachmentChips({ atts, previewId, onPreview, onRemove }
   atts: AttachmentMeta[];
   previewId: string | null;
   onPreview: (id: string) => void;
-  /** 缺省 = 只读（AiBlock 历史消息） */
+  /** Omitted = read-only (AiBlock history messages) */
   onRemove?: (id: string) => void;
 }) {
   return (
@@ -39,7 +40,7 @@ export default function AttachmentChips({ atts, previewId, onPreview, onRemove }
   );
 }
 
-/** 预览浮层（chips 行上方）：图片读 dataUrl 显示，文本显示头部 2000 字 */
+/** Preview popover above the chip row: images from their data URL, text limited to the first 2000 chars */
 function AttachmentPreview({ att }: { att: AttachmentMeta }) {
   const [dataUrl, setDataUrl] = useState<string | null>(null);
   const isImage = att.mime.startsWith('image/');

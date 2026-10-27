@@ -1,4 +1,4 @@
-/** TermBlock — UI 可见的 block 投影（Spec §2）。内部字段不进此类型。 */
+/** TermBlock — UI-visible projection of a block (spec §2). Internal fields never appear in this type. */
 
 export type BlockStatus = 'pending' | 'executing' | 'done' | 'interrupted';
 
@@ -14,13 +14,13 @@ export interface TermBlock {
   wasLongRunning: boolean;
   /** Keep live output visible until its final parsed snapshot is ready. */
   snapshotPending?: boolean;
-  /** agent 发起的命令（投影标记，不落库）→ 块上渲染 ⚡ 徽标 */
+  /** Command started by the agent (projection flag, never persisted); renders a badge on the block */
   agent?: boolean;
-  /** 带颜色的 HTML 快照（extractSnapshotFromBuffer 生成） */
+  /** Colored HTML snapshot (produced by extractSnapshotFromBuffer) */
   outputHtml: string;
-  /** 纯文本输出（复制/AI 用） */
+  /** Plain-text output (for copy and AI) */
   outputText: string;
-  /** 原始输出（≤256KB，供未来 resize 重排） */
+  /** Raw output (≤256KB, kept for reflow on resize) */
   outputRaw: string;
   linesTruncated: number;
 }

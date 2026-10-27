@@ -4,8 +4,9 @@ import { useTerminalStore } from '@features/terminal';
 import { firstLeaf, leaves as layoutLeaves, type TerminalSpec } from '@features/workspace/model/windowLayout';
 
 /**
- * 统一提供当前窗口、聚焦 pane 和工作目录。
- * 文件面板、输入栏等视图不再各自推导“当前终端”，避免状态规则分叉。
+ * Single source for the current window, the focused pane and the working directory.
+ * File panels, the composer and other views no longer derive "the current terminal"
+ * themselves, which keeps the state rules from diverging.
  */
 export function useActiveWorkspace() {
   const activeId = useSessionStore((state) => state.activeId);

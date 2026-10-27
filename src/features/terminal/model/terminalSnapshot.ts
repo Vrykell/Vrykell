@@ -1,8 +1,8 @@
 /**
- * terminalSnapshot — 用 xterm.js buffer 提取带颜色的 HTML 和纯文本。
+ * terminalSnapshot — extract colored HTML and plain text from a terminal buffer.
  *
- * anser/正则无法处理光标移动、清屏、\r 覆盖写入等序列，
- * 只有终端模拟器自身能正确处理全部 ANSI 转义。
+ * A regex pass cannot handle cursor movement, screen clears or \r overwrites;
+ * only the terminal emulator itself resolves every ANSI escape correctly.
  */
 import { Terminal } from '@xterm/xterm';
 import type { IBufferCell } from '@xterm/xterm';
@@ -38,7 +38,7 @@ function cellStyle(cell: IBufferCell): string {
   const parts: string[] = [];
   const inverse = cell.isInverse();
 
-  // 前景色（inverse 时取背景色）
+  // Foreground color (use the background color when inverse)
   if (inverse) {
     const bg = getBgCss(cell);
     parts.push(`color:${bg ?? 'var(--xterm-bg)'}`);
@@ -47,7 +47,7 @@ function cellStyle(cell: IBufferCell): string {
     if (fg) parts.push(`color:${fg}`);
   }
 
-  // 背景色（inverse 时取前景色）
+  // Background color (use the foreground color when inverse)
   if (inverse) {
     const fg = getFgCss(cell);
     parts.push(`background:${fg ?? 'var(--text-primary)'}`);
@@ -121,10 +121,10 @@ export function extractSnapshotFromBuffer(
       const style = cellStyle(c);
 
       if (width === 2) {
-        // CJK 全宽字符：xterm 里占 2 格（2ch），但 HTML 里浏览器回退字体
-        // 按 1em 渲染（Menlo 13px 下 13px ≠ 15.65px），每字少 ~2.65px，
-        // 光标（Xch 定位）和其后的排版全部向右漂移 ——
-        // 包 inline-block 强制占满 2ch，让渲染宽度与网格严格一致。
+        // Full-width CJK characters occupy 2 grid cells, but the browser fallback
+        // font renders them at 1em, narrower than the 2ch advance. The cursor
+        // (positioned in ch units) and everything after it then drift right, so
+        // wrap each glyph in an inline-block sized 2ch to match the grid exactly.
         if (currentText) {
           spans.push(currentStyle
             ? `<span style="${currentStyle}">${currentText}</span>`
@@ -226,13 +226,14 @@ function escapeHtml(s: string): string {
 }
 
 /**
- * createBlockTerm creates the live xterm used while a command is running.
+ * createBlockTerm creates the live terminal used while a command is running.
  * It preserves native cursor, IME, selection, and CJK layout.
  *
- * 创建时**不 open**（xterm v5 的 write 先于 open 是安全的：解析器与 buffer
- * 是 core 服务，open 只接管 DOM/渲染；xterm-headless 即此用法）。
- * RunningItem moves the element into the output stream and opens it. The controller
- * owns its lifecycle; completed blocks use a matching HTML snapshot and font metrics.
+ * The terminal is deliberately not opened on creation: writing before open is safe
+ * because the parser and buffer are core services and open only takes over DOM
+ * rendering. RunningItem moves the element into the output stream and opens it. The
+ * controller owns its lifecycle; completed blocks use a matching HTML snapshot and
+ * font metrics.
  */
 export function createBlockTerm(
   cols: number,

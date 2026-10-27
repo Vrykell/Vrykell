@@ -10,18 +10,18 @@ import { useTypographyStore } from '@config/typography';
 import type { Terminal } from '@xterm/xterm';
 import type { Scene } from '@features/terminal/services/pipeline/sessionController';
 
-// 每个标签页一个 xterm 实例（模块级引用，不进 zustand state）
+// One terminal emulator instance per tab (module-level reference, kept out of store state)
 const termInstances = new Map<string, Terminal>();
 export { termInstances };
 
-// 设置里的渲染器偏好变化后立即应用到已打开的终端（新建的终端在挂载时读同一份偏好）。
+// Apply renderer preference changes to open terminals immediately (new terminals read the same preference when mounting).
 useTypographyStore.subscribe((state, previous) => {
   if (state.terminalRenderer === previous.terminalRenderer) return;
   for (const term of termInstances.values()) applyTerminalRenderer(term, state.terminalRenderer);
 });
 
-// e2e 测试桥：暴露 term 注册表供断言读取 buffer（WebGL renderer 下文本不进 DOM，
-// 测试无法用 getByText 读终端输出）。仅测试环境初始化，不影响正常运行。
+// e2e test bridge: exposes the terminal registry so assertions can read the buffer (with
+// the GPU renderer, text never enters the DOM, so text queries cannot read terminal output).
 if (typeof window !== 'undefined') {
   (window as unknown as Record<string, unknown>).__vrykellTerms = termInstances;
 }
@@ -33,7 +33,7 @@ export function unregisterTerminal(tabId: string, t: Terminal) {
   if (termInstances.get(tabId) === t) termInstances.delete(tabId);
 }
 
-/** 当前聚焦的终端 id：优先 focusedPaneId（校验其属于活跃窗口），否则活跃窗口第一个终端。 */
+/** Focused terminal id: prefer focusedPaneId when it belongs to the active window, otherwise the active window's first terminal. */
 export function getFocusedTerminalId(): string {
   const ts = useTerminalStore.getState();
   const ws = useWorkspaceStore.getState();
@@ -48,7 +48,7 @@ export function getFocusedTerminalId(): string {
   return ws.activeId;
 }
 
-/** 读取指定 pane 终端缓冲末尾 maxLines 行（去尾部空行），用于「输出发给 AI」。 */
+/** Read the last maxLines of a pane's terminal buffer (trailing blank lines removed) for sending output to the AI. */
 export function getRecentOutputFor(paneId: string, maxLines = 30): string {
   const term = termInstances.get(paneId);
   if (!term) return '';
@@ -64,27 +64,28 @@ export function getRecentOutputFor(paneId: string, maxLines = 30): string {
   return lines.join('\n');
 }
 
-/** 读取聚焦终端缓冲末尾 maxLines 行（去尾部空行），用于「输出发给 AI」。 */
+/** Read the last maxLines of the focused terminal buffer (trailing blank lines removed) for sending output to the AI. */
 export function getRecentOutput(maxLines = 30): string {
   return getRecentOutputFor(getFocusedTerminalId(), maxLines);
 }
 
-/** 实时终端画面（read_terminal 工具用）。 */
+/** Live terminal screen (used by the read_terminal tool). */
 export interface TerminalScreen {
   scene: Scene;
   cols: number;
   rows: number;
-  /** 光标在可见画面内的位置（0-based 行、列）；块列表等无光标场景为 null */
+  /** Cursor position within the visible screen (0-based row, column); null in block-list and other cursorless scenes */
   cursorY: number | null;
   cursorX: number | null;
-  /** 可见画面文本（带行号，去尾部空行） */
+  /** Visible screen text (with line numbers, trailing blank lines removed) */
   content: string;
 }
 
 /**
- * 读取指定 pane 主 xterm 当前可见画面（classic / altScreen 场景）。
- * 覆盖范围 = 当前 viewport（alt buffer 即整个屏幕；normal buffer 为可见视口）。
- * 无 xterm 实例（如 blockList 下主 xterm 闲置/已卸载）返回 null，调用方自行回退。
+ * Read the current visible screen of a pane's main terminal (classic / altScreen scenes).
+ * Coverage is the current viewport (the whole screen in the alt buffer; the visible viewport
+ * in the normal buffer). Returns null when no terminal instance exists (for example while the
+ * main terminal is idle or unmounted in blockList), leaving fallback to the caller.
  */
 export function getTerminalScreen(paneId: string): TerminalScreen | null {
   const ts = useTerminalStore.getState();
@@ -95,7 +96,7 @@ export function getTerminalScreen(paneId: string): TerminalScreen | null {
   const buf = term.buffer.active;
   const cols = term.cols || dims.cols;
   const rows = term.rows || dims.rows;
-  // viewportY = 可见区域顶部在 buffer 内的绝对行号；alt buffer 无 scrollback，恒为 0
+  // viewportY = absolute buffer row of the visible top; the alt buffer has no scrollback, so it stays 0
   const start = Math.max(0, buf.viewportY);
   const end = Math.min(buf.length - 1, start + rows - 1);
   const lines: string[] = [];
@@ -123,21 +124,21 @@ interface TerminalState {
   /** Shell startup is separate from PTY allocation. */
   startupStates: Record<string, 'starting' | 'ready' | 'failed' | 'closed'>;
   setStartupState: (paneId: string, status: 'starting' | 'ready' | 'failed' | 'closed') => void;
-  /** session 尚未返回时暂存的命令；PTY 就绪后由 setSession 原样冲刷 */
+  /** Commands buffered until the session exists; setSession flushes them verbatim once the PTY is ready */
   pendingCommands: Record<string, string[]>;
-  /** tabId → 终端尺寸（状态栏展示用） */
+  /** tabId → terminal dimensions (shown in the status bar) */
   dims: Record<string, { cols: number; rows: number }>;
   visible: boolean;
   /** Manual fullscreen belongs to its pane, independently of the controller's alternate buffer. */
   manualFullscreen: Record<string, boolean>;
   setManualFullscreen: (paneId: string, active: boolean) => void;
-  /** 键盘路由目标：'input' → InputEditor, 'terminal' → xterm.js */
+  /** Keyboard routing target: 'input' → InputEditor, 'terminal' → the terminal emulator */
   keyboardTarget: 'input' | 'terminal';
   setKeyboardTarget: (t: 'input' | 'terminal') => void;
-  /** 分屏时聚焦的 paneId（决定键盘输入/runInTerminal 写哪个 PTY） */
+  /** Focused paneId in a split (decides which PTY receives keyboard input and runInTerminal writes) */
   focusedPaneId: string | null;
   setFocusedPane: (paneId: string | null) => void;
-  /** tabId → 当前场景状态机（classic / blockList / altScreen） */
+  /** tabId → current scene state machine (classic / blockList / altScreen) */
   scenes: Record<string, Scene>;
   /** Actual local shell selected when each live process started. */
   shellTypes: Record<string, string>;
@@ -147,12 +148,12 @@ interface TerminalState {
   clearSession: (tabId: string, expectedSessionId?: string) => void;
   queueCommand: (tabId: string, command: string) => void;
   setDims: (tabId: string, cols: number, rows: number) => void;
-  /** 关 tab 时删除该 tab 的 session/dims/scene，避免 per-tab 残留 */
+  /** Remove the tab's session/dims/scene when the tab closes, leaving no per-tab residue */
   dropTab: (tabId: string) => void;
   toggle: () => void;
   stageCommand: (paneId: string, command: string) => void;
   runInTerminal: (command: string, paneId?: string) => Promise<void>;
-  /** 外部写入输入栏（搜索点击历史命令等），InputEditor 消费后自动清空 */
+  /** External write into the composer (for example a clicked history entry); InputEditor clears it after consuming */
   pendingInput: string;
   setPendingInput: (text: string) => void;
 }

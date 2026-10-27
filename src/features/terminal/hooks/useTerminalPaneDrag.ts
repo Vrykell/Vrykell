@@ -4,7 +4,7 @@ import { useDockDragStore } from '@features/workspace';
 const DRAG_THRESHOLD_PX = 5;
 const NON_DRAG_SELECTOR = 'input, textarea, button, a, [contenteditable="true"], .xterm, [data-no-drag], [data-selectable]';
 
-/** 将终端 Pane 的鼠标拖动生命周期收敛为可复用的交互 Hook。 */
+/** Encapsulates a terminal pane's pointer-drag lifecycle as a reusable interaction hook. */
 export function useTerminalPaneDrag(terminalId: string, enabled = true) {
   return useCallback((event: React.MouseEvent) => {
     if (!enabled || event.button !== 0) return;

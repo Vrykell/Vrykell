@@ -1,11 +1,12 @@
 import { Settings } from '@ui/icons';
 import { registerSource } from '@features/search/services/registry';
 import { searchSettings } from '@features/settings/services/registry';
+import { t } from '@i18n';
 import type { SearchResult, SettingResultData } from '@features/search/types';
 
 registerSource({
   id: 'setting',
-  label: '设置',
+  label: t('Settings'),
   icon: Settings,
   search: async (query: string): Promise<SearchResult[]> => {
     const matches = searchSettings(query);

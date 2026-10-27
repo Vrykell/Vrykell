@@ -5,6 +5,7 @@ import { leaves as layoutLeaves } from '@features/workspace/model/windowLayout';
 import { shellTypeLabel } from '@platform/shells';
 import { isInputBoxVisible } from '@features/terminal/inputVisibility';
 import { agentControl } from '@features/agent/services/agentControl';
+import { t } from '@i18n';
 
 interface UseTerminalInputContextOptions {
   paneId: string;
@@ -12,7 +13,7 @@ interface UseTerminalInputContextOptions {
   isLongRunning?: boolean;
 }
 
-/** 聚合单个 pane 的终端上下文，隔离输入栏对多个 Store 和运行时服务的订阅。 */
+/** Aggregates terminal context for one pane and isolates the composer from store and runtime subscriptions. */
 export function useTerminalInputContext({
   paneId,
   focused,
@@ -38,7 +39,7 @@ export function useTerminalInputContext({
     if (!activeTab || !isSessionTab(activeTab)) return undefined;
     const spec = layoutLeaves(activeTab.layout).find((terminal) => terminal.id === paneId);
     if (spec?.kind === 'ssh') return spec.ssh?.name || spec.ssh?.host || 'SSH';
-    return spec?.shellType ? shellTypeLabel(spec.shellType) : '本地';
+    return spec?.shellType ? shellTypeLabel(spec.shellType) : t('Local');
   });
 
   const recentGitBranch = useBlockStore((state) => {

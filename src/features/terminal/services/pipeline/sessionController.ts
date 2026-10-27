@@ -1,11 +1,12 @@
 import { resizeTerminal } from '../../model/terminalResize';
 /**
- * SessionController — block 生命周期 + 三场景状态机（Spec §1-§3）。
+ * SessionController — block lifecycle and three-scene state machine (spec §1-§3).
  *
- * 同步消费 Rust 端扫描后的 DispatchEvent（扫描见 src-tauri/src/scan.rs）；每段输出只有一个目的地：
+ * Synchronously consumes DispatchEvent batches from the backend scanner; every output
+ * segment has exactly one destination:
  *   blockList·pending    → activeBlock.earlyBuf
- *   blockList·executing  → activeBlock.outputTerm（块内活 xterm，RunningItem 挂载显示）
- *   classic / altScreen  → 主 xterm（OSC raw 也转发，保 OSC 8/52）
+ *   blockList·executing  → activeBlock.outputTerm (in-block live terminal, mounted by RunningItem)
+ *   classic / altScreen  → main terminal (raw OSC forwarded too, preserving OSC 8/52)
  */
 
 import type { Terminal } from '@xterm/xterm';
@@ -39,12 +40,12 @@ export interface SessionSinks {
 }
 
 const RAW_CAP = 256 * 1024;
-const MAX_FULL_BLOCKS = 200;    // 超出丢弃最老 block 的输出，保留 header
+const MAX_FULL_BLOCKS = 200;    // Beyond this, drop the oldest blocks' output but keep their headers
 const MAX_TOTAL_BLOCKS = 500;   // Hard cap for block history, including header-only entries.
 
 interface InternalBlock extends TermBlock {
   outputTerm: Terminal | null;
-  /** outputTerm 的隐藏宿主 div（RunningItem 挂载时移进卡片可见化） */
+  /** Hidden host div for outputTerm (RunningItem moves it into the card when mounting) */
   outputEl: HTMLDivElement | null;
   _outputDispose: (() => void) | null;
   earlyBuf: string;
@@ -53,20 +54,20 @@ interface InternalBlock extends TermBlock {
   _consumeCommandEchoTerminator: boolean;
   _truncationTracker: BufferTruncationTracker | null;
   _commandFromUi: boolean;
-  /** 是否由 OSC 133;A 正常创建（用于决定 earlyBuf 是否含提示符行） */
+  /** Whether OSC 133;A created the block normally (decides whether earlyBuf includes the prompt line) */
   _fromA: boolean;
 }
 
-// block id 跨重启唯一（时间戳前缀 + 自增），避免重启后与历史块 id 碰撞
+// Block ids stay unique across restarts (timestamp prefix plus counter) so restored history cannot collide
 const BLOCK_PREFIX = Date.now().toString(36);
 let nextId = 1;
 
 export class SessionController {
   private _blocks: InternalBlock[] = [];
   private _scene: Scene;
-  /** altScreen 进入前的场景（退出时恢复） */
+  /** Scene before entering altScreen (restored on exit) */
   private preAltScene: Scene;
-  /** 是否启用块系统：false = 经典模式（传统终端，输出直进 xterm，不建块） */
+  /** Whether the block system is enabled: false = classic mode (traditional terminal, output goes straight to the main terminal, no blocks) */
   private blockEnabled: boolean;
   private pendingUiCommand = '';
   private pendingWireCommand = '';
@@ -75,9 +76,9 @@ export class SessionController {
   private pendingPreexecTimer: ReturnType<typeof setTimeout> | null = null;
   private longRunningTimer: ReturnType<typeof setTimeout> | null = null;
   private _disposed = false;
-  /** 最近一次 OSC 7 上报的 cwd：真实 RC 顺序是 OSC7 → D → A，新 block 以此播种 */
+  /** Last cwd reported by OSC 7: the real RC order is OSC7 → D → A, and new blocks are seeded with it */
   private lastCwd: string | undefined;
-  /** 当前前台程序设置的窗口标题（OSC 0/2）；空串=未设置，仅在程序占用终端时有效 */
+  /** Window title set by the current foreground program (OSC 0/2); empty = unset, valid only while a program owns the terminal */
   private programTitle = '';
   /** Pipeline counters of this pane; the session hook feeds the receive stage into the same window. */
   readonly ioLog: TerminalIoLog;
@@ -86,11 +87,11 @@ export class SessionController {
     private tabId: string,
     private cols: number,
     private sinks: SessionSinks,
-    /** 块内活终端的行数（= 主 xterm/PTY 行数，TUI 几何一致的关键）；缺省 24 */
+    /** Rows of the in-block live terminal (= main terminal/PTY rows, which keeps TUI geometry identical); defaults to 24 */
     private rows = 24,
-    /** 初始场景（终端打开模式：classic 或 blockList）；缺省 classic */
+    /** Initial scene (terminal open mode: classic or blockList); defaults to classic */
     initialScene: Scene = 'classic',
-    /** 块系统开关；false = 经典模式（传统终端） */
+    /** Block system switch; false = classic mode (traditional terminal) */
     blockEnabled = true,
     /** Integrated shells create the block when OSC 133;E reports the command. */
     private deferBlockUntilPreexec = false,
@@ -122,7 +123,7 @@ export class SessionController {
     return this._blocks.length > 0 ? this._blocks[this._blocks.length - 1]! : null;
   }
 
-  /** 运行中块的活终端（term + 隐藏宿主 el）；无 executing 块时为 null */
+  /** Live terminal of the running block (term + hidden host el); null when no block is executing */
   get executingTerm(): { term: Terminal; el: HTMLDivElement } | null {
     const ab = this.activeBlock;
     if (ab?.status === 'executing' && ab.outputTerm && ab.outputEl) {
@@ -131,12 +132,12 @@ export class SessionController {
     return null;
   }
 
-  // ── 事件入口 ──
+  // ── Event entry ──
 
   handleEvents(events: DispatchEvent[]): void {
     this.ioLog.consumed(events, this._scene);
     if (!this.blockEnabled) {
-      // 经典模式：传统终端，所有输出直进主 xterm（不建块、不切场景、TUI 由 xterm 原生处理）
+      // Classic mode: traditional terminal, all output goes straight to the main terminal (no blocks, no scene switches, TUIs handled natively)
       for (const ev of events) {
         this.sinks.writeMain(ev.kind === 'data' ? ev.text : ev.raw);
       }
@@ -160,7 +161,7 @@ export class SessionController {
     }
   }
 
-  // ── 数据路由（唯一目的地） ──
+  // ── Data routing (single destination) ──
 
   private routeData(text: string): void {
     if (this._scene === 'classic' || this._scene === 'altScreen') {
@@ -170,7 +171,7 @@ export class SessionController {
     }
     let ab = this.activeBlock;
     if (!ab || (ab.status !== 'executing' && ab.status !== 'pending')) {
-      // blockList 下没有活跃 block（如前一个已 done）：自动创建新 pending block 接孤儿输出
+      // No active block in blockList (for example the previous one is done): create a pending block for the orphan output
       this.onPrecmd(false);
       ab = this.activeBlock;
     }
@@ -196,7 +197,7 @@ export class SessionController {
     }
   }
 
-  // ── OSC 处理 ──
+  // ── OSC handling ──
 
   private handleOsc(code: string, payload: string, raw: string): void {
     if (isTerminalDebugEnabled()) {
@@ -208,8 +209,8 @@ export class SessionController {
       const ownsTerminal = this.activeBlock?.status === 'executing' || this._scene === 'altScreen';
       this.setProgramTitle(ownsTerminal ? cleanProgramTitle(payload) : '');
     }
-    // classic/altScreen：OSC raw 转发主 xterm（OSC 8 超链接等不失效）；
-    // 但 133/7 是 integration 标记，永不进主 xterm。
+    // classic/altScreen: forward raw OSC to the main terminal (keeps OSC 8 hyperlinks working),
+    // but 133/7 are integration markers and never reach the main terminal.
     const isIntegration = code === '133;A' || code === '133;B' || code === '133;C' || code === '133;D'
       || code === '133;E' || code === '133;G' || code === '7';
     if (this._scene !== 'blockList' && !isIntegration) {
@@ -260,8 +261,9 @@ export class SessionController {
         const path = workingDirectoryFromUri(payload);
         if (path !== undefined) {
           this.lastCwd = path;
-          // OSC 7 常在 133;A 之前到达（真实 RC 顺序），此刻活跃 block 是刚结束的旧
-          // block，不能把新 cwd 记到它头上；只有 pending（当前位置行）才同步更新。
+          // OSC 7 often arrives before 133;A (the real RC order); the active block is then
+          // the one that just finished, so the new cwd must not be attached to it. Only a
+          // pending block (the current prompt line) is updated in place.
           const ab = this.activeBlock;
           if (ab && ab.status === 'pending' && this._scene === 'blockList') {
             ab.cwd = path;
@@ -287,7 +289,7 @@ export class SessionController {
     this.sinks.onProgramTitle?.(title);
   }
 
-  // ── Block 生命周期（Spec §2） ──
+  // ── Block lifecycle (spec §2) ──
 
   private onPrecmd(fromA = true): void {
     const wasClassic = this._scene === 'classic';
@@ -296,18 +298,18 @@ export class SessionController {
     }
     // The prompt is back: any title the previous foreground program set no longer applies.
     this.setProgramTitle('');
-    // 首个 A：classic → blockList
+    // First A: classic → blockList
     if (this._scene === 'classic') {
       this._scene = 'blockList';
       this.sinks.onSceneChanged('blockList');
     }
     const prev = this.activeBlock;
     if (prev && (prev.status === 'executing' || prev.status === 'pending')) {
-      // 无 D 直接 A（Ctrl+C 中断 / 空命令直接回车）
+      // A without a preceding D (Ctrl+C interrupt / empty submission)
       if (prev.status === 'executing') {
         this.finishBlock(prev, null, 'interrupted');
       } else {
-        // pending 空 block（连按回车）：status=done 无输出
+        // Empty pending block (repeated Enter): mark done with no output
         prev.status = 'done';
         prev.endedAt = Date.now();
       }
@@ -390,7 +392,7 @@ export class SessionController {
     ab._pendingCommandEcho = wireCommand.split(/\r?\n/, 1)[0]?.trim() || null;
     ab._commandEchoPrefixConsumed = false;
 
-    // 创建块内活终端（隐藏宿主，RunningItem 挂载后移入卡片可见化）
+    // Create the in-block live terminal (hidden host; RunningItem moves it into the card when mounting)
     const blk = createBlockTerm(this.cols, this.rows);
     ab.outputTerm = blk.term;
     ab.outputEl = blk.el;
@@ -413,7 +415,7 @@ export class SessionController {
       terminalDebug('block-terminal-ready', { tabId: this.tabId, blockId: ab.id, cols: blk.term.cols, rows: blk.term.rows });
     }
 
-    // earlyBuf 处置（typeahead / 提示符行剥离启发式，Spec §2）
+    // Handle earlyBuf (typeahead / prompt-line stripping heuristic, spec §2)
     const early = ab.earlyBuf;
     ab.earlyBuf = '';
     if (early) {
@@ -437,7 +439,7 @@ export class SessionController {
           }
         }
       }
-      // 剩余含非空白内容 → 后台输出，进 outputTerm
+      // Remaining non-whitespace content is background output, written to outputTerm
       if (rest.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').trim().length > 0) {
         ab.outputTerm!.write(rest);
         ab.outputRaw = rest.slice(-RAW_CAP);
@@ -448,7 +450,7 @@ export class SessionController {
       if (this._disposed) return;
       if (this.activeBlock === ab && ab.status === 'executing') {
         ab.wasLongRunning = true;
-        // 活终端后已无周期同步，wasLongRunning 翻转（输入栏隐藏）需主动推 UI
+        // The live terminal has no periodic sync afterwards, so a wasLongRunning flip (which hides the composer) must be pushed to the UI
         this.sinks.onBlocksChanged();
       }
     }, 2000);
@@ -685,8 +687,9 @@ export class SessionController {
       this.sinks.onBlockComplete(block);
       this.sinks.onBlocksChanged();
     };
-    // xterm 的 write 是异步队列！D 与输出常在同一 chunk，此刻 outputTerm 尚未解析完。
-    // 空写 + 回调利用 FIFO 保证此前所有写入已落 buffer，再提取快照（完成归零的关键）。
+    // Terminal writes are an async queue: D and its output often share a chunk, so outputTerm
+    // has not finished parsing yet. An empty write plus callback uses the FIFO to guarantee
+    // earlier writes reached the buffer before the snapshot is taken.
     if (block.outputTerm) {
       block.outputTerm.write('', done);
     } else {
@@ -696,7 +699,7 @@ export class SessionController {
   }
 
   private enforceBlockCap(): void {
-    // 1. 只保留最近 MAX_FULL_BLOCKS 个完整块（有输出的）的输出，更早的只留 header
+    // 1. Keep output only for the most recent MAX_FULL_BLOCKS blocks that have output; older ones keep their header
     const full = this._blocks.filter((b) => b.outputHtml || b.outputText);
     if (full.length > MAX_FULL_BLOCKS) {
       const excess = full.slice(0, full.length - MAX_FULL_BLOCKS);
@@ -706,8 +709,9 @@ export class SessionController {
         b.outputRaw = '';
       }
     }
-    // 2. 总块数硬上限：_blocks 数组本身要有界，否则 header 只增不减，
-    //    store 每次全量 map/filter 越来越慢，长会话慢性内存增长。
+    // 2. Hard cap on total blocks: the _blocks array itself must stay bounded, otherwise
+    //    headers only accumulate and every full map/filter in the store gets slower,
+    //    growing memory over long sessions.
     while (this._blocks.length > MAX_TOTAL_BLOCKS) {
       const [b] = this._blocks.splice(0, 1);
       if (!b) break;
@@ -718,18 +722,18 @@ export class SessionController {
     }
   }
 
-  // ── 场景切换 ──
+  // ── Scene switching ──
 
   private enterAlt(raw: string): void {
     if (this._scene === 'altScreen') {
       this.sinks.writeMain(raw);
       return;
     }
-    // alt 期间输出只写主 xterm，块内 outputTerm 收不到任何字节
+    // While alt is active, output goes only to the main terminal; the block's outputTerm receives no bytes
     this.preAltScene = this._scene;
     if (isTerminalDebugEnabled()) terminalDebug('alternate-screen-enter', { tabId: this.tabId, previousScene: this._scene });
     this._scene = 'altScreen';
-    this.sinks.writeMain(raw); // xterm 自己切 alt buffer
+    this.sinks.writeMain(raw); // the terminal switches to the alt buffer itself
     this.sinks.onSceneChanged('altScreen');
   }
 
@@ -743,7 +747,7 @@ export class SessionController {
     this.sinks.onSceneChanged(this._scene);
   }
 
-  // ── 外部接口 ──
+  // ── External interface ──
 
   resize(cols: number, rows?: number): void {
     if (this.cols === cols && (rows === undefined || this.rows === rows)) return;
@@ -758,9 +762,9 @@ export class SessionController {
   }
 
   /**
-   * 播种历史 block（会话恢复时）：把已持久化的 done block 塞进 controller 作为
-   * 起始真相源，后续 shell 输出的新 block 追加在其后，避免 onBlocksChanged 把
-   * 恢复出来的块整体覆盖掉。
+   * Seed persisted blocks when a session is restored: they become the controller's starting
+   * source of truth so new shell output appends after them instead of onBlocksChanged
+   * overwriting the restored blocks.
    */
   seed(blocks: readonly TermBlock[]): void {
     if (isTerminalDebugEnabled()) {
@@ -821,8 +825,9 @@ export class SessionController {
     this.finishBlock(ab, null, 'interrupted');
   }
 
-  /** 清空全部 block（用户「清除输出块」）。controller 是真相源，必须在此清，
-   *  否则下一次 onBlocksChanged 会把 store 里清掉的 block 整体回填。 */
+  /** Remove all blocks (the user's "clear output blocks" action). The controller is the
+   *  source of truth, so they must be cleared here, otherwise the next onBlocksChanged
+   *  refills the blocks the store just cleared. */
   clear(): void {
     for (const b of this._blocks) {
       b._outputDispose?.();

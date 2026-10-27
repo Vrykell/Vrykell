@@ -4,13 +4,13 @@ import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 const EMPTY: TermBlock[] = [];
 
 interface BlockState {
-  /** tabId → 命令块列表 */
+  /** tabId → command block list */
   byTab: Record<string, TermBlock[]>;
   addBlock: (tabId: string, block: TermBlock) => void;
   updateBlock: (tabId: string, blockId: string, patch: Partial<TermBlock>) => void;
   setBlocks: (tabId: string, blocks: TermBlock[]) => void;
   clearBlocks: (tabId: string) => void;
-  /** 关 tab 时删除该 tab 的 block 数据，避免 per-tab 残留 */
+  /** Remove the tab's block data when it closes, leaving no per-tab residue */
   dropTab: (tabId: string) => void;
 }
 
@@ -46,7 +46,7 @@ export const useBlockStore = create<BlockState>((set) => ({
     }),
 }));
 
-/** 根据 tabId 获取块的 selector（始终返回稳定引用避免无限渲染）。 */
+/** Block selector for a tab (always returns a stable reference to prevent render loops). */
 export function selectBlocks(tabId: string) {
   return (s: BlockState) => s.byTab[tabId] ?? EMPTY;
 }

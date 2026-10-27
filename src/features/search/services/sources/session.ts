@@ -8,7 +8,7 @@ import { searchSessions } from '@platform/api/search';
 
 registerSource({
   id: 'session',
-  label: '会话',
+  label: t('Sessions'),
   icon: Monitor,
   search: async (query: string): Promise<SearchResult[]> => {
     if (!query.trim()) return [];
@@ -23,8 +23,8 @@ registerSource({
         title: s.title,
         subtitle: count === null ? undefined : t('{{count}} command blocks', { count }),
         detail: s.status === 'historical'
-          ? `已关闭 · ${s.closed_at ? new Date(s.closed_at).toLocaleDateString() : ''}`
-          : '活跃中',
+          ? t('Closed · {{date}}', { date: s.closed_at ? new Date(s.closed_at).toLocaleDateString() : '' })
+          : t('Active'),
         data: {
           sessionId: s.id,
           title: s.title,

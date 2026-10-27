@@ -16,7 +16,7 @@ export type BlockMenuAnchor =
   | { kind: 'pointer'; x: number; y: number }
   | { kind: 'control'; left: number; top: number };
 
-/** 聚合块列表需要的显示流、AI 交错内容和菜单状态。 */
+/** Aggregates the display flow, interleaved AI content and menu state needed by the block list. */
 export function useTerminalBlockFlow(tabId: string) {
   const blocks = useBlockStore(selectBlocks(tabId));
   const highlightQuery = useSearchHighlightStore((state) => state.query);

@@ -1,19 +1,20 @@
 /**
- * windowLayout — 窗口（会话）内终端的二叉分裂树布局。
+ * Binary split tree layout for the terminals inside a window (session).
  *
- * 一个窗口是一个容器，持有 1–4 个终端。布局是一棵二叉树：
- *   - leaf：一个终端
- *   - split：把一块区域按 dir 平分成 first / second，ratio 为 first 占比
+ * A window is a container holding 1-4 terminals. The layout is a binary tree:
+ *   - leaf: a single terminal
+ *   - split: divides a region in half along dir into first / second, where ratio is
+ *     the share taken by first
  *
- * 停靠规则（与用户约定一致）：
- *   - 1 终端：可分裂成左右/上下四个 1/2 屏（4 个落点）
- *   - 2 终端：可分裂某个半屏成 1/4 屏（4 个落点）
- *   - 3 终端：只能分裂还没被分裂的那个半屏（2 个落点）
- *   - 4 终端：满，只能替换
- *   （「可分裂」= 叶子深度 ≤ 1：根叶子或根的直接孩子）
+ * Docking rules:
+ *   - 1 terminal: may split into four half-screen slots (left/right/top/bottom)
+ *   - 2 terminals: may split one half-screen into a quarter screen (4 slots)
+ *   - 3 terminals: may only split the half-screen that is not split yet (2 slots)
+ *   - 4 terminals: full, replacement only
+ *   (splittable = leaf depth <= 1: the root leaf or a direct child of the root)
  */
 
-export type SplitDir = 'row' | 'col'; // row = 左右，col = 上下
+export type SplitDir = 'row' | 'col'; // row = side by side, col = stacked
 import type { SshOptions } from '@core/ssh';
 import { measurePaneTree } from '@core/paneLayout';
 import { paneTreeOperations, type PaneTree } from '@core/paneTree';
@@ -27,7 +28,7 @@ export interface TerminalSpec {
   ssh?: SshOptions & { name: string; host: string; user?: string; port?: number; connectionId?: string };
   cwd?: string;
   useProfileDirectory?: boolean;
-  /** 打开模式：classic = 经典 xterm；block = 块列表视图（SSH 恒 classic） */
+  /** Open mode: classic = classic terminal view; block = block list view (SSH is always classic). */
   openMode?: 'classic' | 'block';
 }
 
@@ -75,23 +76,23 @@ export interface Rect {
 }
 
 export interface DropTarget {
-  /** 被分裂的叶子终端 id */
+  /** Id of the leaf terminal being split. */
   leafId: string;
   dir: SplitDir;
   position: 'first' | 'second';
-  /** 新终端落点矩形（0..1 相对窗口） */
+  /** Drop rect for the new terminal (0..1, relative to the window). */
   rect: Rect;
 }
 
 export interface Divider {
   dir: SplitDir;
   ratio: number;
-  /** first 子树的第一个终端 id / second 子树的第一个终端 id（稳定标识） */
+  /** Ids of the first terminal of the first and of the second subtree (stable identity). */
   aId: string;
   bId: string;
-  /** 分隔线位置（相对窗口） */
+  /** Divider position (relative to the window). */
   rect: Rect;
-  /** 该 split 节点自身占据的区域（相对窗口）—— 嵌套分隔线拖拽比例以它为准 */
+  /** Region occupied by this split node (relative to the window); nested divider drag ratios are measured against it. */
   region: Rect;
 }
 
@@ -99,7 +100,7 @@ export interface Divider {
 export const MIN_PANE_SIZE = 135;
 /** Keep the command toolbar and composer usable when a pane is narrowed. */
 export const MIN_PANE_WIDTH = 360;
-/** 分隔线厚度（px）。 */
+/** Divider thickness in px. */
 export const DIVIDER_SIZE = 6;
 
 export function leaf(terminal: TerminalSpec): WindowLayout {
@@ -110,7 +111,7 @@ export function countLeaves(layout: WindowLayout): number {
   return tree.leaves(layout).length;
 }
 
-/** 同一水平行里最多有多少个终端（row 相加、col 取较大），用于按布局动态计算窗口最小宽度。 */
+/** Largest number of terminals in one horizontal row (row adds, col takes the larger side); drives the layout-dependent minimum window width. */
 export function maxRowPanes(layout: WindowLayout): number {
   if (layout.type === 'leaf') return 1;
   return layout.dir === 'row'
@@ -118,7 +119,7 @@ export function maxRowPanes(layout: WindowLayout): number {
     : Math.max(maxRowPanes(layout.first), maxRowPanes(layout.second));
 }
 
-/** 窗口（会话容器）的最小宽度：最宽一行 × 每终端最小宽 + 分隔线厚度。 */
+/** Minimum width of a window (session container): widest row x per-pane minimum width + divider thickness. */
 export function minTerminalWidth(layout: WindowLayout): number {
   const n = maxRowPanes(layout);
   return n * MIN_PANE_WIDTH + (n - 1) * DIVIDER_SIZE;
@@ -144,14 +145,14 @@ export function findLeaf(layout: WindowLayout, id: string): TerminalSpec | null 
   return findLeaf(layout.first, id) ?? findLeaf(layout.second, id);
 }
 
-/** 叶子深度：根叶子=0，根直接孩子=1，更深则 >1；未找到 -1。 */
+/** Leaf depth: root leaf = 0, direct child of the root = 1, deeper > 1; -1 when not found. */
 export function leafDepth(layout: WindowLayout, id: string, depth = 0): number {
   if (layout.type === 'leaf') return layout.terminal.id === id ? depth : -1;
   const d = leafDepth(layout.first, id, depth + 1);
   return d >= 0 ? d : leafDepth(layout.second, id, depth + 1);
 }
 
-/** 分裂某个叶子，把新终端放到该叶子区域的第一/第二半。 */
+/** Split a leaf, placing the new terminal in the first or second half of that leaf's region. */
 export function splitLeaf(
   root: WindowLayout,
   leafId: string,
@@ -170,17 +171,17 @@ export function splitLeaf(
   });
 }
 
-/** 替换某个叶子里的终端。 */
+/** Replace the terminal inside a leaf. */
 export function replaceLeaf(root: WindowLayout, leafId: string, newTerminal: TerminalSpec): WindowLayout {
   return tree.update(root, leafId, () => leaf(newTerminal));
 }
 
-/** 移除某个叶子；父节点若只剩一个孩子则提升该孩子。 */
+/** Remove a leaf; a parent left with a single child is collapsed into that child. */
 export function removeLeaf(root: WindowLayout, leafId: string): WindowLayout | null {
   return tree.remove(root, leafId);
 }
 
-/** 每个叶子的几何矩形（0..1 相对窗口）。 */
+/** Geometric rect of every leaf (0..1, relative to the window). */
 export function leafRects(
   layout: WindowLayout,
   rect: Rect = { x: 0, y: 0, w: 1, h: 1 },
@@ -188,18 +189,20 @@ export function leafRects(
   return measureWindowLayout(layout, rect).cells.map(({ id, rect: cell }) => ({ terminalId: id, rect: cell }));
 }
 
-/** 可停靠落点（按上面的停靠规则）。 */
+/** Dock targets (per the docking rules above). */
 export function dropTargets(layout: WindowLayout): DropTarget[] {
   return measureWindowLayout(layout).targets;
 }
 
 /**
- * 移动终端的落点：对每个「其它终端」给出上下左右四个边沿落点（吸附式）。
- * 与分裂（dropTargets）不同：移动时被拖动终端会先移除，落点只面向剩余终端，
- * 因此不受「深度 ≤ 1」限制，可自由放到任意其它终端的上/下/左/右。
+ * Move targets: every other terminal yields four edge targets (top/bottom/left/right).
+ * Unlike splitting (dropTargets) the dragged terminal is removed first, so targets face
+ * the remaining terminals only and are not limited by depth <= 1: a terminal may be
+ * dropped above, below, left or right of any other terminal.
  */
 export function moveTargets(layout: WindowLayout, dragId: string): DropTarget[] {
-  // 先移除被拖动终端，落点矩形以「移除后的整个容器」为基准，忠实反映最终落位（而非目标终端当前子区域）
+  // Remove the dragged terminal first so targets are measured against the container after
+  // removal, reflecting the final placement instead of the target terminal's current sub-region.
   const remaining = removeLeaf(layout, dragId);
   if (!remaining) return [];
   const targets: DropTarget[] = [];
@@ -219,17 +222,17 @@ export function moveTargets(layout: WindowLayout, dragId: string): DropTarget[] 
   return targets;
 }
 
-/** 全部分隔线（用于渲染与拖拽调比例）。 */
+/** All dividers (used for rendering and for dragging ratios). */
 export function dividers(layout: WindowLayout): Divider[] {
   return measureWindowLayout(layout).dividers;
 }
 
-/** 调整分隔线比例（用 aId/bId 定位 split 节点）。 */
+/** Adjust a divider ratio (locating the split node by aId/bId). */
 export function setRatio(root: WindowLayout, aId: string, bId: string, ratio: number): WindowLayout {
   return tree.ratio(root, aId, bId, ratio);
 }
 
-/** 终端的几何矩形 + 面向相邻终端的内侧边框标记（左/右/上/下）。 */
+/** Terminal geometry plus flags for inner borders facing an adjacent terminal (left/right/top/bottom). */
 export interface LayoutCell {
   terminalId: string;
   rect: Rect;
@@ -237,9 +240,10 @@ export interface LayoutCell {
 }
 
 /**
- * 布局树遍历收集：返回每个终端的几何矩形（0..1 相对窗口）与内侧边框标记。
- * 供平面渲染（PaneLayout）一次性绝对定位所有 pane —— 拖动重排只改几何，
- * 不重挂终端组件（重挂会 ptyClose 杀掉运行中命令）。
+ * Walk the layout tree and collect every terminal's geometry (0..1, relative to the
+ * window) together with its inner border flags. Flat rendering positions all panes at
+ * once; drag reordering only changes geometry and never remounts terminal components
+ * (a remount closes the PTY and kills a running command).
  */
 export function collectLayoutCells(layout: WindowLayout): LayoutCell[] {
   return measureWindowLayout(layout).cells.map(({ id, ...cell }) => ({ terminalId: id, ...cell }));

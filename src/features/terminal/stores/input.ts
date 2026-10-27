@@ -1,10 +1,11 @@
 import { create } from 'zustand';
 
 /**
- * useInputStore — 输入栏每 pane 独立状态（text + AI/命令模式）。
+ * useInputStore — per-pane composer state (text plus AI/command mode).
  *
- * 分屏后两个 pane 是独立终端，各自记住草稿与模式；未分屏时 paneId = 标签 id。
- * 聚焦切换（点击 pane / 切标签）由 InputEditor 按聚焦 pane 读取对应状态。
+ * After a split each pane is an independent terminal with its own draft and mode;
+ * without a split paneId equals the tab id. Focus switches read the state for the
+ * focused pane through InputEditor.
  */
 
 export interface PaneInput {
@@ -73,7 +74,7 @@ export const useInputStore = create<InputState>((set) => ({
     }),
 }));
 
-/** paneId 的输入状态 selector（缺失时返回稳定 EMPTY，避免无限重渲染）。 */
+/** Input state selector for a pane (returns a stable EMPTY when absent, preventing render loops). */
 export function selectPaneInput(paneId: string) {
   return (s: InputState): PaneInput => s.byPane[paneId] ?? EMPTY;
 }

@@ -5,13 +5,13 @@ export interface SessionWorkspaceSnapshot {
   activeId: string;
 }
 
-/** 返回当前活动的真实会话标签，历史/设置视图不属于会话实体。 */
+/** Return the active tab when it is a real session; history and settings views are not session entities. */
 export function selectActiveSessionTab(snapshot: SessionWorkspaceSnapshot): Extract<Tab, { kind: 'session' }> | null {
   const activeTab = snapshot.tabs.find((tab) => tab.id === snapshot.activeId);
   return activeTab && isSessionTab(activeTab) ? activeTab : null;
 }
 
-/** 返回当前工作区中的所有真实会话标签。 */
+/** Return every real session tab in the workspace. */
 export function selectSessionTabs(snapshot: Pick<SessionWorkspaceSnapshot, 'tabs'>): Array<Extract<Tab, { kind: 'session' }>> {
   return snapshot.tabs.filter(isSessionTab);
 }

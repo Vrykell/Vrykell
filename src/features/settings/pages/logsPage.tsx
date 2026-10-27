@@ -18,22 +18,22 @@ export function LogsPage() {
     setExporting(true);
     setMessage(null);
     try {
-      const path = await save({ title: '导出详细诊断日志', defaultPath: `vrykell-diagnostics-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`, filters: [{ name: '诊断日志', extensions: ['jsonl'] }] });
-      if (path) { await exportDiagnostics(path); setMessage({ text: `已导出到 ${path}`, tone: 'success' }); }
-    } catch (cause) { setMessage({ text: `导出失败：${String(cause)}`, tone: 'error' }); }
+      const path = await save({ title: t('Export detailed diagnostics log'), defaultPath: `vrykell-diagnostics-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`, filters: [{ name: t('Diagnostics log'), extensions: ['jsonl'] }] });
+      if (path) { await exportDiagnostics(path); setMessage({ text: t('Exported to {{path}}', { path }), tone: 'success' }); }
+    } catch (cause) { setMessage({ text: t('Export failed: {{error}}', { error: String(cause) }), tone: 'error' }); }
     finally { setExporting(false); }
   };
   return <SettingsGroup title={t('Diagnostics')}>
-    <Field title="自动保存日志" description={t('Save diagnostics on this device across restarts.')}>
-      <OutlineButton role="switch" aria-label="自动保存日志" aria-checked={autoSave} disabled={saving} onClick={() => { void saveSetting(() => setDiagnosticAutoSave(!autoSave)); }}>{saving ? '保存中…' : autoSave ? '已开启' : '已关闭'}</OutlineButton>
+    <Field title={t('Save logs automatically')} description={t('Save diagnostics on this device across restarts.')}>
+      <OutlineButton role="switch" aria-label={t('Save logs automatically')} aria-checked={autoSave} disabled={saving} onClick={() => { void saveSetting(() => setDiagnosticAutoSave(!autoSave)); }}>{saving ? t('Saving…') : autoSave ? t('Enabled') : t('Disabled')}</OutlineButton>
       {error && <ErrorBox compact testId="logs-error" style={{ marginTop: 8 }}>{error}</ErrorBox>}
     </Field>
-    <Field title="导出日志" description={t('Export recent diagnostics. Passwords, keys and terminal or conversation content are excluded.')}>
-      <OutlineButton disabled={exporting} onClick={() => { void exportLog(); }}>{exporting ? '导出中…' : '导出详细日志'}</OutlineButton>
+    <Field title={t('Export logs')} description={t('Export recent diagnostics. Passwords, keys and terminal or conversation content are excluded.')}>
+      <OutlineButton disabled={exporting} onClick={() => { void exportLog(); }}>{exporting ? t('Exporting…') : t('Export detailed log')}</OutlineButton>
       {message && <ErrorBox compact tone={message.tone} testId="logs-export-status" style={{ marginTop: 8 }}>{message.text}</ErrorBox>}
     </Field>
-    <Field title="日志存储" description={t('Files rotate at 5 MB. Keep the current file and two backups.')}>
-      <OutlineButton onClick={() => { void diagnosticsLogDirectory().then(async path => { setDirectory(path); await openPath(path); }).catch(cause => setMessage({ text: `打开日志目录失败：${String(cause)}`, tone: 'error' })); }}>打开日志目录</OutlineButton>
+    <Field title={t('Log storage')} description={t('Files rotate at 5 MB. Keep the current file and two backups.')}>
+      <OutlineButton onClick={() => { void diagnosticsLogDirectory().then(async path => { setDirectory(path); await openPath(path); }).catch(cause => setMessage({ text: t('Could not open the log folder: {{error}}', { error: String(cause) }), tone: 'error' })); }}>{t('Open log folder')}</OutlineButton>
       {directory && <p style={{ color: 'var(--text-muted)', overflowWrap: 'anywhere' }}>{directory}</p>}
     </Field>
   </SettingsGroup>;
