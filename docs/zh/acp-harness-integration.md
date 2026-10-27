@@ -109,6 +109,8 @@ ACP v1 只提供 **`usage_update`**：会话上下文 `used`/`size`（token）+ 
 - 会话内：停止按钮 = `session/cancel`；输入框底部的模式 / 模型 / 配置选择器分别调用 `session/set_mode`、`session/set_model`、`session/set_config_option`；`plan` 更新渲染成对话流末尾的「计划」卡片（已完成划线、进行中高亮）；上下文占用显示在输入框状态行；输入 `/` 列出该 agent 自报的斜杠命令，`available_commands_update` 到达时整份替换。
 - 设置页新增「ACP」分组：服务器列表（连接 / 测试 / 编辑 / 删除）加预设；添加与编辑走中央浮层，持久化到 `~/.vrykell/harnesses.json`（与 `mcp.json` 同款：单文件、camelCase、可手改）。
 - 每个服务器提供「测试连接」：只跑 `initialize` 并显示协商结果（协议版本、能力）。
+- 失败要分类，不能靠猜：只有协议自己的 `-32000`（需要认证）才会在错误旁显示该 agent 的登录说明；其它失败只显示自己的错误文本。传输结束时，页面会收到进程退出码和 stderr 末尾（放在错误的「技术细节」里），这条已断开的连接会被忘掉，下一次发送或「重试」会重新打开它；一轮对话五分钟内没有任何事件就判定为失联并停止，不再让它占着会话等满 prompt 预算。
+- `notice` 更新——我们声明支持的能力——显示在会话状态行；它是实时信息，不属于对话历史。
 
 ## 8. 安全边界（必须说清）
 
@@ -160,4 +162,6 @@ ACP v1 只提供 **`usage_update`**：会话上下文 `used`/`size`（token）+ 
 
 | 现象 | 原因 | 处理 |
 | --- | --- | --- |
+| 刚打开会话就报 `harness handshake failed: the agent closed the connection (exit code N; stderr: …)` | 配置的命令不是 ACP 服务器。例如不带参数的 `codex` 会进入交互式终端界面，读到请求后立即退出 | 改用预设命令（`npx -y @agentclientprotocol/codex-acp`）或 ACP Registry 列出的命令；括号里的 stderr 末尾就是程序自己给出的原因 |
+| 一轮对话静默五分钟后以「代理长时间没有响应，本轮已停止。」结束 | 适配器始终没有回应 `session/prompt`：可能是它吞掉了 provider 的失败，也可能进程已经卡死 | 去看该 agent 自己的日志。会话仍可继续；如果进程被关闭，下一次发送会自动重连 |
 | 测试连接通过，但打开会话报 `harness could not open a session: agent error (-32603): Internal error: Cannot call write after a stream was destroyed` | 适配器进程还在，但它要启动的 agent 程序不在 `PATH` 上。例如 `pi-acp` 在 Windows 上启动 `pi.cmd`：程序不存在时子进程立即退出，适配器随后向已销毁的管道写入，这个内部错误就成了 `session/new` 的应答。`initialize` 不启动内层程序，所以测试连接测不出来 | 安装适配器依赖的程序（`pi-acp` 需要 `npm i -g @earendil-works/pi-coding-agent`），或先用 `node scripts/acp-probe.mjs npx -y pi-acp` 在应用外复现：probe 会打印同一错误和适配器的 stderr |

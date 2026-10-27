@@ -156,6 +156,14 @@ token counts through `_meta`, we can pick them up (`_meta.vrykell` is our extens
   camelCase, hand-editable).
 - Every server offers "test connection": it only runs `initialize` and reports the negotiated result
   (protocol version, capabilities).
+- Failures are classified, never guessed: only the protocol's `-32000` ("authentication required")
+  puts the agent's login instructions next to the error. A transport that ends is reported to the
+  page with the process exit code and the tail of its stderr behind the error's disclosure; the
+  dead connection is forgotten so the next prompt (or the retry action) reopens it; and a turn that
+  produces no event for five minutes is stopped instead of holding the session for the prompt
+  budget.
+- `notice` updates — the capability we advertise — appear in the session's status line. They are
+  live information, not transcript history.
 
 ## 8. Security boundary (stated plainly)
 
@@ -232,4 +240,6 @@ Following the checklist in `security-model.md`, these are hard requirements when
 
 | Symptom | Cause | Fix |
 | --- | --- | --- |
+| `harness handshake failed: the agent closed the connection (exit code N; stderr: …)` right after opening starts | The configured command is not an ACP server. `codex` with no arguments, for example, starts its interactive terminal UI and exits as soon as it reads the request | Use the preset command (`npx -y @agentclientprotocol/codex-acp`) or the command the ACP registry lists; the stderr tail names the program's own reason |
+| A turn ends after five silent minutes with "The agent did not respond in time; the turn was stopped." | The adapter never answered `session/prompt` — a provider failure it swallowed, or a process that hung | Check the agent's own log. The session stays usable; the next prompt reopens the connection if the process had to be closed |
 | "Test connection" passes, but opening a session reports `harness could not open a session: agent error (-32603): Internal error: Cannot call write after a stream was destroyed` | The adapter process is still alive, but the agent program it starts is not on `PATH`. On Windows, for example, `pi-acp` starts `pi.cmd`: when that program does not exist the child exits at once, the adapter then writes into the destroyed pipe, and the resulting internal error becomes the `session/new` answer. `initialize` never starts the inner program, so "Test connection" cannot catch it | Install the program the adapter needs (`pi-acp` needs `npm i -g @earendil-works/pi-coding-agent`), or reproduce outside the app with `node scripts/acp-probe.mjs npx -y pi-acp`, which prints the same error and the adapter's stderr |

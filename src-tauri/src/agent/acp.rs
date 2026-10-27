@@ -18,10 +18,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, AsyncWrite, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::{mpsc, oneshot};
 
@@ -49,15 +49,71 @@ const LOAD_TIMEOUT: Duration = Duration::from_secs(300);
 /// agent that never answers at all.
 const TURN_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 
+/// The tail of the agent's stderr kept for the error surface. Harnesses log freely; the last few
+/// KiB are what explains an exit, and a bound keeps a chatty agent from growing the process.
+const STDERR_TAIL_LIMIT: usize = 8 * 1024;
+
+/// How long the reader waits for the child to report its status once its output has ended.
+const EXIT_STATUS_GRACE: Duration = Duration::from_millis(500);
+
+/// JSON-RPC code the protocol defines for a request that needs authentication.
+pub const AUTH_REQUIRED_CODE: i64 = -32000;
+
+/// A failed request. The code travels beside the text because `-32000` is the protocol's
+/// "authentication required": the page must not infer that from the wording of an error.
+#[derive(Clone, Debug, PartialEq)]
+pub struct AgentFailure {
+    pub code: Option<i64>,
+    pub message: String,
+    /// Raw transport output (exit status and the agent's stderr tail), shown behind the error's
+    /// disclosure instead of inside its summary.
+    pub details: Option<String>,
+    /// The message describes a connection that ended, not something the agent decided.
+    pub transport: bool,
+}
+
+impl AgentFailure {
+    fn new(code: Option<i64>, message: impl Into<String>) -> Self {
+        Self { code, message: message.into(), details: None, transport: false }
+    }
+
+    fn transport(message: impl Into<String>) -> Self {
+        Self { transport: true, ..Self::new(None, message) }
+    }
+
+    fn with_details(mut self, details: Option<String>) -> Self {
+        self.details = details;
+        self
+    }
+
+    fn is_authentication(&self) -> bool { self.code == Some(AUTH_REQUIRED_CODE) }
+}
+
+impl std::fmt::Display for AgentFailure {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(&self.message)
+    }
+}
+
 /// A readable line from a JSON-RPC error: the message it carries, which is what a user can act on.
 /// Agents put their own error objects under `data`, so the raw value is only the last resort.
-fn format_agent_error(error: &Value) -> String {
+fn agent_failure(error: &Value) -> AgentFailure {
     let message = error.get("message").and_then(Value::as_str).unwrap_or("").trim();
     let code = error.get("code").and_then(Value::as_i64);
-    match (message.is_empty(), code) {
+    let text = match (message.is_empty(), code) {
         (false, Some(code)) => format!("agent error ({code}): {message}"),
         (false, None) => format!("agent error: {message}"),
         (true, _) => format!("agent error: {error}"),
+    };
+    AgentFailure::new(code, text)
+}
+
+/// Keep only the end of the agent's diagnostics: a crash explains itself in its last lines.
+fn append_stderr_tail(buffer: &mut Vec<u8>, chunk: &[u8]) {
+    buffer.extend_from_slice(chunk);
+    if buffer.len() > STDERR_TAIL_LIMIT {
+        let excess = buffer.len() - STDERR_TAIL_LIMIT;
+        buffer.drain(..excess);
     }
 }
 
@@ -141,7 +197,7 @@ async fn await_permission(receiver: oneshot::Receiver<PermissionOutcome>, timeou
 }
 
 /// Requests that arrive from the agent while a turn is running.
-type Pending = Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Value, String>>>>>;
+type Pending = Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Value, AgentFailure>>>>>;
 
 pub struct AcpClient {
     /// Lines waiting for the writer task.
@@ -151,10 +207,19 @@ pub struct AcpClient {
     /// Notifications the agent sent (`session/update` and friends), in arrival order. Behind a
     /// mutex so the event pump and a request can run side by side.
     events: tokio::sync::Mutex<mpsc::UnboundedReceiver<Value>>,
-    /// Held so the child is killed when the client is dropped (`kill_on_drop`).
-    child: Mutex<Option<Child>>,
+    /// Held so the child is killed when the client is dropped (`kill_on_drop`). Shared with the
+    /// reader so it can report the exit status once the agent's output ends.
+    child: Arc<Mutex<Option<Child>>>,
     tasks: Vec<tokio::task::AbortHandle>,
-    closed: AtomicBool,
+    /// True once the transport is unusable: the pipe ended or the client was shut down.
+    closed: Arc<AtomicBool>,
+    /// True only when we closed it ourselves; a connection that ends without this was an agent
+    /// that died, which the page has to be told about.
+    closing: Arc<AtomicBool>,
+    /// The end of the agent's stderr, which is where a crash explains itself.
+    stderr: Arc<Mutex<Vec<u8>>>,
+    /// Exit code of the agent process, or `i32::MIN` while it is still running.
+    exit_code: Arc<AtomicI32>,
     mcp_servers: Mutex<Vec<Value>>,
 }
 
@@ -168,6 +233,11 @@ impl AcpClient {
         let (out_tx, mut out_rx) = mpsc::unbounded_channel::<String>();
         let (event_tx, events) = mpsc::unbounded_channel::<Value>();
         let pending: Pending = Arc::new(Mutex::new(HashMap::new()));
+        let closed = Arc::new(AtomicBool::new(false));
+        let closing = Arc::new(AtomicBool::new(false));
+        let stderr = Arc::new(Mutex::new(Vec::new()));
+        let exit_code = Arc::new(AtomicI32::new(i32::MIN));
+        let child: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
 
         // Writer task: one line per message, exactly as the protocol frames them.
         let writer_task = tokio::spawn(async move {
@@ -188,6 +258,10 @@ impl AcpClient {
         let reader_pending = pending.clone();
         // The reader answers agent requests, so it needs its own handle to the write queue.
         let answer_tx = out_tx.clone();
+        let reader_closed = closed.clone();
+        let reader_stderr = stderr.clone();
+        let reader_exit = exit_code.clone();
+        let reader_child = child.clone();
         let reader_task = tokio::spawn(async move {
             let mut lines = BufReader::new(reader).lines();
             while let Ok(Some(line)) = lines.next_line().await {
@@ -248,23 +322,27 @@ impl AcpClient {
                     let waiter = reader_pending.lock().ok().and_then(|mut map| map.remove(&id));
                     if let Some(waiter) = waiter {
                         let outcome = match message.get("error") {
-                            Some(error) => Err(format_agent_error(error)),
+                            Some(error) => Err(agent_failure(error)),
                             None => Ok(message.get("result").cloned().unwrap_or(Value::Null)),
                         };
                         let _ = waiter.send(outcome);
                     }
                 }
             }
-            // The agent closed the pipe: every waiter has to learn that, not hang.
+            // The agent closed the pipe. Mark the transport unusable before waking the waiters:
+            // a prompt sent after this point must fail at once, not wait out its whole budget.
+            reader_closed.store(true, Ordering::SeqCst);
+            capture_exit_status(&reader_child, &reader_exit, EXIT_STATUS_GRACE).await;
+            let details = transport_details(&reader_stderr, &reader_exit);
             if let Ok(mut map) = reader_pending.lock() {
                 for (_, waiter) in map.drain() {
-                    let _ = waiter.send(Err("the agent closed the connection".to_string()));
+                    let _ = waiter.send(Err(AgentFailure::transport("the agent closed the connection").with_details(details.clone())));
                 }
             }
         });
 
         Self { out: out_tx, next_id: AtomicU64::new(0), pending, events: tokio::sync::Mutex::new(events), mcp_servers: Mutex::new(Vec::new()),
-            child: Mutex::new(None), tasks: vec![writer_task.abort_handle(), reader_task.abort_handle()], closed: AtomicBool::new(false) }
+            child, tasks: vec![writer_task.abort_handle(), reader_task.abort_handle()], closed, closing, stderr, exit_code }
     }
 
     /// Spawn a program and speak ACP to it. `kill_on_drop` keeps a killed client from leaking a
@@ -282,7 +360,7 @@ impl AcpClient {
         cmd.args(&program_args)
             .stdin(std::process::Stdio::piped())
             .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::null())
+            .stderr(std::process::Stdio::piped())
             .kill_on_drop(true);
         #[cfg(windows)]
         cmd.creation_flags(0x08000000);
@@ -300,17 +378,68 @@ impl AcpClient {
         let mut child = cmd.spawn().map_err(|e| format!("could not start the harness: {e}"))?;
         let stdin = child.stdin.take().ok_or("the harness gave no stdin")?;
         let stdout = child.stdout.take().ok_or("the harness gave no stdout")?;
-        let client = Self::over(BufReader::new(stdout), stdin, permission);
+        let stderr = child.stderr.take();
+        let mut client = Self::over(BufReader::new(stdout), stdin, permission);
+        if let Some(mut stderr) = stderr {
+            // Keep reading stderr for the life of the process: a pipe nobody drains would fill up
+            // and block a chatty agent, and the tail is what explains a crash.
+            let tail = client.stderr.clone();
+            let reader = tokio::spawn(async move {
+                let mut chunk = [0u8; 4096];
+                loop {
+                    match stderr.read(&mut chunk).await {
+                        Ok(0) | Err(_) => break,
+                        Ok(count) => {
+                            if let Ok(mut buffer) = tail.lock() { append_stderr_tail(&mut buffer, &chunk[..count]); }
+                        }
+                    }
+                }
+            });
+            client.tasks.push(reader.abort_handle());
+        }
         *client.child.lock().map_err(|_| "the client state is poisoned")? = Some(child);
         Ok(client)
     }
 
+    /// True only when this client closed the connection itself; an agent that dies leaves it false.
+    pub fn is_closing(&self) -> bool { self.closing.load(Ordering::SeqCst) }
+
+    pub fn exit_code(&self) -> Option<i32> {
+        match self.exit_code.load(Ordering::SeqCst) {
+            i32::MIN => None,
+            code => Some(code),
+        }
+    }
+
+    pub fn stderr_len(&self) -> usize {
+        self.stderr.lock().map(|buffer| buffer.len()).unwrap_or(0)
+    }
+
+    /// What the process left behind, for the error's disclosure. `None` when it left nothing.
+    pub fn transport_details(&self) -> Option<String> { transport_details(&self.stderr, &self.exit_code) }
+
+    /// A short suffix for a start-up failure: the exit code and the last stderr line, which is
+    /// usually the only sentence that says why the program refused to run.
+    pub fn transport_hint(&self) -> String {
+        let code = self.exit_code();
+        let tail = self.stderr.lock().ok().map(|buffer| String::from_utf8_lossy(&buffer).to_string()).unwrap_or_default();
+        let line = tail.lines().rev().find(|line| !line.trim().is_empty()).map(|line| line.trim().replace(['\r', '\n'], " ")).unwrap_or_default();
+        let line = line.chars().take(200).collect::<String>();
+        match (code, line.is_empty()) {
+            (Some(code), false) => format!(" (exit code {code}; stderr: {line})"),
+            (Some(code), true) => format!(" (exit code {code})"),
+            (None, false) => format!(" (stderr: {line})"),
+            (None, true) => String::new(),
+        }
+    }
+
     fn stop_io(&self) {
+        self.closing.store(true, Ordering::SeqCst);
         self.closed.store(true, Ordering::SeqCst);
         for task in &self.tasks { task.abort(); }
         if let Ok(mut pending) = self.pending.lock() {
             for (_, waiter) in pending.drain() {
-                let _ = waiter.send(Err("the harness connection is closed".to_string()));
+                let _ = waiter.send(Err(AgentFailure::transport("the harness connection is closed")));
             }
         }
     }
@@ -346,26 +475,32 @@ impl AcpClient {
     /// takes differs by method, and a budget shorter than the work turns a slow turn into a
     /// failure the user cannot explain.
     pub async fn request(&self, method: &str, params: Value, budget: Duration) -> Result<Value, String> {
+        self.request_detailed(method, params, budget).await.map_err(|failure| failure.to_string())
+    }
+
+    /// The same request, keeping the JSON-RPC code so a caller can tell an authentication failure
+    /// from any other. Only the turn path needs that distinction today.
+    async fn request_detailed(&self, method: &str, params: Value, budget: Duration) -> Result<Value, AgentFailure> {
         let id = self.next_id.fetch_add(1, Ordering::SeqCst);
         let (tx, rx) = oneshot::channel();
         {
-            let mut map = self.pending.lock().map_err(|_| "the client state is poisoned".to_string())?;
-            if self.closed.load(Ordering::SeqCst) { return Err("the harness connection is closed".to_string()); }
+            let mut map = self.pending.lock().map_err(|_| AgentFailure::new(None, "the client state is poisoned"))?;
+            if self.closed.load(Ordering::SeqCst) { return Err(AgentFailure::transport("the harness connection is closed")); }
             map.insert(id, tx);
         }
         if let Err(error) = self.send_line(json!({ "jsonrpc": "2.0", "id": id, "method": method, "params": params })) {
             if let Ok(mut pending) = self.pending.lock() { pending.remove(&id); }
-            return Err(error);
+            return Err(AgentFailure::transport(error));
         }
         match tokio::time::timeout(budget, rx).await {
             Ok(Ok(outcome)) => outcome,
-            Ok(Err(_)) => Err(format!("{method} answered nothing")),
+            Ok(Err(_)) => Err(AgentFailure::new(None, format!("{method} answered nothing"))),
             Err(_) => {
                 // Drop the waiter so a late answer is ignored rather than resolving a dead call.
                 if let Ok(mut map) = self.pending.lock() {
                     map.remove(&id);
                 }
-                Err(format!("{method} timed out"))
+                Err(AgentFailure::new(None, format!("{method} timed out")))
             }
         }
     }
@@ -465,9 +600,9 @@ impl AcpClient {
     }
 
     /// Send a prompt and wait for the stop reason; the turn's content arrives as notifications.
-    pub async fn prompt(&self, session_id: &str, prompt: Value) -> Result<String, String> {
+    pub async fn prompt(&self, session_id: &str, prompt: Value) -> Result<String, AgentFailure> {
         let result = self
-            .request(
+            .request_detailed(
                 "session/prompt",
                 json!({ "sessionId": session_id, "prompt": prompt }),
                 TURN_TIMEOUT,
@@ -489,7 +624,9 @@ impl AcpClient {
 impl Drop for AcpClient {
     fn drop(&mut self) {
         self.stop_io();
-        // The child also has kill_on_drop for failed handshakes and unexpected teardown.
+        // The reader task holds a clone of the child slot, so dropping this client alone would not
+        // necessarily drop the process. Taking it out here keeps `kill_on_drop` immediate.
+        if let Ok(mut child) = self.child.lock() { child.take(); }
     }
 }
 
@@ -497,6 +634,52 @@ impl Drop for AcpClient {
 fn out_tx_for_error(tx: &mpsc::UnboundedSender<String>, payload: Value) -> Result<(), String> {
     let line = serde_json::to_string(&payload).map_err(|e| e.to_string())?;
     tx.send(line).map_err(|_| "the harness connection is closed".to_string())
+}
+
+/// Record the child's exit status once its output has ended. A process is normally reaped by the
+/// time its stdout closes; the short grace covers the kernel's own ordering, not a slow program.
+async fn capture_exit_status(child: &Arc<Mutex<Option<Child>>>, exit_code: &AtomicI32, grace: Duration) {
+    let deadline = tokio::time::Instant::now() + grace;
+    loop {
+        {
+            if let Ok(mut guard) = child.lock() {
+                let Some(child) = guard.as_mut() else { return };
+                if let Ok(Some(status)) = child.try_wait() {
+                    exit_code.store(status.code().unwrap_or(i32::MIN), Ordering::SeqCst);
+                    return;
+                }
+            }
+        }
+        if tokio::time::Instant::now() >= deadline { return; }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+}
+
+/// The exit status and the stderr tail, formatted for the error disclosure. Only what the process
+/// actually produced: no prompt text and no invented reason.
+fn transport_details(stderr: &Arc<Mutex<Vec<u8>>>, exit_code: &Arc<AtomicI32>) -> Option<String> {
+    let code = match exit_code.load(Ordering::SeqCst) {
+        i32::MIN => None,
+        code => Some(code),
+    };
+    let tail = stderr.lock().ok().map(|buffer| String::from_utf8_lossy(&buffer).trim().to_string()).unwrap_or_default();
+    match (code, tail.is_empty()) {
+        (None, true) => None,
+        (Some(code), true) => Some(format!("exit code: {code}")),
+        (None, false) => Some(tail),
+        (Some(code), false) => Some(format!("exit code: {code}\n\n{tail}")),
+    }
+}
+
+/// A protocol version the client cannot speak has to fail at the handshake: continuing would make
+/// every later message mean something else.
+fn check_protocol_version(info: &Value) -> Result<(), String> {
+    match info.get("protocolVersion").and_then(Value::as_u64) {
+        Some(version) if version != PROTOCOL_VERSION => Err(format!(
+            "the harness speaks protocol version {version}; this app speaks protocol version {PROTOCOL_VERSION}"
+        )),
+        _ => Ok(()),
+    }
 }
 
 // ── configuration ────────────────────────────────────────────────────────────
@@ -584,10 +767,16 @@ pub async fn acp_handshake(name: String) -> Result<Value, String> {
         error
     })?;
     let outcome = client.initialize("vrykell", env!("CARGO_PKG_VERSION")).await;
+    // Capture what the process said before shutdown takes its pipes away.
+    let hint = client.transport_hint();
     client.shutdown().await;
     let info = outcome.map_err(|error| {
         note("acp-handshake-failed", json!({ "name": harness.name, "stage": "initialize" }));
-        format!("harness handshake failed: {error}")
+        format!("harness handshake failed: {error}{hint}")
+    })?;
+    check_protocol_version(&info).map_err(|error| {
+        note("acp-handshake-failed", json!({ "name": harness.name, "stage": "version" }));
+        error
     })?;
     note("acp-handshake-ok", json!({
         "name": harness.name,
@@ -826,8 +1015,18 @@ pub async fn acp_open<R: tauri::Runtime>(
     })?);
     let info = match client.initialize("vrykell", env!("CARGO_PKG_VERSION")).await {
         Ok(info) => info,
-        Err(error) => { client.shutdown().await; return Err(format!("harness handshake failed: {error}")); }
+        Err(error) => {
+            let hint = client.transport_hint();
+            client.shutdown().await;
+            note("acp-open-failed", json!({ "name": harness.name, "stage": "initialize" }));
+            return Err(format!("harness handshake failed: {error}{hint}"));
+        }
     };
+    if let Err(error) = check_protocol_version(&info) {
+        client.shutdown().await;
+        note("acp-open-failed", json!({ "name": harness.name, "stage": "version" }));
+        return Err(error);
+    }
     // The protocol requires an absolute working directory, and an empty one is refused by the agent
     // ("cwd must be an absolute path"). Fall back to the directory the app itself runs in; a caller
     // that knows the project directory (the workspace does) should pass it.
@@ -875,7 +1074,33 @@ pub async fn acp_open<R: tauri::Runtime>(
         loop {
             // Explicit shutdown closes the notification channel even while this task owns a client.
             let Some(pump_client) = pump_client.upgrade() else { break };
-            let Some(message) = pump_client.next_event().await else { break };
+            let Some(message) = pump_client.next_event().await else {
+                // The channel closes for two reasons only: we shut the session down, or the agent's
+                // output ended. The second one has to reach the page, which would otherwise keep
+                // showing a session that can no longer answer anything.
+                if !pump_client.is_closing() {
+                    let details = pump_client.transport_details();
+                    note("acp-transport-closed", json!({
+                        "name": pump_name,
+                        "sessionId": pump_session.clone(),
+                        "exitCode": pump_client.exit_code(),
+                        "stderrBytes": pump_client.stderr_len(),
+                    }));
+                    emit(
+                        &pump_app,
+                        AcpEvent {
+                            session_id: pump_session.clone(),
+                            kind: "error".to_string(),
+                            payload: json!({
+                                "message": "the agent closed the connection",
+                                "reason": "transport",
+                                "details": details,
+                            }),
+                        },
+                    );
+                }
+                break;
+            };
             // The first notification is the interesting one for diagnosis: an open session that
             // never speaks means the agent found nothing to report, not that the wire is broken.
             if !saw_update {
@@ -955,26 +1180,55 @@ pub async fn acp_prompt<R: tauri::Runtime>(
 ) -> Result<(), String> {
     let client = state.get(&session_id)?;
     let generation = client.app_tools.as_ref().map(|tools| tools.begin_turn()).transpose()?;
+    note("acp-prompt", json!({ "sessionId": session_id }));
     let app = app.clone();
     let session = session_id.clone();
     tokio::spawn(async move {
+        let started = std::time::Instant::now();
         let outcome = client.client
             .prompt(&client.agent_session_id, json!([{ "type": "text", "text": text }]))
             .await;
         if let Some(tools) = &client.app_tools { tools.end_turn(generation); }
+        let duration_ms = started.elapsed().as_millis().min(u64::MAX as u128) as u64;
         match outcome {
-            Ok(stop) => emit(
-                &app,
-                AcpEvent {
-                    session_id: session,
-                    kind: "stop".to_string(),
-                    payload: json!({ "stopReason": stop }),
-                },
-            ),
-            Err(message) => emit(
-                &app,
-                AcpEvent { session_id: session, kind: "error".to_string(), payload: json!({ "message": message }) },
-            ),
+            Ok(stop) => {
+                note("acp-prompt-end", json!({ "sessionId": session, "stopReason": stop.clone(), "durationMs": duration_ms }));
+                emit(
+                    &app,
+                    AcpEvent {
+                        session_id: session,
+                        kind: "stop".to_string(),
+                        payload: json!({ "stopReason": stop }),
+                    },
+                )
+            }
+            Err(failure) => {
+                // Error text is useful in the log; the prompt itself never is.
+                note("acp-prompt-end", json!({
+                    "sessionId": session,
+                    "code": failure.code,
+                    "error": failure.message.chars().take(200).collect::<String>(),
+                    "durationMs": duration_ms,
+                }));
+                emit(
+                    &app,
+                    AcpEvent {
+                        session_id: session,
+                        kind: "error".to_string(),
+                        payload: {
+                            let auth_required = failure.is_authentication();
+                            let transport = failure.transport;
+                            json!({
+                                "message": failure.message,
+                                "code": failure.code,
+                                "authRequired": auth_required,
+                                "details": failure.details,
+                                "reason": if transport { json!("transport") } else { Value::Null },
+                            })
+                        },
+                    },
+                )
+            }
         }
     });
     Ok(())
@@ -1121,12 +1375,78 @@ mod tests {
             "data": { "errorName": "APIError", "service": "session" },
         });
         assert_eq!(
-            format_agent_error(&error),
+            agent_failure(&error).to_string(),
             "agent error (-32603): Internal error: Forbidden, gateway detected abuse traffic",
         );
 
-        assert_eq!(format_agent_error(&json!({ "message": "boom" })), "agent error: boom");
-        assert_eq!(format_agent_error(&json!({ "code": 1 })), "agent error: {\"code\":1}");
+        assert_eq!(agent_failure(&json!({ "message": "boom" })).to_string(), "agent error: boom");
+        assert_eq!(agent_failure(&json!({ "code": 1 })).to_string(), "agent error: {\"code\":1}");
+    }
+
+    #[test]
+    fn authentication_is_recognised_by_its_protocol_code_not_its_wording() {
+        // The protocol's own auth code; the page must not show login hints for other failures.
+        let failure = agent_failure(&json!({ "code": -32000, "message": "Authentication required" }));
+        assert_eq!(failure.code, Some(AUTH_REQUIRED_CODE));
+        assert!(failure.is_authentication());
+        assert!(!agent_failure(&json!({ "code": -32603, "message": "Insufficient Balance" })).is_authentication());
+        assert!(!agent_failure(&json!({ "message": "please log in" })).is_authentication());
+    }
+
+    #[test]
+    fn a_closed_transport_is_flagged_so_the_page_can_localise_it() {
+        assert!(AgentFailure::transport("the harness connection is closed").transport);
+        assert!(!AgentFailure::new(None, "agent error: boom").transport);
+    }
+
+    #[test]
+    fn a_protocol_version_the_client_cannot_speak_is_refused() {
+        assert!(check_protocol_version(&json!({ "protocolVersion": 1 })).is_ok());
+        // Older clients tolerated a missing field; the version is only enforced when it is present.
+        assert!(check_protocol_version(&json!({})).is_ok());
+        let error = check_protocol_version(&json!({ "protocolVersion": 2 })).unwrap_err();
+        assert!(error.contains("protocol version 2"), "{error}");
+        assert!(error.contains("speaks protocol version 1"), "{error}");
+    }
+
+    #[test]
+    fn the_stderr_tail_keeps_the_end_and_drops_the_start() {
+        let mut buffer = Vec::new();
+        append_stderr_tail(&mut buffer, b"npx: command failed\n");
+        append_stderr_tail(&mut buffer, &vec![b'x'; STDERR_TAIL_LIMIT]);
+        assert_eq!(buffer.len(), STDERR_TAIL_LIMIT);
+        assert!(buffer.ends_with(b"xxxx"));
+        assert!(!buffer.starts_with(b"npx"));
+    }
+
+    #[tokio::test]
+    async fn the_transport_hint_names_the_exit_code_and_the_last_stderr_line() {
+        let (ours, _theirs) = tokio::io::duplex(64);
+        let (read, write) = tokio::io::split(ours);
+        let client = AcpClient::over(read, write, Arc::new(|_| None));
+        client.stderr.lock().unwrap().extend_from_slice(b"booting\nunknown option --acp\n");
+        client.exit_code.store(2, Ordering::SeqCst);
+        assert_eq!(client.transport_hint(), " (exit code 2; stderr: unknown option --acp)");
+        assert!(client.transport_details().unwrap().contains("exit code: 2"));
+        assert!(client.transport_details().unwrap().contains("unknown option --acp"));
+    }
+
+    #[tokio::test]
+    async fn an_agent_that_ends_its_output_marks_the_connection_closed_and_wakes_waiters() {
+        let (ours, theirs) = tokio::io::duplex(1024);
+        let (read, write) = tokio::io::split(ours);
+        let client = Arc::new(AcpClient::over(read, write, Arc::new(|_| None)));
+        let request_client = client.clone();
+        let request = tokio::spawn(async move {
+            request_client.request("initialize", json!({}), Duration::from_secs(30)).await
+        });
+        // Let the request register its waiter, then let the agent disappear without answering.
+        tokio::task::yield_now().await;
+        drop(theirs);
+        let outcome = tokio::time::timeout(Duration::from_secs(5), request).await.expect("the waiter was released").unwrap();
+        assert!(outcome.unwrap_err().contains("closed the connection"));
+        assert!(client.closed.load(Ordering::SeqCst));
+        assert!(!client.closing.load(Ordering::SeqCst));
     }
 
     /// A scripted agent: answers the handshake, creates a session, streams a turn, asks for

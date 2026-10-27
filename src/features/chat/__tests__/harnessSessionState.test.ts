@@ -6,9 +6,10 @@
  * those as controls and a plan card, so the store has to keep them next to the messages.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { useHarnessStore } from '@features/chat/stores/harness';
+import { HARNESS_FIRST_RESPONSE_TIMEOUT_MS, useHarnessStore } from '@features/chat/stores/harness';
+import { t } from '@i18n';
 import { useHarnessSessionRefs } from '@features/chat/stores/harnessSessions';
-import { acpClose, acpOpen, acpPrompt, acpAppToolResult, acpSetConfigOption, acpSetMode, acpSetModel, type HarnessOpenResult } from '@platform/api/acp';
+import { acpCancel, acpClose, acpOpen, acpPrompt, acpAppToolResult, acpSetConfigOption, acpSetMode, acpSetModel, type HarnessOpenResult } from '@platform/api/acp';
 import { answerUserQuestion, questionKey, useUserQuestions } from '@features/agent/services/userQuestions';
 
 vi.mock('@platform/api/acp', () => ({
@@ -346,5 +347,71 @@ describe('harness session state', () => {
     expect(useHarnessSessionRefs.getState().refs['Claude Code']).toBeUndefined();
     await useHarnessStore.getState().prompt(TAB, 'First input');
     expect(useHarnessSessionRefs.getState().refs['Claude Code']?.sessionId).toBe('history-id');
+  });
+
+  it('surfaces a session notice as the status line', () => {
+    useHarnessStore.getState().applyEvent(notification({
+      sessionUpdate: 'notice', severity: 'warning', title: 'MCP server unavailable', description: 'Continuing without it.',
+    }) as never);
+
+    expect(current().note).toBe('MCP server unavailable · Continuing without it.');
+  });
+
+  it('keeps an authentication failure apart from every other failure', () => {
+    useHarnessStore.getState().applyEvent({
+      sessionId: SESSION, kind: 'error',
+      payload: { message: 'agent error (-32603): API Error: 402 Insufficient Balance', details: 'exit code: 1', authRequired: false },
+    });
+    expect(current()).toMatchObject({ error: expect.stringContaining('402'), errorDetails: 'exit code: 1', authRequired: false });
+
+    useHarnessStore.getState().applyEvent({
+      sessionId: SESSION, kind: 'error',
+      payload: { message: 'agent error (-32000): Authentication required', code: -32000, authRequired: true },
+    });
+    expect(current()).toMatchObject({ authRequired: true, errorDetails: null });
+  });
+
+  it('shows a transport end with the process diagnostics behind it', () => {
+    vi.mocked(acpClose).mockClear();
+    useHarnessStore.getState().applyEvent({
+      sessionId: SESSION, kind: 'error',
+      payload: { message: 'the agent closed the connection', reason: 'transport', details: 'exit code: 1\n\nboom' },
+    });
+
+    expect(current().error).toBe(t('The agent closed the connection.'));
+    expect(current().errorDetails).toBe('exit code: 1\n\nboom');
+    expect(current().pending).toBe(false);
+    // A dead connection is not reused: the next prompt reopens it (or the retry action does).
+    expect(current().sessionId).toBeNull();
+    expect(acpClose).toHaveBeenCalledWith(SESSION);
+  });
+
+  it('stops a turn the agent never began', async () => {
+    vi.useFakeTimers();
+    await useHarnessStore.getState().prompt(TAB, 'Are you there?');
+    vi.mocked(acpCancel).mockClear();
+
+    await vi.advanceTimersByTimeAsync(HARNESS_FIRST_RESPONSE_TIMEOUT_MS);
+    await vi.advanceTimersByTimeAsync(1300);
+
+    expect(acpCancel).toHaveBeenCalledWith(SESSION);
+    expect(current().pending).toBe(false);
+    expect(current().error).toBe(t('The agent did not respond in time; the turn was stopped.'));
+  });
+
+  it('does not stop a turn that is waiting for the user', async () => {
+    vi.useFakeTimers();
+    await useHarnessStore.getState().prompt(TAB, 'Ask me first');
+    useHarnessStore.getState().applyEvent({
+      sessionId: SESSION, kind: 'permission',
+      payload: { toolCall: { toolCallId: 'call-1', title: 'Run it' }, options: [{ optionId: 'allow', name: 'Allow' }] },
+    });
+    vi.mocked(acpCancel).mockClear();
+
+    await vi.advanceTimersByTimeAsync(HARNESS_FIRST_RESPONSE_TIMEOUT_MS);
+
+    expect(acpCancel).not.toHaveBeenCalled();
+    expect(current().pending).toBe(true);
+    expect(current().permission?.title).toBe('Run it');
   });
 });

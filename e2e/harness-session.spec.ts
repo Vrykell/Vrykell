@@ -28,6 +28,35 @@ function permissionRequest(toolCallId: string, title: string) {
 }
 
 test.describe('harness session', () => {
+  test('shows the failure text and asks for a login only on an authentication error', async ({ page }) => {
+    await setupTauriMock(page, {});
+    await page.goto('/');
+    await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
+
+    await page.keyboard.press('Control+,');
+    await page.getByText('ACP', { exact: true }).first().click();
+    await page.getByTestId('harness-connect-0').click();
+    await expect(page.getByTestId('harness-send')).toBeVisible({ timeout: 10000 });
+
+    // A quota failure is not a missing login: the message stays visible and no hint is invented.
+    await emitAcpSession(page, {
+      sessionId: SESSION, kind: 'error',
+      payload: {
+        message: 'agent error (-32603): API Error: 402 Insufficient Balance',
+        code: -32603, authRequired: false, details: 'exit code: 1\n\nInsufficient Balance',
+      },
+    });
+    await expect(page.locator('[data-error-notification="true"]')).toContainText('Insufficient Balance');
+    await expect(page.getByTestId('harness-auth-hint')).toHaveCount(0);
+
+    // The protocol's own authentication code gets the instructions the agent advertised.
+    await emitAcpSession(page, {
+      sessionId: SESSION, kind: 'error',
+      payload: { message: 'agent error (-32000): Authentication required', code: -32000, authRequired: true },
+    });
+    await expect(page.getByTestId('harness-auth-hint')).toContainText('Run `fake login`');
+  });
+
   test('streams the harness output and answers its permission request', async ({ page }) => {
     await setupTauriMock(page, {});
     await page.goto('/');

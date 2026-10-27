@@ -58,6 +58,10 @@ export interface HarnessSession {
   /** The session is being opened. */
   opening: boolean;
   error: string | null;
+  /** Raw transport output the error came with (exit status, stderr tail), for its disclosure. */
+  errorDetails?: string | null;
+  /** The failure asked for authentication (`-32000`); only then are the agent's login hints shown. */
+  authRequired?: boolean;
   /** The last thing worth telling the user (a refused permission, a stop reason, ...). */
   note: string | null;
   /** The modes the agent offers (legacy mode API; new agents publish them as config options). */
@@ -106,7 +110,7 @@ interface HarnessStore {
 
 const fresh = (harness: string): HarnessSession => ({
   queuedInputs: [], stopping: false,
-  harness, sessionId: null, cwd: '', agent: null, messages: [], pending: false, opening: false, error: null, note: null,
+  harness, sessionId: null, cwd: '', agent: null, messages: [], pending: false, opening: false, error: null, errorDetails: null, authRequired: false, note: null,
   modes: null, models: null, configOptions: null, plan: [], context: null, commands: [],
   permission: null, permissionGeneration: 0,
 });
@@ -129,6 +133,60 @@ function drainHarnessQueue(tabId: string) {
   if (next) void useHarnessStore.getState().prompt(tabId, next.text);
 }
 function stopApplicationTools(tabId: string) { applicationSessions.get(tabId)?.close(); applicationSessions.delete(tabId); }
+
+/** How long a turn may go without a single event before the page treats the agent as gone. The
+ *  protocol has no heartbeat, and an adapter that never answers a prompt would otherwise hold it
+ *  for its full one-hour budget. Only the start of a turn is guarded: a long tool reports its
+ *  `tool_call` first, so silence after that is work, not a dead connection. */
+export const HARNESS_FIRST_RESPONSE_TIMEOUT_MS = 5 * 60 * 1000;
+const firstResponseTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function disarmFirstResponse(tabId: string) {
+  const timer = firstResponseTimers.get(tabId);
+  if (timer === undefined) return;
+  clearTimeout(timer);
+  firstResponseTimers.delete(tabId);
+}
+
+function armFirstResponse(tabId: string) {
+  disarmFirstResponse(tabId);
+  firstResponseTimers.set(tabId, setTimeout(() => {
+    firstResponseTimers.delete(tabId);
+    const session = useHarnessStore.getState().byTab[tabId];
+    // A card the user has to answer is not a silent agent: the clock belongs to the agent only.
+    if (!session?.pending || session.stopping || session.permission) return;
+    void stopUnansweredTurn(tabId);
+  }, HARNESS_FIRST_RESPONSE_TIMEOUT_MS));
+}
+
+/** Stop a turn the agent never began, and say so. The session stays usable: a closed connection
+ *  leaves `sessionId` empty, so the next prompt reopens it. */
+async function stopUnansweredTurn(tabId: string) {
+  const session = useHarnessStore.getState().byTab[tabId];
+  if (!session?.pending || session.stopping || session.permission || !session.sessionId) return;
+  turnVersions.set(tabId, (turnVersions.get(tabId) ?? 0) + 1);
+  stopApplicationTools(tabId);
+  patch(tabId, current => ({ ...current, pending: false, stopping: true, interrupted: true, permission: null }));
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const acknowledged = await new Promise<boolean>(resolve => {
+    cancellationAcks.set(tabId, () => resolve(true));
+    timer = setTimeout(() => resolve(false), 1200);
+    void acpCancel(session.sessionId!).catch(() => resolve(false));
+  });
+  clearTimeout(timer); cancellationAcks.delete(tabId);
+  if (useHarnessStore.getState().byTab[tabId]?.sessionId !== session.sessionId) return;
+  if (!acknowledged) {
+    tabOfSession.delete(session.sessionId);
+    patch(tabId, current => ({ ...current, sessionId: null }));
+    void acpClose(session.sessionId).catch(() => undefined);
+  }
+  patch(tabId, current => ({
+    ...current, stopping: false,
+    error: t('The agent did not respond in time; the turn was stopped.'),
+    errorDetails: null, authRequired: false,
+  }));
+  queueMicrotask(() => drainHarnessQueue(tabId));
+}
 
 /** Subscribe to the backend's events once; every harness page calls this on mount. */
 export function bindHarnessEvents(): Promise<void> {
@@ -162,11 +220,12 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
   open: async (tabId, harness, cwd, newSession = false, resumeSessionId) => {
     // One open per tab prevents a remount racing the first attempt from starting an extra process.
     if (get().byTab[tabId]?.opening) return;
+    disarmFirstResponse(tabId);
     const version = (openVersions.get(tabId) ?? 0) + 1; openVersions.set(tabId, version);
     if (!(tabId in get().byTab)) {
       set((state) => ({ byTab: { ...state.byTab, [tabId]: fresh(harness) } }));
     }
-    patch(tabId, (session) => ({ ...session, opening: true, error: null }));
+    patch(tabId, (session) => ({ ...session, opening: true, error: null, errorDetails: null, authRequired: false }));
     try {
       await bindHarnessEvents();
       // Resume the harness's last conversation when we remember one from the same directory; the
@@ -201,7 +260,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       for (const event of queued) get().applyEvent(event);
       queueMicrotask(() => drainHarnessQueue(tabId));
     } catch (error) {
-      if (openVersions.get(tabId) === version) patch(tabId, (session) => ({ ...session, opening: false, error: String((error as Error)?.message ?? error) }));
+      if (openVersions.get(tabId) === version) patch(tabId, (session) => ({ ...session, opening: false, error: String((error as Error)?.message ?? error), errorDetails: null, authRequired: false }));
     } finally {
       if (!Object.values(get().byTab).some(session => session.opening)) openingEvents.clear();
     }
@@ -226,7 +285,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     const question: ChatMessage = {
       id: `harness-question-${Date.now()}-${inputSequence++}`, role: 'user', content: text.trim(), createdAt: Date.now(),
     };
-    patch(tabId, (current) => ({ ...current, messages: [...current.messages, question], pending: true, interrupted: false, note: null, error: null }));
+    patch(tabId, (current) => ({ ...current, messages: [...current.messages, question], pending: true, interrupted: false, note: null, error: null, errorDetails: null, authRequired: false }));
     useHarnessSessionRefs.getState().remember(session.harness, { sessionId: session.resumeSessionId ?? sessionId, cwd: session.cwd, at: Date.now() });
     stopApplicationTools(tabId);
     const paneId = session.executionPaneId ?? null;
@@ -237,15 +296,18 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     }));
     try {
       await acpPrompt(sessionId, text.trim());
+      if (turnVersions.get(tabId) === version && get().byTab[tabId]?.pending) armFirstResponse(tabId);
     } catch (error) {
       if (turnVersions.get(tabId) !== version || get().byTab[tabId]?.sessionId !== sessionId) return;
+      disarmFirstResponse(tabId);
       stopApplicationTools(tabId);
-      patch(tabId, (current) => ({ ...current, pending: false, error: String((error as Error)?.message ?? error) }));
+      patch(tabId, (current) => ({ ...current, pending: false, error: String((error as Error)?.message ?? error), errorDetails: null, authRequired: false }));
       queueMicrotask(() => drainHarnessQueue(tabId));
     }
   },
 
   cancel: async (tabId) => {
+    disarmFirstResponse(tabId);
     stopApplicationTools(tabId);
     const session = get().byTab[tabId];
     if (!session || session.stopping) return;
@@ -284,7 +346,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
         ? { ...current, modes: { ...current.modes, currentModeId: modeId } }
         : current);
     } catch (error) {
-      patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error) }));
+      patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error), errorDetails: null, authRequired: false }));
     }
   },
 
@@ -297,7 +359,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
         ? { ...current, models: { ...current.models, currentModelId: modelId } }
         : current);
     } catch (error) {
-      patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error) }));
+      patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error), errorDetails: null, authRequired: false }));
     }
   },
 
@@ -311,11 +373,12 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
         configOptions: Array.isArray(configOptions) ? configOptions : current.configOptions,
       }));
     } catch (error) {
-      patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error) }));
+      patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error), errorDetails: null, authRequired: false }));
     }
   },
 
   close: async (tabId) => {
+    disarmFirstResponse(tabId);
     openVersions.set(tabId, (openVersions.get(tabId) ?? 0) + 1);
     turnVersions.set(tabId, (turnVersions.get(tabId) ?? 0) + 1);
     cancellationAcks.get(tabId)?.(); cancellationAcks.delete(tabId);
@@ -347,7 +410,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     try {
       await acpAnswerPermission(session.sessionId, request.toolCallId, optionId);
     } catch (error) {
-      patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error) }));
+      patch(tabId, (current) => ({ ...current, error: String((error as Error)?.message ?? error), errorDetails: null, authRequired: false }));
     }
   },
 
@@ -361,6 +424,8 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       return;
     }
     const session = get().byTab[tabId];
+    // Any event proves the agent is alive; the watchdog only covers a turn that never starts.
+    disarmFirstResponse(tabId);
     if (session?.stopping && (event.kind === 'update' || event.kind === 'permission')) return;
     if (session?.interrupted && !session.pending && event.kind === 'update') {
       const kind = String(harnessUpdate(event.payload).sessionUpdate ?? '');
@@ -378,6 +443,11 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       return;
     }
     if (event.kind === 'stop' || event.kind === 'error') stopApplicationTools(tabId);
+    if (event.kind === 'error' && event.payload.reason === 'transport') {
+      // The process is gone: forget the id so the next prompt reopens, and free the backend entry.
+      tabOfSession.delete(event.sessionId);
+      void acpClose(event.sessionId).catch(() => undefined);
+    }
     // The usage panel counts what the ACP servers report about their own sessions. A loaded
     // conversation arrives through `replayEvents`, which must not count it a second time.
     if (session) recordAcpEvent(session.harness, event);
@@ -417,6 +487,12 @@ function foldSessionEvent(session: HarnessSession, event: AcpSessionEvent): Harn
             };
           })
           .filter((command) => command.name.length > 0);
+      } else if (kind === 'notice') {
+        // Live user-facing information that is not conversation content. The page has one status
+        // line for it, which is enough for "the MCP server went away" and similar warnings.
+        const title = typeof update.title === 'string' ? update.title.trim() : '';
+        const description = typeof update.description === 'string' ? update.description.trim() : '';
+        if (title || description) next.note = [title, description].filter(Boolean).join(' · ');
       }
       return next;
     }
@@ -427,8 +503,20 @@ function foldSessionEvent(session: HarnessSession, event: AcpSessionEvent): Harn
         : reason && reason !== 'end_turn' ? t('The harness stopped the turn: {{reason}}', { reason }) : null;
       return { ...session, pending: false, permission: null, note };
     }
-    case 'error':
-      return { ...session, pending: false, permission: null, error: String(event.payload.message ?? t('The harness failed.')) };
+    case 'error': {
+      // Our own transport message is localized; an agent's error text travels as the agent wrote it.
+      const transport = event.payload.reason === 'transport';
+      const message = transport
+        ? t('The agent closed the connection.')
+        : String(event.payload.message ?? t('The harness failed.'));
+      return {
+        ...session, pending: false, permission: null, error: message,
+        // A dead connection is reopened by the next prompt or the retry action, not reused.
+        sessionId: transport ? null : session.sessionId,
+        errorDetails: typeof event.payload.details === 'string' ? event.payload.details : null,
+        authRequired: event.payload.authRequired === true,
+      };
+    }
     case 'permission': {
       // The card waits for the user; the backend holds the agent until the answer comes back.
       const toolCall = (event.payload.toolCall ?? {}) as Record<string, unknown>;

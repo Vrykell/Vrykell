@@ -162,7 +162,7 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
     triggerClassName={inSidebar ? undefined : 'harness-selector'} style={inSidebar ? undefined : { width: 'auto', maxWidth: 180 }} value={session.executionPaneId ?? ''} options={executionOptions}
     disabled={session.pending || session.opening} onChange={paneId => useHarnessStore.getState().setExecutionPane(tabId, paneId || null)}
     action={{ label: t('New terminal'), onSelect: bounds => setTerminalPicker({ anchor: bounds ? { x: bounds.left, y: bounds.bottom + 4, aboveY: bounds.top } : undefined }) }} />;
-  const hints = authHints(session?.agent ?? null);
+  const hints = session?.authRequired ? authHints(session.agent) : [];
   const plan = session?.plan ?? [];
 
   // Slash commands: while the first word is still being typed, the agent's own commands are one
@@ -203,10 +203,14 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
         {!session && <p style={{ margin: '10px 4px', color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
           {t('Opening the harness session…')}
         </p>}
-        {session?.error && <ErrorBox title={t('Connection failed')} details={session.error}
-          actions={!session.sessionId && <OutlineButton onClick={() => void useHarnessStore.getState().open(tabId, harness, cwd ?? '', fresh, resumeSessionId)}>{t('Retry')}</OutlineButton>} />}
-        {/* A failed turn is often just a missing login: the agent said how to sign in at handshake. */}
-        {session?.error && hints.length > 0 && (
+        {session?.error && <ErrorBox title={session.sessionId ? t('The harness failed.') : t('Connection failed')}
+          details={session.errorDetails ?? undefined}
+          actions={!session.sessionId && <OutlineButton onClick={() => void useHarnessStore.getState().open(tabId, harness, cwd ?? '', fresh, resumeSessionId)}>{t('Retry')}</OutlineButton>}>
+          {session.error}
+        </ErrorBox>}
+        {/* Only the protocol's authentication code gets the agent's login instructions: a quota,
+            a timeout or a crash looks like a failure too, but none of them is a missing login. */}
+        {session?.error && session.authRequired && hints.length > 0 && (
           <p data-testid="harness-auth-hint" style={{ margin: '2px 4px 8px', color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
             {t('Log in to this agent first:')} {hints.join(' · ')}
           </p>
