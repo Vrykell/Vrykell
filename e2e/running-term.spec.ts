@@ -348,6 +348,56 @@ test('运行块挂载前到达的输出不破坏首次滚轮回溯', async ({ pa
   expect(before.viewportY - after.viewportY).toBeLessThanOrEqual(20);
 });
 
+test('运行中块的实时输出可选中并复制', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await startRunningBlock(page);
+  const host = page.getByTestId('running-term');
+  await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
+  await emitPtyOutput(page, 'live-selection-text\r\n');
+  await expectAnyTermContains(page, 'live-selection-text', 3000);
+
+  const box = (await host.locator('.xterm-screen').boundingBox())!;
+  await page.mouse.move(box.x + 1, box.y + 10);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 170, box.y + 10, { steps: 10 });
+  await page.mouse.up();
+  const selection = await page.evaluate(() => {
+    const terms = (window as unknown as { __vrykellTerms?: Map<string, { getSelection: () => string }> }).__vrykellTerms;
+    const key = [...(terms?.keys() ?? [])].find(entry => entry.startsWith('block:'));
+    return key ? terms?.get(key)?.getSelection() ?? '' : '';
+  });
+  expect(selection).toContain('live-selection');
+  await page.keyboard.press('Control+c');
+  await expect.poll(() => clipboardText(page)).toContain('live-selection');
+});
+
+test('运行中块不抢走已完成块文本的选区', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  const input = page.getByPlaceholder(/输入命令/);
+  await expect(input).toBeVisible({ timeout: 5000 });
+  await input.fill('echo completed-text');
+  await input.press('Enter');
+  await expect(page.locator('[data-testid^="command-block-"]').filter({ hasText: 'completed-text' }).first()).toBeVisible({ timeout: 5000 });
+  await startRunningBlock(page);
+
+  const output = page.locator('[data-testid^="command-block-"]').filter({ hasText: 'completed-text' }).first()
+    .locator('.command-block-output [data-selectable]').first();
+  const box = (await output.boundingBox())!;
+  await page.mouse.move(box.x + 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + box.width - 2, box.y + box.height / 2, { steps: 12 });
+  await page.mouse.up();
+  const selection = () => page.evaluate(() => window.getSelection()?.toString() ?? '');
+  await expect.poll(selection).toContain('completed-text');
+  // The idle-focus poll must not collapse the selection half a second after the drag.
+  await page.waitForTimeout(1200);
+  expect(await selection()).toContain('completed-text');
+  // Copying a page selection is the webview's native path, so it does not pass through the
+  // mocked clipboard plugin; the selection surviving is what the app must guarantee.
+});
+
 test('块终端与页面同色且无圆角，裁剪仍落在 el', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');

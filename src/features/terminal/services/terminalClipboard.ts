@@ -39,6 +39,15 @@ export function getPaneTerminal(paneId: string): Terminal | null {
 }
 
 /**
+ * Whether the copy shortcut has something to copy: the terminal's own selection or page text
+ * selected in a block. The terminal keeps focus during block selection, so a plain Ctrl+C must
+ * still copy the page selection instead of sending an interrupt.
+ */
+export function hasCopyableSelection(term: Terminal | null | undefined): boolean {
+  return Boolean(term?.getSelection() || window.getSelection()?.toString());
+}
+
+/**
  * Copy the terminal selection: the xterm selection first, then the page selection (block output is
  * real DOM). Failures and an empty selection surface through a toast; the result reports whether
  * the clipboard really received the text.

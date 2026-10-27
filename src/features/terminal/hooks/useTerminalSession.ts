@@ -33,7 +33,7 @@ import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
 import { t } from '@i18n';
 import { SessionController } from '@features/terminal/services/pipeline/sessionController';
 import { blockTerminalFor, recoverTerminalSurfaces } from '@features/terminal/services/terminalRepaint';
-import { captureTerminalPaste, copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
+import { captureTerminalPaste, copyTerminalSelection, hasCopyableSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { cancelTerminalInput, writeTerminalInput } from '@features/terminal/services/terminalWriteQueue';
 import { setPendingCommandRegistrar } from '@features/terminal/services/pendingCommandRegistry';
 import { querySequences } from '@features/terminal/model/terminalQueries';
@@ -678,7 +678,7 @@ export function useTerminalSession(
       // Ctrl+Shift+C/V 同样有效。
       if (e.type === 'keydown' && (e.ctrlKey || e.metaKey) && !e.altKey) {
         const key = e.key.toLowerCase();
-        const copy = key === 'c' && (e.metaKey || e.shiftKey || term.hasSelection());
+        const copy = key === 'c' && (e.metaKey || e.shiftKey || hasCopyableSelection(term));
         const paste = key === 'v';
         if (copy || paste) {
           e.preventDefault();

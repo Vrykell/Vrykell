@@ -691,6 +691,7 @@
 - **字符格取整（主流终端的做法）**：等宽字体的 advance 常是小数（14px 字号下约 8.4px），`cols × cellWidth` 就落在非整数上，画布右边缘会剩一条亚像素列 —— 拖动窗口时「有时有、有时没有」正是这个取整。做法是给 xterm 设置 `letterSpacing = round(实测格宽) − 实测格宽`（每格最多半个像素），格宽锁到整数、网格落在设备像素上；`useTerminalSession` 与 `createBlockTerm` 都在创建时设置、并在字号变化时重算（`terminalFont.ts` 的 `snapLetterSpacing` 有单测）。
 - **win32-input-mode 的按键捕获会顺手吞掉复制/粘贴**：`attachWin32KeyCapture` 在**捕获阶段**就 `preventDefault + stopPropagation`，会话一旦请求该模式，Ctrl+C 会被编码成按键记录发进 PTY，复制直接失效 —— 而 e2e 默认不开这个模式，所以「本机不触发、用户机上必现」。判定必须拿到终端本身：Ctrl+V 永远放行；Ctrl+C 只在**有选区**时放行（无选区仍要编码，否则会话丢了中断键）。回归覆盖见 `terminal-clipboard.spec.ts` 的「win32-input-mode 下 Ctrl+C 仍然复制」。
 - **终端「选区旁边一条细线」= 终端自带的滚动条**：`.xterm-viewport` 比 `.xterm-screen` 宽 8px（那 8px 是原生滚动条滑道），全局 `::-webkit-scrollbar-thumb` 的 `2px 透明边框 + padding-box` 让它只剩中间约 4px 的浅色细条，紧贴选区时就像渲染瑕疵。运行块早就用 `display: none` 关掉了自己的滚动条，pane 现在也关（滚轮/触控板/键盘滚动不受影响）。切换渲染器（WebGL/DOM）**不会**改变这个现象，别把它当成渲染器问题。
+- **空闲聚焦轮询会抹掉块选区**：运行中块由 `useTerminalFocus` 在焦点落回 body 时定时把焦点交还活 xterm。用户在已完成块里划选文本时焦点仍在 body，轮询就会在拖动中途聚焦终端并折叠浏览器选区，随后 Ctrl+C 没有内容可复制。现在按住主键或存在非折叠页面选区时暂停轮询，复制快捷键也把选中的页面文本视为可复制。`useTerminalFocus.test.tsx` 与 `running-term.spec.ts` 覆盖两条路径。
 
 ---
 

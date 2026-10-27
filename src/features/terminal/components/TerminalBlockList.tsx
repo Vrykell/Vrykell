@@ -26,7 +26,7 @@ import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import { useTerminalBlockFlow } from '@features/terminal/hooks/useTerminalBlockFlow';
 import type { BlockMenuAnchor } from '@features/terminal/hooks/useTerminalBlockFlow';
 import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/model/blockVisibility';
-import { captureTerminalPaste, copyTerminalSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
+import { captureTerminalPaste, copyTerminalSelection, hasCopyableSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { measureRunningTerminalRows } from '../model/runningTerminalRows';
 import { repaintTerminal } from '../model/terminalResize';
@@ -411,7 +411,7 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     term.attachCustomKeyEventHandler((e) => {
       if (e.type === 'keydown' && (e.ctrlKey || e.metaKey) && !e.altKey) {
         const key = e.key.toLowerCase();
-        const copy = key === 'c' && (e.metaKey || e.shiftKey || term.hasSelection());
+        const copy = key === 'c' && (e.metaKey || e.shiftKey || hasCopyableSelection(term));
         const paste = key === 'v';
         if (copy || paste) {
           e.preventDefault();

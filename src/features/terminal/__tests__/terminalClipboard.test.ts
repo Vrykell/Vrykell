@@ -25,6 +25,7 @@ vi.mock('@ui/feedback/Toast', () => ({
 
 import {
   copyTerminalSelection,
+  hasCopyableSelection,
   pasteClipboardIntoTerminal,
   pasteConfirmReason,
   pasteLineCount,
@@ -65,6 +66,15 @@ describe('terminalClipboard', () => {
   it('copies the xterm selection to the clipboard', async () => {
     await expect(copyTerminalSelection(fakeTerm('hello world'))).resolves.toBe(true);
     expect(writeTextMock).toHaveBeenCalledWith('hello world');
+  });
+
+  it('recognizes page text as copyable while the terminal keeps focus', () => {
+    expect(hasCopyableSelection(fakeTerm(''))).toBe(false);
+    expect(hasCopyableSelection(null)).toBe(false);
+    expect(hasCopyableSelection(fakeTerm('terminal text'))).toBe(true);
+    vi.spyOn(window, 'getSelection').mockReturnValue({ toString: () => 'block text' } as unknown as Selection);
+    expect(hasCopyableSelection(fakeTerm(''))).toBe(true);
+    expect(hasCopyableSelection(null)).toBe(true);
   });
 
   it('falls back to the DOM selection when the terminal has none', async () => {
