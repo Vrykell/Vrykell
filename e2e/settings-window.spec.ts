@@ -85,9 +85,13 @@ test('language and appearance choices apply immediately and persist', async ({ p
   await modes.getByRole('radio', { name: 'Light', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   const tint = page.getByRole('switch', { name: 'Desktop material', exact: true });
-  await tint.click();
-  await expect(tint).toHaveAttribute('aria-checked', 'false');
-  await expect(page.locator('.application-window')).toHaveAttribute('data-desktop-tint', 'false');
+  if (await tint.count()) {
+    await tint.click();
+    await expect(tint).toHaveAttribute('aria-checked', 'false');
+    await expect(page.locator('.application-window')).toHaveAttribute('data-desktop-tint', 'false');
+  } else {
+    await expect(tint).toHaveCount(0);
+  }
   await expect(page.locator('.workspace-sidebar')).toHaveCSS('background-color', 'rgb(233, 240, 250)');
   await page.screenshot({ path: info.outputPath('appearance-light.png') });
   await modes.getByRole('radio', { name: 'Dark', exact: true }).click();

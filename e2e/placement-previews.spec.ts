@@ -16,7 +16,16 @@ for (const theme of ['dark', 'light'] as const) for (const material of [true, fa
   await page.evaluate(async theme => { const { applyTheme } = await import('/src/config/theme/tokens.ts'); applyTheme(theme); }, theme);
   if (!material) {
     await gotoSetting(page, '主题');
-    await page.getByRole('switch', { name: '桌面材质', exact: true }).click();
+    const toggle = page.getByRole('switch', { name: '桌面材质', exact: true });
+    if (await toggle.count()) {
+      await toggle.click();
+    } else {
+      await page.evaluate(async () => {
+        const path = '/src/features/settings/model/terminalTheme.ts';
+        const { useTerminalThemeStore } = await import(path) as typeof import('../src/features/settings/model/terminalTheme');
+        useTerminalThemeStore.setState(state => ({ config: { ...state.config, desktopTint: false } }));
+      });
+    }
     await page.keyboard.press('Escape');
   }
   const button = (await page.locator('[data-dock-btn="files"]').boundingBox())!;

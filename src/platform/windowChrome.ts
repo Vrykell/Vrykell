@@ -1,7 +1,7 @@
 /** Native window borders use the theme's neutral gray divider color. */
 import { invoke } from '@platform/diagnostics';
 import { Effect, getCurrentWindow } from '@tauri-apps/api/window';
-import { isWindows, isMacOS } from './runtime';
+import { isMacOS, supportsNativeMaterial } from './runtime';
 import type { ThemeMode } from '@config/theme/tokens';
 
 let materialUpdate = Promise.resolve();
@@ -14,7 +14,7 @@ export function syncWindowMaterial(enabled: boolean, mode: ThemeMode): Promise<v
     if (revision !== materialRevision) return;
     const root = document.documentElement;
     root.dataset.nativeMaterial = enabled ? 'fallback' : 'off';
-    if (!isWindows && !isMacOS) return;
+    if (!supportsNativeMaterial) return;
     try {
       const window = getCurrentWindow();
       await window.setTheme(mode);

@@ -2,8 +2,11 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 const material = vi.hoisted(() => ({ setTheme: vi.fn(), setEffects: vi.fn(), clearEffects: vi.fn() }));
-const platform = vi.hoisted(() => ({ windows: true, mac: false }));
-vi.mock('@platform/runtime', () => ({ get isWindows() { return platform.windows; }, get isMacOS() { return platform.mac; } }));
+const platform = vi.hoisted(() => ({ nativeMaterial: true, mac: false }));
+vi.mock('@platform/runtime', () => ({
+  get supportsNativeMaterial() { return platform.nativeMaterial; },
+  get isMacOS() { return platform.mac; },
+}));
 vi.mock('@tauri-apps/api/window', () => ({ Effect: { Acrylic: 'acrylic', Sidebar: 'sidebar' }, getCurrentWindow: () => material }));
 vi.mock('@platform/diagnostics', () => ({ invoke: invokeMock, diagnostic: vi.fn() }));
 
@@ -13,7 +16,7 @@ const root = () => document.documentElement;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  platform.windows = true; platform.mac = false;
+  platform.nativeMaterial = true; platform.mac = false;
   invokeMock.mockResolvedValue(undefined);
   root().removeAttribute('style');
   delete root().dataset.toolWindow;
@@ -82,14 +85,14 @@ it('retains the last choice when multiple material updates are queued', async ()
 });
 
 it('uses the native sidebar material on a supported desktop', async () => {
-  platform.windows = false; platform.mac = true;
+  platform.nativeMaterial = true; platform.mac = true;
   await syncWindowMaterial(true, 'light');
   expect(material.setEffects).toHaveBeenCalledWith({ effects: ['sidebar'] });
   expect(root().dataset.nativeMaterial).toBe('active');
 });
 
 it('publishes a CSS fallback when the compositor has no native material implementation', async () => {
-  platform.windows = false;
+  platform.nativeMaterial = false; platform.mac = false;
   await syncWindowMaterial(true, 'dark');
   expect(material.setEffects).not.toHaveBeenCalled();
   expect(root().dataset.nativeMaterial).toBe('fallback');

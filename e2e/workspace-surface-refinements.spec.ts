@@ -2,6 +2,9 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
+// The native material treatment exists only on platforms that expose window effects.
+test.use({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15' });
+
 for (const theme of ['深色', '浅色']) test(`acrylic is confined to navigation and region edges stay square in ${theme}`, async ({ page }, info) => {
   await setupTauriMock(page); await page.goto('/');
   await gotoSetting(page, '主题'); await page.getByRole('radio', { name: theme, exact: true }).click();
