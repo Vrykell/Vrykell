@@ -1,5 +1,5 @@
-import ReactMarkdown, { type ExtraProps } from 'react-markdown';
-import type { ComponentPropsWithoutRef } from 'react';
+import ReactMarkdown, { type Components, type ExtraProps } from 'react-markdown';
+import { useMemo, type ComponentPropsWithoutRef } from 'react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { t } from '@i18n';
 import { useToastStore } from '@ui/feedback/Toast';
@@ -78,22 +78,26 @@ function MathSpan({ node: _node, className, children, ...props }: ComponentProps
 }
 
 export default function Markdown({ content, paneId }: { content: string; paneId?: string | null }) {
+  // Stable renderer identities keep streamed code blocks mounted; rebuilding the map on every
+  // chunk would remount each block and drop its highlight, copy state and scroll position.
+  const components = useMemo<Components>(() => ({
+    a: Link,
+    span: MathSpan,
+    pre: (props: ComponentPropsWithoutRef<'pre'> & ExtraProps) => <CommandBlock {...props} paneId={paneId} />,
+    // Remote images remain links to avoid tracking and blocked image placeholders.
+    img: (props: ComponentPropsWithoutRef<'img'> & ExtraProps) => (
+      <Link href={props.src} data-tip={props.alt} style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
+        {props.alt || props.src}
+      </Link>
+    ),
+  }), [paneId]);
+
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfmSafe, remarkMath, remarkStandaloneMathDisplay]}
       // Incomplete or non-mathematical dollar fragments remain readable during streaming.
       rehypePlugins={[[rehypeKatex, { throwOnError: false, errorColor: 'var(--error)' }]]}
-      components={{
-        a: Link,
-        span: MathSpan,
-        pre: (props) => <CommandBlock {...props} paneId={paneId} />,
-        // Remote images remain links to avoid tracking and blocked image placeholders.
-        img: (props) => (
-          <Link href={props.src} data-tip={props.alt} style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
-            {props.alt || props.src}
-          </Link>
-        ),
-      }}
+      components={components}
     >
       {content}
     </ReactMarkdown>

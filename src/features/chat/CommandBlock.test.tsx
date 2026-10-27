@@ -80,4 +80,14 @@ describe('CommandBlock', () => {
     expect(writeText).toHaveBeenCalledWith('print("hi")\n');
     await screen.findByText('已复制');
   });
+
+  it('keeps a code block mounted while its streamed code grows', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    const view = render(<Markdown content={'```python\nprint(1)\n```'} />);
+    fireEvent.click(screen.getByTestId('code-copy-btn'));
+    await screen.findByText('已复制');
+    view.rerender(<Markdown content={'```python\nprint(1)\nprint(2)\n```\n\nMore answer text'} />);
+    expect(screen.getByTestId('code-copy-btn')).toHaveTextContent('已复制');
+  });
 });
