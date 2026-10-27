@@ -91,10 +91,10 @@ describe('right auxiliary dock', () => {
   });
 });
 
-describe('layout migration', () => {
-  const seed = { leftZone: ['tabs', 'ssh', 'files', 'git'], rightZone: ['chat'], leftPanels: ['files'], rightPanels: [], panelWidths: { files: 240, chat: 350 } };
-  it('moves saved auxiliary actions to the right and retires navigation panels', () => {
-    expect(normalizeDockLayout(seed)).toEqual({ leftZone: [], rightZone: ['chat', 'files', 'git', 'command-history'], leftPanels: [], rightPanels: ['files'], panelWidths: { files: 200, chat: 320 } });
+describe('layout normalization', () => {
+  const seed = { layoutVersion: 6, leftZone: ['tabs', 'ssh', 'files', 'git'], rightZone: ['chat'], leftPanels: ['files'], rightPanels: [], panelWidths: { files: 240, chat: 350 } };
+  it('keeps one left panel and rebuilds the right action row', () => {
+    expect(normalizeDockLayout(seed)).toEqual({ leftZone: ['files'], rightZone: ['chat', 'git', 'command-history'], leftPanels: ['files'], rightPanels: [], panelWidths: { files: 200, chat: 320 } });
   });
   it('prefers the formerly visible right panel when two panels were open', () => {
     expect(normalizeDockLayout({ ...seed, rightPanels: ['chat'] })?.rightPanels).toEqual(['chat']);
@@ -106,22 +106,13 @@ describe('layout migration', () => {
     expect(normalizeDockLayout({ ...seed, leftPanels: ['tabs', 'ssh'] })?.rightPanels).toEqual([]);
   });
   it('repairs duplicate and unknown entries without discarding the saved order', () => {
-    expect(normalizeDockLayout({ ...seed, rightZone: ['git', 'git', 'removed', 'settings'], leftZone: ['git', 'chat', 'files'] })?.rightZone).toEqual(['git', 'chat', 'files', 'command-history']);
+    expect(normalizeDockLayout({ ...seed, rightZone: ['git', 'git', 'removed', 'settings'], leftZone: ['git', 'chat', 'files'] })?.rightZone).toEqual(['chat', 'files', 'command-history']);
   });
   it('sanitizes non-finite and obsolete widths', () => {
     expect(normalizeDockLayout({ ...seed, panelWidths: { files: 1, chat: Infinity, removed: 200 } })?.panelWidths).toEqual({ files: 160 });
   });
   it.each([null, [], {}, { ...seed, leftZone: null }, { ...seed, panelWidths: [] }])('rejects malformed layout %j', value => {
     expect(normalizeDockLayout(value)).toBeNull();
-  });
-  it('loads a previous storage version and writes the migrated layout separately', async () => {
-    localStorage.setItem('dock-layout-v4', JSON.stringify(seed));
-    vi.resetModules();
-    const { useDockStore: migrated } = await import('./dock');
-    expect(migrated.getState().leftZone).toEqual([]);
-    expect(migrated.getState().rightPanels).toEqual(['files']);
-    expect(localStorage.getItem('dock-layout-v4')).toBe(JSON.stringify(seed));
-    expect(JSON.parse(localStorage.getItem('dock-layout-v6')!).rightPanels).toEqual(['files']);
   });
 });
 
@@ -165,17 +156,15 @@ describe('independent auxiliary sides', () => {
     expect(useWorkspaceNavigation.getState().collapsed).toBe(false);
     expect(useDockStore.getState()).toMatchObject({ leftPanels: ['chat'], rightPanels: ['files'] });
   });
-  it('normalizes and reloads both sides without rewriting the previous version', async () => {
+  it('normalizes and reloads both sides', async () => {
     const seed = { layoutVersion: 6, widthPreset: 'compact', leftZone: ['files', 'files'], rightZone: ['files', 'chat'],
       leftPanels: ['files', 'chat'], rightPanels: ['files', 'chat'], panelWidths: { chat: 370 } };
     const expected = normalizeDockLayout(seed)!;
     expect(expected).toMatchObject({ leftZone: ['files'], leftPanels: ['files'], rightPanels: ['chat'], panelWidths: { chat: 370 } });
     expect(expected.rightZone).not.toContain('files');
     localStorage.setItem('dock-layout-v6', JSON.stringify(seed));
-    localStorage.setItem('dock-layout-v5', 'previous layout');
     vi.resetModules();
     const { useDockStore: restored } = await import('./dock');
     expect(restored.getState()).toMatchObject(expected);
-    expect(localStorage.getItem('dock-layout-v5')).toBe('previous layout');
   });
 });

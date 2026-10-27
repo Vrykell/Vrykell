@@ -85,6 +85,7 @@ Workspace history writes serialize by both live container and durable history id
 | History metadata parsed pre-layout terminal payloads | History reads only the current terminal pane tree |
 | Pane transfer and deletion still handled null legacy pane rows | Both operate on explicit pane ids only |
 | The old native `workspace` tab kind still had a routing entry | Removed the route and its stale tests |
+| Dock layout still read v3-v5 records and renamed legacy entries | Read only the current `dock-layout-v6` record; unknown versions reset to defaults |
 | Foundation copy was hardcoded in Chinese inside code | Route default titles, limits, empty hints, restore failures and degraded-restore notices through the i18n catalog |
 
 The remaining adapters only convert current domain payloads: terminal session JSON, document and comparison references, and conversation or agent references. They are not alternate tab, tree, group or close implementations, and they do not read older data formats. Native editor and agent pages register resource hosts; content-strip rows come from canonical containers. Utility pages retain singleton routing and use the same ordering mechanism. New workspace behavior belongs in the canonical model/service/provider, with a domain adapter only when process, content or storage behavior differs.

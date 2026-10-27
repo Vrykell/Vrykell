@@ -46,19 +46,18 @@ interface DockState extends PersistedLayout {
 
 const defaults = (): PersistedLayout => ({ leftZone: [], rightZone: [...PANEL_IDS], leftPanels: [], rightPanels: [], panelWidths: {} });
 
-/** Keep independent sides in current layouts and migrate older right-only layouts. */
+/** Keep independent sides in the current layout. */
 export function normalizeDockLayout(value: unknown): PersistedLayout | null {
   if (!value || typeof value !== 'object') return null;
   const data = value as Record<string, unknown>;
-  if (![data.leftZone, data.rightZone, data.leftPanels, data.rightPanels].every(Array.isArray)
+  if (data.layoutVersion !== 6 || ![data.leftZone, data.rightZone, data.leftPanels, data.rightPanels].every(Array.isArray)
     || !data.panelWidths || typeof data.panelWidths !== 'object' || Array.isArray(data.panelWidths)) return null;
   const valid = (input: unknown) => (input as unknown[]).filter((id): id is string => typeof id === 'string' && PANEL_IDS.includes(id));
-  const independent = data.layoutVersion === 6;
   // The left dock holds a single panel; any extra saved entry returns to the right row.
-  const leftZone = independent ? [...new Set(valid(data.leftZone))].slice(0, 1) : [];
+  const leftZone = [...new Set(valid(data.leftZone))].slice(0, 1);
   const rightZone = [...new Set([...valid(data.rightZone), ...valid(data.leftZone), ...PANEL_IDS])].filter(id => !leftZone.includes(id));
-  const leftOpen = independent ? valid(data.leftPanels).find(id => leftZone.includes(id)) : undefined;
-  const rightOpen = independent ? valid(data.rightPanels).find(id => rightZone.includes(id)) : [...valid(data.rightPanels), ...valid(data.leftPanels)][0];
+  const leftOpen = valid(data.leftPanels).find(id => leftZone.includes(id));
+  const rightOpen = valid(data.rightPanels).find(id => rightZone.includes(id));
   const panelWidths: Record<string, number> = {};
   for (const [id, width] of Object.entries(data.panelWidths)) {
     if (!PANEL_DEFS[id] || typeof width !== 'number' || !Number.isFinite(width)) continue;
@@ -72,9 +71,9 @@ function saveLayout(layout: PersistedLayout) {
 }
 
 function loadLayout(): PersistedLayout {
-  const raw = safeLocalStorageGet(STORAGE_KEY) ?? safeLocalStorageGet('dock-layout-v5') ?? safeLocalStorageGet('dock-layout-v4') ?? safeLocalStorageGet('dock-layout-v3');
+  const raw = safeLocalStorageGet(STORAGE_KEY);
   if (!raw) return defaults();
-  const layout = normalizeDockLayout(safeJsonParse<unknown>(raw.split('"project-commands"').join('"command-history"')));
+  const layout = normalizeDockLayout(safeJsonParse<unknown>(raw));
   if (!layout) { console.warn('[dock] Invalid layout; restoring defaults'); return defaults(); }
   if ([...layout.leftPanels, ...layout.rightPanels].includes('chat')) useWorkspaceNavigation.getState().setAiPlacement('side');
   saveLayout(layout);

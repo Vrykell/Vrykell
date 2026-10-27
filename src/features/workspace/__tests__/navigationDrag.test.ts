@@ -5,7 +5,7 @@ afterEach(() => useNavigationDrag.getState().end());
 
 describe('navigation drag state', () => {
   it('shares the source across sides and changes insertion position without writing preferences', () => {
-    const saved = localStorage.getItem('dock-layout-v4');
+    const saved = localStorage.getItem('dock-layout-v6');
     useNavigationDrag.getState().start('files');
     useNavigationDrag.getState().hover('right', 0);
     expect(useNavigationDrag.getState().target).toEqual({ side: 'right', index: 0 });
@@ -15,7 +15,7 @@ describe('navigation drag state', () => {
     useNavigationDrag.getState().hover('left', 2);
     expect(useNavigationDrag.getState().id).toBe('files');
     expect(useNavigationDrag.getState().target).toEqual({ side: 'left', index: 2 });
-    expect(localStorage.getItem('dock-layout-v4')).toBe(saved);
+    expect(localStorage.getItem('dock-layout-v6')).toBe(saved);
   });
   it('clears all preview state on completion or cancellation and on the next drag', () => {
     useNavigationDrag.getState().start('tabs');
