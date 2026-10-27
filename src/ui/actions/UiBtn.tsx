@@ -105,7 +105,7 @@ interface ToolbarBtnProps {
   active?: boolean;
   onClick?: (e: MouseEvent) => void;
   children: React.ReactNode;
-  /** 附加的 HTML 属性（如 data-*, draggable, onDragStart 等） */
+  /** Extra HTML attributes such as data-*, draggable and onDragStart. */
   attrs?: Record<string, unknown>;
 }
 
@@ -115,7 +115,7 @@ export function ToolbarBtn({ title, active, onClick, children, attrs }: ToolbarB
     data-tip={title} aria-label={title} onClick={onClick} {...attributes}>{children}</IconButton>;
 }
 
-// ── 时长/大小格式化 ──
+// Duration and size formatting
 
 export function fmtDuration(ms: number): string {
   if (ms < 1000) return `${ms}ms`;
@@ -125,7 +125,7 @@ export function fmtDuration(ms: number): string {
   return `${m}m${s}s`;
 }
 
-/** 字节数格式化（B/KB/MB/GB/TB）。 */
+/** Format a byte count (B/KB/MB/GB/TB). */
 export function fmtSize(bytes: number): string {
   if (!bytes) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];

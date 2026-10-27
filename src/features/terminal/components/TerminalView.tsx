@@ -1,10 +1,8 @@
 /**
- * TerminalView — 终端主表面（窗口 = 会话容器，持有 1–4 个终端的二叉分裂树）。
- *
- *   渲染活跃窗口的布局树：
- *     - leaf → 终端 pane（隐藏 xterm 驱动 PTY + 块列表 + 独立输入栏 + 类型下拉）
- *     - split → 行/列 flex + 可拖拽分隔线（调宽/高）
- *   分裂用 ⌘D/⌘⇧D（继承类型）、⌥⌘D（选类型）；分隔线拖动调整比例。
+ * Terminal surface: a window is a session container holding a binary split tree of one to four
+ * terminals. The active window's layout renders as either a terminal pane (hidden xterm driving
+ * the PTY, block list, input bar and type menu) or a row/column split with draggable dividers.
+ * Splitting inherits the terminal type; the divider drag adjusts ratios.
  */
 
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
@@ -137,9 +135,9 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
             inner={unified ? { left: false, right: false, top: false, bottom: false } : collectLayoutCells(tab.layout).find(cell => cell.terminalId === terminal.id)!.inner}
             reorderable={!unified && layoutLeaves(tab.layout).length > 1} />}
         </ResourceContent>)}
-      {/* 所有 session tab 保持挂载，非活跃 tab 隐藏而非卸载 ——
-          卸载会触发 useTerminalSession cleanup 里的 ptyClose，杀掉运行中的命令。
-          切走再切回时 PTY/块列表/离屏终端全部存活。 */}
+      {/* Keep every session tab mounted and hide inactive ones: unmounting runs the
+          useTerminalSession cleanup, which closes the PTY and kills a running command. Hidden
+          tabs keep their process, block list and offscreen terminal alive. */}
       {tabs.map((tab) => {
         if (tab.kind === 'session') {
           return (
@@ -181,7 +179,7 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
         </div>
       )}
 
-      {/* 终端区域右键菜单 */}
+      {/* Terminal area context menu */}
       {ctxMenu && (
         <ContextMenu
           anchor={ctxMenu}
@@ -194,7 +192,7 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// 单个 session tab 表面（含布局树 + 分裂/移动覆盖层）
+// Single session tab surface: layout tree plus split/move overlays
 // ═══════════════════════════════════════════════════════════
 
 function SessionTabView(props: {
@@ -229,8 +227,8 @@ function SessionTabView(props: {
       background: 'var(--xterm-bg)',
     }}>
       <div style={{ flex: 1, minWidth: 0, minHeight: 0, display: 'flex', position: 'relative' }}>
-        {/* 平面渲染：pane 按终端 id 作 key，绝对定位落位 ——
-            拖动重排只改几何，不重挂 TerminalPane（重挂会 ptyClose 杀掉运行中命令）。 */}
+        {/* Plane rendering: panes are keyed by terminal id and absolutely positioned, so reorder
+            only changes geometry and never remounts TerminalPane (which would close the PTY). */}
         <PaneLayout
           windowId={windowId}
           layout={layout}
@@ -254,7 +252,7 @@ function SessionTabView(props: {
 }
 
 // ═══════════════════════════════════════════════════════════
-// 布局平面渲染（PaneLayout）
+// Layout plane rendering (PaneLayout)
 // ═══════════════════════════════════════════════════════════
 
 interface InnerEdges { left: boolean; right: boolean; top: boolean; bottom: boolean; }
@@ -280,11 +278,11 @@ function PaneLayout({ layout, windowId, focusedTermId, active, setRatioNode }: {
 }
 
 // ═══════════════════════════════════════════════════════════
-// 分隔线（拖拽调比例）
+// Divider (drag to adjust the ratio)
 // ═══════════════════════════════════════════════════════════
 
 // ═══════════════════════════════════════════════════════════
-// 终端 pane
+// Terminal pane
 // ═══════════════════════════════════════════════════════════
 
 function TerminalPane(props: {
@@ -433,7 +431,7 @@ function TerminalPane(props: {
   );
 }
 
-// ── TuiBanner（altScreen 应用：vim/htop 等） ──
+// TuiBanner (alternate-screen programs)
 
 function TuiBanner({ tabId }: { tabId: string }) {
   const {
@@ -466,7 +464,7 @@ function TuiBanner({ tabId }: { tabId: string }) {
 }
 
 // ═══════════════════════════════════════════════════════════
-// PaneInputEditor（终端 pane 的独立输入栏） ═══════════════════════════════════════════════════════════
+// PaneInputEditor (the terminal pane's dedicated input bar)
 
 function PaneInputEditor({ paneId, focused, insetLeft = 8, insetRight = 8, onSessionStatusClick, onSessionStatusReady, sessionNotice, sessionStatusOpen }: { paneId: string; focused: boolean; insetLeft?: number; insetRight?: number; onSessionStatusClick?: () => void; onSessionStatusReady?: (trigger: HTMLButtonElement | null) => void; sessionStatusOpen?: boolean; sessionNotice?: React.ReactNode }) {
   const blocks = useBlockStore(selectBlocks(paneId));

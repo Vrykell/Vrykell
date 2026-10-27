@@ -5,7 +5,7 @@ import { t } from '@i18n';
 
 interface Props {
   children: ReactNode;
-  /** 自定义降级 UI，不传则用默认 */
+  /** Custom fallback UI; the default is used when omitted. */
   fallback?: ReactNode;
 }
 
@@ -15,10 +15,9 @@ interface State {
 }
 
 /**
- * ErrorBoundary — React 渲染崩溃最后防线。
- *
- * 捕获子树中所有未处理的渲染异常，显示降级 UI 而非白屏。
- * 不会捕获：事件处理器、异步代码、SSR、ErrorBoundary 自身的错误。
+ * Last line of defence for render crashes: catches unhandled render errors in the subtree and
+ * shows a fallback instead of a blank page. Event handlers, async code, SSR and errors thrown by
+ * the boundary itself are not caught.
  */
 export default class ErrorBoundary extends Component<Props, State> {
   state: State = { error: null, errorInfo: null };
@@ -63,7 +62,7 @@ function DefaultFallback({ error, componentStack, onReset }: {
       fontFamily: 'var(--font-ui)', padding: 40, gap: 16,
     }}>
       <div style={{ opacity: 0.3 }}><TriangleAlert size={48} /></div>
-      <h2 style={{ margin: 0, fontWeight: 'var(--fw-semibold)' }}>页面渲染错误</h2>
+      <h2 style={{ margin: 0, fontWeight: 'var(--fw-semibold)' }}>{t('Page render error')}</h2>
       <p data-selectable style={{
         margin: 0, color: 'var(--text-secondary)', fontSize: 'calc(13px * var(--ui-font-scale))',
         maxWidth: 480, textAlign: 'center', lineHeight: 1.6,
@@ -71,8 +70,8 @@ function DefaultFallback({ error, componentStack, onReset }: {
         {error.message}
       </p>
       <ErrorDetails
-        title="完整错误堆栈"
-        text={error.stack ?? '(无堆栈信息)'}
+        title={t('Full error stack')}
+        text={error.stack ?? t('(no stack trace)')}
         copyTestId="error-copy-stack"
         defaultOpen
         style={{ maxWidth: 520, width: '100%' }}
@@ -83,7 +82,7 @@ function DefaultFallback({ error, componentStack, onReset }: {
       />
       {componentStack && (
         <ErrorDetails
-          title="组件堆栈"
+          title={t('Component stack')}
           text={componentStack.trim()}
           copyTestId="error-copy-component-stack"
           style={{ maxWidth: 520, width: '100%' }}

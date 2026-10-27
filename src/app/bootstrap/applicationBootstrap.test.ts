@@ -76,7 +76,7 @@ describe('createApplicationBootstrap', () => {
     });
 
     expect(deps.restoreWorkspace).toHaveBeenCalledOnce();
-    expect(errors).toEqual(['刷新 AI 配置']);
+    expect(errors).toEqual(['refresh AI configuration']);
     dispose();
   });
 });

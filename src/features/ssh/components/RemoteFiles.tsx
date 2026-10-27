@@ -22,11 +22,11 @@ import ErrorBox from '@ui/feedback/ErrorBox';
 import { requestSshAuthentication, useSshAuthenticationRevision } from '../hooks/useSessionAuthentication';
 
 /**
- * RemoteFiles — SSH 文件面板。
+ * SSH file panel.
  *
- * 与本地文件面板共用 FilePanel + useFileBrowser：「操作哪个主机」只由这里的 target
- * 决定，菜单与拖放语义由面板配置推导；远程专有部分只有上传 / 下载、远端编辑器打开
- * 与文件服务失败说明。
+ * Shares FilePanel and useFileBrowser with the local panel: this target alone decides which host
+ * is operated on, and the panel configuration derives menu and drag semantics. The remote-only
+ * parts are upload/download, opening in a remote editor and file-service failure messages.
  */
 export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnection; enabled?: boolean }) {
   const authenticationRevision = useSshAuthenticationRevision(conn.id);
@@ -69,7 +69,7 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
     } catch (error) { toast(String(error), 'error'); }
   };
 
-  /** 上传（菜单与系统拖入共用）：逐个上传并汇总结果 */
+  /** Upload paths one by one and aggregate the result (shared by the menu and system drops). */
   const uploadPaths = async (paths: string[], dir: string) => {
     if (!ops.upload || paths.length === 0) return;
     setTransferPage('upload');
@@ -170,7 +170,8 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
         }
         if (locals.length === 0) return null;
         toast(locals.length > 1 ? t('files.download.plainDoneCount', { n: locals.length }) : t('files.download.plainDone'), 'success');
-        // 拖出 = 下载副本交给系统拖拽（系统按移动接收）；远端源文件保留，移出收尾只用于本地面板
+        // Dragging out downloads a copy for the system drag (accepted as a move); the remote
+        // source stays, and the move cleanup applies only to the local panel.
         return { paths: locals, mode: 'move' as const };
       }}
     />

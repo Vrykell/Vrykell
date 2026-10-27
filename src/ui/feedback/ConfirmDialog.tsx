@@ -1,6 +1,7 @@
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import { useRef } from 'react';
 import { useDialogKeyboard } from '@ui/hooks/useDialogKeyboard';
+import { t } from '@i18n';
 interface Props {
   open: boolean;
   title: string;
@@ -13,15 +14,15 @@ interface Props {
 }
 
 /**
- * ConfirmDialog — 通用二次确认弹窗（删除 / 重命名等不可逆或易误触操作）。
- * 确定按钮可按 danger 着色。
+ * Shared confirmation dialog for destructive or easy-to-misfire actions such as delete and
+ * rename. The confirm button can use the danger treatment.
  */
 export default function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = '确定',
-  cancelLabel = '取消',
+  confirmLabel = t('Confirm'),
+  cancelLabel = t('Cancel'),
   danger = false,
   onConfirm,
   onCancel,

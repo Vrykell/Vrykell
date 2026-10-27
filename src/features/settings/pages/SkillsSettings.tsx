@@ -88,7 +88,7 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
     ));
 
   if (files.length === 0) {
-    return <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: 8 }}>仅 SKILL.md，无其他文件</div>;
+    return <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: 8 }}>{t('Only SKILL.md, no other files')}</div>;
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -96,7 +96,7 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
         {render(tree, 0)}
       </div>
       {selected && (error ? (
-        <ErrorBox actions={<button onClick={reload} style={{ minHeight: 32 }}>重试</button>}>
+        <ErrorBox actions={<button onClick={reload} style={{ minHeight: 32 }}>{t('Retry')}</button>}>
           {error}
         </ErrorBox>
       ) : (

@@ -1,8 +1,9 @@
 /**
- * 应用启动编排层。
+ * Application startup orchestration.
  *
- * 这里仅负责启动顺序、异步错误隔离和生命周期清理；具体业务初始化
- * 通过依赖注入提供，避免 App 组件直接依赖所有基础设施模块。
+ * This layer owns startup order, async error isolation and lifecycle cleanup. Business
+ * initialization arrives through dependency injection so the App component does not depend on
+ * every infrastructure module directly.
  */
 
 export type ApplicationTask = () => void | Promise<void>;
@@ -23,7 +24,7 @@ export interface ApplicationBootstrapOptions {
 }
 
 function defaultErrorHandler(taskName: string, error: unknown): void {
-  console.warn(`[application] ${taskName} 初始化失败:`, error);
+  console.warn(`[application] ${taskName} failed to initialize:`, error);
 }
 
 function runTask(
@@ -51,7 +52,7 @@ function registerCleanup(
   }
 }
 
-/** 创建一次可测试、可销毁的应用运行时。 */
+/** Create an application runtime that can be tested and disposed once. */
 export function createApplicationBootstrap(
   dependencies: ApplicationBootstrapDependencies,
   options: ApplicationBootstrapOptions = {},
@@ -60,13 +61,13 @@ export function createApplicationBootstrap(
   const cleanups: ApplicationCleanup[] = [];
   let disposed = false;
 
-  runTask('配置 Agent 流', dependencies.configureAgentStream, onError);
-  runTask('刷新 AI 配置', dependencies.refreshAiConfig, onError);
-  runTask('刷新工具权限', dependencies.refreshToolPolicy, onError);
-  registerCleanup(cleanups, '初始化智能标题', dependencies.subscribeAutoTitle, onError);
-  runTask('恢复工作区会话', dependencies.restoreWorkspace, onError);
-  runTask('加载工作区目录', dependencies.loadWorkspaceDirs, onError);
-  runTask('恢复命令历史', dependencies.hydrateHistory, onError);
+  runTask('configure agent stream', dependencies.configureAgentStream, onError);
+  runTask('refresh AI configuration', dependencies.refreshAiConfig, onError);
+  runTask('refresh tool policy', dependencies.refreshToolPolicy, onError);
+  registerCleanup(cleanups, 'initialize automatic titles', dependencies.subscribeAutoTitle, onError);
+  runTask('restore workspace sessions', dependencies.restoreWorkspace, onError);
+  runTask('load workspace directories', dependencies.loadWorkspaceDirs, onError);
+  runTask('restore command history', dependencies.hydrateHistory, onError);
 
   return () => {
     if (disposed) return;
@@ -75,7 +76,7 @@ export function createApplicationBootstrap(
       try {
         cleanup();
       } catch (error) {
-        onError('清理应用运行时', error);
+        onError('dispose application runtime', error);
       }
     }
   };

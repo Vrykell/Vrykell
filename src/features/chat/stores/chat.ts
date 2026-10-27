@@ -28,31 +28,31 @@ export interface ChatMessage {
   environment?: ChatEnvironment | null;
   stopped?: boolean;
   /**
-   * 渲染增强层（rail 上的文本段/动作条目）。隐形契约：纯文本回答恒为
-   * undefined（AiBlock 据此走 legacy 渲染），唯一物化点 = upsertToolPart。
+   * Render-enhancement layer (text segments and action entries on the rail). Plain-text answers
+   * keep this undefined; only upsertToolPart materializes it.
    */
   parts?: MessagePart[];
-  /** 用户消息附件（M5）：图片/文件/长文本粘贴，随消息持久化 */
+  /** Attachments sent with the message: images, files and pasted long text; persisted with it. */
   attachments?: AttachmentMeta[];
   /** Persisted pane ownership keeps split conversations distinct after restoration. */
   paneId?: string;
-  /** 模型思考过程（reasoning 流）；不持久化，仅会话内存 */
+  /** Model reasoning stream; session memory only, never persisted. */
   reasoning?: string;
-  /** 发送时间戳（块流内联时与命令块按时间归并） */
+  /** Send timestamp, used to merge chat and command blocks chronologically. */
   createdAt: number;
   pending?: boolean;
-  /** 流式失败标记（渲染为合成错误节点行） */
+  /** Stream failure marker, rendered as a synthetic error node. */
   error?: boolean;
   /** Raw failure text shown with the retry action. */
   errorText?: string;
 }
 
-/** 工具事件回调：run 为 upsert 语义补丁（未定义字段不覆盖既有值） */
+/** Tool event callback: run is an upsert patch; undefined fields keep existing values. */
 export interface StreamHandlers {
   onToolEvent?: (run: ToolRun) => void;
-  /** 思考流增量（reasoning-delta）；流式追加到回答的 reasoning 字段 */
+  /** Reasoning delta, appended to the answer's reasoning field. */
   onReasoning?: (chunk: string) => void;
-  /** 上下文占用上报（压缩后自动变小，驱动圆环组件） */
+  /** Context usage report; compaction lowers it and drives the ring component. */
   onContextUsed?: (used: number, budget: number) => void;
 }
 
@@ -66,17 +66,17 @@ export interface SendOptions {
   ownerId?: string;
   conversationId?: string;
   references?: TerminalReference[];
-  /** 来源 pane；缺省时为 undefined（仅进面板，不进块流） */
+  /** Source pane; omitted for panel-only messages that stay out of the block stream. */
   paneId?: string;
   streamFn?: StreamFn;
-  /** 随消息发送的附件（M5） */
+  /** Attachments sent with this message. */
   attachments?: AttachmentMeta[];
 }
 
 let counter = 0;
 const nextId = () => `m${Date.now()}-${counter++}`;
 
-/** 进行中的流式请求（tabId → AbortController），dropTab 时中止防泄漏 */
+/** In-flight streams keyed by tab; dropTab aborts them to avoid leaks. */
 const abortControllers = new Map<string, AbortController>();
 
 interface ChatState {
@@ -97,14 +97,14 @@ interface ChatState {
   renameConversation: (id: string, title: string) => void;
   deleteConversation: (id: string, options?: { activateNext?: boolean }) => Promise<void>;
   retryPersistence: () => Promise<void>;
-  /** Independent conversations and legacy terminal history are keyed by their owning ID. */
+  /** Independent conversations and terminal history are keyed by their owning ID. */
   byTab: Record<string, ChatMessage[]>;
   /** Active stream owners run independently; each owner's queue remains ordered. */
   sendingTabs: string[];
-  /** 上下文占用（tabId → 估算 token / 预算）；null=未知 */
+  /** Context usage per tab (estimated tokens and budget); null means unknown. */
   contextUsed: Record<string, { used: number; budget: number } | null>;
   setContextUsed: (tabId: string, used: number, budget: number) => void;
-  /** 输入框草稿（侧栏可追加内容，如文件路径） */
+  /** Composer draft; the side panel may append content such as file paths. */
   draft: string;
   draftTabId: string | null;
   setDraft: (text: string) => void;
@@ -112,24 +112,24 @@ interface ChatState {
   send: (text: string, opts?: SendOptions) => Promise<void>;
   appendChunk: (tabId: string, id: string, chunk: string) => void;
   appendReasoning: (tabId: string, id: string, chunk: string) => void;
-  /** upsert 一个工具动作 part（惰性物化 parts；合并补丁不丢 startedAt） */
+  /** Upsert a tool action part, materializing parts lazily and keeping startedAt across patches. */
   upsertToolPart: (tabId: string, id: string, run: ToolRun) => void;
-  /** 中止某 tab 进行中的流式请求（M4 停止按钮复用） */
+  /** Abort the in-flight stream for a tab. */
   abortStream: (tabId: string) => void;
-  /** 重新生成某条提问的回答：删旧回答（内存+DB），原地起新流（M4） */
+  /** Regenerate an answer: delete the old one in memory and the database, then stream in place. */
   regenerate: (tabId: string, userMsgId: string) => Promise<void>;
-  /** 删除一个交换：提问 + 紧随的回答（内存+DB）（M4） */
+  /** Delete one exchange: the question and the answer that immediately follows it. */
   deleteExchange: (tabId: string, userMsgId: string) => void;
-  /** 编辑重发：提问灌回输入框草稿，删除该条及之后的全部消息（M4） */
+  /** Edit and resend: restore the question to the composer and delete it and every later message. */
   editResend: (tabId: string, userMsgId: string) => void;
-  /** 清空当前标签页的对话 */
+  /** Clear the current tab's conversation. */
   clearTab: () => void;
-  /** 关 tab 时删除该 tab 的对话，避免 per-tab 残留 */
+  /** Delete the tab's conversation when the tab closes, leaving no per-tab residue. */
   dropTab: (tabId: string) => void;
 }
 
 let defaultStream: StreamFn = async (_msgs, onChunk) => {
-  onChunk('（尚未配置 AI 服务）');
+  onChunk(t('AI service is not configured yet'));
 };
 export function setDefaultStream(fn: StreamFn) {
   defaultStream = fn;
@@ -224,7 +224,8 @@ export const useChatStore = create<ChatState>((set, get) => {
     return pendingLoad;
   };
   /**
-   * 流式内核（send/regenerate 共用）：history 取自 store 现状（排除 pending 占位）。
+   * Streaming core shared by send and regenerate: history is read from the current store state,
+   * excluding pending placeholders.
    * User aborts are not failures: partial content stays, unfinished tools end in the
    * cancelled state, but the answer is not marked red and carries no error text; an
    * empty shell aborted immediately is removed.
@@ -232,7 +233,8 @@ export const useChatStore = create<ChatState>((set, get) => {
   const runAssistant = async (tabId: string, assistantId: string, controller: AbortController, streamFn?: StreamFn) => {
     const ownsTurn = () => abortControllers.get(tabId) === controller;
     if (!ownsTurn() || controller.signal.aborted) return;
-    // history 截止到回答占位之前（regenerate 时其后的旧交换不参与本轮上下文）
+    // History stops before the answer placeholder; on regeneration, later exchanges are not
+    // part of this turn's context.
     const all = get().byTab[tabId] ?? [];
     const cut = all.findIndex((m) => m.id === assistantId);
     const history = (cut >= 0 ? all.slice(0, cut) : all)
@@ -241,13 +243,13 @@ export const useChatStore = create<ChatState>((set, get) => {
         role: m.role,
         content: m.role === 'assistant' ? m.content : m.content + referenceHistoryText(m.references),
         ...(m.role === 'assistant' && m.parts ? { parts: m.parts } : {}),
-        // 附件透传：文本/图片映射由 agentStream 按模型能力展开
+        // Pass attachments through; agentStream maps text and images according to model support.
         ...(m.attachments?.length ? { attachments: m.attachments } : {}),
       }));
 
-    // 流式节流：合批 chunk，每 ~50ms flush 一次。否则每个 token 都触发一次
-    // setState → 整个消息列表重渲染 → 流式消息整条 Markdown/KaTeX 重解析，
-    // 长回复下是 O(n²) 的卡顿源。
+    // Coalesce chunks and flush every ~50ms. Otherwise every token triggers a setState, the whole
+    // message list re-renders and the streaming message re-parses all Markdown/KaTeX, which is
+    // quadratic in long responses.
     let pending = '';
     let timer: ReturnType<typeof setTimeout> | null = null;
     const flush = () => {
@@ -275,7 +277,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         ...(get().conversations.some(conversation => conversation.id === tabId)
           ? { paneId: all[cut]?.environment?.paneId ?? null, environment: all[cut]?.environment ?? null } : {}),
         handlers: {
-          // 工具事件直写前先把滞留文本 flush 掉，保证 text/tool 时间序
+          // Flush buffered text before applying a tool event so text and tools keep their order.
           onToolEvent: (run) => {
             if (!ownsTurn() || controller.signal.aborted) return;
             if (timer !== null) {
@@ -285,12 +287,12 @@ export const useChatStore = create<ChatState>((set, get) => {
             flush();
             get().upsertToolPart(tabId, assistantId, run);
           },
-          // 思考流：实时追加到回答的 reasoning 字段（AI 面板渲染为可折叠思考块）
+          // Append reasoning deltas to the answer; the AI panel renders them as a collapsible block.
           onReasoning: (chunk) => {
             if (!ownsTurn() || controller.signal.aborted) return;
             get().appendReasoning(tabId, assistantId, chunk);
           },
-          // 上下文占用：压缩后自动变小，驱动圆环组件
+          // Context usage; compaction lowers it and drives the ring component.
           onContextUsed: (used, budget) => {
             if (!ownsTurn() || controller.signal.aborted) return;
             get().setContextUsed(tabId, used, budget);
@@ -311,8 +313,9 @@ export const useChatStore = create<ChatState>((set, get) => {
       if (!ownsTurn()) return;
       abortControllers.delete(tabId);
       const interrupted = failed || controller.signal.aborted;
-      // 被 abort 的空壳（立即停止、什么都没生成）直接移除，不留空气泡；
-      // 正常完成的空回答保留占位（向后兼容：持久化/测试都依赖问答成对）
+      // Remove an immediately aborted empty answer so no blank bubble remains; a normally
+      // completed empty answer keeps its placeholder because persistence expects question/answer
+      // pairs.
       const cur = get().byTab[tabId]?.find((m) => m.id === assistantId);
       if (controller.signal.aborted && cur && !cur.content && !(cur.parts && cur.parts.length)) {
         set((s) => ({
@@ -364,7 +367,7 @@ export const useChatStore = create<ChatState>((set, get) => {
         };
       });
       queueMicrotask(drainQueue);
-      // 持久化助手消息最终内容 + parts 渲染层
+      // Persist the final content and render parts of the assistant message.
       const assistant = get().byTab[tabId]?.find((m) => m.id === assistantId);
       if (assistant) {
         await persistMessage(tabId, assistant).catch((e: unknown) => console.warn('[chat] Could not save answer:', e));
@@ -487,7 +490,7 @@ export const useChatStore = create<ChatState>((set, get) => {
   }),
   appendChunk: (tabId, id, chunk) =>
     set((s) => {
-      if (!(tabId in s.byTab)) return s; // tab 已关闭，丢弃流式 chunk
+      if (!(tabId in s.byTab)) return s; // Tab closed; drop the streaming chunk.
       return {
         byTab: {
           ...s.byTab,
@@ -495,7 +498,8 @@ export const useChatStore = create<ChatState>((set, get) => {
             if (m.id !== id) return m;
             const content = m.content + chunk;
             if (!m.parts) return { ...m, content };
-            // parts 已物化：双写——chunk 追加到末尾 text part（末尾是 tool 则新开一段）
+            // Parts are materialized: append to the trailing text part, or start a new one after
+            // a tool.
             const parts = m.parts.slice();
             const last = parts[parts.length - 1];
             if (last && last.kind === 'text') {
@@ -510,7 +514,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     }),
   appendReasoning: (tabId, id, chunk) =>
     set((s) => {
-      if (!(tabId in s.byTab)) return s; // tab 已关闭，丢弃思考流
+      if (!(tabId in s.byTab)) return s; // Tab closed; drop the reasoning stream.
       return {
         byTab: {
           ...s.byTab,
@@ -522,13 +526,14 @@ export const useChatStore = create<ChatState>((set, get) => {
     }),
   upsertToolPart: (tabId, id, run) =>
     set((s) => {
-      if (!(tabId in s.byTab)) return s; // tab 已关闭，丢弃工具事件
+      if (!(tabId in s.byTab)) return s; // Tab closed; drop the tool event.
       return {
         byTab: {
           ...s.byTab,
           [tabId]: (s.byTab[tabId] ?? []).map((m) => {
             if (m.id !== id) return m;
-            // 惰性物化：纯文本回答的首个工具事件到达时，用当前 content 重建首 text part
+            // Materialize lazily: the first tool event of a plain-text answer rebuilds the first
+            // text part from the current content.
             const parts: MessagePart[] =
               m.parts ?? (m.content ? [{ kind: 'text', text: m.content }] : []);
             const idx = parts.findIndex(
@@ -537,7 +542,7 @@ export const useChatStore = create<ChatState>((set, get) => {
             if (idx < 0) return { ...m, parts: [...parts, { kind: 'tool', tool: run }] };
             const existing = parts[idx];
             if (existing.kind !== 'tool') return m;
-            // 合并补丁：仅覆盖定义了的字段（保住 startedAt 等既有值）
+            // Merge patch: overlay only defined fields, keeping existing values such as startedAt.
             const merged: ToolRun = { ...existing.tool };
             for (const [k, v] of Object.entries(run)) {
               if (v !== undefined) (merged as unknown as Record<string, unknown>)[k] = v;
@@ -553,7 +558,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     const controller = abortControllers.get(tabId);
     controller?.abort();
     abortControllers.delete(tabId);
-    // M3：挂起的审批 Promise 一律按拒绝放行，防工具 execute 悬挂卡死步进
+    // Reject every pending approval so a tool execute cannot hang the turn.
     denyAllPending(tabId);
     for (const message of get().byTab[tabId] ?? []) if (message.pending && !hasChatContent(message)) void deleteMessage(tabId, message.id).catch(() => {});
     set(state => ({ sendingTabs: state.sendingTabs.filter(id => id !== tabId), queuedSends: state.queuedSends.filter(item => item.ownerId !== tabId),
@@ -569,7 +574,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     if (opts?.conversationId && (!conversation || !(tabId in get().byTab))) return;
     const trimmed = text.trim();
     const atts = opts?.attachments?.length ? opts.attachments : undefined;
-    // 空文本但有附件也允许发送（「看看这张图」之外的纯附件场景）
+    // Empty text is allowed when attachments or references exist.
     if (!trimmed && !atts && !opts?.references?.length) return;
     if (get().sendingTabs.includes(tabId)) {
       set(state => ({ queuedSends: [...state.queuedSends, { id: nextId(), ownerId: tabId, text: trimmed, options: { ...opts, ownerId: tabId, ...(conversation ? { conversationId: tabId } : {}) } }] }));
@@ -591,7 +596,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       draftTabId: null,
       contextUsed: { ...s.contextUsed, [tabId]: null },
     }));
-    // 持久化用户消息（AI 对话是会话状态的一部分；用户消息无 parts）
+    // Persist the user message (the conversation is session state; user messages have no parts).
     if (conversation) {
       const updated = { ...conversation, environment, updatedAt: now,
         title: (get().byTab[tabId]?.filter(message => message.role === 'user').length ?? 0) === 1
@@ -624,7 +629,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     };
     const controller = new AbortController();
     abortControllers.set(tabId, controller);
-    // 新回答占位替换旧回答（原地），history 随之 = 到该提问为止
+    // Replace the old answer with the new placeholder in place; history then ends at the question.
     set((s) => {
       const cur = s.byTab[tabId] ?? [];
       const i = cur.findIndex((m) => m.id === userMsgId);
@@ -682,7 +687,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     useComposerDrafts.getState().dropTab(tabId);
     if (get().draftTabId === tabId) set({ draft: '', draftTabId: null });
     get().abortStream(tabId);
-    clearCompactionCache(tabId); // 清理该 tab 的上下文摘要缓存
+    clearCompactionCache(tabId); // Drop this tab's cached context summary.
     clearSessionGrants(tabId);
     set((s) => {
       if (!(tabId in s.byTab)) return s;
@@ -741,7 +746,7 @@ export function usePaneMessages(paneId: string): ChatMessage[] {
   );
 }
 
-/** 当前活跃标签页的上下文占用（圆环组件用）。 */
+/** Context usage of the active tab, used by the ring component. */
 export function useContextUsage(conversationId?: string): { used: number | null; budget: number | null } {
   const activeId = useWorkspaceStore((s) => s.activeId);
   const ctx = useChatStore((s) => s.contextUsed[conversationId ?? activeId]);

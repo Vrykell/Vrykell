@@ -8,6 +8,7 @@ import {
   partsToHistoryText,
   type MessagePart,
 } from '@features/agent/model/messageParts';
+import { t } from '@i18n';
 
 const sampleParts: MessagePart[] = [
   { kind: 'text', text: '我来看看。' },
@@ -48,7 +49,7 @@ describe('serializeParts / deserializeParts', () => {
 describe('partsToHistoryText', () => {
   it('tool part 折叠为单行摘要，text 忽略', () => {
     const text = partsToHistoryText(sampleParts);
-    expect(text).toBe('\n[执行命令: ls -la → 成功]');
+    expect(text).toBe(`\n[${t('Execute command')}: ls -la → ${t('Succeeded')}]`);
   });
 
   it('path/query 目标与状态文案', () => {
@@ -85,7 +86,7 @@ describe('partsToHistoryText', () => {
       },
     ];
     expect(partsToHistoryText(parts)).toBe(
-      '\n[读取文件: src/main.ts → 成功]\n[搜索: foo → 失败]\n[mystery_tool → 已拒绝]',
+      `\n[${t('Read file')}: src/main.ts → ${t('Succeeded')}]\n[${t('Search')}: foo → ${t('Failed')}]\n[mystery_tool → ${t('Denied')}]`,
     );
   });
 

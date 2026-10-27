@@ -28,6 +28,8 @@ const en: Record<string, string> = {
   'terminal.clipboard.confirmPasteLines': 'Paste {{lines}} lines and {{chars}} characters? This program has not requested bracketed paste; lines may execute as keyboard input.',
   'terminal.clipboard.confirmPasteSize': 'Paste {{lines}} lines and {{chars}} characters? Writing this much text may take some time.',
   'terminal.processExited': '[Process exited]',
+  'SSH connection failed: {{error}}': 'SSH connection failed: {{error}}',
+  'Could not start the shell: {{error}}': 'Could not start the shell: {{error}}',
   'ssh.state.connecting': 'Connecting', 'ssh.state.authenticating': 'Awaiting authentication', 'ssh.state.connected': 'SSH session', 'ssh.state.disconnected': 'Disconnected',
   'ssh.state.authCancelled': 'Authentication cancelled; connection closed', 'ssh.state.manualClosed': 'SSH connection closed', 'ssh.connecting.to': 'Connecting to {{target}}…',
   'ssh.input.mode': 'Input mode', 'ssh.input.password': 'Password input', 'ssh.input.direct': 'Direct input',

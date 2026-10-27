@@ -63,6 +63,6 @@ export function startDefaultApplication(): () => void {
     loadWorkspaceDirs: () => useWorkspaceDirsStore.getState().load(),
     hydrateHistory: () => useHistoryStore.getState().hydrate(),
   }, {
-    onError: (taskName, error) => reportFailure(`启动任务「${taskName}」失败`, error),
+    onError: (taskName, error) => reportFailure(t('Startup task "{{task}}" failed', { task: taskName }), error),
   });
 }

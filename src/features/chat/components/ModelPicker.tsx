@@ -1,14 +1,11 @@
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import { TextInput } from '@ui/fields/TextInput';
 /**
- * ModelPicker — 页面化模型选择窗口。
+ * Full model picker dialog: search by name or model id, filter by capability (vision, reasoning,
+ * tools, search), then pick a row (icon, name, provider and capability badges). Each row can adjust
+ * its thinking effort; selecting a row sets the model and closes the dialog.
  *
- * 点击任何「模型按钮」打开：顶部搜索框（按名称/模型 ID 过滤）→
- * 能力标签过滤区（视觉/推理/工具/搜索，多选）→ 模型列表项
- * （图标 + 名称 + 服务商 + 能力徽标；每项可独立调思考强度与
- * Agent 开关；点击列表项选中模型并关窗）。
- *
- * 同文件导出 ModelScopeBar：设置页「按模型配置」用的模型选择条。
+ * The same module exports ModelScopeBar for per-model settings scopes.
  */
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -16,7 +13,7 @@ import { iconSizes, BrainCircuit, Eye, Globe, Search, SlidersHorizontal, Wrench,
 import { t } from '@i18n';
 import { useAiConfigStore, setActiveModel, type ModelProfile, useAgentSettings } from '@features/agent';
 import {
-  CAPABILITY_LABELS, detectCapabilities, hasCapability,
+  capabilityLabel, detectCapabilities, hasCapability,
   type ModelCapability,
 } from '@features/agent/model/capabilities';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
@@ -25,7 +22,7 @@ import Select from '@ui/fields/Select';
 
 const CAP_ORDER: ModelCapability[] = ['vision', 'reasoning', 'tools', 'search'];
 
-// ── 样式 ──
+// Styles
 
 const pill: React.CSSProperties = {
   padding: '3px 10px', fontSize: 'calc(11px * var(--ui-font-scale))',
@@ -52,7 +49,7 @@ function CapBadge({ on, label }: { on: boolean; label: string }) {
   );
 }
 
-/** 每模型快速调整：思考强度（AI 面板已具备 Agent 开关，这里只留强度）。 */
+/** Per-model quick setting: thinking effort (the AI panel already owns the agent switch). */
 function ItemControls({ profile }: { profile: ModelProfile }) {
   const agentSettings = useAgentSettings();
   const eff = agentSettings.resolve(profile.id);
@@ -63,23 +60,23 @@ function ItemControls({ profile }: { profile: ModelProfile }) {
     <div
       style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}
       onClick={(e) => e.stopPropagation()}
-      data-tip="思考强度"
+      data-tip={t('Thinking effort')}
     >
       <SlidersHorizontal size={iconSizes.compact} style={{ color: 'var(--text-muted)' }} />
       <Select<'low' | 'medium' | 'high'>
-        aria-label={`${profile.name || profile.model}的思考强度`}
+        aria-label={t('Thinking effort for {{model}}', { model: profile.name || profile.model })}
         value={eff.thinkingLevel}
         onChange={(thinkingLevel) =>
           agentSettings.updateModel(profile.id, { thinkingLevel })
         }
-        options={[{ value: 'low', label: '低' }, { value: 'medium', label: '中' }, { value: 'high', label: '高' }]}
+        options={[{ value: 'low', label: t('Low') }, { value: 'medium', label: t('Medium') }, { value: 'high', label: t('High') }]}
         style={{ width: 84 }}
       />
     </div>
   );
 }
 
-// ── 模型选择窗口 ──
+// Model picker dialog
 
 export default function ModelPicker({ open, onClose, showThinking = true }: { open: boolean; onClose: () => void; showThinking?: boolean }) {
   const models = useAiConfigStore((s) => s.models);
@@ -135,7 +132,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
         }}
         onClick={onClose}
       >
-        <div className="workspace-floating workspace-floating-dialog" role="dialog" aria-modal="true" aria-label="选择模型"
+        <div className="workspace-floating workspace-floating-dialog" role="dialog" aria-modal="true" aria-label={t('Select model')}
           onClick={(e) => e.stopPropagation()}
           style={{
             width: 480, maxWidth: 'calc(100vw - 48px)', maxHeight: 'min(560px, 80vh)',
@@ -144,14 +141,14 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
             animation: 'modalIn 0.22s var(--ease-out)',
           }}
         >
-        {/* 顶部：标题 + 搜索框 */}
+        {/* Header: title and search */}
         <div style={{ padding: '14px 16px 10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', flex: 1 }}>选择模型</span>
+            <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', flex: 1 }}>{t('Select model')}</span>
             <button
               data-subtle
-              data-tip="关闭"
-              aria-label="关闭"
+              data-tip={t('Close')}
+              aria-label={t('Close')}
               onClick={onClose}
               style={{
                 border: 'none', background: 'transparent', color: 'var(--text-muted)',
@@ -167,7 +164,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="搜索模型…"
+              placeholder={t('Search models…')}
               style={{
                 flex: 1, minWidth: 0, background: 'transparent', border: 'none',
                 outline: 'none', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-primary)',
@@ -176,7 +173,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
           </div>
         </div>
 
-        {/* 能力标签过滤区 */}
+        {/* Capability filters */}
         <div style={{ display: 'flex', gap: 6, padding: '0 16px 10px', flexWrap: 'wrap' }}>
           {CAP_ORDER.map((cap) => {
             const TagIcon =
@@ -192,17 +189,17 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
                 }}
               >
                 <TagIcon size={iconSizes.compact} />
-                {CAPABILITY_LABELS[cap]}
+                {capabilityLabel(cap)}
               </OutlineButton>
             );
           })}
         </div>
 
-        {/* 模型列表 */}
+        {/* Model list */}
         <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 8px 10px' }}>
           {list.length === 0 && (
             <div style={{ padding: 18, textAlign: 'center', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
-              无匹配模型
+              {t('No matching models')}
             </div>
           )}
           {list.map((m) => {
@@ -218,7 +215,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
                 data-selected={active}
                 onClick={() => {
                   void setActiveModel(m.id).then(() => {
-                    toast(`已切换到 ${m.name || m.model}`);
+                    toast(t('Switched to {{model}}', { model: m.name || m.model }));
                     onClose();
                   });
                 }}
@@ -247,7 +244,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
                       {providerLabel(m.provider)}
                     </span>
                     {CAP_ORDER.map((cap) => (
-                      <CapBadge key={cap} on={caps[cap]} label={CAPABILITY_LABELS[cap]} />
+                      <CapBadge key={cap} on={caps[cap]} label={capabilityLabel(cap)} />
                     ))}
                   </div>
                 </div>
@@ -262,7 +259,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
   );
 }
 
-// ── 设置页模型选择条（按模型配置的作用域选择） ──
+// Model scope bar for per-model settings
 
 export function ModelScopeBar({
   options,

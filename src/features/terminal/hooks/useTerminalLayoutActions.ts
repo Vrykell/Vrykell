@@ -19,10 +19,10 @@ interface UseTerminalLayoutActionsOptions {
 }
 
 /**
- * 管理终端窗口布局的领域动作：分裂、移动和分隔线比例调整。
+ * Layout actions for a terminal window: split, move and divider ratios.
  *
- * 组件只负责渲染落点和触发回调，布局变更及 UI 状态收敛在这里，避免
- * TerminalView 同时承担布局算法、Store 读写和视图编排。
+ * Components render placement targets and trigger callbacks; layout mutation and UI state stay
+ * here so TerminalView does not also own layout algorithms, store writes and view orchestration.
  */
 export function useTerminalLayoutActions({ windowId, layout }: UseTerminalLayoutActionsOptions) {
   const setWindowLayout = useSessionStore((state) => state.setWindowLayout);

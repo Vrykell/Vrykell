@@ -42,13 +42,13 @@ export type { TitleSource };
 export type TabKind = 'session' | 'history' | 'ai-history' | 'git-diff' | 'editor' | 'usage' | 'harness'
   | 'start' | 'start-code' | 'start-ai';
 
-/** SSH 会话目标（终端类型=ssh 时的专属字段） */
+/** SSH target for a session whose terminal type is SSH. */
 export interface SshTabTarget extends SshOptions {
   name: string;
   host: string;
   user?: string;
   port?: number;
-  /** 关联的 SSH 连接 id（用于回查密码等完整配置） */
+  /** Saved SSH connection id, used to look up the full configuration such as the password. */
   connectionId?: string;
 }
 
@@ -82,13 +82,13 @@ export interface AddTabOptions {
   /** Defaults to local; history and usage kinds create workspace pages. */
   kind?: 'local' | 'ssh' | 'history' | 'ai-history' | 'usage' | 'harness' | 'start' | 'start-code' | 'start-ai';
   shellType?: ShellType;
-  /** SSH 连接目标（kind='ssh' 时） */
+  /** SSH target (when kind is 'ssh'). */
   ssh?: SshTabTarget;
-  /** 归属分组 id */
+  /** Owning group id. */
   groupId?: string;
 }
 
-/** 是否为真实会话窗口（可落库、可分组） */
+/** Whether the tab is a real session window that can be persisted and grouped. */
 export function isSessionTab(tab: Tab): tab is Extract<Tab, { kind: 'session' }> {
   return tab.kind === 'session';
 }
@@ -98,17 +98,17 @@ export function isStartTab(tab: Tab): tab is Extract<Tab, { kind: 'start' | 'sta
   return tab.kind === 'start' || tab.kind === 'start-code' || tab.kind === 'start-ai';
 }
 
-/** 窗口内全部终端 */
+/** Every terminal in the window. */
 export function terminalsOf(tab: Tab): TerminalSpec[] {
   return isSessionTab(tab) ? layoutLeaves(tab.layout) : [];
 }
 
-/** 窗口内第一个终端（用于标题/图标等展示） */
+/** First terminal in the window, used for titles and icons. */
 export function firstTerminalOf(tab: Tab): TerminalSpec | null {
   return isSessionTab(tab) ? firstLeaf(tab.layout) : null;
 }
 
-/** 聚焦终端的当前工作目录（运行时 terminalCwds，回退到终端 spec.cwd）。 */
+/** Working directory of the focused terminal (runtime terminalCwds, falling back to spec.cwd). */
 export function getFocusedCwd(): string | undefined {
   const ws = useWorkspaceStore.getState();
   const termId = getFocusedTerminalId();
@@ -120,13 +120,13 @@ export function getFocusedCwd(): string | undefined {
   return undefined;
 }
 
-/** 把真实会话窗口序列化成后端 { kind, payload }；视图标签返回 null。 */
+/** Serialize a real session tab into the backend's { kind, payload }; view tabs return null. */
 export function serializeSession(tab: Tab): { kind: string; payload: string } | null {
   if (!isSessionTab(tab)) return null;
   return { kind: 'session', payload: JSON.stringify({ layout: tab.layout }) };
 }
 
-/** 生成窗口内下一个终端的稳定 id（${windowId}#n）。 */
+/** Next stable terminal id inside a window (${windowId}#n). */
 export function nextTerminalId(windowId: string, layout: WindowLayout): string {
   let max = -1;
   for (const t of layoutLeaves(layout)) {
@@ -142,7 +142,8 @@ function cloneLayout(layout: WindowLayout, newWindowId: string): WindowLayout {
   return mapTerminals(layout, terminal => ({ ...terminal, id: `${newWindowId}#${n++}` }));
 }
 
-// 标签 id 跨重启唯一（时间戳前缀 + 自增），避免重启后与历史会话 id 碰撞
+// Tab ids stay unique across restarts (timestamp prefix plus counter) so a restored tab cannot
+// collide with a persisted session id.
 const ID_PREFIX = Date.now().toString(36);
 let counter = 0;
 const nextTabId = () => `t${ID_PREFIX}-${counter++}`;
@@ -155,7 +156,7 @@ const START_TITLE = t('Start');
 interface WorkspaceState {
   tabs: Tab[];
   activeId: string;
-  /** 最近关闭的标签（撤销关闭用，不参与 UI 渲染） */
+  /** Most recently closed tab, used by undo and excluded from rendering. */
   lastClosed: Tab | null;
   addTab: (opts?: AddTabOptions) => string;
   /** Open the singleton session history page. */
@@ -166,7 +167,7 @@ interface WorkspaceState {
   /** Open (or focus) the session page of a configured harness. */
   openHarnessTab: (name?: string, cwd?: string) => void;
   lastLocalPaneId: string | null;
-  /** 新建/复用设置标签页 */
+  /** Open or focus the singleton settings page. */
   openSettings: () => void;
   openGitDiff: (selection: GitSelection) => string;
   openEditorFile: (file: EditorFile) => string;
@@ -190,39 +191,39 @@ interface WorkspaceState {
   autoTitle: (id: string, title: string, options?: { allowManual?: boolean }) => void;
   renameTab: (id: string, title: string) => void;
   undoCloseTab: () => void;
-  /** 更新某终端的当前工作目录（从 shell OSC 7 检测），keyed by 终端 id */
+  /** Update a terminal's working directory from shell OSC 7, keyed by terminal id. */
   setTerminalCwd: (terminalId: string, cwd: string) => void;
-  /** 终端运行时 cwd（keyed by 终端 id，不落库） */
+  /** Runtime working directories keyed by terminal id; never persisted. */
   terminalCwds: Record<string, string>;
-  /** 移除终端时清理其 cwd 残留 */
+  /** Drop a terminal's cached working directory when it is removed. */
   dropTerminalCwd: (terminalId: string) => void;
   /** Live title a running program set via OSC 0/2, keyed by terminal id (never persisted). */
   programTitles: Record<string, string>;
   /** Record (or clear, with an empty value) a terminal's program-set title. */
   setProgramTitle: (terminalId: string, title: string) => void;
-  /** 更新窗口的终端布局（分裂/移除/替换/调比例），并持久化 */
+  /** Update and persist a window's terminal layout (split, remove, replace or ratio). */
   setWindowLayout: (id: string, layout: WindowLayout) => void;
-  /** 把某个终端窗格移出当前会话标签，放成一个新的会话标签 */
+  /** Move a terminal pane out of its session tab into a new session tab. */
   detachTerminalPane: (paneId: string) => void;
-  /** 直接分裂聚焦终端（继承类型，跳过落点选择；⌘⇧D 用） */
+  /** Split the focused terminal directly, inheriting its type and skipping the slot picker. */
   splitFocusedDirect: (dir: SplitDir) => void;
-  /** 关闭指定终端；若只剩一个则关闭窗口 */
+  /** Close a terminal; closes the window when it is the last one. */
   closeTerminal: (terminalId: string) => void;
-  /** 关闭聚焦终端；若只剩一个则关闭窗口 */
+  /** Close the focused terminal; closes the window when it is the last one. */
   closeFocusedTerminal: () => void;
 
-  // ── 分组 ──
+  // Groups.
   groups: TabGroup[];
-  /** 从后端加载分组列表 */
+  /** Load the group list from the backend. */
   loadGroups: () => Promise<void>;
-  /** 复制会话：以相同终端配置（类型/SSH 目标/cwd/布局）克隆一个新标签页 */
+  /** Clone a session with the same terminal configuration (type, SSH target, cwd and layout). */
   duplicateTab: (tabId: string) => void;
   /** Hide groups without active tabs while retaining their historical membership. */
   pruneEmptyGroups: () => void;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
-  // 初始无标签：默认终端由 App 启动逻辑创建（优先恢复上次会话，无恢复才创建默认）
+  // No tabs initially: the startup flow restores the last session or creates a default terminal.
   tabs: [],
   activeId: '',
   lastClosed: null,
@@ -299,10 +300,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const created = sessionManager.create(id, tab.title, undefined, ser.kind, ser.payload);
       if (tab.groupId) {
         created.then(() => sessionSetGroup(id, tab.groupId ?? null)).catch((e) =>
-          console.warn('[workspace] 新标签归属分组持久化失败:', e),
+          console.warn('[workspace] failed to persist the group of a new tab:', e),
         );
       }
-      // 新建终端不默认入布局（用户拖拽决定停靠位置）
+      // A new terminal is not placed in the layout by default; the user drags it into a slot.
       useTerminalStore.getState().setFocusedPane(firstLeaf(tab.layout).id);
     }
     // A real tab replaces the area's placeholder start page.
@@ -484,13 +485,13 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       activeId: nextActiveId,
       lastClosed: reopenable ? closed : null,
     });
-    // 聚焦若属于被关标签则回落到新的活跃标签
+    // Fall back to the new active tab when focus belonged to the closed tab.
     const fp = useTerminalStore.getState().focusedPaneId;
     if (fp === id || (isSessionTab(closed) && layoutLeaves(closed.layout).some((t) => t.id === fp))) {
       const nextTab = next.find((tab) => tab.id === get().activeId);
       useTerminalStore.getState().setFocusedPane(nextTab ? (isSessionTab(nextTab) ? firstLeaf(nextTab.layout).id : nextTab.id) : null);
     }
-    // 清理该 tab 各终端的 per-terminal 数据（blocks/chat/terminal 残留）
+    // Clear per-terminal data for every terminal of the tab (blocks, chat and terminal records).
     if (isSessionTab(closed)) {
       for (const term of layoutLeaves(closed.layout)) {
         useBlockStore.getState().dropTab(term.id);
@@ -719,7 +720,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const spec: TerminalSpec = {
       id: newId, kind: src.kind, shellType: src.shellType,
       ssh: src.ssh ? { ...src.ssh } : undefined, cwd: src.cwd,
-      // 继承源模式；源未设置（老会话）则回退：SSH 经典、local 按 shell 类型
+      // Inherit the source mode; a source without one falls back to classic for SSH and to the
+      // shell default for local terminals.
       openMode: src.openMode ?? (src.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(src.shellType)),
     };
     const next = splitLeaf(tab.layout, termId, dir, 'second', spec);
@@ -738,7 +740,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const next = removeLeaf(tab.layout, terminalId);
     if (!next) return;
     ws.setWindowLayout(tab.id, next);
-    // 清理被移除终端的 per-terminal 残留（blocks/PTY 记录/cwd）
+    // Clear per-terminal residue of the removed terminal (blocks, PTY records and cwd).
     useBlockStore.getState().dropTab(terminalId);
     useTerminalStore.getState().dropTab(terminalId);
     useInputStore.getState().dropPane(terminalId);
@@ -750,19 +752,19 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     get().closeTerminal(getFocusedTerminalId());
   },
 
-  // ── 分组 ──
+  // Groups.
 
   loadGroups: async () => {
     try {
       const list = await groupsList();
       set({
-        // 只加载未归档且含活跃会话的分组（空分组不进入标签面板）
+        // Load only unarchived groups with active sessions; empty groups stay out of the strip.
         groups: list
           .filter((g: BackendGroupEntry) => !g.archived && g.session_count > 0 && (!g.id.startsWith('group:') || g.id.startsWith('group:terminal:')))
           .map((g: BackendGroupEntry) => ({ id: g.id, title: g.title, collapsed: g.collapsed })),
       });
     } catch {
-      // 后端不可用时保持空分组
+      // Keep an empty group list when the backend is unavailable.
     }
   },
 
@@ -770,7 +772,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const tab = get().tabs.find((t) => t.id === tabId);
     if (!tab || !isSessionTab(tab)) return;
     const newId = nextTabId();
-    // 克隆整棵布局（含多终端分屏），终端 id 全部重排，PTY 会话全新
+    // Clone the whole layout (including multi-terminal splits): every terminal id is reassigned
+    // and each gets a new PTY session.
     const layout = cloneLayout(tab.layout, newId);
     const newTab: Tab = {
       id: newId,
@@ -785,7 +788,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const ser = serializeSession(newTab)!;
     sessionManager.create(newId, newTab.title, undefined, ser.kind, ser.payload);
     if (newTab.groupId) sessionSetGroup(newId, newTab.groupId).catch((e) =>
-      console.warn('[workspace] 复制标签归属分组持久化失败:', e),
+      console.warn('[workspace] failed to persist the group of a duplicated tab:', e),
     );
     useTerminalStore.getState().setFocusedPane(firstLeaf(layout).id);
   },

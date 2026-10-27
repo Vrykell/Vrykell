@@ -1,4 +1,4 @@
-/** 工作区领域公开入口。 */
+/** Public entry point for the workspace domain. */
 export { useUiStore } from '@features/workspace/stores/ui';
 export {
   useDockStore,

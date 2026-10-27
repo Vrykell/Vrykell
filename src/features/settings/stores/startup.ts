@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { t } from '@i18n';
 
 export type StartupMode = 'restore' | 'default' | 'empty';
 export const STARTUP_STORAGE_KEY = 'vrykell-startup-mode';
@@ -19,6 +20,6 @@ export const useStartupSettings = create<{
   setMode: (mode) => {
     set({ mode });
     try { localStorage.setItem(STARTUP_STORAGE_KEY, mode); }
-    catch { throw new Error('浏览器存储不可用，启动设置未能保存'); }
+    catch { throw new Error(t('Browser storage is unavailable; the startup setting was not saved.')); }
   },
 }));

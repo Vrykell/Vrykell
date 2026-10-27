@@ -1,6 +1,7 @@
 import { invoke as rawInvoke, type InvokeArgs, type InvokeOptions } from '@tauri-apps/api/core';
 import { create } from 'zustand';
 import sharedCommands from '@core/sharedCommands.json';
+import { t } from '@i18n';
 export type { InvokeArgs, InvokeOptions } from '@tauri-apps/api/core';
 
 export interface DiagnosticRecord {
@@ -33,7 +34,7 @@ export function flushDiagnostics(): Promise<void> {
         try {
           await rawInvoke('diagnostics_records', { records: batch.slice(offset, offset + 64) });
         } catch (error) {
-          useDiagnosticSettings.setState({ error: `日志写入失败：${redactText(String(error))}` });
+          useDiagnosticSettings.setState({ error: t('Could not write the log: {{error}}', { error: redactText(String(error)) }) });
         }
       }
     });
@@ -127,7 +128,7 @@ export async function setDiagnosticAutoSave(enabled: boolean): Promise<void> {
     useDiagnosticSettings.setState({ autoSave: enabled });
     diagnostic('diagnostics-preference', { autoSave: enabled }, 'info');
   } catch (error) {
-    useDiagnosticSettings.setState({ error: `日志设置保存失败：${redactText(String(error))}` });
+    useDiagnosticSettings.setState({ error: t('Could not save the log setting: {{error}}', { error: redactText(String(error)) }) });
     throw error;
   } finally { useDiagnosticSettings.setState({ saving: false }); }
 }

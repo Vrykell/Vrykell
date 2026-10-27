@@ -2,7 +2,8 @@
  * capabilities — 模型能力探测规则测试。
  */
 import { describe, it, expect } from 'vitest';
-import { detectCapabilities, hasCapability, CAPABILITY_LABELS } from '@features/agent/model/capabilities';
+import { capabilityLabel, detectCapabilities, hasCapability, type ModelCapability } from '@features/agent/model/capabilities';
+import { t } from '@i18n';
 
 describe('detectCapabilities', () => {
   it('anthropic / gemini：原生视觉与搜索，现代模型有推理', () => {
@@ -53,6 +54,8 @@ describe('detectCapabilities', () => {
   });
 
   it('标签文案完整', () => {
-    expect(CAPABILITY_LABELS).toEqual({ vision: '视觉', reasoning: '推理', tools: '工具', search: '搜索' });
+    expect((['vision', 'reasoning', 'tools', 'search'] as ModelCapability[]).map(capabilityLabel)).toEqual([
+      t('Vision'), t('Reasoning'), t('Tools'), t('Search'),
+    ]);
   });
 });

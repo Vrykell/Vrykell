@@ -347,7 +347,8 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
         hostVisible: host.getClientRects().length > 0,
       });
     }
-    // e2e 测试桥：块终端 buffer 也进注册表（WebGL 下文本不进 DOM，测试读 buffer 断言）
+    // Test bridge: register the block terminal buffer too (WebGL keeps text out of the DOM, so
+    // browser tests assert against the buffer).
     const w = window as unknown as { __vrykellTerms?: Map<string, unknown> };
     w.__vrykellTerms?.set(`block:${tabId}`, term);
 
@@ -406,8 +407,8 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     }
 
     // The controller owns data forwarding for both replies and native keyboard input.
-    // 复制/粘贴归终端（End 保留给「回到输入栏」，不进 PTY）：Ctrl+C 有选区时复制、
-    // Ctrl+V 粘贴，Ctrl+Shift+C/V 同样有效。
+    // Copy and paste stay in the terminal: Ctrl+C copies when there is a selection (otherwise it
+    // remains the PTY interrupt) and Ctrl+V pastes; Ctrl+Shift+C/V do the same.
     term.attachCustomKeyEventHandler((e) => {
       if (e.type === 'keydown' && (e.ctrlKey || e.metaKey) && !e.altKey) {
         const key = e.key.toLowerCase();

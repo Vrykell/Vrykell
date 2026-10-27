@@ -28,7 +28,7 @@ import { downloadsDiscard } from '@features/files/services/downloads';
 import { t } from '@i18n';
 
 export interface FilePanelProps {
-  /** 执行目标：本地文件面板与 SSH 文件面板只是这个状态变量的不同取值。 */
+  /** Execution target: the local and SSH file panels are two values of this state. */
   target: FileOpsTarget;
   enabled?: boolean;
   /** Reload after external authentication without discarding navigation or undo history. */
@@ -37,36 +37,36 @@ export interface FilePanelProps {
   /** Set when `initialPath` is a remembered location: `null` then means the drive view. */
   initialResolved?: boolean;
   onPathChange?: (path: string | null) => void;
-  /** 双击 / Enter 打开文件 */
+  /** Open a file on double-click or Enter. */
   openEntry: (entry: FsEntry) => void;
   /** Switch the terminal to the validated directory from the overflow menu. */
   onSyncToTerminal?: (currentDir: string) => void;
   /** Current terminal directory, used to relocate the file panel. */
   terminalCwd?: string | null;
-  /** 面板专有菜单回调：未提供的条目不会出现在菜单里 */
+  /** Panel-specific menu callbacks; entries without one are hidden. */
   handlers?: Partial<FileMenuHandlers>;
-  /** 行图标（本地按扩展名 / 工作区高亮） */
+  /** Row icon (local: by extension or workspace highlight). */
   renderIcon?: (entry: FsEntry) => ReactNode;
-  /** 行高亮判定（本地工作区文件夹） */
+  /** Row highlight predicate (local workspace folders). */
   isHighlighted?: (path: string) => boolean;
-  /** path 未解析时显示的名称（远程连接名） */
+  /** Label shown while a path is unresolved (remote connection name). */
   pendingLabel?: string;
-  /** 自定义错误视图（远程：文件服务失败说明） */
+  /** Custom error view (remote: file service failure). */
   renderError?: (error: string, retry: () => void) => ReactNode;
-  /** path 为 null 时的视图（本地：磁盘卡片） */
+  /** View for a null path (local: disk cards). */
   renderNullPathView?: (api: { disks: DiskEntry[]; settled: boolean; navigate: (path: string | null) => void }) => ReactNode;
-  /** 系统文件拖入：远端由上层上传，本地默认按移动处理 */
+  /** External file drops: the remote panel uploads; local drops default to moving. */
   onExternalDrop?: (paths: string[], target: { rowPath: string | null; dir: string }) => void;
-  /** 拖出窗口前的准备（远端：先下载到本地再交给系统拖拽） */
+  /** Prepare a native drag (remote: download locally before handing it to the system). */
   prepareNativeDrag?: (items: Array<{ path: string; name: string; is_dir: boolean }>) => Promise<{ paths: string[]; mode: 'copy' | 'move' } | null>;
 }
 
 /**
- * FilePanel — 本地与 SSH 文件面板共用的视图。
+ * Shared view for the local and SSH file panels.
  *
- * 浏览、选中、视图回退、剪贴板、回退历史与文件操作全部来自 useFileBrowser；
- * 「菜单显示什么、拖出是否先下载、拖入是移动还是上传」等状态差异全部由
- * filePanelConfigFor(target) 推导，界面只按配置渲染。
+ * Browsing, selection, back/forward, clipboard, undo history and file operations come from
+ * useFileBrowser. Differences such as visible menu entries, download-before-drag and move versus
+ * upload are derived by filePanelConfigFor(target); the view only renders that configuration.
  */
 export default function FilePanel({
   target,
@@ -167,7 +167,7 @@ export default function FilePanel({
   const directoryReady = path !== null && settled && !error && !loading && !navigationPending;
   const [externalDrop, setExternalDrop] = useState<{ rowPath: string | null; dir: string } | null>(null);
 
-  // 面包屑压缩：不换行，侧栏窄时省略高层级目录
+  // Compact breadcrumbs into one line, hiding higher levels when the sidebar is narrow.
   const segs = path === null ? [] : ops.segments(path);
   const crumbRef = useRef<HTMLDivElement>(null);
   const [crumbWidth, setCrumbWidth] = useState(0);
@@ -184,7 +184,7 @@ export default function FilePanel({
     [segs, maxChars, ops],
   );
 
-  /** 远端拖出取消：删除本次拖拽下载的临时副本并提示（源文件在远端，未被改动）。 */
+  /** Remote drag cancelled: delete the temporary copies downloaded for it; the remote sources are unchanged. */
   const discardNativeDragCopies = async (paths: string[]) => {
     if (paths.length === 0) return;
     try {
@@ -195,7 +195,7 @@ export default function FilePanel({
     }
   };
 
-  /** 拖到目标目录 = 移动；拖出窗口按配置决定是否先下载，成功后按移动语义清理源 */
+  /** Drop into a directory moves; dragging out may download first, then cleans up the source. */
   const startRowDrag = useFileRowDrag({
     onDrop: (items, dropTarget) => {
       const paths = items.map((item) => item.path);
@@ -204,7 +204,8 @@ export default function FilePanel({
     },
     prepareNativeDrag: config.drag.downloadBeforeNativeDrag ? prepareNativeDrag : undefined,
     onNativeDragEnd: (result, items, payload) => {
-      // 本地：系统按「移动」接收，拖出成功后清理源头；远端：拖出=下载，源文件必须保留
+      // Local: the system accepts a move, so a completed drag removes the source. Remote: a drag
+      // downloads a copy, so the source must stay.
       if (result === 'Dropped' && config.drag.cleanupSourceAfterNativeDrag) {
         void removeAfterTransfer(items.map((item) => ({ name: item.name, path: item.path, is_dir: item.is_dir })));
       } else if (result === 'Cancelled' && config.drag.downloadBeforeNativeDrag) {
@@ -216,7 +217,7 @@ export default function FilePanel({
   const dragTarget = useFileDragStore((state) => state.target);
   const dragItems = useFileDragStore((state) => state.items);
 
-  /** 系统文件拖入：命中行 = 该行的落点目录，空白处 = 当前目录 */
+  /** External drop target: the hit row's directory, or the current directory for blank space. */
   useExternalFileDrop({
     resolveTarget: (x, y) => {
       const tree = scrollRef.current;
@@ -235,7 +236,7 @@ export default function FilePanel({
     },
   });
 
-  /** 行是否显示为放置目标：内部拖拽要求目标有效，外部拖入只看命中行 */
+  /** Whether a row renders as a drop target: internal drags need a valid target; external ones only the hit row. */
   const isDropTarget = (row: VisibleRow) => {
     if (dragTarget?.rowPath === row.entry.path) {
       const dir = dragTarget.dir;
@@ -245,11 +246,11 @@ export default function FilePanel({
     return externalDrop?.rowPath === row.entry.path;
   };
 
-  /** 面包屑 → 可编辑路径：进入即全选，回车跳转，Esc / 失焦取消 */
+  /** Breadcrumb to editable path: select all, Enter navigates, Esc or blur cancels. */
   const beginPathEdit = () => setPathDraft(path ?? '');
   const cancelPathEdit = () => setPathDraft(null);
 
-  /** 菜单回调：核心动作由面板实现，专有动作由上层注入 */
+  /** Menu callbacks: the panel implements core actions; the host injects panel-specific ones. */
   const handlers: FileMenuHandlers = {
     onCollapseAll: collapseAll,
     onNew: (kind, entry) => void createEntry(kind, entry),
@@ -301,7 +302,7 @@ export default function FilePanel({
     void navigate(destination);
   };
 
-  /** 菜单作用目标：命中行属于多选时是整组 */
+  /** Menu targets: the whole multi-selection when the hit row belongs to it. */
   const targetsFor = (entry: FsEntry): FsEntry[] => {
     if (!selection.has(entry.path)) return [entry];
     const byPath = new Map<string, FsEntry>();
@@ -316,13 +317,13 @@ export default function FilePanel({
       ? config.menus.rowMulti
       : entry.is_dir ? config.menus.rowFolder : config.menus.rowFile;
 
-  /** 进入目录 / 打开文件 —— 双击与 Enter 共用 */
+  /** Enter a directory or open a file; shared by double-click and Enter. */
   const activateEntry = (entry: FsEntry) => {
     if (entry.is_dir) navigate(entry.path);
     else openEntry(entry);
   };
 
-  /** 单击选中；Shift 连选、Ctrl/Cmd 加选；双击进入目录 / 打开文件 */
+  /** Click selects; Shift extends, Ctrl/Cmd toggles; double-click enters or opens. */
   const handleRowClick = (entry: FsEntry, event: React.MouseEvent) => {
     if (event.shiftKey && anchorPath !== null) {
       const from = rows.findIndex((row) => row.entry.path === anchorPath);
@@ -340,7 +341,7 @@ export default function FilePanel({
     selectOnly(entry.path);
   };
 
-  /** ↑/↓ 移动光标并滚入视野，Enter 进入 / 打开；剪贴板走 Ctrl/Cmd+C/X/V */
+  /** Arrows move the cursor into view and Enter activates; clipboard uses Ctrl/Cmd+C/X/V. */
   const handleTreeKeyDown = (event: React.KeyboardEvent) => {
     if ((event.target as HTMLElement).tagName === 'INPUT') return;
 
@@ -381,7 +382,7 @@ export default function FilePanel({
     }
   };
 
-  /** 空白处右键：命中的不是行才弹（磁盘视图没有可执行项时不弹） */
+  /** Blank-area context menu: only when no row was hit; the disk view has no actions. */
   const handleTreeContextMenu = (event: React.MouseEvent) => {
     if ((event.target as HTMLElement).closest('[data-file-row]')) return;
     if (path === null) return;
@@ -395,7 +396,7 @@ export default function FilePanel({
       display: 'flex', flexDirection: 'column', height: '100%',
       userSelect: 'none', background: 'transparent',
     }}>
-      {/* 顶栏：面包屑（可编辑）+ 操作按钮（更多在最右） */}
+      {/* Top bar: editable breadcrumbs plus actions, with the overflow menu at the far right. */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 2,
         padding: '6px 8px',
@@ -421,13 +422,13 @@ export default function FilePanel({
                   label={config.rootLabel}
                   onClick={() => navigate(config.rootPath)}
                   active={path === null}
-                  title={path === null ? '单击编辑路径，回车跳转' : undefined}
+                  title={path === null ? t('Click to edit the path; press Enter to navigate') : undefined}
                 />
               )}
               {hiddenCount > 0 && (
                 <>
                   <span style={{ color: 'var(--text-muted)' }}>›</span>
-                  <span data-tip="已省略上级目录" style={{ color: 'var(--text-muted)', letterSpacing: 1 }}>…</span>
+                  <span data-tip={t('Parent folders are hidden')} style={{ color: 'var(--text-muted)', letterSpacing: 1 }}>…</span>
                 </>
               )}
               {visibleCrumbs.map((crumb, index) => {
@@ -439,7 +440,7 @@ export default function FilePanel({
                       label={crumb.seg}
                       onClick={isCurrent ? beginPathEdit : () => navigate(crumb.full)}
                       active={isCurrent}
-                      title={isCurrent ? '单击编辑路径，回车跳转' : undefined}
+                      title={isCurrent ? t('Click to edit the path; press Enter to navigate') : undefined}
                       dropPath={isCurrent ? undefined : crumb.full}
                     />
                   </span>
@@ -460,7 +461,7 @@ export default function FilePanel({
               onBlur={cancelPathEdit}
               onClick={(event) => event.stopPropagation()}
               spellCheck={false}
-              aria-label="编辑路径"
+              aria-label={t('Edit path')}
               data-testid={config.ids.pathInput}
               style={{
                 flex: 1, minWidth: 0, height: 22, padding: '0 6px',
@@ -489,13 +490,13 @@ export default function FilePanel({
             <ArrowDown size={iconSizes.control} />
           </IconBtn>
           {/* The recovery view owns the panel while browsing is impossible: no overflow menu. */}
-          {!error && <IconBtn title="更多操作" data-testid={config.ids.more} onClick={openMoreMenu}>
+          {!error && <IconBtn title={t('More actions')} data-testid={config.ids.more} onClick={openMoreMenu}>
             <MoreHorizontal size={iconSizes.control} />
           </IconBtn>}
         </div>
       </div>
 
-      {/* 文件树 */}
+      {/* File tree */}
       <div
         className="scroll-region"
         ref={scrollRef}
@@ -513,7 +514,7 @@ export default function FilePanel({
         ) : error ? <>
           {renderError
             ? renderError(error, refresh)
-            : <ErrorBox style={{ margin: 12 }} actions={<button onClick={refresh} style={{ minHeight: 32 }}>重试</button>}>{error}</ErrorBox>}
+            : <ErrorBox style={{ margin: 12 }} actions={<button onClick={refresh} style={{ minHeight: 32 }}>{t('Retry')}</button>}>{error}</ErrorBox>}
           {path !== null && <button style={{ margin: 12 }} onClick={() => { void navigate(null); }}>{t('Return to home directory')}</button>}
         </> : path === null && renderNullPathView ? (
           renderNullPathView({ disks, settled, navigate })
@@ -557,7 +558,7 @@ export default function FilePanel({
             ))}
             {rows.length === 0 && settled && (
               <div style={{ padding: 16, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', textAlign: 'center' }}>
-                空目录
+                {t('Empty directory')}
               </div>
             )}
           </>
@@ -593,7 +594,7 @@ export default function FilePanel({
         <ContextMenu
           anchor={moreMenu}
           items={[
-            // 回退入口只在确实操作过文件后出现；历史栈可连续回退
+            // Undo appears only after a file operation; the history stack can unwind repeatedly.
             ...(undo ? [{
               label: undoCount > 1
                 ? t('files.undo.menuSteps', { label: t(undo.labelKey), n: undoCount })
@@ -632,18 +633,18 @@ export default function FilePanel({
 
       <ConfirmDialog
         open={confirm !== null}
-        title={confirm?.kind === 'delete' ? '确认删除' : '确认重命名'}
+        title={confirm?.kind === 'delete' ? t('Confirm deletion') : t('Confirm rename')}
         message={
           confirm
             ? confirm.kind === 'delete'
               ? !undoEnabled ? t('Delete selected items without application undo? Remote deletion is permanent; local deletion uses the system trash.') : confirm.entries.length > 1
-                ? `确定要删除选中的 ${confirm.entries.length} 项吗？删除后可在「更多 → 回退删除」恢复。`
-                : `确定要删除「${confirm.entries[0]!.name}」吗？删除后可在「更多 → 回退删除」恢复。`
-              : `确定要将「${confirm.entry.name}」重命名为「${confirm.newName}」吗？`
+                ? t('Delete the {{count}} selected items? You can restore them from More → Undo delete.', { count: confirm.entries.length })
+                : t('Delete "{{name}}"? You can restore it from More → Undo delete.', { name: confirm.entries[0]!.name })
+              : t('Rename "{{name}}" to "{{newName}}"?', { name: confirm.entry.name, newName: confirm.newName })
             : undefined
         }
         danger={confirm?.kind === 'delete'}
-        confirmLabel={confirm?.kind === 'delete' ? '删除' : '重命名'}
+        confirmLabel={confirm?.kind === 'delete' ? t('Delete') : t('Rename')}
         onConfirm={confirmAction}
         onCancel={cancelConfirm}
       />
@@ -660,7 +661,7 @@ export default function FilePanel({
   );
 }
 
-// ── 文件行 ──
+// File row
 
 function FileRow({
   row,
@@ -686,16 +687,16 @@ function FileRow({
   testId: string;
   expanderTestId: string;
   selected: boolean;
-  /** 已剪切待粘贴：淡显提示会被移走 */
+  /** Cut and awaiting paste; dimmed to show it will move. */
   cut: boolean;
-  /** 拖拽悬停在本行：高亮放置目标 */
+  /** A drag hovers this row, so it highlights as the drop target. */
   dropTarget: boolean;
-  /** 工作区文件夹等强调色 */
+  /** Accent color for workspace folders and similar rows. */
   highlighted: boolean;
   renaming: boolean;
   icon?: ReactNode;
   openHint: string;
-  /** 拖放落点目录：文件夹 = 自身，文件 = 同级目录（拖到文件上等于拖到它所在目录） */
+  /** Drop directory: a folder is its own; a file drops into its parent (which is what dropping on the file means). */
   dropDir?: string;
   onRenameCommit: (entry: FsEntry, newName: string) => void;
   onRenameCancel: (entry: FsEntry) => void;
@@ -738,9 +739,9 @@ function FileRow({
       onDoubleClick={renaming ? undefined : () => onRowDoubleClick(entry)}
       onContextMenu={renaming ? undefined : (event) => onRowContextMenu(event, entry)}
       data-tip={renaming
-        ? '输入新名称，回车确认，Esc 取消'
+        ? t('Enter a new name, press Enter to confirm, or Esc to cancel')
         : entry.is_dir
-          ? (highlighted ? '工作区文件夹 · 单击选中，双击进入，可拖入文件' : '单击选中，双击进入，可拖入文件')
+          ? (highlighted ? t('Workspace folder · click to select, double-click to open, drop files inside') : t('Click to select, double-click to open, drop files inside'))
           : openHint}
       data-testid={testId}
       data-file-row="true"
@@ -763,8 +764,8 @@ function FileRow({
       onMouseEnter={(event) => { event.currentTarget.style.background = dropTarget ? 'var(--accent-bg)' : selected ? 'var(--selection-bg)' : 'var(--hover)'; }}
       onMouseLeave={(event) => { event.currentTarget.style.background = dropTarget ? 'var(--accent-bg)' : restingBackground; }}
     >
-      {/* 展开 chevron —— 仅目录有；空目录同样保留箭头（展开后不显示任何空提示）。
-          阻断 click 与 dblclick 冒泡：连点箭头只切换展开，不会被行当成双击而进入目录。 */}
+      {/* Expand chevron, folders only; empty folders keep it too (expanding shows no empty hint).
+          Stop click and double-click propagation so repeated clicks toggle without entering. */}
       <span
         onClick={entry.is_dir && !renaming ? (event) => { event.stopPropagation(); onChevronClick(entry); } : undefined}
         onDoubleClick={(event) => event.stopPropagation()}
@@ -812,14 +813,14 @@ function FileRow({
   );
 }
 
-// ── 面包屑段 ──
+// Breadcrumb segment
 
 function Crumb({ label, onClick, active, title, dropPath }: {
   label: string;
   onClick: () => void;
   active: boolean;
   title?: string;
-  /** 可作为拖拽放置目标的完整路径（当前目录不可放） */
+  /** Full path usable as a drop target; the current directory cannot receive drops. */
   dropPath?: string;
 }) {
   return (

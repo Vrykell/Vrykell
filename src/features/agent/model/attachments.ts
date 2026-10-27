@@ -90,7 +90,7 @@ export function makePasteAttachment(text: string): AttachmentMeta {
   return {
     id: nextAttachmentId(),
     kind: 'paste',
-    name: `粘贴的文本（${text.length} 字）`,
+    name: t('Pasted text ({{count}} characters)', { count: text.length }),
     mime: 'text/plain',
     size: text.length,
     textContent: text,
@@ -99,7 +99,7 @@ export function makePasteAttachment(text: string): AttachmentMeta {
 
 /** 读取附件 blob 为 dataUrl（预览与喂模型共用） */
 export async function readAttachmentDataUrl(att: AttachmentMeta): Promise<string> {
-  if (!att.blobPath) throw new Error('附件没有落盘数据');
+  if (!att.blobPath) throw new Error(t('Attachment data is missing.'));
   const b64 = await invoke<string>('read_attachment', { path: att.blobPath });
   return `data:${att.mime};base64,${b64}`;
 }
@@ -143,20 +143,20 @@ export async function attachmentsForModel(
   const images: string[] = [];
   for (const att of atts) {
     if (att.textContent !== undefined) {
-      const label = att.kind === 'paste' ? '粘贴的文本' : `文件 ${att.name}`;
+      const label = att.kind === 'paste' ? t('Pasted text') : t('File {{name}}', { name: att.name });
       textParts.push(`【${label}】\n${att.textContent}`);
     } else if (att.mime.startsWith('image/')) {
       if (vision && att.blobPath) {
         try {
           images.push(await readAttachmentDataUrl(att));
         } catch {
-          textParts.push(`【图片 ${att.name}】（读取失败，略）`);
+          textParts.push(`【${t('Image {{name}} (could not be read; skipped)', { name: att.name })}】`);
         }
       } else {
-        textParts.push(`【图片 ${att.name}】（当前模型不支持图片输入，略）`);
+        textParts.push(`【${t('Image {{name}} (this model does not support image input; skipped)', { name: att.name })}】`);
       }
     } else if (att.blobPath) {
-      textParts.push(`【文件 ${att.name}】（二进制，略）`);
+      textParts.push(`【${t('File {{name}} (binary; skipped)', { name: att.name })}】`);
     }
   }
   return { text: textParts.join('\n\n'), images };

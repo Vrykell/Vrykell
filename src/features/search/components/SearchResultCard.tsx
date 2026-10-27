@@ -4,6 +4,7 @@ import {
 } from '@ui/icons';
 import { fileIcon } from '@features/files/utils/fileIcon';
 import KeyHint from '@ui/feedback/KeyHint';
+import { t } from '@i18n';
 import type {
   SearchResult,
   BlockResultData,
@@ -18,11 +19,11 @@ interface Props {
   query: string;
   onSelect: () => void;
   onExecute: (result: SearchResult) => void;
-  /** 恢复历史会话 */
+  /** Restore the historical session. */
   onRestore?: (sessionId: string, sessionTitle: string) => void;
 }
 
-/** 将文本按 query 拆分为高亮/非高亮片段 */
+/** Split text into highlighted and plain segments for the query. */
 function highlightFragments(
   text: string,
   query: string,
@@ -82,7 +83,7 @@ export default function SearchResultCard({
   return (
     <div className="workspace-floating-row global-search-result" data-search-result data-selected={selected}
       onClick={(e) => {
-        // 历史会话/块：点击卡片 = 恢复（与 ↩ 按钮一致）
+        // Historical session or block: clicking the card restores it, like the restore button.
         if (isHistoricalBlock && onRestore) {
           e.stopPropagation();
           onRestore(blockData!.tabId, blockData!.tabTitle ?? '');
@@ -111,7 +112,7 @@ export default function SearchResultCard({
         position: 'relative',
       }}
     >
-      {/* 类型图标 */}
+      {/* Type icon */}
       <span style={{
         flexShrink: 0, width: 20, marginTop: 1,
         display: 'inline-flex', justifyContent: 'center', color: 'var(--text-muted)',
@@ -119,9 +120,9 @@ export default function SearchResultCard({
         {(() => { const Icon = typeIcon(result); return <Icon size={16} />; })()}
       </span>
 
-      {/* 内容 */}
+      {/* Content */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        {/* 主标题 */}
+        {/* Primary title */}
         <div style={{
           fontWeight: 'var(--fw-semibold)', fontSize: 'calc(13px * var(--ui-font-scale))',
           overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
@@ -130,7 +131,7 @@ export default function SearchResultCard({
           {query ? <HighlightedText text={result.title} query={query} /> : result.title}
         </div>
 
-        {/* 副标题 — 输出片段，带高亮 */}
+        {/* Subtitle: highlighted output snippet */}
         {result.subtitle && (
           <div style={{
             fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', marginTop: 2,
@@ -144,7 +145,7 @@ export default function SearchResultCard({
           </div>
         )}
 
-        {/* 第三行：detail + badge */}
+        {/* Third line: detail and badge */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
           marginTop: 3, fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)',
@@ -165,20 +166,20 @@ export default function SearchResultCard({
               {statusLabel(blockData.status)}
             </span>
           )}
-          {/* 历史会话徽章 */}
+          {/* Historical session badge */}
           {(isHistoricalBlock || isHistoricalSession) && (
             <span style={{
               fontSize: 'calc(10px * var(--ui-font-scale))', padding: '1px 5px', borderRadius: 4,
               background: 'var(--hover)',
               color: 'var(--text-secondary)',
             }}>
-              历史会话
+              {t('Historical session')}
             </span>
           )}
         </div>
       </div>
 
-      {/* 恢复按钮（历史会话的块 或 历史会话本身） */}
+      {/* Restore button for a historical block or session */}
       {(isHistoricalBlock || isHistoricalSession) && onRestore && (
         <RestoreBtn
           onClick={(e) => {
@@ -199,8 +200,8 @@ function RestoreBtn({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
   return (
     <OutlineButton
       onClick={onClick}
-      data-tip="恢复此会话"
-      aria-label="恢复此会话"
+      data-tip={t('Restore this session')}
+      aria-label={t('Restore this session')}
       style={{
         flexShrink: 0,
         width: 22, height: 22,
@@ -239,9 +240,9 @@ function typeIcon(result: SearchResult): AppIcon {
 
 function statusLabel(status: string): string {
   switch (status) {
-    case 'running': return '运行中';
-    case 'completed': return '完成';
-    case 'failed': return '失败';
+    case 'running': return t('Running');
+    case 'completed': return t('Completed');
+    case 'failed': return t('Failed');
     default: return status;
   }
 }

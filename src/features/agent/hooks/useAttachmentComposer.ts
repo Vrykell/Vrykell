@@ -10,6 +10,7 @@ import {
   totalSize,
   type AttachmentMeta,
 } from '@features/agent/model/attachments';
+import { t } from '@i18n';
 
 interface AttachmentComposerState {
   attachments: AttachmentMeta[];
@@ -36,7 +37,7 @@ export function useAttachmentComposer(state?: AttachmentComposerState) {
     setAttachments((current) => {
       const next = [...current, ...list];
       if (totalSize(next) > LIMITS.totalBytes) {
-        toastError('附件合计超过 10MB 上限');
+        toastError(t('Attachments exceed the 10 MB total limit.'));
         return current;
       }
       return next;
@@ -49,7 +50,7 @@ export function useAttachmentComposer(state?: AttachmentComposerState) {
       try {
         const attachment = await importFileAsAttachment(path);
         if (attachment.kind === 'image' && attachment.size > LIMITS.imageBytes) {
-          toastError(`图片 ${attachment.name} 超过 5MB 上限`);
+          toastError(t('Image {{name}} exceeds the 5 MB limit.', { name: attachment.name }));
           continue;
         }
         imported.push(attachment);
@@ -74,7 +75,7 @@ export function useAttachmentComposer(state?: AttachmentComposerState) {
     const saved: AttachmentMeta[] = [];
     for (const file of files) {
       if (file.type.startsWith('image/') && file.size > LIMITS.imageBytes) {
-        toastError(`图片 ${file.name || '粘贴的图片'} 超过 5MB 上限`);
+        toastError(t('Image {{name}} exceeds the 5 MB limit.', { name: file.name || t('Pasted image') }));
         continue;
       }
       try {

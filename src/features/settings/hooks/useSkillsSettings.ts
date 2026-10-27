@@ -6,6 +6,7 @@ import {
   type SkillMeta, type SkillDetail,
 } from '@features/agent/services/skills';
 import { useToastStore } from '@ui/feedback/Toast';
+import { t } from '@i18n';
 
 /** 管理技能设置页的列表、详情、导入和信任状态。 */
 export function useSkillsSettings() {
@@ -45,11 +46,11 @@ export function useSkillsSettings() {
     try {
       const remote = await fetchRemoteSkills(url);
       if (remote.length === 0) {
-        toast('清单为空', 'info');
+        toast(t('The manifest is empty.'), 'info');
         return;
       }
       for (const skill of remote) await installSkillMd(skill.name, skill.description, skill.prompt);
-      toast(`已安装 ${remote.length} 个技能`, 'success');
+      toast(t('Installed {{count}} skills.', { count: remote.length }), 'success');
       setImportUrl('');
       refresh();
     } catch (error) {
@@ -66,7 +67,7 @@ export function useSkillsSettings() {
       setImporting(true);
       try {
         const imported = await importSkillsFromPath(selected);
-        toast(`已导入 ${imported.length} 个技能`, 'success');
+        toast(t('Imported {{count}} skills.', { count: imported.length }), 'success');
         refresh();
       } finally {
         setImporting(false);
@@ -97,7 +98,7 @@ export function useSkillsSettings() {
   const del = useCallback(async (name: string) => {
     try {
       await removeSkill(name);
-      toast(`已删除 ${name}`, 'success');
+      toast(t('Deleted {{name}}.', { name }), 'success');
       refresh();
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');

@@ -28,13 +28,12 @@ import { t } from '@i18n';
 import { ensureSshLoaded, useSshStore } from '@features/ssh';
 import RemoteFiles from '@features/ssh/components/RemoteFiles';
 
-/** 本地面板的目标是常量：接口实现在这里只被选中一次。 */
+/** The local panel's target is constant; the interface implementation is selected once. */
 const LOCAL_TARGET: FileOpsTarget = { kind: 'local' };
 
 /**
- * PanelFiles — 文件面板入口。
- * 活跃标签页为 SSH 连接时切到远程浏览，否则浏览本地磁盘；
- * 两者共用同一套 FilePanel + useFileBrowser，只有执行目标（target）不同。
+ * File panel entry point. An SSH connection uses remote browsing; otherwise the local disks are
+ * shown. Both share FilePanel and useFileBrowser and differ only in their FileOps target.
  */
 export default function PanelFiles() {
   const { focusedSpec, activeTab } = useActiveWorkspace();
@@ -51,7 +50,7 @@ export default function PanelFiles() {
   return <LocalFiles enabled={filesOpen} />;
 }
 
-/** 本地面板：只提供本地专有的菜单项、图标与磁盘视图。 */
+/** Local panel: provides the local-only menu entries, icons and disk view. */
 function LocalFiles({ enabled }: { enabled: boolean }) {
   const [transferPage, setTransferPage] = useState<'upload' | 'download' | null>(null);
   const workspaceDirs = useWorkspaceDirsStore();
@@ -67,7 +66,7 @@ function LocalFiles({ enabled }: { enabled: boolean }) {
       useToastStore.getState().addToast(`${t('Could not open the file')}: ${String((error as Error)?.message ?? error)}`, 'error'));
   };
 
-  /** 在终端编辑器中打开（本地专有语义） */
+  /** Open a local file in the terminal editor. */
   const openFileInTerminal = async (entry: FsEntry) => {
     const addToast = useToastStore.getState().addToast;
     let command = '';
@@ -76,10 +75,10 @@ function LocalFiles({ enabled }: { enabled: boolean }) {
     try {
       const result = await openFile(entry.path, (nextCommand) => { command = nextCommand; }, shellType);
       if (result.via === 'system') {
-        if (result.degraded) addToast('未找到可用的终端编辑器，已用系统默认应用打开', 'info');
+        if (result.degraded) addToast(t('No terminal editor is available; opened with the system default application.'), 'info');
         return;
       }
-      if (result.fellBack) addToast(`未找到配置的编辑器，已降级为 ${result.editor}`, 'info');
+      if (result.fellBack) addToast(t('The configured editor was not found; fell back to {{editor}}.', { editor: result.editor }), 'info');
     } catch (error) {
       addToast(String((error as Error)?.message ?? error), 'error');
       return;
@@ -93,7 +92,7 @@ function LocalFiles({ enabled }: { enabled: boolean }) {
       const sid = await waitForTerminalStartup(`${tabId}#0`);
       await ptyWrite(sid, command.endsWith('\n') ? command : `${command}\n`);
     } catch (error) {
-      addToast(`无法执行文件打开命令：${String((error as Error)?.message ?? error)}`, 'error');
+      addToast(t('Could not run the file open command: {{error}}', { error: String((error as Error)?.message ?? error) }), 'error');
     }
   };
 
@@ -112,7 +111,7 @@ function LocalFiles({ enabled }: { enabled: boolean }) {
       onSyncToTerminal={(dir) => {
         const sid = sessions[focused];
         if (!sid) {
-          useToastStore.getState().addToast('终端会话未就绪', 'info');
+          useToastStore.getState().addToast(t('The terminal session is not ready.'), 'info');
           return;
         }
         void Promise.resolve().then(() => ptyWrite(sid, `${directoryCommand(dir, shellType)}\r`)).catch((error) =>
@@ -132,7 +131,7 @@ function LocalFiles({ enabled }: { enabled: boolean }) {
         disks.length === 0 ? (
           settled && (
             <div style={{ padding: 16, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', textAlign: 'center' }}>
-              暂无可用磁盘
+              {t('No disks available')}
             </div>
           )
         ) : (
@@ -167,7 +166,7 @@ function LocalFiles({ enabled }: { enabled: boolean }) {
   );
 }
 
-/** 磁盘小卡片：图标 + 名称 + 可用容量；单击进入。 */
+/** Disk card: icon, name and free space; click to navigate. */
 function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
   const total = disk.total_bytes;
   const free = disk.free_bytes;
@@ -175,7 +174,7 @@ function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
   return (
     <div
       onClick={onOpen}
-      data-tip={`${disk.path} · 共 ${fmtSize(total)} · 已用 ${pct}%`}
+      data-tip={t('{{path}} · {{total}} total · {{percent}}% used', { path: disk.path, total: fmtSize(total), percent: pct })}
       data-testid={`disk-card-${disk.name}`}
       style={{
         display: 'flex', alignItems: 'center', gap: 10,
@@ -201,7 +200,7 @@ function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
           fontSize: 'calc(10.5px * var(--ui-font-scale))', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)',
           marginTop: 1,
         }}>
-          {total > 0 ? `${fmtSize(free)} 可用` : '—'}
+          {total > 0 ? t('{{free}} free', { free: fmtSize(free) }) : '—'}
         </div>
       </div>
     </div>

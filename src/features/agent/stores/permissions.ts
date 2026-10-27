@@ -254,11 +254,11 @@ export async function ensureTrustedSkill(
   if (!toolCallId || !ctx.setToolState || !ctx.tabId) {
     return {
       proceed: false,
-      error: `当前上下文无法确认信任，已拒绝访问未信任技能「${skillName}」`,
+      error: t('The current context cannot confirm trust, so access to the untrusted skill "{{skill}}" was denied.', { skill: skillName }),
     };
   }
   ctx.setToolState(toolCallId, 'approval-pending', {
-    danger: `信任技能「${skillName}」后可访问其文件与脚本`,
+    danger: t('Trusting "{{skill}}" grants access to its files and scripts.', { skill: skillName }),
   });
   const { decision } = await requestApproval(toolCallId, ctx.signal, ctx.tabId);
   if (decision === 'timeout') {
@@ -273,7 +273,7 @@ export async function ensureTrustedSkill(
   }
   if (decision === 'deny') {
     ctx.setToolState(toolCallId, 'denied');
-    return { proceed: false, error: `未信任技能「${skillName}」，已拒绝访问` };
+    return { proceed: false, error: t('The skill "{{skill}}" is not trusted; access was denied.', { skill: skillName }) };
   }
   ctx.setToolState(toolCallId, 'running');
   return { proceed: true };
@@ -370,21 +370,21 @@ export async function gate(
   } catch (error) {
     // Fail closed: without an authorization from the backend the tool must not run.
     console.warn('[permissions] Authorization unavailable:', error);
-    return denied(undefined, '无法获取授权（后端不可用），操作已拒绝');
+    return denied(undefined, t('Authorization is unavailable (the backend is offline); the operation was denied.'));
   }
 
   if (ctx.signal?.aborted) return denied(undefined, t('Tool call cancelled.'));
   const reason = reasonText(decision.reason);
   if (decision.decision === 'deny') {
     if (toolCallId) ctx.setToolState?.(toolCallId, 'denied', reason ? { danger: reason } : undefined);
-    return denied(reason, '操作被拒绝');
+    return denied(reason, t('The operation was denied.'));
   }
   if (decision.decision === 'allow') {
     return { proceed: true, ...(decision.lease ? { lease: decision.lease } : {}) };
   }
   // ask：挂起等审批。无 setToolState/tabId 说明不在交互上下文（如测试），按拒绝处理
   if (!toolCallId || !ctx.setToolState || !ctx.tabId) {
-    return denied(undefined, '当前上下文无法发起审批，操作被拒绝');
+    return denied(undefined, t('The current context cannot request approval; the operation was denied.'));
   }
   // The shape Rust derived for this call labels the card's narrowest choice; without one the card
   // offers the whole-tool session approval instead.
@@ -402,7 +402,7 @@ export async function gate(
   }
   if (choice.decision === 'deny') {
     ctx.setToolState(toolCallId, 'denied', reason ? { danger: reason } : undefined);
-    return denied(undefined, '用户拒绝了本次操作');
+    return denied(undefined, t('The user denied this operation.'));
   }
   // The card may edit a command before running it: the edited text is re-authorized (a dangerous
   // edit still gets the native confirmation), bound into the lease as the approved arguments, and
@@ -430,12 +430,12 @@ export async function gate(
       if (recheck.decision === 'deny') {
         const blocked = reasonText(recheck.reason) || reason;
         ctx.setToolState(toolCallId, 'denied', blocked ? { danger: blocked } : undefined);
-        return denied(blocked, '操作被拒绝');
+        return denied(blocked, t('The operation was denied.'));
       }
     } catch (error) {
       // Fail closed: without an authorization for the edited text it must not run.
       console.warn('[permissions] Authorization unavailable:', error);
-      return denied(undefined, '无法获取授权（后端不可用），操作已拒绝');
+      return denied(undefined, t('Authorization is unavailable (the backend is offline); the operation was denied.'));
     }
   }
   if (ctx.signal?.aborted) return denied(undefined, t('Tool call cancelled.'));
@@ -454,7 +454,7 @@ export async function gate(
   if (ctx.signal?.aborted) return denied(undefined, t('Tool call cancelled.'));
   if (approved.decision !== 'allow') {
     ctx.setToolState(toolCallId, 'denied', reason ? { danger: reason } : undefined);
-    return denied(reason, '审批未能完成，操作已拒绝');
+    return denied(reason, t('Approval did not complete; the operation was denied.'));
   }
   if (ctx.tabId && choice.decision !== 'once') grantedConversations.add(ctx.tabId);
   const runningExtra = {

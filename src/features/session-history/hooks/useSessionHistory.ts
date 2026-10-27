@@ -176,8 +176,8 @@ export function useSessionHistory(options: UseSessionHistoryOptions = {}): Sessi
     void sessionManager.remove(session.id)
       .then(() => { useHistoryMetaStore.getState().removeRecords([historyRecordKey('session', session.id)]); return load(); })
       .catch((error: unknown) => {
-        console.warn('删除历史会话失败:', error);
-        notify(`删除历史会话失败：${String((error as Error)?.message ?? error)}`, 'error');
+        console.warn('Failed to delete the historical session:', error);
+        notify(t('Could not delete the historical session: {{error}}', { error: String((error as Error)?.message ?? error) }), 'error');
       });
   }, [load, notify]);
 

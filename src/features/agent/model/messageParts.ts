@@ -1,4 +1,4 @@
-import { t } from '@i18n';
+import { t, type I18nKey } from '@i18n';
 import type { ModelMessage } from 'ai';
 
 /**
@@ -22,9 +22,9 @@ export interface ToolRun {
   modelOutput?: string;
   providerExecuted?: boolean;
   error?: string;
-  /** 危险命令命中原因（M3 审批卡展示「⚠ …」）；仅 run_command 可能有 */
+  /** Reason a dangerous command matched (shown as a warning on the approval card); run_command only. */
   danger?: string;
-  /** 后端派生的命令形态（如 `npm run`）：审批卡据此提供「本会话允许这一种」 */
+  /** Backend-derived command shape (for example `npm run`); the approval card can allow only it. */
   shape?: string;
   startedAt: number;
   endedAt?: number;
@@ -54,12 +54,12 @@ export function partsToModelMessages(content: string, parts?: MessagePart[]): Mo
   return messages;
 }
 
-/** parts → DB 字符串；空/undefined → ''（省空间且与旧数据同形） */
+/** Parts to the stored string; empty or undefined becomes '' (compact and identical to old data). */
 export function serializeParts(parts?: MessagePart[]): string {
   return parts && parts.length > 0 ? JSON.stringify(parts) : '';
 }
 
-/** DB 字符串 → parts；''/脏 JSON/非数组 → undefined（旧数据走 legacy 渲染） */
+/** Stored string to parts; '', malformed JSON or a non-array becomes undefined (plain-text rendering). */
 export function deserializeParts(raw: string): MessagePart[] | undefined {
   if (!raw) return undefined;
   try {
@@ -82,34 +82,34 @@ export function deserializeParts(raw: string): MessagePart[] | undefined {
   }
 }
 
-const TOOL_LABEL: Record<string, string> = {
-  run_command: '执行命令',
-  read_file: '读取文件',
-  edit_file: '修改文件',
-  write_file: '写入文件',
-  search_files: '搜索',
-  list_dir: '列目录',
-  web_search: '联网搜索',
-  google_search: '联网搜索',
-  web_fetch: '抓取网页',
-  web_crawl: '爬取网页',
-  read_terminal: '读取终端',
-  terminal_keys: '终端按键',
-  use_skill: '调用技能',
-  install_skill: '安装技能',
-  mcp: 'MCP 工具',
-  memory: '记忆',
-  think: '思考',
+const TOOL_LABEL: Record<string, I18nKey> = {
+  run_command: 'Execute command',
+  read_file: 'Read file',
+  edit_file: 'Edit file',
+  write_file: 'Write file',
+  search_files: 'Search',
+  list_dir: 'List directory',
+  web_search: 'Web search',
+  google_search: 'Web search',
+  web_fetch: 'Fetch page',
+  web_crawl: 'Crawl pages',
+  read_terminal: 'Read terminal',
+  terminal_keys: 'Terminal keys',
+  use_skill: 'Use skill',
+  install_skill: 'Install skill',
+  mcp: 'MCP tool',
+  memory: 'Memory tool',
+  think: 'Think',
 };
 
-const STATE_LABEL: Record<ToolRunState, string> = {
+const STATE_LABEL: Record<ToolRunState, I18nKey> = {
   'input-pending': 'Awaiting answer',
-  'approval-pending': '等待批准',
-  running: '执行中',
-  done: '成功',
-  error: '失败',
-  denied: '已拒绝',
-  cancelled: t('Cancelled'),
+  'approval-pending': 'Awaiting approval',
+  running: 'Running',
+  done: 'Succeeded',
+  error: 'Failed',
+  denied: 'Denied',
+  cancelled: 'Cancelled',
 };
 
 /** Build a compact display/export summary; model history uses full call/result pairs. */
@@ -118,9 +118,9 @@ export function partsToHistoryText(parts?: MessagePart[]): string {
   const lines: string[] = [];
   for (const p of parts) {
     if (p.kind !== 'tool') continue;
-    const label = TOOL_LABEL[p.tool.toolName] ?? p.tool.toolName;
+    const label = TOOL_LABEL[p.tool.toolName] ? t(TOOL_LABEL[p.tool.toolName]!) : p.tool.toolName;
     if (p.tool.toolName === 'ask_user') {
-      lines.push(`[${t('Ask the user')}: ${String(p.tool.input.question ?? '').slice(0, 2000)} → ${STATE_LABEL[p.tool.state]}]`);
+      lines.push(`[${t('Ask the user')}: ${String(p.tool.input.question ?? '').slice(0, 2000)} → ${t(STATE_LABEL[p.tool.state])}]`);
       try {
         const result: unknown = JSON.parse(p.tool.output ?? '{}');
         if (result && typeof result === 'object' && 'answer' in result && typeof result.answer === 'string') lines.push(`${t('Your answer')}: ${result.answer.slice(0, 4000)}`);
@@ -136,7 +136,7 @@ export function partsToHistoryText(parts?: MessagePart[]): string {
             ? p.tool.input.query
             : '';
     lines.push(
-      `[${label}${target ? `: ${target}` : ''} → ${STATE_LABEL[p.tool.state]}]`,
+      `[${label}${target ? `: ${target}` : ''} → ${t(STATE_LABEL[p.tool.state])}]`,
     );
   }
   return lines.length > 0 ? '\n' + lines.join('\n') : '';

@@ -5,6 +5,7 @@ import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 import { shellTypeLabel, fallbackShells, getAvailableShells, listShells } from '@platform/shells';
+import { t } from '@i18n';
 
 describe('shells', () => {
   it('shellTypeLabel 映射与兜底', () => {
@@ -12,7 +13,7 @@ describe('shells', () => {
     expect(shellTypeLabel('cmd')).toBe('CMD');
     expect(shellTypeLabel('powershell')).toBe('Windows PowerShell');
     expect(shellTypeLabel('weird')).toBe('weird');
-    expect(shellTypeLabel('')).toBe('终端');
+    expect(shellTypeLabel('')).toBe(t('Terminal'));
   });
 
   it('fallbackShells 返回结构完整的选项', () => {

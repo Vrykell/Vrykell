@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
+import { t } from '@i18n';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { useToastStore } from '@ui/feedback/Toast';
 
@@ -52,8 +53,8 @@ export function useAutoSave<Value>(initialValue: Value, onSave: (value: Value) =
         } catch (cause) {
           terminalDebug('settings-save-failed', { revision: version, errorType: cause instanceof Error ? cause.name : typeof cause });
           if (current.version === version) {
-            report('error', '保存失败，请重试');
-            if (!current.mounted) useToastStore.getState().addToast('设置保存失败，请重新打开设置检查', 'error');
+            report('error', t('Save failed. Try again.'));
+            if (!current.mounted) useToastStore.getState().addToast(t('Settings could not be saved. Reopen settings to check.'), 'error');
           }
         }
       }

@@ -4,9 +4,8 @@ import { getAvailableShells, type ShellType } from '@platform/shells';
 import { createResizeQueue, fitTerminal, repaintTerminal } from '../model/terminalResize';
 import { configureTerminalInput } from '@features/terminal/model/terminalInput';
 /**
- * useTerminalSession — 主 xterm 生命周期 + SessionController 接线。
- *
- * 主 xterm 只在 classic / altScreen 场景接收数据（blockList 下闲置隐藏）。
+ * Main xterm lifecycle and SessionController wiring. The main terminal receives data only in
+ * the classic and alternate-screen scenes; it stays hidden while the block list is visible.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -75,7 +74,7 @@ const TERMINAL_PARSE_LAG_REPORT_MS = 250;
 /** Bound the startup buffer so a stale session flooding output cannot grow it forever. */
 const PRE_SESSION_MAX_BATCHES = 512;
 
-/** 清除指定 tab 的全部输出块；无存活 session 时退化为清 store。 */
+/** Clear every output block of a tab; falls back to the store when no live session exists. */
 export function clearSessionBlocks(tabId: string): void {
   const c = sessionControllers.get(tabId);
   if (c) c.clear();
@@ -110,14 +109,14 @@ export function appendTerminalBlankLines(paneId: string, count: number): void {
   sessionControllers.get(paneId)?.appendBlankLines(count);
 }
 
-/** 运行中块的活终端（RunningItem 挂载显示 / useTerminalFocus 聚焦目标） */
+/** Live terminal inside a running block (mounted by RunningItem, focused by useTerminalFocus). */
 export function getExecutingTerm(tabId: string) {
   return sessionControllers.get(tabId)?.executingTerm ?? null;
 }
 
 /** Scene-aware resize driver; block output follows the available command-list width. */
 
-/** 触发指定 tab 重新校核 PTY/块终端宽度（无 session 时 no-op） */
+/** Re-check the PTY and block-terminal width for a tab; no-op without a session. */
 export function syncTermWidth(tabId: string): void {
   widthSyncs.get(tabId)?.();
 }
@@ -242,7 +241,8 @@ export function useTerminalSession(
     let stopped = false;
     let connectionFailed = false;
     const startupAbort = new AbortController();
-    // spawn 完成前的初始输出缓冲（shell 启动提示符）：拿到 sessionId 后回放，避免丢失
+    // Buffer initial output (the shell prompt) until spawn returns a session id, then replay it
+    // instead of dropping it.
     let preSession: { id: string; events: DispatchEvent[] }[] = [];
     const pendingUnlisteners: Promise<UnlistenFn>[] = [];
     let focusTimer: ReturnType<typeof setTimeout> | null = null;
@@ -273,9 +273,9 @@ export function useTerminalSession(
     };
     closeSessionRef.current = close;
 
-    // ── 管线：controller（扫描已在 Rust 端完成，这里直接消费事件） ──
+    // Pipeline: the Rust scanner already parsed the stream; consume its events here.
 
-    // 从窗口布局取该终端的打开模式（paneId 即终端 id）
+    // Read this terminal's open mode from the window layout (paneId is the terminal id).
     const tab = useSessionStore.getState().tabs.find((t) => t.id === ownerTab.current);
     const spec = tab && tab.kind === 'session'
       ? layoutLeaves(tab.layout).find((t) => t.id === paneId)
@@ -306,7 +306,8 @@ export function useTerminalSession(
       }, delay);
     };
 
-    // 打开模式：spec.openMode 优先；老会话缺省时 SSH 回退 classic、local 按 shell 类型
+    // Open mode: spec.openMode wins; a restored session without one falls back to classic for
+    // SSH and to the shell default for local terminals.
     // Shells without integration must remain interactive, including restored sessions.
     const openMode = spec?.kind === 'local' && spec.shellType === 'cmd' ? 'classic'
       : spec?.openMode ?? (spec?.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(spec?.shellType));
@@ -368,7 +369,7 @@ export function useTerminalSession(
         }
         if (useSessionStore.getState().activeId !== ownerTab.current || !['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) || useUiStore.getState().settingsOpen) return;
         if (scene === 'blockList') {
-          term.reset(); // 清掉 classic 残留
+          term.reset(); // Drop classic-scene residue.
           useTerminalStore.getState().setKeyboardTarget('input');
         } else {
           useTerminalStore.getState().setKeyboardTarget('terminal');
@@ -398,7 +399,7 @@ export function useTerminalSession(
       onBlockStart: (block) => {
         if (spec) captureHistoryCommand(spec, paneId, block);
         sessionManager.record(ownerTab.current, paneId, block, 'start');
-        // 惯用命名：标题跟随「聚焦终端」的首条命令（未定名时）
+        // The first command of the focused terminal names the tab until the user renames it.
         if (block.command && paneId === useTerminalStore.getState().focusedPaneId) {
           useSessionStore.getState().titleFromCommand(ownerTab.current, block.command);
         }
@@ -437,8 +438,8 @@ export function useTerminalSession(
     if (isTerminalDebugEnabled()) {
       terminalDebug('session-controller-register', { paneId, tabId: ownerTab.current, scene: initialScene, blockEnabled, deferBlockUntilPreexec });
     }
-    // 初始场景手动落位（无 OSC 133 触发）：
-    // blockList → 清 classic 残留、焦点到输入栏；classic → 焦点到 xterm 直接打字
+    // Place the initial scene without an OSC 133 trigger: the block list clears classic residue
+    // and focuses the input bar; classic focuses the xterm for direct typing.
     if (initialScene === 'blockList') {
       useTerminalStore.getState().setScene(paneId, 'blockList');
       term.reset();
@@ -460,8 +461,8 @@ export function useTerminalSession(
       }, 50);
     }
 
-    // 会话恢复：restore 已把持久化 block 按 pane 写进 store（在 addTab 之前），
-    // 这里播种进 controller，避免首次 onBlocksChanged 用空列表覆盖恢复结果。
+    // Restore seeded the persisted blocks into the store per pane before the tab was added.
+    // Seed them into the controller so the first onBlocksChanged cannot overwrite them with [].
     const restoredBlocks = useBlockStore.getState().byTab[paneId] ?? [];
     if (restoredBlocks.length > 0) {
       controller.seed(restoredBlocks);
@@ -548,7 +549,7 @@ export function useTerminalSession(
           if (queries.length > 0) terminalDebug('terminal-queries', { id, queries });
         }
         if (sessionId === null) {
-          // 尚未拿到 sessionId：先缓冲，等 spawn 完成后回放
+          // No session id yet: buffer the batch and replay it once spawn completes.
           if (preSession.length < PRE_SESSION_MAX_BATCHES) preSession.push({ id, events });
           return;
         }
@@ -578,9 +579,9 @@ export function useTerminalSession(
       }),
     );
 
-    // ── PTY 启动 ──
+    // PTY startup.
 
-    // 类型/cwd 已在 controller 创建前取好（spec）
+    // The type and cwd were resolved into the spec before the controller was created.
     let tabCwd = spec?.cwd;
     const spawnOpts: PtySpawnOptions | undefined = spec?.kind === 'ssh'
       ? { ssh: { host: spec.ssh?.host ?? '', user: spec.ssh?.user, port: spec.ssh?.port,
@@ -591,8 +592,9 @@ export function useTerminalSession(
       : spec?.kind === 'local'
         ? { shell: spec.shellType, openMode }
         : undefined;
-    // 分屏 pane 初次挂载时容器可能尚未布局，fit 会算出 0×0；用兜底尺寸先启动，
-    // 等 ResizeObserver/就绪后重校到真实尺寸，避免 PTY 以 0×0 启动导致空白。
+    // A split pane may mount before its container is laid out, in which case fit measures 0x0.
+    // Start with fallback dimensions and re-fit to the real size from the ResizeObserver so the
+    // PTY never starts at 0x0 and renders a blank screen.
     const spawnCols = term.cols > 0 ? term.cols : 80;
     const spawnRows = term.rows > 0 ? term.rows : 24;
     if (isTerminalDebugEnabled()) {
@@ -611,15 +613,16 @@ export function useTerminalSession(
           spawnOpts.ssh.hostKeyType = info.keyType;
         } catch (error) {
           const message = String((error as Error)?.message ?? error);
-          // 用户主动取消，或已记录的主机密钥发生变化（可能是中间人）时必须停下。
-          if (message.includes('已取消') || message.includes('主机密钥不匹配')) throw error;
-          // 预检只是「提前看指纹」，它失败（例如老服务器无法与预检库协商算法）不应该
-          // 让可用的 ssh 无法启动：改由 ssh 自己校验，未知指纹在终端里询问。
+          // Stop when the user cancelled or a recorded host key changed (possible interception).
+          if (message.includes('已取消') || message.includes('cancelled') || message.includes('主机密钥不匹配')) throw error;
+          // Preflight only inspects the fingerprint early. Its failure (for example an old server
+          // that cannot negotiate an algorithm with the preflight library) must not prevent a
+          // usable SSH session: let SSH validate and ask about unknown fingerprints in-terminal.
           if (isTerminalDebugEnabled()) terminalDebug('ssh-preflight-unavailable', { paneId });
           spawnOpts.ssh.hostKeyPolicy = 'ask';
         }
       }
-      if (disposed || stopped) throw new Error('已取消连接');
+      if (disposed || stopped) throw new Error('Connection cancelled');
       return ptySpawn(spawnCols, spawnRows, tabCwd, spawnOpts);
     };
     startSession()
@@ -634,7 +637,7 @@ export function useTerminalSession(
           useTerminalStore.setState(state => ({ shellTypes: { ...state.shellTypes, [paneId]: shell } }));
         }
         if (isTerminalDebugEnabled()) terminalDebug('pty-spawn-ready', { paneId, id });
-        // 回放 spawn 完成前缓冲的初始输出（shell 启动提示符）
+        // Replay initial output buffered before spawn returned (the shell prompt).
         for (const ev of preSession) {
           if (ev.id === sessionId) {
             handleOutput(ev.events);
@@ -646,7 +649,7 @@ export function useTerminalSession(
         if (currentScene === 'classic' && useSessionStore.getState().activeId === ownerTab.current && ['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) && !useUiStore.getState().settingsOpen && !document.activeElement?.closest('.ai-workspace-surface') && !(spec?.kind === 'ssh' && blockEnabled && connectionOutputRef.current)) {
           term.focus();
         }
-        // PTY 就绪后按真实布局尺寸重校
+        // Re-fit to the real layout once the PTY is ready.
         requestAnimationFrame(() => {
           if (disposed || el.offsetWidth === 0 || el.offsetHeight === 0) return;
           fitTerminal(term, fit);
@@ -665,17 +668,19 @@ export function useTerminalSession(
             terminalDebug('pty-spawn-error', { paneId, errorType: e instanceof Error ? e.name : typeof e });
           }
           console.error('[useTerminalSession] PTY spawn failed:', e);
-          writeMain(`\r\n\x1b[31m[${spec?.kind === 'ssh' ? 'SSH 连接失败' : '无法启动 Shell'}：${e}]\x1b[0m\r\n`);
+          writeMain(`\r\n\x1b[31m[${spec?.kind === 'ssh'
+            ? t('SSH connection failed: {{error}}', { error: String(e) })
+            : t('Could not start the shell: {{error}}', { error: String(e) })}]\x1b[0m\r\n`);
         }
       });
 
-    // ── 用户输入（xterm 聚焦时：classic/altScreen，及 blockList 运行中块） ──
+    // User input while the xterm owns focus: classic, alternate screen and running blocks.
 
-    // blockList 下 End 保留给「回到输入栏」（InputEditor 的全局监听会接住），
-    // 不能漏进 PTY（xterm 默认会发 \x1b[F）
+    // In the block list, End stays with the input bar (its global listener handles it) and must
+    // not reach the PTY, where xterm would send \x1b[F.
     term.attachCustomKeyEventHandler((e) => {
-      // 复制/粘贴归终端：Ctrl+C 有选区时复制（没有选区仍是 PTY 的中断），Ctrl+V 粘贴；
-      // Ctrl+Shift+C/V 同样有效。
+      // Copy and paste stay in the terminal: Ctrl+C copies when there is a selection (otherwise
+      // it remains the PTY interrupt) and Ctrl+V pastes; Ctrl+Shift+C/V do the same.
       if (e.type === 'keydown' && (e.ctrlKey || e.metaKey) && !e.altKey) {
         const key = e.key.toLowerCase();
         const copy = key === 'c' && (e.metaKey || e.shiftKey || hasCopyableSelection(term));
@@ -755,7 +760,7 @@ export function useTerminalSession(
     // Classic and alternate-screen scenes use the main xterm width. In block-list
     // mode, match the PTY to the visible output width so wrapped lines stay intact.
 
-    /** 实测字符宽（渲染服务内部尺寸，与 RunningTerm 的 cellHeight 同源） */
+    /** Measured cell width (renderer service dimensions, same source as RunningTerm's cell height). */
     const cellWidth = (): number => getCellMetrics(term).width;
 
     /**
@@ -833,7 +838,7 @@ export function useTerminalSession(
       if (widthRaf) return;
       widthRaf = requestAnimationFrame(() => {
         widthRaf = 0;
-        // 后台标签 display:none 宽度为 0，别把 PTY 挤成 2 列
+        // A hidden background tab has zero width; never squeeze the PTY to two columns.
         if (el.offsetWidth === 0) return;
         const previousCols = term.cols;
         const previousRows = term.rows;
@@ -986,7 +991,7 @@ export function useTerminalSession(
     window.addEventListener('blur', onWindowBlur);
     window.addEventListener('focus', onWindowFocus);
 
-    // ── 清理 ──
+    // Cleanup.
 
     return () => {
       unsubscribeTypography();

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { TerminalSpec } from '@features/workspace/model/windowLayout';
 
-/** 分裂落点选择器：open=true 时显示可分裂区域，spec 为空 = 继承聚焦终端类型。 */
+/** Split placement picker: open shows the split targets; an empty spec inherits the focused terminal's type. */
 interface SplitPlacement {
   open: boolean;
   spec: TerminalSpec | null;
@@ -21,11 +21,11 @@ interface UiState {
   setPaletteOpen: (open: boolean) => void;
   globalSearchOpen: boolean;
   setGlobalSearchOpen: (open: boolean) => void;
-  /** 选类型弹窗开关 */
+  /** Terminal-type picker visibility. */
   splitPickerOpen: boolean;
   openSplitPicker: () => void;
   closeSplitPicker: () => void;
-  /** 分裂落点选择器 */
+  /** Split placement picker. */
   splitPlacement: SplitPlacement;
   beginSplit: (spec: TerminalSpec | null) => void;
   cancelSplit: () => void;

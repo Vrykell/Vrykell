@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { iconSizes, Check, ChevronDown, Plus } from '@ui/icons';
 import '@ui/fields/Select.css';
 import { useListNavigationMode } from '../hooks/useListNavigationMode';
+import { t } from '@i18n';
 
 /** Shared field trigger for option lists and richer selection dropdowns. */
 export const SelectTrigger = forwardRef<HTMLButtonElement, ButtonHTMLAttributes<HTMLButtonElement>>(function SelectTrigger({ children, className, onClick, onKeyDown, ...props }, ref) {
@@ -51,7 +52,7 @@ interface SelectProps<Value extends string | number> {
 
 /** A controlled select with a themed, viewport-aware listbox. */
 export default function Select<Value extends string | number>({
-  value, options, onChange, disabled = false, placeholder = '请选择', style, id, action, triggerClassName,
+  value, options, onChange, disabled = false, placeholder = t('Select an option'), style, id, action, triggerClassName,
   'aria-label': label, 'aria-describedby': description, 'data-testid': testId,
   'data-tip': tip, 'data-tip-description': tipDescription,
 }: SelectProps<Value>) {

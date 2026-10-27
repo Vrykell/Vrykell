@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { iconSizes, Copy, Minus, Square, X  } from '@ui/icons';
 import { getCurrentWindow, type Window } from '@tauri-apps/api/window';
 import { usesCustomWindowControls } from '@platform/runtime';
+import { t } from '@i18n';
 
 const CONTROL_WIDTH = 46;
 
@@ -107,8 +108,8 @@ export default function WindowControls() {
         data-subtle
         data-testid="window-minimize"
         className="window-control-button"
-        aria-label="最小化窗口"
-        data-tip="最小化"
+        aria-label={t('Minimize window')}
+        data-tip={t('Minimize')}
         style={buttonStyle}
         onClick={minimize}
       >
@@ -119,8 +120,8 @@ export default function WindowControls() {
         data-subtle
         data-testid="window-maximize"
         className="window-control-button"
-        aria-label={maximized ? '还原窗口' : '最大化窗口'}
-        data-tip={maximized ? '还原' : '最大化'}
+        aria-label={maximized ? t('Restore window') : t('Maximize window')}
+        data-tip={maximized ? t('Restore') : t('Maximize')}
         style={buttonStyle}
         onClick={toggleMaximize}
       >
@@ -132,8 +133,8 @@ export default function WindowControls() {
         data-testid="window-close"
         className="window-control-button"
         data-danger="true"
-        aria-label="关闭窗口"
-        data-tip="关闭"
+        aria-label={t('Close window')}
+        data-tip={t('Close')}
         style={buttonStyle}
         onClick={close}
       >

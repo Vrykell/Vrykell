@@ -5,6 +5,7 @@ import { useAutoSave } from '../hooks/useAutoSave';
 import SaveStatus from './SaveStatus';
 import { inputStyle } from './formStyles';
 import { useSettingsSave } from './SettingsSaveProvider';
+import { t } from '@i18n';
 
 interface Props {
   value: string;
@@ -32,7 +33,7 @@ export default function AutoSaveInput({ value, onCommit, placeholder, style, mul
   const composing = useRef(false);
   const { flex, flexShrink, width, minWidth, marginTop, marginBottom, ...controlStyle } = style ?? {};
   const validateDraft = validate ?? (type === 'number'
-    ? (next: string) => next.trim() && Number.isFinite(Number(next)) ? undefined : '请输入有效数字'
+    ? (next: string) => next.trim() && Number.isFinite(Number(next)) ? undefined : t('Enter a valid number')
     : undefined);
   const save = useAutoSave(value, onCommit, validateDraft, clearAfterSave ? '' : undefined, next => {
     let result = trim ? next.trim() : next;
@@ -57,6 +58,6 @@ export default function AutoSaveInput({ value, onCommit, placeholder, style, mul
       await save.cancel();
       await onClear();
       save.reset('');
-    }); }} style={{ marginLeft: 8, padding: '2px 8px', fontSize: 'var(--fs-micro)' }}>清除</button>}
+    }); }} style={{ marginLeft: 8, padding: '2px 8px', fontSize: 'var(--fs-micro)' }}>{t('Clear')}</button>}
   </div>;
 }

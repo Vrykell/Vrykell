@@ -10,12 +10,12 @@ import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { writeClipboardFiles } from '@platform/clipboard';
 import { t, type I18nKey } from '@i18n';
 
-/** 右键菜单 / 重命名 / 删除确认的状态。 */
+/** State for context menus, rename and the delete confirmation. */
 export type FileConfirmState =
   | { kind: 'rename'; entry: FsEntry; newName: string }
   | { kind: 'delete'; entries: FsEntry[] };
 
-/** 剪贴板：复制或剪切（剪切粘贴 = 移动，可回退）。 */
+/** Clipboard: copy or cut (cut then paste moves and remains undoable). */
 export interface FileClipboard {
   mode: 'copy' | 'cut';
   paths: string[];
@@ -30,7 +30,7 @@ export interface FileUndo {
   pairs: FileOpPair[];
 }
 
-/** 回退历史最多保留的步数（更早的步进会把暂存删除项永久清理）。 */
+/** Maximum undo steps; older steps permanently remove their staged deletions. */
 const MAX_UNDO_STEPS = 20;
 
 /**
@@ -73,42 +73,43 @@ function freshView(expanded: ReadonlySet<string>): ViewSnapshot {
 }
 
 /**
- * 目录加载超过这个时间才显示进度提示：本地磁盘等快速加载不会闪一下提示。
+ * Show the progress hint only when a directory takes longer than this; fast local disks should
+ * not flash it.
  */
 const LOADING_HINT_DELAY_MS = 150;
 
 export interface UseFileBrowserOptions {
-  /** 执行目标（需保持引用稳定：local 用常量，ssh 用 useMemo）。 */
+  /** Execution target; keep the reference stable (constant for local, useMemo for SSH). */
   target: FileOpsTarget;
-  /** 面板可见时才连接后端。 */
+  /** Connect to the backend only while the panel is visible. */
   enabled?: boolean;
-  /** 初始目录（本地：终端 cwd / null = 主目录；远程：记忆的目录 / null = 远端主目录）。 */
+  /** Initial directory (local: terminal cwd / null = home; remote: remembered / null = remote home). */
   initialPath?: string | null;
   /** True when `initialPath` is already final: `null` then means the drive view, not "resolve home". */
   initialResolved?: boolean;
-  /** 目录变化时持久化（远程面板按连接记忆目录）。 */
+  /** Persist directory changes (the remote panel remembers per connection). */
   onPathChange?: (path: string | null) => void;
-  /** 双击 / Enter 打开文件（本地：终端编辑器；远程：远端编辑器）。 */
+  /** Open a file on double-click or Enter (local: terminal editor; remote: remote editor). */
   openEntry: (entry: FsEntry) => void;
 }
 
-/** 路径末段名称（本地 / 远端分隔符都适用）。 */
+/** Last path segment, for both local and remote separators. */
 function pathName(path: string): string {
   return path.split(/[\\/]/).filter(Boolean).pop() ?? path;
 }
 
-/** 下一帧执行（环境没有 rAF 时退回定时器）。 */
+/** Run on the next frame, falling back to a timer without requestAnimationFrame. */
 function schedule(task: () => void) {
   if (typeof requestAnimationFrame === 'function') requestAnimationFrame(task);
   else setTimeout(task, 16);
 }
 
 /**
- * useFileBrowser — 本地与 SSH 文件面板共用的浏览与操作状态机。
+ * Browsing and operation state shared by the local and SSH file panels.
  *
- * 视图层只依赖这一套：目录加载、树形展开、选中、视图回退、剪贴板、
- * 回退历史与新建 / 重命名 / 删除都通过 `FileOps` 交给对应后端实现，
- * 「操作本地还是远端」只由 `target` 决定，不再有两套并行的面板逻辑。
+ * The view depends only on this layer: directory loading, tree expansion, selection, back/forward,
+ * clipboard, undo history and new/rename/delete all go through `FileOps` to the matching backend.
+ * The `target` alone decides whether the local or remote side is operated on.
  */
 export function useFileBrowser({
   target,
@@ -217,7 +218,7 @@ export function useFileBrowser({
       if (alive.current && version === requestVersion.current) setLoadingHint(true);
     }, LOADING_HINT_DELAY_MS);
     setError(null);
-    // 保留上一份列表，快速切换时原地替换而不是先闪成空白
+    // Keep the previous list so a fast switch replaces it in place instead of flashing empty.
     const kind = currentPath === null ? 'root' : 'directory';
     terminalDebug('files-load-start', { requestId: version, kind });
     const cached = preloaded.current;
@@ -231,7 +232,7 @@ export function useFileBrowser({
         preloaded.current = { path: result.base, result };
         correctPath(result.base);
       }
-      // 本地面板的 null 路径是磁盘视图（条目为空）；其余情况直接用列表结果
+      // A null path on the local panel is the disk view (no entries); otherwise use the list.
       const showDisks = currentPath === null && ops.disks !== undefined;
       setEntries(showDisks ? [] : result.entries);
       terminalDebug('files-load-end', { requestId: version, kind, entryCount: result.entries.length });
@@ -244,7 +245,7 @@ export function useFileBrowser({
     }
     void request.catch((cause: unknown) => {
       if (version !== requestVersion.current) return;
-      // 保留原始错误：远程面板据此区分「文件服务不可用 / 需要认证」等情况
+      // Preserve the original error; the remote panel classifies service-unavailable and auth cases.
       setError(String((cause as Error)?.message ?? cause));
       terminalDebug('files-load-error', { requestId: version, kind, errorType: cause instanceof Error ? cause.name : typeof cause });
     }).finally(() => {
@@ -276,7 +277,8 @@ export function useFileBrowser({
     return () => { requestVersion.current += 1; };
   }, [enabled, load, path]);
 
-  // 目标目录加载完成后还原快照里的滚动位置（此前的提交仍是上一个目录）
+  // Restore the snapshot scroll position after the target directory loads; earlier commits still
+  // belonged to the previous directory.
   useLayoutEffect(() => {
     if (loading || loadedPath !== path || pendingScrollTop.current === null) return;
     const target0 = pendingScrollTop.current;
@@ -288,7 +290,7 @@ export function useFileBrowser({
   const currentDir = path ?? '';
   const settled = loadedPath === path;
 
-  /** 把某个路径的行滚入视野（列表刷新是异步的，按帧重试几次）。 */
+  /** Scroll a path's row into view; list refreshes are async, so retry for a few frames. */
   const revealPath = useCallback((target: string) => {
     let attempts = 0;
     const step = () => {
@@ -307,15 +309,15 @@ export function useFileBrowser({
     schedule(step);
   }, []);
 
-  // ── 选中 ──
+  // Selection.
 
-  /** 单击只选中（进入目录 / 打开文件由双击触发）。 */
+  /** Clicking only selects; double-click enters a directory or opens a file. */
   const selectOnly = useCallback((target1: string | null) => {
     setSelectionState(target1 === null ? new Set() : new Set([target1]));
     setAnchorPath(target1);
   }, []);
 
-  /** Ctrl/Cmd 单击：加选或取消一行。 */
+  /** Ctrl/Cmd click toggles one row in the selection and moves the anchor to it. */
   const toggleSelection = useCallback((target1: string) => {
     setSelectionState((current) => {
       const next = new Set(current);
@@ -326,7 +328,7 @@ export function useFileBrowser({
     setAnchorPath(target1);
   }, []);
 
-  /** Shift 连选 / 程序化替换选中集，保留锚点。 */
+  /** Shift range or programmatic selection replacement; keeps the anchor. */
   const replaceSelection = useCallback((paths: Iterable<string>, anchor: string | null = null) => {
     const next = new Set(paths);
     setSelectionState(next);
@@ -428,7 +430,7 @@ export function useFileBrowser({
     return true;
   }, [captureView, error, expandedSet, load, ops, path, restoreView, settled, toast, trail.entries, trail.cursor]);
 
-  // ── 树形展开 ──
+  // Tree expansion.
 
   const loadChildren = useCallback((entry: Pick<FsEntry, 'path'>) => {
     terminalDebug('files-tree-load-start', {});
@@ -472,12 +474,12 @@ export function useFileBrowser({
       });
   }, [clearChildTimer, ops]);
 
-  /** 重新读取某个目录的子列表（失败重试、内容变动后刷新）。 */
+  /** Re-read a directory's children (after a failure or a content change). */
   const refreshDir = useCallback((target1: Pick<FsEntry, 'path'>) => {
     return loadChildren(target1);
   }, [loadChildren]);
 
-  /** 收起全部展开的文件夹（保留子列表缓存，重新展开不再请求）。 */
+  /** Collapse every expanded folder; keep the child cache so expanding again does not re-request. */
   const collapseAll = useCallback(() => {
     setExpandedSet(new Set());
   }, []);
@@ -494,9 +496,9 @@ export function useFileBrowser({
   }, [childCache, childPending, expandedSet, loadChildren]);
 
   /**
-   * 文件变更后刷新受影响的目录：当前目录列表 + 变更项的父目录 + 目标目录。
-   * 只刷新根列表会留下「幽灵条目」——已展开子目录里的旧内容还留在 childCache 中，
-   * 于是被删除/移动的条目仍在树上、改名后的条目仍显示旧名字。
+   * Refresh every directory affected by a file change: the current list, the changed item's
+   * parent and the destination. Refreshing only the root leaves ghosts: stale child caches keep
+   * deleted or moved entries on the tree and renamed entries under their old names.
    */
   const refreshAffected = useCallback((touched: Array<string | null | undefined>, destDir?: string | null) => {
     const dirs = new Set<string>();
@@ -509,7 +511,7 @@ export function useFileBrowser({
     load(path);
     let refreshed = 0;
     for (const dir of dirs) {
-      // 未展开过的目录没有缓存，等用户展开时再读
+      // A directory that was never expanded has no cache; read it when the user expands it.
       if (childCache[dir] === undefined && !expandedSet.has(dir)) continue;
       void refreshDir({ path: dir });
       refreshed += 1;
@@ -517,14 +519,14 @@ export function useFileBrowser({
     terminalDebug('files-dir-refresh', { candidateDirs: dirs.size, refreshedDirs: refreshed });
   }, [childCache, expandedSet, load, ops, path, refreshDir]);
 
-  // ── 回退历史 ──
+  // Undo history.
 
   const setUndo = useCallback((next: FileUndo[]) => {
     undoStackRef.current = next;
     setUndoStack(next);
   }, []);
 
-  /** 记录一步可回退操作；被挤出历史的暂存删除项永久清理（回退窗口结束）。 */
+  /** Record an undoable step; staged deletions pushed out of the window are purged permanently. */
   const pushUndo = useCallback((entry: FileUndo) => {
     if (!(target.kind === 'ssh' ? useFileUndoSettings.getState().remote : useFileUndoSettings.getState().local)) return;
     const next = [entry, ...undoStackRef.current];
@@ -538,17 +540,17 @@ export function useFileBrowser({
 
   useEffect(() => { if (!undoEnabled) setUndo([]); }, [undoEnabled, setUndo]);
 
-  /** 该步被消耗后出栈（无论成功与否）。 */
+  /** Remove the top step after it is consumed, successful or not. */
   const popUndo = useCallback(() => {
     setUndo(undoStackRef.current.slice(1));
   }, [setUndo]);
 
   /**
-   * 回退一步文件操作（重命名 / 移动 / 删除），可连续回退。
+   * Undo one file operation (rename, move or delete); repeatable.
    *
-   * 每次调用都会消耗掉栈顶这一步：目标可能已在别处被移动 / 删除 / 改名，
-   * 若把失败项留在栈顶，菜单会一直显示一个再也退不掉的步数。失败时改为
-   * 「提示 + 移除该步」，让计数始终跟着实际剩余步数走。
+   * Every call consumes the top step: the target may have been moved, deleted or renamed
+   * elsewhere, and leaving a failed step on top would leave a counter that can never decrease.
+   * A failure therefore reports and removes that step so the count matches what remains.
    */
   const runUndo = useCallback(async () => {
     if (!(target.kind === 'ssh' ? useFileUndoSettings.getState().remote : useFileUndoSettings.getState().local)) return;
@@ -566,7 +568,7 @@ export function useFileBrowser({
         firstError = outcome.errors[0] ?? '';
         restoredPaths.push(...outcome.completed.map((pair) => pair.from));
       } else if (current.kind === 'remove') {
-        // 新建 / 复制粘贴的回退 = 把新增的条目移入暂存
+        // Undoing a new item or paste moves the added entries into the staging area.
         const outcome = await ops.stageDelete(current.pairs.map((pair) => pair.to));
         done = outcome.completed.length;
         failed = outcome.errors.length;
@@ -582,7 +584,7 @@ export function useFileBrowser({
           }
         }
       } else {
-        // 按原目录分组移回（同一次操作通常来自同一目录）
+        // Move entries back grouped by their original directory (one operation usually shares one).
         const byParent = new Map<string, FileOpPair[]>();
         for (const pair of current.pairs) {
           const parent = ops.parentOf(pair.from) ?? '/';
@@ -615,19 +617,20 @@ export function useFileBrowser({
     } else if (failed > 0) {
       toast(t('files.undo.failed', { reason: firstError || t('files.undo.reasonMissing') }), 'error');
     }
-    // 回退同样会改动已展开目录里的内容：按涉及的路径刷新父目录与目标目录
+    // Undo also changes expanded directories: refresh the parents and destinations it touched.
     refreshAffected(current.pairs.flatMap((pair) => [pair.from, pair.to]));
   }, [ops, popUndo, refreshAffected, replaceSelection, toast, target.kind]);
 
-  // ── 迁移（粘贴 / 拖拽共用） ──
+  // Transfers shared by paste and drag.
 
   /**
-   * 把条目复制/移动到目标目录：成功项记录回退（移动）、刷新视图与目标文件夹缓存。
-   * 后端在重名时自动加序号，回退对使用真实目标路径。
+   * Copy or move entries into a destination: completed moves become undo steps and the view and
+   * destination cache refresh. The backend adds a numbered suffix for duplicate names, so undo
+   * records the real destination paths.
    */
   const transferInto = useCallback(async (paths: string[], destDir: string, mode: 'copy' | 'move') => {
     try {
-      // 同级移动是空操作：统一在这里跳过，两个面板与后端语义一致
+      // Moving into the same directory is a no-op; skip it here so both panels match the backend.
       const sources = mode === 'move' ? paths.filter((source) => ops.parentOf(source) !== destDir) : paths;
       if (sources.length === 0) return;
       const outcome = mode === 'copy' ? await ops.copy(sources, destDir) : await ops.move(sources, destDir);
@@ -635,17 +638,17 @@ export function useFileBrowser({
       if (outcome.completed.length > 0) {
         if (mode === 'move') pushUndo({ kind: 'move', labelKey: 'files.undo.cut', pairs: outcome.completed });
         else pushUndo({ kind: 'remove', labelKey: 'files.undo.paste', pairs: outcome.completed.map((pair) => ({ from: pair.to, to: pair.to })) });
-        // 后端为重名自动加了序号时说明一下，避免用户以为名字被改了
+        // Explain an automatically numbered suffix for a duplicate name.
         const renamed = outcome.completed.some((pair) => pathName(pair.to) !== pathName(pair.from));
-        const suffixHint = renamed ? '（同名已自动加序号）' : '';
+        const suffixHint = renamed ? t(' (a numbered suffix was added)') : '';
         toast(
           mode === 'copy'
-            ? `已复制 ${outcome.completed.length} 项${suffixHint}`
-            : `已移动 ${outcome.completed.length} 项${suffixHint}`,
+            ? `${t('Copied {{count}} items', { count: outcome.completed.length })}${suffixHint}`
+            : `${t('Moved {{count}} items', { count: outcome.completed.length })}${suffixHint}`,
           'success',
         );
         replaceSelection(outcome.completed.map((pair) => pair.to));
-        // 粘贴落点：目标目录若是已展开的子目录就展开并刷新，然后把新条目滚入视野
+        // Expand a destination subdirectory so the pasted entries are visible, then scroll to them.
         if (destDir !== path) setExpandedSet((current) => new Set([...current, destDir]));
         revealPath(outcome.completed[0]!.to);
       }
@@ -657,24 +660,24 @@ export function useFileBrowser({
     }
   }, [ops, pushUndo, refreshAffected, replaceSelection, revealPath, toast]);
 
-  // ── 剪贴板 ──
+  // Clipboard.
 
   const copyEntries = useCallback((list: FsEntry[]) => {
     const paths = list.map((entry) => entry.path);
     setClipboard({ mode: 'copy', paths });
     // In-panel paste reads the in-memory clipboard; the OS file manager reads the system one.
     void writeClipboardFiles(paths, 'copy').catch(() => {});
-    toast(list.length > 1 ? `已复制 ${list.length} 项` : '已复制');
+    toast(list.length > 1 ? t('Copied {{count}} items', { count: list.length }) : t('Copied'));
   }, [toast]);
 
   const cutEntries = useCallback((list: FsEntry[]) => {
     const paths = list.map((entry) => entry.path);
     setClipboard({ mode: 'cut', paths });
     void writeClipboardFiles(paths, 'cut').catch(() => {});
-    toast(list.length > 1 ? `已剪切 ${list.length} 项` : '已剪切');
+    toast(list.length > 1 ? t('Cut {{count}} items', { count: list.length }) : t('Cut to clipboard'));
   }, [toast]);
 
-  /** 粘贴到指定目录；剪切是移动（可回退），复制不改变回退记录。 */
+  /** Paste into a directory; cut pastes as a move (undoable) and copy adds no undo step. */
   const pasteInto = useCallback(async (destDir: string | null) => {
     if (!clipboard || destDir === null) return;
     const mode = clipboard.mode === 'cut' ? 'move' : 'copy';
@@ -682,7 +685,7 @@ export function useFileBrowser({
     await transferInto(clipboard.paths, destDir, mode);
   }, [clipboard, transferInto]);
 
-  /** Ctrl+V / 空白处右键：粘贴到当前目录。 */
+  /** Ctrl+V or the blank-area menu pastes into the current directory. */
   const pasteClipboard = useCallback(() => pasteInto(path), [pasteInto, path]);
 
   const cutPaths = useMemo(
@@ -690,16 +693,16 @@ export function useFileBrowser({
     [clipboard],
   );
 
-  // ── 新建 / 重命名 / 删除 ──
+  // Create, rename and delete.
 
   const doRename = useCallback(async (entry: FsEntry, newName: string) => {
     try {
       const finalPath = await ops.rename(entry.path, newName);
       terminalDebug('files-op', { op: 'rename', doneCount: 1, errorCount: 0 });
       pushUndo({ kind: 'rename', labelKey: 'files.undo.rename', pairs: [{ from: entry.path, to: finalPath }] });
-      toast('已重命名', 'success');
+      toast(t('Renamed'), 'success');
       replaceSelection([finalPath]);
-      // 改名的条目可能位于已展开的子目录里：父目录缓存必须一起刷新，否则仍显示旧名字
+      // A renamed entry may live in an expanded subdirectory; refresh its parent cache too.
       refreshAffected([entry.path, finalPath]);
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
@@ -707,8 +710,8 @@ export function useFileBrowser({
   }, [ops, pushUndo, refreshAffected, replaceSelection, toast]);
 
   /**
-   * 新建文件 / 文件夹：位置由命中的行决定（文件夹内 / 文件同级 / 空白处=当前目录），
-   * 建好后立即进入重命名。
+   * Create a file or folder: the hit row decides the location (inside a folder, beside a file, or
+   * the current directory for blank space), then rename starts immediately.
    */
   const createEntry = useCallback(async (kind: 'file' | 'dir', targetEntry: FsEntry | null) => {
     if (path === null) return;
@@ -719,17 +722,17 @@ export function useFileBrowser({
         : await ops.createDir(dir, DEFAULT_DIR_NAME);
       terminalDebug('files-op', { op: kind === 'file' ? 'create-file' : 'create-dir', doneCount: 1 });
       const entry: FsEntry = { name: pathName(created), path: created, is_dir: kind === 'dir' };
-      // 新建可回退：更多菜单的「回退新建」把刚建出来的条目移入暂存
+      // Creation is undoable: the overflow menu's undo moves the new entry into staging.
       pushUndo({ kind: 'remove', labelKey: 'files.undo.create', pairs: [{ from: created, to: created }] });
       if (targetEntry?.is_dir) {
-        // 落在目录里：确保该目录已展开并刷新子列表，新条目才可见
+        // Created inside a folder: expand it and refresh its children so the entry is visible.
         setExpandedSet((current) => new Set([...current, targetEntry.path]));
         await loadChildren(targetEntry);
       } else {
         load(path);
         if (dir !== path) {
-          // 右键的是展开目录里的文件：新条目落在它的同级目录（那个子目录），
-          // 只刷新根列表会在已展开的子目录里留下旧内容，必须一起刷新
+          // The hit row is a file inside an expanded directory, so the new entry lands in that
+          // subdirectory. Refreshing only the root would leave the old child cache in place.
           setExpandedSet((current) => new Set([...current, dir]));
           void loadChildren({ path: dir });
         }
@@ -738,15 +741,18 @@ export function useFileBrowser({
       setRenameTarget(entry);
       revealPath(created);
       const defaultName = kind === 'file' ? DEFAULT_FILE_NAME : DEFAULT_DIR_NAME;
-      toast(`${kind === 'dir' ? '已新建文件夹' : '已新建文件'}${entry.name !== defaultName ? '（同名已自动加序号）' : ''}`, 'success');
+      const createdLabel = t(kind === 'dir' ? 'Created folder' : 'Created file');
+      toast(`${createdLabel}${entry.name !== defaultName ? t(' (a numbered suffix was added)') : ''}`, 'success');
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
     }
   }, [load, loadChildren, ops, path, pushUndo, replaceSelection, revealPath, toast]);
 
   /**
-   * 拖出窗口成功后的收尾：系统按「移动」接收了条目，源头（本地 / 远端）同步移除并进回退历史。
-   * 同盘拖出时系统可能已经把源移走，此时 staged 请求会失败——这类「已不存在」安静跳过即可。
+   * Finish a successful drag out of the window: the system accepted the entries as a move, so the
+   * source is removed on both local and remote sides and becomes an undo step. On the same drive
+   * the system may already have moved it, in which case the staged request fails because the
+   * source no longer exists; that case is skipped quietly.
    */
   const removeAfterTransfer = useCallback(async (entries: FsEntry[]) => {
     if (entries.length === 0) return;
@@ -757,21 +763,21 @@ export function useFileBrowser({
         pushUndo({ kind: 'delete', labelKey: 'files.undo.moveOut', pairs: outcome.completed });
         toast(
           !undoEnabled ? t('Moved to the system without application undo') : outcome.completed.length > 1
-            ? `已移动 ${outcome.completed.length} 项到系统，可在更多菜单回退`
-            : '已移动到系统，可在更多菜单回退',
+            ? t('Moved {{count}} items to the system; undo from the More menu.', { count: outcome.completed.length })
+            : t('Moved to the system; undo from the More menu.'),
           'success',
         );
         replaceSelection([]);
       }
       refreshAffected(entries.map((entry) => entry.path));
     } catch (error) {
-      // 失败通常是「源已被系统移走」：不打断用户，只记录日志
+      // Failure usually means the system already moved the source away; keep the log, not a dialog.
       terminalDebug('files-op', { op: 'move-out-failed', itemCount: entries.length, errorType: (error as Error)?.name ?? typeof error });
       refreshAffected(entries.map((entry) => entry.path));
     }
   }, [ops, pushUndo, refreshAffected, replaceSelection, toast, undoEnabled]);
 
-  /** 删除 = 移到暂存区（可回退）；回退窗口结束或挤出历史后永久清理。 */
+  /** Delete moves entries into staging (undoable); the history window or eviction purges them. */
   const doDelete = useCallback(async (list: FsEntry[]) => {
     try {
       const outcome = await ops.stageDelete(list.map((entry) => entry.path));
@@ -781,20 +787,20 @@ export function useFileBrowser({
         pushUndo({ kind: 'delete', labelKey: 'files.undo.delete', pairs: outcome.completed });
         toast(
           !undoEnabled ? t('Deleted without application undo') : outcome.completed.length > 1
-            ? `已删除 ${outcome.completed.length} 项，可在更多菜单回退`
-            : '已删除，可在更多菜单回退',
+            ? t('Deleted {{count}} items; undo from the More menu.', { count: outcome.completed.length })
+            : t('Deleted; undo from the More menu.'),
           'success',
         );
         replaceSelection([]);
       }
-      // 被删项可能位于已展开的子目录里：刷新父目录缓存，避免残留幽灵条目
+      // Deleted entries may live in expanded subdirectories; refresh their parents to avoid ghosts.
       refreshAffected(outcome.completed.map((pair) => pair.from));
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
     }
   }, [ops, pushUndo, refreshAffected, replaceSelection, toast, undoEnabled]);
 
-  // ── 菜单与确认 ──
+  // Menus and confirmation.
 
   const handleContextMenu = useCallback((event: React.MouseEvent, entry: FsEntry) => {
     event.preventDefault();
@@ -821,13 +827,13 @@ export function useFileBrowser({
     setConfirm({ kind: 'rename', entry, newName: trimmed });
   }, []);
 
-  /** 打开重命名输入框（菜单入口 / 新建后立即重命名），并把该行滚入视野。 */
+  /** Open the rename input (from the menu or right after creation) and scroll the row into view. */
   const startRename = useCallback((entry: FsEntry) => {
     setRenameTarget(entry);
     revealPath(entry.path);
   }, [revealPath]);
 
-  /** 打开删除确认（菜单入口）。 */
+  /** Open the delete confirmation (menu entry). */
   const confirmDelete = useCallback((entries: FsEntry[]) => {
     if (entries.length === 0) return;
     setConfirm({ kind: 'delete', entries });

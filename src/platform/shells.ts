@@ -1,5 +1,6 @@
 import { invoke } from '@platform/diagnostics';
 import { isMacOS } from '@platform/runtime';
+import { t as translate } from '@i18n';
 
 /** 本地 shell 类型标识 */
 export type ShellType = 'zsh' | 'bash' | 'powershell' | 'pwsh' | 'cmd';
@@ -7,9 +8,9 @@ export type ShellType = 'zsh' | 'bash' | 'powershell' | 'pwsh' | 'cmd';
 /** Every configurable shell type, in the order settings lists them. */
 export const SHELL_TYPES: ShellType[] = ['zsh', 'bash', 'powershell', 'pwsh', 'cmd'];
 
-/** shell 类型 → 显示名（默认标签标题用）。 */
-export function shellTypeLabel(t: string): string {
-  switch (t) {
+/** Map a shell type to its display name, used for default tab titles. */
+export function shellTypeLabel(shell: string): string {
+  switch (shell) {
     case 'zsh': return 'Zsh';
     case 'bash': return 'Bash';
     // The OS-bundled Windows PowerShell and the standalone pwsh build are different
@@ -17,7 +18,7 @@ export function shellTypeLabel(t: string): string {
     case 'powershell': return 'Windows PowerShell';
     case 'pwsh': return 'PowerShell 7';
     case 'cmd': return 'CMD';
-    default: return t || '终端';
+    default: return shell || translate('Terminal');
   }
 }
 

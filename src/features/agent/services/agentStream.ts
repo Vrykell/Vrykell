@@ -403,10 +403,10 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
         break; // start/end/finish 等事件暂不消费
     }
   }
-  // 达到工具调用上限：streamText 会静默截断（无 finishReason），此处补上失败原因
+  // Reaching the tool-call limit leaves streamText without a finish reason; state the cause.
   if (streamError == null && stepLimit > 0 && stepCount >= stepLimit && lastFinishReason === 'tool-calls') {
     onChunk(
-      `\n\n> ⚠️ 已达工具调用上限（${stepLimit} 步），回复可能不完整；可在「AI 行为」页调高最大迭代步数。`,
+      `\n\n> ⚠️ ${t('The tool-call limit ({{steps}} steps) was reached, so the reply may be incomplete. Raise the maximum iterations in AI Behavior.', { steps: stepLimit })}`,
     );
   }
   // Optional metrics must never hold a completed or cancelled turn open.
