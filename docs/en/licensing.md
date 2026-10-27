@@ -16,7 +16,7 @@ npm run licenses:check
 npm run build
 ```
 
-The generator examines frontend output modules, imported icon collections, bundled font provenance and native dependencies for the reference targets `x86_64-pc-windows-msvc`, `aarch64-apple-darwin` and `x86_64-unknown-linux-gnu`. Native metadata resolution may download missing locked packages. It does not build installers or alter the lockfiles.
+The generator examines frontend output modules, imported icon collections, bundled font provenance and native dependencies for the reference targets `x86_64-pc-windows-msvc`, `aarch64-apple-darwin`, `x86_64-apple-darwin` and `x86_64-unknown-linux-gnu`. Native metadata resolution may download missing locked packages. It does not build installers or alter the lockfiles.
 
 The generated file is `public/legal/THIRD_PARTY_NOTICES.txt`. It contains component versions, license expressions, source URLs and original license/notice texts. The native inventory is conservative and includes build dependencies; inclusion does not imply that every entry is linked into every target. License texts omitted from published package archives are retained in `licenses/third-party/` with their upstream source records where available.
 

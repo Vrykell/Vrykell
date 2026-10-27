@@ -7,7 +7,7 @@ The complete generated inventory, original notices, license texts and exact-vers
 | Material | Terms and attribution |
 | --- | --- |
 | Frontend modules | Original package licenses and notices, including their own bundled third-party notices, are retained in the generated inventory. |
-| Native dependencies | The inventory covers three reference desktop dependency graphs, including build dependencies. Original licenses remain applicable. Exact-version source archives are linked for covered source, including MPL-2.0 components. |
+| Native dependencies | The inventory covers four reference desktop dependency graphs, including build dependencies. Original licenses remain applicable. Exact-version source archives are linked for covered source, including MPL-2.0 components. |
 | Bundled native transport and cryptography | The original native license texts are included separately from the wrapper packages. The bundled database engine is public domain; its source and copyright statement are linked in the inventory. |
 | Bundled fonts | OFL-1.1; the five original notices remain in [public/fonts](public/fonts/). Provenance, conversion details and checksums are in [the font manifest](public/fonts/manifest.json). Font outlines and author/license metadata are retained during WOFF2 compression. |
 | Editor icon font | Codicons artwork: Microsoft and contributors, CC-BY-4.0. Redistributed for embedded editor controls without project artwork changes. Its code has a separate MIT license. Source: <https://github.com/microsoft/vscode-codicons>. |

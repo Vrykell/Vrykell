@@ -16,7 +16,7 @@ npm run licenses:check
 npm run build
 ```
 
-生成器检查前端输出模块、导入的图标集合、内置字体来源，以及 `x86_64-pc-windows-msvc`、`aarch64-apple-darwin` 和 `x86_64-unknown-linux-gnu` 三个参考目标的原生依赖。解析原生元数据时可能下载尚未缓存的锁定包，不会构建安装包或修改锁文件。
+生成器检查前端输出模块、导入的图标集合、内置字体来源，以及 `x86_64-pc-windows-msvc`、`aarch64-apple-darwin`、`x86_64-apple-darwin` 和 `x86_64-unknown-linux-gnu` 四个参考目标的原生依赖。解析原生元数据时可能下载尚未缓存的锁定包，不会构建安装包或修改锁文件。
 
 生成文件为 `public/legal/THIRD_PARTY_NOTICES.txt`，包含组件版本、许可表达式、源码位置及原始许可／声明正文。原生清单采用保守范围，包含构建依赖；列入清单不表示每个目标都链接所有条目。已发布包缺少的许可正文保存在 `licenses/third-party/`，能够定位时同时记录上游来源。
 
