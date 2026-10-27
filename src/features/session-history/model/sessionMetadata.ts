@@ -11,10 +11,10 @@ function record(value: unknown): Record<string, unknown> | null {
   return typeof value === 'object' && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
 
-/** Read modern panes and legacy metadata once, preserving each pane's target and cwd. */
+/** Read the current terminal pane tree from a session payload. */
 export function sessionHistoryTerminals(session: BackendSessionEntry): SavedHistoryTerminal[] {
   let payload: Record<string, unknown> = {};
-  try { payload = record(JSON.parse(session.payload)) ?? {}; } catch { /* Invalid metadata retains the saved session fallback. */ }
+  try { payload = record(JSON.parse(session.payload)) ?? {}; } catch { /* Invalid metadata has no terminals. */ }
   const terminals: Record<string, unknown>[] = [];
   const visit = (value: unknown) => {
     const node = record(value);
@@ -25,12 +25,10 @@ export function sessionHistoryTerminals(session: BackendSessionEntry): SavedHist
     } else if (node.type === 'split') { visit(node.first); visit(node.second); }
   };
   visit(payload.layout);
-  if (!terminals.length) terminals.push(payload);
   return terminals.map((terminal, index) => {
     const ssh = record(terminal.ssh);
-    const kind = terminal.kind === 'ssh' || ssh || (terminal.kind !== 'local' && session.kind === 'ssh') ? 'ssh' : 'local';
-    const cwd = typeof terminal.cwd === 'string' && terminal.cwd.trim() ? terminal.cwd
-      : index === 0 ? session.cwd || (typeof payload.cwd === 'string' ? payload.cwd : '') : '';
+    const kind = terminal.kind === 'ssh' || ssh ? 'ssh' : 'local';
+    const cwd = typeof terminal.cwd === 'string' && terminal.cwd.trim() ? terminal.cwd : index === 0 ? session.cwd : '';
     return {
       ...(typeof terminal.id === 'string' ? { paneId: terminal.id } : {}),
       kind, cwd,

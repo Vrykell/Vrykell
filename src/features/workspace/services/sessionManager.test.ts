@@ -166,30 +166,6 @@ describe('sessionManager 生命周期', () => {
     expect(useChatStore.getState().byTab[sessionId]).toBeUndefined();
   });
 
-  it('restore：ssh 旧 payload 与 shellType 旧 payload 兼容解析', async () => {
-    const sid1 = 'ssh-session';
-    invokeMock.mockResolvedValueOnce(undefined);
-    invokeMock.mockResolvedValueOnce([]);
-    invokeMock.mockResolvedValueOnce([]);
-    invokeMock.mockResolvedValueOnce({ id: sid1, title: 'ssh', kind: 'session', payload: JSON.stringify({ ssh: { name: 'prod', host: 'h', user: 'root', port: 22, connectionId: 'c' } }), group_id: null, cwd: null, created_at: 1, updated_at: 2, archived_at: null });
-    await sessionManager.restore(sid1, 'ssh');
-    let tab = useSessionStore.getState().tabs.find((t) => t.id === sid1)!;
-    let term = (tab as { layout: { terminal: { kind: string; ssh?: { host: string; user?: string; port?: number } } } }).layout.terminal as { kind: string; ssh?: { host: string }; shellType?: string };
-    expect(term.kind).toBe('ssh');
-    expect(term.ssh?.host).toBe('h');
-
-    const sid2 = 'local-session';
-    invokeMock.mockResolvedValueOnce(undefined);
-    invokeMock.mockResolvedValueOnce([]);
-    invokeMock.mockResolvedValueOnce([]);
-    invokeMock.mockResolvedValueOnce({ id: sid2, title: 'l', kind: 'session', payload: JSON.stringify({ shellType: 'zsh' }), group_id: null, cwd: null, created_at: 1, updated_at: 2, archived_at: null });
-    await sessionManager.restore(sid2, 'l');
-    tab = useSessionStore.getState().tabs.find((t) => t.id === sid2)!;
-    term = (tab as { layout: { terminal: { kind: string; shellType?: string } } }).layout.terminal as { kind: string; ssh?: { host: string }; shellType?: string };
-    expect(term.kind).toBe('local');
-    expect(term.shellType).toBe('zsh');
-  });
-
   it('record：start 与 complete 透传', async () => {
     const block = {
       id: 'b1', command: 'ls', status: 'done', exitCode: 0, startedAt: 1, endedAt: 2,

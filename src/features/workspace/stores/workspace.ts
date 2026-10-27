@@ -72,7 +72,7 @@ export type Tab =
   | (TabBase & { kind: 'start-code' })
   | (TabBase & { kind: 'start-ai' });
 
-/** Legacy terminal persistence exposes the canonical group metadata without its scope tag. */
+/** Native terminal groups omit the scope because their owner is fixed. */
 export type TabGroup = Omit<WorkspaceGroup, 'scope'>;
 
 export interface AddTabOptions {

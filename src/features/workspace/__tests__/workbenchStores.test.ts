@@ -7,7 +7,7 @@ import { workspacePaneCells, workspacePaneIds, type WorkspacePaneLayout } from '
 const pane = (id: string): Extract<WorkspacePaneLayout, { type: 'pane' }> => ({ type: 'pane', id, resourceId: `file:${id}` });
 const tab = (id: string, layout: WorkspacePaneLayout | null = pane(id)): WorkspaceContainer => ({ id, scope: 'code', layout, focused: id, zoomed: null });
 const target = (id: string) => ({ leafId: id, dir: 'row' as const, position: 'second' as const, rect: { x: 0, y: 0, w: 1, h: 1 } });
-const setup = () => { const workbench = createWorkbenchStore('test-containers'); const area = createPaneWorkspaceStore('test-legacy', 'code', workbench); return { workbench, area }; };
+const setup = () => { const workbench = createWorkbenchStore('test-containers'); const area = createPaneWorkspaceStore('code', workbench); return { workbench, area }; };
 
 beforeEach(() => localStorage.clear());
 
@@ -26,23 +26,12 @@ it('persists one versioned snapshot and does not write unchanged state or transi
 
 it('does not overwrite a saved snapshot while native resources are still hydrating', () => {
   const workbench = createWorkbenchStore('hydrating', false);
-  const area = createPaneWorkspaceStore('hydrating-legacy', 'code', workbench);
+  const area = createPaneWorkspaceStore('code', workbench);
   workbench.getState().update(state => putContainer(state, tab('a')));
   area.getState().reconcile([]); expect(workbench.getState().snapshot.tabs).toHaveLength(1);
   expect(localStorage.getItem('hydrating')).toBeNull();
   workbench.setState({ ready: true });
   expect(JSON.parse(localStorage.getItem('hydrating')!)).toMatchObject({ tabs: [{ id: 'a' }] });
-});
-
-it('migrates a legacy layout only when its scope has no new container', () => {
-  localStorage.setItem('test-legacy', JSON.stringify({ layout: pane('a'), focused: 'a', historyIdentity: { id: 'workspace:old', createdAt: 1 } }));
-  const { workbench, area } = setup();
-  expect(area.getState()).toMatchObject({ layout: pane('a'), focused: 'a', startActive: false, historyIdentity: { id: 'workspace:old' } });
-  expect(workbench.getState().snapshot.tabs).toHaveLength(1);
-  createPaneWorkspaceStore('test-legacy', 'code', workbench);
-  expect(workbench.getState().snapshot.tabs).toHaveLength(1);
-  localStorage.setItem('no-focus', JSON.stringify({ layout: pane('b') }));
-  expect(createPaneWorkspaceStore('no-focus').getState().focused).toBe('b');
 });
 
 it('shows the empty fallback once, repairs selection and preserves every independent tab', () => {
@@ -128,7 +117,7 @@ it('restores by identity or resource set, releases former owners and ignores cor
 
 it('rejects restoring resources into a scope that cannot own them', () => {
   const workbench = createWorkbenchStore('scope-validation');
-  const area = createPaneWorkspaceStore('scope-validation-area', 'code', workbench);
+  const area = createPaneWorkspaceStore('code', workbench);
   area.getState().restore({ type: 'pane', id: 'chat', resourceId: 'chat:one' }, 'chat');
   expect(workbench.getState().snapshot.tabs).toEqual([]);
 });

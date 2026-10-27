@@ -24,8 +24,6 @@ interface NavigationState {
   lastTabs: Partial<Record<WorkspaceArea, string>>;
   groupColors: Record<string, HistoryGroupColor>;
   workspaceOrder: WorkspaceArea[];
-  /** Read-only migration input; live strip order belongs to the workbench. */
-  readonly sessionLayoutOrder: string[];
   aiPlacement: 'main' | 'side';
   historyPreset: HistoryTypePreset;
   historyPresetRevision: number;
@@ -65,8 +63,7 @@ const workspaceOrder = [...new Set([...savedWorkspaceOrder, ...DEFAULT_WORKSPACE
 export const useWorkspaceNavigation = create<NavigationState>((set) => ({
   area: 'terminal', previousArea: 'terminal', collapsed: saved?.collapsed === true || window.innerWidth <= WORKSPACE_COMPACT_BREAKPOINT,
   sidebarWidth: normalizeSidebarWidth(saved?.sidebarWidth), sidebarDragWidth: null, sidebarOverlay: false,
-  lastTabs: {}, groupColors, workspaceOrder, sessionLayoutOrder: Array.isArray(saved?.sessionLayoutOrder)
-    ? saved.sessionLayoutOrder.filter((id): id is string => typeof id === 'string' && !id.startsWith('page:')) : [], aiPlacement: 'main',
+  lastTabs: {}, groupColors, workspaceOrder, aiPlacement: 'main',
   historyPreset: 'all', historyPresetRevision: 0, historyLoading: false, historyDestination: 'native',
   selectArea: area => set(state => ({ area, previousArea: state.area !== 'ai' ? state.area : state.previousArea,
     ...(state.sidebarOverlay && area !== state.area ? { collapsed: true, sidebarOverlay: false, sidebarDragWidth: null } : {}) })),

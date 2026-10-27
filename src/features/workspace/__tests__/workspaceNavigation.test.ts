@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it } from 'vitest';
 import { normalizeSidebarWidth, orderedWorkspaceIds, useWorkspaceNavigation, workspaceAreaForKind, workspaceSidebarWidth } from '../stores/navigation';
 const snapshot = useWorkspaceNavigation.getState();
-beforeEach(() => useWorkspaceNavigation.setState({ collapsed: false, sidebarOverlay: false, sidebarWidth: 208, sidebarDragWidth: null, area: 'terminal', previousArea: 'terminal', lastTabs: {}, groupColors: {}, sessionLayoutOrder: [], aiPlacement: 'main' }));
+beforeEach(() => useWorkspaceNavigation.setState({ collapsed: false, sidebarOverlay: false, sidebarWidth: 208, sidebarDragWidth: null, area: 'terminal', previousArea: 'terminal', lastTabs: {}, groupColors: {}, aiPlacement: 'main' }));
 afterEach(() => useWorkspaceNavigation.setState(snapshot, true));
 
 it.each([['session', 'terminal'], ['history', 'terminal'], ['editor', 'code'], ['git-diff', 'code'], ['harness', 'ai'], ['usage', 'ai'], ['ai-history', 'ai']])('assigns %s to the %s workspace', (kind, area) => {
@@ -75,9 +75,6 @@ it.each([[null, 208], [Number.NaN, 208], [Infinity, 208], ['300', 208], [159, 16
 it('filters stale identifiers without maintaining a separate live strip order', () => {
   expect(orderedWorkspaceIds(['file:a', 'file:b', 'diff:c'], ['stale', 'diff:c', 'file:a'])).toEqual(['diff:c', 'file:a', 'file:b']);
   expect(orderedWorkspaceIds(['file:b', 'file:d'], ['stale', 'diff:c', 'file:a'])).toEqual(['file:b', 'file:d']);
-  useWorkspaceNavigation.setState({ sessionLayoutOrder: ['group:team', 'tab:loose'] });
-  useWorkspaceNavigation.getState().setCollapsed(true);
-  expect(JSON.parse(localStorage.getItem('workspace-navigation-v1')!).sessionLayoutOrder).toBeUndefined();
 });
 it('persists group color overrides independently of terminal icon colors', () => {
   useWorkspaceNavigation.getState().setGroupColor('group-a', 'violet');

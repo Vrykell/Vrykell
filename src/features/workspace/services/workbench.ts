@@ -39,8 +39,10 @@ export function synchronizeWorkbench() {
         const valid = new Set((scope === 'unified' ? resources : mainResources.filter(resource => nativeScope(resource.kind) === scope)).map(resource => resource.id));
         if (useWorkbenchStore.getState().ready) state = reconcileContainers(state, scope, valid);
       }
+      let addedTerminal = false;
       for (const tab of workspace.tabs) if (tab.kind === 'session') {
         const existing = state.tabs.find(item => item.id === tab.id);
+        if (!existing) addedTerminal = true;
         const focused = useTerminalStore.getState().focusedPaneId;
         state = putContainer(state, { ...existing, id: tab.id, scope: 'terminal', title: tab.title, layout: terminalWorkspaceLayout(tab.layout), focused: leaves(tab.layout).some(pane => pane.id === focused) ? focused! : existing?.focused ?? leaves(tab.layout)[0]!.id, zoomed: existing?.zoomed ?? null, groupId: tab.groupId });
       }
@@ -51,10 +53,14 @@ export function synchronizeWorkbench() {
         const paneId = `pane:${crypto.randomUUID()}`;
         state = putContainer(state, { id: resource.id, scope, layout: { type: 'pane', id: paneId, resourceId: resource.id }, focused: paneId, zoomed: null });
       }
+      if (addedTerminal) {
+        const nativeOrder = new Map(workspace.tabs.filter(tab => tab.kind === 'session').map((tab, index) => [tab.id, index]));
+        const terminalTabs = state.tabs.filter(tab => tab.scope === 'terminal')
+          .sort((a, b) => (nativeOrder.get(a.id) ?? Infinity) - (nativeOrder.get(b.id) ?? Infinity));
+        let terminalIndex = 0;
+        state = { ...state, tabs: state.tabs.map(tab => tab.scope === 'terminal' ? terminalTabs[terminalIndex++]! : tab) };
+      }
       const groups = [...state.groups.filter(group => group.scope !== 'terminal'), ...workspace.groups.map(group => ({ ...group, scope: 'terminal' as const }))];
-      const navigation = useWorkspaceNavigation.getState();
-      const legacyOrders = { terminal: navigation.sessionLayoutOrder, code: [], ai: [], unified: [] };
-      for (const scope of WORKSPACE_SCOPES) if (!state.order[scope] && legacyOrders[scope].length) state = { ...state, order: { ...state.order, [scope]: legacyOrders[scope] } };
       state = { ...state, groups, tabs: state.tabs.map(tab => {
         const cells = panesOf(tab); if (!cells.length) return tab;
         const members = cells.map(pane => resources.find(resource => resource.id === pane.resourceId)).map(resource => resource ? workspaceHistoryMember(resource) : null);

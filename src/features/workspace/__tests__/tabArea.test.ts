@@ -13,7 +13,6 @@ it('routes every tab kind to exactly one functional workspace', () => {
     usage: 'ai',
     'ai-history': 'ai',
     'start-ai': 'ai',
-    workspace: 'unified',
   });
   expect(Object.isFrozen(TAB_KIND_AREA)).toBe(true);
 });
@@ -21,5 +20,4 @@ it('routes every tab kind to exactly one functional workspace', () => {
 it('keeps an unknown persisted kind visible in the terminal instead of dropping it', () => {
   expect(workspaceAreaForKind('from-a-newer-build')).toBe('terminal');
   expect(workspaceAreaForKind('session')).toBe('terminal');
-  expect(workspaceAreaForKind('workspace')).toBe('unified');
 });

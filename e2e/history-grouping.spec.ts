@@ -27,14 +27,15 @@ async function seedSessionHistory(page: Page) {
     const internal = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__;
     const original = internal.invoke;
     const now = Date.now();
-    const remote = (host: string) => JSON.stringify({ layout: { type: 'leaf', terminal: { kind: 'ssh', cwd: '/srv/app', ssh: { host, user: 'dev' }, openMode: 'classic' } } });
+    const local = (id: string, shellType: string, cwd: string) => JSON.stringify({ layout: { type: 'leaf', terminal: { id, kind: 'local', shellType, cwd } } });
+    const remote = (id: string, host: string) => JSON.stringify({ layout: { type: 'leaf', terminal: { id, kind: 'ssh', cwd: '/srv/app', ssh: { host, user: 'dev' }, openMode: 'classic' } } });
     const items = [
-      { id: 'local', title: 'Local Bash', cwd: '/srv/app', payload: '{"shellType":"bash"}' },
-      { id: 'cmd', title: 'Local CMD', cwd: 'C:/work', payload: '{"shellType":"cmd"}' },
-      { id: 'remote-z', title: 'Deploy Zebra', cwd: '', payload: remote('alpha.test'), created_at: now - 40 * 86400000 },
-      { id: 'remote-a', title: 'Deploy Alpha', cwd: '', payload: remote('alpha.test') },
-      { id: 'remote-b', title: 'Deploy Beta', cwd: '', payload: remote('beta.test') },
-      { id: 'remote-unknown', title: 'Missing directory', cwd: '', payload: '{"ssh":{"host":"unknown.test"}}' },
+      { id: 'local', title: 'Local Bash', cwd: '/srv/app', payload: local('local#0', 'bash', '/srv/app') },
+      { id: 'cmd', title: 'Local CMD', cwd: 'C:/work', payload: local('cmd#0', 'cmd', 'C:/work') },
+      { id: 'remote-z', title: 'Deploy Zebra', cwd: '', payload: remote('remote-z#0', 'alpha.test'), created_at: now - 40 * 86400000 },
+      { id: 'remote-a', title: 'Deploy Alpha', cwd: '', payload: remote('remote-a#0', 'alpha.test') },
+      { id: 'remote-b', title: 'Deploy Beta', cwd: '', payload: remote('remote-b#0', 'beta.test') },
+      { id: 'remote-unknown', title: 'Missing directory', cwd: '', payload: remote('remote-unknown#0', 'unknown.test') },
     ].map((item, index) => ({ status: 'historical', kind: 'local', created_at: now, closed_at: now - index * 1000, block_count: 1, sort_order: index, group_id: 'old-group', ...item }));
     internal.invoke = async (command, args) => {
       if (command === 'list_sessions') return items;
@@ -188,7 +189,7 @@ test('AI history groups by working directory and conversation type and uses sett
   await expect(remove).toHaveCSS('opacity', '1');
   await record.press('Enter');
   await expect(page.getByTestId('workspace-area-ai')).toHaveAttribute('aria-current', 'page');
-  await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
+  await expect(page.getByTestId('ai-surface-main').locator('[data-chat-composer]:visible')).toBeVisible();
 });
 
 test('session date basis survives title sorting, regrouping and reopening', async ({ page }) => {

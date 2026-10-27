@@ -38,33 +38,20 @@ export interface RestoreMeta {
   groupId?: string | null;
 }
 
-/** 解析后端 payload JSON → 窗口布局（兼容旧版 shellType/ssh 单终端 payload）。 */
+/** Parse the current session payload into the terminal pane tree. */
 function parseLayout(payload: string, sessionId: string): WindowLayout {
   try {
-    const p = JSON.parse(payload) as {
-      layout?: unknown;
-      shellType?: string;
-      ssh?: { name?: string; host?: string; user?: string | null; port?: number | null; connectionId?: string | null };
-    };
-    const layout = parseWindowLayout(p.layout);
+    const parsed = JSON.parse(payload) as { layout?: unknown };
+    const layout = parseWindowLayout(parsed.layout);
     if (layout) return layout;
-    if (p.ssh) {
-      return leaf({
-        id: `${sessionId}#0`, kind: 'ssh',
-        ssh: { name: p.ssh.name ?? '', host: p.ssh.host ?? '', user: p.ssh.user ?? undefined, port: p.ssh.port ?? undefined, connectionId: p.ssh.connectionId ?? undefined },
-      });
-    }
-    if (p.shellType) {
-      return leaf({ id: `${sessionId}#0`, kind: 'local', shellType: p.shellType });
-    }
   } catch {
-    /* fallthrough */
+    /* fall through to the single-pane fallback */
   }
   return leaf({ id: `${sessionId}#0`, kind: 'local' });
 }
 
-/** Older sessions kept one cwd on the session row instead of each terminal pane. */
-function applyLegacyCwd(layout: WindowLayout, cwd: string): WindowLayout {
+/** A session-level cwd remains a fallback until the first pane payload carries its own. */
+function applySessionCwd(layout: WindowLayout, cwd: string): WindowLayout {
   const first = firstLeaf(layout);
   return first.cwd ? layout : replaceLeaf(layout, first.id, { ...first, cwd });
 }
@@ -248,7 +235,7 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
         id: c.id,
         role: c.role as 'user' | 'assistant',
         content: c.content,
-        // parts 渲染层（'' / 脏数据 → undefined，走 legacy 文本渲染）
+        // Empty or malformed parts fall back to plain text rendering.
         parts: deserializeParts(c.parts),
         // 附件元数据（M5；'' / 脏数据 → undefined）
         attachments: deserializeAttachments(c.attachments),
@@ -281,8 +268,8 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
     }
   }
   const parsedLayout = parseLayout(info?.payload ?? '{}', sessionId);
-  const layout = info?.cwd ? applyLegacyCwd(parsedLayout, info.cwd) : parsedLayout;
-  // Legacy records belong to the first pane; explicit split-pane ownership is retained.
+  const layout = info?.cwd ? applySessionCwd(parsedLayout, info.cwd) : parsedLayout;
+  // Messages without an explicit pane belong to the first pane.
   const firstPaneId = firstLeaf(layout).id;
   useChatStore.setState((state) => {
     const messages = state.byTab[sessionId];

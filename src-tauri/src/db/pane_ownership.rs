@@ -12,8 +12,8 @@ impl HistoryDb {
         }
         let transaction = self.conn().unchecked_transaction().map_err(|error| error.to_string())?;
         for pane in panes {
-            transaction.execute("DELETE FROM blocks WHERE session_id=?1 AND (pane_id=?2 OR (?3 AND (pane_id IS NULL OR pane_id=?1)))", params![session, pane, pane == &format!("{session}#0") || pane == session]).map_err(|error| error.to_string())?;
-            transaction.execute("DELETE FROM chat_messages WHERE session_id=?1 AND (pane_id=?2 OR (?3 AND (pane_id IS NULL OR pane_id=?1)))", params![session, pane, pane == &format!("{session}#0") || pane == session]).map_err(|error| error.to_string())?;
+            transaction.execute("DELETE FROM blocks WHERE session_id=?1 AND pane_id=?2", params![session, pane]).map_err(|error| error.to_string())?;
+            transaction.execute("DELETE FROM chat_messages WHERE session_id=?1 AND pane_id=?2", params![session, pane]).map_err(|error| error.to_string())?;
         }
         transaction.commit().map_err(|error| error.to_string())
     }
@@ -33,10 +33,6 @@ impl HistoryDb {
         for pane in panes {
             transaction.execute("UPDATE blocks SET session_id=?1 WHERE session_id=?2 AND pane_id=?3", params![target, source, pane]).map_err(|error| error.to_string())?;
             transaction.execute("UPDATE chat_messages SET session_id=?1 WHERE session_id=?2 AND pane_id=?3", params![target, source, pane]).map_err(|error| error.to_string())?;
-            if pane == &format!("{source}#0") || pane == source {
-                transaction.execute("UPDATE blocks SET session_id=?1,pane_id=?3 WHERE session_id=?2 AND (pane_id IS NULL OR pane_id=?2)", params![target, source, pane]).map_err(|error| error.to_string())?;
-                transaction.execute("UPDATE chat_messages SET session_id=?1,pane_id=?3 WHERE session_id=?2 AND (pane_id IS NULL OR pane_id=?2)", params![target, source, pane]).map_err(|error| error.to_string())?;
-            }
         }
         transaction.commit().map_err(|error| error.to_string())
     }
@@ -50,19 +46,19 @@ mod tests {
     fn transfers_only_selected_content_and_preserves_it_when_the_source_is_deleted() {
         let db = HistoryDb::open_in_memory();
         for id in ["source", "target", "other"] { db.create_session(id, id, 1, "", "session", "{}").unwrap(); }
-        for (id, pane) in [("a", Some("source#0")), ("b", Some("source#1")), ("legacy", None)] {
+        for (id, pane) in [("a", Some("source#0")), ("b", Some("source#1"))] {
             db.record_block(id, "source", pane, "command", "output", "output", "", None, "done", 1, None, "").unwrap();
         }
         db.append_chat_message_for_pane("chat", "source", "user", "text", 1, "", "", Some("source#1")).unwrap();
         db.move_terminal_panes("source", "target", &["source#1".into()]).unwrap();
         assert_eq!(db.get_session_blocks("target").unwrap().len(), 1);
         assert_eq!(db.get_chat_messages("target").unwrap().len(), 1);
-        assert_eq!(db.get_session_blocks("source").unwrap().len(), 2);
+        assert_eq!(db.get_session_blocks("source").unwrap().len(), 1);
         db.move_terminal_panes("source", "target", &["source#0".into()]).unwrap();
-        assert_eq!(db.get_session_blocks("target").unwrap().len(), 3);
+        assert_eq!(db.get_session_blocks("target").unwrap().len(), 2);
         db.move_terminal_panes("source", "target", &["source#0".into()]).unwrap();
         db.delete_session("source").unwrap();
-        assert_eq!(db.get_session_blocks("target").unwrap().len(), 3);
+        assert_eq!(db.get_session_blocks("target").unwrap().len(), 2);
         assert!(db.get_session_blocks("other").unwrap().is_empty());
     }
 
@@ -87,14 +83,13 @@ mod tests {
     fn deletes_only_requested_panes_and_accepts_repeated_deletion() {
         let db = HistoryDb::open_in_memory();
         db.create_session("source", "Source", 1, "", "session", "{}").unwrap();
-        for (id, pane) in [("a", Some("source#0")), ("b", Some("source#1")), ("legacy", None)] {
+        for (id, pane) in [("a", Some("source#0")), ("b", Some("source#1"))] {
             db.record_block(id, "source", pane, "command", "output", "output", "", None, "done", 1, None, "").unwrap();
         }
         db.append_chat_message_for_pane("a", "source", "user", "text", 1, "", "", Some("source#1")).unwrap();
-        db.append_chat_message("legacy", "source", "user", "text", 1, "", "").unwrap();
         db.delete_terminal_panes("source", &["source#1".into()]).unwrap();
-        assert_eq!(db.get_session_blocks("source").unwrap().len(), 2);
-        assert_eq!(db.get_chat_messages("source").unwrap().len(), 1);
+        assert_eq!(db.get_session_blocks("source").unwrap().len(), 1);
+        assert!(db.get_chat_messages("source").unwrap().is_empty());
         db.delete_terminal_panes("source", &["source#0".into()]).unwrap();
         assert!(db.get_session_blocks("source").unwrap().is_empty());
         assert!(db.get_chat_messages("source").unwrap().is_empty());

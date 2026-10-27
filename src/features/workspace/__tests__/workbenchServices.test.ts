@@ -63,7 +63,7 @@ beforeEach(() => {
   useAiWorkspace.setState({ ...aiInitial, nativeTabs: [], selected: '', sideSessions: [], sideSelected: '' }, true);
   useHarnessWorkspace.setState({ ...agentsInitial, connections: [], selected: '' }, true);
   useHarnessStore.setState({ byTab: {} }); useBlockStore.setState({ byTab: {} });
-  useWorkspaceNavigation.setState({ area: 'code', sessionLayoutOrder: [] });
+  useWorkspaceNavigation.setState({ area: 'code' });
   useTerminalStore.setState({ sessions: {}, focusedPaneId: null });
   useUiStore.setState({ settingsOpen: false });
   useWorkbenchFeedback.setState({ failure: null });
@@ -77,7 +77,6 @@ it('adopts every native resource once, retains multi-pane terminal containers an
   if (native.kind !== 'session') throw new Error('Expected terminal');
   useWorkspaceStore.getState().setWindowLayout(native.id, splitLeaf(native.layout, 'native#0', 'row', 'second', { id: 'native#1', kind: 'ssh', ssh: { name: 'Host', host: 'host' } }));
   useTerminalStore.setState({ focusedPaneId: 'native#1' });
-  useWorkspaceNavigation.setState({ sessionLayoutOrder: ['tab:native'] });
   synchronizeWorkbench();
   const state = useWorkbenchStore.getState().snapshot;
   expect(state.tabs.filter(tab => tab.scope === 'terminal')).toHaveLength(1);
@@ -91,6 +90,20 @@ it('adopts every native resource once, retains multi-pane terminal containers an
   useWorkspaceStore.setState({ tabs: [] }); synchronizeWorkbench(); expect(useWorkbenchStore.getState().snapshot.tabs.some(tab => tab.scope === 'terminal')).toBe(false);
   useWorkbenchStore.setState({ ready: false }); document(); synchronizeWorkbench(); useWorkspaceStore.setState({ tabs: [] }); synchronizeWorkbench();
   expect(useWorkbenchStore.getState().snapshot.tabs.some(tab => tab.scope === 'code')).toBe(true);
+});
+
+it('follows native terminal insertion order after a grouped restore', () => {
+  terminal('two'); terminal('one'); synchronizeWorkbench();
+  expect(useWorkbenchStore.getState().snapshot.tabs.filter(tab => tab.scope === 'terminal').map(tab => tab.id)).toEqual(['two', 'one']);
+  document();
+  terminal('three'); synchronizeWorkbench();
+  expect(useWorkbenchStore.getState().snapshot.tabs.filter(tab => tab.scope === 'terminal').map(tab => tab.id)).toEqual(['two', 'one', 'three']);
+  expect(useWorkbenchStore.getState().snapshot.tabs.some(tab => tab.scope === 'code')).toBe(true);
+  useWorkbenchStore.getState().update(state => putContainer(state, { id: 'orphan', scope: 'terminal', layout: { type: 'pane', id: 'orphan-pane', resourceId: 'terminal:one#0' }, focused: 'orphan-pane', zoomed: null }));
+  useWorkspaceStore.setState(state => ({ tabs: [...state.tabs, { id: 'four', title: 'four', kind: 'session', layout: leaf({ id: 'four#0', kind: 'local' }) }] }));
+  synchronizeWorkbench();
+  const terminals = useWorkbenchStore.getState().snapshot.tabs.filter(tab => tab.scope === 'terminal');
+  expect(terminals[terminals.length - 1]?.id).toBe('orphan');
 });
 
 it('activates layout containers through native owners and ignores missing tabs and resources', () => {

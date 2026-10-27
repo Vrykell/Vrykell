@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { safeJsonParse, safeLocalStorageGet } from '@utils/errorHandler';
 import type { PaneTarget } from '@core/paneLayout';
 import { parseWorkspacePaneLayout, pruneWorkspacePanes, setWorkspacePaneRatio, workspacePaneCells, type WorkspacePaneLayout } from '../model/workspaceResources';
 import type { TerminalSpec } from '../model/windowLayout';
@@ -33,13 +32,7 @@ export interface PaneWorkspaceState {
 }
 
 /** An area exposes its selected container, never an area-owned split layout. */
-export function createPaneWorkspaceStore(storageKey: string, scope: WorkspaceScope = 'unified', workbench = createWorkbenchStore(`${storageKey}-containers-v2`)) {
-  const saved = safeJsonParse<{ layout?: unknown; focused?: string; historyIdentity?: WorkspaceHistoryIdentity }>(safeLocalStorageGet(storageKey) ?? '{}');
-  const legacy = parseWorkspacePaneLayout(saved?.layout);
-  if (legacy && !workbench.getState().snapshot.tabs.some(tab => tab.scope === scope)) {
-    const id = newContainerId();
-    workbench.getState().update(state => selectContainer(putContainer(state, { id, scope, layout: legacy, focused: saved?.focused ?? '', zoomed: null, historyIdentity: saved?.historyIdentity }), id));
-  }
+export function createPaneWorkspaceStore(scope: WorkspaceScope = 'unified', workbench = createWorkbenchStore()) {
   const current = () => {
     const state = workbench.getState().snapshot;
     return state.tabs.find(tab => tab.id === state.selected[scope] && tab.scope === scope);
@@ -132,8 +125,8 @@ export function createPaneWorkspaceStore(storageKey: string, scope: WorkspaceSco
 }
 
 export const workspaceAreaStores = {
-  terminal: createPaneWorkspaceStore('terminal-pane-workspace-v1', 'terminal', useWorkbenchStore),
-  code: createPaneWorkspaceStore('code-pane-workspace-v1', 'code', useWorkbenchStore),
-  ai: createPaneWorkspaceStore('ai-pane-workspace-v1', 'ai', useWorkbenchStore),
-  unified: createPaneWorkspaceStore('unified-workspace-v1', 'unified', useWorkbenchStore),
+  terminal: createPaneWorkspaceStore('terminal', useWorkbenchStore),
+  code: createPaneWorkspaceStore('code', useWorkbenchStore),
+  ai: createPaneWorkspaceStore('ai', useWorkbenchStore),
+  unified: createPaneWorkspaceStore('unified', useWorkbenchStore),
 };

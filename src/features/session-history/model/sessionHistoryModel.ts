@@ -262,17 +262,16 @@ export function hasSessionHistoryFilter(filter: SessionHistoryFilter): boolean {
 /** Classic sessions have no command blocks; chat messages are counted separately. */
 export function sessionCommandCount(session: BackendSessionEntry): number | null {
   try {
-    const payload = JSON.parse(session.payload) as { layout?: import('@features/workspace/model/windowLayout').WindowLayout; openMode?: string; shellType?: string; ssh?: unknown };
+    const payload = JSON.parse(session.payload) as { layout?: import('@features/workspace/model/windowLayout').WindowLayout };
     const modes: Array<string | undefined> = [];
     const walk = (layout: NonNullable<typeof payload.layout>) => {
       if (layout.type === 'leaf') modes.push(layout.terminal.openMode ?? (layout.terminal.shellType === 'cmd' ? 'classic' : undefined));
       else if (layout.type === 'split') { walk(layout.first); walk(layout.second); }
     };
     if (payload.layout) walk(payload.layout);
-    else modes.push(payload.openMode ?? (payload.shellType === 'cmd' || payload.ssh || session.kind === 'ssh' ? 'classic' : undefined));
     if (modes.includes('block')) return session.block_count;
     if (modes.length > 0 && modes.every(mode => mode === 'classic')) return null;
-  } catch { /* Legacy metadata has no reliable presentation mode. */ }
+  } catch { /* A corrupt payload has no reliable presentation mode. */ }
   return session.block_count > 0 ? session.block_count : null;
 }
 

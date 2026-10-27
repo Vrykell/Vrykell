@@ -23,6 +23,8 @@ import { useBlockStore } from '@features/terminal';
 import { useChatStore } from '@features/chat';
 import { useSessionStore, isSessionTab } from '@features/workspace';
 import { leaves } from '@features/workspace/model/windowLayout';
+import { useToastStore } from '@ui/feedback/Toast';
+import { t } from '@i18n';
 import {
   MAX_TITLE_LEN,
   normalizeCommandForTitle,
@@ -166,7 +168,9 @@ export async function maybeAutoTitle(
 /** Force a fresh title (session context menu): skip the cooldown, manual guard and sufficiency. */
 export async function regenerateTitle(tabId: string): Promise<boolean> {
   lastAttempt.delete(tabId);
-  return maybeAutoTitle(tabId, Date.now(), { bypassCooldown: true, allowManual: true });
+  const updated = await maybeAutoTitle(tabId, Date.now(), { bypassCooldown: true, allowManual: true });
+  if (updated) useToastStore.getState().addToast(t('Tab title updated'), 'success');
+  return updated;
 }
 
 /** Activity → reset the idle debounce timer. */

@@ -3,9 +3,12 @@ import { t } from '@i18n';
 import type { BackendSessionEntry } from '@platform/api/types';
 import { deriveSessionHistorySections, groupHistoricalSessions, hasSessionHistoryFilter, sessionCommandCount, sessionSummaryText, sortHistoricalSessions, updateSessionHistoryFilter, type SessionHistorySort } from '@features/session-history/model/sessionHistoryModel';
 
+const pane = (over: Record<string, unknown> = {}) => ({ type: 'leaf', terminal: { id: 'pane', kind: 'local', shellType: 'bash', openMode: 'block', ...over } });
+const payload = (layout: unknown = pane()) => JSON.stringify({ layout });
+
 function session(overrides: Partial<BackendSessionEntry>): BackendSessionEntry {
   return {
-    id: 'id', title: '标题', status: 'historical', kind: 'local', payload: '{}',
+    id: 'id', title: '标题', status: 'historical', kind: 'local', payload: payload(),
     cwd: '/workspace', created_at: 1, closed_at: Date.now(), block_count: 0, sort_order: 0,
     group_id: null, ...overrides,
   };
@@ -23,9 +26,9 @@ describe('session history model', () => {
   });
   it('keeps groups and sorts both grouped and loose results after mode filtering', () => {
     const items = ['g', null].flatMap(group_id => [
-      session({ id: `b-${group_id}`, group_id, title: 'Beta', payload: '{"openMode":"block"}' }),
-      session({ id: `a-${group_id}`, group_id, title: 'Alpha', payload: '{"openMode":"block"}' }),
-      session({ id: `c-${group_id}`, group_id, payload: '{"openMode":"classic"}' }),
+      session({ id: `b-${group_id}`, group_id, title: 'Beta', payload: payload(pane({ openMode: 'block' })) }),
+      session({ id: `a-${group_id}`, group_id, title: 'Alpha', payload: payload(pane({ openMode: 'block' })) }),
+      session({ id: `c-${group_id}`, group_id, payload: payload(pane({ openMode: 'classic' })) }),
     ]);
     const sections = deriveSessionHistorySections(items, { query: '', type: 'all', date: 'all', mode: 'block', sort: 'title-asc' });
     expect(sections.grouped.get('g')!.map(item => item.title)).toEqual(['Alpha', 'Beta']);
@@ -34,9 +37,9 @@ describe('session history model', () => {
   });
   it('groups by the saved shell type independently of startup mode and workspace membership', () => {
     const items = [
-      session({ id: 'bash', payload: '{"shellType":"bash","openMode":"classic"}', group_id: 'old-group' }),
-      session({ id: 'cmd', payload: '{"shellType":"cmd"}' }),
-      session({ id: 'ssh', kind: 'ssh', payload: '{"ssh":{"host":"example"}}' }),
+      session({ id: 'bash', payload: payload(pane({ shellType: 'bash', openMode: 'classic' })), group_id: 'old-group' }),
+      session({ id: 'cmd', payload: payload(pane({ shellType: 'cmd' })) }),
+      session({ id: 'ssh', kind: 'ssh', payload: payload(pane({ kind: 'ssh', ssh: { host: 'example' } })) }),
     ];
     expect(groupHistoricalSessions(items, 'terminal').map(card => card.title)).toEqual(['Bash', 'CMD', 'SSH']);
     expect(new Set(groupHistoricalSessions(items, 'type').map(card => card.id))).toEqual(new Set(['type:local', 'type:ssh']));
@@ -50,7 +53,7 @@ describe('session history model', () => {
     expect(cards.map(card => card.title)).toContain('dev@a.test · /srv/app');
     expect(cards.map(card => card.title)).toContain('dev@a.test:2222 · /srv/app');
     expect(cards.every(card => card.sessions.length === 1)).toBe(true);
-    const missing = groupHistoricalSessions([remote('a', 'a.test'), session({ id: 'missing', cwd: '', kind: 'ssh', payload: '{"ssh":{"host":"b.test"}}' })], 'cwd');
+    const missing = groupHistoricalSessions([remote('a', 'a.test'), session({ id: 'missing', cwd: '', kind: 'ssh', payload: payload(pane({ kind: 'ssh', ssh: { host: 'b.test' } })) })], 'cwd');
     expect(missing.find(card => card.title.startsWith('b.test'))?.title).toContain('未记录工作目录');
   });
   it('counts mixed panes once and retains their group when connection or mode filters match a pane', () => {
@@ -131,14 +134,13 @@ describe('session history model', () => {
   });
 });
 
-it('shows command counts only for block sessions, including mixed layouts and legacy positive counts', () => {
-  const metadata = (mode: 'classic' | 'block') => ({ type: 'leaf', terminal: { id: 'pane', kind: 'local', openMode: mode } });
-  expect(sessionCommandCount(session({ block_count: 4, payload: JSON.stringify({ layout: metadata('classic') }) }))).toBeNull();
-  expect(sessionCommandCount(session({ block_count: 0, payload: JSON.stringify({ layout: metadata('block') }) }))).toBe(0);
-  expect(sessionCommandCount(session({ block_count: 2, payload: JSON.stringify({ layout: { type: 'split', first: metadata('classic'), second: metadata('block') } }) }))).toBe(2);
-  expect(sessionCommandCount(session({ kind: 'ssh', block_count: 0 }))).toBeNull();
-  expect(sessionCommandCount(session({ kind: 'ssh', block_count: 3, payload: JSON.stringify({ ssh: { host: 'legacy.test' } }) }))).toBeNull();
-  expect(sessionCommandCount(session({ block_count: 3 }))).toBe(3);
+it('shows command counts only for block sessions, including mixed layouts', () => {
+  const metadata = (mode: 'classic' | 'block') => pane({ openMode: mode });
+  expect(sessionCommandCount(session({ block_count: 4, payload: payload(metadata('classic')) }))).toBeNull();
+  expect(sessionCommandCount(session({ block_count: 0, payload: payload(metadata('block')) }))).toBe(0);
+  expect(sessionCommandCount(session({ block_count: 2, payload: payload({ type: 'split', first: metadata('classic'), second: metadata('block') }) }))).toBe(2);
+  expect(sessionCommandCount(session({ kind: 'ssh', block_count: 0, payload: payload(pane({ kind: 'ssh', openMode: 'classic', ssh: { host: 'remote.test' } })) }))).toBeNull();
+  expect(sessionCommandCount(session({ block_count: 3, payload: '{}' }))).toBe(3);
 });
 
 it('summarizes a session for the clipboard', () => {

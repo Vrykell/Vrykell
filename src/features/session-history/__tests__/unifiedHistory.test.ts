@@ -5,7 +5,9 @@ import { DEFAULT_UNIFIED_FILTER, filterUnifiedHistory, groupUnifiedHistory, unif
 const session = (id: string, kind: 'local' | 'ssh', time: number): BackendSessionEntry => ({
   id, title: `${kind} ${id}`, status: 'historical', created_at: time - 100, closed_at: time,
   block_count: 0, cwd: kind === 'local' ? '/repo' : '', group_id: null, sort_order: 0, kind,
-  payload: kind === 'ssh' ? JSON.stringify({ ssh: { host: 'prod.example.com', user: 'deploy' } }) : JSON.stringify({ cwd: '/repo' }),
+  payload: JSON.stringify({ layout: { type: 'leaf', terminal: kind === 'ssh'
+    ? { id: `${id}#0`, kind, ssh: { host: 'prod.example.com', user: 'deploy' }, openMode: 'classic' }
+    : { id: `${id}#0`, kind, cwd: '/repo', openMode: 'block' } } }),
 });
 
 it('matches every member type of a mixed combination without splitting the history record', () => {

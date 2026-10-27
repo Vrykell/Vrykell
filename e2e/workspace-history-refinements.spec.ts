@@ -40,9 +40,6 @@ test('the history singleton never persists into the terminal tab order', async (
   await page.getByTestId('tab-history-btn').click();
   await expect(page.locator('[data-testid="unified-history-page"]:visible')).toBeVisible();
   await expect(page.locator('[data-tab-kind="history"]')).toHaveCount(1);
-  // System pages are stripped from the persisted tab order.
-  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('workspace-navigation-v1') ?? '{}') as { sessionLayoutOrder?: string[] });
-  expect((saved.sessionLayoutOrder ?? []).some(id => id.startsWith('page:'))).toBe(false);
   // Closing the singleton restores the session-only order.
   await page.getByTestId('workspace-area-terminal').click();
   const historyRow = page.locator('[data-tab-kind="history"]');

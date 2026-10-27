@@ -6,7 +6,7 @@ const group: BackendGroupEntry = { id: 'project', title: 'Project', collapsed: f
   session_count: 0, sort_order: 0, created_at: 1 };
 const member = (id: string, cwd: string, closed: number): BackendSessionEntry => ({ id, title: id, cwd,
   created_at: 1, closed_at: closed, status: 'historical', group_id: group.id, sort_order: 0,
-  kind: 'local', payload: '{}', block_count: 0 });
+  kind: 'local', payload: JSON.stringify({ layout: { type: 'leaf', terminal: { id: `pane-${id}`, kind: 'local', cwd, shellType: 'bash' } } }), block_count: 0 });
 
 it('preserves original groups across directory and date classifications without duplicating members', () => {
   const now = Date.now();

@@ -193,13 +193,15 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     const sshConnections: Record<string, unknown>[] = [
       { id: 'ssh-1', name: '生产服务器', host: 'prod.example.com', port: 22, user: 'root', password: '', authMethod: 'password', lastOpenedAt: null, hasPassword: true },
     ];
+    const terminalPayload = (id: string, kind = 'local', cwd = '', shellType = 'bash', ssh?: Record<string, string>) =>
+      JSON.stringify({ layout: { type: 'leaf', terminal: { id, kind, cwd, shellType, ...(ssh ? { ssh } : {}) } } });
     const mockSessions: Record<string, unknown>[] = [
-      { id: 't1', title: '终端', status: 'active', created_at: Date.now(), closed_at: null, block_count: 2, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: '{}' },
-      { id: 'hist-1', title: '旧的调试会话', status: 'historical', created_at: Date.now() - 1000, closed_at: Date.now() - 500, block_count: 5, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: '{}' },
+      { id: 't1', title: '终端', status: 'active', created_at: Date.now(), closed_at: null, block_count: 2, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: terminalPayload('t1#0') },
+      { id: 'hist-1', title: '旧的调试会话', status: 'historical', created_at: Date.now() - 1000, closed_at: Date.now() - 500, block_count: 5, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: terminalPayload('hist-1#0') },
       ...(groupedHistoricalSession ? [
-        { id: 'hist-group-1', title: '归档分组中的会话', status: 'historical', created_at: Date.now() - 2000, closed_at: Date.now() - 1000, block_count: 1, cwd: '/project/docs', group_id: 'archived-group', sort_order: 0, kind: 'local', payload: '{}' },
-        { id: 'hist-group-2', title: 'Backend', status: 'historical', created_at: Date.now() - 3000, closed_at: Date.now() - 10 * 86400000, block_count: 0, cwd: '/srv/backend', group_id: 'archived-group', sort_order: 1, kind: 'ssh', payload: '{"ssh":{"host":"project.test","user":"dev"}}' },
-        { id: 'hist-group-3', title: 'Frontend', status: 'historical', created_at: Date.now() - 4000, closed_at: Date.now() - 2000, block_count: 0, cwd: '/project/web', group_id: 'archived-group', sort_order: 2, kind: 'local', payload: '{}' },
+        { id: 'hist-group-1', title: '归档分组中的会话', status: 'historical', created_at: Date.now() - 2000, closed_at: Date.now() - 1000, block_count: 1, cwd: '/project/docs', group_id: 'archived-group', sort_order: 0, kind: 'local', payload: terminalPayload('hist-group-1#0', 'local', '/project/docs') },
+        { id: 'hist-group-2', title: 'Backend', status: 'historical', created_at: Date.now() - 3000, closed_at: Date.now() - 10 * 86400000, block_count: 0, cwd: '/srv/backend', group_id: 'archived-group', sort_order: 1, kind: 'ssh', payload: terminalPayload('hist-group-2#0', 'ssh', '/srv/backend', 'bash', { host: 'project.test', user: 'dev' }) },
+        { id: 'hist-group-3', title: 'Frontend', status: 'historical', created_at: Date.now() - 4000, closed_at: Date.now() - 2000, block_count: 0, cwd: '/project/web', group_id: 'archived-group', sort_order: 2, kind: 'local', payload: terminalPayload('hist-group-3#0', 'local', '/project/web') },
       ] : []),
     ];
     const mockGroups: Record<string, unknown>[] = groupedHistoricalSession
@@ -1072,7 +1074,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return [{ id: 'b1', session_id: 'hist-1', pane_id: null, command: 'npm run dev', output_raw: 'o', output_clean: 'dev server running', exit_code: 0, status: 'done', started_at: Date.now() - 60000, ended_at: Date.now() - 59000, session_title: '终端', session_status: 'historical' }];
           case 'search_sessions':
             searchCalls.push({ cmd: 'search_sessions', args });
-            return [{ id: 't1', title: 'npm run dev', status: 'active', created_at: Date.now(), closed_at: null, block_count: 2, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: '{}' }];
+            return [{ id: 't1', title: 'npm run dev', status: 'active', created_at: Date.now(), closed_at: null, block_count: 2, cwd: '', group_id: null, sort_order: 0, kind: 'local', payload: terminalPayload('t1#0') }];
           case 'shell_launch_directory': return launchDirectory ?? null;
           case 'shell_take_forwarded_directories': return pendingLaunchDirectories.splice(0);
           case 'context_menu_status': return { ...menu };

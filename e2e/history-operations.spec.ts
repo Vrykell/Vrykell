@@ -18,7 +18,7 @@ async function seedSessions(page: Page) {
       { id: 'beta', title: 'Deploy Beta', cwd: '/srv/app' },
       { id: 'hidden', title: 'Unrelated history', cwd: '/other' },
     ].map((item, index) => ({ ...item, kind: 'local', status: 'historical', created_at: now, closed_at: now - index * 1000,
-      payload: '{"shellType":"bash"}', block_count: 0, sort_order: index, group_id: null }));
+      payload: JSON.stringify({ layout: { type: 'leaf', terminal: { id: `${item.id}#0`, kind: 'local', shellType: 'bash', cwd: item.cwd } } }), block_count: 0, sort_order: index, group_id: null }));
     probe.__HISTORY_CALLS__ = [];
     probe.__TAURI_INTERNALS__.invoke = async (command, args) => {
       if (command === 'list_sessions') return [...items];

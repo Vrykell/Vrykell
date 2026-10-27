@@ -5,14 +5,14 @@ export type SessionTypeFilter = 'all' | 'local' | 'ssh';
 export type SessionDateFilter = 'all' | 'today' | '7d' | '30d' | '90d';
 export type SessionModeFilter = 'all' | 'block' | 'classic';
 
-/** Use saved pane modes, with the original defaults for legacy session metadata. */
+/** Use the saved pane modes and their current defaults. */
 export function sessionTerminalModes(session: BackendSessionEntry): Set<Exclude<SessionModeFilter, 'all'>> {
   return new Set(sessionHistoryTerminals(session).map(terminal => terminal.shellType === 'cmd' ? 'classic'
     : terminal.openMode ?? (terminal.kind === 'ssh' ? 'classic' : 'block')));
 }
 
 export function isSshSession(session: BackendSessionEntry): boolean {
-  return sessionHistoryTerminals(session).some(terminal => terminal.kind === 'ssh');
+  return session.kind === 'ssh' || sessionHistoryTerminals(session).some(terminal => terminal.kind === 'ssh');
 }
 
 export function sshTargetOf(session: BackendSessionEntry): string | null {

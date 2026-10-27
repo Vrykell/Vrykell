@@ -39,7 +39,7 @@ const terminalSpecSchema = z.object({
   ssh: z.object({ name: z.string().max(320), host: z.string().min(1).max(2048), user: z.string().max(256).optional(), port: z.number().int().min(1).max(65535).optional(), connectionId: z.string().max(256).optional() }).passthrough().optional(),
 });
 
-/** Validate the older native wire encoding before converting it into live pane references. */
+/** Validate the terminal wire encoding before converting it into live pane references. */
 export function parseWindowLayout(value: unknown): WindowLayout | null {
   const ids = new Set<string>();
   const parse = (input: unknown, depth: number): WindowLayout | null => {

@@ -35,11 +35,9 @@ beforeEach(() => {
 });
 
 describe('sessionManager.restore（窗口布局）', () => {
-  it('从旧 ssh payload 恢复含 SSH 终端的窗口', async () => {
-    const session = mockSession({
-      id: 'ssh-1', title: '生产服务器', kind: 'ssh',
-      payload: JSON.stringify({ ssh: { name: '生产服务器', host: 'prod.example.com', user: 'root', port: 22, connectionId: 'c1' } }),
-    });
+  it('从当前 layout payload 恢复含 SSH 终端的窗口', async () => {
+    const layout = { type: 'leaf', terminal: { id: 'ssh-1#0', kind: 'ssh', ssh: { name: '生产服务器', host: 'prod.example.com', user: 'root', port: 22, connectionId: 'c1' } } };
+    const session = mockSession({ id: 'ssh-1', title: '生产服务器', kind: 'ssh', payload: JSON.stringify({ layout }) });
     mockedInvoke.mockImplementation(async (cmd: string) => (cmd === 'get_session' ? session : defaultInvoke(cmd)));
 
     await sessionManager.restore('ssh-1', '生产服务器');
@@ -52,8 +50,9 @@ describe('sessionManager.restore（窗口布局）', () => {
     expect(term.ssh?.connectionId).toBe('c1');
   });
 
-  it('从旧 shellType payload 恢复本地终端窗口', async () => {
-    const session = mockSession({ id: 'local-1', title: 'Zsh', kind: 'local', payload: JSON.stringify({ shellType: 'zsh' }) });
+  it('从当前 layout payload 恢复本地终端窗口', async () => {
+    const layout = { type: 'leaf', terminal: { id: 'local-1#0', kind: 'local', shellType: 'zsh' } };
+    const session = mockSession({ id: 'local-1', title: 'Zsh', kind: 'local', payload: JSON.stringify({ layout }) });
     mockedInvoke.mockImplementation(async (cmd: string) => (cmd === 'get_session' ? session : defaultInvoke(cmd)));
 
     await sessionManager.restore('local-1', 'Zsh');
