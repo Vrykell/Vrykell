@@ -547,7 +547,7 @@ Global search places only the query in a lighter field, with inset spacing on al
 | PF3 | Detailed log performance | Auto-save does not call IPC or open the file per event; the terminal data path (reads, output flushes, IPC intake, controller intake, routing destinations) aggregates into one `pty-io` / `terminal-io` record per second and growing silence becomes `read-idle` at 1 s, 2 s, 4 s, …, so a full-screen program cannot write the log dry; batched records are ordered, complete and redacted, and flushed before export | Frontend unit tests verify batching 130 records, timing, errors and export order, plus the `terminal-io` window; Rust verifies 1025 records, hourly rotation, pruning and write errors, plus the `pty-io`/`read-idle` window; E2E enables logging then tests continuous output input |
 | PF4 | Responsive terminal resizing | Fit without clearing the previous frame, repaint resized canvases before presentation, and deduplicate/coalesce pending PTY sizes without a time debounce. Completed commands retain live output until the parsed snapshot is ready. Short commands avoid temporary GPU canvases | Unit tests cover frame repaint, size coalescing and snapshot handoff. `resize-stability.spec.ts` checks continuous narrowing with both renderers and short commands |
 
-Benchmarks and scope of application are in [Terminal Performance Verification](terminal-performance-2026-10-06.md).
+Benchmarks and scope of application are covered by `terminal-performance.spec.ts`.
 
 ## 22. Scrollbars
 

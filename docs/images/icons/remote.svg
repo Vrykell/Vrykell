@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>remote</title>
+  <rect width="64" height="64" rx="16" fill="#22C55E" fill-opacity="0.12"/>
+  <g stroke="#22C55E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <rect x="14" y="14" width="36" height="13" rx="4"/>
+  <rect x="14" y="32" width="36" height="13" rx="4"/>
+  <circle cx="22" cy="20.5" r="1.5"/>
+  <circle cx="22" cy="38.5" r="1.5"/>
+  <path d="M31 20.5h12M31 38.5h12"/>
+  </g>
+</svg>

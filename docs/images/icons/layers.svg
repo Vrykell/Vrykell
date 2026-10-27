@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>layers</title>
+  <rect width="64" height="64" rx="16" fill="#A78BFA" fill-opacity="0.12"/>
+  <g stroke="#A78BFA" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M32 12l20 10-20 10-20-10 20-10z"/>
+  <path d="M12 32l20 10 20-10"/>
+  <path d="M12 42l20 10 20-10"/>
+  </g>
+</svg>

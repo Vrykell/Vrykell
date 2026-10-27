@@ -1,8 +1,0 @@
-
- RUN  v4.1.11 D:/projects/typescript/Vrykell
-
-
- Test Files  5 passed (5)
-      Tests  20 passed (20)
-   Start at  11:20:15
-   Duration  3.47s (transform 1.57s, setup 1.15s, import 3.94s, tests 622ms, environment 7.54s)

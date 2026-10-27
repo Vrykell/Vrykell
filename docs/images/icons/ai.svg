@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <title>ai</title>
+  <rect width="64" height="64" rx="16" fill="#08C9B0" fill-opacity="0.12"/>
+  <g stroke="#08C9B0" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M17 17h30a5 5 0 0 1 5 5v14a5 5 0 0 1-5 5H30l-9 7v-7h-4a5 5 0 0 1-5-5V22a5 5 0 0 1 5-5z"/>
+  <path d="M35 23l1.7 4.3L41 29l-4.3 1.7L35 35l-1.7-4.3L29 29l4.3-1.7L35 23z"/>
+  </g>
+</svg>

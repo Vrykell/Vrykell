@@ -1,8 +1,0 @@
-
-> vrykell@0.1.0 check:architecture
-> node scripts/check-architecture.mjs
-
-提示：以下 IPC 命令已注册但 src/ 内没有调用点，请确认是否仍在使用：
-- set_ai_key
-- clear_ai_key
-架构边界检查通过：目标目录、依赖方向、视图边界与 IPC 命令注册表均正常。

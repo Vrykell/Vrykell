@@ -1,120 +1,216 @@
+<div align="center">
+
+<img src="public/app-icon.svg" width="88" alt="Vrykell" />
+
 # Vrykell
 
-chat-first 终端。终端是主表面，每个命令渲染为一个**命令块（Block）**；AI 对话（Anthropic/Gemini/OpenAI 兼容 BYOK 直连）以内联 @Agent 块 + 全局 AI 面板（dock 侧栏）双形态展示，并支持**代码代理**（工具调用、权限模式、Skills、MCP、记忆、调度）。
+**终端、AI 对话和代码，在同一个桌面工作区。**
 
-> v1 自研 DOM 终端已废弃并归档（`archive/v1-dom-terminal` 分支）。当前开发在 `dev` 分支。
+<p>
+  <a href="#快速开始"><img src="https://img.shields.io/badge/Quick_start-169AF0?style=for-the-badge&logo=rocket&logoColor=white" alt="Quick start" /></a>
+  <a href="docs/zh/feature-spec.md"><img src="https://img.shields.io/badge/Docs-0F172A?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Documentation" /></a>
+  <a href="README.en.md"><img src="https://img.shields.io/badge/English-374151?style=for-the-badge&logo=googletranslate&logoColor=white" alt="English" /></a>
+</p>
 
-## 技术栈
+<p>
+  <img src="https://img.shields.io/badge/Windows-0078D4?style=flat-square&logo=windows11&logoColor=white" alt="Windows" />
+  <img src="https://img.shields.io/badge/macOS-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS" />
+  <img src="https://img.shields.io/badge/Linux-FCC624?style=flat-square&logo=linux&logoColor=black" alt="Linux" />
+  <img src="https://img.shields.io/badge/Tauri_2-24C8D8?style=flat-square&logo=tauri&logoColor=white" alt="Tauri 2" />
+  <img src="https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" />
+  <img src="https://img.shields.io/badge/Rust-000000?style=flat-square&logo=rust&logoColor=white" alt="Rust" />
+</p>
 
-- **桌面壳**：Tauri 2（Rust 后端）
-- **前端**：React 19 + TypeScript + Vite
-- **终端**：`@xterm/xterm`（主终端 + 每块离屏 xterm，不做自研终端模拟器）
-- **状态**：zustand
-- **AI**：AI SDK（`ai` + `@ai-sdk/*`，BYOK 多 provider）+ react-markdown + KaTeX
-- **后端能力**：`portable-pty`（PTY）、`rusqlite`（持久化）、`ssh2`（SSH/SFTP）
-- **测试**：vitest（单测）、Playwright（e2e）
+</div>
+
+<p align="center">
+  <a href="docs/images/hero-dark.png">
+    <img src="docs/images/hero-dark.png" width="100%" alt="Vrykell 工作区：命令块终端与 AI 对话并排" />
+  </a>
+</p>
+
+<p align="center"><sub>左侧是命令块终端，右侧是能引用命令输出并执行工具的 AI 对话。</sub></p>
+
+## Vrykell 是什么
+
+Vrykell 是一个终端优先的桌面工作台，面向每天在终端里工作的开发者。它把每条命令保存成结构化的命令块，把 AI Agent 放进命令旁边，并让终端、文件、编辑器和对话共享同一套标签、分屏与分组。
+
+大多数 AI 终端只是把聊天窗口贴在终端旁边。Vrykell 让 AI 能引用具体命令块、读取输出，并在需要时执行命令、编辑文件或继续分屏处理。应用使用 Tauri 2 构建，支持 Windows、macOS 和 Linux。
+
+**设计原则**
+
+- **终端是主界面**：AI 是命令块和工作区的一部分，不是另一个需要来回切换的应用。
+- **操作可回看、可撤销**：命令块保留上下文，工具调用先确认，文件修改可以回到差异页检查。
+- **本地优先**：自带 API Key 直连模型服务，密钥留在本机；诊断日志只记录运行元数据。
 
 ## 快速开始
 
-请先安装 Node.js、npm 和 Rust 工具链（含 Cargo），并准备好当前平台的 Tauri 2 系统构建依赖。
-
-Fedora 安装系统开发依赖（包含本项目 SSH/SFTP 所需依赖）：
+需要 Node.js 20+、Rust 工具链，以及当前平台的 [Tauri 2 系统依赖](https://v2.tauri.app/start/prerequisites/)。
 
 ```bash
-sudo dnf install gcc gcc-c++ make pkgconf-pkg-config \
-  glib2-devel gtk3-devel webkit2gtk4.1-devel \
-  openssl-devel libssh2-devel libappindicator-gtk3-devel \
-  librsvg2-devel libxdo-devel curl wget file
-```
-
-其他发行版请参考 [Tauri 系统依赖说明](https://v2.tauri.app/start/prerequisites/#linux)。
-
-> **macOS 构建依赖**：SSH/SFTP 所用的 `libssh2` 和 OpenSSL 随 Cargo 从源码编译，不需要安装 Homebrew、`pkg-config` 或系统 OpenSSL。Intel 和 Apple Silicon 均使用此配置。首次构建会较慢，需要 Xcode Command Line Tools、Perl 和 Make；可用 `xcode-select --install` 安装命令行工具。
->
-> **macOS build dependencies**: Cargo builds the SSH/SFTP libraries (`libssh2` and OpenSSL) from source on both Intel and Apple Silicon. Homebrew, `pkg-config`, and system OpenSSL are not required. The first build takes longer and requires Xcode Command Line Tools, Perl, and Make; install the command line tools with `xcode-select --install`.
-
-```bash
+git clone https://github.com/xtr-hub/Vrykell.git
+cd Vrykell
 npm install
-npm run tauri dev  # 启动完整 Tauri 应用
+npm run tauri dev      # 启动完整桌面应用
+npm run tauri build    # 构建安装包
 ```
 
-`npm run tauri dev` 使用项目依赖 `@tauri-apps/cli`，并自动启动前端开发服务器，无需另外运行 `npm run dev`，也无需全局安装 Tauri CLI。仅开发前端时，可单独运行 `npm run dev`（端口 1420）。
+只开发前端时运行 `npm run dev`（固定端口 1420）。
 
-### 加速桌面打包
+<details>
+<summary>平台依赖</summary>
 
-Rust 编译缓存使用 [sccache](https://github.com/mozilla/sccache)。首次安装一次：
+- **Windows**：使用系统 WebView2。
+- **macOS**：需要 Xcode Command Line Tools、Perl 和 Make。SSH/SFTP 依赖由 Cargo 从源码构建，不需要 Homebrew 或系统 OpenSSL。
+- **Linux**：需要 Tauri 2 系统依赖，完整安装命令见 [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)。
+- **测试**：`npm run test`、`npm run test:e2e`、`cargo test --manifest-path src-tauri/Cargo.toml`。
+
+</details>
+
+## 从一条命令开始
+
+### 1. 命令变成块
+
+在底部输入 `git status`，执行后不会只留下滚动的输出。每个块记录工作目录、耗时、退出码和 Git 分支；命令、输出和操作都在同一个块里。运行中的命令使用真实终端渲染，TUI、备用屏幕、选区复制和输入法都能工作。
+
+块内菜单可以复制命令或输出、重新运行、清除，或把这块输出交给 AI。命令历史按项目、目录、Shell 和状态筛选，支持收藏、自定义分组、排序和 AI 自动分组。
+
+<p align="center">
+  <a href="docs/images/feature-terminal.png"><img src="docs/images/feature-terminal.png" width="100%" alt="命令块终端" /></a>
+</p>
+
+### 2. 把失败输出交给 AI
+
+点击块内的「询问 AI」，或打开侧栏对话。Agent 会拿到当前命令块作为引用，可以读取输出、搜索文件、执行命令和编辑文件；执行和写入默认需要确认，危险命令还会走系统级确认。
+
+```text
+为什么刚才的构建失败了？定位原因，给出最小修复，并说明要改哪些文件。
+```
+
+内联 Agent 和侧栏对话共享会话、草稿和流式状态。模型可以来自 Anthropic、Gemini 或 OpenAI 兼容服务；工具、Skills、MCP 服务器和记忆使用同一套设置。
+
+<p align="center">
+  <a href="docs/images/feature-ai.png"><img src="docs/images/feature-ai.png" width="100%" alt="AI 读取命令输出并给出建议" /></a>
+</p>
+
+### 3. 终端和编辑器共享工作区
+
+每个区域有自己的标签条。终端、编辑器、Git 对比、文件和对话可以拖动排序、命名分组，最多拆成四个窗格；聚合工作区允许把不同类型的资源放进同一个标签或分屏，打开新资源不会打乱已有布局。
+
+会话历史只恢复终端和对话。编辑器内容、未保存草稿和文件浏览状态留在当前工作区，避免重启后悄悄恢复过期文件。
+
+<p align="center">
+  <a href="docs/images/feature-unified.png"><img src="docs/images/feature-unified.png" width="100%" alt="聚合工作区开始页" /></a>
+</p>
+
+### 4. 远程主机也在同一工作区
+
+SSH/SFTP 主机管理器支持密码或密钥、跳板机、端口转发和主机指纹确认。远程目录可以直接浏览、上传、下载、打开编辑，也可以和本地终端一样使用命令块与 AI。
+
+<p align="center">
+  <a href="docs/images/feature-ssh.png"><img src="docs/images/feature-ssh.png" width="100%" alt="SSH 主机管理" /></a>
+</p>
+
+## 功能细节
+
+<table>
+<tr>
+<td width="50%" valign="top">
+  <img src="docs/images/icons/terminal.svg" width="44" alt="" /><br /><br />
+  <b>终端与命令历史</b><br />
+  每条命令保留工作目录、耗时、退出码、分支和完整输出；运行中的块支持 TUI、备用屏幕和输入法。历史按项目、环境、Shell 和目录归属，支持搜索、收藏、分组、排序和 AI 分组预览。
+</td>
+<td width="50%" valign="top">
+  <img src="docs/images/icons/ai.svg" width="44" alt="" /><br /><br />
+  <b>AI 与工具</b><br />
+  Anthropic、Gemini 和 OpenAI 兼容服务；内联 Agent 与侧栏对话共享会话。支持工具审批、Skills、MCP 服务器、本地记忆，以及通过 ACP 接入的外部 Agent。
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+  <img src="docs/images/icons/workspace.svg" width="44" alt="" /><br /><br />
+  <b>工作区与分屏</b><br />
+  每个区域独立标签条，支持拖拽排序、命名分组、折叠、配色和空组清理。最多四个窗格，可拆出、合并或切换焦点；聚合工作区把终端、文件、编辑器和对话放进同一标签。
+</td>
+<td width="50%" valign="top">
+  <img src="docs/images/icons/remote.svg" width="44" alt="" /><br /><br />
+  <b>远程、文件与编辑器</b><br />
+  SSH/SFTP、主机管理、跳板、端口转发和指纹确认；本地与远程文件面板共享浏览、拖放、上传下载和撤销。内置编辑器、Markdown 预览、Git 差异和命令面板。
+</td>
+</tr>
+</table>
+
+## 模型与工具
+
+打开 **设置 → 模型配置**，添加上游地址、API Key 和模型，然后选择当前模型。请求直接发给模型服务商，不经过 Vrykell 的中转服务；API Key 保存在本机。
+
+| 服务 | 说明 |
+| --- | --- |
+| Anthropic | 原生 Messages API |
+| Gemini | 原生 API |
+| OpenAI compatible | Ollama、LM Studio、vLLM 等兼容 `/v1` 的服务 |
+
+工具权限在 **设置 → 工具权限** 中调整。标准档按工具规则询问，严格档逐次询问，放行档仍会确认危险命令和凭据路径。Skills、MCP 服务器和记忆分别有独立设置页。
+
+## 项目状态
+
+- 当前版本 **0.1.0**，仍在早期开发，界面和行为可能变化。
+- 会话历史只保存终端和对话；文件、编辑器缓冲区和未保存草稿不会跨重启恢复。
+- macOS 的 SSH/SFTP 依赖由 Cargo 从源码构建；Linux 需要 Tauri 2 系统依赖。
+- 本仓库尚未附带整体开源许可证，默认保留所有权利；第三方依赖许可见 [NOTICE](NOTICE)。
+
+## 本地开发
 
 ```bash
-cargo install sccache --locked
-npm run tauri build
+npx tsc --noEmit                 # 类型检查
+npm run test                     # 单元测试
+npm run test:e2e                 # Playwright 浏览器回归
+cargo test --manifest-path src-tauri/Cargo.toml
+npm run check:architecture       # 导入边界与 IPC 注册表检查
+npm run build                    # 生产构建
 ```
 
-项目的 Tauri 命令会在打包时开启 Rust 增量编译；安装 sccache 后还会通过 `RUSTC_WRAPPER` 缓存依赖编译，并在结束后显示缓存统计。没有安装 sccache 时会提示并继续增量构建。首次构建仍需编译依赖，后续修改后的打包会复用增量结果，清理构建产物后的重建可复用 sccache 缓存。
-
-Linux 上打包 AppImage 时会自动设置 `NO_STRIP=1`：linuxdeploy 自带的 binutils 版本较旧，无法解析新版工具链产出的 `.relr.dyn` 段，逐库报错并让打包中断。跳过这一步不影响产物——拷入 AppDir 的系统库本身已经是 stripped。
-
-### Faster desktop packaging
-
-Rust compilation caching uses [sccache](https://github.com/mozilla/sccache). Install it once, then use the usual packaging command:
-
-```bash
-cargo install sccache --locked
-npm run tauri build
-```
-
-The project Tauri command enables Rust incremental compilation for packaging; when sccache is installed, it also caches dependency compilation through `RUSTC_WRAPPER` and prints cache statistics afterward. If sccache is not installed, the command warns and still uses incremental compilation. The first build still compiles dependencies; later source rebuilds can reuse incremental results, and clean rebuilds can reuse the sccache cache.
-
-On Linux the AppImage step sets `NO_STRIP=1` automatically: the binutils bundled with linuxdeploy is too old to parse the `.relr.dyn` sections newer toolchains emit, so every strip call fails and the bundle aborts. Skipping that pass does not affect the artifact — the system libraries copied into the AppDir are already stripped.
-
-## 常见问题
-
-### Linux 编译提示找不到 `glib-2.0`
-
-如果 `glib-sys` 构建失败，且 `pkg-config` 提示找不到 `glib-2.0.pc`，请先安装系统开发依赖。Fedora 使用上方的 `dnf install` 命令，然后检查：
-
-```bash
-pkg-config --modversion glib-2.0 gtk+-3.0 webkit2gtk-4.1
-npm run tauri dev
-```
-
-安装到系统默认路径的开发包通常无需手动设置 `PKG_CONFIG_PATH`。`npm install` 不会安装这些系统依赖。
-
-### `cargo tauri dev` 提示 `no such command: tauri`
-
-这表示 Cargo 未安装 Tauri CLI。本项目已通过 npm 管理 CLI，请在项目根目录执行：
-
-```bash
-npm install
-npm run tauri dev
-```
-
-不要使用 `cargo install tauri` 安装 CLI：`tauri` 是 Rust 库，不包含可执行程序，因此会提示 `there is nothing to install`。
-
-## 构建与测试
-
-```bash
-npm run build      # tsc + vite build
-npm run test       # vitest run（单测，覆盖率阈值 80/75/80/80）
-npm run test:e2e   # playwright test（e2e；dev server 端口取 PW_PORT，缺省 1421）
-cargo test --manifest-path src-tauri/Cargo.toml  # Rust 后端测试
-# 提交前全量验证：
-npx tsc --noEmit && npx vitest run && npx playwright test
-```
+提交前至少运行类型检查、单元测试和架构检查。终端、工作区和 AI 相关改动还需要运行对应的浏览器回归。
 
 ## 文档
 
-文档中英双语：中文在 `docs/zh/`，英文在 `docs/en/`，两侧文件名一一对应。
+<table>
+<tr>
+<td width="50%">
+  <img src="docs/images/icons/book.svg" width="40" alt="" /><br /><br />
+  <b><a href="docs/zh/feature-spec.md">功能规格</a></b><br />
+  <sub>每个功能的行为、边界和回归用例。</sub>
+</td>
+<td width="50%">
+  <img src="docs/images/icons/layers.svg" width="40" alt="" /><br /><br />
+  <b><a href="docs/zh/architecture.md">架构</a></b><br />
+  <sub>模块划分、终端管线和依赖方向。</sub>
+</td>
+</tr>
+<tr>
+<td width="50%">
+  <img src="docs/images/icons/rules.svg" width="40" alt="" /><br /><br />
+  <b><a href="docs/zh/development-rules.md">开发规则</a></b><br />
+  <sub>硬约束、共享组件、测试和提交要求。</sub>
+</td>
+<td width="50%">
+  <img src="docs/images/icons/shield.svg" width="40" alt="" /><br /><br />
+  <b><a href="docs/zh/security-model.md">安全模型</a></b><br />
+  <sub>IPC、渲染、文件访问和工具授权边界。</sub>
+</td>
+</tr>
+</table>
 
-| 文档（中 · en） | 内容 |
-|------|------|
-| [docs/zh/architecture.md](docs/zh/architecture.md) · [en](docs/en/architecture.md) | **当前实现架构**（Rust 扫描、三场景状态机、Block 生命周期、分屏、Agent、主题） |
-| [docs/zh/development-rules.md](docs/zh/development-rules.md) · [en](docs/en/development-rules.md) | 开发规则与硬约束 |
-| [docs/zh/feature-spec.md](docs/zh/feature-spec.md) · [en](docs/en/feature-spec.md) | 功能规格与测试清单 |
-| [docs/zh/development-log.md](docs/zh/development-log.md) · [en](docs/en/development-log.md) | 开发阶段日志 |
-| [docs/zh/code-audit.md](docs/zh/code-audit.md) · [en](docs/en/code-audit.md) | 代码审计与修复记录 |
-| [docs/zh/security-review.md](docs/zh/security-review.md) · [en](docs/en/security-review.md) | 安全性审查 |
-| [NOTICE](NOTICE) | 第三方依赖许可说明 |
+其他文档：[工作区底层](docs/zh/workspace-foundation.md) · [运行修复复查](docs/zh/workspace-runtime-review.md) · [ACP 接入](docs/zh/acp-harness-integration.md) · [SSH 配置](docs/zh/ssh-profiles.md) · [踩坑记录](docs/zh/pitfalls.md)
 
-## 架构速览
+## 贡献
 
-PTY 输出 → **Rust StreamScanner 同步扫描**（`src-tauri/src/terminal/scan.rs`）→ SessionController 三场景状态机（OSC 133 驱动）→ 每 executing block 一个离屏 xterm；完成后提取 outputHtml 快照 → scene 驱动 UI，block 列表普通 DOM 滚动 + follow-bottom。分屏时每个 pane 各有一个 SessionController。详见 [architecture.md](docs/zh/architecture.md)（英文版 [docs/en/architecture.md](docs/en/architecture.md)）。
+欢迎提交 Issue 和 PR。开始之前请阅读[开发规则](docs/zh/development-rules.md)和[项目约定](.agents/skills/vrykell-conventions/SKILL.md)。
+
+## 许可
+
+本仓库尚未附带整体开源许可证，默认保留所有权利；第三方依赖许可见 [NOTICE](NOTICE)。
+
+<p align="center">
+  <a href="https://github.com/xtr-hub/Vrykell/stargazers"><img src="https://img.shields.io/github/stars/xtr-hub/Vrykell?style=social" alt="GitHub stars" /></a>
+</p>
