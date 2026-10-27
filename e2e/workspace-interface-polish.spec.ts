@@ -69,6 +69,9 @@ for (const platform of ['macos', 'linux']) test.describe(`${platform} settings a
     await setupTauriMock(page, {}); await page.goto('/');
     await expect(page.locator('html')).toHaveAttribute('data-native-material', platform === 'macos' ? 'active' : 'fallback');
     await gotoSetting(page, '主题');
+    const materialToggle = page.getByRole('switch', { name: '桌面材质', exact: true });
+    if (platform === 'macos') await expect(materialToggle).toBeVisible();
+    else await expect(materialToggle).toHaveCount(0);
     await expect(page.locator('.settings-navigation').getByRole('button', { name: 'Windows 右键菜单', exact: true })).toHaveCount(0);
     const settings = await page.evaluate(async () => {
       const path = '/src/features/settings/services/registry.ts';

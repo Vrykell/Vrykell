@@ -1,11 +1,20 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { ThemePage } from '../pages/themePage';
 import { useTerminalThemeStore } from '../model/terminalTheme';
 
 const theme = vi.hoisted(() => ({ preference: 'system', setMode: vi.fn() }));
+const platform = vi.hoisted(() => ({ nativeMaterial: true }));
 vi.mock('@app/providers/ThemeProvider', () => ({ useTheme: () => theme }));
+vi.mock('@platform/runtime', () => ({
+  get supportsNativeMaterial() { return platform.nativeMaterial; },
+  isMacOS: false,
+  isWindows: false,
+  isLinux: true,
+  usesCustomWindowControls: true,
+}));
 
+beforeEach(() => { platform.nativeMaterial = true; });
 afterEach(() => vi.restoreAllMocks());
 
 it('shows all three preview choices and applies a selected mode', () => {
@@ -16,6 +25,13 @@ it('shows all three preview choices and applies a selected mode', () => {
   expect(document.querySelectorAll('.theme-mode-preview')).toHaveLength(3);
   fireEvent.click(screen.getByRole('radio', { name: '浅色' }));
   expect(theme.setMode).toHaveBeenCalledWith('light');
+});
+
+it('hides the desktop material control where window effects are unsupported', () => {
+  platform.nativeMaterial = false;
+  render(<ThemePage />);
+  expect(screen.queryByRole('switch', { name: '桌面材质' })).toBeNull();
+  expect(screen.getByRole('radiogroup', { name: '主题模式' })).toBeInTheDocument();
 });
 
 it('lets desktop color be disabled while preserving other appearance preferences', async () => {

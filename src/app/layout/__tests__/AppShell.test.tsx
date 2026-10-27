@@ -3,7 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import AppShell from '../AppShell';
 import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
 
-vi.mock('@platform/runtime', () => ({ isMacOS: true, isWindows: false }));
+vi.mock('@platform/runtime', () => ({ isMacOS: true, isWindows: false, supportsNativeMaterial: true }));
 vi.mock('@app/layout/WorkspaceShell', () => ({ default: () => <main>Workspace</main> }));
 vi.mock('@app/layout/ApplicationOverlays', () => ({ default: () => null }));
 vi.mock('@ui/layout/OverlayScrollbars', () => ({ default: () => null }));

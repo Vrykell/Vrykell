@@ -2,6 +2,9 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
+// The native material treatment exists only on platforms that expose window effects.
+test.use({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15' });
+
 for (const theme of ['深色', '浅色']) test(`acrylic is confined to navigation and region edges stay square in ${theme}`, async ({ page }, info) => {
   await setupTauriMock(page); await page.goto('/');
   await gotoSetting(page, '主题'); await page.getByRole('radio', { name: theme, exact: true }).click();
@@ -30,8 +33,10 @@ for (const theme of ['深色', '浅色']) test(`acrylic is confined to navigatio
 
 test('terminal dragging carries the complete tab and closing preview never closes the session', async ({ page }, info) => {
   await setupTauriMock(page); await page.goto('/');
-  await page.keyboard.press('Control+t');
   const tabs = page.locator('[data-tab-row-id]');
+  await expect(tabs).toHaveCount(1);
+  await page.keyboard.press('Control+t');
+  await expect(tabs).toHaveCount(2);
   const row = tabs.first(); const box = (await row.boundingBox())!;
   const title = await row.getByRole('tab').innerText();
   await page.mouse.move(box.x + 35, box.y + 16); await page.mouse.down();

@@ -8,6 +8,7 @@ import type { ThemePreference } from '@config/theme/tokens';
 import { iconSizes, Image as ImageIcon, Trash2 } from '@ui/icons';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import { useTheme } from '@app/providers/ThemeProvider';
+import { supportsNativeMaterial } from '@platform/runtime';
 import { useTerminalThemeStore } from '@features/settings/model/terminalTheme';
 import { useToastStore } from '@ui/feedback/Toast';
 import { SettingsGroup, Field, Toggle } from '@features/settings/components/ui';
@@ -80,9 +81,11 @@ export function ThemePage() {
         </div>
       </Field>
 
-      <Field title={t('Desktop material')} description={t('Use acrylic material in the left sidebar. Other regions stay opaque.')}>
-        <Toggle label={t('Desktop material')} on={config.desktopTint ?? true} onChange={desktopTint => themeUpdate({ desktopTint })} />
-      </Field>
+      {supportsNativeMaterial && (
+        <Field title={t('Desktop material')} description={t('Use acrylic material in the left sidebar. Other regions stay opaque.')}>
+          <Toggle label={t('Desktop material')} on={config.desktopTint ?? true} onChange={desktopTint => themeUpdate({ desktopTint })} />
+        </Field>
+      )}
 
       <Field title={t('Application opacity')} description={t('Lower opacity reveals more of the wallpaper.')}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
