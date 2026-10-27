@@ -31,7 +31,9 @@
   --preview-dark-canvas: #202020;
   --preview-dark-sidebar: #28282B;
   --preview-dark-line: #4B4E52;
-  --chrome-translucent-bg: color-mix(in srgb, var(--sidebar-bg) 60%, transparent);
+  /* The navigation scrim over the native material: a higher share of the sidebar color is more
+     opaque. Other regions stay fully opaque. */
+  --chrome-translucent-bg: color-mix(in srgb, var(--sidebar-bg) 88%, transparent);
   --material-blur: 20px;
   --material-saturation: 1.2;
   --material-brightness: 1;
