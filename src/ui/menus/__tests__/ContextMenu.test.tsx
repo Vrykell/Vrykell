@@ -154,6 +154,13 @@ describe('independent action menus', () => {
     expect(rows[1].lastElementChild).toHaveAttribute('data-check-slot');
   });
 
+  it('caps resource menus without stretching short lists to the cap', () => {
+    render(<ContextMenu anchor={{ x: 0, y: 0 }} variant="resources" items={[{ label: 'Note', onClick: () => {} }]} onClose={() => {}} />);
+    const menu = screen.getByRole('menu');
+    expect(menu.style.width).toBe('max-content');
+    expect(menu.style.maxWidth).toContain('320px');
+  });
+
   it('adds no mark column to menus without radio rows', () => {
     render(<ContextMenu anchor={{ x: 0, y: 0 }} items={[{ label: 'Copy', onClick: () => {} }]} onClose={() => {}} />);
     expect(screen.getByRole('menu').querySelector('[data-check-slot]')).toBeNull();

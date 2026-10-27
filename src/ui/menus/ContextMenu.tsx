@@ -10,6 +10,7 @@ import { useListNavigationMode } from '../hooks/useListNavigationMode';
 export interface MenuAnchor { x: number; y: number; trigger?: HTMLElement; above?: HTMLElement; align?: 'start' | 'end' }
 export interface ContextMenuItem {
   label: string;
+  tip?: string;
   onClick?: () => void;
   danger?: boolean;
   group?: MenuGroup;
@@ -22,11 +23,12 @@ export interface ContextMenuItem {
 interface Props {
   anchor: MenuAnchor; items: ContextMenuItem[]; onClose: () => void;
   label?: string; description?: string; itemRole?: 'menuitem'; header?: ReactNode; footer?: ReactNode; onCancel?: () => void;
+  variant?: 'actions' | 'resources';
 }
 interface OpenSubmenu { item: ContextMenuItem; trigger: HTMLButtonElement; focus: boolean }
 
 /** One menu tree owns outside presses and keyboard focus, including all nested surfaces. */
-export default function ContextMenu({ anchor, items, onClose, label = t('Action menu'), description, itemRole, header, footer, onCancel }: Props) {
+export default function ContextMenu({ anchor, items, onClose, label = t('Action menu'), description, itemRole, header, footer, onCancel, variant = 'actions' }: Props) {
   const tree = useRef<HTMLDivElement>(null);
   const [path, setPath] = useState<OpenSubmenu[]>([]);
   const id = useId();
@@ -55,7 +57,7 @@ export default function ContextMenu({ anchor, items, onClose, label = t('Action 
       else setPath(previous => previous.length > level ? previous.slice(0, level) : previous);
     }} onOpen={(item, trigger) => open(level, item, trigger, true)} />;
   return createPortal(<div ref={tree}>
-    <MenuSurface anchor={anchor} label={label} focus onClose={close}>
+    <MenuSurface anchor={anchor} label={label} focus onClose={close} variant={variant}>
       {header && <div className="context-menu-header">{header}</div>}
       {description && <div className="context-menu-description">{description}</div>}
       {rows(items, 0)}
@@ -70,9 +72,9 @@ export default function ContextMenu({ anchor, items, onClose, label = t('Action 
   </div>, document.body);
 }
 
-function MenuSurface({ anchor, submenuOf, label, focus, children, onClose, onBack, id }: {
+function MenuSurface({ anchor, submenuOf, label, focus, children, onClose, onBack, id, variant = 'actions' }: {
   anchor: MenuAnchor; submenuOf?: HTMLElement; label: string; focus: boolean; children: ReactNode;
-  onClose: () => void; onBack?: () => void; id?: string;
+  onClose: () => void; onBack?: () => void; id?: string; variant?: 'actions' | 'resources';
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const navigation = useListNavigationMode(true);
@@ -95,7 +97,7 @@ function MenuSurface({ anchor, submenuOf, label, focus, children, onClose, onBac
         : (current + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
       buttons[next]?.focus();
     }} style={{ ...position, position: 'fixed', zIndex: 9999, width: 'max-content', minWidth: 'min(180px, calc(100vw - 16px))',
-      maxWidth: 'calc(100vw - 16px)', maxHeight: position.maxHeight ?? 'calc(100vh - 16px)', overflowY: 'auto', boxSizing: 'border-box', padding: 4,
+      maxWidth: variant === 'resources' ? 'min(320px, calc(100vw - 16px))' : 'calc(100vw - 16px)', maxHeight: position.maxHeight ?? 'calc(100vh - 16px)', overflowY: 'auto', boxSizing: 'border-box', padding: 4,
       fontSize: 'calc(12px * var(--ui-font-scale))' }}>{children}</div>;
 }
 
@@ -106,9 +108,9 @@ export function ContextMenuItems({ items, onClose, itemRole, onOpen, onHover, op
   onHover?: (item: ContextMenuItem, trigger: HTMLButtonElement) => void;
 }) {
   const ordered = orderMenuItems(items);
-  return <>{ordered.map((item, index) => <Fragment key={`${menuGroup(item)}-${item.label}`}>
+  return <>{ordered.map((item, index) => <Fragment key={`${menuGroup(item)}-${item.label}-${index}`}>
     {index > 0 && menuGroup(item) !== menuGroup(ordered[index - 1]!) && <div role="separator" className="context-menu-separator" />}
-    <MenuItem role={item.submenu ? 'menuitem' : itemRole} disabled={item.disabled} label={item.label} danger={item.danger ?? item.group === 'danger'}
+    <MenuItem role={item.submenu ? 'menuitem' : itemRole} disabled={item.disabled} label={item.label} tip={item.tip} danger={item.danger ?? item.group === 'danger'}
       shortcut={item.shortcut} checked={item.checked} submenu={!!item.submenu} expanded={openLabel === item.label} controls={submenuId}
       onPointerEnter={event => onHover?.(item, event.currentTarget)}
       onKeyDown={event => { if (event.key === 'ArrowRight' && item.submenu) { event.preventDefault(); event.stopPropagation(); onOpen?.(item, event.currentTarget); } }}
