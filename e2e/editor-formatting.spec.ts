@@ -31,5 +31,7 @@ test('previews markdown without execution actions and switches real encoding req
   const status = (await editor.locator('.code-editor-status').boundingBox())!;
   const path = (await editor.getByTestId('editor-file-path').boundingBox())!;
   expect(Math.abs(status.y - path.y)).toBeLessThan(10);
+  await expect(editor.locator('.code-editor-status')).toHaveCSS('font-size', '14px');
+  await expect(editor.getByTestId('editor-file-path')).toHaveCSS('font-size', '14px');
   await page.screenshot({ path: info.outputPath('editor-status-encoding.png') });
 });

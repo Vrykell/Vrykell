@@ -14,7 +14,7 @@
 .code-diff-status { padding: 24px 16px; color: var(--text-muted); text-align: center; font-size: var(--fs-caption); line-height: 1.6; }
 .code-diff-labels { display: flex; align-items: center; gap: 8px; padding: 4px 12px 8px; color: var(--text-muted); font-size: var(--fs-caption); }
 .code-diff-labels > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.code-editor-status { display: flex; flex-shrink: 0; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: 14px; height: 32px; min-height: 32px; box-sizing: border-box; padding: 2px 12px; color: var(--text-muted); font-size: var(--fs-caption); line-height: 24px; white-space: nowrap; overflow: hidden; }
+.code-editor-status { display: flex; flex-shrink: 0; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: 14px; height: 32px; min-height: 32px; box-sizing: border-box; padding: 2px 12px; color: var(--text-muted); font-size: var(--fs-body); line-height: 24px; white-space: nowrap; overflow: hidden; }
 .code-editor-vim-status { flex: 0 1 auto; min-width: 0; max-height: 28px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 28px; }
 .code-editor-vim-status > span { white-space: nowrap; }
 .code-editor-vim-status > span:last-child { margin-left: 8px; }
@@ -28,8 +28,8 @@
 .code-editor-preview { flex: 1; min-height: 0; overflow: auto; padding: 18px 24px; user-select: text; }
 .code-editor .monaco-editor .find-widget { border: 1px solid var(--border); border-radius: var(--radius-inner); box-shadow: var(--shadow-sm); background: var(--field-bg); max-width: calc(100% - 24px); right: 12px !important; margin-top: 8px; }
 .code-editor .monaco-editor .find-widget > .button.codicon-widget-close { top: 50%; transform: translateY(-50%); }
-.editor-status-path { display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 60px; overflow: hidden; padding: 0; height: auto; background: transparent; }
-.editor-status-path > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.code-editor-status > button { padding: 2px 4px; min-height: 20px; background: transparent; color: var(--text-muted); font: inherit; white-space: nowrap; }
+.code-editor-status .editor-status-path { display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 60px; overflow: hidden; padding: 0; height: auto; background: transparent; font: inherit; }
+.code-editor-status .editor-status-path > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.code-editor-status > button, .code-editor-status > button.text-control { padding: 2px 4px; min-height: 20px; background: transparent; color: var(--text-muted); font: inherit; white-space: nowrap; }
 .code-editor-status > button:hover { background: transparent; color: var(--text-primary); }
 @media (max-width: 580px) { .code-editor-status { gap: 8px; } .code-editor-status > span:nth-last-child(3) { display: none; } }
