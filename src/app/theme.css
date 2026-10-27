@@ -793,7 +793,7 @@ button.primary-button:is(:hover, :focus):not(:disabled), button.user-primary-act
 .history-list > .history-empty:only-child, .command-history-body > .history-empty:only-child { flex: 1; min-height: 0; }
 .git-files > .git-empty:only-child { display: flex; flex: 1; align-items: center; justify-content: center; }
 .search-empty-state { display: flex; flex: 1; min-height: 80px; align-items: center; justify-content: center; flex-direction: column; gap: 8px; padding: 20px; box-sizing: border-box; text-align: center; color: var(--text-muted); font-size: var(--fs-caption); }
-.terminal-tab-list > .search-empty-state { padding: 0 16px; min-height: 34px; height: 100%; white-space: nowrap; }
+.folder-tab-empty > .search-empty-state { padding: 0 16px; min-height: 34px; height: 100%; white-space: nowrap; }
 .command-row .sidebar-row-inline-actions, .command-row .sidebar-row-action { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity var(--dur-fast) var(--ease); }
 .command-row[data-actions-visible="true"] .sidebar-row-inline-actions, .command-row[data-actions-visible="true"] .sidebar-row-action { opacity: 1; visibility: visible; pointer-events: auto; }
 .command-row[data-actions-visible="true"] .sidebar-row-title { padding-right: var(--sidebar-action-width); }

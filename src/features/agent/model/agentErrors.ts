@@ -1,11 +1,12 @@
 /**
- * agentErrors — AI SDK 错误拆解成人话。
+ * agentErrors — turn model SDK errors into plain language.
  */
 
 /**
- * 把 AI SDK 的错误拆成人话。v7 重试包装器（"Failed after 3 attempts"）会把
- * 底层的 APICallError（statusCode / responseBody / url / cause）整个吞掉，
- * 这里逐层展开：状态码 + 服务端响应体 + cause 链（Rust 代理的拒绝文案也在其中）。
+ * The v7 retry wrapper ("Failed after 3 attempts") swallows the underlying APICallError
+ * (statusCode / responseBody / url / cause) entirely, so unwrap it layer by layer here: status
+ * code + server response body + the cause chain (which also carries the backend proxy's rejection
+ * text).
  */
 export function describeError(err: unknown): string {
   const parts: string[] = [];
@@ -25,7 +26,7 @@ export function describeError(err: unknown): string {
         line += ` [HTTP ${anyErr.statusCode}]`;
       }
       if (anyErr.url) line += ` (${anyErr.url})`;
-      // 与上一层重复的消息不再追加
+      // Do not append a message already contained in an earlier layer.
       if (!parts.some((p) => p.includes(line))) parts.push(line);
       if (typeof anyErr.responseBody === 'string' && anyErr.responseBody) {
         const body = anyErr.responseBody.slice(0, 300);

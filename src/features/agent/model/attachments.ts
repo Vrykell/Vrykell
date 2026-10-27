@@ -1,18 +1,19 @@
 /**
- * attachments — AI 对话附件（M5）。
+ * attachments — AI conversation attachments.
  *
- * 三种来源统一成 AttachmentMeta：
- *   image：粘贴/拖入/选择的图片（字节落 ~/.vrykell/attachments/，blobPath）
- *   file ：选择的文件——UTF-8 文本 ≤100KB 内联 textContent，否则落盘 blobPath
- *   paste：超长粘贴文本（>PASTE_FOLD_CHARS 折叠成 chip），始终内联 textContent
+ * Three sources normalized into AttachmentMeta:
+ *   image: pasted/dropped/selected image (bytes stored under ~/.vrykell/attachments/, blobPath)
+ *   file : selected file — UTF-8 text ≤100KB inlined into textContent, otherwise stored as blobPath
+ *   paste: over-long pasted text (>PASTE_FOLD_CHARS folded into a chip), always inline in textContent
  *
- * 模型映射（agentStream 调 toModelParts）：
- *   视觉模型：image → { type:'image', image: dataUrl }（读 blobPath → base64）
- *   文本附件 → 【文件 name】\n内容 段并入 user content
- *   非视觉模型：image 降级为 [图片 name 略] 文本提示
+ * Model mapping (agentStream calls attachmentsForModel):
+ *   vision model: image → { type:'image', image: dataUrl } (read blobPath → base64)
+ *   text attachments → a bracketed "[File name]" header plus its content merged into user content
+ *   non-vision model: image downgraded to a bracketed text hint
  *
- * 持久化：ChatMessage.attachments 序列化进 DB attachments 列（'' = 无）。
- * textContent 随元数据入库（重开后仍在）；blobPath 指向附件目录文件。
+ * Persistence: ChatMessage.attachments is serialized into the DB attachments column ('' = none).
+ * textContent is stored with the metadata (still present after reopening); blobPath points to a
+ * file in the attachment directory.
  */
 
 import { t } from '@i18n';
@@ -25,25 +26,25 @@ export interface AttachmentMeta {
   name: string;
   mime: string;
   size: number;
-  /** 文本内联（≤100KB）；paste 恒有 */
+  /** Inline text (≤100KB); always present for paste. */
   textContent?: string;
-  /** 落盘路径（~/.vrykell/attachments/ 内） */
+  /** Stored file path (inside ~/.vrykell/attachments/). */
   blobPath?: string;
 }
 
 export const LIMITS = {
-  /** 单张图片上限 */
+  /** Per-image limit. */
   imageBytes: 5 * 1024 * 1024,
-  /** 合计上限（Rust 侧也挡 10MB） */
+  /** Combined limit (the backend also enforces 10MB). */
   totalBytes: 10 * 1024 * 1024,
-  /** 粘贴文本折叠成 chip 的阈值 */
+  /** Threshold above which pasted text folds into a chip. */
   pasteFoldChars: 500,
 } as const;
 
 let counter = 0;
 export const nextAttachmentId = () => `att-${Date.now()}-${counter++}`;
 
-/** Rust import_attachment/save_attachment 的返回形状 */
+/** Return shape of the backend import_attachment/save_attachment commands. */
 export interface AttachmentImport {
   name: string;
   mime: string;
@@ -64,13 +65,13 @@ export function importToMeta(r: AttachmentImport, kind: AttachmentMeta['kind']):
   };
 }
 
-/** 选择/导入本地文件为附件。路径必须来自系统级用户动作（选择器或拖放），否则后端拒绝。 */
+/** Select/import a local file as an attachment. The path must come from a system-level user action (picker or drag-and-drop), otherwise the backend rejects it. */
 export async function importFileAsAttachment(path: string): Promise<AttachmentMeta> {
   try {
     const r = await invoke<AttachmentImport>('import_attachment', { path });
     return importToMeta(r, r.mime.startsWith('image/') ? 'image' : 'file');
   } catch (error) {
-    // 后端只回稳定错误码，文案在这里落到 i18n。
+    // The backend returns stable error codes only; the copy is localized here through i18n.
     if (String(error).includes('path-not-granted')) {
       throw new Error(t('This file was not chosen by you. Pick it through the dialog or drop it onto the window.'));
     }
@@ -78,14 +79,14 @@ export async function importFileAsAttachment(path: string): Promise<AttachmentMe
   }
 }
 
-/** 保存粘贴/拖入的二进制（File/Blob 已读成 base64）为附件 */
+/** Save pasted/dropped binary data (File/Blob already read as base64) as an attachment. */
 export async function saveBlobAsAttachment(name: string, mime: string, base64: string): Promise<AttachmentMeta> {
   const r = await invoke<AttachmentImport>('save_attachment', { name, dataBase64: base64 });
   const meta = importToMeta(r, mime.startsWith('image/') ? 'image' : 'file');
-  return { ...meta, mime }; // save 侧 mime 按文件名猜，前端 File.type 更准
+  return { ...meta, mime }; // The save side guesses the mime from the file name; the frontend File.type is more accurate.
 }
 
-/** 超长粘贴文本折叠为 paste 附件 */
+/** Fold over-long pasted text into a paste attachment. */
 export function makePasteAttachment(text: string): AttachmentMeta {
   return {
     id: nextAttachmentId(),
@@ -97,14 +98,14 @@ export function makePasteAttachment(text: string): AttachmentMeta {
   };
 }
 
-/** 读取附件 blob 为 dataUrl（预览与喂模型共用） */
+/** Read an attachment blob as a dataUrl (shared by preview and model input). */
 export async function readAttachmentDataUrl(att: AttachmentMeta): Promise<string> {
   if (!att.blobPath) throw new Error(t('Attachment data is missing.'));
   const b64 = await invoke<string>('read_attachment', { path: att.blobPath });
   return `data:${att.mime};base64,${b64}`;
 }
 
-// ── 序列化 ──
+// ── serialization ──
 
 export function serializeAttachments(atts?: AttachmentMeta[]): string {
   return atts && atts.length > 0 ? JSON.stringify(atts) : '';
@@ -121,19 +122,19 @@ export function deserializeAttachments(raw: string): AttachmentMeta[] | undefine
   }
 }
 
-// ── 模型映射 ──
+// ── model mapping ──
 
-/** 视觉能力判定：anthropic/gemini 原生支持；openai-compatible 按模型名启发式 */
+/** Vision capability: natively supported by anthropic/gemini; heuristic by model name for openai-compatible endpoints. */
 export function supportsVision(provider: ProviderKind, model: string): boolean {
   if (provider === 'anthropic' || provider === 'gemini') return true;
   return /gpt-4o|gpt-4\.1|gpt-5|o1|o3|o4|vision|\bvl\b|qwen.*vl|glm-4v|claude|gemini/i.test(model);
 }
 
 /**
- * 附件 → 喂给模型的形态。
- * 视觉模型：图片转 image part（读 blob）；文本/粘贴转文本段。
- * 非视觉：图片降级为占位提示文本。
- * 返回 { text: 并入 user content 的文本段, images: image part 的 dataUrl 列表 }
+ * Attachment → the shape fed to the model.
+ * Vision model: images become image parts (blob read); text/paste become text segments.
+ * Non-vision: images are downgraded to placeholder hint text.
+ * Returns { text: the text segment merged into user content, images: dataUrl list for image parts }.
  */
 export async function attachmentsForModel(
   atts: AttachmentMeta[],
@@ -162,7 +163,7 @@ export async function attachmentsForModel(
   return { text: textParts.join('\n\n'), images };
 }
 
-/** 附件合计大小（前端限额校验用） */
+/** Combined attachment size (used by the frontend limit check). */
 export function totalSize(atts: AttachmentMeta[]): number {
   return atts.reduce((s, a) => s + a.size, 0);
 }

@@ -1,6 +1,6 @@
 /**
- * 主题 Provider — 通过 React Context 管理外观偏好（深色 / 浅色 / 跟随系统）。
- * 所有组件通过 useTheme() 获取当前生效模式与偏好。
+ * Theme provider — manages the appearance preference (dark / light / follow system)
+ * through component context. Components read the applied mode and the preference via useTheme().
  */
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
 import {
@@ -40,7 +40,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, [preference]);
 
   useEffect(() => {
-    // 明暗切换：重应用基础 palette + 背景层不透明度 + xterm 主题
+    // On a mode change, re-apply the base palette, the background-layer opacity and the terminal theme
     applyTerminalTheme(useTerminalThemeStore.getState().config, mode);
   }, [mode]);
 

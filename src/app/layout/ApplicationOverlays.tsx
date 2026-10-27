@@ -11,7 +11,7 @@ interface ApplicationOverlaysProps {
   onPickSplit: (spec: TerminalSpec) => void;
 }
 
-/** 应用级弹层集合，避免 App 壳直接管理每个弹层的状态细节。 */
+/** Application-level overlay set, so the app shell does not own each overlay's state details. */
 export default function ApplicationOverlays({ onPickSplit }: ApplicationOverlaysProps) {
   const paletteOpen = useUiStore((state) => state.paletteOpen);
   const globalSearchOpen = useUiStore((state) => state.globalSearchOpen);

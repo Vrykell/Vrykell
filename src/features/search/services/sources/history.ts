@@ -11,16 +11,16 @@ registerSource({
   search: async (query: string): Promise<SearchResult[]> => {
     const lower = query.toLowerCase();
 
-    // 先查前端热缓存（instant）
+    // Check the frontend hot cache first (instant)
     const localEntries = useHistoryStore
       .getState()
       .entries.filter((e) => e.command.toLowerCase().includes(lower))
       .slice(0, 10);
 
-    // 同时查后端 SQLite（完整历史 + 频次统计）
+    // Also query the backend database (full history + frequency counts)
     const backendPromise = backendSearchHistory(query, 20).catch(() => []);
 
-    // 先用本地结果即时渲染
+    // Render local results immediately
     const localResults: SearchResult[] = localEntries.map((e) => ({
       type: 'history',
       id: `local-history-${e.timestamp}`,
@@ -35,7 +35,7 @@ registerSource({
       } as HistoryResultData,
     }));
 
-    // 等待后端结果 → 合并去重
+    // Wait for the backend results → merge and deduplicate
     const backend = await backendPromise;
     const localCommands = new Set(localEntries.map((e) => e.command));
     const backendResults: SearchResult[] = backend

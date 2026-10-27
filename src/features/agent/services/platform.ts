@@ -1,7 +1,7 @@
 /** Typed access to the local memory store. */
 import { invoke } from '@platform/diagnostics';
 
-// ── 记忆 ──
+// ── memory ──
 
 export interface MemoryRecord {
   id: string;

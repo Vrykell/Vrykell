@@ -6,11 +6,14 @@ import type { FsEntry, DiskEntry, FileStat } from '@platform/api/types';
 export type { FsEntry, DiskEntry, FileStat };
 
 /**
- * 打开系统原生选择器（文件 / 多文件 / 目录 / 保存）并**在 Rust 侧登记**用户选中的路径。
+ * Opens the native picker (file / multiple files / directory / save) and **registers the
+ * selected paths in the backend**.
  *
- * 为什么不让网页自己调 dialog 插件：读文件内容的命令（附件导入等）只接受"用户动作产生的
- * 路径"，而只有 Rust 亲自打开选择器才知道那次选择真的来自用户——网页拿到的是路径，不是
- * 随便指名路径的权力。返回值是后端规范化后的绝对路径。
+ * Why the web view does not call the dialog plugin itself: commands that read file
+ * contents (attachment import and similar) accept only paths produced by a user action,
+ * and only the backend opening the picker knows the choice really came from the user —
+ * the page receives a path, not the power to name arbitrary paths. The return value is
+ * the absolute path normalized by the backend.
  */
 export function pickPath(
   mode: 'file' | 'files' | 'directory' | 'save' = 'file',
@@ -26,24 +29,26 @@ export function pickPath(
 }
 
 /**
- * 本地文件系统 API —— 所有跨 IPC 边界的路径都在这里归一化：
- * 入参路径先规范成前端统一的 `/` 形式再 invoke，后端返回的路径（条目、磁盘、主目录）
- * 也先规范化再交给业务层。业务层直接使用规范路径，不再自行处理分隔符与盘符根。
+ * Local filesystem API — every path crossing the IPC boundary is normalized here:
+ * input paths are turned into the front end's unified `/` form before invoke, and paths
+ * returned by the backend (entries, disks, home) are normalized before reaching feature
+ * code. Feature code uses the normalized path and never handles separators or drive roots
+ * itself.
  */
 
-/** 列出目录条目（path 为空时由后端决定起始目录）。 */
+/** Lists directory entries (when path is empty the backend chooses the start directory). */
 export function fsList(path?: string | null): Promise<FsEntry[]> {
   return invoke<FsEntry[]>('fs_list', { path: path == null ? null : normPath(path) })
     .then((entries) => entries.map((entry) => ({ ...entry, path: normPath(entry.path) })));
 }
 
-/** 列出磁盘（macOS 根卷+挂载卷 / Windows 盘符），附带容量信息。 */
+/** Lists disks (root plus mounted volumes on macOS / drive letters on Windows) with capacity information. */
 export function fsDisks(): Promise<DiskEntry[]> {
   return invoke<DiskEntry[]>('fs_disks')
     .then((disks) => disks.map((disk) => ({ ...disk, path: normPath(disk.path) })));
 }
 
-/** 用户主目录路径。 */
+/** User home directory path. */
 export function fsHome(): Promise<string> {
   return invoke<string>('fs_home').then((home) => normPath(home));
 }
@@ -54,28 +59,28 @@ export function fsStat(path: string): Promise<FileStat> {
     .then((stat) => ({ ...stat, path: normPath(stat.path) }));
 }
 
-/** 重命名：目标名被占用时后端自动加序号，返回最终路径。 */
+/** Renames; when the target name is taken the backend appends a sequence number and returns the final path. */
 export function fsRename(oldPath: string, newName: string): Promise<string> {
   return invoke<string>('fs_rename', { oldPath: normPath(oldPath), newName }).then(normPath);
 }
 
-/** 新建空文件（同名自动加序号），返回最终路径。 */
+/** Creates an empty file (auto-numbered on name clash) and returns the final path. */
 export function fsCreateFile(dir: string, name: string): Promise<string> {
   return invoke<string>('fs_create_file', { dir: normPath(dir), name }).then(normPath);
 }
 
-/** 新建文件夹（同名自动加序号），返回最终路径。 */
+/** Creates a folder (auto-numbered on name clash) and returns the final path. */
 export function fsCreateDir(dir: string, name: string): Promise<string> {
   return invoke<string>('fs_create_dir', { dir: normPath(dir), name }).then(normPath);
 }
 
-/** 完成的一条 from→to 对（用于记录文件操作回退）。 */
+/** One completed from→to pair (recorded so a file operation can be undone). */
 export interface FileOpPair {
   from: string;
   to: string;
 }
 
-/** 批量文件操作结果：完成项 + 失败说明（部分失败不中断其余项）。 */
+/** Result of a batch file operation: completed pairs plus failure messages (a partial failure does not stop the rest). */
 export interface FileOpOutcome {
   completed: FileOpPair[];
   errors: string[];
@@ -89,41 +94,41 @@ function normalizeOutcome(outcome: FileOpOutcome): FileOpOutcome {
   return { completed: outcome.completed.map(normalizePair), errors: outcome.errors };
 }
 
-/** 复制到目标目录（目录递归，符号链接按链接复制）。 */
+/** Copies into the target directory (recursive for directories, symlinks copied as links). */
 export function fsCopy(paths: string[], destDir: string): Promise<FileOpOutcome> {
   return invoke<FileOpOutcome>('fs_copy', { paths: paths.map(normPath), destDir: normPath(destDir) })
     .then(normalizeOutcome);
 }
 
-/** 移动到目标目录（跨盘自动退化为复制 + 删源）。 */
+/** Moves into the target directory (cross-device moves degrade to copy + delete source). */
 export function fsMove(paths: string[], destDir: string): Promise<FileOpOutcome> {
   return invoke<FileOpOutcome>('fs_move', { paths: paths.map(normPath), destDir: normPath(destDir) })
     .then(normalizeOutcome);
 }
 
-/** 可回退删除：先把内容移动到应用暂存区，返回 原始→暂存 映射。 */
+/** Reversible delete: moves content to the app staging area first and returns the original→staged mapping. */
 export function fsStageDelete(paths: string[], undoEnabled = true): Promise<FileOpOutcome> {
   return invoke<FileOpOutcome>('fs_stage_delete', { paths: paths.map(normPath), ...(undoEnabled ? {} : { undoEnabled: false }) })
     .then(normalizeOutcome);
 }
 
-/** 回退删除：把暂存项移回原位（原位置已占用时该项报错）。 */
+/** Undoes a staged delete: moves staged items back (an item reports an error when its original location is occupied). */
 export function fsRestoreStaged(items: FileOpPair[]): Promise<FileOpOutcome> {
   return invoke<FileOpOutcome>('fs_restore_staged', { items: items.map(normalizePair) })
     .then(normalizeOutcome);
 }
 
-/** 把暂存项送入系统回收站（可回退窗口结束后补完删除）。 */
+/** Sends staged items to the system trash (completes the delete once the undo window ends). */
 export function fsPurgeStaged(paths: string[]): Promise<void> {
   return invoke('fs_purge_staged', { paths: paths.map(normPath) });
 }
 
-/** 用系统「打开方式」对话框打开文件（Windows 选择器 / macOS 在 Finder 中显示）。 */
+/** Opens a file through the system "open with" dialog (native picker on Windows, reveal in the file manager on macOS). */
 export function fileOpenWith(path: string): Promise<void> {
   return invoke('file_open_with', { path: normPath(path) });
 }
 
-/** 在系统文件管理器中定位并选中该路径（Windows 资源管理器 / macOS Finder）。 */
+/** Reveals and selects the path in the system file manager. */
 export function fileRevealInDir(path: string): Promise<void> {
   return revealItemInDir(path);
 }

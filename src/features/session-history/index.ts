@@ -1,4 +1,4 @@
-/** 会话历史功能公开入口，页面不需要了解内部 model 目录结构。 */
+/** Public entry point of the session history feature; pages do not need to know the internal model layout. */
 export {
   useSessionHistory,
   type SessionHistoryController,

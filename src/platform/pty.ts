@@ -3,7 +3,7 @@ import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import type { DispatchEvent } from '@core/terminal/events';
 import type { SshOptions } from '@core/ssh';
 
-/** SSH 连接目标（透传给 Rust pty_spawn 的 ssh 参数） */
+/** SSH connection target (passed through to the backend pty_spawn ssh argument). */
 export interface SshSpawnTarget extends SshOptions {
   host: string;
   user?: string;
@@ -12,9 +12,9 @@ export interface SshSpawnTarget extends SshOptions {
 }
 
 export interface PtySpawnOptions {
-  /** 本地 shell 类型（zsh / bash / powershell / pwsh / cmd），缺省走 $SHELL 探测 */
+  /** Local shell type (zsh / bash / powershell / pwsh / cmd); defaults to $SHELL detection. */
   shell?: string;
-  /** SSH 连接目标；与 shell 互斥，优先 SSH */
+  /** SSH connection target; mutually exclusive with shell, SSH wins. */
   ssh?: SshSpawnTarget | null;
   /** Terminal presentation mode; block hides the native prompt in integrated shells. */
   openMode?: 'classic' | 'block';

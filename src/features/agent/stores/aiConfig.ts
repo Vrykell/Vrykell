@@ -14,7 +14,7 @@ const PROVIDER_SELECTION_KEY = 'vrykell-ai-provider';
 
 import type { ModelCapabilities } from '@features/agent/model/capabilities';
 
-/** 一个可用的模型配置（命名 profile）。API key 按 provider 复用，不做每模型单独 key。 */
+/** One usable model profile (a named profile). The API key is reused per provider rather than stored per model. */
 export interface ModelProfile {
   id: string;
   name: string;
@@ -22,15 +22,17 @@ export interface ModelProfile {
   baseUrl: string;
   model: string;
   providerName?: string;
-  /** 自定义分组名；缺省按厂商自动分组 */
+  /** Custom group name; grouped by vendor when omitted. */
   group?: string;
-  /** 创建时自动探测的能力（视觉/推理/工具/搜索）；旧数据缺省 */
+  /** Capabilities probed on creation (vision/reasoning/tools/search); older data leaves them unset. */
   capabilities?: ModelCapabilities;
 }
 
-// AI 配置（provider / 各家 key / baseUrl / model / 模型列表）都在 Rust 后端持久化，
-// 前端用 zustand store 镜像一份供 UI 订阅（状态栏模型名等需要响应式）；key 本身不回显。
-// provider/baseUrl/model 是「当前生效模型」的镜像字段，方便旧代码与状态栏直接读取。
+// AI configuration (provider / per-provider keys / baseUrl / model / model list) is persisted by
+// the backend; the frontend mirrors it in a store so the UI can subscribe (the status bar model
+// name needs to react). Keys themselves are never echoed back.
+// provider/baseUrl/model mirror the "currently active model" so older code and the status bar can
+// read them directly.
 interface AiConfigState {
   baseUrl: string;
   model: string;
@@ -38,9 +40,9 @@ interface AiConfigState {
   /** Providers (endpoint ids) that hold their own API key. */
   providerKeys: string[];
   hasTavilyKey: boolean;
-  /** 多模型列表（命名 profile） */
+  /** Named model profiles. */
   models: ModelProfile[];
-  /** 当前生效模型 id */
+  /** Id of the currently active model. */
   activeModel: string;
   /** Provider row selected on the model page (session state). */
   selectedProvider: string | null;
@@ -60,7 +62,7 @@ export const useAiConfigStore = create<AiConfigState>(() => ({
   lastSelectedProvider: safeLocalStorageGet(PROVIDER_SELECTION_KEY) || null,
 }));
 
-/** 当前生效模型的完整 profile；列表为空时回退到镜像字段（旧配置/未刷新）。 */
+/** Full profile of the active model; falls back to the mirror fields when the list is empty (older config or not refreshed yet). */
 export function activeModelProfile(): ModelProfile {
   const s = useAiConfigStore.getState();
   return (
@@ -104,7 +106,7 @@ interface AiConfigInfoRust {
   active_model: string;
 }
 
-/** 启动时同步一次 Rust 侧配置（provider / 各家 key 是否已配 / baseUrl / model / 模型列表）。 */
+/** Sync the backend configuration once at startup (provider / which keys are configured / baseUrl / model / model list). */
 export async function refreshAiConfig(): Promise<void> {
   try {
     const info = await invoke<AiConfigInfoRust>('get_ai_config');
@@ -118,7 +120,7 @@ export async function refreshAiConfig(): Promise<void> {
       activeModel: info.active_model ?? '',
     });
   } catch {
-    // 忽略：后端不可用时保持默认
+    // Ignore: keep the defaults when the backend is unavailable.
   }
 }
 
@@ -152,7 +154,7 @@ export async function setAiProvider(provider: ProviderKind): Promise<void> {
   useAiConfigStore.setState({ provider });
 }
 
-/** 一次性替换模型列表 + 当前生效模型（设置页「模型配置」用）。 */
+/** Replace the model list and the active model in one go (used by the model settings page). */
 export async function setAiModels(models: ModelProfile[], activeModel: string): Promise<void> {
   await invoke('set_ai_models', { models, activeModel });
   const active = models.find((m) => m.id === activeModel) ?? models[0];
@@ -165,7 +167,7 @@ export async function setAiModels(models: ModelProfile[], activeModel: string): 
   });
 }
 
-/** 切换当前生效模型（按 id）。 */
+/** Switch the active model by id. */
 export async function setActiveModel(id: string): Promise<void> {
   await invoke('set_active_model', { id });
   const s = useAiConfigStore.getState();

@@ -1,9 +1,10 @@
 /**
- * files — read_file / write_file / edit_file 工具（M2）。
+ * files — read_file / write_file / edit_file tools.
  *
- * 薄封装 Rust 命令（fs.rs）：读取带 256KB 截断、写入前自动备份、
- * 编辑走唯一命中约束。execute 永不 throw —— invoke 的 Err 转为
- * 结构化 { ok:false, error }，让模型自我修正。
+ * Thin wrappers over Rust commands (fs.rs): reads truncate at 256KB, writes back
+ * up the previous contents, and edits require a unique match. execute never
+ * throws — an invoke Err becomes a structured { ok:false, error } so the model
+ * can correct itself.
  */
 
 import { invoke } from '@platform/diagnostics';
@@ -12,7 +13,7 @@ import { tool } from 'ai';
 import { z } from 'zod';
 import { gate, ensureSkillAccess, type ToolContext } from '@features/agent/stores/permissions';
 
-/** invoke 结果统一成结构化结果（约定见 tools/index.ts 头注释） */
+/** Normalize invoke results into the structured result shape (see the header comment in tools/index.ts). */
 async function call<T>(fn: () => Promise<T>): Promise<{ ok: boolean; result?: string; error?: string }> {
   try {
     return { ok: true, result: String(await fn()) };

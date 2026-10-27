@@ -2,7 +2,7 @@ import { invoke } from '@platform/diagnostics';
 import { isMacOS } from '@platform/runtime';
 import { t as translate } from '@i18n';
 
-/** 本地 shell 类型标识 */
+/** Local shell type identifier. */
 export type ShellType = 'zsh' | 'bash' | 'powershell' | 'pwsh' | 'cmd';
 
 /** Every configurable shell type, in the order settings lists them. */
@@ -28,12 +28,12 @@ export interface ShellOption {
   default: boolean;
 }
 
-/** 调用 Rust list_shells 获取机器上可用的 shell。 */
+/** Calls the backend list_shells command to get the shells available on this machine. */
 export function listShells(): Promise<ShellOption[]> {
   return invoke<ShellOption[]>('list_shells');
 }
 
-/** 非 Tauri 环境（纯浏览器 dev / 测试）下的平台猜测兜底。 */
+/** Platform guess used when no backend is present (browser dev / tests). */
 export function fallbackShells(): ShellOption[] {
   if (isMacOS) {
     return [
@@ -47,7 +47,7 @@ export function fallbackShells(): ShellOption[] {
   ];
 }
 
-/** 获取可用 shell；invoke 失败（无后端）时回退平台猜测，保证弹窗可用。 */
+/** Returns the available shells; falls back to the platform guess when invoke fails, so the dialog still opens. */
 export async function getAvailableShells(): Promise<ShellOption[]> {
   try {
     const shells = await listShells();

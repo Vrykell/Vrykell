@@ -3,54 +3,54 @@ import { createLocalFileOps } from '@features/files/services/localFileOps';
 import { createSshFileOps } from '@features/ssh/services/fileOps';
 
 /**
- * fileOps — 文件操作对 UI 的唯一接口。
+ * fileOps — the single interface between the UI and file operations.
  *
- * 视图层（本地文件面板 / SSH 文件面板）只依赖这里的 `FileOps`：
- * 到底操作本地磁盘还是远端主机，由 `FileOpsTarget` 这一状态决定，
- * 真正的读写都交给后端命令（本地 `@platform/api/fs`、远程 SSH 命令）。
+ * View code (local file panel / SSH file panel) depends only on `FileOps`:
+ * the `FileOpsTarget` state decides whether the target is local disk or a remote host,
+ * and all reads and writes are delegated to backend commands (local `@platform/api/fs`, remote SSH commands).
  */
 
-/** 一条 from→to 映射（回退历史据此还原）。 */
+/** A from→to mapping used to restore earlier operations. */
 export interface FileOpPair {
   from: string;
   to: string;
 }
 
-/** 批量操作结果：完成项 + 失败说明（部分失败不中断其余项）。 */
+/** Batch result: completed pairs plus failure messages (one failure does not stop the rest). */
 export interface FileOpOutcome {
   completed: FileOpPair[];
   errors: string[];
 }
 
-/** 目录列表结果；base 用于「目标自己解析出的起始目录」（远端主目录）。 */
+/** Directory listing result; base is the start directory the target resolved itself (remote home). */
 export interface FileListResult {
   base: string | null;
   entries: FsEntry[];
 }
 
-/** 文件操作的执行目标：面板状态决定用哪套实现。 */
+/** Execution target for file operations: the panel state selects the implementation. */
 export type FileOpsTarget = { kind: 'local' } | { kind: 'ssh'; connectionId: string };
 
-/** 文件操作接口：重名避让、可回退删除等语义由实现与后端保证。 */
+/** File operation interface: collision avoidance and undoable deletion are guaranteed by the implementations and backend. */
 export interface FileOps {
   /** Optional optimized traversal on the target's file channel. */
   search?(root: string, query: string, signal: AbortSignal,
     onProgress?: (result: { entries: FsEntry[]; truncated: boolean; skipped: number }) => void): Promise<{ entries: FsEntry[]; truncated: boolean; skipped: number }>;
   /** Single-path metadata: the path bar detects files with it and the properties dialog reads it. */
   stat(path: string): Promise<FileStat>;
-  /** 列出目录；dir 为 null 时用目标的默认起始目录（远端会返回解析后的 base）。 */
+  /** Lists a directory; dir null means the target's default start directory (remote returns the resolved base). */
   list(dir: string | null): Promise<FileListResult>;
-  /** 路径语义（本地与远端分隔符规则不同，统一由实现提供）。 */
+  /** Path semantics (local and remote separator rules differ; each implementation supplies them). */
   parentOf(path: string): string | null;
-  /** 拆分为路径段（面包屑展示用）。 */
+  /** Splits into path segments for the breadcrumb. */
   segments(path: string): string[];
-  /** 由路径段拼回完整路径。 */
+  /** Joins path segments back into a full path. */
   joinSegments(segments: string[]): string;
   join(dir: string, name: string): string;
-  /** 新建空文件 / 文件夹，返回最终路径（重名自动加序号）。 */
+  /** Creates an empty file or folder and returns the final path (a numeric suffix is added on collision). */
   createFile(dir: string, name: string): Promise<string>;
   createDir(dir: string, name: string): Promise<string>;
-  /** 重命名，返回最终路径（重名自动加序号）。 */
+  /** Renames and returns the final path (a numeric suffix is added on collision). */
   rename(path: string, newName: string): Promise<string>;
   move(paths: string[], destDir: string): Promise<FileOpOutcome>;
   copy(paths: string[], destDir: string): Promise<FileOpOutcome>;
@@ -58,24 +58,24 @@ export interface FileOps {
   stageDelete(paths: string[]): Promise<FileOpOutcome>;
   restoreStaged(pairs: FileOpPair[]): Promise<FileOpOutcome>;
   purgeStaged(paths: string[]): Promise<void>;
-  /** 本地面板的起始目录（远端由 list 自行解析）。 */
+  /** Local panel's start directory (remote resolves it through list). */
   home?(): Promise<string>;
-  /** 本地专有：磁盘视图（path 为 null 时展示）。 */
+  /** Local only: disk view (shown when path is null). */
   disks?(): Promise<DiskEntry[]>;
-  /** 远程专有：上传本地路径到目录（返回远端最终路径；未返回时不做回退记录）/ 下载到本地并返回本地路径。 */
+  /** Remote only: upload a local path into a directory (returns the final remote path; no undo record when nothing is returned) / download to local and return the local path. */
   upload?(dir: string, localPath: string): Promise<string | void>;
   download?(path: string): Promise<string>;
 }
 
-/** 目标 → 实现：视图层唯一的实现选择点。 */
+/** Target → implementation: the view layer's only implementation choice. */
 export function fileOpsFor(target: FileOpsTarget): FileOps {
   return target.kind === 'ssh' ? createSshFileOps(target.connectionId) : createLocalFileOps();
 }
 
 /**
- * 右键 / 拖放命中的行 → 实际落点目录：
- * 文件夹 → 自身；文件 → 同级目录；空白处 → 当前目录。
- * 两个面板共用这一份语义，避免各自维护一套「右键位置」判断。
+ * Row hit by a context menu or drop → actual destination directory:
+ * folder → itself; file → its parent directory; blank space → current directory.
+ * Both panels share this rule instead of each keeping its own "menu position" logic.
  */
 export function resolveTargetDir(
   entry: Pick<FsEntry, 'path' | 'is_dir'> | null | undefined,
@@ -87,6 +87,6 @@ export function resolveTargetDir(
   return parentOf(entry.path) ?? currentDir;
 }
 
-/** 新建文件 / 文件夹的默认名字（重名时后端自动加序号）。 */
+/** Default names for new files and folders (the backend adds a numeric suffix on collision). */
 export const DEFAULT_FILE_NAME = 'Untitled';
 export const DEFAULT_DIR_NAME = 'NewFolder';

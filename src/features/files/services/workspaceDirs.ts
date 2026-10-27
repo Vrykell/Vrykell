@@ -13,7 +13,6 @@ interface WorkspaceDirsState {
   load: () => Promise<void>;
   add: (path: string, name: string) => Promise<void>;
   remove: (id: number) => Promise<void>;
-  /** 检查路径是否已在工作区中 */
   contains: (path: string) => boolean;
 }
 
@@ -36,7 +35,7 @@ export const useWorkspaceDirsStore = create<WorkspaceDirsState>((set, get) => ({
   add: async (path: string, name: string) => {
     try {
       await addWorkspace(path, name, Date.now());
-      // 重新加载以获取服务端生成的 id
+      // Reload to obtain the server-generated id
       await get().load();
     } catch (e) {
       console.warn('workspaceDirs.add failed:', e);

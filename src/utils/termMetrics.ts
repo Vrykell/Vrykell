@@ -1,8 +1,9 @@
 /**
- * termMetrics — xterm 渲染尺寸读取（字符宽/行高 px）。
+ * termMetrics — reads renderer cell metrics (character width / row height in px).
  *
- * xterm 未暴露公开 API，尺寸需读私有 `_core._renderService.dimensions`；
- * 全应用统一走这里（曾有三处各自内联，升级 xterm 时需同步多处）。
+ * The terminal library exposes no public API for this, so the size is read from the
+ * private `_core._renderService.dimensions`; keep that access here so every caller reads
+ * it the same way.
  */
 import type { Terminal } from '@xterm/xterm';
 

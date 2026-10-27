@@ -1,5 +1,5 @@
 export { default as UploadManager } from '@features/files/components/UploadManager';
-/** 文件领域公开入口。 */
+/** Public entry point of the files domain. */
 export { default as DownloadManager } from '@features/files/components/DownloadManager';
 export { useFileDragStore } from '@features/files/stores/fileDrag';
 export type { FileDragState } from '@features/files/stores/fileDrag';

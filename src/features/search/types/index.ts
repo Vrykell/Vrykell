@@ -1,9 +1,9 @@
-// ── 结果类型枚举 ──
+// ── Result type enum ──
 import type { AppIcon } from '@ui/icons';
 
 export type ResultType = 'history' | 'block' | 'file' | 'setting' | 'action' | 'session';
 
-// ── 搜索源定义 ──
+// ── Search source definition ──
 export interface SearchSource {
   id: ResultType;
   label: string;
@@ -11,7 +11,7 @@ export interface SearchSource {
   search: (query: string, options?: { signal: AbortSignal; onProgress: (results: SearchResult[]) => void }) => Promise<SearchResult[]>;
 }
 
-// ── 搜索结果 ──
+// ── Search result ──
 export interface SearchResult {
   type: ResultType;
   id: string;
@@ -21,7 +21,7 @@ export interface SearchResult {
   data: SearchResultData;
 }
 
-// ── 类型特定数据 ──
+// ── Type-specific data ──
 export type SearchResultData =
   | HistoryResultData
   | BlockResultData
@@ -45,12 +45,12 @@ export interface BlockResultData {
   exitCode: number | null;
   status: 'running' | 'completed' | 'failed';
   startLine: number;
-  /** 摘取包含匹配关键词的输出片段 */
+  /** Output snippet containing the matched keyword */
   outputSnippet?: { text: string; matchStart: number; matchEnd: number };
   startedAt: number;
   durationMs?: number;
   tabTitle?: string;
-  /** 所属会话状态：活跃 / 已关闭 */
+  /** Owning session status: active / closed */
   sessionStatus?: 'active' | 'historical';
 }
 

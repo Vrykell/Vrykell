@@ -1,15 +1,17 @@
 /**
- * terminal — 实时终端读写工具（read_terminal / terminal_keys）。
+ * terminal — live terminal read/write tools (read_terminal / terminal_keys).
  *
- * 让 agent 能像人一样「看屏幕 + 敲键盘」，从而驱动 vim/less/htop 等全屏
- * 交互式 TUI，达到「通过 vim 写文件」的水平：
- *   - read_terminal  读取聚焦终端当前可见画面（altScreen 读 alt buffer，即 vim 画面）
- *   - terminal_keys  向聚焦终端 PTY 发送原始按键序列（不含回车，纯按键）
+ * They let the agent "look at the screen and type keys" like a person, driving full-screen
+ * interactive TUIs (editors, pagers, system monitors) well enough to edit files through a
+ * terminal editor:
+ *   - read_terminal  reads the currently visible screen of the focused terminal (in altScreen it
+ *                    reads the alt buffer, i.e. the editor screen)
+ *   - terminal_keys  sends a raw key sequence to the focused terminal's PTY (keys only, no Enter)
  *
- * 两者都不等待命令完成（那是 run_command 的职责）；典型用法：
- *   terminal_keys("vi /path/file.txt\r") → read_terminal() → terminal_keys("i…内容…\x1b:wq\r")
+ * Neither waits for a command to finish (that is run_command's job); typical use:
+ *   terminal_keys("editor /path/file.txt\r") → read_terminal() → terminal_keys("i…content…\x1b:wq\r")
  *
- * 约定：永不 throw —— 返回结构化结果，让模型自我修正。
+ * Convention: never throw — return a structured result so the model can correct itself.
  */
 
 import { tool } from 'ai';
@@ -30,7 +32,7 @@ import { terminalDisconnected } from '../services/terminalAvailability';
 const BLOCK_OUTPUT_CAP = 2000;
 const BLOCK_COUNT = 4;
 
-/** 块列表场景下「实时画面」= 最近若干命令块的输出尾部（主 xterm 在该场景闲置）。 */
+/** "Live screen" in the block-list scene = the tails of the most recent command blocks (the main terminal surface is idle there). */
 function blockListContent(paneId: string): string {
   const blocks = useBlockStore.getState().byTab[paneId] ?? [];
   const withOutput = blocks.filter((b) => b.outputText && b.outputText.trim().length > 0);
@@ -58,7 +60,7 @@ export function buildTerminalTools(ctx: ToolContext) {
         const executionState = agentControl.isControlled(paneId) || (useBlockStore.getState().byTab[paneId] ?? []).some(block => block.status === 'executing')
           ? 'busy' : ts.scenes[paneId] === 'altScreen' ? 'interactive' : ts.scenes[paneId] === 'blockList' ? 'ready' : 'unknown';
         if (screen) return { ok: true, ...screen, executionState };
-        // 主 xterm 无实例（blockList）：用命令块输出拼出「画面」
+        // No main terminal surface (blockList): compose the "screen" from command block output.
         return {
           ok: true,
           executionState,
@@ -81,7 +83,7 @@ export function buildTerminalTools(ctx: ToolContext) {
       execute: async ({ keys, wait_ms }, { toolCallId }) => {
         const g = await gate('terminal_keys', { keys }, toolCallId, ctx);
         if (!g.proceed) return g.result;
-        // 容错归一化：模型常把转义多写一层反斜杠（字面文本），全部解码成真实控制字符
+        // Tolerant normalization: the model often adds an extra backslash layer (literal text), so decode everything into real control characters.
         const { keys: normalized, error } = normalizeKeys(keys);
         if (error) {
           return { ok: false, error };
@@ -121,24 +123,25 @@ export function buildTerminalTools(ctx: ToolContext) {
 }
 
 /**
- * 容错归一化模型写的按键串：把「字面转义」（多一层反斜杠的文本，如 "\\u0018"、"\\b"、"\\e"）
- * 解码成真实控制字符；残留无法识别的转义（如 "\uZZZZ"）返回 error，绝不原样发送。
+ * Tolerantly normalize the key string written by the model: decode "literal escapes" (text with an
+ * extra backslash layer, such as "\\u0018", "\\b", "\\e") into real control characters; any escape
+ * still unrecognized (such as "\uZZZZ") returns an error and is never sent verbatim.
  */
 function normalizeKeys(raw: string): { keys: string; error?: string } {
   const keys = raw
-    // 字面 \uXXXX → 字符（如 \\u0018 → Ctrl+X）
+    // Literal \uXXXX → character (for example \\u0018 → Ctrl+X)
     .replace(/\\u([0-9a-fA-F]{4})/g, (_, h: string) => String.fromCharCode(parseInt(h, 16)))
-    // 字面 \xNN → 字符（如 \\x1b → Esc）
+    // Literal \xNN → character (for example \\x1b → Esc)
     .replace(/\\x([0-9a-fA-F]{2})/g, (_, h: string) => String.fromCharCode(parseInt(h, 16)))
-    // 字面 \e → Esc
+    // Literal \e → Esc
     .replace(/\\e/g, '\u001b')
-    // 字面 JSON 转义（模型常多打一层反斜杠）
+    // Literal JSON escapes (the model often adds an extra backslash)
     .replace(/\\b/g, '\b')
     .replace(/\\t/g, '\t')
     .replace(/\\r/g, '\r')
     .replace(/\\n/g, '\n')
     .replace(/\\f/g, '\f');
-  // 校验：此时残留的 \u/\x 一定是格式错误的转义（如 \uZZZZ / \xGG），报错而非原样发送
+  // Validate: any remaining \u/\x is necessarily a malformed escape (such as \uZZZZ / \xGG), so report an error instead of sending it verbatim.
   const m = /\\u(?![0-9a-fA-F]{4})/.exec(keys) ?? /\\x(?![0-9a-fA-F]{2})/.exec(keys);
   if (m) {
     return {

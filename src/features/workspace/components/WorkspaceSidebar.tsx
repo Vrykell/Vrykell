@@ -94,7 +94,7 @@ export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number
         }}
       </ListReorderPreview>
   </aside>
-    <div className="workspace-sidebar-resize" hidden={collapsed}>
+    <div className="workspace-sidebar-resize" hidden={collapsed} role="region" aria-label={t('Sidebar resize')}>
       <ResizeHandle axis="x" edge="right" label={t('Resize workspace sidebar')} testId="workspace-sidebar-resize"
         valueNow={Math.min(sidebarWidth, maxWidth)} valueMin={160} valueMax={maxWidth}
         onDelta={delta => useWorkspaceNavigation.getState().resizeSidebar(delta, maxWidth)}

@@ -1,12 +1,12 @@
 /**
- * 全局错误处理 — 捕获未被局部 try/catch 覆盖的异常。
+ * Global error handling — catches exceptions not covered by a local try/catch.
  *
- * - window.onerror: 同步异常（语法错误、类型错误等）
- * - unhandledrejection: 未 catch 的 Promise rejection
- * - Tauri invoke 失败不会走到这里（每个 invoke 调用处自行处理）
+ * - window.onerror: synchronous errors (syntax errors, type errors, ...)
+ * - unhandledrejection: uncaught promise rejections
+ * - IPC invoke failures do not arrive here (each call site handles its own)
  *
- * 设计原则：不静默吞掉错误，打印到 console 供调试，
- * 但不让应用白屏（白屏由 ErrorBoundary 兜底）。
+ * Design rule: never swallow errors silently — log them to the console for debugging —
+ * but never let the app go blank (the error boundary owns that fallback).
  */
 
 let installed = false;
@@ -16,13 +16,13 @@ export function installGlobalErrorHandlers() {
   installed = true;
 
   window.addEventListener('error', (event) => {
-    // 只处理运行时错误，跳过资源加载失败（如 <img src=404>）
+    // Only runtime errors; skip resource load failures (e.g. <img src=404>)
     if (event instanceof ErrorEvent) {
       console.error(
         `[global] ${event.filename}:${event.lineno}:${event.colno} ${event.message}`,
       );
     }
-    // 不调用 preventDefault()，让浏览器默认行为（控制台报错）继续
+    // Do not call preventDefault(): keep the browser's default reporting
   });
 
   window.addEventListener('unhandledrejection', (event) => {
@@ -30,13 +30,13 @@ export function installGlobalErrorHandlers() {
       '[global] Unhandled Promise rejection:',
       event.reason,
     );
-    // 不调用 preventDefault()，让浏览器默认行为继续
+    // Do not call preventDefault(): keep the browser's default behavior
   });
 }
 
 /**
- * 安全的 JSON 解析 — 不抛异常，返回 null + console.warn。
- * 用于 localStorage、IPC 消息等外部数据。
+ * Safe JSON parsing — never throws; returns null and logs a warning.
+ * Used for external data such as localStorage entries and IPC messages.
  */
 export function safeJsonParse<T = unknown>(raw: string): T | null {
   try {
@@ -48,7 +48,7 @@ export function safeJsonParse<T = unknown>(raw: string): T | null {
 }
 
 /**
- * 安全取 localStorage — 不抛异常（Safari 隐私模式、配额满等场景）。
+ * Safe localStorage read — never throws (private browsing, full quota, ...).
  */
 export function safeLocalStorageGet(key: string): string | null {
   try {

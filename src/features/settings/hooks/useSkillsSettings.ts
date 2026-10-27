@@ -8,7 +8,7 @@ import {
 import { useToastStore } from '@ui/feedback/Toast';
 import { t } from '@i18n';
 
-/** 管理技能设置页的列表、详情、导入和信任状态。 */
+/** Manages the skill settings page list, detail, imports and trust state. */
 export function useSkillsSettings() {
   const [metas, setMetas] = useState<SkillMeta[]>([]);
   const [detail, setDetail] = useState<SkillDetail | null>(null);

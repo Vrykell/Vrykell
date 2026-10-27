@@ -3,6 +3,7 @@ import { afterEach, expect, it } from 'vitest';
 import WorkspaceSidebar from '../components/WorkspaceSidebar';
 import { useDockStore } from '../stores/dock';
 import { useWorkspaceNavigation } from '../stores/navigation';
+import { t } from '@i18n';
 
 const navigation = useWorkspaceNavigation.getState();
 const dock = useDockStore.getState();
@@ -75,6 +76,7 @@ it('resizes through the shared separator, keeps a held collapsed drag reversible
   useWorkspaceNavigation.setState({ collapsed: false, sidebarWidth: 208, sidebarDragWidth: null });
   render(<WorkspaceSidebar />);
   const handle = screen.getByRole('separator', { name: '调整工作区侧栏宽度' });
+  expect(screen.getByRole('region', { name: t('Sidebar resize') })).toContainElement(handle);
   expect(handle).toHaveAttribute('aria-valuenow', '208');
   fireEvent.mouseDown(handle, { clientX: 208 });
   fireEvent.mouseMove(document, { clientX: 150 });

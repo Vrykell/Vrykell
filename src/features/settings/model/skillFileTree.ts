@@ -5,7 +5,7 @@ export interface FileNode {
   children?: FileNode[];
 }
 
-/** 将技能的扁平相对路径构建为可渲染的目录树。 */
+/** Builds the flat relative paths of a skill into a renderable directory tree. */
 export function buildFileTree(files: string[]): FileNode[] {
   const root: FileNode[] = [];
   const map = new Map<string, FileNode>();

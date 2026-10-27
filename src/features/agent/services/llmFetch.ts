@@ -1,14 +1,15 @@
 /**
- * llmFetch — AI SDK provider 的自定义 fetch 适配器。
+ * llmFetch — custom fetch adapter for the model provider.
  *
- * LLM 请求不直接从 webview 发出：请求体经 invoke('llm_stream') 交给 Rust，
- * Rust 按目标 host 附加真实 API key 后发 HTTPS，响应字节流经 Channel 以
- * base64 块推回，这里再组装成标准 fetch Response 喂给 AI SDK。效果：
- *   - API key 永不进 webview 内存；
- *   - 不依赖 WebKit 的流式 fetch（老 macOS 兼容风险消除）。
+ * Model requests never leave the webview directly: the request body goes to the backend through
+ * invoke('llm_stream'); the backend attaches the real API key for the target host and sends HTTPS,
+ * then pushes the response bytes back through a Channel as base64 chunks, which this adapter
+ * reassembles into a standard fetch Response for the model SDK. Benefits:
+ *   - the API key never enters webview memory;
+ *   - no dependence on the system webview's streaming fetch (removes compatibility risk on older macOS).
  *
- * 取消语义：AI SDK abort signal / Response.body.cancel() 都会触发
- * llm_abort，Rust 侧用 AbortHandle 取消 reqwest 请求。
+ * Cancellation: a model SDK abort signal or Response.body.cancel() both trigger llm_abort; the
+ * backend cancels the HTTP request with an AbortHandle.
  */
 import type { ProviderKind } from './provider';
 import { sessionHeaderFor } from '@config/providers';
@@ -21,7 +22,7 @@ interface LlmStreamEvent {
   kind: 'started' | 'chunk' | 'done' | 'error';
   status?: number;
   headers?: [string, string][];
-  /** base64 编码的原始字节（chunk 可能切断多字节 UTF-8，拼好再解码） */
+  /** Base64-encoded raw bytes (a chunk may split a multi-byte UTF-8 sequence; join before decoding). */
   data?: string;
   message?: string;
   retryable?: boolean;
@@ -113,7 +114,7 @@ export function createProxyFetch(provider?: ProviderKind, sessionId?: string): t
           }
         }
       } catch {
-        // stream 已关闭/已取消时忽略迟到事件
+        // Ignore late events once the stream is closed or cancelled.
       }
     };
 
@@ -155,15 +156,15 @@ export function createProxyFetch(provider?: ProviderKind, sessionId?: string): t
         try {
           controller.error(err);
         } catch {
-          // 已关闭
+          // already closed
         }
       },
     );
 
     const { status, headers: respHeaders } = await started;
-    // Response 构造器要求 status ∈ [200, 599]；异常值兜底为 502
+    // The Response constructor requires status ∈ [200, 599]; fall back to 502 for invalid values.
     const safeStatus = status >= 200 && status <= 599 ? status : 502;
-    // 204/304 不允许带 body
+    // 204/304 must not carry a body.
     const noBody = safeStatus === 204 || safeStatus === 304;
     return new Response(noBody ? null : stream, { status: safeStatus, headers: respHeaders });
   }) as typeof fetch;

@@ -10,7 +10,7 @@ const en: Record<string, string> = {
   'Advanced connection options': 'Advanced connection options',
   'Route the connection through a jump host (ProxyJump).': 'Route the connection through a jump host (ProxyJump).',
   'workspace.nav.terminals': 'Terminal sessions', 'workspace.nav.files': 'Project files', 'workspace.nav.conversations': 'AI conversations', 'workspace.nav.hosts': 'Host management', 'workspace.nav.dashboard': 'Resource dashboard',
-  'dock.git': 'Source control', 'dock.tabs': 'Tabs', 'dock.files': 'Files', 'dock.ssh': 'SSH', 'dock.chat': 'AI assistant', 'dock.settings': 'Settings',
+  'dock.git': 'Source control', 'dock.command-history': 'Command history', 'dock.tabs': 'Tabs', 'dock.files': 'Files', 'dock.ssh': 'SSH', 'dock.chat': 'AI assistant', 'dock.settings': 'Settings',
   'dock.dragTip': 'Drag to reorder or change sides / click to {{action}}', 'dock.open': 'Open', 'dock.close': 'Close',
   'panel.newTab': 'New tab', 'panel.emptyDir': 'Empty directory', 'panel.goUp': 'Back', 'panel.enterDir': 'Open directory', 'panel.addToInput': 'Add path to AI input',
   'panel.tabGroup.count': '{{n}} tabs', 'panel.sessionGroup.count': '{{n}} sessions',

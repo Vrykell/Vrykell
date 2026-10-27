@@ -3,29 +3,26 @@ import type { SearchSource, ResultType } from '@features/search/types';
 
 const sources = new Map<ResultType, SearchSource>();
 
-/** 注册搜索源（各 source 文件 import 时自动调用） */
+/** Registers a search source (each source file calls this on import) */
 export function registerSource(source: SearchSource) {
   if (!sources.has(source.id)) {
     sources.set(source.id, source);
   }
 }
 
-/** 获取所有已注册的源 */
 export function getSources(): SearchSource[] {
   return Array.from(sources.values());
 }
 
-/** 获取指定 ID 的源 */
 export function getSource(id: ResultType): SearchSource | undefined {
   return sources.get(id);
 }
 
-/** 获取所有源 ID */
 export function getSourceIds(): ResultType[] {
   return Array.from(sources.keys());
 }
 
-// ── 过滤器 — 已启用源 ID 集合（zustand store，保证切换后结果/UI 响应式刷新） ──
+// ── Filter — set of enabled source IDs (store, so results/UI refresh reactively after a toggle) ──
 
 const DEFAULT_ENABLED: ResultType[] = ['history', 'block', 'file', 'setting', 'action', 'session'];
 
@@ -46,12 +43,12 @@ export const useEnabledSourcesStore = create<EnabledSourcesState>((set, get) => 
   setAll: (ids) => set({ enabledIds: ids }),
 }));
 
-/** 获取已启用的源 ID（非响应式，供 engine 等非组件代码读取） */
+/** Returns the enabled source IDs (non-reactive, for non-component code such as the engine) */
 export function getEnabledSourceIds(): Set<ResultType> {
   return useEnabledSourcesStore.getState().enabledIds;
 }
 
-/** 切换某个源的启用状态（向后兼容的同步封装） */
+/** Toggles a source's enabled state (synchronous wrapper kept for backward compatibility) */
 export function toggleSource(id: ResultType, enabled: boolean) {
   useEnabledSourcesStore.getState().toggle(id, enabled);
 }

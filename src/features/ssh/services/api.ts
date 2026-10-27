@@ -6,8 +6,8 @@ import type { FsEntry, FileStat } from '@platform/api/types';
 import type { SshAuthenticationTarget, SshOptions } from '@core/ssh';
 
 /**
- * SSH 连接 API —— 存储与 CRUD 均在后端（SQLite），前端只调用命令。
- * 密码不回显：列表返回 hasPassword 标记，编辑时不回填明文。
+ * SSH connection API — storage and CRUD live in the backend (database); the frontend only calls commands.
+ * Passwords are never echoed: the list returns a hasPassword flag and the editor does not prefill the plaintext.
  */
 
 export type SshAuthMethod = 'password' | 'key' | 'ask' | 'agent';
@@ -26,7 +26,7 @@ export interface SshConnection extends SshOptions {
 
 export interface SshFsEntry extends FsEntry {}
 
-/** 目录列表响应：条目 + 实际目录的真实路径（空请求 = 远程 home）。 */
+/** Directory listing response: entries + the real path of the actual directory (empty request = remote home). */
 export interface SshListResponse {
   entries: SshFsEntry[];
   base: string;
@@ -51,7 +51,7 @@ const STATIC_FORWARD = new RegExp(`^(?:${FORWARD_HOST}:)?(\\d{1,5}):${FORWARD_HO
 /** `[bind:]port`, a local SOCKS listener. */
 const DYNAMIC_FORWARD = new RegExp(`^(?:${FORWARD_HOST}:)?(\\d{1,5})$`);
 
-/** 表单校验：返回错误信息，合法返回 null。 */
+/** Form validation: returns an error message, or null when valid. */
 export function validateSshConnection(c: Partial<SshConnection>): string | null {
   if (!c.name || !c.name.trim()) return t('Enter a connection name.');
   if (!c.host || !c.host.trim()) return t('Enter a host IP or domain.');
@@ -103,7 +103,7 @@ export function touchSshConnection(id: string): Promise<void> {
   return invoke('ssh_connection_touch', { id });
 }
 
-/** 测试连接（显式参数，供表单在保存前测试）。 */
+/** Tests a connection (explicit parameters, so the form can test before saving). */
 export function sshTest(target: {
   host: string;
   port?: number;
@@ -127,7 +127,7 @@ export function sshConfigCandidates(): Promise<SshConfigCandidate[]> {
   return invoke('ssh_config_candidates');
 }
 
-/** 查询主机指纹与 known_hosts 记录状态（首次连接确认用）。 */
+/** Queries the host fingerprint and whether it is already trusted (used for first-connection confirmation). */
 export interface SshHostKeyInfo {
   fingerprint: string;
   known: boolean;
@@ -146,12 +146,12 @@ export function sshHostKeyInfo(host: string, port?: number, options?: SshOptions
   return invoke('ssh_host_key_info', { host, port: port ?? null, ...(options ? { options } : {}) });
 }
 
-/** 用户确认指纹后记录主机密钥到 known_hosts（幂等）。 */
+/** Records the host key as trusted after the user confirms the fingerprint (idempotent). */
 export function sshTrustHostKey(host: string, port: number | undefined, expectedFingerprint: string, options?: SshOptions): Promise<void> {
   return invoke('ssh_trust_host_key', { host, port: port ?? null, expectedFingerprint, ...(options ? { options } : {}) });
 }
 
-/** 列出远程目录（按连接 id，密码由后端解析）。返回条目 + 实际目录真实路径。 */
+/** Lists a remote directory by connection id; the backend resolves the password. Returns entries + the real path of the actual directory. */
 export function sshFsList(id: string, path?: string): Promise<SshListResponse> {
   return invoke('ssh_list', { id, path: path ?? null });
 }
@@ -228,59 +228,59 @@ export async function sshSearchFiles(id: string, path: string, query: string, si
   finally { signal.removeEventListener('abort', cancel); progress.onmessage = () => {}; }
 }
 
-/** 下载远程文件到本地临时目录，返回本地路径（用于系统默认应用打开）。 */
+/** Downloads a remote file to a local temporary directory and returns the local path (for opening with the system default app). */
 export function sshDownload(id: string, path: string): Promise<string> {
   return invoke('ssh_download', { id, path });
 }
 
-/** 重命名远程条目（目标重名时自动加序号），返回最终路径。 */
+/** Renames a remote entry (adds a numeric suffix on collision) and returns the final path. */
 export function sshRename(id: string, path: string, newName: string): Promise<string> {
   return invoke<string>('ssh_rename', { id, path, newName });
 }
 
-/** 新建远程空文件（同名自动加序号），返回最终路径。 */
+/** Creates an empty remote file (adds a numeric suffix on collision) and returns the final path. */
 export function sshCreateFile(id: string, dir: string, name: string): Promise<string> {
   return invoke<string>('ssh_create_file', { id, dir, name });
 }
 
-/** 新建远程文件夹（同名自动加序号），返回最终路径。 */
+/** Creates a remote folder (adds a numeric suffix on collision) and returns the final path. */
 export function sshCreateDir(id: string, dir: string, name: string): Promise<string> {
   return invoke<string>('ssh_create_dir', { id, dir, name });
 }
 
-/** 移动远程文件/目录到目标目录（SFTP rename，重名自动加序号），返回最终路径。 */
+/** Moves a remote file/directory into a destination directory (SFTP rename, adds a numeric suffix on collision) and returns the final path. */
 export function sshMove(id: string, path: string, destDir: string): Promise<string> {
   return invoke<string>('ssh_move', { id, path, destDir });
 }
 
-/** 完成的一条 from→to 对（用于远程文件操作回退）。 */
+/** A completed from→to pair (used to undo remote file operations). */
 export interface SshOpPair {
   from: string;
   to: string;
 }
 
-/** 批量远程操作结果：完成项 + 失败说明（部分失败不中断其余项）。 */
+/** Batch remote operation result: completed items + failure messages (one failure does not stop the rest). */
 export interface SshOpOutcome {
   completed: SshOpPair[];
   errors: string[];
 }
 
-/** 复制远程文件/目录到目标目录（远端 cp -R，逐项预检同名/自身子树）。 */
+/** Copies remote files/directories into a destination directory (remote cp -R; pre-checks name collisions and self-subtrees per item). */
 export function sshCopy(id: string, paths: string[], destDir: string): Promise<SshOpOutcome> {
   return invoke('ssh_copy', { id, paths, destDir });
 }
 
-/** 可回退删除：把远程条目移动到远端暂存目录，返回 原始→暂存 映射。 */
+/** Undoable delete: moves remote entries into a remote staging directory and returns the original→staging mapping. */
 export function sshStageDelete(id: string, paths: string[], undoEnabled = true): Promise<SshOpOutcome> {
   return invoke('ssh_stage_delete', { id, paths, ...(undoEnabled ? {} : { undoEnabled: false }) });
 }
 
-/** 回退删除：把暂存项移回原位。 */
+/** Undoes a delete: moves staged items back to their original locations. */
 export function sshRestoreStaged(id: string, items: SshOpPair[]): Promise<SshOpOutcome> {
   return invoke('ssh_restore_staged', { id, items });
 }
 
-/** 把暂存项永久删除（回退窗口结束后）。 */
+/** Permanently deletes staged items (after the undo window ends). */
 export function sshPurgeStaged(id: string, paths: string[]): Promise<void> {
   return invoke('ssh_purge_staged', { id, paths });
 }
@@ -291,7 +291,7 @@ export function sshUpload(id: string, remoteDir: string, localPath: string): Pro
 }
 
 let seq = 0;
-/** 生成连接 id（新建时前端生成，后端按 id upsert）。 */
+/** Generates a connection id (created in the frontend; the backend upserts by id). */
 export function newSshId(): string {
   seq += 1;
   return `ssh-${Date.now().toString(36)}-${seq}`;

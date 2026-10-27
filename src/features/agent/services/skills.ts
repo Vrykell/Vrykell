@@ -1,14 +1,15 @@
 /**
- * skills — 文件夹式技能（对齐 Agent Skills 开放规范）。
+ * skills — folder-based skills (aligned with the Agent Skills open specification).
  *
- * 每个技能是一个磁盘目录（`~/.vrykell/skills/<name>/`），含 `SKILL.md`
- * （frontmatter：name/description/allowed-tools + 正文）+ 可选 scripts/references/assets。
- * 索引（来源/信任/启停/内容哈希）由 Rust 持有，本模块只做类型 + invoke 封装。
+ * Each skill is a directory on disk (`~/.vrykell/skills/<name>/`) containing `SKILL.md`
+ * (frontmatter: name/description/allowed-tools plus the body) and optional
+ * scripts/references/assets. The backend owns the index (source/trust/enabled/content hash); this
+ * module only provides types and invoke wrappers.
  */
 
 import { invoke } from '@platform/diagnostics';
 
-/** 技能元信息（list_skills 返回，不含正文）。 */
+/** Skill metadata (returned by list_skills, without the body). */
 export interface SkillMeta {
   name: string;
   description: string;
@@ -22,12 +23,12 @@ export interface SkillMeta {
   modified: boolean;
 }
 
-/** 技能详情（get_skill 返回，含正文）。 */
+/** Skill detail (returned by get_skill, including the body). */
 export interface SkillDetail extends SkillMeta {
   prompt: string;
 }
 
-/** 网络技能清单里的单条（统一协议 vrykell-skills/v1）。 */
+/** One entry in a remote skill registry (the vrykell-skills/v1 protocol). */
 export interface RemoteSkill {
   name: string;
   description: string;
@@ -36,18 +37,18 @@ export interface RemoteSkill {
   author?: string;
 }
 
-/** 技能信任信息（find_skill_reference 返回）。 */
+/** Skill trust information (returned by find_skill_reference). */
 export interface SkillTrustInfo {
   name: string;
   trusted: boolean;
   enabled: boolean;
 }
 
-/** GitHub 市场搜索结果。 */
+/** Remote repository marketplace search result. */
 export interface MarketSkill {
   name: string;
   description: string;
-  /** 仓库内技能目录相对路径 */
+  /** Path of the skill directory relative to the repository. */
   dir: string;
 }
 
@@ -67,29 +68,29 @@ export const fetchRemoteSkills = (url: string) =>
 export const findSkillReference = (text: string) =>
   invoke<SkillTrustInfo | null>('find_skill_reference', { text });
 
-/** GitHub 市场：列出仓库内的技能。 */
+/** Remote repository marketplace: list the skills inside a repository. */
 export const marketGithubList = (repo: string) => invoke<MarketSkill[]>('market_github_list', { repo });
-/** GitHub 市场：安装仓库内某目录的技能。 */
+/** Remote repository marketplace: install a skill from one directory in a repository. */
 export const marketGithubInstall = (repo: string, dir: string) =>
   invoke<SkillMeta>('market_github_install', { repo, dir });
 
-/** 若文本/路径引用的是未信任技能，返回其名称；否则 null。 */
+/** If the text or path references an untrusted skill, return its name; otherwise null. */
 export async function untrustedSkillFor(text: string): Promise<string | null> {
   try {
     const info = await findSkillReference(text);
     if (info && !info.trusted) return info.name;
   } catch {
-    /* 忽略查询失败，放行 */
+    /* Ignore a failed lookup and allow. */
   }
   return null;
 }
 
-/** 可注入 agent 上下文的技能：已启用 + 已信任。 */
+/** Skills that can be injected into the agent context: enabled + trusted. */
 export function availableSkillMetas(metas: SkillMeta[]): SkillMeta[] {
   return metas.filter((m) => m.enabled && m.trusted);
 }
 
-/** 注入系统提示词的「可用技能清单」（仅名称 + 描述）。 */
+/** "Available skills" list injected into the system prompt (names + descriptions only). */
 export function buildSkillsContext(metas: SkillMeta[]): string {
   if (metas.length === 0) return '';
   const lines = metas.map(k => `- ${k.name}: ${k.description || 'No description'}`);

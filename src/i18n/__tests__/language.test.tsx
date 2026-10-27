@@ -32,7 +32,7 @@ it('resolves system language and preserves interpolation and unknown labels', ()
 });
 
 it('provides English labels for every internal catalog key', () => {
-  for (const key of Object.keys(zh).filter(key => /^[a-z][\w]*\.[\w.]+$/.test(key))) {
+  for (const key of Object.keys(zh).filter(key => /^[a-z][\w.-]*\.[\w.-]+$/.test(key))) {
     expect(en[key], key).toBeTruthy();
   }
 });

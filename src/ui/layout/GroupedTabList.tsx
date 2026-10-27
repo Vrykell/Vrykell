@@ -99,7 +99,7 @@ export default function GroupedTabList({ items, selected, label, listId, classNa
     { label: t('Delete tab group'), group: 'danger', danger: true, onClick: () => setConfirmation({ group, mode: 'delete' }) },
   ];
   return <>
-    <div ref={strip} className={`folder-tab-list ${className}`} role="tablist" aria-label={label} data-reorder-list={listId}
+    <div ref={strip} className={`folder-tab-list ${className}`} role="tablist" aria-label={label} data-reorder-list={listId} data-empty={!items.length || undefined}
       onContextMenu={event => { event.preventDefault(); onBlankContext?.({ x: event.clientX, y: event.clientY, trigger: event.currentTarget }); }}
       onKeyDown={event => {
         if ((event.target as Element).closest('input') || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -135,9 +135,9 @@ export default function GroupedTabList({ items, selected, label, listId, classNa
           {(collapsed || !group.members.length) && <ListReorderZonePlaceholder listId={listId} zoneId={group.id} />}
         </Fragment>;
       })}
-      {!items.length && empty}
       {grouping && <div data-reorder-zone="ungrouped" data-reorder-kind="loose-tab" className="terminal-ungrouped-tail"><ListReorderZonePlaceholder listId={listId} zoneId="ungrouped" /></div>}
     </div>
+    {!items.length && empty && <div className="folder-tab-empty" role="status">{empty}</div>}
     <ListReorderPreview listId={listId} variant="item" owner={strip} className="terminal-group-reorder-preview">{moving => {
       const item = items.find(item => item.id === moving.id);
       if (item) return <div className="folder-tab folder-tab-preview" data-active={selected === item.id} data-tab-surface={item.surface}>{render(item, true)}</div>;

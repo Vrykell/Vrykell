@@ -1,24 +1,23 @@
 import { create } from 'zustand';
 
-/** 正在拖动的条目（预览用图标 + 后续操作用路径）。 */
+/** Entry being dragged (icon for the preview + path for later operations). */
 export interface FileDragItem {
   path: string;
   name: string;
   is_dir: boolean;
 }
 
-/** 放置目标：命中的行（用于高亮）与它代表的目录（用于落地）。 */
+/** Drop target: the hit row (for highlighting) and the directory it represents (for the drop). */
 export interface FileDropTarget {
   rowPath: string | null;
   dir: string;
 }
 
 export interface FileDragState {
-  /** 正在拖动的条目 */
   items: FileDragItem[];
-  /** 指针位置（预览跟随） */
+  /** Pointer position (the preview follows it) */
   pointer: { x: number; y: number } | null;
-  /** 当前悬停的放置目标 */
+  /** Currently hovered drop target */
   target: FileDropTarget | null;
   start: (items: FileDragItem[], pointer: { x: number; y: number }) => void;
   movePointer: (pointer: { x: number; y: number }) => void;
@@ -26,7 +25,7 @@ export interface FileDragState {
   end: () => void;
 }
 
-/** 文件面板拖拽状态：行拖到文件夹/文件（同级目录）/面包屑即移动。 */
+/** File panel drag state: dropping a row on a folder, a file (its parent directory) or the breadcrumb moves it. */
 export const useFileDragStore = create<FileDragState>((set) => ({
   items: [],
   pointer: null,

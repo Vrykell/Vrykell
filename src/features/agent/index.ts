@@ -1,4 +1,4 @@
-/** Agent 领域公开入口。 */
+/** Public entry point for the agent domain. */
 export * from '@features/agent/stores/agentSettings';
 export * from '@features/agent/stores/aiConfig';
 export * from '@features/agent/stores/permissions';

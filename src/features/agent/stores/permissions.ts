@@ -41,7 +41,7 @@ export const DEFAULT_APPROVAL_TIMEOUT_SECONDS = 300;
 export const MIN_APPROVAL_TIMEOUT_SECONDS = 60;
 export const MAX_APPROVAL_TIMEOUT_SECONDS = 1800;
 
-/** 工具结果统一形状（与 tools/* 的结构化约定一致） */
+/** Shared tool result shape (matches the structured convention in tools/*). */
 export interface GateResult {
   ok: boolean;
   denied?: boolean;
@@ -56,13 +56,13 @@ export interface ToolContext {
   remote?: boolean;
   /** Shell of the execution target: picks the danger-rule table (Windows shells also run POSIX-shaped aliases). */
   shellType?: string | null;
-  /** 会话 id（= 工作区 tabId），审批卡的落点 */
+  /** Conversation id (= workspace tabId) that anchors the approval card. */
   tabId?: string;
-  /** 审批状态回写（agentStream 接到后 upsert ToolRun）；shape 用于卡片上的「本会话允许这一种」，input 携带编辑后的命令 */
+  /** Approval state callback (agentStream upserts the ToolRun from it); shape marks an "allow this kind for this session" choice, input carries the edited command. */
   setToolState?: (toolCallId: string, state: ToolRunState, extra?: { danger?: string; shape?: string; input?: Record<string, unknown> }) => void;
 }
 
-/** 全部受管工具（设置页表格也用它渲染，新增工具别漏） */
+/** Every managed tool (the settings table renders from this list; add new tools here). */
 export const TOOL_NAMES = [
   'run_command',
   'read_file',
@@ -116,7 +116,7 @@ interface PermissionsState {
   setLevel: (tool: ToolName, level: ToolLevel) => void;
   setMode: (mode: PermissionMode) => void;
   setApprovalTimeout: (seconds: number) => void;
-  /** 后端策略回填（启动与设置页变更后） */
+  /** Backfill from the backend policy (on startup and after settings changes). */
   applyPolicy: (levels: Record<string, ToolLevel>) => void;
 }
 
@@ -187,7 +187,7 @@ export function levelOf(tool: string): ToolLevel {
   return s.levels[tool] ?? 'ask';
 }
 
-// ── 审批桥 ──
+// ── approval bridge ──
 
 type ApprovalResolution = { decision: ApprovalDecision; command?: string };
 const pending = new Map<string, { resolve: (result: ApprovalResolution) => void; owner?: string }>();
@@ -217,13 +217,13 @@ function requestApproval(toolCallId: string, signal?: AbortSignal, owner?: strin
   });
 }
 
-/** 审批卡按钮入口。unknown toolCallId 静默忽略（可能已被 stop 兜底清掉） */
+/** Entry point for the approval-card buttons. Unknown toolCallIds are ignored silently (a stop may already have cleaned them up). */
 export function resolveApproval(toolCallId: string, decision: ApprovalDecision, command?: string) {
   pending.get(toolCallId)?.resolve({ decision, command });
   pending.delete(toolCallId);
 }
 
-/** 中止/断流时兜底：所有挂起审批一律按拒绝放行，防 execute 悬挂 */
+/** Fallback for aborts and broken streams: resolve every pending approval as denied so execute cannot hang. */
 export function denyAllPending(conversationId?: string) {
   for (const [id, entry] of pending) {
     if (conversationId && entry.owner !== conversationId) continue;
@@ -243,8 +243,9 @@ export function clearSessionGrants(conversationId?: string) {
 }
 
 /**
- * 未信任技能的访问确认：agent 要读/写/运行某个未信任技能的文件或脚本时调用。
- * 复用审批卡；允许则放行（由调用方持久化信任），拒绝则阻断。
+ * Trust confirmation for an untrusted skill: called when the agent wants to read, write or run a
+ * file or script of a skill that is not trusted yet. Reuses the approval card; an allow proceeds
+ * (the caller persists the trust) and a deny blocks.
  */
 export async function ensureTrustedSkill(
   skillName: string,
@@ -280,8 +281,8 @@ export async function ensureTrustedSkill(
 }
 
 /**
- * 工具执行前检查：文本/路径若引用未信任技能，先弹「信任此技能」确认；
- * 通过则持久化信任并放行，否则阻断。
+ * Pre-execution check: when the text or path references an untrusted skill, ask for confirmation
+ * to trust it first; approval persists the trust and proceeds, denial blocks.
  */
 export async function ensureSkillAccess(
   text: string,
@@ -299,7 +300,7 @@ export async function ensureSkillAccess(
   return { proceed: true };
 }
 
-// ── 授权入口（Rust 决定） ──
+// ── authorization entry points (decided by Rust) ──
 
 /** Injectable for tests: the backend call that decides a tool call. */
 export type ToolAuthorizer = (request: AuthorizeRequest) => Promise<ToolDecision>;
@@ -338,9 +339,10 @@ function denied(reason: string | undefined, fallback: string): GateOutcome {
 }
 
 /**
- * 工具 execute 的第一行。`command` 是受门控的后端命令名（read_file_text / fs_search …），
- * 租约与参数一并绑定到它；返回 proceed:false 时直接把 result 作为工具结果返回
- * （带 denied 哨兵，agentStream 据此刻成 denied 灰环）。
+ * First line of every tool execute. `command` is the gated backend command name
+ * (read_file_text / fs_search …), and the lease is bound to it together with the arguments.
+ * When it returns proceed:false, the result is returned as the tool result directly (with the
+ * denied sentinel, which agentStream renders as a denied ring).
  */
 export async function gate(
   toolName: ToolName,
@@ -382,7 +384,7 @@ export async function gate(
   if (decision.decision === 'allow') {
     return { proceed: true, ...(decision.lease ? { lease: decision.lease } : {}) };
   }
-  // ask：挂起等审批。无 setToolState/tabId 说明不在交互上下文（如测试），按拒绝处理
+  // ask: suspend until approved. Without setToolState/tabId there is no interactive context (tests, for example), so deny.
   if (!toolCallId || !ctx.setToolState || !ctx.tabId) {
     return denied(undefined, t('The current context cannot request approval; the operation was denied.'));
   }

@@ -48,7 +48,7 @@ export function Field({ title, description, children, layout = 'row' }: {
   );
 }
 
-// ── 开关（AI 行为页用） ──
+// ── Switch (for the AI behavior page) ──
 
 export function Toggle({ on, onChange, label }: { on: boolean; onChange: (v: boolean) => void | Promise<void>; label?: string }) {
   const { save } = useSettingsSave();

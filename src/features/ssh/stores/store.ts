@@ -17,8 +17,8 @@ function applySavedOrder(connections: SshConnection[]): SshConnection[] {
 }
 
 /**
- * SSH 连接 store —— 后端 SQLite 的响应式投影。
- * 存储与 CRUD 均在后端；前端只缓存列表（密码不回显）。
+ * SSH connection store — a reactive projection of the backend database.
+ * Storage and CRUD live in the backend; the frontend only caches the list (passwords are never echoed).
  */
 interface SshState {
   connections: SshConnection[];
@@ -78,7 +78,7 @@ export const useSshStore = create<SshState>((set, get) => ({
 
 }));
 
-/** 确保 store 已从后端加载（幂等，fire-and-forget）。 */
+/** Ensures the store has loaded from the backend (idempotent, fire-and-forget). */
 export function ensureSshLoaded(): void {
   const s = useSshStore.getState();
   if (!s.loaded && !s.loading) void s.load();

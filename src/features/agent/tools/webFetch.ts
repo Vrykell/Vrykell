@@ -1,10 +1,10 @@
 /**
- * webFetch — 一等联网工具（与 read_file/edit_file 同级，不依赖「联网搜索」开关）。
- *   - web_search：DuckDuckGo HTML 抓取（联网搜索无 key 兜底）。
- *   - web_fetch：抓取任意 URL → 结构化 Markdown 文本（标题/层级/链接保留结构）。
- *   - web_crawl：从起始 URL 广度优先爬取多页（同域、限深度/页数），逐页结构化。
+ * webFetch — first-class web tools (on par with read_file/edit_file, independent of the web-search switch).
+ *   - web_search: HTML search-engine scraping (keyless fallback for web search).
+ *   - web_fetch: fetch any URL → structured Markdown text (titles/hierarchy/links keep their structure).
+ *   - web_crawl: breadth-first crawl from a starting URL (same domain, depth/page limits), structured per page.
  *
- * 都走 Rust 的 web_search / web_fetch / web_crawl 命令（reqwest 直连 + HTML→Markdown）。
+ * All go through the backend web_search / web_fetch / web_crawl commands (direct HTTP client + HTML→Markdown).
  */
 
 import { tool } from 'ai';
@@ -58,7 +58,7 @@ function formatSearchResults(r: WebSearchResponse): string {
   return lines.length ? lines.join('\n') : '（无结果）';
 }
 
-/** web_fetch → 结构化文本（标题 + 正文 + 页内链接 + 截断标记）。 */
+/** web_fetch → structured text (title + body + in-page links + truncation marker). */
 function formatFetch(r: WebFetchResponse): string {
   const parts: string[] = [];
   if (r.title) parts.push(`标题：${r.title}`);
@@ -73,7 +73,7 @@ function formatFetch(r: WebFetchResponse): string {
   return head + body + linkBlock;
 }
 
-/** web_search 兜底：DuckDuckGo HTML 抓取（无需 API Key）。 */
+/** web_search fallback: HTML search-engine scraping (no API key required). */
 export function buildWebSearchTool(ctx: ToolContext) {
   return tool({
       description: DESC_WEB_SEARCH_DDG,
@@ -97,7 +97,7 @@ export function buildWebSearchTool(ctx: ToolContext) {
   });
 }
 
-/** web_fetch：抓取任意 URL → 结构化 Markdown 文本（一等工具）。 */
+/** web_fetch: fetch any URL → structured Markdown text (first-class tool). */
 export function buildWebFetchTool(ctx: ToolContext) {
   return tool({
       description: DESC_WEB_FETCH,
@@ -117,7 +117,7 @@ export function buildWebFetchTool(ctx: ToolContext) {
   });
 }
 
-/** web_crawl：爬取多页（BFS，同域/限深度/限页数），逐页结构化。 */
+/** web_crawl: crawl multiple pages (BFS, same domain / depth limit / page limit), structured per page. */
 export function buildWebCrawlTool(ctx: ToolContext) {
   return tool({
       description: DESC_WEB_CRAWL,

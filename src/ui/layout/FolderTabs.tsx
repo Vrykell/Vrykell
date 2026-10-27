@@ -33,7 +33,7 @@ export default function FolderTabs({ items, selected, label, listId, className =
     setEditingId(null);
   };
   const cancelRename = () => { renameFinished.current = true; setEditingId(null); };
-  return <header className={`folder-header ${headerClassName}`}>
+  return <div className={`folder-header ${headerClassName}`}>
     {menuItems && <div className="folder-more"><EditorActions label={menuLabel} items={menuItems} /></div>}
     <GroupedTabList items={items} selected={selected} label={label} listId={listId ?? instanceId} className={className} grouping={grouping} empty={empty}
       onSelect={onSelect} onClose={onClose} onMove={onMove} onRename={beginRename} tabActions={tabActions} onBlankContext={onBlankContext}
@@ -41,7 +41,7 @@ export default function FolderTabs({ items, selected, label, listId, className =
         editing={!preview && editingId === item.id} editTitle={editTitle} setEditTitle={setEditTitle}
         onStartRename={() => beginRename(item)} onCommitRename={commitRename} onCancelRename={cancelRename} />} />
     <div className="folder-actions">{toolbar}</div>
-  </header>;
+  </div>;
 }
 
 export function FolderTabContent({ item, selected, onSelect, onClose, editing = false, editTitle = '', setEditTitle,

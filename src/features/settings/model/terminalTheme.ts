@@ -1,10 +1,10 @@
 /**
- * terminalTheme — 应用主题外观配置 store（透明度 / 背景图片 / CSS 变量覆盖）。
+ * terminalTheme — app theme appearance store (opacity / background image / CSS variable overrides).
  *
- * 真相源在 Rust 后端 `~/.vrykell/theme.json`；前端 store 做响应式镜像 + 即时应用。
+ * The source of truth is the backend `~/.vrykell/theme.json`; the frontend store mirrors it reactively and applies changes immediately.
  *
- * 壁纸与不透明度在 React 层落地（App.tsx 的壁纸背景层 + 内容 opacity），
- * 不依赖 CSS var() 的 url 解析，渲染更可靠、可测试。
+ * Wallpaper and opacity are applied in the view layer (the App.tsx wallpaper background plus content opacity),
+ * without relying on CSS var() url resolution, so rendering is more reliable and testable.
  */
 
 import { create } from 'zustand';
@@ -25,9 +25,9 @@ export interface TerminalThemeConfig {
   desktopTint?: boolean;
   /** Application opacity, 0.5..=1 (1 = fully opaque). */
   opacity: number;
-  /** 应用壁纸本地绝对路径；null = 纯色背景 */
+  /** Absolute local path of the wallpaper; null = solid color background */
   backgroundImage: string | null;
-  /** CSS 变量覆盖表（主题外观） */
+  /** CSS variable override map (theme appearance) */
   vars: Record<string, string>;
 }
 
@@ -43,7 +43,7 @@ export function getThemePath(): Promise<string> {
   return invoke<string>('get_theme_path');
 }
 
-// 壁纸 asset URL 的 localStorage 缓存：URL 很小，启动时同步应用，壁纸直接经 asset 协议读本地文件
+// localStorage cache of the wallpaper asset URL: the URL is small, applied synchronously at startup, and the wallpaper is read from the local file through the asset protocol
 const WALLPAPER_CACHE_KEY = 'vrykell-wallpaper-url';
 
 function readCachedWallpaper(): string | null {
@@ -63,7 +63,7 @@ function cacheWallpaper(url: string | null): void {
   }
 }
 
-/** 启动时同步应用上次缓存的壁纸 URL，避免异步加载期间的黑色背景。 */
+/** Applies the last cached wallpaper URL synchronously at startup to avoid a black background while loading asynchronously. */
 export function applyCachedWallpaper(): void {
   const cached = readCachedWallpaper();
   if (cached) {
@@ -71,7 +71,7 @@ export function applyCachedWallpaper(): void {
   }
 }
 
-/** 本地壁纸路径 → asset URL（asset 协议直接读本地文件，无需 base64 / IPC 大串传输）。 */
+/** Local wallpaper path → asset URL (the asset protocol reads the local file directly, with no base64 / large IPC payload). */
 function resolveWallpaperUrl(path: string | null): string | null {
   if (!path) return null;
   try {
@@ -82,11 +82,11 @@ function resolveWallpaperUrl(path: string | null): string | null {
   }
 }
 
-/** 重应用所有 xterm 实例的主题（明暗/颜色覆盖变化时同步背景/光标/选区/滚动条滑块）。 */
+/** Reapplies the theme to every terminal instance (syncs background/cursor/selection/scrollbar thumb when the color scheme or overrides change). */
 export function reapplyXtermTheme(): void {
   const theme = readXtermTheme();
   const cs = getComputedStyle(document.documentElement);
-  // 滚动条滑块颜色与 block 列表滚动条(theme.css)一致
+  // Scrollbar thumb colors match the block list scrollbar (theme.css)
   const thumb = cs.getPropertyValue('--scrollbar-thumb').trim() || 'rgba(255,255,255,0.14)';
   const thumbHover = cs.getPropertyValue('--scrollbar-thumb-hover').trim() || 'rgba(255,255,255,0.22)';
   for (const t of termInstances.values()) {
@@ -99,12 +99,12 @@ export function reapplyXtermTheme(): void {
         scrollbarSliderActiveBackground: thumbHover,
       };
     } catch {
-      /* ignore：实例可能正在销毁 */
+      /* ignore: the instance may be being destroyed */
     }
   }
 }
 
-/** 同步应用：颜色覆盖 + xterm 主题。mode 缺省时用当前 data-theme。 */
+/** Applies synchronously: color overrides + terminal theme. mode defaults to the current data-theme. */
 export function applyTerminalTheme(config: TerminalThemeConfig, mode?: ThemeMode): void {
   setThemeOverrides(config.vars ?? {});
   applyTheme(mode ?? getCurrentTheme());
@@ -116,7 +116,7 @@ export function applyTerminalTheme(config: TerminalThemeConfig, mode?: ThemeMode
 interface TerminalThemeState {
   config: TerminalThemeConfig;
   loaded: boolean;
-  /** 已解析的壁纸 data URL（React 背景层直接使用） */
+  /** Resolved wallpaper data URL (used directly by the view's background layer) */
   wallpaperDataUrl: string | null;
   load: () => Promise<void>;
   update: (patch: Partial<TerminalThemeConfig>) => Promise<void>;

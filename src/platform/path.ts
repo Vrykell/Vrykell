@@ -1,29 +1,35 @@
 /**
- * platform/path — 本地文件系统路径语义的唯一出口（跨平台分隔符 / 盘符根 / 上级目录）。
+ * platform/path — the single source of local filesystem path semantics
+ * (cross-platform separators, drive roots, parent directories).
  *
- * 约定：前端统一把路径归一化成正斜杠形式（`C:/Users/foo`、`/Users/foo`），传给后端的
- * `fs_list` 等命令（Windows 的 read_dir 同样接受 `/`）；后端返回的原生反斜杠路径在
- * `@platform/api/fs` 边界处归一化后再进业务状态。业务层不得再自行处理分隔符。
+ * Convention: the front end normalizes every path to forward slashes
+ * (`C:/Users/foo`, `/Users/foo`) before passing it to backend commands such as
+ * `fs_list` (the Windows directory listing accepts `/` too); native backslash paths
+ * returned by the backend are normalized at the `@platform/api/fs` boundary before
+ * entering feature state. Feature code must not handle separators itself.
  *
- * - 文件系统根 `/` 必须保留（全剥尾斜杠会把根剥成空串，fs_list('') 会失败）。
- * - Windows 盘符根保留根斜杠 `C:/`：`C:` 是「该驱动器当前目录」而不是根。
+ * - The filesystem root `/` must be preserved (stripping all trailing slashes would
+ *   turn it into an empty string and fs_list('') would fail).
+ * - A Windows drive root keeps its root slash `C:/`: `C:` means "the current directory
+ *   of that drive", not the root.
  *
- * 与 React 无关，便于单测。
+ * Free of UI dependencies so it stays unit-testable.
  */
 
-/** 归一化分隔符为 `/`，去掉尾部斜杠；`/C:/Users`（OSC 7 的 Windows 盘符形式）→ `C:/Users`。 */
+/** Normalizes separators to `/` and strips trailing slashes; `/C:/Users` (the Windows drive form of OSC 7) → `C:/Users`. */
 export function normPath(p: string): string {
-  // 先处理前导斜杠 + 盘符（/C:/Users、/C:/、/C:），再收尾斜杠，避免盘符形式被提前破坏
+  // Handle a leading slash plus drive (/C:/Users, /C:/, /C:) before trimming trailing
+  // slashes, so the drive form is not broken early
   let s = p.replace(/\\/g, '/').replace(/^\/\/\?\/UNC\//i, '//').replace(/^\/\/\?\/([a-zA-Z]:\/)/, '$1')
     .replace(/^\/([a-zA-Z]):(\/|$)/, '$1:/');
   s = s.replace(/\/+$/, '');
-  if (s === '') return '/'; // 根路径
-  // 盘符根补齐根斜杠（C: → C:/），避免后端把它当成驱动器相对路径
+  if (s === '') return '/'; // root path
+  // Give a bare drive its root slash (C: → C:/) so the backend does not treat it as a drive-relative path
   if (/^[a-zA-Z]:$/.test(s)) return `${s}/`;
   return s;
 }
 
-/** 拆成显示段：`C:/Users/foo` → ['C:', 'Users', 'foo']；`/Users` → ['Users']。 */
+/** Display segments: `C:/Users/foo` → ['C:', 'Users', 'foo']; `/Users` → ['Users']. */
 export function pathSegments(p: string): string[] {
   const path = normPath(p);
   const parts = path.split('/').filter(Boolean);
@@ -31,7 +37,7 @@ export function pathSegments(p: string): string[] {
   return parts;
 }
 
-/** 段 → 路径：['C:'] → 'C:/'，['C:', 'Users'] → 'C:/Users'，['Users'] → '/Users'。 */
+/** Segments → path: ['C:'] → 'C:/', ['C:', 'Users'] → 'C:/Users', ['Users'] → '/Users'. */
 export function segmentsToPath(segs: string[]): string {
   if (segs.length === 0) return '';
   const first = segs[0]!;
@@ -41,21 +47,22 @@ export function segmentsToPath(segs: string[]): string {
   return '/' + segs.join('/');
 }
 
-/** 是否 Windows 盘符根（`C:` / `C:/`）。 */
+/** Whether this is a Windows drive root (`C:` / `C:/`). */
 export function isDriveRoot(p: string): boolean {
   const segs = pathSegments(p);
   return segs.length === 1 && /^[a-zA-Z]:$/.test(segs[0]!);
 }
 
 /**
- * 上级目录路径；已在文件系统根 / 盘符根时返回 null（调用方应切到「盘符」视图）。
+ * Parent directory path; null at the filesystem root or drive root (the caller should
+ * switch to the drive view).
  */
 export function parentOf(p: string): string | null {
   const segs = pathSegments(p);
-  if (segs.length === 0) return null; // 已在文件系统根
+  if (segs.length === 0) return null; // already at the filesystem root
   if (segs[0]?.startsWith('//') && segs.length <= 2) return null;
   if (segs.length === 1) {
-    // 盘符根（C:）→ 无上级；文件系统根的直接子目录（/Users）→ /
+    // Drive root (C:) → no parent; a direct child of the filesystem root (/Users) → /
     return isDriveRoot(p) ? null : '/';
   }
   segs.pop();

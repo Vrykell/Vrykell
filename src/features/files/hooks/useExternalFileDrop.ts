@@ -3,16 +3,17 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 import type { FileDropTarget } from '@features/files/stores/fileDrag';
 
 interface UseExternalFileDropOptions {
-  /** 指针位置（CSS 像素）→ 放置目标；返回 null 表示该处不接受放置 */
+  /** Pointer position (CSS pixels) → drop target; null means the location does not accept drops */
   resolveTarget: (x: number, y: number) => FileDropTarget | null;
   onHover: (target: FileDropTarget | null) => void;
   onDrop: (paths: string[], target: FileDropTarget) => void;
 }
 
 /**
- * 系统文件拖入面板：走 Tauri 的原生拖放事件。
- * Windows 上「原生文件拖入（带真实路径）」与 HTML5 拖放互斥（tauri dragDropEnabled），
- * 因此拖入统一走这条通道，应用内拖拽用指针事件，两者共用 data-drop-dir 命中测试。
+ * Native file drop into the panel: handled through the host's native drag-drop events.
+ * Native file drops (with real paths) and HTML5 drag-and-drop are mutually exclusive on some
+ * platforms, so external drops all go through this channel while in-app drags
+ * use pointer events; both share the data-drop-dir hit testing.
  */
 export function useExternalFileDrop({ resolveTarget, onHover, onDrop }: UseExternalFileDropOptions) {
   const latest = useRef({ resolveTarget, onHover, onDrop });

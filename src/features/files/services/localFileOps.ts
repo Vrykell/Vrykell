@@ -6,7 +6,7 @@ import {
 import { parentOf, pathSegments, segmentsToPath } from '@platform/path';
 import type { FileOps } from '@features/files/model/fileOps';
 
-/** 本地磁盘实现：路径语义来自 @platform/path，操作全部走后端文件命令。 */
+/** Local disk implementation: path semantics come from @platform/path; all operations go through backend file commands. */
 export function createLocalFileOps(): FileOps {
   return {
     stat: (path) => fsStat(path),

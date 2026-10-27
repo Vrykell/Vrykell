@@ -3,10 +3,10 @@ import { t } from '@i18n';
 import { IconButton } from '@ui/actions/IconButton';
 import { TextInput } from '@ui/fields/TextInput';
 /**
- * SkillsSettings — 技能设置页（文件夹式技能 + 安全模型）。
+ * SkillsSettings — skills settings page (folder-style skills + security model).
  *
- * 列表行 + 详情面板（内嵌文件树浏览，复用现有文件系统交互），导入支持 URL/文件夹/压缩包。
- * 信任分级：未信任/已信任 + 启用/禁用；含脚本/来源/已修改 徽标；导入默认未信任。
+ * List rows + detail panel (embedded file tree browser reusing the existing file system interactions); imports support URL/folder/archive.
+ * Trust levels: untrusted/trusted plus enabled/disabled; badges for scripts/source/modified; imports start untrusted.
  */
 
 import { useState } from 'react';
@@ -29,14 +29,14 @@ import { inputStyle } from '../components/formStyles';
 const toast = (msg: string, type: 'info' | 'success' | 'error') =>
   useToastStore.getState().addToast(msg, type);
 
-/** 预置技能市场（GitHub 仓库 URL，含 SKILL.md 的常见技能库） */
+/** Preset skill marketplaces (repository URLs of common skill libraries containing SKILL.md) */
 const MARKETPLACES: { name: string; repo: string }[] = [
   { name: 'anthropics/skills', repo: 'https://github.com/anthropics/skills' },
   { name: 'magnus919/agent-skills', repo: 'https://github.com/magnus919/agent-skills' },
 ];
 
 
-// ── 样式 ──
+// ── Styles ──
 
 const btn: React.CSSProperties = {
   padding: '4px 10px',
@@ -113,7 +113,7 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
   );
 }
 
-// ── 详情面板 ──
+// ── Detail panel ──
 
 function SkillDetailPanel({ skill, onClose, onChanged }: {
   skill: SkillDetail;
@@ -193,7 +193,7 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
   );
 }
 
-// ── 技能市场（弹层页面） ──
+// ── Skill marketplace (overlay page) ──
 
 function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
   metas: SkillMeta[];
@@ -281,7 +281,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
   );
 }
 
-// ── 主页面 ──
+// ── Main page ──
 
 export default function SkillsSettings() {
   const {

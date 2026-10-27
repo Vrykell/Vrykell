@@ -1,11 +1,11 @@
 /**
- * remotePath — SSH 文件面板路径 store 与工具。
+ * remotePath — path store and helpers for the SSH file panel.
  *
- * 面板路径按连接 id 持久（跨标签一致）；SSH 会话没有 cwd 自动上报，
- * 由「同步到终端目录」按钮主动注入 OSC 7 后读取解析结果（见 RemoteFiles）。
+ * The panel path persists per connection id (consistent across tabs); SSH sessions do not report cwd automatically,
+ * so the "sync to terminal directory" button injects OSC 7 and then reads the parsed result (see RemoteFiles).
  *
- * 路径语义（规范化 / 拼接 / 上级目录）统一来自平台层 `@platform/posixPath`，
- * 这里只做转发与 store/pane 相关的 SSH 专属工具。
+ * Path semantics (normalization / joining / parent) come from the platform layer `@platform/posixPath`;
+ * this module only forwards them and owns the SSH-specific store/pane helpers.
  */
 
 import { create } from 'zustand';
@@ -17,7 +17,7 @@ import { normalizePosix, parentPosix, joinPosix } from '@platform/posixPath';
 import { t } from '@i18n';
 
 interface RemotePathState {
-  /** 连接 id → 面板路径；null = 连接 home */
+  /** Connection id → panel path; null = connection home */
   path: Record<string, string | null>;
   set: (connId: string, p: string | null) => void;
 }
@@ -35,24 +35,24 @@ export const useRemotePathStore = create<RemotePathState>()(persist((set) => ({
   },
 }));
 
-/** 规范化远程绝对路径（POSIX 语义，实现见平台层）。 */
+/** Normalizes a remote absolute path (POSIX semantics; implementation in the platform layer). */
 export function normalizeRemotePath(p: string): string {
   return normalizePosix(p);
 }
 
-/** 上级目录；根再上返回 null（= home）。 */
+/** Parent directory; the parent of the root returns null (= home). */
 export function parentOfRemote(p: string): string | null {
   if (!p || p === '/') return null;
   const parent = parentPosix(p);
   return parent === normalizePosix(p) ? null : parent;
 }
 
-/** POSIX 路径拼接（目录 + 名称）。 */
+/** POSIX path joining (directory + name). */
 export function joinRemote(dir: string, name: string): string {
   return joinPosix(dir, name);
 }
 
-/** 当前活跃标签里与指定连接匹配的 SSH pane id（优先聚焦 pane）。 */
+/** SSH pane id matching the connection in the active tab (focused pane preferred). */
 export function sshPaneIdFor(connId: string): string | null {
   const ws = useSessionStore.getState();
   const at = ws.tabs.find((x) => x.id === ws.activeId);
@@ -65,7 +65,7 @@ export function sshPaneIdFor(connId: string): string | null {
   return matched.some((t) => t.id === focused) ? focused : matched[0].id;
 }
 
-/** shell 单引号包裹并转义（路径含空格/单引号/特殊字符时安全）。 */
+/** Wraps and escapes a shell single-quoted string (safe when the path contains spaces, single quotes or special characters). */
 export function shellQuote(p: string): string {
   if (/[\x00-\x1f\x7f-\x9f]/.test(p)) throw new Error(t('Files with control characters cannot be opened in a terminal.'));
   return `'${p.replace(/'/g, "'\\''")}'`;

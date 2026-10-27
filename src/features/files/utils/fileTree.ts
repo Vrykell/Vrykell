@@ -1,23 +1,23 @@
 import type { FsEntry } from '@platform/api/types';
 
 /**
- * fileTree — 文件面板树形展开的纯逻辑（排序 + 可见行拍平）。
- * 与 React 无关，便于单测。
+ * fileTree — pure logic for the file panel's tree expansion (sorting + flattening visible rows).
+ * Framework-agnostic and easy to unit test.
  */
 
 export interface VisibleRow {
   entry: FsEntry;
-  /** 缩进深度，根级为 0 */
+  /** Indentation depth; root level is 0 */
   depth: number;
-  /** 目录是否处于展开状态（文件恒为 false） */
+  /** Whether the directory is expanded (always false for files) */
   expanded: boolean;
-  /** 目录且已展开但子项尚未加载完成 */
+  /** Directory that is expanded but whose children have not finished loading */
   loading: boolean;
-  /** 目录已加载且没有子项（已知为空，行首不再显示展开箭头） */
+  /** Directory that is loaded and has no children (known empty; no expander shown at the row start) */
   empty: boolean;
 }
 
-/** 目录在前，同类按名称排序（localeCompare） */
+/** Directories first, then same-kind entries sorted by name (localeCompare) */
 export function sortEntries(list: FsEntry[]): FsEntry[] {
   return [...list].sort((a, b) => {
     if (a.is_dir !== b.is_dir) return a.is_dir ? -1 : 1;
@@ -26,8 +26,8 @@ export function sortEntries(list: FsEntry[]): FsEntry[] {
 }
 
 /**
- * 把根列表 + 展开状态 + 子项缓存拍平成渲染用的可见行。
- * 展开但缓存未到的目录标记 loading；缓存为空数组视为已加载的空目录（empty）。
+ * Flattens the root list, expansion state and child cache into visible rows for rendering.
+ * An expanded directory whose cache has not arrived yet is marked loading; an empty cache array counts as a loaded empty directory (empty).
  */
 export function flattenVisible(
   roots: FsEntry[],
@@ -47,8 +47,9 @@ export function flattenVisible(
         empty: entry.is_dir && children !== undefined && children.length === 0,
       });
       if (isOpen) {
-        // 防环：目录路径已在祖先链上（自引用 symlink、后端对任意路径返回相同
-        // 列表等异常情况）时照常渲染该行，但不再递归，否则栈溢出
+        // Cycle guard: when a directory path is already on the ancestor chain (self-referencing
+        // symlink, backend returning the same listing for an arbitrary path), still render the row
+        // but do not recurse, otherwise the stack overflows
         if (children && !ancestors.has(entry.path)) {
           walk(children, depth + 1, new Set([...ancestors, entry.path]));
         }

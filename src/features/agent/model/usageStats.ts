@@ -199,7 +199,7 @@ export function tokensSeries(
     bucket.tokens += record.inputTokens + record.outputTokens;
     bucket.turns += 1;
   }
-  // 没有用量的前导空桶对读图没帮助：从第一个有数据（或最后一个）的桶开始
+  // Leading empty buckets add nothing to the chart: start at the first bucket with data (or the last one).
   const firstWithData = buckets.findIndex((bucket) => bucket.turns > 0);
   const trimmed = firstWithData > 0 ? buckets.slice(firstWithData) : buckets.slice(-1);
   return { buckets: trimmed, unit: hourly ? 'hour' : 'day' };
@@ -295,8 +295,8 @@ export function formatTokens(value: number): string {
 }
 
 /**
- * Compact token counts with the Chinese units the rest of the app's copy uses:
- * 12,300 → "1.2万", 14,000,000 → "1400万", 671,000,000 → "6.7亿".
+ * Compact token counts with the localized large-number units used across the app's copy
+ * (ten-thousand and hundred-million scales).
  */
 export function formatCompact(value: number): string {
   if (!Number.isFinite(value) || value <= 0) return '0';

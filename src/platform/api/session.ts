@@ -34,7 +34,7 @@ export function updateSessionCwd(id: string, cwd: string): Promise<void> {
   return invoke('update_session_cwd', { id, cwd });
 }
 
-/** 覆盖会话 payload JSON（分屏布局持久化用）。 */
+/** Overwrites the session payload JSON (used for split-layout persistence). */
 export function updateSessionPayload(id: string, payload: string): Promise<void> {
   return invoke('update_session_payload', { id, payload });
 }
@@ -51,12 +51,12 @@ export function getSession(id: string): Promise<BackendSessionEntry> {
   return invoke('get_session', { id });
 }
 
-/** 列出全部会话（活跃 + 历史），按创建时间倒序。 */
+/** Lists every session (active + archived), newest first. */
 export function listSessions(): Promise<BackendSessionEntry[]> {
   return invoke('list_sessions');
 }
 
-// ── 块持久化 ──
+// ── Block persistence ──
 
 export function recordBlock(
   id: string, sessionId: string, paneId: string | null, command: string,
@@ -72,7 +72,7 @@ export function getSessionBlocks(sessionId: string): Promise<BackendBlockEntry[]
   return invoke('get_session_blocks', { sessionId });
 }
 
-// ── AI 对话持久化 ──
+// ── AI conversation persistence ──
 
 export function appendChatMessage(
   id: string, sessionId: string, role: string, content: string, createdAt: number, parts: string,
@@ -86,7 +86,7 @@ export function listChatMessages(sessionId: string): Promise<BackendChatMessage[
   return invoke('list_chat_messages', { sessionId });
 }
 
-/** 删除单条 AI 对话消息（M4：重新生成/编辑重发/删除交换）。幂等。 */
+/** Deletes one AI conversation message (regenerate / edit-and-resend / delete). Idempotent. */
 export function deleteChatMessage(id: string): Promise<void> {
   return invoke('delete_chat_message', { id });
 }

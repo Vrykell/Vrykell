@@ -1,6 +1,6 @@
 /**
- * 平台探测（纯前端，无需 plugin-os）。
- * Tauri webview 的 userAgent 在 macOS 上含 "Mac"（Macintosh / Mac OS X）。
+ * Platform detection from the user agent (front-end only).
+ * The webview user agent contains "Mac" on macOS (Macintosh / Mac OS X).
  */
 export const isMacOS = /Mac/.test(navigator.userAgent);
 export const isWindows = /Windows/.test(navigator.userAgent);

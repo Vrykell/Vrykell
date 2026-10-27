@@ -1,10 +1,10 @@
 /**
- * 主题 Token 定义。
- * 所有颜色从此处集中管理 — 组件只用 `var(--xxx)` 引用。
- * 添加新主题只需新增一个 palette 对象。
+ * Theme token definitions.
+ * Every color is managed here — components only reference `var(--xxx)`.
+ * A new theme only needs another palette object.
  */
 
-// ── 类型 ──
+// ── Types ──
 
 export interface ThemePalette {
   /** Small controls and shell colors remain independently customizable. */
@@ -43,7 +43,7 @@ export interface ThemePalette {
   chromeField: string;
   tabMenuBg: string;
   selectionBg: string;
-  // 背景层（从深到浅）
+  // Background layers (darkest to lightest)
   canvas: string;
   surface: string;
   /** Borderless content cards stay distinct from the page canvas. */
@@ -55,44 +55,44 @@ export interface ThemePalette {
   block: string;
   elevated: string;
   hover: string;
-  /** button:hover 背景 */
+  /** Hover background for buttons. */
   buttonHover: string;
 
-  // 边框
+  // Borders
   border: string;
   borderStrong: string;
   /** Low-contrast resting divider for resizable panes. */
   resizeDivider: string;
-  /** InputEditor 未聚焦时的边框色 */
+  /** Border color of an unfocused input editor. */
   inputBorder: string;
 
-  // 文字
+  // Text
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
 
-  // 主强调色
+  // Primary accent
   accent: string;
   accentDim: string;
-  /** accent 背景上的文字色（保证对比度） */
+  /** Text color on accent backgrounds (kept contrast-safe). */
   accentText: string;
 
-  // 次强调色（shell 指示器/搜索高亮/InlineAI 前缀 等蓝色场景）
+  // Secondary accent (blue roles: shell indicators, search highlights, inline AI prefixes)
   accentBlue: string;
   accentBlueDim: string;
   accentBlueStrong: string;
 
-  // AI / 暖色强调（AI 模式文字、运行中指示器、WSL shell）
+  // AI / warm accent (AI-mode text, running indicator, alternate shell)
   accentWarm: string;
   accentWarmDim: string;
 
-  // 用户消息强调
+  // User message accent
   accentUser: string;
   accentUserDim: string;
   /** Primary actions keep the send-button blue in both palette modes. */
   primaryAction: string;
 
-  // 语义色
+  // Semantic colors
   success: string;
   successDim: string;
   error: string;
@@ -100,13 +100,13 @@ export interface ThemePalette {
   dangerAction: string;
   dangerActionText: string;
   errorDim: string;
-  errorLight: string;   // 失败命令文字等浅红
+  errorLight: string;   // Light red for failed command text and similar
   warning: string;
 
-  // 命令块文字
-  blockCmdText: string;       // 正常命令文字
-  blockCmdFailed: string;     // 失败命令文字
-  blockDivider: string;       // block 间 1px 分隔线
+  // Command block text
+  blockCmdText: string;       // Normal command text
+  blockCmdFailed: string;     // Failed command text
+  blockDivider: string;       // 1px divider between blocks
 
   // Display-only command syntax colors.
   cmdProgram: string;
@@ -119,31 +119,31 @@ export interface ThemePalette {
   cmdRedirect: string;        // > >> redirect
   cmdString: string;          // "quoted string"
 
-  // 搜索高亮背景
+  // Search highlight background
   searchHighlightBg: string;
 
-  // 终端/shell 状态点
-  shellConnected: string;     // 绿色圆点
-  shellDisconnected: string;  // 灰色圆点
+  // Terminal/shell status dots
+  shellConnected: string;     // Green dot
+  shellDisconnected: string;  // Gray dot
 
-  // 叠加层 & 阴影
-  overlay: string;        // 模态遮罩
-  overlayLight: string;   // 较浅遮罩（HistoryPanel）
+  // Overlays & shadows
+  overlay: string;        // Modal scrim
+  overlayLight: string;   // Lighter scrim (history panel)
   shadowSm: string;
   shadowMd: string;
   shadowLg: string;
 
-  // 半透明强调背景（toast / badge 用）
+  // Translucent accent backgrounds (toasts / badges)
   accentBg: string;
-  accentBgStrong: string; // 激活态更亮的强调背景
+  accentBgStrong: string; // Brighter accent background for the active state
   successBg: string;
   errorBg: string;
-  errorBadgeBg: string;       // 失败退出码 badge
+  errorBadgeBg: string;       // Failed exit-code badge
 
-  // 特殊
+  // Special
   tuiBanner: string;
   codeBg: string;
-  commandBlockBg: string;     // CommandBlock 微妙的背景
+  commandBlockBg: string;     // Subtle command block background
   aiBlockBg: string;
   failedBlockBg: string;
   scrollbarThumb: string;
@@ -151,7 +151,7 @@ export interface ThemePalette {
   apiKeyBg: string;
   apiKeyBorder: string;
 
-  // xterm.js 主题
+  // Terminal theme
   xtermBg: string;
   xtermForeground: string;
   xtermCursor: string;
@@ -242,7 +242,7 @@ const dark: ThemePalette = {
   resizeDivider: 'rgba(255,255,255,0.035)',
   inputBorder: 'rgba(255,255,255,0.08)',
 
-  // 文字
+  // Text
   textPrimary: '#EBEDF0',
   textSecondary: '#C9D0D6',
   textMuted: '#B5BDC6',
@@ -260,7 +260,7 @@ const dark: ThemePalette = {
   accentWarm: '#D5AD54',
   accentWarmDim: 'rgba(213,173,84,0.14)',
 
-  // 用户消息：浅灰
+  // User message surface
   accentUser: '#183C57',
   accentUserDim: 'rgba(24,60,87,0.35)',
   primaryAction: '#2C67C5',
@@ -323,7 +323,7 @@ const dark: ThemePalette = {
   xtermCursor: '#E9EBED',
   textCaret: '#50C0FF',
   xtermSelection: 'rgba(141,183,232,0.28)',
-  // 低饱和 ANSI 色板：保留目录、路径、错误等语义，同时避免彩色噪声。
+  // Low-saturation ANSI palette: keeps directory, path and error semantics while avoiding color noise.
   xtermBlack: '#1B1F24',
   xtermRed: '#F28B82',
   xtermGreen: DARK_ACCENTS.green,
@@ -373,14 +373,14 @@ export const TEAL_THEME_PRESET: Record<string, string> = {
   '--block-divider': 'rgba(255,255,255,0.07)',
 };
 
-// ── Light（默认：中性，主色不带任何颜色倾向） ──
+// ── Light (neutral: the primary accent carries no hue) ──
 
 const light: ThemePalette = {
   iconColor: '#454545',
   iconHoverColor: '#111111',
   focusRing: '#3478D1',
 
-  // 浅色下沿用同一品牌色，色相可辨识、作为标记（非正文）对比度足够。
+  // The same vendor hues carry over to the light palette; as marks (not body text) they stay distinguishable with enough contrast.
   brandAnthropic: '#C2643F',
   brandOpenai: '#0E8F71',
   brandGemini: '#4A7FE0',
@@ -511,7 +511,7 @@ const light: ThemePalette = {
   xtermBrightWhite: '#FFFFFF',
 };
 
-// ── 导出 ──
+// ── Exports ──
 
 export type ThemeMode = 'dark' | 'light';
 
@@ -522,7 +522,7 @@ export type ThemePreference = ThemeMode | 'system';
 
 const THEME_PREFERENCE_KEY = 'vrykell-theme-mode';
 
-/** Read the persisted appearance choice; 'dark' keeps the historical default. */
+/** Reads the persisted appearance choice; defaults to 'dark'. */
 export function readThemePreference(): ThemePreference {
   try {
     const stored = localStorage.getItem(THEME_PREFERENCE_KEY);
@@ -543,7 +543,7 @@ export function resolveThemeMode(preference: ThemePreference): ThemeMode {
   return prefersDark ? 'dark' : 'light';
 }
 
-/** Palette → CSS 自定义属性映射 */
+/** Palette → CSS custom property mapping. */
 export function paletteToCssVars(p: ThemePalette): Record<string, string> {
   return {
     '--icon-color': p.iconColor,
@@ -661,31 +661,31 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--xterm-bright-magenta': p.xtermBrightMagenta,
     '--xterm-bright-cyan': p.xtermBrightCyan,
     '--xterm-bright-white': p.xtermBrightWhite,
-    // 保持现有字体/几何变量不变（不在 palette 中管理）
+    // Font and geometry variables stay unchanged (they are not managed by the palette)
   };
 }
 
-// ── 用户主题覆盖（终端主题配置的 vars，叠加在基础 palette 之上） ──
+// ── User theme overrides (the `vars` of a terminal theme config, layered over the base palette) ──
 
 let overrides: Record<string, string> = {};
 let appliedOverrideKeys = new Set<string>();
 
-/** 设置 CSS 变量覆盖表（theme.json 的 vars）。空对象 = 无覆盖。 */
+/** Sets the CSS-variable override map (the `vars` of theme.json). An empty object means no overrides. */
 export function setThemeOverrides(o: Record<string, string>): void {
   overrides = o ?? {};
 }
 
-/** 读取当前 CSS 变量覆盖表。 */
+/** Reads the current CSS-variable override map. */
 export function getThemeOverrides(): Record<string, string> {
   return overrides;
 }
 
-/** 将 palette（叠加用户覆盖）写入 :root，并标记 data-theme */
+/** Writes the palette (plus user overrides) to :root and marks data-theme. */
 export function applyTheme(mode: ThemeMode): void {
   const base = paletteToCssVars(themes[mode]);
   const vars = { ...base, ...overrides };
   const root = document.documentElement;
-  // Clear former custom aliases so the stylesheet can inherit the current palette again.
+  // Remove overrides absent from the new map, so the stylesheet inherits the current palette again.
   for (const key of appliedOverrideKeys) {
     if (!(key in vars)) root.style.removeProperty(key);
   }
@@ -700,7 +700,7 @@ export function getCurrentTheme(): ThemeMode {
   return (document.documentElement.dataset.theme as ThemeMode) || 'dark';
 }
 
-/** 将 #rgb / #rrggbb 十六进制颜色转为 rgba() 字符串（alpha 0..1）；解析失败回退黑色。 */
+/** Converts a #rgb / #rrggbb hex color to an rgba() string (alpha 0..1); falls back to black when parsing fails. */
 export function hexToRgba(hex: string, alpha: number): string {
   let h = hex.trim().replace(/^#/, '');
   if (h.length === 3) h = h.split('').map((c) => c + c).join('');
@@ -711,7 +711,7 @@ export function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
-/** 将任意颜色（hex / rgb() / rgba()）转成带指定 alpha 的 rgba；其它格式原样返回。 */
+/** Converts any color (hex / rgb() / rgba()) to rgba with the given alpha; other formats are returned unchanged. */
 export function toRgba(color: string, alpha: number): string {
   const c = color.trim();
   if (/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(c)) {

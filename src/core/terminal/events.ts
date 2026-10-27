@@ -1,8 +1,9 @@
 /**
- * DispatchEvent — PTY 字节流扫描后的事件契约。
+ * DispatchEvent — the event contract produced by scanning the PTY byte stream.
  *
- * 扫描在 Rust 端完成（src-tauri/src/terminal/scan.rs），前端只消费已分类事件。
- * 形状与 Rust `ScanEvent`（serde tag=kind, camelCase）一一对应。
+ * Scanning happens in Rust (src-tauri/src/terminal/scan.rs); the front end only consumes
+ * already-classified events. The shape maps one-to-one onto the Rust `ScanEvent`
+ * (serde tag=kind, camelCase).
  */
 
 export type DispatchEvent =

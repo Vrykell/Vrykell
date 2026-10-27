@@ -5,7 +5,7 @@ import type {
   BackendHistoryEntry, BackendFileMatch, BackendBlockEntry, BackendSessionEntry,
 } from '@platform/api/types';
 
-/** 搜索文件系统；搜索根与结果路径在边界处归一化。 */
+/** Searches the filesystem; search roots and result paths are normalized at the boundary. */
 export async function searchFiles(
   query: string,
   maxResults = 50,
@@ -32,7 +32,7 @@ export async function searchFiles(
   finally { options?.signal.removeEventListener('abort', cancel); if (progress) progress.onmessage = () => {}; }
 }
 
-/** 搜索命令历史 */
+/** Searches command history. */
 export function searchHistory(
   query: string,
   maxResults = 30,
@@ -49,7 +49,7 @@ export function searchHistory(
   });
 }
 
-/** 记录命令到后端 SQLite 历史 */
+/** Records a command in the backend history. */
 export function recordHistory(
   command: string,
   cwd: string,
@@ -59,12 +59,12 @@ export function recordHistory(
   return invoke('record_history', { command, cwd, exitCode, timestamp });
 }
 
-/** 清空命令历史 */
+/** Clears command history. */
 export function clearHistory(): Promise<void> {
   return invoke('clear_history');
 }
 
-/** 按关键词搜索命令块（联表 sessions 拿标题/状态） */
+/** Searches command blocks by keyword (joined with sessions for title/status). */
 export function searchBlocks(
   query: string, maxResults = 20, filterSessionStatus?: string | null,
 ): Promise<BackendBlockEntry[]> {
@@ -73,7 +73,7 @@ export function searchBlocks(
   });
 }
 
-/** 按标题搜索会话 */
+/** Searches sessions by title. */
 export function searchSessions(query: string, maxResults = 10): Promise<BackendSessionEntry[]> {
   return invoke('search_sessions', { query, maxResults });
 }

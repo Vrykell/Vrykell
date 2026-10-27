@@ -1,12 +1,14 @@
 /**
- * tools — buildTools(ctx) 按开关与权限组装 agent 工具表。
+ * tools — buildTools(ctx) assembles the agent tool table from feature switches
+ * and permission levels.
  *
- * M1 只有 run_command；M2 加入文件/搜索工具；M3 接权限（permissions.ts）：
- * deny 级工具不注册；其余工具 execute 首行过 gate()（allow/会话授权直放，
- * ask 挂起等审批卡，危险命令无视授权逐次询问）。
+ * Tools with the deny level are never registered. Every other tool calls gate()
+ * as its first step (allow and session grants pass straight through, ask suspends
+ * on an approval card, and dangerous commands are confirmed on every call
+ * regardless of grants).
  *
- * 工具 execute 约定：返回结构化结果而非 throw（throw 会终止步进），
- * 让模型拿到失败信息后自我修正。
+ * Tool execute convention: return a structured result instead of throwing (a throw
+ * ends the step loop); the model receives the failure and can correct itself.
  */
 
 import { tool, type ToolSet } from 'ai';
@@ -74,7 +76,7 @@ export function buildTools(ctx: ToolContext) {
     ...buildInstallSkillTool(ctx),
     ...buildMemoryTool(ctx),
   } as Record<string, unknown>;
-  // deny 级工具不注册（模型根本看不到，比 execute 拒绝更省 token）
+  // Deny-level tools are not registered: the model never sees them, which saves tokens compared with rejecting at execute time.
   const out: ToolSet = {};
   for (const name of TOOL_NAMES) {
     if (ctx.paneId === null && ['run_command', 'read_terminal', 'terminal_keys'].includes(name)) continue;

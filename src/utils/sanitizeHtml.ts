@@ -1,14 +1,16 @@
 /**
- * sanitizeHtml — 输出 HTML 快照净化。
+ * sanitizeHtml — sanitizes stored output HTML snapshots.
  *
- * 命令块的颜色快照（outputHtml）由 extractSnapshotFromBuffer 生成（文本一律
- * escapeHtml，样式仅限调色板/hex 颜色），结构上天然安全。但快照会**落库**
- * （blocks.output_html）并在会话恢复时经 dangerouslySetInnerHTML 渲染 ——
- * 本地 DB 若被篡改/注入，脚本、事件处理器、javascript: 链接都会在渲染时执行。
+ * The colored snapshot of a command block (outputHtml) is produced by
+ * extractSnapshotFromBuffer (text is always escaped, styles are limited to palette/hex
+ * colors), so its structure is safe by construction. Snapshots are persisted, though
+ * (blocks.output_html), and rendered through dangerouslySetInnerHTML when a session is
+ * restored: if the local database were tampered with, scripts, event handlers and
+ * javascript: links would execute on render.
  *
- * 因此恢复（sessionManager.restore）与渲染（BlockOutput）两侧都做净化：
- * 只允许快照生成器产生的结构 —— <span>（白名单 style）+ <br>，其余标签与
- * 属性一律丢弃。
+ * Both the restore path (sessionManager.restore) and the render path (BlockOutput)
+ * therefore sanitize: only the structure the snapshot generator emits is allowed —
+ * <span> with a whitelisted style plus <br>; every other tag and attribute is dropped.
  */
 
 const SAFE_STYLE_PROPS = new Set([
@@ -23,7 +25,7 @@ const SAFE_STYLE_PROPS = new Set([
   'letter-spacing',
 ]);
 
-/** 样式值黑名单：url()/expression/javascript:/@import 等一律拒绝。 */
+/** Style-value blacklist: url()/expression/javascript:/@import and similar are always rejected. */
 const DANGEROUS_STYLE_VALUE = /url\s*\(|expression|javascript:|@import|behavior|-moz-binding|[\\"'{}]|\/\*/i;
 
 function sanitizeStyleValue(style: string): string {
@@ -42,8 +44,9 @@ function sanitizeStyleValue(style: string): string {
 }
 
 /**
- * 净化输出 HTML：返回只含 <span>（安全 style）与 <br> 的标记。
- * 非白名单标签替换为其纯文本；span 的 style 之外属性全部移除。
+ * Sanitizes output HTML: the result contains only <span> (with a safe style) and <br>.
+ * Tags outside the whitelist are replaced by their text; span attributes other than
+ * style are removed.
  */
 export function sanitizeOutputHtml(html: string): string {
   if (!html || !html.includes('<')) return html;
@@ -51,7 +54,7 @@ export function sanitizeOutputHtml(html: string): string {
   const body = doc.body;
 
   const walk = (node: Element) => {
-    // 自后向前遍历：replaceWith 不影响前面兄弟节点的索引
+    // Walk backwards so replaceWith does not shift the indices of earlier siblings
     for (let i = node.children.length - 1; i >= 0; i--) {
       const child = node.children[i]!;
       walk(child);
@@ -65,13 +68,13 @@ export function sanitizeOutputHtml(html: string): string {
         child.removeAttribute('style');
         const cleaned = sanitizeStyleValue(style);
         if (cleaned) child.setAttribute('style', cleaned);
-        // 其余属性（on*、id、class、href…）全部移除
+        // Remove all remaining attributes (on*, id, class, href, ...)
         for (const attr of Array.from(child.attributes)) {
           if (attr.name !== 'style') child.removeAttribute(attr.name);
         }
         continue;
       }
-      // 其它标签：解包（丢弃标签与属性，保留已净化的子节点/文本）
+      // Other tags: unwrap (drop the tag and its attributes, keep the sanitized children/text)
       child.replaceWith(...Array.from(child.childNodes));
     }
   };

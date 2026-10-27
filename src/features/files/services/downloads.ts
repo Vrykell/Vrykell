@@ -1,8 +1,8 @@
 import { invoke } from '@platform/diagnostics';
 
 /**
- * 下载历史 API —— 下载记录由后端在 ssh_download 成功后写入 SQLite，
- * 前端这里只负责列出 / 清空。字段为后端 serde camelCase。
+ * Download history API — the backend records a download in the database after a successful ssh_download;
+ * the frontend only lists and clears it. Fields use the backend's camelCase naming.
  */
 export interface DownloadEntry {
   id: number;
@@ -27,7 +27,7 @@ export function downloadsDelete(id: number): Promise<void> {
   return invoke('downloads_delete', { id });
 }
 
-/** 丢弃拖出取消后遗留的本地下载副本：后端删除文件并移除对应下载历史。 */
+/** Discards local download copies left behind by a cancelled drag-out: the backend deletes the files and removes their download history entries. */
 export function downloadsDiscard(paths: string[]): Promise<void> {
   return invoke('downloads_discard', { paths });
 }

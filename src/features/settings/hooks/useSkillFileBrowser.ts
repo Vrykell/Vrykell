@@ -7,7 +7,7 @@ interface UseSkillFileBrowserOptions {
   files: string[];
 }
 
-/** 管理技能详情中的文件树展开、选中和文件内容读取。 */
+/** Manages file tree expansion, selection and file content loading in the skill detail view. */
 export function useSkillFileBrowser({ skillName, files }: UseSkillFileBrowserOptions) {
   const tree = useMemo(() => buildFileTree(files), [files]);
   const filesKey = files.join('\u0000');

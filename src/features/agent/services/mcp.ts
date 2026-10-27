@@ -1,15 +1,16 @@
 /**
- * mcp — Model Context Protocol 前端侧（类型 + Tauri invoke 封装 + AI SDK 工具包装）。
+ * mcp — Model Context Protocol frontend (types + invoke wrappers + tool wrapping).
  *
- * 参照主流 agent 编码工具的 MCP 设计：Rust 后端持有 stdio 连接（见 src-tauri/src/mcp.rs），
- * 前端把已连接服务器暴露的工具包装成 AI SDK 工具，命名空间为 `mcp__<server>__<tool>`。
+ * Mirrors the MCP design used by mainstream coding agents: the backend holds the stdio connections
+ * (see src-tauri/src/mcp.rs), and the frontend wraps the tools exposed by connected servers as
+ * tools namespaced `mcp__<server>__<tool>`.
  */
 
 import { tool, jsonSchema } from 'ai';
 import { invoke } from '@platform/diagnostics';
 import { gate, type ToolContext } from '@features/agent/stores/permissions';
 
-/** 服务器状态（Rust mcp_get_servers 返回）。 */
+/** Server status (returned by the backend mcp_get_servers command). */
 export interface McpServer {
   name: string;
   command: string;
@@ -21,7 +22,7 @@ export interface McpServer {
   toolCount: number;
 }
 
-/** 保存用配置（不含运行时状态）。 */
+/** Configuration for saving (no runtime state). */
 export interface McpServerConfig {
   name: string;
   command: string;
@@ -31,7 +32,7 @@ export interface McpServerConfig {
   enabled: boolean;
 }
 
-/** 已连接服务器暴露的单个工具（Rust mcp_list_all_tools 返回）。 */
+/** A single tool exposed by a connected server (returned by the backend mcp_list_all_tools command). */
 export interface McpExposedTool {
   server: string;
   name: string;
@@ -50,7 +51,7 @@ export const listMcpTools = () => invoke<McpExposedTool[]>('mcp_list_all_tools')
 export const callMcpTool = (server: string, tool: string, args: Record<string, unknown>, lease?: string | null) =>
   invoke<unknown>('mcp_call_tool', { server, tool, args, ...(lease === undefined ? {} : { lease }) });
 
-/** 把一个 MCP 工具包装成 AI SDK 工具（execute 转发到 Rust mcp_call_tool）。 */
+/** Wrap an MCP tool as a model tool (execute forwards to the backend mcp_call_tool command). */
 export function buildMcpTool(mcp: McpExposedTool, ctx: ToolContext) {
   const description = `[MCP · ${mcp.server}] ${mcp.description || mcp.name}`;
   return tool({

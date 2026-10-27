@@ -5,12 +5,12 @@ import type { SearchResult, BlockResultData } from '@features/search/types';
 import { searchBlocks } from '@platform/api/search';
 import { fmtDuration } from '@ui/actions/UiBtn';
 
-/** 去除 ANSI 转义序列，提取纯文本 */
+/** Strips ANSI escape sequences and extracts plain text */
 function stripAnsi(s: string): string {
   return s.replace(/\x1b\[[0-9;]*[a-zA-Z]/g, '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, '');
 }
 
-/** 从输出中提取包含匹配关键词的片段（最多 100 字符，居中匹配位置） */
+/** Extracts a snippet around the matched keyword from the output (at most 100 characters, centered on the match) */
 function extractSnippet(
   output: string,
   queryLower: string,
@@ -26,7 +26,7 @@ function extractSnippet(
   const half = Math.floor((maxLen - qLen) / 2);
   let start = Math.max(0, idx - half);
   const end = Math.min(clean.length, idx + qLen + half);
-  // 调整到单词边界
+  // Adjust to a word boundary
   if (start > 0 && clean[start] !== ' ' && clean[start - 1] !== ' ') {
     start = Math.max(0, start - 10);
   }

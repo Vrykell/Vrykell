@@ -6,29 +6,29 @@ import { t } from '@i18n';
 import type { ShellType } from '@platform/shells';
 
 /**
- * fileOpen — 文件面板的文件打开逻辑。
+ * fileOpen — file opening logic for the file panel.
  *
- * 纯策略（shell 引用 / 扩展名 / 模板解析 / 命令构造 / 编辑器可用性检测与降级）
- * 已下沉到 Rust 的 file_open 命令；前端只保留 localStorage 配置读写、系统默认
- * 应用打开（openPath）与把命令写进终端（write 回调）。
+ * Pure policy (shell resolution / extension / template parsing / command construction / editor availability detection and fallback)
+ * lives in the backend file_open command; the frontend keeps only localStorage config access,
+ * opening with the system default app (openPath) and writing commands into the terminal (write callback).
  *
- * 单击文件 → 在活跃终端里跑编辑器命令；右键可选系统默认应用。
- * 模板按扩展名配置，占位符 {file}（缺省追加到命令末尾）；
- * 特殊值 __system__ 表示用系统默认应用打开。
- * 编辑器不可用时按 [配置的编辑器 → vim → nano → vi → 系统默认应用] 降级。
+ * Single click on a file → run the editor command in the active terminal; the context menu can open it with the system default app.
+ * Templates are configured per extension, placeholder {file} (appended to the command when absent);
+ * the special value __system__ opens with the system default app.
+ * When the editor is unavailable, fall back from the configured editor to other installed terminal editors, then the system default app.
  */
 
-/** 模板特殊值：用系统默认应用打开 */
+/** Template special value: open with the system default app */
 export const SYSTEM_DEFAULT = '__system__';
 
 export interface FileOpenConfig {
-  /** 默认终端编辑器命令（如 vim / nano / code） */
+  /** Default terminal editor command (for example a terminal text editor or an IDE launcher) */
   defaultEditor: string;
-  /** 扩展名（小写、不含点）→ 命令模板 */
+  /** Extension (lowercase, no dot) → command template */
   templates: Record<string, string>;
-  /** 远程默认编辑器命令（远程文件双击打开时用） */
+  /** Default remote editor command (used when a remote file is opened) */
   remoteEditor: string;
-  /** 远程扩展名 → 命令模板 */
+  /** Remote extension → command template */
   remoteTemplates: Record<string, string>;
 }
 
@@ -41,7 +41,7 @@ export const DEFAULT_CONFIG: FileOpenConfig = {
   remoteTemplates: {},
 };
 
-// ── 配置读写 ──
+// ── Config read/write ──
 
 function stringOr(value: unknown, fallback: string): string {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback;
@@ -73,7 +73,7 @@ export function saveConfig(cfg: FileOpenConfig) {
   return safeLocalStorageSet(STORAGE_KEY, JSON.stringify(cfg));
 }
 
-// ── 模板文本（设置 UI 用）：每行 ext=命令 ──
+// ── Template text (for the settings UI): one ext=command per line ──
 
 export function parseTemplatesText(text: string): Record<string, string> {
   const out: Record<string, string> = {};
@@ -95,21 +95,21 @@ export function serializeTemplates(templates: Record<string, string>): string {
     .join('\n');
 }
 
-// ── 远程打开命令构造（前端拼接，写进 SSH 终端） ──
+// ── Remote open command construction (built in the frontend, written to the SSH terminal) ──
 
-/** 取小写扩展名（无点或点开头隐藏文件返回空串）。 */
+/** Lowercase extension (empty for hidden files without a dot or with a leading dot). */
 function extOf(path: string): string {
   const base = path.split('/').pop() ?? '';
   const dot = base.lastIndexOf('.');
   return dot > 0 ? base.slice(dot + 1).toLowerCase() : '';
 }
 
-/** POSIX shell 单引号引用 */
+/** POSIX shell single-quote quoting */
 function shellQuote(path: string): string {
   return `'${path.replace(/'/g, "'\\''")}'`;
 }
 
-/** 按远程模板/远程默认编辑器构造远程打开命令；有 {file} 替换，无则追加引用路径。 */
+/** Builds the remote open command from the remote template/default editor; replaces {file} when present, otherwise appends the quoted path. */
 export function remoteOpenCommand(cfg: FileOpenConfig, path: string): string {
   if (/[\x00-\x1f\x7f-\x9f]/.test(path)) throw new Error(t('Files with control characters cannot be opened in a terminal.'));
   const tpl = cfg.remoteTemplates[extOf(path)] ?? cfg.remoteEditor;
@@ -117,13 +117,13 @@ export function remoteOpenCommand(cfg: FileOpenConfig, path: string): string {
   return cmd.endsWith('\n') ? cmd : `${cmd}\n`;
 }
 
-// ── 打开入口 ──
+// ── Open entry points ──
 
 export type OpenResult =
   | { via: 'terminal'; editor: string; fellBack: boolean }
   | { via: 'system'; degraded: boolean };
 
-/** Rust file_open 命令的返回形状（serde tag=via，camelCase） */
+/** Shape returned by the file_open command (tag=via, camelCase) */
 interface FileOpenResultRust {
   via: 'terminal' | 'system';
   editor?: string;
@@ -133,7 +133,7 @@ interface FileOpenResultRust {
 }
 
 /**
- * 打开文件。terminal 方式通过 write 回调写入命令（调用方拼换行/写 PTY）。
+ * Opens a file. With the terminal route, the command is written through the write callback (the caller adds the newline / writes to the PTY).
  */
 export async function openFile(
   path: string,

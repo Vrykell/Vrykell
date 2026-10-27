@@ -9,12 +9,12 @@ import { activateWorkspaceInstance, focusedWorkspaceArea, newWorkspaceItem } fro
 import { requestWorkspaceSplit, requestTerminalSplit } from '@features/workspace/services/unifiedWorkspace';
 
 /**
- * 全局快捷键：
- * - Cmd/Ctrl+T 新建标签；Cmd/Ctrl+W 关闭当前标签
- * - Cmd/Ctrl+1..9 切换到第 N 个标签
- * - Cmd/Ctrl+F 打开全局搜索
- * - Cmd/Ctrl+, 打开设置
- * - Cmd/Ctrl+P 命令面板
+ * Global shortcuts:
+ * - Cmd/Ctrl+T new tab; Cmd/Ctrl+W close the current tab
+ * - Cmd/Ctrl+1..9 switch to the Nth tab
+ * - Cmd/Ctrl+F open global search
+ * - Cmd/Ctrl+, open settings
+ * - Cmd/Ctrl+P command palette
  */
 
 export function useGlobalShortcuts() {
@@ -64,8 +64,8 @@ export function useGlobalShortcuts() {
         }
         if (!((e.metaKey || e.ctrlKey) && e.key === 'f')) return;
       }
-      // Escape: 当键盘路由到终端且不在 TUI 全屏场景时，切回输入栏
-      // Scene ownership determines input routing; an alternate-screen application receives Escape.
+      // Escape: hand focus back to the input bar when the keyboard is routed to the terminal
+      // and no alternate-screen application is active; scene ownership decides input routing.
       if (e.key === 'Escape' && !e.metaKey && !e.ctrlKey && !e.shiftKey) {
         const ts = useTerminalStore.getState();
         const scene = ts.scenes[getFocusedTerminalId()] ?? 'classic';
@@ -77,21 +77,21 @@ export function useGlobalShortcuts() {
         }
       }
 
-      // Cmd/Ctrl+Shift+T: 撤销关闭标签
+      // Cmd/Ctrl+Shift+T: reopen the last closed tab
       if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key === 'T') {
         e.preventDefault();
         useSessionStore.getState().undoCloseTab();
         return;
       }
 
-      // Cmd+F 或 Ctrl+F: 全局搜索
+      // Cmd+F or Ctrl+F: global search
       if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
         e.preventDefault();
         useUiStore.getState().setGlobalSearchOpen(true);
         return;
       }
 
-      // Cmd+] / Cmd+[ 在当前窗口的终端间切换焦点（仅 Cmd，避免 Ctrl+[ = ESC 被劫持）
+      // Cmd+] / Cmd+[ cycle focus between terminals in the current window (Cmd only, so Ctrl+[ stays Escape)
       if (e.metaKey && !e.ctrlKey && !e.shiftKey && (e.key === ']' || e.key === '[')) {
         const ws = useSessionStore.getState();
         const tab = ws.tabs.find((t) => t.id === ws.activeId);
@@ -108,7 +108,7 @@ export function useGlobalShortcuts() {
         }
       }
 
-      // ⌥⌘D：选择类型后再分裂（混搭 local/ssh）
+      // ⌥⌘D: choose a terminal type, then split (mixes local/SSH)
       if (focusedWorkspaceArea() === 'terminal' && e.metaKey && e.altKey && !e.ctrlKey && e.key === 'd') {
         e.preventDefault();
         useUiStore.getState().openSplitPicker();
@@ -121,11 +121,11 @@ export function useGlobalShortcuts() {
         e.preventDefault();
         newWorkspaceItem();
       } else if (e.key === 'd' && focusedWorkspaceArea() === 'terminal') {
-        // Cmd+D 分裂：进入落点选择（新终端继承类型）
+        // Cmd+D split: enter drop-target selection (the new terminal inherits the type)
         e.preventDefault();
         requestTerminalSplit(null);
       } else if (e.key === 'D' && focusedWorkspaceArea() === 'terminal') {
-        // Cmd+Shift+D：直接上下分裂（跳过落点选择）
+        // Cmd+Shift+D: split vertically without drop-target selection
         e.preventDefault();
         ws.splitFocusedDirect('col');
       } else if (e.key.toLowerCase() === 'd' && ['code', 'ai', 'unified'].includes(focusedWorkspaceArea())) {

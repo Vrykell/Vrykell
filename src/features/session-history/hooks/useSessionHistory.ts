@@ -72,7 +72,7 @@ function loadFilter(): SessionHistoryFilter {
       };
     }
   } catch {
-    // 损坏或不可用的 sessionStorage 回退到默认筛选。
+    // Corrupt or unavailable sessionStorage falls back to the default filter.
   }
   return { query: '', type: 'all', date: 'all', mode: 'all', sort: 'closed-desc', groupBy: 'day', dateField: 'closed', starredOnly: false };
 }
@@ -81,7 +81,7 @@ function saveFilter(filter: SessionHistoryFilter): void {
   try {
     sessionStorage.setItem(FILTER_KEY, JSON.stringify(filter));
   } catch {
-    // sessionStorage 不可用时不影响会话历史使用。
+    // An unavailable sessionStorage does not affect session history usage.
   }
 }
 

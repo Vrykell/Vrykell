@@ -1,9 +1,10 @@
 /**
- * search — list_dir / search_files 工具（M2）。
+ * search — list_dir / search_files tools.
  *
- * list_dir 薄封装现有 fs_list；search_files 走新 Rust 命令 fs_search
- * （文件名子串 / 内容逐行两种模式，跳过 .git/node_modules 等重目录，
- *  结果封顶）。execute 永不 throw（约定见 tools/index.ts 头注释）。
+ * list_dir wraps the existing fs_list command; search_files uses the fs_search
+ * Rust command (name substring or per-line content matching, skipping heavy
+ * directories such as .git/node_modules, with capped results). execute never
+ * throws (see the header comment in tools/index.ts).
  */
 
 import { invoke } from '@platform/diagnostics';

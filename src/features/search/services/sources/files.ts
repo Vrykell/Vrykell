@@ -14,7 +14,7 @@ function fmtTimeAgo(ts: number): string {
   return `${Math.floor(ms / 86400000)}天前`;
 }
 
-/** 文件图标统一由 SearchResultCard 依据 FileResultData 渲染（lib/fileIcon） */
+/** File icons are rendered uniformly by SearchResultCard from FileResultData (lib/fileIcon) */
 
 registerSource({
   id: 'file',
@@ -22,7 +22,7 @@ registerSource({
   icon: FileText,
   search: async (query, options): Promise<SearchResult[]> => {
     try {
-      // 跨工作区搜索
+      // Search across workspaces
       const wsDirs = useWorkspaceDirsStore.getState().dirs;
       const roots = wsDirs.length > 0 ? wsDirs.map((d) => d.path) : undefined;
       const mapFiles = (files: BackendFileMatch[]): SearchResult[] => files.map(f => ({

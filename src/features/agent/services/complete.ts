@@ -1,14 +1,17 @@
 /**
- * complete — 终端命令自动补全（M8）。
+ * complete — terminal command autocomplete.
  *
- * 两级引擎（「无 AI 也要能工作」：本地级零网络零 key，始终可用）：
- *   1. 本地：命令历史前缀匹配（history store 热缓存，最近优先）→ 路径补全
- *      （末 token 像路径时 fs_list 列目录做前缀匹配）
- *   2. AI 增强：本地无结果且配了 key 时，generateText 生成补全
- *      （模型 = agentSettings.completeModel，空 = 沿用聊天模型）
+ * Two-tier engine ("must work without AI too": the local tier is zero-network, zero-key and
+ * always available):
+ *   1. Local: command-history prefix matching (history store hot cache, newest first) → path
+ *      completion (when the last token looks like a path, list the directory with fs_list and
+ *      match name prefixes)
+ *   2. AI enhancement: when the local tier finds nothing and a key is configured, generate a
+ *      completion with generateText (model = agentSettings.completeModel, empty = reuse the chat model)
  *
- * 返回的是「后缀」（接在当前输入后面的部分），调用方渲染 ghost text。
- * 全程可 abort（输入变化即作废上一次），任何失败静默返回 null。
+ * The return value is a "suffix" (the part appended to the current input); the caller renders it as
+ * ghost text. Everything is abortable (an input change invalidates the previous attempt) and any
+ * failure returns null silently.
  */
 import { generateText } from 'ai';
 import { invoke } from '@platform/diagnostics';
@@ -21,7 +24,7 @@ export interface CompleteOptions {
   cwd?: string;
 }
 
-/** 本地历史前缀匹配（同步，entries 已是最近优先）；返回后缀或 null */
+/** Local history prefix match (synchronous, entries are already newest-first); returns the suffix or null. */
 export function localComplete(prefix: string): string | null {
   const hit = useHistoryStore
     .getState()
@@ -29,7 +32,7 @@ export function localComplete(prefix: string): string | null {
   return hit ? hit.command.slice(prefix.length) : null;
 }
 
-/** 本地历史前缀匹配的全部候选（同步，最近优先，按后缀去重）；返回后缀数组（无匹配为空数组） */
+/** All local history prefix-match candidates (synchronous, newest first, deduplicated by suffix); returns suffixes (empty array when nothing matches). */
 export function localCompleteCandidates(prefix: string): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -46,7 +49,7 @@ export function localCompleteCandidates(prefix: string): string[] {
   return out;
 }
 
-/** 末 token 是否为路径形态（绝对 / ./ ../ ~ 或含斜杠） */
+/** Whether the last token looks like a path (absolute, ./, ../, ~ or contains a slash). */
 export function looksLikePath(token: string): boolean {
   return (
     token.startsWith('/') ||
@@ -68,8 +71,9 @@ interface FsEntry {
 }
 
 /**
- * 路径补全：解析末 token 的目录部分（绝对直接用，相对拼 cwd，~ 不展开直接放弃），
- * fs_list 后按名字前缀取第一个匹配。返回后缀（目录补结尾 /）或 null。
+ * Path completion: resolve the directory part of the last token (absolute used as-is, relative
+ * joined with cwd, ~ not expanded and gives up), then take the first name-prefix match from
+ * fs_list. Returns the suffix (directories get a trailing /) or null.
  */
 export async function pathComplete(
   prefix: string,
@@ -78,7 +82,7 @@ export async function pathComplete(
 ): Promise<string | null> {
   const token = lastToken(prefix);
   if (!looksLikePath(token)) return null;
-  if (token.startsWith('~')) return null; // 前端不知 home，~ 交给 shell 自己
+  if (token.startsWith('~')) return null; // The frontend does not know the home directory, so ~ is left to the shell.
   const slash = token.lastIndexOf('/');
   const dirPart = token.slice(0, slash + 1);
   const base = token.slice(slash + 1);
@@ -98,11 +102,11 @@ export async function pathComplete(
     if (!hit) return null;
     return hit.name.slice(base.length) + (hit.is_dir ? '/' : '');
   } catch {
-    return null; // 目录不可读等：静默降级
+    return null; // Unreadable directory and similar: degrade silently.
   }
 }
 
-/** AI 增强补全：本地无结果且有 key 时才走；模型需返回以前缀开头的完整命令 */
+/** AI-enhanced completion: only when the local tier found nothing and a key is configured; the model must return a full command starting with the prefix. */
 export async function aiComplete(
   prefix: string,
   opts: CompleteOptions,
@@ -135,11 +139,11 @@ export async function aiComplete(
     if (line.startsWith(prefix) && line.length > prefix.length) return line.slice(prefix.length);
     return null;
   } catch {
-    return null; // 网络/中止/解析失败：静默
+    return null; // Network/abort/parse failure: stay silent.
   }
 }
 
-/** 完整链路：本地历史 → 路径 → AI 增强；返回后缀或 null */
+/** Full chain: local history → path → AI enhancement; returns the suffix or null. */
 export async function completeCommand(
   prefix: string,
   opts: CompleteOptions,

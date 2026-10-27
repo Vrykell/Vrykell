@@ -4,7 +4,7 @@ import AppShell from '@app/layout/AppShell';
 import { useT } from '@i18n';
 import '@features/search/services/init';
 
-/** 应用组合根：只连接应用生命周期、全局交互和视觉壳。 */
+/** Application composition root: wires only the app lifecycle, global interactions and the visual shell. */
 export default function App() {
   useT();
   useAppBootstrap();

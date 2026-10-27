@@ -1,10 +1,11 @@
 /**
- * skill — 技能相关工具：
- *   - use_skill：加载一个技能的完整指令（SKILL.md 正文 + 目录 + 辅助文件清单）。
- *   - install_skill：让 agent 替用户安装/更新一个技能（写入 SKILL.md 技能目录）。
+ * skill — skill-related tools:
+ *   - use_skill: loads a skill's complete instructions (SKILL.md body + directory + list of auxiliary files).
+ *   - install_skill: lets the agent install or update a skill for the user (writes into the skill directory).
  *
- * 技能是磁盘目录（~/.vrykell/skills/<name>/），正文之外还有 scripts/references/assets，
- * agent 拿到技能目录后可用 read_file / run_command 读取运行其中的文件。
+ * A skill is a directory on disk (~/.vrykell/skills/<name>/); besides the body it can hold
+ * scripts/references/assets, and once the agent has the skill directory it can read and run
+ * those files with read_file / run_command.
  */
 
 import { tool } from 'ai';
@@ -47,7 +48,7 @@ export function buildSkillTool(ctx: ToolContext) {
   };
 }
 
-/** 让 agent 替用户安装技能（用户说「帮我做个…技能」时用）。 */
+/** Lets the agent install a skill for the user (used when the user asks it to create a skill). */
 export function buildInstallSkillTool(ctx: ToolContext) {
   return {
     install_skill: tool({

@@ -6,14 +6,14 @@ import {
 import { normalizeRemotePath, parentOfRemote, joinRemote } from '@features/ssh/utils/remotePath';
 import type { FileOpOutcome, FileOps } from '@features/files/model/fileOps';
 
-/** SSH 远程实现：路径语义为 POSIX，操作全部走后端 SFTP / 远端命令。 */
+/** SSH remote implementation: POSIX path semantics; all operations go through backend SFTP / remote commands. */
 export function createSshFileOps(connectionId: string): FileOps {
-  /** 逐条移动：后端会为重名自动加序号，逐条拿到真实目标路径（回退对依赖它）。 */
+  /** Moves items one by one: the backend adds a numeric suffix on collision, so each item yields its real destination path (the undo pair relies on it). */
   const move = async (paths: string[], destDir: string): Promise<FileOpOutcome> => {
     const completed: FileOpOutcome['completed'] = [];
     const errors: string[] = [];
     for (const path of paths) {
-      if (parentOfRemote(path) === destDir) continue;   // 同级：无操作
+      if (parentOfRemote(path) === destDir) continue;   // Same level: no operation
       try {
         completed.push({ from: path, to: await sshMove(connectionId, path, destDir) });
       } catch (error) {

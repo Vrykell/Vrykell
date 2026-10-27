@@ -1,9 +1,9 @@
 /**
- * provider — 按当前配置构造 AI SDK model 实例。
+ * provider — build model SDK instances from the current configuration.
  *
- * 所有实例都注入 createProxyFetch()：请求实际经 Rust llm_stream 代理发出，
- * 真实 API key 由 Rust 附加，这里的 apiKey 占位值不会出现在网络请求里
- * （Rust 侧会丢弃并替换认证头）。
+ * Every instance gets createProxyFetch() injected: requests actually go out through the backend
+ * llm_stream proxy, which attaches the real API key. The apiKey placeholder here never reaches the
+ * network (the backend discards and replaces the auth header).
  */
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import { createAnthropic } from '@ai-sdk/anthropic';
@@ -82,10 +82,11 @@ export function createChatModel(cfg: ChatModelConfig) {
 }
 
 /**
- * 原生联网搜索工具（provider 服务端执行，无本地 execute）。
- * 返回工具表里的键名 + 工具实例；openai-compatible 无原生能力返回 null
- * （由调用方用 Tavily 兜底）。anthropic 的键名必须是 web_search，
- * gemini 必须是 google_search（provider 侧按名字识别）。
+ * Native web search tool (executed server-side by the provider, no local execute).
+ * Returns the key to use in the tool table plus the tool instance; openai-compatible has no
+ * native capability and returns null (the caller falls back to the hosted search API).
+ * Anthropic requires the key `web_search` and Gemini `google_search` (the provider identifies
+ * them by name).
  */
 export function createNativeWebSearchTool(
   provider: ProviderKind,
@@ -110,12 +111,12 @@ export function createNativeWebSearchTool(
 }
 
 /**
- * 深思考开关 → streamText providerOptions。
- * openai-compatible 的键名 = createOpenAICompatible 的 name（'vrykell'），
- * SDK 会把它合并进请求体；anthropic 开启 thinking 时调用方还需把
- * maxOutputTokens 抬到 budgetTokens 之上（API 硬性约束）。
+ * Deep-thinking switch → streamText providerOptions.
+ * The openai-compatible key is the name passed to the provider factory ('vrykell'), which the SDK
+ * merges into the request body; when Anthropic thinking is enabled, the caller must also raise
+ * maxOutputTokens above budgetTokens (a hard API constraint).
  */
-/** providerOptions 用的 JSON 子集类型（SDK 的 ProviderOptions 未从 'ai' 顶层导出） */
+/** JSON subset used by providerOptions (the SDK's ProviderOptions type is not exported from the package root). */
 type Jsonish = string | number | boolean | { [k: string]: Jsonish };
 
 export type ThinkingLevel = 'low' | 'medium' | 'high';

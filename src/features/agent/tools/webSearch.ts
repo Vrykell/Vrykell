@@ -1,14 +1,14 @@
 /**
- * webSearch — web_search 工具的 Tavily 兜底实现（M6）。
+ * webSearch — hosted search API fallback for the web_search tool.
  *
- * 联网搜索的优先级（agentStream 里组装）：
- *   anthropic → 原生 web_search 工具（provider 服务端执行）
- *   gemini    → 原生 google_search 工具
- *   其余      → 本文件的 Tavily 工具（invoke('tavily_search') 走 Rust 转发，
- *               key 不出 Rust，见 ai.rs 的 tavily_search 命令）
+ * Web search priority (assembled in agentStream):
+ *   anthropic → native web_search tool (the provider runs it server-side)
+ *   gemini    → native google_search tool
+ *   others    → the hosted search API tool in this file (invoke('tavily_search') is forwarded by
+ *               the backend; the key stays there, see the tavily_search command in ai.rs)
  *
- * execute 返回纯文本结果（ToolRunCard 展开直接可读）；
- * 失败返回 { ok:false, error } 结构化对象（不 throw，让模型自我修正）。
+ * execute returns plain text (readable when the tool card is expanded);
+ * failures return a structured { ok:false, error } object (no throw, so the model can self-correct).
  */
 
 import { tool } from 'ai';
@@ -27,7 +27,7 @@ interface TavilyResponse {
   results?: TavilyResult[];
 }
 
-/** 单条结果的内容截断长度（避免超长网页摘要灌爆上下文） */
+/** Content truncation length per result (prevents very long page summaries from flooding the context). */
 const CONTENT_CAP = 300;
 
 export function buildTavilySearchTool(ctx: ToolContext) {
@@ -53,7 +53,7 @@ export function buildTavilySearchTool(ctx: ToolContext) {
   });
 }
 
-/** Tavily 响应 → 纯文本（摘要 + 编号结果列表），供模型阅读也供卡片展开 */
+/** Search response → plain text (answer + numbered result list), for both the model and the expanded card. */
 export function formatResults(r: TavilyResponse): string {
   const lines = (r.results ?? []).map(
     (it, i) =>

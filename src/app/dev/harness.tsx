@@ -1,12 +1,13 @@
 /**
- * harness.tsx — 输入栏度量对比页（仅开发用，不进应用 bundle）。
+ * harness.tsx — input-bar measurement comparison page (development only, not part of the app bundle).
  *
- * 在同一页面、同一 CSS 上下文（theme.css）里渲染两个真实组件：
- *   左：终端 InputEditor（绑定到 workspace 默认 session tab 的 pane）
- *   右：PanelChat（dock 面板形态，宽度 320）
- * 挂载后测量两条输入栏的容器/prompt 行/输入行/textarea 高度，写入 #result。
+ * Renders two real components on one page and in one CSS context (theme.css):
+ *   left: the terminal InputEditor (bound to the pane of the workspace's default session tab)
+ *   right: PanelChat (dock panel shape, width 320)
+ * After mount it measures the container / prompt row / input row / textarea height of
+ * both input bars and writes the result into #result.
  *
- * 访问：http://localhost:1420/harness.html（由 scripts/measure-input-bars.cjs 驱动）
+ * Visit: http://localhost:1420/harness.html (driven by scripts/measure-input-bars.cjs)
  */
 
 import { StrictMode } from 'react';
@@ -22,7 +23,7 @@ import PanelChat from '@features/chat/components/PanelChat';
 
 applyTheme('dark');
 
-// ── 最小 store 状态：默认 session tab 已存在，补上 pane 会话/场景/聚焦 ──
+// ── Minimal store state: the default session tab exists; add the pane session/scene/focus ──
 const tab = useSessionStore.getState().tabs.find(isSessionTab);
 if (!tab) throw new Error('harness: no session tab in initial workspace state');
 const paneId = firstLeaf(tab.layout).id;
@@ -32,7 +33,7 @@ useTerminalStore.setState({
   scenes: { [paneId]: 'blockList' },
 });
 
-// ── 全局错误捕获（渲染崩溃会落到这里） ──
+// ── Global error capture (render crashes land here) ──
 const errors: string[] = [];
 window.addEventListener('error', (e) => errors.push(`error: ${e.message}`));
 window.addEventListener('unhandledrejection', (e) => errors.push(`rejection: ${String(e.reason).slice(0, 300)}`));
@@ -42,7 +43,7 @@ console.error = (...args: unknown[]) => {
   origConsoleError(...args);
 };
 
-// ── 真实流式路径：send + 伪 streamFn 逐字符推流，内容覆盖 LLM 常见脏输出 ──
+// ── Real streaming path: send + a fake streamFn that pushes characters, covering the dirty output a model typically streams ──
 const STREAM_ANSWER = [
   '好的，这个问题分两步：\n\n',
   '1. 先运行 `$ make test` 确认失败用例，成本约 $5 ~ $10。\n',
@@ -57,7 +58,7 @@ function startStreamSimulation() {
   const streamFn = async (_msgs: Array<{ role: string; content: string }>, onChunk: (t: string) => void) => {
     let i = 0;
     while (i < STREAM_ANSWER.length) {
-      const n = 1 + Math.floor(Math.random() * 3); // 1~3 字符随机切片，制造脏中间态
+      const n = 1 + Math.floor(Math.random() * 3); // random 1–3 character slices to create dirty intermediate states
       onChunk(STREAM_ANSWER.slice(i, i + n));
       i += n;
       await new Promise((r) => setTimeout(r, 8));
@@ -66,7 +67,7 @@ function startStreamSimulation() {
   void useChatStore.getState().send('为什么构建失败？', { paneId, streamFn });
 }
 
-// ── 测量：textarea → 输入行 → 容器（两个组件的 DOM 深度一致） ──
+// ── Measurement: textarea → input row → container (both components have the same DOM depth) ──
 function measure(slotId: string) {
   const slot = document.getElementById(slotId);
   if (!slot) return { error: `slot ${slotId} missing` };
@@ -107,13 +108,13 @@ function publish() {
 function Harness() {
   return (
     <div style={{ display: 'flex', gap: 40, padding: 20, height: '100%', background: 'var(--canvas)' }}>
-      {/* 终端侧：模拟 pane 底部（700px 宽） */}
+      {/* Terminal side: simulates the bottom of a pane (700px wide) */}
       <div style={{ width: 700, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', background: 'var(--surface)' }}>
         <div id="term-slot">
           <InputEditor paneId={paneId} focused />
         </div>
       </div>
-      {/* 面板侧：模拟 dock 面板（320px 宽，固定高度） */}
+      {/* Panel side: simulates a dock panel (320px wide, fixed height) */}
       <div style={{ width: 320, background: 'var(--surface)', borderLeft: '1px solid var(--border)' }}>
         <div id="panel-slot" style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
           <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -138,7 +139,7 @@ const poll = setInterval(() => {
   const msgs = s.byTab[tab.id] ?? [];
   if (msgs.length > 0 && s.sendingTabs.length === 0) {
     clearInterval(poll);
-    setTimeout(publish, 400); // 等最后一帧渲染落地
+    setTimeout(publish, 400); // wait for the last frame to paint
   }
 }, 300);
-setTimeout(() => { clearInterval(poll); publish(); }, 30000); // 兜底
+setTimeout(() => { clearInterval(poll); publish(); }, 30000); // safety timeout

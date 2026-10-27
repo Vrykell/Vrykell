@@ -4,7 +4,7 @@ import { installGlobalErrorHandlers } from '@utils/errorHandler';
 import { initializeDiagnostics } from '@platform/diagnostics';
 import { syncWindowFrame } from '@platform/windowChrome';
 
-/** 在 React 挂载前完成不会依赖 React 树的启动工作，减少首屏闪烁。 */
+/** Startup work that does not depend on the component tree, done before mount to avoid first-paint flicker. */
 export function preloadApplication(): void {
   initializeDiagnostics();
   applyTheme(resolveThemeMode(readThemePreference()));

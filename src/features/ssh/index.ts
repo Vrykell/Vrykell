@@ -1,4 +1,4 @@
-/** SSH 领域公开入口。 */
+/** Public entry point of the SSH domain. */
 export * from '@features/ssh/stores/store';
 export { finishSshAuthentication, useSessionAuthenticationStore } from './stores/sessionAuthentication';
 export { useHostEditor } from './stores/hostEditor';

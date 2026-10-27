@@ -3,7 +3,7 @@ import { iconSizes, Folder } from '@ui/icons';
 import { fileIcon } from '@features/files/utils/fileIcon';
 import { useFileDragStore } from '@features/files';
 
-/** 拖拽预览：显示被拖文件/文件夹的图标（多选带数量角标），不参与命中测试。 */
+/** Drag preview: shows the icon of the dragged file/folder (with a count badge for multi-selection); excluded from hit testing. */
 export default function FileDragPreview() {
   const items = useFileDragStore((state) => state.items);
   const pointer = useFileDragStore((state) => state.pointer);

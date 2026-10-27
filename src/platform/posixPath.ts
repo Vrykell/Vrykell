@@ -1,17 +1,18 @@
 /**
- * posixPath — 远端主机（POSIX）路径语义。
+ * posixPath — path semantics for remote hosts (POSIX).
  *
- * 远端路径规则与宿主平台无关，因此「绝对/相对判断、拼接、取父目录、取文件名」都收口在这里，
- * 业务层不要自己拼接分隔符或判断 `startsWith('/')`。对应的 Rust 实现见
- * `src-tauri/src/platform/path.rs`（Windows 宿主同样不能用 std::path 处理远端路径）。
+ * Remote path rules do not depend on the host platform, so absolute/relative checks,
+ * joining, parent and file-name resolution all live here; feature code must not join
+ * separators itself or test `startsWith('/')`. The matching backend implementation is
+ * `src-tauri/src/platform/path.rs` (a Windows host cannot use std::path for remote paths).
  */
 
-/** 是否绝对路径（POSIX：以 `/` 开头）。 */
+/** Whether the path is absolute (POSIX: starts with `/`). */
 export function isPosixAbsolute(path: string): boolean {
   return path.startsWith('/');
 }
 
-/** 规范化：折叠重复分隔符与 `.`、处理 `..`、去掉结尾 `/`；空值归一为 `/`。 */
+/** Normalizes: collapses repeated separators and `.`, resolves `..`, drops a trailing `/`; empty input becomes `/`. */
 export function normalizePosix(path: string): string {
   if (!path) return '/';
   const parts: string[] = [];
@@ -26,13 +27,13 @@ export function normalizePosix(path: string): string {
   return `/${parts.join('/')}`;
 }
 
-/** 拼接目录与名称（目录为根或空时不会产生 `//`）。 */
+/** Joins a directory and a name (no `//` when the directory is the root or empty). */
 export function joinPosix(dir: string, name: string): string {
   const base = normalizePosix(dir);
   return base === '/' ? `/${name}` : `${base}/${name}`;
 }
 
-/** 父目录；根目录返回 null。 */
+/** Parent directory; null at the root. */
 export function parentPosix(path: string): string | null {
   const normalized = normalizePosix(path);
   if (normalized === '/') return null;
@@ -40,14 +41,14 @@ export function parentPosix(path: string): string | null {
   return cut <= 0 ? '/' : normalized.slice(0, cut);
 }
 
-/** 文件名（末段）；根目录返回 null。 */
+/** File name (last segment); null at the root. */
 export function fileNamePosix(path: string): string | null {
   const normalized = normalizePosix(path);
   if (normalized === '/') return null;
   return normalized.slice(normalized.lastIndexOf('/') + 1);
 }
 
-/** 路径末段名称（用于展示，始终有值）。 */
+/** Last path segment for display; always has a value. */
 export function baseNamePosix(path: string): string {
   return fileNamePosix(path) ?? path;
 }

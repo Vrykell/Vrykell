@@ -13,11 +13,11 @@ export interface SearchState {
   query: string;
   sources: Record<string, SourceState>;
   allResults: SearchResult[];
-  /** 是否正在（任意源）加载 */
+  /** Whether any source is loading */
   loading: boolean;
 }
 
-/** 执行一次全局搜索（函数版本，非 hook） */
+/** Runs a global search once (function form, not a hook) */
 export async function globalSearch(query: string): Promise<SearchResult[]> {
   if (!canSearchQuery(query)) return [];
 
@@ -37,7 +37,7 @@ export async function globalSearch(query: string): Promise<SearchResult[]> {
   return results.flat();
 }
 
-/** React hook：带状态管理的全局搜索 */
+/** Hook: global search with state management */
 export function useSearchEngine() {
   const [state, setState] = useState<SearchState>({
     query: '',
@@ -53,13 +53,13 @@ export function useSearchEngine() {
     controllerRef.current?.abort();
     const controller = new AbortController();
     controllerRef.current = controller;
-    // 生成新的请求 ID（用于竞态处理）
+    // Generate a new request ID (for race handling)
     requestIdRef.current += 1;
     const reqId = requestIdRef.current;
 
     setState({ query, sources: {}, allResults: [], loading: true });
 
-    // 空查询：清空结果
+    // Empty query: clear results
     if (!canSearchQuery(query)) {
       if (debounceRef.current) clearTimeout(debounceRef.current);
       setState({
@@ -71,14 +71,14 @@ export function useSearchEngine() {
       return;
     }
 
-    // 清除上一次的 debounce
+    // Clear the previous debounce
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     debounceRef.current = setTimeout(async () => {
       const sources = getSources();
       const enabled = searchQuerySources(query, getEnabledSourceIds());
 
-      // 初始化每个源的 loading 状态
+      // Initialize the loading state of each source
       const sourceStates: Record<string, SourceState> = {};
       for (const s of sources) {
         if (enabled.has(s.id)) {
@@ -87,7 +87,7 @@ export function useSearchEngine() {
       }
       setState((prev) => ({ ...prev, sources: sourceStates }));
 
-      // 并行搜索每个已启用的源
+      // Search every enabled source in parallel
       const promises = sources
         .filter((s) => enabled.has(s.id))
         .map(async (s) => {
@@ -102,7 +102,7 @@ export function useSearchEngine() {
                 });
               },
             });
-            // 竞态检查：如果请求 ID 已变，丢弃结果
+            // Race check: discard the result if the request ID has changed
             if (reqId !== requestIdRef.current) return;
             setState((prev) => {
               const updated = { ...prev.sources };
@@ -121,14 +121,14 @@ export function useSearchEngine() {
           }
         });
 
-      // 等待所有源完成
+      // Wait for all sources to settle
       await Promise.allSettled(promises);
       if (reqId !== requestIdRef.current) return;
       setState((prev) => ({ ...prev, loading: false }));
     }, 150);
   }, []);
 
-  // 清理 debounce
+  // Clean up the debounce
   useEffect(() => {
     return () => {
       requestIdRef.current += 1;

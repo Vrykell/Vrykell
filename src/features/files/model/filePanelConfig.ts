@@ -1,17 +1,18 @@
 import type { FsEntry } from '@platform/api/types';
 import type { FileOpsTarget } from '@features/files/model/fileOps';
+import { t } from '@i18n';
 
 /**
- * filePanelConfig — 文件面板「因状态而异」的部分集中在这里。
+ * filePanelConfig — the parts of the file panel that vary by state live here.
  *
- * 同一个状态变量（FileOpsTarget：本地 / 某个 SSH 连接）决定：
- *   - 右键菜单与 ⋯ 菜单显示哪些条目、什么顺序
- *   - 拖出是否需要先下载、系统文件拖入是移动还是上传
- *   - 打开文件的语义与顶栏按钮
- * 界面只按这份配置渲染，不再各自维护一套判断。
+ * One state variable (FileOpsTarget: local / a given SSH connection) decides:
+ *   - which entries the context menu and the ⋯ menu show, and in what order
+ *   - whether dragging out needs a download first, and whether a native file drop moves or uploads
+ *   - file opening semantics and the toolbar buttons
+ * The UI only renders from this config instead of keeping its own checks.
  */
 
-/** 菜单条目 key（顺序即展示顺序）。 */
+/** Menu entry keys (their order is the display order). */
 export type FileMenuItemKey =
   | 'new-file' | 'new-folder'
   | 'workspace-add' | 'workspace-remove' | 'open-tab'
@@ -22,7 +23,7 @@ export type FileMenuItemKey =
 
 export interface FilePanelConfig {
   variant: 'local' | 'ssh';
-  /** 测试标识（e2e 依赖，保持既有命名） */
+  /** Test ids (e2e depends on them; keep the existing names) */
   ids: {
     tree: string;
     crumbBar: string;
@@ -35,37 +36,36 @@ export interface FilePanelConfig {
     expander: string;
   };
   menus: {
-    /** 右键文件夹行 */
+    /** Context menu on a folder row */
     rowFolder: FileMenuItemKey[];
-    /** 右键文件行 */
+    /** Context menu on a file row */
     rowFile: FileMenuItemKey[];
-    /** 右键多选中的一行（作用于整组） */
+    /** Context menu on one row of a multi-selection (applies to the whole group) */
     rowMulti: FileMenuItemKey[];
-    /** 空白处右键 */
+    /** Context menu on blank space */
     blank: FileMenuItemKey[];
-    /** ⋯ 菜单（回退项由面板自动置于最前） */
+    /** ⋯ menu (the panel places the undo entry first automatically) */
     more: FileMenuItemKey[];
   };
   drag: {
-    /** 拖出到系统前是否需要先下载到本地（远端 = true） */
+    /** Whether dragging out to the system requires a download first (remote = true) */
     downloadBeforeNativeDrag: boolean;
-    /** 系统文件拖入面板：移动进面板（本地）还是上传（远端） */
+    /** Native file drop into the panel: move into the panel (local) or upload (remote) */
     externalDropMode: 'move' | 'upload';
-    /** 拖出到系统成功后是否清理源头（本地 = 移动，true；远端 = 下载，源文件保留，false） */
+    /** Whether the source is cleaned up after a successful native drag (local = move, true; remote = download, source kept, false) */
     cleanupSourceAfterNativeDrag: boolean;
   };
-  /** 打开文件的语义 */
   open: 'terminal-editor' | 'remote-editor';
   /** Opening a file typed into the path bar: system default app locally, the panel editor remotely. */
   pathBarFile: 'system-app' | 'editor';
-  /** 是否提供「终端切到当前目录」按钮 */
+  /** Whether to provide the "switch terminal to the current directory" button */
   syncToTerminal: boolean;
-  /** 面包屑首段（本地「此电脑」/ 远程「/」） */
+  /** First breadcrumb segment (local root node / remote "/") */
   rootLabel: string;
-  /** 点击面包屑首段去的目录：本地 null（此电脑），远程 '/'（根目录）。
-      远程的 null 表示「尚未解析 → 回主目录」，根面包屑绝不能用它，否则会重新解析主目录。 */
+  /** Directory the first breadcrumb segment navigates to: local null (root node), remote '/' (root directory).
+      A remote null means "not resolved yet → home directory"; the root breadcrumb must never use it or it would re-resolve home. */
   rootPath: string | null;
-  /** path 未知（远端主目录尚未解析）时显示的名称来源 */
+  /** Name source shown while path is unknown (remote home not resolved yet) */
   pendingLabel?: 'connection';
 }
 
@@ -93,7 +93,7 @@ const SSH_IDS: FilePanelConfig['ids'] = {
   expander: 'remote-row-expander',
 };
 
-/** 状态变量 → 面板配置：本地与 SSH 的唯一分歧点。 */
+/** State variable → panel config: the only point where local and SSH diverge. */
 export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
   if (target.kind === 'ssh') {
     return {
@@ -103,7 +103,7 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
         rowFolder: ['new-file', 'new-folder', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'download', 'properties', 'delete'],
         rowFile: ['new-file', 'new-folder', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'download', 'properties', 'delete'],
         rowMulti: ['copy', 'cut', 'paste', 'download', 'delete'],
-        // 空白处与 ⋯ 菜单提供同一套操作（远端多出上传），只是落点固定为当前目录
+        // Blank space and the ⋯ menu expose the same actions (remote adds upload); only the destination is fixed to the current directory
         blank: ['paste', 'new-file', 'new-folder', 'upload-file', 'upload-dir', 'sync-terminal', 'sync-cwd', 'downloads-view', 'uploads-view', 'collapse-all', 'refresh'],
         more: ['new-file', 'new-folder', 'upload-file', 'upload-dir', 'sync-terminal', 'sync-cwd', 'downloads-view', 'uploads-view', 'collapse-all', 'refresh'],
       },
@@ -123,7 +123,7 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
       rowFolder: ['new-file', 'new-folder', 'workspace-add', 'workspace-remove', 'open-tab', 'reveal', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'properties', 'delete'],
       rowFile: ['new-file', 'new-folder', 'open-editor', 'open-system', 'open-with', 'reveal', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'properties', 'delete'],
       rowMulti: ['copy', 'cut', 'paste', 'delete'],
-      // 空白处与 ⋯ 菜单提供同一套操作，只是落点固定为当前目录
+      // Blank space and the ⋯ menu expose the same actions; only the destination is fixed to the current directory
       blank: ['paste', 'new-file', 'new-folder', 'new-tab-here', 'sync-terminal', 'sync-cwd', 'reveal', 'downloads-view', 'uploads-view', 'collapse-all', 'refresh'],
       more: ['new-file', 'new-folder', 'new-tab-here', 'sync-terminal', 'sync-cwd', 'reveal', 'downloads-view', 'uploads-view', 'collapse-all', 'refresh'],
     },
@@ -131,7 +131,7 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
     open: 'terminal-editor',
     pathBarFile: 'editor',
     syncToTerminal: true,
-    rootLabel: '此电脑',
+    rootLabel: t('This PC'),
     rootPath: null,
   };
 }

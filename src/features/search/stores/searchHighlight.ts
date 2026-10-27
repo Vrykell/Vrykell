@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-/** 全局搜索高亮 — 当用户在搜索栏输入时，终端页面上的匹配文字实时高亮 */
+/** Global search highlight — while the user types in the search bar, matching text on the terminal page is highlighted live */
 interface SearchHighlightState {
   query: string;
   setQuery: (q: string) => void;

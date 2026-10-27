@@ -1,18 +1,19 @@
 /**
- * context — code-agent 式的上下文管理。
+ * context — agent-style context management.
  *
- * 三种策略（对应 agentSettings.contextStrategy）：
- *   - off     ：全量，不裁剪
- *   - window  ：按 token 预算从最新往回保留（保底保留最新一条提问）
- *   - compact ：超预算时把被丢弃的旧消息压缩成「运行摘要」作为 system 上下文
+ * Three strategies (matching agentSettings.contextStrategy):
+ *   - off     : full history, no trimming
+ *   - window  : keep a suffix by token budget, newest first (always keeps at least the latest request)
+ *   - compact : when over budget, compress the discarded older messages into a "running summary" used as system context
  *
- * token 用轻量启发式估算（CJK ≈ 1 token/字，其余 ≈ 4 字符/token），不依赖 tokenizer。
- * 摘要按 tabId 做增量缓存：只有新增溢出的消息才重新摘要，会话内不重复折叠。
+ * Tokens are estimated with a lightweight heuristic (CJK ≈ 1 token per character, everything else
+ * ≈ 4 characters per token) without a tokenizer. Summaries are cached incrementally per tabId: only
+ * newly overflowed messages are summarized again, so a conversation is never folded twice.
  */
 import { generateText, type LanguageModel, type ModelMessage } from 'ai';
 import type { ContextStrategy } from '@features/agent/stores/agentSettings';
 
-/** 一张图片的粗略 token 估算（不同模型差异大，这里取 512×512 常见档位） */
+/** Rough token estimate for one image (it varies widely by model; this uses the common 512×512 tier). */
 export const IMAGE_TOKEN_ESTIMATE = 1105;
 
 export function messageTokens(message: ModelMessage): number {
@@ -31,13 +32,13 @@ export interface SizedMessage {
 export interface PlanContextOptions {
   sized: SizedMessage[];
   strategy: ContextStrategy;
-  /** 上下文 token 预算；0 = 不设限 */
+  /** Context token budget; 0 = unlimited. */
   maxTokens: number;
   /** Input budget already consumed by instructions and retrieved context. */
   reservedTokens?: number;
   /** Rolling summary from an earlier step of the same tool loop. */
   previousSummary?: string;
-  /** 摘要长度上限（token） */
+  /** Upper bound for the summary (tokens). */
   summaryTokens: number;
   model: LanguageModel;
   tabId?: string;
@@ -45,17 +46,17 @@ export interface PlanContextOptions {
 }
 
 export interface PlanContextResult {
-  /** 非空时作为 system 上下文（compact 摘要） */
+  /** When non-empty, used as system context (the compact summary). */
   system?: string;
   messages: ModelMessage[];
 }
 
-/** CJK 友好 token 估算。 */
+/** CJK-friendly token estimate. */
 export function estimateTokens(text: string): number {
   let t = 0;
   for (let i = 0; i < text.length; i++) {
     const code = text.charCodeAt(i);
-    // CJK 统一表意 / 假名 / 谚文 / 全角标点 → 1 token/字
+    // CJK ideographs / kana / hangul / full-width punctuation → 1 token per character
     const cjk =
       (code >= 0x3000 && code <= 0x9fff) ||
       (code >= 0xff00 && code <= 0xffef) ||
@@ -65,7 +66,7 @@ export function estimateTokens(text: string): number {
   return Math.ceil(t);
 }
 
-// ── 增量摘要缓存（按 tabId） ──
+// ── incremental summary cache (per tabId) ──
 
 interface CompactionCacheEntry {
   foldedCount: number;
@@ -75,7 +76,7 @@ interface CompactionCacheEntry {
 
 const compactionCache = new Map<string, CompactionCacheEntry>();
 
-/** 关闭 tab 时清理摘要缓存（由 chat store dropTab 调用）。 */
+/** Clear the summary cache when a tab closes (called by the chat store's dropTab). */
 export function clearCompactionCache(tabId: string) {
   compactionCache.delete(tabId);
 }
@@ -153,7 +154,7 @@ async function buildSummary(
     if (cached && foldedCount > 0 && foldedCount <= dropped.length) {
       const fp = hashText(dropped.slice(0, foldedCount).map(messageText).join('\n\n'));
       if (fp === cached.fingerprint) {
-        // 已折叠部分未变：只折叠新增的溢出消息
+        // The folded prefix is unchanged: fold only the newly overflowed messages.
         const fresh = dropped.slice(foldedCount);
         if (fresh.length === 0) return cached.summary;
         const merged = await summarize(fresh, cached.summary, summaryTokens, model, signal, inputBudget);
@@ -167,7 +168,7 @@ async function buildSummary(
         return merged;
       }
     }
-    // 缓存缺失 / 已折叠部分被改动 → 全量重摘要
+    // Cache missing / folded prefix changed → summarize everything again.
     const summary = await summarize(dropped, null, summaryTokens, model, signal, inputBudget);
     if (summary == null) return null;
     compactionCache.set(tabId, {
@@ -180,7 +181,7 @@ async function buildSummary(
   return summarize(dropped, previousSummary ?? null, summaryTokens, model, signal, inputBudget);
 }
 
-/** 按策略规划上下文：返回 (可选 system 摘要) + 最终要发送的消息。 */
+/** Plan the context for a strategy: returns the optional system summary plus the messages to send. */
 export async function planContext(opts: PlanContextOptions): Promise<PlanContextResult> {
   const { sized, strategy, maxTokens, summaryTokens, model, tabId, signal } = opts;
 
@@ -188,7 +189,7 @@ export async function planContext(opts: PlanContextOptions): Promise<PlanContext
     return { messages: sized.map((s) => s.msg) };
   }
 
-  // 从最新往回累计，保留能放下的后缀；最新一条无条件保留
+  // Accumulate from the newest backwards, keeping the suffix that fits; the latest message is always kept.
   const available = Math.max(1, maxTokens - (opts.reservedTokens ?? 0));
   let keep = sized.length;
   let used = 0;
@@ -211,7 +212,7 @@ export async function planContext(opts: PlanContextOptions): Promise<PlanContext
     return { messages: kept.map((s) => s.msg) };
   }
 
-  // compact：把 dropped 折叠成摘要
+  // compact: fold the dropped messages into a summary.
   const summaryBudget = Math.max(0, Math.min(summaryTokens, Math.floor(available / 4), available - (sized[sized.length - 1]?.tokens ?? 0)));
   if (summaryBudget === 0) return { messages: kept.map(s => s.msg) };
   while (kept.length > 1 && used + summaryBudget > available) {

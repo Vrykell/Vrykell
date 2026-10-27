@@ -23,9 +23,9 @@ import { terminalDisconnected } from '../services/terminalAvailability';
 
 export interface RunCommandResult {
   ok: boolean;
-  /** 块模式才有；快照/错误路径为 undefined */
+  /** Only present in block mode; undefined on snapshot and error paths. */
   exitCode?: number;
-  /** 输出尾部（≤8KB） */
+  /** Tail of the output (≤8KB). */
   output: string;
   error?: string;
   completed?: boolean;
@@ -43,9 +43,9 @@ function tail(s: string): string {
 }
 
 /**
- * Shorten long output to the head and the tail with an explicit gap marker. Keeping only the
- * tail used to hide the first lines of a run (paths, early failures) and made the model re-run
- * the command to see them; the marker tells it what happened instead.
+ * Shorten long output to the head and the tail with an explicit gap marker. The head keeps paths
+ * and early failures visible to the model, and the marker states what was omitted so the model
+ * does not re-run the command just to see the beginning.
  */
 function capOutput(s: string): string {
   if (s.length <= OUTPUT_CAP) return s;
@@ -81,9 +81,10 @@ export async function runCommandAndWait(
   }
 
   const timeoutMs = opts?.timeoutMs ?? DEFAULT_TOOL_COMMAND_TIMEOUT_MS;
-  // 认领基准时刻：写入前的已存在的「pending 提示符块」正是本命令未来的家
-  // （提示符绘制时 133;A 就建了块），所以不能用「新块」判认领 —— 用
-  // startedAt >= t0（preexec 时刻）才覆盖「旧 pending 块转 executing」路径。
+  // Claim baseline: the pending prompt block that already exists before the write is where this
+  // command will live (the block is created when the prompt is drawn, at 133;A), so claiming on
+  // "a new block" is not enough — startedAt >= t0 (the preexec instant) also covers the path where
+  // an old pending block turns executing.
   const t0 = Date.now();
 
   const pane = executionPaneSpec(paneId);
@@ -144,8 +145,9 @@ function waitForCompletion(
       resolve(r);
     };
 
-    /** 执行中途切入全屏 TUI（如模型无视描述跑了 vim/claude）→ 立即收口，
-     *  不干等 120s 超时；程序留在终端里交给用户操作 */
+    /** Switching into a full-screen TUI mid-run (for example the model launched a full-screen
+     *  program despite the description) settles immediately instead of waiting out the 120s timeout;
+     *  the program stays in the terminal for the user to operate. */
     const unsubScene = useTerminalStore.subscribe((s) => {
       const disconnected = terminalDisconnected(paneId, sessionId);
       if (disconnected) { finish(disconnected); return; }
@@ -164,7 +166,8 @@ function waitForCompletion(
     const blockById = (id: string) => (useBlockStore.getState().byTab[paneId] ?? []).find((x) => x.id === id);
     const isTerminal = (status: string | undefined) => status === 'done' || status === 'interrupted';
 
-    /** 从被跟踪块构建结果（读取当下 outputText）；单块保持原样，多块按「命令 + 输出」拼接 */
+    /** Build the result from the tracked blocks (reading their current outputText); a single block
+     *  stays as-is, multiple blocks are joined as "command + output". */
     const resultFromBlocks = (): RunCommandResult | null => {
       if (tracked.length === 0) return null;
       const list = tracked.map(blockById);
@@ -193,9 +196,10 @@ function waitForCompletion(
     const settleIfDone = (): void => {
       if (tracked.length === 0 || doneGraceTimer) return;
       if (!resultFromBlocks()) return;
-      // finishBlock 先推 done 样式、再经 xterm write('') FIFO 回调异步提取输出
-      // 快照（sessionController.finishBlock）——此刻 outputText 多半还是 ''。
-      // 给快照提取一个宽限再收口，否则模型会拿到空输出误判「目录为空」。
+      // finishBlock pushes the done style first, then asynchronously extracts the output snapshot
+      // through the terminal emulator write('') FIFO callback (sessionController.finishBlock) — at that moment
+      // outputText is usually still ''. Give snapshot extraction a grace period before settling,
+      // otherwise the model receives empty output and wrongly concludes the directory is empty.
       doneGraceTimer = setTimeout(() => {
         doneGraceTimer = null;
         const r = resultFromBlocks();
@@ -221,8 +225,8 @@ function waitForCompletion(
       }, 500);
     };
 
-    /** 认领块：登记 ⚡ 真源 + 记录 toolCall→block 映射（内嵌命令块渲染用）
-     *  + 立即补一记 updateBlock 让徽标即时出现 */
+    /** Claim a block: register the source of truth + record the toolCall→block mapping (for
+     *  embedded command block rendering) + apply an updateBlock immediately so the badge shows up. */
     const claim = (blockId: string) => {
       if (tracked.includes(blockId)) return;
       tracked.push(blockId);
@@ -231,24 +235,27 @@ function waitForCompletion(
       useBlockStore.getState().updateBlock(paneId, blockId, { agent: true });
     };
 
-    /** 本次提交的候选命令回显：整条命令 + 各非空行（多行脚本会被拆成一句一块）。 */
+    /** Command echoes to expect for this submission: the whole command plus each non-empty line
+     *  (a multi-line script is split into one block per statement). */
     const submitted = new Set(
       [command.trim(), ...command.split('\n').map((line) => line.trim()).filter(Boolean)],
     );
 
-    /** 收集本次提交产生的所有块（按开始时间顺序）；不相关块（用户并发输入）不并入。 */
+    /** Collect every block produced by this submission, in start order; unrelated blocks
+     *  (concurrent user input) are not merged in. */
     const collectBlocks = (): void => {
       const blocks = useBlockStore.getState().byTab[paneId] ?? [];
       for (const b of blocks) {
         if (b.startedAt == null || b.startedAt < t0) continue;
         const echo = b.command.trim();
-        // 回显缺失（shell integration 未提供 133;E）时按空回显兜底
+        // Missing echo (shell integration did not provide 133;E): treat the echo as empty.
         if (echo && !submitted.has(echo)) continue;
         claim(b.id);
       }
     };
 
-    /** 首块认领：优先命令回显完全一致的块，否则取本次提交最早的块（回显缺失时兜底）。 */
+    /** First-block claim: prefer a block whose command echo matches exactly, otherwise take the
+     *  earliest block from this submission (fallback when the echo is missing). */
     const tryClaim = (): void => {
       if (tracked.length > 0) return;
       const blocks = useBlockStore.getState().byTab[paneId] ?? [];
@@ -264,7 +271,8 @@ function waitForCompletion(
 
     const graceTimer = setTimeout(() => {
       if (tracked.length === 0) {
-        // 自愈：宽限期结束时绕过订阅直扫一次（事件可能因时序错过）
+        // Self-heal: when the grace period ends, scan directly once, bypassing the subscription
+        // (events can be missed because of timing).
         tryClaim();
         collectBlocks();
         settleIfDone();
@@ -282,7 +290,7 @@ function waitForCompletion(
     };
     signal?.addEventListener('abort', onAbort, { once: true });
 
-    // 订阅块流：认领本次提交的块（打 agent 标记）→ 等终态
+    // Subscribe to the block stream: claim this submission's blocks (tag them as agent) → wait for a terminal state.
     unsub = useBlockStore.subscribe(() => {
       tryClaim();
       collectBlocks();

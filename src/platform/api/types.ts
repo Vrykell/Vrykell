@@ -1,13 +1,14 @@
 /**
- * 后端契约类型（Rust 返回/入参结构）的唯一权威定义。
+ * Backend contract types (Rust response/argument shapes) — the single authoritative definition.
  *
- * 这些类型描述的是 Tauri `invoke` 跨进程边界的原始数据形状，属于基础设施契约，
- * 与任何具体 feature 的领域模型无关，因此收敛到 `@platform/api`，供 API 封装层
- * 与各业务域共同引用，避免 features 反向持有基础设施类型。
+ * These describe the raw data shape across the IPC boundary of the invoke layer. They are
+ * infrastructure contracts, independent of any feature's domain model, so they live in
+ * `@platform/api` and are shared by the API wrappers and the feature domains, which keeps
+ * features from reaching into infrastructure types.
  */
 
-// ── 本地文件系统 ──
-/** Rust fs_list 返回的目录条目（path 由 @platform/api/fs 归一化后交给业务层） */
+// ── Local filesystem ──
+/** Directory entry returned by the backend fs_list (its path is normalized by @platform/api/fs before reaching feature code). */
 export interface FsEntry {
   name: string;
   path: string;
@@ -15,7 +16,7 @@ export interface FsEntry {
   is_symlink?: boolean;
 }
 
-/** Rust fs_disks 返回的磁盘条目（「此电脑」视图小卡片展示用） */
+/** Disk entry returned by the backend fs_disks (small cards in the drives view). */
 export interface DiskEntry {
   name: string;
   path: string;
@@ -35,7 +36,7 @@ export interface FileStat {
   modified_ms: number | null;
 }
 
-// ── 历史命令 ──
+// ── Command history ──
 export interface BackendHistoryEntry {
   id: number;
   command: string;
@@ -45,7 +46,7 @@ export interface BackendHistoryEntry {
   run_count: number;
 }
 
-// ── 文件搜索匹配 ──
+// ── File search matches ──
 export interface BackendFileMatch {
   name: string;
   path: string;
@@ -56,7 +57,7 @@ export interface BackendFileMatch {
   content_snippet: string | null;
 }
 
-/** Rust blocks 表 JOIN sessions 返回 */
+/** Returned by the backend block query joined with sessions. */
 export interface BackendBlockEntry {
   /** Absent on older backend responses. */
   cwd?: string;
@@ -75,7 +76,7 @@ export interface BackendBlockEntry {
   session_status: string;
 }
 
-/** Rust sessions 表返回 */
+/** Returned by the backend sessions table. */
 export interface BackendSessionEntry {
   id: string;
   title: string;
@@ -86,13 +87,13 @@ export interface BackendSessionEntry {
   cwd: string;
   group_id: string | null;
   sort_order: number;
-  /** 会话类型判别：local | ssh */
+  /** Session kind discriminator: local | ssh. */
   kind: string;
-  /** 变体专属数据的 JSON 字符串 */
+  /** Variant-specific JSON payload. */
   payload: string;
 }
 
-/** Rust groups 表返回 */
+/** Returned by the backend groups table. */
 export interface BackendGroupEntry {
   id: string;
   title: string;
@@ -103,7 +104,7 @@ export interface BackendGroupEntry {
   archived: boolean;
 }
 
-/** Rust workspaces 表返回 */
+/** Returned by the backend workspaces table. */
 export interface BackendWorkspaceEntry {
   id: number;
   path: string;
@@ -111,15 +112,15 @@ export interface BackendWorkspaceEntry {
   added_at: number;
 }
 
-/** Rust chat_messages 表返回 */
+/** Returned by the backend chat_messages table. */
 export interface BackendChatMessage {
   pane_id?: string | null;
   id: string;
   role: string;
   content: string;
   created_at: number;
-  /** 消息 parts 渲染层 JSON（'' = 无/旧数据，见 agent/messageParts.ts） */
+  /** Message parts JSON for the render layer ('' = none/legacy data, see agent/messageParts.ts). */
   parts: string;
-  /** 附件元数据 JSON（M5，'' = 无/旧数据，见 agent/attachments.ts） */
+  /** Attachment metadata JSON ('' = none/legacy data, see agent/attachments.ts). */
   attachments: string;
 }

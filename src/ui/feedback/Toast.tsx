@@ -8,33 +8,34 @@ interface ToastItem {
   id: number;
   message: string;
   type: ToastType;
-  /** 展示时长 ms；0 = 不自动消失 */
+  /** Display duration in ms; 0 = never auto-dismiss. */
   duration: number;
-  /** 退场中（播放 toastOut 动画后移除） */
+  /** Leaving (removed after the exit animation plays). */
   leaving?: boolean;
 }
 
 interface ToastState {
   toasts: ToastItem[];
-  /** id → 自动消失计时器 */
+  /** id → auto-dismiss timer. */
   timers: Record<number, ReturnType<typeof setTimeout>>;
   addToast: (message: string, type?: ToastType, duration?: number) => void;
   removeToast: (id: number) => void;
-  /** 悬停暂停自动消失 */
+  /** Pause auto-dismiss while hovered. */
   pause: (id: number) => void;
-  /** 离开后重新计时 */
+  /** Restart the countdown after the pointer leaves. */
   resume: (id: number) => void;
 }
 
 let nextId = 1;
 
 const DEFAULT_DURATION = 3000;
-/** 退场动画时长（与 toastOut keyframe 一致） */
+/** Exit animation duration (matches the toastOut keyframes). */
 const LEAVE_MS = 200;
 
-/** 把 toast 标记为退场，动画结束后真正移除。 */
+/** Marks a toast as leaving and removes it once the animation ends. */
 function dismiss(set: (fn: (s: ToastState) => Partial<ToastState>) => void, id: number): void {
-  // 自动消失路径也要清计时器表（否则手动关闭/悬停暂停后残留）
+  // The auto-dismiss path also clears the timer map (otherwise a manual close or a hover
+  // pause leaves an entry behind)
   const timer = useToastStore.getState().timers[id];
   if (timer) clearTimeout(timer);
   set((s) => {
@@ -45,7 +46,7 @@ function dismiss(set: (fn: (s: ToastState) => Partial<ToastState>) => void, id: 
   const leaveTimer = setTimeout(() => {
     set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) }));
   }, LEAVE_MS);
-  // 退场计时器不挂进 timers（不参与暂停/恢复）
+  // The exit timer is not tracked in timers (it takes no part in pause/resume)
   void leaveTimer;
 }
 
@@ -63,7 +64,7 @@ export const useToastStore = create<ToastState>((set) => ({
   },
 
   removeToast: (id) => {
-    // 手动关闭：清除计时器后播放退场动画
+    // Manual close: clear the timer, then play the exit animation
     const timer = useToastStore.getState().timers[id];
     if (timer) clearTimeout(timer);
     set((s) => {
@@ -93,7 +94,7 @@ export const useToastStore = create<ToastState>((set) => ({
   },
 }));
 
-/** ToastContainer — 右下角消息通知（不遮底部输入栏）。 */
+/** ToastContainer — bottom-right notifications (never covering the bottom input bar). */
 export default function ToastContainer() {
   const toasts = useToastStore((s) => s.toasts);
   if (toasts.length === 0) return null;

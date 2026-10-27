@@ -41,7 +41,7 @@ export interface SearchGroup {
   results: SearchResult[];
 }
 
-/** 聚合全局搜索的输入、异步请求、结果导航和跨领域动作。 */
+/** Aggregates global search input, async requests, result navigation and cross-domain actions. */
 export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
   const setHighlightQuery = useSearchHighlightStore((state) => state.setQuery);
   const setPendingInput = useTerminalStore((state) => state.setPendingInput);
