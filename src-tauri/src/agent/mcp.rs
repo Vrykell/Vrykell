@@ -1,13 +1,13 @@
-//! mcp — Model Context Protocol 客户端（本地 stdio 服务器，参照主流 agent 编码工具的
-//! MCP 设计）。
+//! mcp: Model Context Protocol client for local stdio servers, following mainstream agent tools.
+//! MCP design.
 //!
-//! 配置在 `~/.vrykell/mcp.json` 的 `servers` 数组里，每项声明：
-//!   - `command` + `args` + `env`：本地 stdio 服务器（如 `npx -y @modelcontextprotocol/server-filesystem`）
-//!   - `url`：远程 HTTP/SSE 服务器（v1 保留字段，当前以 stdio 为主）
+//! Configuration lives in the `servers` array of `~/.vrykell/mcp.json`; each entry declares:
+//!   - `command` + `args` + `env`: a local stdio server such as `npx -y @modelcontextprotocol/server-filesystem`.
+//!   - `url`: a remote HTTP/SSE server (reserved for v1; stdio is the current focus).
 //!
-//! 连接流程 = JSON-RPC 2.0 over stdio（每行一条消息）：
+//! The connection is JSON-RPC 2.0 over stdio, one message per line:
 //!   initialize → notifications/initialized → tools/list → tools/call
-//! 连接以子进程方式持有（kill_on_drop 兜底回收）；工具按需列出，调用时转发。
+//! The connection owns a child process with kill_on_drop as a fallback. Tools are listed on demand and forwarded on call.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -18,8 +18,8 @@ use tokio::process::{Child, ChildStdin, ChildStdout, Command};
 use tokio::sync::{watch, Mutex};
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(60);
-const MAX_MCP_ARGS_BYTES: usize = 1024 * 1024; // 工具调用参数上限 1MB
-const MAX_MCP_RESULT_CHARS: usize = 256 * 1024; // 工具结果上限 256KB
+const MAX_MCP_ARGS_BYTES: usize = 1024 * 1024; // 1 MB tool-argument limit
+const MAX_MCP_RESULT_CHARS: usize = 256 * 1024; // 256 KB tool-result limit
 const MAX_MCP_MESSAGE_BYTES: usize = 2 * 1024 * 1024;
 
 async fn exchange(
@@ -65,17 +65,17 @@ async fn until_closed<T>(
     }
 }
 
-// ── 配置 ──
+// -- Configuration --
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase", default)]
 pub struct McpServerConfig {
     pub name: String,
-    /// 本地 stdio 启动命令（与 url 二选一，stdio 优先）
+    /// Local stdio command (alternatives to url; stdio wins when both are set).
     pub command: String,
     pub args: Vec<String>,
     pub env: HashMap<String, String>,
-    /// 远程 HTTP/SSE 地址（v1 保留，未实现则报错）
+    /// Remote HTTP/SSE address (reserved for v1; using it reports an error).
     pub url: String,
     pub enabled: bool,
 }
@@ -117,14 +117,14 @@ impl McpConfig {
     pub fn save(&self) -> Result<(), String> {
         let p = Self::path();
         if let Some(dir) = p.parent() {
-            std::fs::create_dir_all(dir).map_err(|e| format!("创建配置目录失败：{e}"))?;
+            std::fs::create_dir_all(dir).map_err(|e| format!("Failed to create the configuration directory: {e}"))?;
         }
-        let json = serde_json::to_string_pretty(self).map_err(|e| format!("序列化 MCP 配置失败：{e}"))?;
-        std::fs::write(&p, json).map_err(|e| format!("写入 MCP 配置失败：{e}"))
+        let json = serde_json::to_string_pretty(self).map_err(|e| format!("Failed to serialize the MCP configuration: {e}"))?;
+        std::fs::write(&p, json).map_err(|e| format!("Failed to write the MCP configuration: {e}"))
     }
 }
 
-// ── 工具信息（对前端暴露） ──
+// -- Tool metadata exposed to the frontend --
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -160,10 +160,10 @@ pub struct McpExposedTool {
     pub input_schema: serde_json::Value,
 }
 
-// ── 连接 ──
+// -- Connection --
 
 struct McpConnection {
-    /// 持有子进程句柄：kill_on_drop(true) 保证连接被替换/丢弃时回收进程
+    /// Holds the child process; kill_on_drop(true) reaps it when the connection is replaced or dropped.
     #[allow(dead_code)]
     child: Child,
     stdin: ChildStdin,
@@ -173,7 +173,7 @@ struct McpConnection {
 }
 
 impl McpConnection {
-    /// 发送 JSON-RPC 请求，读行直到匹配 id 返回 result（通知/日志行忽略）。
+    /// Send a JSON-RPC request and read lines until the matching id returns a result, ignoring notifications and logs.
     async fn request(
         &mut self,
         method: &str,
@@ -195,16 +195,16 @@ impl McpConnection {
         )
         .await?;
         let note = serde_json::json!({ "jsonrpc": "2.0", "method": "notifications/initialized", "params": {} });
-        let mut line = serde_json::to_string(&note).map_err(|e| format!("序列化通知失败：{e}"))?;
+        let mut line = serde_json::to_string(&note).map_err(|e| format!("Failed to serialize the notification: {e}"))?;
         line.push('\n');
         self.stdin
             .write_all(line.as_bytes())
             .await
-            .map_err(|e| format!("写入 initialized 通知失败：{e}"))?;
+            .map_err(|e| format!("Failed to write the initialized notification: {e}"))?;
         self.stdin
             .flush()
             .await
-            .map_err(|e| format!("刷新 initialized 通知失败：{e}"))?;
+            .map_err(|e| format!("Failed to flush the initialized notification: {e}"))?;
         Ok(())
     }
 
@@ -212,7 +212,7 @@ impl McpConnection {
         let resp = self.request("tools/list", serde_json::json!({})).await?;
         let tools = resp.get("tools").cloned().unwrap_or(serde_json::Value::Null);
         let list: Vec<McpToolInfo> = serde_json::from_value(tools)
-            .map_err(|e| format!("解析 tools/list 失败：{e}"))?;
+            .map_err(|e| format!("Failed to parse tools/list: {e}"))?;
         self.tools = list.clone();
         Ok(list)
     }
@@ -228,7 +228,7 @@ impl McpConnection {
     }
 }
 
-// ── 运行时状态 ──
+// -- Runtime state --
 
 struct McpRuntime {
     config: McpConfig,
@@ -272,7 +272,7 @@ impl Default for McpState {
 
 async fn spawn_server(cfg: &McpServerConfig) -> Result<McpConnection, String> {
     if cfg.command.trim().is_empty() {
-        return Err(format!("服务器「{}」缺少 command", cfg.name));
+        return Err(format!("Server '{}' is missing command", cfg.name));
     }
     let mut cmd = Command::new(cfg.command.trim());
     #[cfg(windows)]
@@ -286,11 +286,11 @@ async fn spawn_server(cfg: &McpServerConfig) -> Result<McpConnection, String> {
 
     let mut child = cmd
         .spawn()
-        .map_err(|e| format!("启动 MCP 服务器失败：{e}"))?;
-    let stdin = child.stdin.take().ok_or("无法获取 MCP 服务器 stdin")?;
-    let stdout = child.stdout.take().ok_or("无法获取 MCP 服务器 stdout")?;
+        .map_err(|e| format!("Failed to start the MCP server: {e}"))?;
+    let stdin = child.stdin.take().ok_or("Could not obtain the MCP server stdin")?;
+    let stdout = child.stdout.take().ok_or("Could not obtain the MCP server stdout")?;
 
-    // stderr 后台排空，避免管道缓冲写满卡住子进程（日志丢弃，v1）
+    // Drain stderr in the background so a full pipe cannot block the child; logs are discarded for v1.
     if let Some(stderr) = child.stderr.take() {
         tokio::spawn(async move {
             let mut se = stderr;
@@ -316,7 +316,7 @@ async fn spawn_server(cfg: &McpServerConfig) -> Result<McpConnection, String> {
     Ok(conn)
 }
 
-// ── Tauri 命令 ──
+// -- Tauri commands --
 
 #[tauri::command]
 pub async fn mcp_get_servers(state: tauri::State<'_, McpState>) -> Result<Vec<McpServerStatus>, String> {
@@ -350,21 +350,21 @@ pub async fn mcp_save_server(
     let mut rt = state.0.lock().await;
     let name = config.name.trim().to_string();
     if name.is_empty() {
-        return Err("服务器名称不能为空".to_string());
+        return Err("Server name cannot be empty".to_string());
     }
     if name.len() > 80 {
-        return Err("服务器名称过长（≤80 字符）".to_string());
+        return Err("Server name is too long (maximum 80 characters)".to_string());
     }
     if name.chars().any(|c| c.is_control()) {
-        return Err("服务器名称含非法字符".to_string());
+        return Err("Server name contains invalid characters".to_string());
     }
     if config.command.trim().is_empty() && config.url.trim().is_empty() {
-        return Err("需要填写 command 或 url".to_string());
+        return Err("Provide a command or url".to_string());
     }
     if config.command.contains('\0') || config.args.iter().any(|a| a.contains('\0')) {
-        return Err("command/args 含非法字符".to_string());
+        return Err("command or args contain invalid characters".to_string());
     }
-    // 配置变更：先断开旧连接，下次按新配置连接
+    // Configuration changed: disconnect the old connection and reconnect with the new settings.
     rt.disconnect(&name);
     let mut cfg = config;
     cfg.name = name.clone();
@@ -406,12 +406,12 @@ pub async fn mcp_connect(state: tauri::State<'_, McpState>, name: String) -> Res
     let (cfg, revision, closed) = {
         let mut rt = state.0.lock().await;
         let cfg = rt.config.servers.iter().find(|server| server.name == name).cloned()
-            .ok_or_else(|| format!("未找到 MCP 服务器「{name}」"))?;
+            .ok_or_else(|| format!("MCP server '{name}' was not found"))?;
         if !cfg.enabled {
-            return Err(format!("MCP 服务器「{name}」已禁用"));
+            return Err(format!("MCP server '{name}' is disabled"));
         }
         if !cfg.url.trim().is_empty() {
-            return Err("远程 HTTP/SSE MCP 服务器暂未支持（v1 仅支持本地 stdio）".to_string());
+            return Err("Remote HTTP/SSE MCP servers are not supported yet; v1 supports local stdio only".to_string());
         }
         rt.disconnect(&name);
         let revision = rt.revisions[&name];
@@ -436,7 +436,7 @@ pub async fn mcp_disconnect(state: tauri::State<'_, McpState>, name: String) -> 
     Ok(())
 }
 
-/// 所有已连接服务器的工具（带 server 命名空间，供 agent 组装 AI 工具表）。
+/// Tools from every connected server, namespaced by server for the agent tool table.
 #[tauri::command]
 pub async fn mcp_list_all_tools(state: tauri::State<'_, McpState>) -> Result<Vec<McpExposedTool>, String> {
     let rt = state.0.lock().await;
@@ -454,7 +454,7 @@ pub async fn mcp_list_all_tools(state: tauri::State<'_, McpState>) -> Result<Vec
     Ok(out)
 }
 
-/// 调用某服务器的工具，返回其 content（文本优先）。
+/// Call a server tool and return its content, preferring text.
 #[tauri::command]
 pub async fn mcp_call_tool(
     state: tauri::State<'_, McpState>,
@@ -463,12 +463,12 @@ pub async fn mcp_call_tool(
     args: Option<serde_json::Value>,
 ) -> Result<serde_json::Value, String> {
     let session = state.0.lock().await.connections.get(&server).cloned()
-        .ok_or_else(|| format!("MCP 服务器「{server}」未连接"))?;
+        .ok_or_else(|| format!("MCP server '{server}' is not connected"))?;
     let args = args.unwrap_or(serde_json::Value::Object(Default::default()));
-    // 参数体积上限，防止超大 payload 打爆内存/上下文
+    // Cap argument size so an oversized payload cannot exhaust memory or context.
     if let Ok(s) = serde_json::to_string(&args) {
         if s.len() > MAX_MCP_ARGS_BYTES {
-            return Err("MCP 调用参数过大（>1MB）".to_string());
+            return Err("MCP call arguments exceed the 1 MB limit".to_string());
         }
     }
     let result = until_closed(&session.closed, async {
@@ -614,7 +614,7 @@ mod tests {
     fn tool_info_serde_camel_case() {
         let t = McpToolInfo {
             name: "read".to_string(),
-            description: Some("读文件".to_string()),
+            description: Some("Read file".to_string()),
             input_schema: serde_json::json!({ "type": "object" }),
         };
         let json = serde_json::to_string(&t).unwrap();
