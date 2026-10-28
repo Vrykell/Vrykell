@@ -1,5 +1,5 @@
 /**
- * 技能系统 e2e：列表/信任/启用/详情/删除/市场/URL 导入。
+ * Skills system e2e: list / trust / enable / details / delete / marketplace / URL import.
  */
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, skillOps } from './tauri-mock';
@@ -11,14 +11,14 @@ test.beforeEach(async ({ page }) => {
   await gotoSetting(page, '技能');
 });
 
-/** 按技能名定位卡片行（name span 的第二个祖先 div = 卡片） */
+/** Locate a card row by skill name (the second ancestor div of the name span is the card) */
 const rowOf = (name: string) =>
   (page: import('@playwright/test').Page) =>
     page.locator('section').getByText(name, { exact: true }).first().locator('xpath=ancestor::div[2]');
 
 
-test.describe('技能设置页', () => {
-  test('技能列表：徽标（信任/禁用/含脚本/来源）与文件数', async ({ page }) => {
+test.describe('Skills settings page', () => {
+  test('Skill list: badges (trust / disabled / script / source) and file count', async ({ page }) => {
     await expect(page.getByText('写单测')).toBeVisible();
     await expect(page.getByText('旧脚本技能')).toBeVisible();
     const row = rowOf('旧脚本技能')(page);
@@ -30,39 +30,39 @@ test.describe('技能设置页', () => {
     await expect(row.getByText('3 个文件', { exact: true })).toBeVisible();
   });
 
-  test('信任 / 启用按钮：调用 set_skill_state 并刷新徽标', async ({ page }) => {
+  test('Trust / enable buttons: call set_skill_state and refresh badges', async ({ page }) => {
     const row = rowOf('旧脚本技能')(page);
     await row.getByRole('button', { name: '信任' }).click();
     await expect(row.getByText('已信任', { exact: true })).toBeVisible();
     await row.getByRole('button', { name: '启用' }).click();
-    // 启用后按钮文本变「禁用」；未信任徽标消失
+    // After enabling, the button label switches to "disable" and the untrusted badge disappears
     await expect(row.getByRole('button', { name: '禁用' })).toBeVisible();
     const ops = await skillOps(page);
     expect(ops).toContainEqual(expect.objectContaining({ op: 'set_state', name: '旧脚本技能', trusted: true }));
     expect(ops).toContainEqual(expect.objectContaining({ op: 'set_state', name: '旧脚本技能', enabled: true }));
   });
 
-  test('详情面板：文件树 + SKILL.md + 返回', async ({ page }) => {
+  test('Details panel: file tree + SKILL.md + back', async ({ page }) => {
     await page.getByText('写单测').click();
     await expect(page.getByRole('button', { name: '返回', exact: true })).toBeVisible();
     await expect(page.getByText('已信任', { exact: true }).last()).toBeVisible();
-    // SKILL.md 正文
+    // SKILL.md body
     await expect(page.getByText('先看代码，再写 vitest 单测。')).toBeVisible();
-    // 打开文件夹按钮
+    // Open folder button
     await expect(page.getByRole('button', { name: '打开文件夹' })).toBeVisible();
-    // 返回列表
+    // Back to the list
     await page.getByRole('button', { name: '返回', exact: true }).click();
     await expect(page.getByText('还没有技能')).toHaveCount(0);
   });
 
-  test('详情面板文件树：点击脚本文件显示内容', async ({ page }) => {
+  test('Details panel file tree: clicking a script file shows its content', async ({ page }) => {
     await page.getByText('旧脚本技能').click();
-    await page.getByText('scripts', { exact: true }).first().click(); // 展开目录
+    await page.getByText('scripts', { exact: true }).first().click(); // expand the directory
     await page.getByText('run.sh', { exact: true }).first().click();
     await expect(page.getByText('这是技能文件 旧脚本技能/scripts/run.sh 的内容。')).toBeVisible();
   });
 
-  test('删除技能：确认后移除并提示', async ({ page }) => {
+  test('Delete skill: confirm, remove and show a notice', async ({ page }) => {
     const row = rowOf('写单测')(page);
     await row.locator('[data-tip="删除技能"]').click();
     await expect(page.getByText('已删除 写单测')).toBeVisible();
@@ -71,31 +71,31 @@ test.describe('技能设置页', () => {
     expect(ops).toContainEqual(expect.objectContaining({ op: 'remove', name: '写单测' }));
   });
 
-  test('技能市场：浏览仓库 → 安装 → 已安装标记', async ({ page }) => {
+  test('Skill marketplace: browse repository → install → installed marker', async ({ page }) => {
     await page.getByRole('button', { name: /技能市场/ }).click();
     await expect(page.getByText('技能市场', { exact: true }).last()).toBeVisible();
-    // 选预置仓库并浏览
+    // Pick the preset repository and browse
     await page.getByRole('combobox', { name: '技能仓库' }).click();
     await page.getByRole('option', { name: 'anthropics/skills', exact: true }).click();
     await page.getByRole('button', { name: '浏览' }).click();
     await expect(page.getByText('github-skill-1')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('github-skill-2')).toBeVisible();
-    // 安装第一个
-    // 列表第一项的安装按钮即 github-skill-1（列表顺序与 mock 一致）
+    // Install the first one
+    // The install button of the first list item belongs to github-skill-1 (list order matches the mock)
     const installBtn = page.locator('section').getByRole('button', { name: '安装' }).first();
     await installBtn.click();
     await expect(page.getByText('已安装 github-skill-1')).toBeVisible();
     await expect(page.locator('section').getByText('已安装', { exact: true }).first()).toBeVisible();
     const ops = await skillOps(page);
     expect(ops).toContainEqual(expect.objectContaining({ op: 'market_install', name: 'github-skill-1' }));
-    // 市场内搜索过滤（等安装 toast 消失，避免文本干扰）
+    // Search filtering inside the marketplace (wait for the install toast to disappear so its text does not interfere)
     await expect(page.getByText('已安装 github-skill-1')).toHaveCount(0, { timeout: 5000 });
     await page.getByPlaceholder('搜索技能…').fill('skill-2');
     await expect(page.getByText('GitHub 操作技能', { exact: true })).toHaveCount(0);
     await expect(page.getByText('第二个仓库技能', { exact: true })).toBeVisible();
   });
 
-  test('URL 导入：批量安装远程技能', async ({ page }) => {
+  test('URL import: install remote skills in bulk', async ({ page }) => {
     await page.getByPlaceholder('从 URL 导入技能清单').fill('https://example.com/skills.json');
     await page.getByRole('button', { name: '导入', exact: true }).click();
     await expect(page.getByText('已安装 2 个技能')).toBeVisible({ timeout: 5000 });
@@ -105,7 +105,7 @@ test.describe('技能设置页', () => {
     expect(ops.filter((o) => o.op === 'install')).toHaveLength(2);
   });
 
-  test('安全提示条可关闭', async ({ page }) => {
+  test('Security banner can be dismissed', async ({ page }) => {
     const banner = page.locator('section').getByText(/技能可能包含脚本/);
     await expect(banner).toBeVisible();
     await banner.locator('xpath=..').locator('[data-tip="关闭"]').click();

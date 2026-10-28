@@ -321,7 +321,7 @@ test('split placement previews the hovered slot and closes with Escape', async (
   await page.getByTestId('new-tab-option-shell:zsh').click();
   const overlay = page.getByTestId('placement-overlay');
   await expect(overlay).toBeVisible();
-  // 覆盖层不显示提示文案：悬停前为空，悬停后只出现指针下的灰色预览
+  // The overlay shows no hint text: empty before hovering, and afterwards only the gray preview under the pointer appears
   await expect(overlay).toBeEmpty();
   await page.keyboard.press('Escape');
   await expect(overlay).toHaveCount(0);
@@ -329,13 +329,13 @@ test('split placement previews the hovered slot and closes with Escape', async (
 });
 
 test('split placement closes when it loses focus', async ({ page }) => {
-  // 点击覆盖层之外的侧栏按钮 → 自动取消
+  // Clicking a sidebar button outside the overlay cancels it automatically
   await page.keyboard.press('Meta+d');
   await expect(page.getByTestId('placement-overlay')).toBeVisible();
   await page.locator('[data-dock-btn="files"]').click();
   await expect(page.getByTestId('placement-overlay')).toHaveCount(0);
 
-  // 窗口失焦 → 自动取消
+  // Window loses focus → cancel automatically
   await page.keyboard.press('Meta+d');
   await expect(page.getByTestId('placement-overlay')).toBeVisible();
   await page.evaluate(() => window.dispatchEvent(new Event('blur')));

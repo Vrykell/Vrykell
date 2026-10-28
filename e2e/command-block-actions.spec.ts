@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { clipboardText, mockAnthropic, ptyWrites, setupTauriMock, terminalRowHeight } from './tauri-mock';
 
-test.describe('命令块操作全链路', () => {
+test.describe('Command block actions end to end', () => {
   test('commands and output keep their geometry while context remains visible and hover reveals only more', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
@@ -58,7 +58,7 @@ test.describe('命令块操作全链路', () => {
     await expect(output).toContainText('content-first');
   });
 
-  test('命令块右键菜单出现在鼠标点击位置', async ({ page }) => {
+  test('Command block context menu appears at the pointer position', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     const input = page.getByPlaceholder(/输入命令/);
@@ -85,7 +85,7 @@ test.describe('命令块操作全链路', () => {
     expect(bounds!.y).toBe(160);
   });
 
-  test('运行命令后复制命令和输出，并通过同一面板重新运行', async ({ page }) => {
+  test('Run a command, copy its command and output, and rerun it from the same panel', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
 
@@ -120,7 +120,7 @@ test.describe('命令块操作全链路', () => {
     await expect(block).toContainText('linux-block-action');
   });
 
-  test('通过更多菜单复制输出并清除当前面板的命令块', async ({ page }) => {
+  test('Copy output from the more menu and clear the command blocks in the current panel', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
 

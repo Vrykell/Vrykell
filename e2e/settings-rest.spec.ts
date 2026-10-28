@@ -1,5 +1,5 @@
 /**
- * 主题 / 打开方式 / 快捷键说明 / 网络搜索 / 权限 设置页 e2e。
+ * Theme / opening mode / keyboard shortcuts / web search / permissions settings pages e2e.
  */
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, themeConfig, aiKeyCalls } from './tauri-mock';
@@ -10,8 +10,8 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/');
 });
 
-test.describe('主题设置页', () => {
-  test('深色/浅色切换更新 data-theme', async ({ page }) => {
+test.describe('Theme settings page', () => {
+  test('Dark/light toggle updates data-theme', async ({ page }) => {
     await gotoSetting(page, '主题');
     const theme = await page.evaluate(() => document.documentElement.dataset.theme);
     expect(theme).toBe('dark');
@@ -25,7 +25,7 @@ test.describe('主题设置页', () => {
       .toBe('dark');
   });
 
-  test('主题模式三个预览并排并跟随系统配色', async ({ page }) => {
+  test('Three theme mode previews sit in one row and follow the system color scheme', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await gotoSetting(page, '主题');
     const group = page.getByRole('radiogroup', { name: '主题模式' });
@@ -40,7 +40,7 @@ test.describe('主题设置页', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   });
 
-  test('不透明度滑块更新后端配置与百分比显示', async ({ page }) => {
+  test('Opacity slider updates the backend config and percentage display', async ({ page }) => {
     await gotoSetting(page, '主题');
     const slider = page.locator('input[type="range"]');
     await expect(page.getByText('100%')).toBeVisible();
@@ -56,8 +56,8 @@ test.describe('主题设置页', () => {
   });
 });
 
-test.describe('主题文件设置页', () => {
-  test('配置文件路径显示与重新加载不报错', async ({ page }) => {
+test.describe('Theme file settings page', () => {
+  test('Config file path is shown and reloading reports no error', async ({ page }) => {
     await gotoSetting(page, '主题文件');
     await expect(page.getByText('/home/e2e/.vrykell/theme.json')).toBeVisible();
     await page.getByRole('button', { name: /重新加载/ }).click();
@@ -65,8 +65,8 @@ test.describe('主题文件设置页', () => {
   });
 });
 
-test.describe('打开方式设置页', () => {
-  test('各 shell 默认块模式，切经典模式持久化', async ({ page }) => {
+test.describe('Opening mode settings page', () => {
+  test('Each shell defaults to block mode; switching to classic mode persists', async ({ page }) => {
     await gotoSetting(page, 'Zsh');
     await page.getByRole('combobox', { name: '打开方式', exact: true }).click();
     await page.getByRole('option', { name: '经典模式', exact: true }).click();
@@ -85,8 +85,8 @@ test.describe('打开方式设置页', () => {
   });
 });
 
-test.describe('快捷键说明页', () => {
-  test('列出全部快捷键', async ({ page }) => {
+test.describe('Keyboard shortcuts page', () => {
+  test('Lists all keyboard shortcuts', async ({ page }) => {
     await gotoSetting(page, '快捷键说明');
     await expect(page.getByText('新建标签页')).toBeVisible();
     await expect(page.getByText('全局搜索')).toBeVisible();
@@ -98,8 +98,8 @@ test.describe('快捷键说明页', () => {
   });
 });
 
-test.describe('网络搜索页', () => {
-  test('搜索方式显示与 Tavily Key 保存/清除', async ({ page }) => {
+test.describe('Web search page', () => {
+  test('Shows the search method and saves/clears the Tavily key', async ({ page }) => {
     await gotoSetting(page, '联网搜索');
     await expect(page.getByText('备用搜索', { exact: true })).toBeVisible();
     await expect(page.getByText('未配置', { exact: true })).toBeVisible();
@@ -117,16 +117,16 @@ test.describe('网络搜索页', () => {
   });
 });
 
-test.describe('模型权限页', () => {
-  test('工具权限分级切换持久化', async ({ page }) => {
+test.describe('Model permissions page', () => {
+  test('Tool permission levels switch and persist', async ({ page }) => {
     await gotoSetting(page, '工具权限');
-    // 执行终端命令 → 禁止
+    // Run terminal commands → deny
     const runRow = rowOf(page, '执行终端命令');
     await runRow.getByRole('combobox', { name: '执行终端命令 权限' }).click();
     await page.getByRole('option', { name: '禁止', exact: true }).click();
     let saved = await page.evaluate(() => localStorage.getItem('vrykell-permissions') ?? '');
     expect(saved).toContain('"run_command":"deny"');
-    // 联网搜索 → 每次询问
+    // Web search → ask every time
     const webRow = rowOf(page, '联网搜索');
     await webRow.getByRole('combobox', { name: '联网搜索 权限' }).click();
     await page.getByRole('option', { name: '每次询问', exact: true }).click();
@@ -134,7 +134,7 @@ test.describe('模型权限页', () => {
     expect(saved).toContain('"web_search":"ask"');
   });
 
-  test('清空会话授权按钮提示成功', async ({ page }) => {
+  test('Clear session grants button reports success', async ({ page }) => {
     await gotoSetting(page, '工具权限');
     await page.getByRole('button', { name: '清空会话授权' }).click();
     await expect(page.getByText('已清空全部会话授权')).toBeVisible();
