@@ -60,7 +60,7 @@ button.ssh-host-connect { flex-shrink: 0; height: 28px; padding: 0 10px; opacity
 .ssh-dashboard-status-dot[data-online="true"] { background: var(--success); }
 .ssh-dashboard-status-dot[data-failure="authentication"] { background: var(--warning); }
 .ssh-dashboard-status-dot[data-failure="error"] { background: var(--error); }
-.ssh-dashboard-address { overflow: hidden; color: var(--text-muted); font: var(--fs-caption) var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.ssh-dashboard-address { overflow: hidden; color: var(--text-muted); font: var(--fs-caption) var(--font-ui); text-overflow: ellipsis; white-space: nowrap; }
 .ssh-host-last-connected { color: var(--text-muted); font-size: var(--fs-caption); margin-top: auto; }
 .ssh-host-tags { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; min-width: 0; }
 .ssh-host-tags > span { display: inline-flex; align-items: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 110px; padding: 2px 7px; border-radius: 4px; background: var(--hover); color: var(--text-secondary); font-size: var(--fs-caption); }

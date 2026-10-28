@@ -15,6 +15,10 @@ test('one host workspace switches resource collection on and pauses while inacti
   await page.screenshot({ path: info.outputPath('hosts-resource-list.png'), animations: 'disabled' });
   await hosts.getByRole('button', { name: '卡片视图', exact: true }).click();
   await expect(hosts.locator('.ssh-dashboard-card')).toBeVisible();
+  const address = hosts.locator('.ssh-dashboard-address').first();
+  await expect(address).toContainText('@');
+  expect(await address.evaluate(element => getComputedStyle(element).fontFamily)).toBe(
+    await hosts.locator('.ssh-dashboard-card-title strong').first().evaluate(element => getComputedStyle(element).fontFamily));
   await page.screenshot({ path: info.outputPath('hosts-resource-cards.png'), animations: 'disabled' });
   await page.getByTestId('workspace-area-terminal').click();
   await page.waitForTimeout(300); const inactiveCalls = await calls();
