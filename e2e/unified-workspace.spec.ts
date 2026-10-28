@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 import { pickPlacementZone } from './placement';
+import { openWorkspaceActions } from './workbench';
 
 async function openFirstResource(page: Page) {
   await page.getByTestId('workspace-instance-bar').getByTestId('workspace-resource-switcher').click();
@@ -54,13 +55,13 @@ test('opens the split-resource menu when splitting a terminal in the unified wor
   const terminal = mixed.locator('.terminal-pane:visible').first();
   await expect(terminal).toBeVisible();
   await terminal.click({ button: 'right' });
-  await page.getByRole('menu', { name: '操作菜单', exact: true }).getByRole('button', { name: '拆分标签页', exact: true }).click();
-  const chooser = page.getByRole('menu', { name: '选择分屏标签', exact: true });
+  await page.getByRole('menu', { name: '操作菜单', exact: true }).getByRole('menuitem', { name: '拆分标签页', exact: true }).hover();
+  const chooser = page.getByRole('menu', { name: '拆分标签页', exact: true });
   await expect(chooser).toBeVisible();
   await expect(chooser).toContainText('新终端');
   await expect(page.getByTestId('placement-overlay')).toHaveCount(0);
   await page.keyboard.press('Escape');
-  await bar.getByRole('button', { name: '拆分标签页', exact: true }).click();
+  await page.keyboard.press('Control+d');
   await page.getByRole('menuitem', { name: '新建文件', exact: true }).click();
   await pickPlacementZone(page, mixed.locator('.unified-pane').first(), 'right');
   const terminalPane = mixed.locator('.unified-pane').filter({ has: page.locator('.terminal-pane') });
@@ -83,13 +84,13 @@ test('creates directly into a split and preserves the initial live resource', as
   await openFirstResource(page);
   await expect(mixed.getByTestId('unified-start-page')).toHaveCount(0);
   await bar.getByRole('tab').nth(0).click();
-  await bar.getByRole('button', { name: '拆分标签页' }).click();
+  await page.keyboard.press('Control+d');
   await page.getByRole('menuitem', { name: '新建文件', exact: true }).click();
   await expect(mixed.locator('.unified-pane')).toHaveCount(1);
   await pickPlacementZone(page, mixed.locator('.unified-pane').first(), 'right');
   await expect(mixed.locator('.unified-pane')).toHaveCount(2);
   await expect(mixed.locator('.monaco-editor')).toBeVisible();
-  await bar.getByRole('button', { name: '拆分标签页' }).click();
+  await page.keyboard.press('Control+d');
   await page.getByRole('menuitem', { name: '新对话', exact: true }).click();
   await pickPlacementZone(page, mixed.locator('.unified-pane').filter({ has: page.locator('.monaco-editor') }), 'bottom');
   await expect(mixed.locator('.unified-pane')).toHaveCount(3);
@@ -132,18 +133,18 @@ test('shares mixed tabs and split panes without restarting terminals or discardi
   await strip.getByRole('tab', { name: /未命名 1.txt/ }).click();
   await expect(mixed.locator('.view-lines')).toContainText('mixed editor draft');
   expect(await editorNode!.evaluate(element => element.isConnected && !!element.closest('[data-testid="unified-workspace"]'))).toBe(true);
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '拆分标签页' }).click();
+  await page.keyboard.press('Control+d');
   await page.getByRole('menuitem', { name: terminalTitle, exact: true }).click();
   await pickPlacementZone(page, mixed.locator('.unified-pane').first(), 'right');
   await expect(mixed.locator('.unified-pane')).toHaveCount(2);
   expect(await terminalNode!.evaluate(element => element.isConnected && !!element.closest('[data-testid="unified-workspace"]'))).toBe(true);
   await mixed.getByPlaceholder(/输入命令/).fill('echo keep-terminal');
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '拆分标签页' }).click();
+  await page.keyboard.press('Control+d');
   await page.getByRole('menuitem', { name: '新对话', exact: true }).first().click();
   await pickPlacementZone(page, mixed.locator('.unified-pane').filter({ has: page.locator('.monaco-editor') }), 'bottom');
   await expect(mixed.locator('.unified-pane')).toHaveCount(3);
   await expect(mixed.locator('[data-chat-composer]')).toHaveValue('first conversation draft');
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '拆分标签页' }).click();
+  await page.keyboard.press('Control+d');
   await page.getByRole('menuitem', { name: '新对话', exact: true }).click();
   await pickPlacementZone(page, mixed.locator('.unified-pane').filter({ has: page.locator('.terminal-pane') }), 'bottom');
   await expect(mixed.locator('.unified-pane')).toHaveCount(4);
@@ -159,7 +160,7 @@ test('shares mixed tabs and split panes without restarting terminals or discardi
   }
   await page.setViewportSize({ width: 1240, height: 800 });
   await mixed.locator('.unified-pane').filter({ has: page.locator('.monaco-editor') }).locator('textarea.inputarea').focus();
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '工作区操作' }).click();
+  await openWorkspaceActions(page);
   await page.getByRole('menu').locator('button').filter({ hasText: '移除此分屏' }).click();
   const confirm = page.getByRole('dialog', { name: '未保存的更改' }); await expect(confirm).toBeVisible();
   await confirm.getByRole('button', { name: '取消', exact: true }).click();

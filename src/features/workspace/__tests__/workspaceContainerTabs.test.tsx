@@ -30,7 +30,7 @@ it('derives labels, capabilities and group order from real containers and tolera
   expect(service.focusNativeContainerResource).toHaveBeenCalledWith('file:one');
   expect(result.current.handles.map(item => item.label)).toEqual(['one', t('Start')]);
   expect(result.current.handles[1]!.closeLabel).toBe(t('Close this tab'));
-  expect(result.current.tabActions!('one').find(item => item.submenu)!.submenu!.items[0]!.label).toBe('');
+  expect(result.current.tabActions!('one').find(item => item.label === t('Merge tab into this tab'))!.submenu!.items[0]!.label).toBe('');
   expect(result.current.grouping!.order).toContain('tab:file:system');
   act(() => useWorkspaceNavigation.setState({ area: 'ai' })); rerender({ selected: 'file:two' });
   expect(service.focusNativeContainerResource).not.toHaveBeenCalledWith('file:two');
@@ -55,8 +55,8 @@ it('exposes the same split, pane position, merge, detach and remove actions on e
   const { result } = renderHook(() => useWorkspaceContainerTabs('code', [handle('one'), handle('two')]));
   expect(result.current.tabActions!('missing')).toEqual([]);
   let actions = result.current.tabActions!('one');
-  actions.find(item => item.label === t('Split tab'))!.onClick!();
-  expect(requestWorkspaceSplit).toHaveBeenCalledWith('file:one');
+  actions.find(item => item.label === t('Split tab'))!.submenu!.items[0]!.onClick!();
+  expect(requestWorkspaceSplit).toHaveBeenCalledWith('file:one', undefined, 'document');
   actions.find(item => item.label === t('Merge tab into this tab'))!.submenu!.items[0]!.onClick!();
   expect(workspaceAreaStores.code.getState().pendingMergeTab).toBe('two');
   act(() => useWorkbenchStore.getState().update(state => ({ ...state, tabs: [{ ...tab('one'), layout: { type: 'split', direction: 'row', ratio: 0.5, first: pane('one'), second: pane('three') }, focused: 'missing' }, { ...tab('two'), title: 'Peer' }, { ...tab('empty'), layout: null }] })));
@@ -68,7 +68,7 @@ it('exposes the same split, pane position, merge, detach and remove actions on e
   actions.find(item => item.label === t('Remove pane'))!.onClick!();
   expect(service.detachWorkspacePane).toHaveBeenCalledWith('code', 'file:one');
   expect(service.removeContainerPane).toHaveBeenCalledWith('one', 'file:one');
-  expect(actions.find(item => item.submenu)!.submenu!.items[0]!.label).toBe('Peer');
+  expect(actions.find(item => item.label === t('Merge tab into this tab'))!.submenu!.items[0]!.label).toBe('Peer');
   expect(result.current.tabActions!('empty')).toEqual([]);
   act(() => useWorkbenchStore.getState().update(state => ({ ...state, tabs: [{ ...tab('one'), layout: { type: 'split', direction: 'col', ratio: 0.5, first: { type: 'split', direction: 'row', ratio: 0.5, first: pane('one'), second: pane('two') }, second: { type: 'split', direction: 'row', ratio: 0.5, first: pane('three'), second: pane('four') } } }] })));
   expect(result.current.tabActions!('one').some(item => item.label === t('Split tab'))).toBe(false);

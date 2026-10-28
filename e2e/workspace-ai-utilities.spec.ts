@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
+import { openWorkspaceActions } from './workbench';
 
 test('an unavailable side dock keeps the same conversation visible in the main workspace', async ({ page }) => {
   await setupTauriMock(page, {}); await page.goto('/');
@@ -7,7 +8,7 @@ test('an unavailable side dock keeps the same conversation visible in the main w
   await page.setViewportSize({ width: 500, height: 800 });
   const composer = page.locator('[data-chat-composer]:visible');
   await composer.fill('keep my visible draft');
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '对话操作' }).click();
+  await openWorkspaceActions(page);
   await page.getByRole('menuitem', { name: '将 AI 停靠到侧栏', exact: true }).click();
   await expect(page.getByTestId('ai-surface-main').locator('[data-chat-composer]')).toHaveValue('keep my visible draft');
   await expect(page.getByTestId('workspace-area-ai')).toHaveAttribute('aria-current', 'page');

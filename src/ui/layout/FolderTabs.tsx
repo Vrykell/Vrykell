@@ -1,7 +1,7 @@
 import { useId, useRef, useState, type ReactNode } from 'react';
 import { IconButton } from '@ui/actions/IconButton';
 import EditorActions from '@ui/menus/EditorActions';
-import type { ContextMenuItem } from '@ui/menus/ContextMenu';
+import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/menus/ContextMenu';
 import { X } from '@ui/icons';
 import { t } from '@i18n';
 import '@ui/layout/FolderTabs.css';
@@ -11,9 +11,10 @@ import type { TabGroupController } from './tabGroups';
 import GroupedTabList from './GroupedTabList';
 
 /** All tab strips share grouping, menus, keyboard navigation and reserved toolbar space. */
-export default function FolderTabs({ items, selected, label, listId, className = '', headerClassName = '', toolbar, empty, menuItems, menuLabel, tabActions, onBlankContext, onSelect, onClose, onMove, onRename, grouping }: {
+export default function FolderTabs({ items, selected, label, listId, className = '', headerClassName = '', toolbar, leading, empty, menuItems, menuLabel, tabActions, onBlankContext, onSelect, onClose, onMove, onRename, grouping }: {
   items: TabHandle[]; selected: string; label: string; className?: string; headerClassName?: string; toolbar: ReactNode;
   listId?: string; grouping?: TabGroupController; empty?: ReactNode; menuItems?: ContextMenuItem[]; menuLabel?: string;
+  leading?: ReactNode;
   tabActions?: (id: string) => ContextMenuItem[]; onBlankContext?: (anchor: import('@ui/menus/ContextMenu').MenuAnchor) => void;
   onSelect: (id: string) => void; onClose: (id: string) => void; onMove: (id: string, over: string, after: boolean) => void;
   onRename?: (id: string, title: string) => void;
@@ -21,6 +22,7 @@ export default function FolderTabs({ items, selected, label, listId, className =
   const instanceId = useId();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [blankMenu, setBlankMenu] = useState<MenuAnchor | null>(null);
   const renameFinished = useRef(false);
   const beginRename = (item: TabHandle) => {
     if (!onRename || !item.capabilities.renameable) return;
@@ -33,14 +35,20 @@ export default function FolderTabs({ items, selected, label, listId, className =
     setEditingId(null);
   };
   const cancelRename = () => { renameFinished.current = true; setEditingId(null); };
+  const actionsForTab = (id: string) => {
+    const items = [...(tabActions?.(id) ?? []), ...(id === selected ? menuItems ?? [] : [])];
+    const labels = new Set<string>();
+    return items.filter(item => { if (labels.has(item.label)) return false; labels.add(item.label); return true; });
+  };
   return <div className={`folder-header ${headerClassName}`}>
-    {menuItems && <div className="folder-more"><EditorActions label={menuLabel} items={menuItems} /></div>}
+    {(leading || menuItems) && <div className="folder-more">{leading ?? <EditorActions label={menuLabel} items={menuItems ?? []} />}</div>}
     <GroupedTabList items={items} selected={selected} label={label} listId={listId ?? instanceId} className={className} grouping={grouping} empty={empty}
-      onSelect={onSelect} onClose={onClose} onMove={onMove} onRename={beginRename} tabActions={tabActions} onBlankContext={onBlankContext}
+      onSelect={onSelect} onClose={onClose} onMove={onMove} onRename={beginRename} tabActions={actionsForTab} onBlankContext={onBlankContext ?? (menuItems ? setBlankMenu : undefined)}
       render={(item, preview) => <FolderTabContent item={item} selected={selected === item.id} onSelect={preview ? undefined : onSelect} onClose={preview ? undefined : onClose}
         editing={!preview && editingId === item.id} editTitle={editTitle} setEditTitle={setEditTitle}
         onStartRename={() => beginRename(item)} onCommitRename={commitRename} onCancelRename={cancelRename} />} />
     <div className="folder-actions">{toolbar}</div>
+    {blankMenu && <ContextMenu anchor={blankMenu} label={menuLabel ?? t('More editor actions')} itemRole="menuitem" items={menuItems ?? []} onClose={() => setBlankMenu(null)} />}
   </div>;
 }
 

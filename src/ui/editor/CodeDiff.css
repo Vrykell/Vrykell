@@ -29,7 +29,7 @@
 @container (max-width: 540px) { .code-editor-cursor { display: none; } }
 .code-editor-preview { flex: 1; min-height: 0; overflow: auto; padding: 18px 24px; user-select: text; }
 .code-editor .monaco-editor .find-widget { border: 1px solid var(--border); border-radius: var(--radius-inner); box-shadow: var(--shadow-sm); background: var(--field-bg); max-width: calc(100% - 24px); right: 12px !important; margin-top: 8px; }
-.code-editor .monaco-editor .find-widget > .button.codicon-widget-close { top: 50%; transform: translateY(-50%); }
+.code-editor .monaco-editor .find-widget > .button.codicon-widget-close { top: 7.5px; transform: none; }
 .code-editor-status .editor-status-path { display: inline-flex; align-items: center; gap: 6px; flex: 1; min-width: 60px; overflow: hidden; padding: 0; height: auto; background: transparent; font: inherit; }
 .code-editor-status .editor-status-path > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .code-editor-status > button, .code-editor-status > button.text-control { padding: 2px 4px; min-height: 20px; background: transparent; color: var(--text-muted); font: inherit; white-space: nowrap; }

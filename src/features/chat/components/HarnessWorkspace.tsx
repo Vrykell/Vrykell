@@ -4,14 +4,14 @@ import { t } from '@i18n';
 import FolderTabs from '@ui/layout/FolderTabs';
 import { IconButton } from '@ui/actions/IconButton';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
-import { Plus, DataUsage, Folder, PanelRight, History, Sparkles } from '@ui/icons';
+import { Plus, DataUsage, PanelRight, History, Sparkles } from '@ui/icons';
 import WorkspaceHeader from '@ui/layout/WorkspaceHeader';
 import ResourceContent from '@ui/layout/ResourceContent';
 import { registerHarnessCloseGuard } from '@core/harness';
 import { pickPath } from '@platform/api/fs';
 import { useToastStore } from '@ui/feedback/Toast';
 import AcpLauncher from '@features/workspace/components/AcpLauncher';
-import { useSessionStore, useUiStore, ScopedPaneWorkspace, useScopedPaneActive, WorkspaceResourceSwitcher, WorkspaceSplitAction } from '@features/workspace';
+import { useSessionStore, useUiStore, ScopedPaneWorkspace, useScopedPaneActive, WorkspaceResourceSwitcher } from '@features/workspace';
 import { UnifiedHistoryView } from '@features/session-history';
 import UsageView from '@features/agent/components/UsageView';
 import { useHarnessStore } from '../stores/harness';
@@ -23,7 +23,6 @@ import { useChatStore } from '../stores/chat';
 import { useAiWorkspace } from '../stores/aiWorkspace';
 import { useWorkspaceNavigation } from '@features/workspace';
 import { selectWorkspaceArea } from '@features/workspace/services/selectWorkspaceArea';
-import { useDockStore } from '@features/workspace';
 import { moveMainConversationToSide } from '../services/aiWorkspace';
 import { useAiWorkspaceTabs } from '../hooks/useAiWorkspaceTabs';
 
@@ -59,13 +58,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
     useAiWorkspace.getState().openNative(useChatStore.getState().createConversation());
   };
   const relocate = () => {
-    moveMainConversationToSide(selected);
-    const dock = useDockStore.getState();
-    dock.openPanel('chat');
-    if (![...useDockStore.getState().leftPanels, ...useDockStore.getState().rightPanels].includes('chat')) {
-      useToastStore.getState().addToast(t('Not enough space. Widen the window or reduce terminal splits.'), 'info');
-      return;
-    }
+    if (!moveMainConversationToSide(selected)) return;
     selectWorkspaceArea(useWorkspaceNavigation.getState().previousArea);
   };
   useEffect(() => registerHarnessCloseGuard((ids, complete) => {
@@ -88,6 +81,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
   const activeSystemPage = activePage && (activePage.kind === 'ai-history' || activePage.kind === 'usage' || activePage.kind === 'start-ai') ? activePage : undefined;
   const stripSelected = strip.selected ?? '';
   const header = <FolderTabs label={t('AI sessions')} selected={stripSelected} listId="harness-sessions"
+      leading={<WorkspaceResourceSwitcher />}
       items={strip.handles} onSelect={strip.onSelect}
       grouping={strip.grouping}
       tabActions={strip.tabActions}
@@ -98,12 +92,9 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
         { label: t('Usage statistics'), onClick: () => useSessionStore.getState().openUsageTab() },
         ...(selected ? [{ label: t('Dock AI to side'), onClick: relocate }] : []),
       ]} toolbar={<>
-        <WorkspaceResourceSwitcher />
-        {!activeSystemPage && selected && <WorkspaceSplitAction resourceId={selected} />}
         <IconButton compact aria-label={t('AI conversation history')} data-tip={t('AI conversation history')} onClick={() => useSessionStore.getState().openAiHistoryTab()}><History size={16} /></IconButton>
         <div ref={surface?.toolbar} className="ai-conversation-toolbar" style={{ display: selected.startsWith('chat:') && activePage?.kind === 'harness' ? 'flex' : 'none' }} />
         <span className="folder-action-secondary ai-secondary-actions">
-        <IconButton compact aria-label={t('Choose project folder')} data-tip={t('Choose project folder')} onClick={() => void chooseDirectory()}><Folder size={16} /></IconButton>
         <IconButton compact aria-label={t('Usage statistics')} data-tip={t('Usage statistics')} onClick={() => useSessionStore.getState().openUsageTab()}><DataUsage size={16} /></IconButton>
         {selected && <IconButton compact data-testid="ai-relocate" aria-label={t('Dock AI to side')} data-tip={t('Dock AI to side')} onClick={relocate}><PanelRight size={16} /></IconButton>}
         </span>

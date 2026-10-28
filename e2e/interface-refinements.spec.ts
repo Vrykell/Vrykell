@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { setupTauriMock, clipboardText, waitForWorkbench } from './tauri-mock';
 import { openSettings } from './settings';
+import { openWorkspaceActions } from './workbench';
 
 test.setTimeout(60_000);
 test.beforeEach(async ({ page }) => {
@@ -41,7 +42,7 @@ test('keeps modal command input in one status row, yanks to clipboard and guards
   const editor = page.getByTestId('file-editor'); await expect(editor.locator('.monaco-editor')).toBeVisible({ timeout: 20_000 });
   const dropdown = page.getByTestId('workspace-instance-bar').locator('.folder-more-button');
   expect(await dropdown.evaluate(element => { const bounds = element.getBoundingClientRect(); return element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)); })).toBe(true);
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click(); await page.getByRole('menu').locator('button').filter({ hasText: 'Vim 模式' }).click();
+  await openWorkspaceActions(page); await page.getByRole('menu').locator('button').filter({ hasText: 'Vim 模式' }).click();
   await expect(editor.locator('.code-editor-vim-status')).toContainText('NORMAL');
   await editor.locator('textarea.inputarea').focus(); await page.keyboard.press('i'); await page.keyboard.insertText('clipboard note\nsecond line'); await page.keyboard.press('Escape');
   await page.keyboard.type('ggyy'); await expect.poll(async () => (await clipboardText(page)).replace(/\r\n/g, '\n')).toBe('clipboard note\n');

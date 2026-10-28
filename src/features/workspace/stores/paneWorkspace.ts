@@ -4,6 +4,7 @@ import { parseWorkspacePaneLayout, pruneWorkspacePanes, setWorkspacePaneRatio, w
 import type { WorkspaceHistoryIdentity } from '../model/workspaceHistory';
 import { acceptsWorkspaceResource, detachContainerPane, focusContainerResource, mergeContainers, moveContainer, panesOf, placeContainerResource, putContainer, reconcileContainers, releaseContainerResources, selectContainer, type WorkspaceContainer, type WorkspaceScope } from '../model/workbench';
 import { createWorkbenchStore, useWorkbenchStore } from './workbench';
+import type { WorkspaceCreation } from '../model/workspaceCreation';
 
 let sequence = 0;
 export const newContainerId = () => `workspace-${crypto.randomUUID()}`;
@@ -14,6 +15,7 @@ export interface PaneWorkspaceState {
   layout: WorkspacePaneLayout | null; focused: string;
   startActive: boolean; choosingSplit: boolean;
   splitAnchor?: { x: number; y: number };
+  splitCreation?: WorkspaceCreation;
   pendingMergeTab?: string;
   chooseMerge: (sourceId?: string) => void;
   historyIdentity?: WorkspaceHistoryIdentity;

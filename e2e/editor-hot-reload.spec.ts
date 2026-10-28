@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { resolve } from 'node:path';
 import { createServer, type ViteDevServer } from 'vite';
 import { setupTauriMock } from './tauri-mock';
+import { openWorkspaceActions } from './workbench';
 
 let server: ViteDevServer;
 
@@ -32,7 +33,7 @@ test('localization hot updates retain editor registrations, buffers and modal bi
   await expect(editor.locator('.monaco-editor')).toBeVisible({ timeout: 30_000 });
   await editor.locator('textarea.inputarea').focus();
   await page.keyboard.insertText('Keep this unsaved note');
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
+  await openWorkspaceActions(page);
   await page.getByRole('menu').locator('button').filter({ hasText: 'Vim 模式' }).click();
   await expect(editor.locator('.code-editor-vim-status')).toContainText('NORMAL');
   await page.evaluate(async () => {

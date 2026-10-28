@@ -33,7 +33,7 @@ export default function ScopedPaneWorkspace({ scope, selected, active }: { scope
   const visible = active && paneActive && !settingsOpen;
   useLayoutEffect(() => {
     if (!visible || !state.choosingSplit || state.splitAnchor) return;
-    const bounds = Array.from(document.querySelectorAll('.workspace-split-action')).map(button => button.getBoundingClientRect()).find(bounds => bounds.width > 0);
+    const bounds = Array.from(document.querySelectorAll('.workspace-resource-switch-action')).map(button => button.getBoundingClientRect()).find(bounds => bounds.width > 0);
     if (bounds) store.setState({ splitAnchor: { x: bounds.right, y: bounds.bottom + 4 } });
   }, [visible, state.choosingSplit, state.splitAnchor, store]);
   useEffect(() => { state.reconcile(ids); }, [key]);
@@ -45,13 +45,27 @@ export default function ScopedPaneWorkspace({ scope, selected, active }: { scope
     state.show(id); activateWorkspaceResource(resource); useWorkspaceNavigation.getState().selectArea(scope);
   };
   const cancel = () => { proceeding.current = false; setAddition(null); state.chooseMerge(); store.setState({ choosingSplit: false }); };
+  useEffect(() => {
+    if (!active || settingsOpen || !state.choosingSplit || !state.splitCreation) return;
+    const kind = state.splitCreation;
+    store.setState({ splitCreation: undefined });
+    proceeding.current = true;
+    if (kind === 'document' || kind === 'conversation') setAddition({ create: kind });
+    else if (kind === 'file') void pickWorkspaceFile().then(file => { if (file) setAddition({ file }); else cancel(); });
+    else if (kind === 'agent') {
+      setLauncher({ anchor: { ...(state.splitAnchor ?? { x: window.innerWidth - 8, y: 80 }), align: 'end' } });
+      store.setState({ choosingSplit: false });
+    }
+  }, [active, settingsOpen, state.choosingSplit, state.splitCreation, store]);
   const commit = (target: PaneTarget) => {
     if (!addition) return;
     if ('tab' in addition) { void mergeWorkspaceContainers(addition.tab, state.activeTabId, target); cancel(); return; }
+    const destination = state.activeTabId;
     let id: string | undefined;
     if ('id' in addition) id = addition.id;
     else id = createScopedResource(addition);
     if (id) {
+      store.getState().selectTab(destination);
       store.getState().place(id, target);
       const resource = currentWorkspaceResources().find(resource => resource.id === id);
       if (resource) activateWorkspaceResource(resource);
@@ -75,8 +89,8 @@ export default function ScopedPaneWorkspace({ scope, selected, active }: { scope
     ]),
   ];
   return <section className="scoped-pane-workspace" data-testid={`pane-workspace-${scope}`} style={{ display: visible ? 'flex' : 'none' }}>
-    <WorkspacePaneCanvas containerId={state.activeTabId} layout={state.layout} focused={state.focused} resources={resources} visible={visible} retainHeader onFocus={focus} onRatio={state.ratio}
-      placing={!!addition} onPlace={commit} onCancel={cancel} onSplit={id => { focus(id); requestWorkspaceSplit(id); }} onRemove={remove}
+    <WorkspacePaneCanvas containerId={state.activeTabId} splitScope={scope} layout={state.layout} focused={state.focused} resources={resources} visible={visible} retainHeader onFocus={focus} onRatio={state.ratio}
+      placing={!!addition} onPlace={commit} onCancel={cancel} onSplit={(id, kind) => { focus(id); requestWorkspaceSplit(id, undefined, kind); }} onRemove={remove}
       onMovePane={(paneId, target) => moveWorkspacePane(state.activeTabId, paneId, target)}
       onDetach={id => detachWorkspacePane(scope, id)} />
     {visible && state.choosingSplit && !addition && <ContextMenu anchor={menuAnchor} label={t('Choose a tab to split')} itemRole="menuitem" items={items} onClose={() => { if (!proceeding.current) store.setState({ choosingSplit: false }); proceeding.current = false; }} />}

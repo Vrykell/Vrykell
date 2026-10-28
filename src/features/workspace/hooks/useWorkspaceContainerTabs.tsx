@@ -12,6 +12,7 @@ import { activateContainer, assignWorkspaceGroup, closeContainer, createContaine
 import { reportWorkbenchFailure } from '../stores/workbenchFeedback';
 import { workspaceAreaStores } from '../stores/paneWorkspace';
 import { useUiStore } from '../stores/ui';
+import { workspaceSplitMenu } from '../model/workspaceCreation';
 import { requestWorkspaceSplit } from '../services/unifiedWorkspace';
 
 /** Every strip row is a layout-owning container, including a one-resource tab. */
@@ -61,7 +62,7 @@ export function useWorkspaceContainerTabs(scope: WorkspaceScope, resourceHandles
       const cells = panesOf(tab); const focused = cells.find(pane => pane.id === tab.focused) ?? cells[0]!;
       const peers = tabs.filter(peer => peer.id !== id && peer.layout && panesOf(peer).length + cells.length <= 4);
       return [
-        ...(cells.length < 4 ? [{ label: t('Split tab'), onClick: () => { activateContainer(id); requestWorkspaceSplit(focused.resourceId); } }] : []),
+        ...(cells.length < 4 ? [workspaceSplitMenu(scope, kind => { activateContainer(id); requestWorkspaceSplit(focused.resourceId, undefined, kind); })] : []),
         ...[
           { label: t('Change pane position'), disabled: cells.length < 2, onClick: () => { activateContainer(id); useUiStore.getState().beginPaneMove(id, focused.id); } },
           { label: t('Move pane to new tab'), disabled: cells.length < 2, onClick: () => { activateContainer(id); detachWorkspacePane(scope, focused.resourceId); } },

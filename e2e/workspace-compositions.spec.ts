@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 import { pickPlacementZone } from './placement';
-import { openWorkspaceResource } from './workbench';
+import { chooseSplitType, openWorkspaceResource } from './workbench';
 
 for (const theme of ['dark', 'light']) test(`common start scopes creation correctly in ${theme} and retains its workspace`, async ({ page }, info) => {
   await setupTauriMock(page, {});
@@ -47,7 +47,7 @@ test('filters a mixed history item by each member and restores the complete layo
   await page.getByRole('menuitem', { name: '新对话', exact: true }).click();
   await workspace.locator('[data-chat-composer]').fill('preserved composition draft');
   const terminal = await page.locator('.terminal-pane').first().elementHandle();
-  await bar.getByRole('button', { name: '拆分标签页', exact: true }).click();
+  await page.keyboard.press('Control+d');
   await page.getByRole('menuitem', { name: terminalTitle, exact: true }).click();
   await pickPlacementZone(page, workspace.locator('.unified-pane').first(), 'right');
   await expect(workspace.locator('.unified-pane')).toHaveCount(2);
@@ -94,7 +94,7 @@ test('only offers pane removal for a real split and keeps the remaining terminal
   await bar.getByRole('button', { name: '新建工作区标签', exact: true }).click();
   await page.getByRole('menuitem', { name: '新建文件', exact: true }).click();
   const title = await bar.getByRole('tab').nth(0).innerText();
-  await bar.getByRole('button', { name: '拆分标签页', exact: true }).click();
+  await page.keyboard.press('Control+d');
   await page.getByRole('menuitem', { name: title, exact: true }).click();
   await pickPlacementZone(page, workspace.locator('.unified-pane').first(), 'right');
   await expect(workspace.locator('.unified-pane')).toHaveCount(2);
@@ -115,10 +115,8 @@ for (const theme of ['dark', 'light']) test(`opens the existing agent launcher a
   const bar = page.getByTestId('workspace-instance-bar');
   for (const width of [640, 1240]) {
     await page.setViewportSize({ width, height: 800 });
-    const split = bar.getByRole('button', { name: '拆分标签页', exact: true });
-    await split.click();
-    await page.getByRole('menuitem', { name: '新建工作区标签', exact: true }).click();
-    await page.getByRole('menuitem', { name: 'ACP 智能体', exact: true }).click();
+    const split = bar.getByRole('button', { name: '新建工作区标签', exact: true });
+    await chooseSplitType(page, 'ACP 智能体');
     await expect(page.getByRole('menu')).toHaveCount(0);
     const picker = page.getByRole('dialog', { name: 'ACP', exact: true });
     await expect(picker.getByTestId('acp-launcher-directory')).toBeVisible();
@@ -189,7 +187,7 @@ test('shows creation choices directly when a split has no existing tabs to add',
   await page.getByTestId('workspace-area-unified').click();
   const bar = page.getByTestId('workspace-instance-bar');
   await openWorkspaceResource(page);
-  await bar.getByRole('button', { name: '拆分标签页', exact: true }).click();
+  await page.keyboard.press('Control+d');
   await expect(page.getByRole('menuitem', { name: '新建工作区标签', exact: true })).toHaveCount(0);
   await expect(page.getByRole('menuitem', { name: '新终端', exact: true })).toBeVisible();
   await expect(page.getByRole('menuitem', { name: '新建文件', exact: true })).toBeVisible();

@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
+import { openWorkspaceActions } from './workbench';
 
 test.setTimeout(60_000);
 test.beforeEach(async ({ page }) => {
@@ -12,7 +13,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function action(page: Page, label: string) {
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
+  await openWorkspaceActions(page);
   await page.getByRole('menu', { name: '更多编辑器操作' }).locator('button').filter({ hasText: label }).click();
 }
 async function source(page: Page) {
@@ -42,7 +43,7 @@ test('opens actual lines with modal o and O and supports numeric line jumps', as
   await page.keyboard.type('2G');
   await expect(editor.locator('.code-editor-cursor')).toContainText('第 2 行');
   await expect(editor.locator('.view-lines')).toContainText('above');
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
+  await openWorkspaceActions(page);
   const menu = page.getByRole('menu', { name: '更多编辑器操作' });
   const lefts = await menu.locator('[data-menu-label]').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().x));
   expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(1);
@@ -73,11 +74,14 @@ test('shares editor preferences, keeps independent metrics and centers a symmetr
   await expect(find).toHaveClass(/visible/);
   const radii = await find.evaluate(element => { const style = getComputedStyle(element); return [style.borderTopLeftRadius, style.borderTopRightRadius, style.borderBottomLeftRadius, style.borderBottomRightRadius]; });
   expect(new Set(radii).size).toBe(1); expect(parseFloat(radii[0])).toBeGreaterThan(0);
+  await editor.locator('textarea.inputarea').focus();
+  await page.keyboard.press('Control+h');
+  await expect(find).toHaveClass(/replaceToggled/);
   for (const width of [1240, 760]) {
     await page.setViewportSize({ width, height: 800 });
     await expect.poll(() => find.evaluate(element => {
-      const bounds = element.getBoundingClientRect(); const close = element.querySelector('.codicon-widget-close')!.getBoundingClientRect();
-      return Math.abs(bounds.y + bounds.height / 2 - close.y - close.height / 2);
+      const row = element.querySelector('.find-part')!.getBoundingClientRect(); const close = element.querySelector('.codicon-widget-close')!.getBoundingClientRect();
+      return Math.abs(row.y + row.height / 2 - close.y - close.height / 2);
     })).toBeLessThanOrEqual(1);
     await page.screenshot({ path: info.outputPath(`editor-find-${width}.png`), animations: 'disabled' });
   }

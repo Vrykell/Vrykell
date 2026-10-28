@@ -7,8 +7,8 @@ test('splits files inside the editor workspace and preserves independent buffers
   await page.getByTestId('workspace-area-code').click();
   await page.getByTestId('code-start-page-content').getByRole('button', { name: '新建文件', exact: true }).click();
   const bar = page.getByTestId('workspace-instance-bar');
-  await bar.getByRole('button', { name: '拆分标签页', exact: true }).click();
-  const triggerBounds = await bar.getByRole('button', { name: '拆分标签页', exact: true }).boundingBox();
+  await page.keyboard.press('Control+d');
+  const triggerBounds = await bar.getByRole('button', { name: '全部工作区标签', exact: true }).boundingBox();
   const menuBounds = await page.getByRole('menu', { name: '选择分屏标签', exact: true }).boundingBox();
   expect(Math.abs(menuBounds!.y - triggerBounds!.y - triggerBounds!.height - 4)).toBeLessThan(2);
   await expect(page.locator('.workspace-layout')).toHaveAttribute('data-area', 'code');
@@ -31,7 +31,7 @@ test('repositions a file pane through the shared pane menu', async ({ page }) =>
   await page.getByTestId('workspace-area-code').click();
   await page.getByTestId('code-start-page-content').getByRole('button', { name: '新建文件', exact: true }).click();
   const bar = page.getByTestId('workspace-instance-bar');
-  await bar.getByRole('button', { name: '拆分标签页', exact: true }).click();
+  await page.keyboard.press('Control+d');
   await page.getByRole('menuitem', { name: '新建文件', exact: true }).click();
   const workspace = page.getByTestId('pane-workspace-code');
   await pickPlacementZone(page, workspace.locator('.unified-pane').first(), 'right');
@@ -93,7 +93,7 @@ test('keeps a saved new file in its split pane instead of exiting the editor', a
   await page.getByTestId('workspace-area-code').click();
   await page.getByTestId('code-start-page-content').getByRole('button', { name: '新建文件', exact: true }).click();
   const bar = page.getByTestId('workspace-instance-bar');
-  await bar.getByRole('button', { name: '拆分标签页', exact: true }).click();
+  await page.keyboard.press('Control+d');
   await page.getByRole('menuitem', { name: '新建文件', exact: true }).click();
   const workspace = page.getByTestId('pane-workspace-code');
   await pickPlacementZone(page, workspace.locator('.unified-pane').first(), 'right');
@@ -117,7 +117,7 @@ test('keeps split conversation tools in the existing tab strip, not extra pane h
   await page.getByTestId('workspace-area-ai').click();
   await page.getByTestId('ai-new-conversation').click();
   const bar = page.getByTestId('workspace-instance-bar');
-  await bar.getByRole('button', { name: '拆分标签页', exact: true }).click();
+  await page.keyboard.press('Control+d');
   await page.getByRole('menuitem', { name: '新对话', exact: true }).click();
   const workspace = page.getByTestId('pane-workspace-ai');
   await pickPlacementZone(page, workspace.locator('.unified-pane').first(), 'right');

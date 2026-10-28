@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { EDITOR_ENCODINGS, editorFileKey, registerEditorCloseGuard, type EditorEncoding, type EditorFile } from '@core/editor';
 import SafeMarkdown from '@features/chat/components/SafeMarkdown';
 import ContextMenu, { type MenuAnchor } from '@ui/menus/ContextMenu';
-import { useSessionStore, useWorkspaceNavigation, useScopedPaneActive, WorkspaceResourceSwitcher, WorkspaceSplitAction, type Tab } from '@features/workspace';
+import { useSessionStore, useWorkspaceNavigation, useScopedPaneActive, WorkspaceResourceSwitcher, type Tab } from '@features/workspace';
 import { openInTerminal } from '@features/files';
 import CodeEditor, { type CodeEditorHandle, type EditorCommand } from '@ui/editor/CodeEditor';
 import { useEditorPreferences } from '@config/editor';
@@ -87,10 +87,11 @@ function CodeStartPane({ tab, active }: { tab: Extract<Tab, { kind: 'start-code'
   }];
   return <section className="editor-pane" data-testid="code-start-page" style={{ display: active ? 'flex' : 'none' }} inert={!active}>
     <WorkspaceHeader active={active}><FolderTabs items={items} selected={tab.id} label={t('Open files and comparisons')}
+      leading={<WorkspaceResourceSwitcher />}
       listId="code-documents" className="editor-tabs" onSelect={() => useSessionStore.getState().activate(tab.id)}
       onClose={() => useSessionStore.getState().closeTab(tab.id)} onMove={() => {}}
       menuItems={[{ label: t('New file'), onClick: newEditorFile }, { label: t('Open file'), onClick: () => void openWorkspaceFile() }]}
-      toolbar={<><WorkspaceResourceSwitcher /><IconButton compact aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}><FolderOpen size={iconSizes.control} /></IconButton><IconButton compact aria-label={t('New file')} data-tip={t('New file')} onClick={newEditorFile}><Plus size={iconSizes.control} /></IconButton></>} /></WorkspaceHeader>
+      toolbar={<><IconButton compact aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}><FolderOpen size={iconSizes.control} /></IconButton><IconButton compact aria-label={t('New file')} data-tip={t('New file')} onClick={newEditorFile}><Plus size={iconSizes.control} /></IconButton></>} /></WorkspaceHeader>
     <div className="workspace-empty workspace-start-page" data-testid="code-start-page-content">
       <FileCode size={40} />
       <h2>{t('Your text editor')}</h2>
@@ -137,6 +138,7 @@ function DocumentContent({ file, active, focused }: { file: EditorFile; active: 
   }, [focused, file]);
   return <section className="editor-pane" data-testid={active ? 'file-editor' : undefined} style={{ display: active ? 'flex' : 'none' }} inert={!active}>
     <WorkspaceHeader active={active && focused}><FolderTabs items={active ? codeTabs.handles : []} selected={codeTabs.selected ?? ''} grouping={codeTabs.grouping} onRename={codeTabs.onRename} label={t('Open files and comparisons')} listId="code-documents" className="editor-tabs"
+      leading={<WorkspaceResourceSwitcher />}
       onSelect={codeTabs.onSelect} onClose={codeTabs.onClose}
       tabActions={codeTabs.tabActions}
       onMove={codeTabs.onMove} menuItems={[
@@ -157,11 +159,9 @@ function DocumentContent({ file, active, focused }: { file: EditorFile; active: 
         ...(!file.draftId ? [{ label: t('Open in terminal'), group: 'view' as const, onClick: terminal }, { label: elevatedLabel, group: 'view' as const, onClick: elevated }] : []),
         { label: t('Discard changes'), group: 'danger', disabled: !dirty || document?.saving, onClick: () => setReload(true) },
       ]} toolbar={<>
-        <WorkspaceResourceSwitcher />
-        <WorkspaceSplitAction resourceId={`file:${editorFileKey(file)}`} />
         {markdown && <IconButton compact aria-label={t('Markdown preview')} aria-pressed={preview} data-tip={t('Markdown preview')} onClick={() => setPreview(value => !value)}>{preview ? <EyeOff size={iconSizes.control} /> : <Eye size={iconSizes.control} />}</IconButton>}
         <span className="folder-action-secondary"><IconButton compact aria-label={t('Undo')} data-tip={t('Undo')} disabled={!canEdit} onClick={() => run('undo')}><Undo2 size={iconSizes.control} /></IconButton><IconButton compact aria-label={t('Redo')} data-tip={t('Redo')} disabled={!canEdit} onClick={() => run('redo')}><RotateCw size={iconSizes.control} /></IconButton><IconButton compact aria-label={t('Find')} data-tip={t('Find')} onClick={() => run('actions.find')}><Search size={iconSizes.control} /></IconButton></span>
-        {!file.draftId && <><span className="folder-action-secondary"><ReloadButton compact label={t('Reload file')} busy={document?.loading} disabled={document?.saving} onReload={reloadFile} /></span><TextButton className="folder-action-secondary" onClick={terminal}>{t('Open in terminal')}</TextButton></>}
+        {!file.draftId && <span className="folder-action-secondary"><ReloadButton compact label={t('Reload file')} busy={document?.loading} disabled={document?.saving} onReload={reloadFile} /></span>}
         <IconButton compact aria-label={t('Save file')} data-tip={t('Save file (Ctrl/Cmd+S)')} disabled={!canSave} onClick={save}><Save size={iconSizes.control} /></IconButton>
         <IconButton compact className="workspace-open-action" aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}><FolderOpen size={iconSizes.control} /></IconButton>
         <IconButton compact className="workspace-create-action" aria-label={t('New file')} data-tip={t('New file')} onClick={newEditorFile}><Plus size={iconSizes.control} /></IconButton>

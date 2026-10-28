@@ -7,9 +7,12 @@ import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { useWorkspaceNavigation } from '@features/workspace/stores/navigation';
 import { scopedPaneStores } from '@features/workspace/stores/scopedPanes';
 import { workspacePaneCells } from '@features/workspace/model/workspaceResources';
+import { useDockStore } from '@features/workspace/stores/dock';
 
 vi.mock('@platform/diagnostics', () => ({ invoke: vi.fn(async () => undefined), diagnostic: vi.fn() }));
 beforeEach(() => {
+  Object.defineProperty(window, 'innerWidth', { value: 1240, configurable: true });
+  useDockStore.setState({ leftZone: [], leftPanels: [], rightPanels: [], collapsedPanels: [] });
   scopedPaneStores.ai.setState({ layout: null, choosingSplit: false });
   useWorkspaceStore.setState({ tabs: [], activeId: 'main' });
   useWorkspaceNavigation.setState({ area: 'terminal', aiPlacement: 'side' });
@@ -56,4 +59,12 @@ it('detaches only the explicitly moved conversation from a main split', () => {
   expect(workspacePaneCells(scopedPaneStores.ai.getState().layout!)).toHaveLength(1);
   expect(workspacePaneCells(scopedPaneStores.ai.getState().layout!)[0].resourceId).toBe(`chat:${first}`);
   expect(availableSideConversationIds()).toEqual(new Set([`chat:${second}`]));
+});
+
+it('keeps the selected main conversation in place when the dock has no room', () => {
+  Object.defineProperty(window, 'innerWidth', { value: 500, configurable: true });
+  const id = useChatStore.getState().createConversation();
+  useAiWorkspace.setState({ nativeTabs: [id], selected: `chat:${id}` });
+  expect(moveMainConversationToSide(`chat:${id}`)).toBe(false);
+  expect(useAiWorkspace.getState()).toMatchObject({ selected: `chat:${id}`, sideSelected: '' });
 });

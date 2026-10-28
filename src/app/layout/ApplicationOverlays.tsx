@@ -16,6 +16,7 @@ export default function ApplicationOverlays({ onPickSplit }: ApplicationOverlays
   const paletteOpen = useUiStore((state) => state.paletteOpen);
   const globalSearchOpen = useUiStore((state) => state.globalSearchOpen);
   const splitPickerOpen = useUiStore((state) => state.splitPickerOpen);
+  const splitPickerSource = useUiStore(state => state.splitPickerSource);
   const setPaletteOpen = useUiStore((state) => state.setPaletteOpen);
   const setGlobalSearchOpen = useUiStore((state) => state.setGlobalSearchOpen);
   const closeSplitPicker = useUiStore((state) => state.closeSplitPicker);
@@ -24,7 +25,7 @@ export default function ApplicationOverlays({ onPickSplit }: ApplicationOverlays
     <>
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
       <GlobalSearch open={globalSearchOpen} onClose={() => setGlobalSearchOpen(false)} />
-      <NewTabModal open={splitPickerOpen} onClose={closeSplitPicker} onPick={onPickSplit} />
+      <NewTabModal open={splitPickerOpen} source={splitPickerSource} onClose={closeSplitPicker} onPick={onPickSplit} />
       <PasteConfirmHost />
       <ToastContainer />
       <TooltipLayer />

@@ -94,6 +94,6 @@ test('a single terminal disables reposition while split remains available', asyn
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.locator('.terminal-pane:visible').first().click({ button: 'right' });
   await expect(page.getByRole('button', { name: '更换窗格位置', exact: true })).toBeDisabled();
-  await expect(page.getByRole('button', { name: '拆分标签页', exact: true })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: '拆分标签页', exact: true })).toBeVisible();
   await expect(page.getByTestId('placement-overlay')).toHaveCount(0);
 });

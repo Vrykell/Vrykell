@@ -63,6 +63,7 @@ export function createUnifiedResource(kind: 'terminal' | 'document' | 'conversat
   }
   const resource = currentWorkspaceResources().find(resource => resource.kind === kind && !previous.has(resource.id));
   if (resource) {
+    if (target || direction) useUnifiedWorkspace.getState().selectTab(state.activeTabId);
     if (target) state.place(resource.id, target);
     else if (direction) state.split(resource.id, direction);
     focusUnifiedResource(resource.id);
@@ -115,9 +116,13 @@ export function reconcileUnifiedResources(ids: string[]) {
   useUnifiedWorkspace.getState().reconcile(ids);
 }
 
-export function requestWorkspaceSplit(resourceId?: string, anchor?: { x: number; y: number }) {
+export function requestWorkspaceSplit(resourceId?: string, anchor?: { x: number; y: number }, creation?: import('../model/workspaceCreation').WorkspaceCreation) {
   const navigation = useWorkspaceNavigation.getState(); const workspace = useWorkspaceStore.getState();
-  if (navigation.area === 'terminal') { requestTerminalSplit(null); return; }
+  if (navigation.area === 'terminal') {
+    if (creation === 'terminal' || creation === 'ssh') useUiStore.getState().openSplitPicker(creation === 'ssh' ? 'ssh' : 'shell');
+    else requestTerminalSplit(null);
+    return;
+  }
   if (navigation.area === 'code' || navigation.area === 'ai') {
     const area = navigation.area;
     const tab = workspace.tabs.find(tab => tab.id === workspace.activeId);
@@ -130,13 +135,13 @@ export function requestWorkspaceSplit(resourceId?: string, anchor?: { x: number;
     const store = scopedPaneStores[area];
     store.getState().show(resource.id);
     if (store.getState().layout && workspacePaneCells(store.getState().layout!).length >= 4) return;
-    store.setState({ choosingSplit: true, splitAnchor: anchor });
+    store.setState({ choosingSplit: true, splitAnchor: anchor, splitCreation: creation });
     return;
   }
   if (navigation.area !== 'unified') return;
   openUnifiedWorkspace();
   if (resourceId) focusUnifiedResource(resourceId);
-  useUnifiedWorkspace.setState({ choosingSplit: true, startActive: false });
+  useUnifiedWorkspace.setState({ choosingSplit: true, startActive: false, splitAnchor: anchor, splitCreation: creation });
 }
 
 export function connectUnifiedAgent(harness: string, target?: PaneTarget, directory?: string) {

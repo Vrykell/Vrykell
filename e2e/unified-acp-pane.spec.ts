@@ -9,7 +9,7 @@ test('uses the shared split picker from the agent workspace and creates a distin
   await page.getByTestId('acp-launcher-Fake ACP').click();
   await page.locator('[data-testid="harness-page"]:visible').getByTestId('harness-composer').fill('first agent draft');
   const before = (await acpCalls(page)).filter(call => call.startsWith('acp_open:')).length;
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '拆分标签页' }).click();
+  await page.keyboard.press('Control+d');
   await page.getByRole('menuitem', { name: 'ACP 智能体', exact: true }).click();
   await expect(page.getByRole('menu', { name: '选择分屏标签', exact: true })).toHaveCount(0);
   await expect(page.getByRole('dialog', { name: 'ACP', exact: true })).toBeVisible();

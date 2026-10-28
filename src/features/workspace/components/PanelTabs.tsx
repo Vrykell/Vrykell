@@ -16,7 +16,6 @@ import WorkspaceHeader from '@ui/layout/WorkspaceHeader';
 import { TextInput } from '@ui/fields/TextInput';
 import { IconBtn } from '@ui/actions/UiBtn';
 import { Plus, History, Bot, Search, ChevronDown, X, iconSizes } from '@ui/icons';
-import ContextMenu, { type MenuAnchor } from '@ui/menus/ContextMenu';
 import NewTabModal from './NewTabModal';
 import SshResourcesAction from './SshResourcesAction';
 import WorkspaceResourceSwitcher from './WorkspaceResourceSwitcher';
@@ -34,7 +33,6 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [modal, setModal] = useState<{ groupId?: string } | null>(null);
-  const [panelMenu, setPanelMenu] = useState<MenuAnchor | null>(null);
   const native = tabs.filter(isSessionTab);
   const containers = useWorkbenchStore(state => state.snapshot.tabs);
   const nativeOwner = (id: string) => {
@@ -74,9 +72,10 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
   const grouping = strip.grouping && { ...strip.grouping, add: (id: string) => setModal({ groupId: id }) };
   const selected = native.some(tab => tab.id === activeId) ? strip.selected ?? activeId : activeId;
   return <WorkspaceHeader active={active}><FolderTabs items={filtered} selected={selected} label={t('Terminal sessions')} listId="session-tabs" className="terminal-tab-list"
+    leading={<WorkspaceResourceSwitcher />}
     headerClassName="terminal-instance-header" grouping={grouping} onSelect={select} onClose={close} onMove={strip.onMove} onRename={strip.onRename}
     empty={query.trim() && <div className="search-empty-state">{t('No matching terminal sessions')}</div>}
-    onBlankContext={setPanelMenu} menuLabel={t('More terminal actions')} menuItems={[
+    menuLabel={t('More terminal actions')} menuItems={[
       ...(strip.tabActions?.(strip.selected ?? '') ?? []),
       { label: t('Create terminal'), onClick: create },
       { label: t('New terminal options'), onClick: () => setModal({}) },
@@ -95,7 +94,7 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
         ] : []),
       ];
     }} toolbar={<>
-      <WorkspaceResourceSwitcher /><SshResourcesAction />
+      <SshResourcesAction />
       <IconBtn title={t('Search session titles…')} data-testid="tab-search-toggle" onClick={() => { setSearchOpen(!searchOpen); setQuery(''); }}><Search size={iconSizes.control} /></IconBtn>
       {searchOpen && <TextInput variant="field" autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder={t('Search session titles…')} data-testid="tab-search" className="terminal-tab-search" />}
       {query && <IconBtn title={t('Clear search')} onClick={() => setQuery('')}><X size={iconSizes.control} /></IconBtn>}
@@ -107,6 +106,5 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
         <IconBtn title={t('New terminal options')} data-testid="tab-new-btn" aria-haspopup="dialog" onClick={() => setModal({})}><ChevronDown size={iconSizes.control} /></IconBtn></span>
     </>} />
     <NewTabModal open={!!modal} groupId={modal?.groupId} onClose={() => setModal(null)} />
-    {panelMenu && <ContextMenu anchor={panelMenu} onClose={() => setPanelMenu(null)} items={[{ label: t('AI auto-group'), disabled: !native.length, onClick: openGrouping }]} />}
   </WorkspaceHeader>;
 }

@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 import { pickPlacementZone } from './placement';
 import { gotoSetting } from './settings';
+import { openWorkspaceActions } from './workbench';
 
 for (const theme of ['dark', 'light']) test(`keeps layouts inside tabs and shows Start only when empty in ${theme}`, async ({ page }, info) => {
   await setupTauriMock(page, {});
@@ -26,17 +27,17 @@ for (const theme of ['dark', 'light']) test(`keeps layouts inside tabs and shows
   await expect(workspace.locator('[data-chat-composer]')).toHaveValue('first task draft');
   await bar.getByRole('tab').nth(1).click();
   await expect(workspace.locator('[data-chat-composer]')).toHaveValue('second task draft');
-  await bar.getByRole('button', { name: '拆分标签页', exact: true }).click();
+  await page.keyboard.press('Control+d');
   await page.getByRole('menuitem', { name: '新对话', exact: true }).click();
   await pickPlacementZone(page, workspace.locator('.unified-pane').first(), 'right');
   await expect(bar.getByRole('tab')).toHaveCount(1);
   await expect(workspace.locator('.unified-pane')).toHaveCount(2);
-  await bar.locator('.folder-more-button').click();
+  await openWorkspaceActions(page);
   await expect(page.getByRole('menuitem', { name: '放大当前窗格', exact: true })).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(workspace.locator('.unified-pane')).toHaveCount(2);
   expect(await first!.evaluate(element => element.isConnected && element.getAttribute('data-chat-composer') !== null)).toBe(true);
-  await bar.locator('.folder-more-button').click();
+  await openWorkspaceActions(page);
   await page.getByRole('menuitem', { name: '将窗格移至新标签页', exact: true }).click();
   await expect(bar.getByRole('tab')).toHaveCount(2);
   await expect(workspace.locator('.unified-pane')).toHaveCount(1);

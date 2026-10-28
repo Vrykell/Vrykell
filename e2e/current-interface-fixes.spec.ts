@@ -89,7 +89,7 @@ test('shares close-safe workspace resource navigation and reserves identical lea
   const menu = page.getByRole('menu', { name: '全部工作区标签' }); await expect(menu.getByRole('menuitem', { name: 'notes.txt' })).toBeVisible();
   const triggerBounds = (await page.getByTestId('workspace-instance-bar').getByTestId('workspace-resource-switcher').boundingBox())!;
   const menuBounds = (await menu.boundingBox())!;
-  expect(menuBounds.x + menuBounds.width).toBeCloseTo(triggerBounds.x + triggerBounds.width, 0);
+  expect(menuBounds.x).toBeCloseTo(triggerBounds.x, 0);
   expect(menuBounds.y - triggerBounds.y - triggerBounds.height).toBeCloseTo(4, 0);
   await menu.getByRole('menuitem', { name: 'Stable shell' }).click();
   for (const area of ['terminal', 'code', 'ai']) {

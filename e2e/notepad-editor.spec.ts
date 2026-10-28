@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { setupTauriMock, waitForWorkbench } from './tauri-mock';
+import { openWorkspaceActions } from './workbench';
 
 test.setTimeout(60_000);
 test.beforeEach(async ({ page }) => {
@@ -22,7 +23,7 @@ async function typeNote(page: Page, text: string) {
   await page.keyboard.press('Control+a'); await page.keyboard.insertText(text);
 }
 async function editorMenu(page: Page, label: string) {
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
+  await openWorkspaceActions(page);
   await page.getByRole('menu').locator('button').filter({ hasText: label }).click();
 }
 async function destination(page: Page, path: string | null) {

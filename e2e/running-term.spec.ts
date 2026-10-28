@@ -187,7 +187,7 @@ test('全屏终端右键菜单提供快捷操作与复制/粘贴', async ({ page
   const menu = page.getByRole('menu', { name: '操作菜单' });
   await expect(menu).toBeVisible();
   for (const [index, label] of ['重绘终端', '终止命令', '结束前台应用', '退出全屏', '复制', '粘贴'].entries()) {
-    await expect(menu.getByRole('button').nth(index)).toContainText(label);
+    await expect(menu.locator('button').nth(index)).toContainText(label);
   }
   await expect(menu.getByLabel('Control+C').first()).toBeVisible();
   await expect(menu.getByLabel('Control+V').first()).toBeVisible();
@@ -248,7 +248,7 @@ test('真 alt 屏 TUI 的窗格右键菜单提供顶栏快捷操作', async ({ p
   await expect(menu).toBeVisible();
   const labels = ['重绘终端', '终止命令', '结束前台应用', '复制', '粘贴', '拆分标签页'];
   for (const [index, label] of labels.entries()) {
-    await expect(menu.getByRole('button').nth(index)).toContainText(label);
+    await expect(menu.locator('button').nth(index)).toContainText(label);
   }
   // The alternate screen already owns the surface, so no fullscreen toggle is offered.
   await expect(menu.getByRole('button', { name: '进入全屏交互' })).toHaveCount(0);

@@ -11,7 +11,7 @@ for (const split of [false, true]) for (const theme of ['dark', 'light']) {
     await page.getByTestId('workspace-area-ai').click();
     await page.getByTestId('ai-new-conversation').click();
     if (split) {
-      await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '拆分标签页', exact: true }).click();
+      await page.keyboard.press('Control+d');
       await page.getByRole('menuitem', { name: '新对话', exact: true }).click();
       await pickPlacementZone(page, page.getByTestId('pane-workspace-ai').locator('.unified-pane').first(), 'right');
     }

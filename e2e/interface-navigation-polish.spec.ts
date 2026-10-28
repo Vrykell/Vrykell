@@ -59,8 +59,7 @@ for (const theme of ['dark', 'light'] as const) {
     const more = page.locator('.folder-more-button').first();
     const menuButtonColor = theme === 'dark' ? 'rgb(32, 32, 32)' : 'rgb(230, 230, 230)';
     await more.hover(); await expect(more).toHaveCSS('background-color', menuButtonColor);
-    await more.click(); await expect(more).toHaveCSS('background-color', menuButtonColor);
-    await page.keyboard.press('Escape');
+    await expect(more).toBeDisabled();
     await page.getByTestId('tab-search-toggle').click();
     await page.getByTestId('tab-search').fill('does-not-exist');
     const empty = page.getByText('无匹配会话', { exact: true });

@@ -62,6 +62,5 @@ export { usePlacedWorkspaceResourceIds } from './hooks/usePlacedWorkspaceResourc
 export { default as ScopedPaneWorkspace } from './components/ScopedPaneWorkspace';
 export { useTabDisplayTitle } from '@features/workspace/hooks/useTabDisplayTitle';
 export { default as WorkspaceResourceSwitcher } from './components/WorkspaceResourceSwitcher';
-export { default as WorkspaceSplitAction } from './components/WorkspaceSplitAction';
 export { detachCompositionPane, useUnifiedWorkspace } from './stores/unifiedWorkspace';
 export { useWorkspaceNavigation, orderedWorkspaceIds, workspaceAreaForKind, type HistoryTypePreset } from './stores/navigation';

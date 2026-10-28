@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
+import { openWorkspaceActions } from './workbench';
 
 test('keeps modal command and search input inside the status row', async ({ page }, info) => {
   await setupTauriMock(page, {});
@@ -8,7 +9,7 @@ test('keeps modal command and search input inside the status row', async ({ page
   await page.getByTestId('code-start-page-content').getByRole('button', { name: '新建文件', exact: true }).click();
   const editor = page.getByTestId('file-editor');
   await expect(editor.locator('.monaco-editor')).toBeVisible({ timeout: 20_000 });
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
+  await openWorkspaceActions(page);
   await page.getByRole('menuitemradio', { name: 'Vim 模式', exact: true }).click();
   await expect(editor.locator('.code-editor-vim-status')).toContainText('NORMAL');
   for (const width of [1240, 640]) {

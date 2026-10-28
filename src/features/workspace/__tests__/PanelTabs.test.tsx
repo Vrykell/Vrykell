@@ -138,9 +138,9 @@ it('creates the default local terminal immediately and keeps the picker on the s
   expect(screen.getByTestId('new-tab-modal')).toHaveAttribute('data-open', 'true');
 });
 
-it('exposes terminal actions through the leading menu and styles the search as a shared field', async () => {
+it('retains terminal actions in the strip context menu and styles the search as a shared field', async () => {
   render(<PanelTabs />);
-  fireEvent.click(screen.getByRole('button', { name: '更多终端操作' }));
+  fireEvent.contextMenu(screen.getByRole('tablist', { name: '终端会话' }));
   const menu = screen.getByRole('menu', { name: '更多终端操作' });
   expect(menu).toHaveTextContent('新建终端选项');
   await act(async () => { fireEvent.click(within(menu).getByRole('menuitem', { name: '搜索会话…' })); });

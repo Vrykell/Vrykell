@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
+import { openWorkspaceActions } from './workbench';
 
 for (const theme of ['dark', 'light']) test(`terminal split creation and group menu remain usable in ${theme}`, async ({ page }, info) => {
   await setupTauriMock(page, {});
@@ -37,7 +38,7 @@ for (const theme of ['dark', 'light']) test(`terminal split creation and group m
   await expect(page.getByRole('button', { name: 'Services', exact: true })).toBeVisible();
   for (const width of [1240, 760]) {
     await page.setViewportSize({ width, height: 800 });
-    await page.getByRole('button', { name: '更多终端操作', exact: true }).click();
+    await openWorkspaceActions(page);
     const menu = page.getByRole('menu', { name: '更多终端操作' });
     await expect(menu.getByRole('menuitem', { name: '会话历史', exact: true })).toBeVisible();
     await menu.getByRole('menuitem', { name: '搜索会话…', exact: true }).click();

@@ -91,7 +91,7 @@ button.workspace-sidebar-toggle.icon-button:focus-visible { outline: 1px solid v
 .unified-pane-canvas { flex: 1; min-width: 0; min-height: 0; overflow: auto; }
 .unified-resource-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
 .unified-resource-actions .folder-header { min-height: 0; background: transparent; flex: 0 0 auto; container-type: normal; }
-.unified-resource-actions :is(.folder-more, .folder-tab-list, .folder-tab-spacer, .workspace-resource-switch-action, .workspace-split-action, .workspace-open-action, .workspace-create-action) { display: none; }
+.unified-resource-actions :is(.folder-more, .folder-tab-list, .folder-tab-spacer, .workspace-resource-switch-action, .workspace-open-action, .workspace-create-action) { display: none; }
 .unified-resource-actions .folder-actions { padding: 0; min-width: 0; }
 .unified-resource-actions .ai-chat-header { margin: 0; }
 .scoped-pane-workspace { flex: 1; min-width: 0; min-height: 0; flex-direction: column; }

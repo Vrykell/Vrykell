@@ -7,6 +7,8 @@ import { scopedPaneStores } from '@features/workspace/stores/scopedPanes';
 import { workspacePaneCells } from '@features/workspace/model/workspaceResources';
 import { useWorkbenchStore } from '@features/workspace/stores/workbench';
 import { panesOf, reconcileContainers } from '@features/workspace/model/workbench';
+import { t } from '@i18n';
+import { useToastStore } from '@ui/feedback/Toast';
 
 export { closeAiWorkspaceSession } from './aiSessionClose';
 
@@ -35,12 +37,19 @@ export function moveSideConversationToMain() {
 }
 
 export function moveMainConversationToSide(id: string) {
+  useDockStore.getState().openPanel('chat');
+  const dock = useDockStore.getState();
+  if (![...dock.leftPanels, ...dock.rightPanels].includes('chat')) {
+    useToastStore.getState().addToast(t('Not enough space. Widen the window or reduce terminal splits.'), 'info');
+    return false;
+  }
   useAiWorkspace.getState().selectSide(id);
   useWorkbenchStore.getState().update(state => {
     const valid = new Set(state.tabs.flatMap(panesOf).map(pane => pane.resourceId).filter(resourceId => resourceId !== id));
     return reconcileContainers(reconcileContainers(state, 'ai', valid), 'unified', valid);
   });
   useAiWorkspace.getState().select('');
+  return true;
 }
 
 export function createSideConversation() {

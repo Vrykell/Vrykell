@@ -8,11 +8,14 @@ import { t } from '@i18n';
 import ContextMenu from '@ui/menus/ContextMenu';
 import { fitWorkspacePanes, measureWorkspacePanes, pruneWorkspacePanes, workspacePaneCells, workspaceSplitDirection, type WorkspacePaneLayout, type WorkspaceResource } from '../model/workspaceResources';
 import { useUiStore } from '../stores/ui';
+import { workspaceSplitMenu, type WorkspaceCreation } from '../model/workspaceCreation';
+import type { WorkspaceScope } from '../model/workbench';
 
-export default function WorkspacePaneCanvas({ containerId, layout, focused, resources, visible, toolbarTarget, retainHeader, dividerTestPrefix, onFocus, onRatio, placing, onPlace, onCancel, onSplit, onRemove, onDetach, onMovePane }: {
+export default function WorkspacePaneCanvas({ containerId, layout, focused, resources, visible, toolbarTarget, retainHeader, dividerTestPrefix, splitScope = 'unified', onFocus, onRatio, placing, onPlace, onCancel, onSplit, onRemove, onDetach, onMovePane }: {
   containerId: string; layout: WorkspacePaneLayout | null; focused: string; resources: WorkspaceResource[]; visible: boolean; toolbarTarget?: HTMLElement | null; retainHeader?: boolean;
   onFocus: (id: string) => void; onRatio: (first: string, second: string, ratio: number) => void; placing?: boolean; onPlace: (target: PaneTarget) => void; onCancel: () => void;
-  onSplit?: (id: string) => void; onRemove?: (id: string) => void;
+  onSplit?: (id: string, creation: WorkspaceCreation) => void; onRemove?: (id: string) => void;
+  splitScope?: WorkspaceScope;
   onDetach?: (id: string) => void; onMovePane?: (paneId: string, target: PaneTarget) => void;
   dividerTestPrefix?: string;
 }) {
@@ -63,7 +66,7 @@ export default function WorkspacePaneCanvas({ containerId, layout, focused, reso
     {moving && visible && <PlacementOverlay targets={movingTargets} onPick={target => { onMovePane?.(moving, target); cancelPaneMove(); }} onCancel={cancelPaneMove} zIndex={110}
       hint={t('Choose a pane position')} emptyMessage={t('A single pane cannot be moved')} />}
     {menu && visible && <ContextMenu anchor={menu} label={t('Pane actions')} itemRole="menuitem" onClose={() => setMenu(null)} items={[
-      ...(onSplit && cells.length < 4 ? [{ label: t('Split tab'), onClick: () => onSplit(menu.id) }] : []),
+      ...(onSplit && cells.length < 4 ? [workspaceSplitMenu(splitScope, kind => onSplit(menu.id, kind))] : []),
       ...(onMovePane ? [{ label: t('Change pane position'), disabled: cells.length < 2, onClick: () => {
         const cell = cells.find(cell => cell.resourceId === menu.id);
         if (cell) beginPaneMove(containerId, cell.id);

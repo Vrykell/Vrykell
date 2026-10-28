@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
+import { openWorkspaceActions } from './workbench';
 
 test.setTimeout(60_000);
 
@@ -76,7 +77,7 @@ test('reviews both sides of a partially staged file and preserves the terminal',
 test('keeps comparisons as workspace tabs and returns to the running terminal', async ({ page }) => {
   const panel = page.getByTestId('git-panel');
   await panel.getByTestId('git-unstaged-src/main.ts').click();
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
+  await openWorkspaceActions(page);
   await page.getByRole('menuitem', { name: '返回终端', exact: true }).click();
   await expect(page.locator('[data-terminal-input]').first()).toBeVisible();
   await panel.getByTestId('git-unstaged-src/main.ts').click();
@@ -343,7 +344,7 @@ test('reorders comparison tabs and moves secondary actions into the compact menu
   await expect(strip.getByRole('tab').first()).toHaveAttribute('aria-selected', 'true');
   await page.setViewportSize({ width: 560, height: 800 });
   await expect(page.getByTestId('workspace-instance-bar').getByRole('combobox', { name: '差异布局' })).not.toBeVisible();
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
+  await openWorkspaceActions(page);
   await expect(page.getByRole('menu').getByRole('menuitemradio', { name: '单栏对比', exact: true })).toBeVisible();
   await page.getByRole('menu').getByRole('menuitem', { name: '刷新差异', exact: true }).click();
 });

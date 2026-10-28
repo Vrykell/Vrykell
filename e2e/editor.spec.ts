@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { setupTauriMock, useWindowsPlatform, waitForWorkbench } from './tauri-mock';
+import { openWorkspaceActions } from './workbench';
 test.setTimeout(60_000);
 test.beforeEach(async ({ page }, info) => {
   await setupTauriMock(page.context(), { launchDirectory: '/home/e2e/project', terminalDirectories: true });
@@ -20,7 +21,7 @@ async function reloadFile(page: Page) {
   const reload = toolbar.getByRole('button', { name: '重新加载文件' });
   if (await reload.isVisible()) await reload.click();
   else {
-    await toolbar.getByRole('button', { name: '更多编辑器操作' }).click();
+    await openWorkspaceActions(page);
     await page.getByRole('menuitem', { name: '重新加载文件', exact: true }).click();
   }
 }
@@ -64,7 +65,7 @@ test('identifies read-only files, blocks normal edits and offers explicit admini
   await page.getByRole('menu', { name: '文件权限' }).getByRole('button', { name: '以管理员权限打开', exact: true }).click();
   expect(await page.evaluate(() => (window as unknown as { __ELEVATED_FILE__?: unknown }).__ELEVATED_FILE__)).toMatchObject({ path: '/home/e2e/project/src/main.ts' });
   await page.evaluate(() => { (window as unknown as { __WRITABLE__: boolean }).__WRITABLE__ = true; });
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
+  await openWorkspaceActions(page);
   await page.getByRole('menu').getByRole('menuitem', { name: '重新加载文件', exact: true }).click();
   await expect(editor.locator('.editor-readonly-label')).toHaveCount(0);
   await replaceText(page, 'allowed after reload');
@@ -127,7 +128,7 @@ test('keeps files in a single page despite a legacy preference and offers termin
 test('returns from a comparison to its editor and explains binary files', async ({ page }) => {
   await openWorking(page);
   await page.getByTestId('git-unstaged-src/main.ts').click();
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
+  await openWorkspaceActions(page);
   await page.getByRole('menuitem', { name: '返回编辑器', exact: true }).click();
   await expect(page.getByTestId('file-editor')).toBeVisible();
   const image = page.getByTestId('git-unstaged-image.png'); await image.hover(); await image.getByRole('button', { name: '打开工作文件' }).click();
@@ -170,7 +171,7 @@ test('reorders connected file tabs and keeps compact actions above the text', as
   }
   await page.setViewportSize({ width: 560, height: 800 });
   await expect(page.getByTestId('workspace-instance-bar').getByRole('button', { name: '在终端中打开', exact: true })).not.toBeVisible();
-  await page.getByTestId('workspace-instance-bar').getByRole('button', { name: '更多编辑器操作' }).click();
+  await openWorkspaceActions(page);
   await expect(page.getByRole('menu').getByRole('menuitem', { name: '在终端中打开', exact: true })).toBeVisible();
 });
 

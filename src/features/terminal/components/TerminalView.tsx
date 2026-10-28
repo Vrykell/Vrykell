@@ -55,8 +55,9 @@ import SshStatusPanel from '@features/ssh/components/SshStatusPanel';
 import type { SshSessionStatus } from '@core/ssh';
 import { useManualFullscreenVisible } from '../hooks/useManualFullscreenVisible';
 import ResourceContent from '@ui/layout/ResourceContent';
-import { closeTerminalPane, requestTerminalSplit, requestWorkspaceSplit } from '@features/workspace/services/unifiedWorkspace';
+import { closeTerminalPane, requestWorkspaceSplit } from '@features/workspace/services/unifiedWorkspace';
 import { detachCompositionPane, useUnifiedWorkspace } from '@features/workspace';
+import { workspaceSplitMenu } from '@features/workspace/model/workspaceCreation';
 
 export default function TerminalView({ active = true }: { active?: boolean }) {
   const area = useWorkspaceNavigation(state => state.area);
@@ -105,7 +106,7 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
     useUiStore.getState().beginPaneMove(unified ? unifiedState.activeTabId : activeId, paneId);
   };
   const commonActions: ContextMenuItem[] = [
-    ...(canSplit ? [{ label: t('Split tab'), group: 'view' as const, onClick: () => unified ? requestWorkspaceSplit(`terminal:${focusedTermId}`) : requestTerminalSplit(null) }] : []),
+    ...(canSplit ? [{ ...workspaceSplitMenu(unified ? 'unified' : 'terminal', kind => requestWorkspaceSplit(`terminal:${focusedTermId}`, undefined, kind)), group: 'view' as const }] : []),
     ...[{
       label: t('Change pane position'), group: 'view' as const, disabled: !multiPane,
       onClick: beginPaneMoveAction,
@@ -264,13 +265,13 @@ function PaneLayout({ layout, windowId, focusedTermId, active, setRatioNode }: {
   const resources = useWorkspaceResources();
   const canonical = useWorkspaceContainer('terminal', windowId);
   const controls = useWorkspacePaneControls('terminal');
-  return <WorkspacePaneCanvas containerId={windowId} layout={canonical?.layout ?? terminalWorkspaceLayout(layout)} focused={focusedTermId} resources={resources} visible={active} retainHeader
+  return <WorkspacePaneCanvas containerId={windowId} splitScope="terminal" layout={canonical?.layout ?? terminalWorkspaceLayout(layout)} focused={focusedTermId} resources={resources} visible={active} retainHeader
     dividerTestPrefix="terminal-divider" onFocus={id => useTerminalStore.getState().setFocusedPane(id.slice('terminal:'.length))}
     placing={active && !!controls.pendingMergeTab} onRatio={setRatioNode} onPlace={target => {
       if (controls.pendingMergeTab) void mergeWorkspaceContainers(controls.pendingMergeTab, windowId, target);
       controls.chooseMerge();
     }} onCancel={() => controls.chooseMerge()}
-    onSplit={id => useWorkspaceNavigation.getState().area === 'unified' ? requestWorkspaceSplit(id) : requestTerminalSplit(null)}
+    onSplit={(id, kind) => requestWorkspaceSplit(id, undefined, kind)}
     onMovePane={(paneId, target) => moveWorkspacePane(windowId, paneId, target)}
     onRemove={id => closeTerminalPane(id.slice('terminal:'.length))} onDetach={id => detachWorkspacePane('terminal', id)}
     />;

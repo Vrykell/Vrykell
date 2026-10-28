@@ -57,7 +57,7 @@ for (const density of [1, 1.25, 2]) {
         await expect(editor.locator('.monaco-editor')).toBeVisible({ timeout: 15_000 });
         expect(await strip.locator('.folder-tab').first().evaluate(element => getComputedStyle(element, '::before').content)).toBe('""');
         await expectJoinedCorners(page, editor, info.outputPath('editor-first-tab-corners.png'));
-        const more = strip.getByRole('button', { name: '更多编辑器操作' });
+        const more = strip.getByRole('button', { name: '全部工作区标签', exact: true });
         const selectedColor = await more.evaluate(element => { const probe = document.createElement('span'); probe.style.backgroundColor = 'var(--tab-menu-bg)'; element.append(probe); const color = getComputedStyle(probe).backgroundColor; probe.remove(); return color; });
         await expect(more).toHaveCSS('background-color', selectedColor);
         expect((await more.boundingBox())!.x + (await more.boundingBox())!.width).toBeLessThan((await strip.locator('.folder-tab').first().boundingBox())!.x);
@@ -81,7 +81,7 @@ for (const density of [1, 1.25, 2]) {
         await page.getByTestId('git-staged-src/main.ts').click();
         const review = page.getByTestId('git-diff-review');
         await expect(review.locator('.monaco-diff-editor')).toBeVisible({ timeout: 15_000 });
-        await expect(strip.getByRole('button', { name: '更多编辑器操作' })).toHaveCSS('background-color', selectedColor);
+        await expect(strip.getByRole('button', { name: '全部工作区标签', exact: true })).toHaveCSS('background-color', selectedColor);
         for (const width of [1240, 760]) {
           await page.setViewportSize({ width, height: 800 });
           await expectJoinedCorners(page, review, info.outputPath(`comparison-corners-${width}.png`));
