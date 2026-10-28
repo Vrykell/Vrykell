@@ -36,7 +36,7 @@ function reset() {
 const entry = (command: string) => ({ command, cwd: '/tmp', timestamp: 1, exitCode: 0 });
 
 describe('local tier (works without AI)', () => {
-  it('excludes failed commands from every completion path but preserves searchable history', async () => {
+  it('includes failed and interrupted commands in local candidates and completion context', async () => {
     reset();
     useHistoryStore.setState({ entries: [
       { ...entry('git broken'), exitCode: 127 },
@@ -44,16 +44,16 @@ describe('local tier (works without AI)', () => {
       entry('git status'),
       { ...entry('git legacy'), exitCode: null },
     ] });
-    expect(localComplete('git ')).toBe('status');
-    expect(localCompleteCandidates('git ')).toEqual(['status', 'legacy']);
+    expect(localComplete('git ')).toBe('broken');
+    expect(localCompleteCandidates('git ')).toEqual(['broken', 'interrupted', 'status', 'legacy']);
     expect(useHistoryStore.getState().search('broken')).toHaveLength(1);
     useAiConfigStore.setState({ providerKeys: ['openai-compatible|https://api.example.com/v1'] });
     mockGenerate.mockResolvedValue({ text: 'docker ps' });
     await completeCommand('docker', {});
     const prompt = (mockGenerate.mock.calls[0]![0] as { prompt: string }).prompt;
     expect(prompt).toContain('git status');
-    expect(prompt).not.toContain('git broken');
-    expect(prompt).not.toContain('git interrupted');
+    expect(prompt).toContain('git broken');
+    expect(prompt).toContain('git interrupted');
   });
   it('history prefix match returns the suffix, most recent first', () => {
     reset();

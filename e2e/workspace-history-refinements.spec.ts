@@ -49,7 +49,7 @@ test('the history singleton never persists into the terminal tab order', async (
   expect(await order()).toEqual(before);
 });
 
-test('failed commands remain in history but do not become completion suggestions', async ({ page }) => {
+test('failed and interrupted commands remain available to history completion', async ({ page }) => {
   await boot(page);
   await page.waitForFunction(async () => {
     const path = '/src/features/terminal/stores/terminal.ts';
@@ -64,7 +64,7 @@ test('failed commands remain in history but do not become completion suggestions
     useAgentSettings.getState().update({ completeEnabled: true });
     useAiConfigStore.setState({ hasKey: false });
   });
-  for (const [command, code] of [['fixture-failed', 127], ['fixture-success', 0]] as const) {
+  for (const [command, code] of [['fixture-failed', 127], ['fixture-interrupted', 130], ['fixture-success', 0]] as const) {
     await emitPtyOutput(page, `\x1b]133;E;${btoa(command)}\x07\x1b]133;C\x07\x1b]133;D;${code}\x07\x1b]133;A\x07$ \x1b]133;B\x07`);
   }
   await expect.poll(() => page.evaluate(async () => {
@@ -75,7 +75,11 @@ test('failed commands remain in history but do not become completion suggestions
   await page.getByPlaceholder(/输入命令/).fill('fixture-');
   await expect(page.locator('.command-completion-suffix')).toHaveText('success');
   await page.getByPlaceholder(/输入命令/).fill('fixture-f');
-  await expect(page.locator('.command-completion-suffix')).toHaveCount(0);
+  await expect(page.locator('.command-completion-suffix')).toHaveText('ailed');
+  await page.getByPlaceholder(/输入命令/).press('Tab');
+  await expect(page.getByPlaceholder(/输入命令/)).toHaveValue('fixture-failed');
+  await page.getByPlaceholder(/输入命令/).fill('fixture-i');
+  await expect(page.locator('.command-completion-suffix')).toHaveText('nterrupted');
 });
 
 test('history toolbar aligns right and compact search closes on blur', async ({ page }, info) => {

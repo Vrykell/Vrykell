@@ -28,7 +28,7 @@ export interface CompleteOptions {
 export function localComplete(prefix: string): string | null {
   const hit = useHistoryStore
     .getState()
-    .entries.find((e) => (e.exitCode === null || e.exitCode === 0) && e.command.length > prefix.length && e.command.startsWith(prefix));
+    .entries.find((e) => e.command.length > prefix.length && e.command.startsWith(prefix));
   return hit ? hit.command.slice(prefix.length) : null;
 }
 
@@ -37,7 +37,6 @@ export function localCompleteCandidates(prefix: string): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
   for (const e of useHistoryStore.getState().entries) {
-    if (e.exitCode !== null && e.exitCode !== 0) continue;
     if (e.command.length > prefix.length && e.command.startsWith(prefix)) {
       const suffix = e.command.slice(prefix.length);
       if (!seen.has(suffix)) {
@@ -115,7 +114,7 @@ export async function aiComplete(
   if (!isApiKeyConfigured()) return null;
   const settings = useAgentSettings.getState().resolve();
   const active = activeModelProfile();
-  const recent = useHistoryStore.getState().entries.filter(e => e.exitCode === null || e.exitCode === 0).slice(0, 5).map((e) => e.command);
+  const recent = useHistoryStore.getState().entries.slice(0, 5).map((e) => e.command);
   try {
     const model = createChatModel({
       provider: active.provider,
