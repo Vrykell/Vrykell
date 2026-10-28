@@ -92,6 +92,8 @@ Answered question cards retain only the chosen option or typed answer as selecta
 
 ## Verification
 
+Appearance retains both original default palettes and offers independently remembered dark/light schemes. At the user's request, mode uses the shared sliding segmented control. Only the applied mode's card group is shown; switching to light immediately applies its remembered palette. Scheme cards preview actual tokens, support keyboard selection and inset the names from their left edges. System changes select the remembered scheme for that mode. Theme imports and exports retain scheme IDs, unknown IDs fall back safely, and explicit custom color overrides stay applied. Save failures remain retryable through the shared settings feedback. Verify live colors, restart, default restoration and narrow/wide layouts.
+
 The strict static audit retains the baseline heuristic findings: shared `Select` usages classified as native selects, plus existing form, wrapper and terminal-scrollbar findings. The custom-provider choice uses the canonical authored `Select`; no native select was introduced. These findings remain explicitly unresolved by the checker, not a passing audit result. Runtime verification covers notification retry and modal focus, actual menu alignment, compact creation pickers, cross-domain resource switching, dark/light dialogs, narrow editor commands and fixed rename geometry.
 
 Run typechecking, owning unit tests, architecture boundaries and interactive browser regressions. Review narrow and wide layouts, both themes, actual display scaling, long diagnostics, empty and failure states. The project feature specification records domain-specific coverage; static design audits do not substitute for runtime evidence.

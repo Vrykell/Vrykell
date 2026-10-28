@@ -80,7 +80,7 @@ Browser tests use one worker per shard. State which checks were not run and why;
 
 Run `npm run dev -- --port 1432 --host 127.0.0.1` in one terminal and `node --experimental-strip-types scripts/capture-readme.mjs` in another. Install the capture browser with `npx playwright install chromium` before the first run. The script renders the real frontend with sample data, without connecting to a live model or server.
 
-Keep the 3200×1800 PNG output at 2× pixel density and a 16:9 aspect ratio. Wait for fonts and the editor to finish loading. Do not upscale old screenshots or stretch images. Preserve original-image links in the README and check desktop and narrow rendering after updates.
+Keep the 3200×1800 PNG output at 2× pixel density and a 16:9 aspect ratio. The capture clips a 16 px corner radius into transparent PNG corners, so rounded images also render on repository pages that remove inline styles. Wait for fonts and the editor to finish loading. Do not upscale old screenshots or stretch images. Preserve original-image links in the README and check desktop and narrow rendering after updates.
 
 ## Commits
 

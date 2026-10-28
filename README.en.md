@@ -57,6 +57,14 @@ Inline AI, side conversations and independent sessions support different ways of
 | Review an agent's work | Compare tool records, file contents and Git diffs before continuing. |
 | Repeat a workflow | Search, favorite, group and rerun commands from history. |
 
+## A workbench in your own colors
+
+Choose from ten built-in dark and light schemes, including the original defaults. The interface, editor and terminal change together. Dark and light choices are remembered separately and can follow your system appearance. Independent fonts, sizes and wallpaper settings help make the workspace your own.
+
+<a href="docs/images/theme-light-en.png"><img src="docs/images/theme-light-en.png" width="1600" alt="A light code, terminal and agent workbench" /></a>
+
+<a href="docs/images/theme-nord-en.png"><img src="docs/images/theme-nord-en.png" width="1600" alt="A cool color scheme with grouped split workspaces" /></a>
+
 ## Capabilities
 
 | Area | Available features |
@@ -67,7 +75,7 @@ Inline AI, side conversations and independent sessions support different ways of
 | Code and files | Local and remote browsing, transfer, built-in editor, Markdown preview, Git status and comparisons. |
 | Remote connections | Host profiles, password and key authentication, host-key verification, port forwarding and resource monitoring over direct connections. |
 | History and search | Command and session history, favorites, grouping, filters and workspace layout restoration. |
-| Appearance and input | Themes, application/terminal/editor typography, bundled fonts, shortcuts and Chinese/English interfaces. |
+| Appearance and input | Ten built-in dark/light color schemes with system appearance support; application/terminal/editor typography, bundled fonts, shortcuts and Chinese/English interfaces. |
 
 Screenshots use the application UI with a sample project and simulated session data. Click an image for its original resolution.
 

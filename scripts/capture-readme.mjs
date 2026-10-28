@@ -1,12 +1,28 @@
 import { chromium, expect } from '@playwright/test';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { setupTauriMock, emitAcpSession, acpUpdate } from '../e2e/tauri-mock.ts';
+import { setupTauriMock, emitAcpSession, acpUpdate, waitForWorkbench } from '../e2e/tauri-mock.ts';
 
 const origin = process.env.README_ORIGIN ?? 'http://127.0.0.1:1432';
 const directory = new URL('../docs/images/', import.meta.url);
 await mkdir(directory, { recursive: true });
 const browser = await chromium.launch({ headless: true, ignoreDefaultArgs: ['--hide-scrollbars'] });
+
+async function capture(page, target) {
+  const path = fileURLToPath(target);
+  const temporary = `${path}.new-${randomUUID()}`;
+  try {
+    await writeFile(temporary, await page.screenshot({ animations: 'disabled', omitBackground: true }));
+    for (let attempt = 0; ; attempt++) {
+      try { await rename(temporary, path); break; }
+      catch (error) {
+        if (attempt >= 3 || !['EPERM', 'EACCES', 'EBUSY', 'UNKNOWN'].includes(error.code)) throw error;
+        await new Promise(resolve => setTimeout(resolve, 150 * (attempt + 1)));
+      }
+    }
+  } finally { await rm(temporary, { force: true }); }
+}
 const code = `type ReleaseTarget = 'windows' | 'macos' | 'linux';
 
 interface BuildPlan {
@@ -26,6 +42,19 @@ export function readyToShip(checks: boolean[]) {
 }
 `;
 
+async function chooseScheme(page, locale, mode, id) {
+  await page.evaluate(async ({ mode, id }) => {
+    const { useTerminalThemeStore } = await import('/src/features/settings/model/terminalTheme.ts');
+    await useTerminalThemeStore.getState().update({ [`${mode}Preset`]: id });
+  }, { mode, id });
+  await page.keyboard.press('Control+,');
+  await page.locator('.settings-navigation').getByRole('button', { name: locale === 'zh' ? '主题' : 'Theme', exact: true }).click();
+  const label = mode === 'light' ? (locale === 'zh' ? '始终浅色' : 'Always light') : (locale === 'zh' ? '始终深色' : 'Always dark');
+  await page.getByRole('radio', { name: label, exact: true }).click();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('html')).toHaveAttribute('data-theme-preset', id);
+}
+
 async function scene(locale, remote = false) {
   const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 2 });
   const page = await context.newPage();
@@ -38,6 +67,8 @@ async function scene(locale, remote = false) {
     localStorage.setItem('mock-acp-servers', JSON.stringify([{ name: 'Code Agent', command: 'demo-agent', args: [], env: {}, cwd: '/work/atlas', enabled: true }]));
   }, { locale, code });
   await page.goto(origin);
+  await waitForWorkbench(page);
+  await page.evaluate(() => { document.documentElement.style.clipPath = 'inset(0 round 16px)'; });
   await expect(page.locator('.terminal-pane:visible').first()).toBeVisible();
   await page.evaluate(() => {
     const invoke = window.__TAURI_INTERNALS__.invoke;
@@ -142,8 +173,22 @@ async function scene(locale, remote = false) {
   await page.mouse.move(1595, 895);
   await page.waitForTimeout(400);
   const path = new URL(`${remote ? 'scenario-remote' : 'hero-workspace'}-${locale}.png`, directory);
-  await page.screenshot({ path: fileURLToPath(path), animations: 'disabled' });
+  await capture(page, path);
   console.log(path.href);
+  if (!remote) {
+    for (const variant of [
+      { name: 'theme-light', mode: 'light', id: 'catppuccin-latte' },
+      { name: 'theme-nord', mode: 'dark', id: 'nord-dark' },
+    ]) {
+      await chooseScheme(page, locale, variant.mode, variant.id);
+      await page.evaluate(() => document.fonts.ready);
+      await page.waitForTimeout(400);
+      const variantPath = new URL(`${variant.name}-${locale}.png`, directory);
+      await capture(page, variantPath);
+      console.log(variantPath.href);
+    }
+    await chooseScheme(page, locale, 'dark', 'default-dark');
+  }
   if (!remote) {
     await page.evaluate(async () => {
       const { useUnifiedWorkspace } = await import('/src/features/workspace/stores/unifiedWorkspace.ts');
@@ -157,7 +202,7 @@ async function scene(locale, remote = false) {
     await expect(page.locator('.monaco-editor:visible .view-lines')).toContainText('checks.every(Boolean)');
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(400);
-    await page.screenshot({ path: fileURLToPath(new URL(`scenario-build-${locale}.png`, directory)), animations: 'disabled' });
+    await capture(page, new URL(`scenario-build-${locale}.png`, directory));
   }
   await context.close();
 }

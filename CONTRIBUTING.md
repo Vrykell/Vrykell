@@ -80,7 +80,7 @@ npm run check:architecture
 
 在一个终端运行 `npm run dev -- --port 1432 --host 127.0.0.1`，在另一个终端运行 `node --experimental-strip-types scripts/capture-readme.mjs`。首次使用前运行 `npx playwright install chromium` 安装截图浏览器。脚本使用真实前端与示例数据生成中英文场景图，不连接实际模型或服务器。
 
-保留 2 倍像素密度生成的 3200×1800 PNG 和 16:9 比例，等待字体与编辑器加载完成。不要放大旧截图或拉伸图片；README 中保留原图链接，更新后检查桌面和窄屏渲染。
+保留 2 倍像素密度生成的 3200×1800 PNG 和 16:9 比例；截取时以 16 px 圆角裁切并保留透明角落，避免仓库页面移除内联样式后圆角失效。等待字体与编辑器加载完成。不要放大旧截图或拉伸图片；README 中保留原图链接，更新后检查桌面和窄屏渲染。
 
 ## 提交信息
 
