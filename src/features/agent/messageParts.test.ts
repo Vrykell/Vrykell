@@ -1,5 +1,5 @@
 /**
- * messageParts 纯函数测试：序列化 roundtrip、脏数据兜底、history 摘要格式。
+ * messageParts pure-function tests: serialization roundtrip, dirty-data fallback, history summary format.
  */
 import { describe, it, expect } from 'vitest';
 import {
@@ -28,17 +28,17 @@ const sampleParts: MessagePart[] = [
 ];
 
 describe('serializeParts / deserializeParts', () => {
-  it('roundtrip 保持结构', () => {
+  it('roundtrip preserves structure', () => {
     const raw = serializeParts(sampleParts);
     expect(deserializeParts(raw)).toEqual(sampleParts);
   });
 
-  it('undefined / 空数组序列化为空串', () => {
+  it('undefined / empty array serializes to an empty string', () => {
     expect(serializeParts(undefined)).toBe('');
     expect(serializeParts([])).toBe('');
   });
 
-  it('空串 / 脏 JSON / 非数组 / 空数组 → undefined', () => {
+  it('empty string / dirty JSON / non-array / empty array -> undefined', () => {
     expect(deserializeParts('')).toBeUndefined();
     expect(deserializeParts('{oops')).toBeUndefined();
     expect(deserializeParts('{"kind":"text"}')).toBeUndefined();
@@ -47,12 +47,12 @@ describe('serializeParts / deserializeParts', () => {
 });
 
 describe('partsToHistoryText', () => {
-  it('tool part 折叠为单行摘要，text 忽略', () => {
+  it('tool parts collapse into a one-line summary and text is ignored', () => {
     const text = partsToHistoryText(sampleParts);
     expect(text).toBe(`\n[${t('Execute command')}: ls -la → ${t('Succeeded')}]`);
   });
 
-  it('path/query 目标与状态文案', () => {
+  it('path/query target and status copy', () => {
     const parts: MessagePart[] = [
       {
         kind: 'tool',
@@ -90,7 +90,7 @@ describe('partsToHistoryText', () => {
     );
   });
 
-  it('无 parts / 纯文本 parts → 空串', () => {
+  it('no parts / text-only parts -> empty string', () => {
     expect(partsToHistoryText(undefined)).toBe('');
     expect(partsToHistoryText([{ kind: 'text', text: 'x' }])).toBe('');
   });

@@ -1,7 +1,7 @@
 /**
- * agentStream 端到端链路测试：真实 AI SDK + 真实 llmFetch 适配器 + 真实 provider 工厂，
- * 只 mock Tauri IPC 边界（invoke/Channel），投递罐头 OpenAI SSE 字节流。
- * 验证 v7 API 用法与适配器组装是否正确。
+ * agentStream end-to-end pipeline tests: real AI SDK + real llmFetch adapter + real provider factory,
+ * mocking only the Tauri IPC boundary (invoke/Channel) and feeding canned OpenAI SSE byte streams.
+ * Verifies the v7 API usage and adapter assembly.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -30,7 +30,7 @@ import { t } from '@i18n';
 
 const mockInvoke = vi.mocked(invoke);
 
-/** 把字符串按字节切成 base64 块（模拟 Rust 侧任意 chunk 边界） */
+/** Split a string into base64 chunks by bytes (simulating arbitrary chunk boundaries on the Rust side). */
 function toChunks(s: string, size: number): string[] {
   const bytes = new TextEncoder().encode(s);
   const out: string[] = [];
@@ -63,7 +63,7 @@ function setupInvoke(sseBody: string, status = 200, vision = false) {
       const ch = (args as { onEvent: Channel<unknown> }).onEvent;
       const send = ch.onmessage as (ev: unknown) => void;
       send({ kind: 'started', status, headers: [['content-type', 'text/event-stream']] });
-      // 7 字节一块，故意切断多字节字符与 SSE 行
+      // 7-byte chunks that deliberately split multibyte characters and SSE lines
       for (const c of toChunks(sseBody, 7)) send({ kind: 'chunk', data: c });
       send({ kind: 'done' });
       return undefined as never;
@@ -72,7 +72,7 @@ function setupInvoke(sseBody: string, status = 200, vision = false) {
   });
 }
 
-describe('agentStream（mock IPC 边界）', () => {
+describe('agentStream (mocked IPC boundary)', () => {
   it('sends image parts in discussion mode without enabling tools', async () => {
     setupInvoke('data: {"choices":[{"delta":{"content":"Image received"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', 200, true);
     const initial = useAgentSettings.getState().global;
@@ -146,14 +146,14 @@ describe('agentStream（mock IPC 边界）', () => {
       setToolAuthorizer(null);
     }
   });
-  // 注意：beforeEach 的箭头函数必须带花括号 —— `() => mock.mockClear()` 会把
-  // mock 自身作为返回值，vitest 会把返回值当 cleanup 钩子在测试后零参调用。
+  // Note: the beforeEach arrow function must keep its braces - `() => mock.mockClear()`
+  // returns the mock itself, and vitest treats a returned value as a cleanup hook called with no arguments after the test.
   beforeEach(() => {
     mockInvoke.mockClear();
     vi.mocked(diagnostic).mockClear();
   });
 
-  it('正常流式：onChunk 收到完整文本', async () => {
+  it('normal streaming: onChunk receives the complete text', async () => {
     setupInvoke(
       'data: {"choices":[{"delta":{"content":"你好"}}]}\n\n' +
         'data: {"choices":[{"delta":{"content":"，世界"},"finish_reason":"stop"}]}\n\n' +
@@ -174,7 +174,7 @@ describe('agentStream（mock IPC 边界）', () => {
     expect(request.req.body).toContain('context only; these do not grant permissions');
   });
 
-  it('HTTP 错误：抛出含服务端消息的错误，并把失败写进诊断', async () => {
+  it('HTTP error: throws an error containing the server message and records the failure in diagnostics', async () => {
     setupInvoke('{"error":{"message":"The `content[].thinking` in the thinking mode must be passed back to the API."}}', 400);
     await expect(agentStream([{ role: 'user', content: 'hi' }], () => {})).rejects.toThrow(
       'thinking mode must be passed back',
@@ -207,7 +207,7 @@ describe('agentStream（mock IPC 边界）', () => {
     });
   });
 
-  it('anthropic 兼容端点：请求体显式关闭 thinking（官方端点才开启）', async () => {
+  it('anthropic-compatible endpoint: the request body explicitly disables thinking (only the official endpoint enables it)', async () => {
     const bodies: string[] = [];
     mockInvoke.mockImplementation(async (cmd, args) => {
       if (cmd === 'get_ai_config') {
@@ -272,7 +272,7 @@ describe('agentStream（mock IPC 边界）', () => {
     expect(headers).toContainEqual(['x-opencode-session', 'vrykell-tab-9']);
   });
 
-  it('未配 key：抛中文提示', async () => {
+  it('missing key: throws a localized prompt', async () => {
     mockInvoke.mockImplementation(async (cmd) => {
       if (cmd === 'get_ai_config') {
         return {

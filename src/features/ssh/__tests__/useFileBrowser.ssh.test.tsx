@@ -24,7 +24,7 @@ vi.mock('@features/ssh/services/api', () => sshMocks);
 const entry = (name: string, path: string, is_dir = false): FsEntry => ({ name, path, is_dir });
 const SSH_TARGET: FileOpsTarget = { kind: 'ssh', connectionId: 'ssh-1' };
 
-describe('useFileBrowser（SSH 目标）', () => {
+describe('useFileBrowser (SSH target)', () => {
   const openEntry = vi.fn();
   const onPathChange = vi.fn();
 
@@ -49,14 +49,14 @@ describe('useFileBrowser（SSH 目标）', () => {
 
   afterEach(() => { vi.clearAllMocks(); });
 
-  it('首次加载用远端主目录解析出的 base，并写回路径', async () => {
+  it('first load uses the base resolved from the remote home directory and writes the path back', async () => {
     const { result } = renderHook(() => useFileBrowser({ target: SSH_TARGET, onPathChange, openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
     expect(sshMocks.sshFsList).toHaveBeenCalledWith('ssh-1', undefined);
     expect(onPathChange).toHaveBeenCalledWith('/home/tester');
   });
 
-  it('隐藏时不连接，重新显示后继续加载（主机信任确认后的重试）', async () => {
+  it('does not connect while hidden and resumes loading when shown again (retry after host trust confirmation)', async () => {
     const { result, rerender } = renderHook(
       ({ enabled }) => useFileBrowser({ target: SSH_TARGET, enabled, openEntry }),
       { initialProps: { enabled: false } },
@@ -72,7 +72,7 @@ describe('useFileBrowser（SSH 目标）', () => {
     expect(sshMocks.sshPurgeStaged).not.toHaveBeenCalled();
   });
 
-  it('选中的条目移动到目标目录：回退对记录后端返回的真实路径', async () => {
+  it('moves a selected entry into the target directory: undo records the real path returned by the backend', async () => {
     sshMocks.sshMove.mockResolvedValue('/home/tester/archive/a (1).txt');
     const { result } = renderHook(() => useFileBrowser({ target: SSH_TARGET, openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
@@ -83,14 +83,14 @@ describe('useFileBrowser（SSH 目标）', () => {
     expect([...result.current.selection]).toEqual(['/home/tester/archive/a (1).txt']);
   });
 
-  it('拖动到同级目录是空操作，不请求后端', async () => {
+  it('dropping into the same directory is a no-op and does not call the backend', async () => {
     const { result } = renderHook(() => useFileBrowser({ target: SSH_TARGET, openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
     await act(async () => { await result.current.transferInto(['/home/tester/a.txt'], '/home/tester', 'move'); });
     expect(sshMocks.sshMove).not.toHaveBeenCalled();
   });
 
-  it('粘贴复制到文件夹使用远端 copy，剪切使用 move', async () => {
+  it('paste copy into a folder uses remote copy, cut uses move', async () => {
     const { result } = renderHook(() => useFileBrowser({ target: SSH_TARGET, openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
 
@@ -103,7 +103,7 @@ describe('useFileBrowser（SSH 目标）', () => {
     expect(sshMocks.sshMove).toHaveBeenCalledWith('ssh-1', '/home/tester/src/nested.txt', '/home/tester');
   });
 
-  it('删除走远端暂存，回退用 restore', async () => {
+  it('delete uses remote staging and undo uses restore', async () => {
     const staged = { from: '/home/tester/a.txt', to: '/home/tester/.vrykell/undo/u-a.txt' };
     sshMocks.sshStageDelete.mockResolvedValue({ completed: [staged], errors: [] });
     const { result } = renderHook(() => useFileBrowser({ target: SSH_TARGET, openEntry }));
@@ -119,7 +119,7 @@ describe('useFileBrowser（SSH 目标）', () => {
     expect(result.current.undoCount).toBe(0);
   });
 
-  it('重命名使用后端返回的最终路径记录回退', async () => {
+  it('rename records undo with the final path returned by the backend', async () => {
     sshMocks.sshRename.mockResolvedValue('/home/tester/b (1).txt');
     const { result } = renderHook(() => useFileBrowser({ target: SSH_TARGET, openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));
@@ -129,7 +129,7 @@ describe('useFileBrowser（SSH 目标）', () => {
     await waitFor(() => expect(result.current.undo?.pairs).toEqual([{ from: '/home/tester/a.txt', to: '/home/tester/b (1).txt' }]));
   });
 
-  it('新建使用远端命令，落在右键命中的目录并立即重命名', async () => {
+  it('create uses the remote command, lands in the right-clicked directory and starts renaming immediately', async () => {
     sshMocks.sshCreateFile.mockResolvedValue('/home/tester/src/Untitled');
     const { result } = renderHook(() => useFileBrowser({ target: SSH_TARGET, openEntry }));
     await waitFor(() => expect(result.current.entries).toHaveLength(2));

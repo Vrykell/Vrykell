@@ -1,20 +1,20 @@
 /**
- * errorHandler — 全局错误处理与安全解析测试。
+ * errorHandler — global error handling and safe parsing tests.
  */
 import { describe, it, expect, vi } from 'vitest';
 import { installGlobalErrorHandlers, safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 
 describe('safeJsonParse / safeLocalStorage', () => {
-  it('safeJsonParse 合法/非法/空', () => {
+  it('safeJsonParse with valid, invalid and empty input', () => {
     expect(safeJsonParse('{"a":1}')).toEqual({ a: 1 });
     expect(safeJsonParse('not json')).toBeNull();
     expect(safeJsonParse('')).toBeNull();
   });
 
-  it('safeLocalStorage 读写与异常兜底', () => {
+  it('safeLocalStorage read/write with exception fallback', () => {
     expect(safeLocalStorageSet('k', 'v')).toBe(true);
     expect(safeLocalStorageGet('k')).toBe('v');
-    // localStorage 抛错（如被禁用）时返回默认
+    // returns the default when localStorage throws (for example, when disabled)
     const orig = Storage.prototype.setItem;
     Storage.prototype.setItem = vi.fn(() => { throw new Error('denied'); });
     expect(safeLocalStorageSet('k', 'v')).toBe(false);
@@ -27,22 +27,22 @@ describe('safeJsonParse / safeLocalStorage', () => {
 });
 
 describe('installGlobalErrorHandlers', () => {
-  it('安装全局错误处理不抛异常；重复安装幂等', () => {
+  it('installing global error handlers does not throw; repeated installation is idempotent', () => {
     expect(() => installGlobalErrorHandlers()).not.toThrow();
     expect(() => installGlobalErrorHandlers()).not.toThrow();
   });
 
-  it('error 事件与 unhandledrejection 均被监听', () => {
+  it('both error events and unhandledrejection are listened to', () => {
     installGlobalErrorHandlers();
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const win = window;
-    // ErrorEvent（运行时错误）
+    // ErrorEvent (runtime error)
     const evt = new ErrorEvent('error', { message: 'boom', filename: 'a.js', lineno: 1, colno: 2 });
     win.dispatchEvent(evt);
     expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('boom'));
-    // 非 ErrorEvent 的 error 事件不报错
+    // an error event that is not an ErrorEvent does not report
     win.dispatchEvent(new Event('error'));
-    // Promise rejection（jsdom 可能缺 PromiseRejectionEvent，兜底用普通 Event）
+    // promise rejection (jsdom may lack PromiseRejectionEvent; fall back to a plain Event)
     const rejEvt =
       typeof PromiseRejectionEvent !== 'undefined'
         ? new PromiseRejectionEvent('unhandledrejection', { promise: Promise.resolve(), reason: new Error('nope') })

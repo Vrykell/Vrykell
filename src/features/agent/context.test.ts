@@ -1,7 +1,7 @@
 /**
- * context（code-agent 式上下文管理）测试：token 估算、窗口裁剪、摘要压缩与增量缓存。
- * 模块级 mock 'ai'（generateText），不用 beforeEach（本仓库 vitest 4 陷阱），
- * 各用例开头调 reset()。
+ * context tests (code-agent style context management): token estimation, window trimming, summary
+ * compaction and incremental caching. The 'ai' module (generateText) is mocked at module level,
+ * no beforeEach is used (a vitest 4 trap in this repository), and each case calls reset() at the start.
  */
 import { describe, it, expect, vi } from 'vitest';
 import type { LanguageModel, ModelMessage } from 'ai';
@@ -25,7 +25,7 @@ describe('estimateTokens', () => {
   it('counts image overhead without counting encoded image bytes as text', () => {
     expect(messageTokens({ role: 'user', content: [{ type: 'image', image: 'data:image/png;base64,' + 'x'.repeat(100_000) }] })).toBe(IMAGE_TOKEN_ESTIMATE + 16);
   });
-  it('CJK 按 1 token/字，ASCII 按 4 字符/token', () => {
+  it('CJK counts as 1 token per character, ASCII as 4 characters per token', () => {
     expect(estimateTokens('你好')).toBe(2);
     expect(estimateTokens('abcd')).toBe(1);
     expect(estimateTokens('你好ab')).toBe(3); // 2 + 2×0.25 = 2.5 → 3
@@ -33,7 +33,7 @@ describe('estimateTokens', () => {
   });
 });
 
-describe('planContext：off / window', () => {
+describe('planContext: off / window', () => {
   it('reserves instruction and tool-schema space and never keeps an orphaned result', async () => {
     reset();
     const grouped: SizedMessage[] = [mk('user', 'earlier', 5),
@@ -43,7 +43,7 @@ describe('planContext：off / window', () => {
     const plan = await planContext({ sized: grouped, strategy: 'window', maxTokens: 20, reservedTokens: 5, summaryTokens: 0, model });
     expect(plan.messages).toEqual([{ role: 'user', content: 'current' }]);
   });
-  it('off 返回全部消息，不裁剪', async () => {
+  it('off returns every message without trimming', async () => {
     reset();
     const r = await planContext({
       sized: [mk('user', 'a', 5), mk('assistant', 'b', 5), mk('user', 'c', 5)],
@@ -53,17 +53,17 @@ describe('planContext：off / window', () => {
     expect(r.messages).toHaveLength(3);
   });
 
-  it('window 超预算：保留能放下的最近消息', async () => {
+  it('window over budget: keeps the most recent messages that fit', async () => {
     reset();
     const r = await planContext({
       sized: [mk('user', 'a', 5), mk('assistant', 'b', 5), mk('user', 'c', 5)],
       strategy: 'window', maxTokens: 12, summaryTokens: 100, model,
     });
     expect(r.system).toBeUndefined();
-    expect(r.messages).toHaveLength(2); // 5+5 放得下，三条放不下
+    expect(r.messages).toHaveLength(2); // 5+5 fits, all three do not
   });
 
-  it('最新一条即使超预算也保底保留', async () => {
+  it('the newest message is always kept even when it exceeds the budget', async () => {
     reset();
     const r = await planContext({
       sized: [mk('user', 'a', 5), mk('user', 'current', 100)],
@@ -75,7 +75,7 @@ describe('planContext：off / window', () => {
   });
 });
 
-describe('planContext：compact 摘要压缩', () => {
+describe('planContext: compact summary', () => {
   it('merges a previous step summary instead of losing it during later loop compaction', async () => {
     reset(); mockGenerate.mockResolvedValue({ text: 'Merged evidence' });
     const result = await planContext({ sized: [mk('assistant', 'new tool evidence', 1000), mk('user', 'current', 500)],
@@ -84,7 +84,7 @@ describe('planContext：compact 摘要压缩', () => {
     expect(mockGenerate.mock.calls[0]?.[0].prompt).toContain('new tool evidence');
     expect(result.system).toBe('Merged evidence');
   });
-  it('超预算生成摘要并作为 system 前置', async () => {
+  it('over budget generates a summary and prepends it as the system message', async () => {
     reset();
     mockGenerate.mockResolvedValue({ text: '摘要' });
     const r = await planContext({
@@ -96,7 +96,7 @@ describe('planContext：compact 摘要压缩', () => {
     expect(r.messages).toHaveLength(2);
   });
 
-  it('增量缓存：新增溢出只摘要增量，不重复折叠旧内容', async () => {
+  it('incremental cache: newly added overflow summarizes only the delta without folding old content again', async () => {
     reset();
     mockGenerate.mockResolvedValueOnce({ text: '摘要1' });
     const base = [mk('user', 'a', 500), mk('assistant', 'b', 500), mk('user', 'c', 500), mk('assistant', 'd', 500), mk('user', 'e', 500)];
@@ -112,10 +112,10 @@ describe('planContext：compact 摘要压缩', () => {
       sized: grown, strategy: 'compact', maxTokens: 1200, summaryTokens: 100, model, tabId: 't-inc',
     });
     expect(r2.system).toBe('摘要2');
-    expect(mockGenerate).toHaveBeenCalledTimes(2); // 只摘要新增的 1 条
+    expect(mockGenerate).toHaveBeenCalledTimes(2); // Only the 1 newly added message is summarized
   });
 
-  it('摘要失败降级为窗口裁剪（不抛错）', async () => {
+  it('summary failure degrades to window trimming (without throwing)', async () => {
     reset();
     mockGenerate.mockRejectedValue(new Error('boom'));
     const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});

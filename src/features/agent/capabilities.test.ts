@@ -1,12 +1,12 @@
 /**
- * capabilities — 模型能力探测规则测试。
+ * capabilities — model capability detection rule tests.
  */
 import { describe, it, expect } from 'vitest';
 import { capabilityLabel, detectCapabilities, hasCapability, type ModelCapability } from '@features/agent/model/capabilities';
 import { t } from '@i18n';
 
 describe('detectCapabilities', () => {
-  it('anthropic / gemini：原生视觉与搜索，现代模型有推理', () => {
+  it('anthropic / gemini: native vision and search, modern models have reasoning', () => {
     const c = detectCapabilities('anthropic', 'claude-sonnet-5');
     expect(c.vision).toBe(true);
     expect(c.search).toBe(true);
@@ -17,7 +17,7 @@ describe('detectCapabilities', () => {
     expect(g.search).toBe(true);
   });
 
-  it('openai-compatible：按模型名判定视觉/推理，无原生搜索', () => {
+  it('openai-compatible: vision/reasoning decided by model name, no native search', () => {
     const gpt4o = detectCapabilities('openai-compatible', 'gpt-4o');
     expect(gpt4o.vision).toBe(true);
     expect(gpt4o.reasoning).toBe(false);
@@ -36,24 +36,24 @@ describe('detectCapabilities', () => {
     expect(r1.vision).toBe(false);
   });
 
-  it('嵌入/转写类模型不支持工具', () => {
+  it('embedding/transcription models do not support tools', () => {
     const emb = detectCapabilities('openai-compatible', 'text-embedding-3-small');
     expect(emb.tools).toBe(false);
     const tts = detectCapabilities('openai-compatible', 'tts-1');
     expect(tts.tools).toBe(false);
-    // 普通模型默认支持工具
+    // ordinary models support tools by default
     const plain = detectCapabilities('openai-compatible', 'gpt-3.5-turbo');
     expect(plain.tools).toBe(true);
   });
 
-  it('hasCapability：profile 缺省时按启发式兜底', () => {
+  it('hasCapability: falls back to heuristics when the profile is missing', () => {
     expect(hasCapability(undefined, 'vision', 'anthropic', 'claude-sonnet-5')).toBe(true);
     expect(hasCapability(undefined, 'search', 'openai-compatible', 'gpt-4o')).toBe(false);
     expect(hasCapability({ vision: false, reasoning: false, tools: true, search: false }, 'vision', 'anthropic', 'x')).toBe(false);
     expect(hasCapability({ vision: true, reasoning: false, tools: true, search: false }, 'vision', 'openai-compatible', 'x')).toBe(true);
   });
 
-  it('标签文案完整', () => {
+  it('label text is complete', () => {
     expect((['vision', 'reasoning', 'tools', 'search'] as ModelCapability[]).map(capabilityLabel)).toEqual([
       t('Vision'), t('Reasoning'), t('Tools'), t('Search'),
     ]);

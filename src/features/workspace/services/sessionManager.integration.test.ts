@@ -34,8 +34,8 @@ beforeEach(() => {
   mockedInvoke.mockImplementation(async (cmd: string) => defaultInvoke(cmd));
 });
 
-describe('sessionManager.restore（窗口布局）', () => {
-  it('从当前 layout payload 恢复含 SSH 终端的窗口', async () => {
+describe('sessionManager.restore (window layout)', () => {
+  it('restores a window containing an SSH terminal from the current layout payload', async () => {
     const layout = { type: 'leaf', terminal: { id: 'ssh-1#0', kind: 'ssh', ssh: { name: '生产服务器', host: 'prod.example.com', user: 'root', port: 22, connectionId: 'c1' } } };
     const session = mockSession({ id: 'ssh-1', title: '生产服务器', kind: 'ssh', payload: JSON.stringify({ layout }) });
     mockedInvoke.mockImplementation(async (cmd: string) => (cmd === 'get_session' ? session : defaultInvoke(cmd)));
@@ -50,7 +50,7 @@ describe('sessionManager.restore（窗口布局）', () => {
     expect(term.ssh?.connectionId).toBe('c1');
   });
 
-  it('从当前 layout payload 恢复本地终端窗口', async () => {
+  it('restores a local terminal window from the current layout payload', async () => {
     const layout = { type: 'leaf', terminal: { id: 'local-1#0', kind: 'local', shellType: 'zsh' } };
     const session = mockSession({ id: 'local-1', title: 'Zsh', kind: 'local', payload: JSON.stringify({ layout }) });
     mockedInvoke.mockImplementation(async (cmd: string) => (cmd === 'get_session' ? session : defaultInvoke(cmd)));
@@ -61,7 +61,7 @@ describe('sessionManager.restore（窗口布局）', () => {
     expect(firstTerminalOf(tab)!.shellType).toBe('zsh');
   });
 
-  it('从 layout payload 恢复窗口布局（多终端）', async () => {
+  it('restores the window layout from the layout payload (multiple terminals)', async () => {
     const layout = {
       type: 'split', dir: 'row', ratio: 0.4,
       first: { type: 'leaf', terminal: { id: 's#0', kind: 'local', shellType: 'zsh' } },
@@ -75,7 +75,7 @@ describe('sessionManager.restore（窗口布局）', () => {
     expect(leaves(tab.kind === 'session' ? tab.layout : { type: 'leaf', terminal: { id: 'x', kind: 'local' } })).toHaveLength(2);
   });
 
-  it('meta.groupId 覆盖后端 group_id', async () => {
+  it('meta.groupId overrides backend group_id', async () => {
     const session = mockSession({ id: 'g-tab', group_id: null, payload: '{}' });
     mockedInvoke.mockImplementation(async (cmd: string) => (cmd === 'get_session' ? session : defaultInvoke(cmd)));
     await sessionManager.restore('g-tab', 't', { groupId: 'g1' });
@@ -128,7 +128,7 @@ describe('sessionManager.restore（窗口布局）', () => {
     expect(useWorkspaceStore.getState().tabs).toHaveLength(0);
   });
 
-  it('payload 损坏时降级为单本地终端', async () => {
+  it('falls back to a single local terminal when the payload is corrupt', async () => {
     const session = mockSession({ id: 'bad', payload: 'not-json' });
     mockedInvoke.mockImplementation(async (cmd: string) => (cmd === 'get_session' ? session : defaultInvoke(cmd)));
     await sessionManager.restore('bad', 'bad');
@@ -138,7 +138,7 @@ describe('sessionManager.restore（窗口布局）', () => {
   });
 });
 
-describe('addTab 持久化 kind + payload', () => {
+describe('addTab persists kind + payload', () => {
   it('persists a remote terminal layout without credentials when content starts', async () => {
     const calls: Array<{ cmd: string; args: Record<string, unknown> }> = [];
     mockedInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
@@ -171,7 +171,7 @@ describe('addTab 持久化 kind + payload', () => {
     expect(payload.layout.terminal.shellType).toBe('zsh');
   });
 
-  it('视图标签（history/settings）不落库', () => {
+  it('view tabs (history/settings) are not persisted', () => {
     const calls: Array<{ cmd: string; args: Record<string, unknown> }> = [];
     mockedInvoke.mockImplementation(async (cmd: string, args?: unknown) => {
       calls.push({ cmd, args: (args ?? {}) as Record<string, unknown> });

@@ -81,46 +81,46 @@ describe('useFollowBottom', () => {
     }
   });
 
-  it('贴底时 deps 变化自动滚到底', async () => {
-    const el = makeEl(800); // 贴底
+  it('scrolls to the bottom when deps change while pinned to the bottom', async () => {
+    const el = makeEl(800); // pinned to the bottom
     const ref = { current: el } as React.RefObject<HTMLDivElement>;
     const { rerender } = renderHook(({ dep }) => useFollowBottom(ref, [dep]), {
       initialProps: { dep: 1 },
     });
     rerender({ dep: 2 });
-    await new Promise((r) => requestAnimationFrame(r)); // hook 内用 rAF 滚动
+    await new Promise((r) => requestAnimationFrame(r)); // the hook scrolls inside rAF
     expect(el.scrollTop).toBe(1000);
   });
 
-  it('用户上滚后不跟随', async () => {
+  it('stops following after the user scrolls up', async () => {
     const el = makeEl(800);
     const ref = { current: el } as React.RefObject<HTMLDivElement>;
     const { rerender } = renderHook(({ dep }) => useFollowBottom(ref, [dep]), {
       initialProps: { dep: 1 },
     });
-    el.scrollTop = 300; // 用户上滚
+    el.scrollTop = 300; // user scrolls up
     el.dispatchEvent(new Event('scroll'));
     rerender({ dep: 2 });
     await new Promise((r) => requestAnimationFrame(r));
     expect(el.scrollTop).toBe(300);
   });
 
-  it('snap 后内容增长的迟到 scroll 事件不误杀 latch（滚到一半的竞态）', async () => {
-    // 真实浏览器里 scrollTop=scrollHeight 会被 clamp 到 max=scrollHeight-clientHeight；
-    // snap 的 scroll 事件异步派发，若内容已增长，旧公式量出 gap>32 会误判用户上滚。
+  it('a late scroll event after a snap does not release the latch when content grows (mid-scroll race)', async () => {
+    // In a real browser scrollTop=scrollHeight is clamped to max=scrollHeight-clientHeight; the
+    // snap's scroll event is dispatched asynchronously, so grown content measures gap>32 and looks like a scroll up.
     const el = makeEl(800);
     const ref = { current: el } as React.RefObject<HTMLDivElement>;
     const { rerender } = renderHook(({ dep }) => useFollowBottom(ref, [dep]), {
       initialProps: { dep: 1 },
     });
-    // 第一次 dep 变化 → snap（jsdom 不 clamp，scrollTop=1000，模拟浏览器 clamp 后停在旧 max）
+    // first dep change -> snap (jsdom does not clamp, scrollTop=1000; a browser stays at the old max after clamping)
     rerender({ dep: 2 });
     await new Promise((r) => requestAnimationFrame(r));
     const snapped = el.scrollTop;
-    // 内容增长（新输出渲染），随后 snap 的迟到 scroll 事件才派发
+    // content grows (new output renders) and only then does the late snap scroll event dispatch
     Object.defineProperty(el, 'scrollHeight', { value: 1400, configurable: true });
     el.dispatchEvent(new Event('scroll'));
-    // latch 应仍为贴底：下一次 dep 变化继续跟随
+    // the latch must still be pinned: the next dep change keeps following
     rerender({ dep: 3 });
     await new Promise((r) => requestAnimationFrame(r));
     expect(el.scrollTop).toBe(1400);
@@ -129,7 +129,7 @@ describe('useFollowBottom', () => {
 });
 
 describe('registerFollowEngager / engageFollow', () => {
-  it('注册后 engageFollow 调用对应回调，反注册后不再调用', () => {
+  it('engageFollow calls the registered callback and stops after unregistering', () => {
     const fn = vi.fn();
     const unreg = registerFollowEngager('p1', fn);
     engageFollow('p1');
@@ -139,7 +139,7 @@ describe('registerFollowEngager / engageFollow', () => {
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
-  it('同 id 重新注册时用新回调覆盖旧的', () => {
+  it('re-registering the same id replaces the old callback with the new one', () => {
     const fn1 = vi.fn();
     const fn2 = vi.fn();
     registerFollowEngager('p1', fn1);

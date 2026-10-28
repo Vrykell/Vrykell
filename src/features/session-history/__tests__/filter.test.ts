@@ -53,7 +53,7 @@ describe('isSshSession / sshTargetOf', () => {
     expect(isSshSession(mk({}))).toBe(false);
   });
 
-  it('解析 SSH 目标 user@host', () => {
+  it('parses the SSH target as user@host', () => {
     expect(sshTargetOf(mk({ payload: payload(sshPane()) }))).toBe('root@prod.example.com');
     expect(sshTargetOf(mk({ payload: payload(sshPane({ ssh: { host: 'h' } })) }))).toBe('h');
     expect(sshTargetOf(mk({}))).toBeNull();
@@ -66,26 +66,26 @@ describe('filterSessions', () => {
   const oldLocal = mk({ id: 'old-1', title: '老会话', closed_at: Date.now() - 40 * 24 * HOUR });
   const sessions = [ssh, local, oldLocal];
 
-  it('无过滤时全部保留', () => {
+  it('keeps everything without filters', () => {
     expect(filterSessions(sessions, '', 'all', 'all').length).toBe(3);
   });
 
-  it('搜索匹配标题', () => {
+  it('search matches the title', () => {
     expect(filterSessions(sessions, '生产', 'all', 'all')).toEqual([ssh]);
     expect(filterSessions(sessions, 'zsh', 'all', 'all')).toEqual([local]);
   });
 
-  it('搜索匹配 SSH 目标(user@host / host)', () => {
+  it('search matches the SSH target (user@host / host)', () => {
     expect(filterSessions(sessions, 'root@prod', 'all', 'all')).toEqual([ssh]);
     expect(filterSessions(sessions, 'prod.example', 'all', 'all')).toEqual([ssh]);
   });
 
-  it('类型筛选:仅本地 / 仅 SSH', () => {
+  it('type filter: local only / SSH only', () => {
     expect(filterSessions(sessions, '', 'local', 'all')).toEqual([local, oldLocal]);
     expect(filterSessions(sessions, '', 'ssh', 'all')).toEqual([ssh]);
   });
 
-  it('日期筛选:近 30 天排除 40 天前关闭的会话', () => {
+  it('date filter: the last 30 days excludes sessions closed 40 days ago', () => {
     const in30 = filterSessions(sessions, '', 'all', '30d');
     expect(in30).toContain(ssh);
     expect(in30).toContain(local);
@@ -93,11 +93,11 @@ describe('filterSessions', () => {
     expect(filterSessions(sessions, '', 'all', 'today')).toEqual([ssh, local]);
   });
 
-  it('组合过滤:SSH + 近 30 天 + 关键字', () => {
+  it('combined filter: SSH + last 30 days + keyword', () => {
     expect(filterSessions(sessions, 'prod', 'ssh', '30d')).toEqual([ssh]);
-    // 关键字不匹配时为空
+    // empty when the keyword does not match
     expect(filterSessions(sessions, '不存在', 'ssh', '30d')).toEqual([]);
-    // 类型冲突时为空
+    // empty when the type conflicts
     expect(filterSessions(sessions, 'prod', 'local', '30d')).toEqual([]);
   });
 

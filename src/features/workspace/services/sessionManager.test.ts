@@ -1,5 +1,5 @@
 /**
- * sessionManager — 会话生命周期（create/close/restore/rename/record 等）测试。
+ * sessionManager — session lifecycle (create/close/restore/rename/record and others) tests.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -21,7 +21,7 @@ beforeEach(() => {
   useChatStore.setState({ byTab: {} });
 });
 
-describe('sessionManager 生命周期', () => {
+describe('sessionManager lifecycle', () => {
   it('moves pane chat ownership immediately and serializes history writes behind the transfer', async () => {
     let finish!: () => void;
     invokeMock.mockImplementation((command: string) => command === 'move_terminal_panes' ? new Promise<void>(resolve => { finish = resolve; }) : Promise.resolve(undefined));
@@ -105,7 +105,7 @@ describe('sessionManager 生命周期', () => {
     expect(invokeMock).not.toHaveBeenCalled();
   });
 
-  it('close / rename / remove：透传与失败静默', async () => {
+  it('close / rename / remove: passthrough and silent failure', async () => {
     invokeMock.mockResolvedValueOnce(undefined);
     await sessionManager.close('t1');
     expect(invokeMock).toHaveBeenCalledWith('archive_session', { id: 't1', timestamp: expect.any(Number) });
@@ -118,7 +118,7 @@ describe('sessionManager 生命周期', () => {
     await expect(sessionManager.remove('t2')).rejects.toThrow('no backend');
   });
 
-  it('restore：完整重建（layout 用 payload；blocks 按 pane 归属；chat 恢复）', async () => {
+  it('restore: full rebuild (layout from payload; blocks by pane ownership; chat restored)', async () => {
     const sessionId = 'restored-1';
     useSessionStore.setState({ groups: [{ id: 'g9', title: '恢复分组', collapsed: false }] });
     invokeMock.mockResolvedValueOnce(undefined); // restore_session
@@ -141,7 +141,7 @@ describe('sessionManager 生命周期', () => {
     expect(tab.title).toBe('恢复的标题');
     expect(isSessionTab(tab) && tab.groupId).toBe('g9');
     expect(isSessionTab(tab) && tab.layout.type === 'leaf' && tab.layout.terminal.cwd).toBe('/latest/path');
-    // blocks 归属：pane null → #0
+    // block ownership: pane null -> #0
     expect(useBlockStore.getState().byTab[`${sessionId}#0`]).toHaveLength(1);
     const restored = useBlockStore.getState().byTab[`${sessionId}#0`]![0]!;
     expect(restored.outputText).toBe('out');
@@ -150,12 +150,12 @@ describe('sessionManager 生命周期', () => {
     expect(restored).not.toHaveProperty('collapsed');
     expect(invokeMock).not.toHaveBeenCalledWith('set_block_collapsed', expect.anything());
     expect(useBlockStore.getState().byTab[`${sessionId}#1`]).toHaveLength(1);
-    // chat 恢复
+    // chat restored
     expect(useChatStore.getState().byTab[sessionId]).toHaveLength(2);
   });
 
-  it('restore：无 blocks/chat 时清空 chat；tab 已存在时 activate', async () => {
-    // 模拟已有一个活跃标签（store 不再内置初始标签）
+  it('restore: clears chat when there are no blocks/chat; activates an existing tab', async () => {
+    // simulate an existing active tab (the store no longer ships an initial tab)
     const sessionId = useSessionStore.getState().addTab({});
     invokeMock.mockResolvedValueOnce(undefined); // restore_session
     invokeMock.mockResolvedValueOnce([]); // blocks
@@ -166,7 +166,7 @@ describe('sessionManager 生命周期', () => {
     expect(useChatStore.getState().byTab[sessionId]).toBeUndefined();
   });
 
-  it('record：start 与 complete 透传', async () => {
+  it('record: start and complete passthrough', async () => {
     const block = {
       id: 'b1', command: 'ls', status: 'done', exitCode: 0, startedAt: 1, endedAt: 2,
       outputHtml: '', outputText: 'out', outputRaw: 'raw', cwd: '/execution/path', wasLongRunning: false,

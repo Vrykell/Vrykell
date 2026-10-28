@@ -10,43 +10,43 @@ describe('platform/path', () => {
     expect(parentOf('//server/share')).toBeNull();
     expect(normPath('\\\\?\\Volume{abc}\\file')).toBe('//?/Volume{abc}/file');
   });
-  it('normPath 归一化反斜杠并去尾斜杠', () => {
+  it('normPath normalizes backslashes and strips trailing slashes', () => {
     expect(normPath('C:\\Users\\foo\\')).toBe('C:/Users/foo');
     expect(normPath('C:\\')).toBe('C:/');
     expect(normPath('C:/Users/foo/')).toBe('C:/Users/foo');
     expect(normPath('/Users/foo')).toBe('/Users/foo');
-    // OSC 7 的 Windows 盘符形式 → 盘符
+    // OSC 7 Windows drive form -> drive
     expect(normPath('/C:/Users/foo')).toBe('C:/Users/foo');
     expect(normPath('/C:/')).toBe('C:/');
     expect(normPath('/C:')).toBe('C:/');
   });
 
-  it('normPath 保留文件系统根（cd / 后文件管理器不显示空目录）', () => {
+  it('normPath keeps the filesystem root (so the file manager does not show an empty directory after cd /)', () => {
     expect(normPath('/')).toBe('/');
     expect(normPath('//')).toBe('/');
     expect(normPath('/..')).toBe('/..');
   });
 
-  it('normPath 盘符根保留根斜杠（C: 是驱动器相对路径，C:/ 才是根）', () => {
+  it('normPath keeps the root slash for a drive root (C: is drive-relative; only C:/ is the root)', () => {
     expect(normPath('C:')).toBe('C:/');
     expect(normPath('c:\\')).toBe('c:/');
   });
 
-  it('pathSegments 拆盘符与目录', () => {
+  it('pathSegments splits drive and directories', () => {
     expect(pathSegments('C:/Users/foo')).toEqual(['C:', 'Users', 'foo']);
     expect(pathSegments('/Users/foo')).toEqual(['Users', 'foo']);
     expect(pathSegments('C:/')).toEqual(['C:']);
     expect(pathSegments('/')).toEqual([]);
   });
 
-  it('segmentsToPath 还原盘符根与文件系统根', () => {
+  it('segmentsToPath restores the drive root and filesystem root', () => {
     expect(segmentsToPath(['C:'])).toBe('C:/');
     expect(segmentsToPath(['C:', 'Users'])).toBe('C:/Users');
     expect(segmentsToPath(['Users'])).toBe('/Users');
     expect(segmentsToPath([])).toBe('');
   });
 
-  it('parentOf 跨平台返回上级', () => {
+  it('parentOf returns the parent across platforms', () => {
     expect(parentOf('C:/Users/foo')).toBe('C:/Users');
     expect(parentOf('C:/Users')).toBe('C:/');
     expect(parentOf('C:/')).toBeNull();
@@ -54,7 +54,7 @@ describe('platform/path', () => {
     expect(parentOf('/')).toBeNull();
   });
 
-  it('isDriveRoot 识别盘符根', () => {
+  it('isDriveRoot recognizes a drive root', () => {
     expect(isDriveRoot('C:/')).toBe(true);
     expect(isDriveRoot('C:')).toBe(true);
     expect(isDriveRoot('C:/Users')).toBe(false);

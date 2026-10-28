@@ -1,7 +1,7 @@
 /**
- * webSearch（M6）测试：mock Tauri invoke 边界，验证 Tavily 工具的
- * 参数传递、结果格式化与错误结构化（execute 永不 throw）。
- * 不用 beforeEach（本仓库 vitest 4 陷阱，见 files.test.ts 头注释）。
+ * webSearch (M6) tests: mock the Tauri invoke boundary and verify the Tavily tool's
+ * parameter passing, result formatting and error structuring (execute never throws).
+ * No beforeEach (a vitest 4 trap in this repository, see the header comment in files.test.ts).
  */
 import { describe, it, expect, vi } from 'vitest';
 
@@ -12,7 +12,7 @@ import { buildTavilySearchTool, formatResults } from '@features/agent/tools/webS
 import { usePermissions, type ToolContext } from '@features/agent/stores/permissions';
 import { approvingToolContext } from '../../../test-utils/approvingToolContext';
 
-// 本文件测 invoke 参数/结果映射，不测门控（门控见 permissions.test.ts）
+// This file covers invoke parameter/result mapping, not gating (see permissions.test.ts for gating)
 usePermissions.setState({ levels: { web_search: 'allow' } });
 const CTX: ToolContext = approvingToolContext();
 
@@ -24,8 +24,8 @@ const execOf = (t: unknown): Exec => {
   return (args) => e(args, {});
 };
 
-describe('tavily 兜底工具', () => {
-  it('成功：摘要 + 编号结果列表；默认 5 条', async () => {
+describe('tavily fallback tool', () => {
+  it('success: summary + numbered result list; 5 results by default', async () => {
     invokeMock.mockResolvedValue({
       answer: 'Rust 是一门系统编程语言',
       results: [
@@ -42,19 +42,19 @@ describe('tavily 兜底工具', () => {
     expect(s).toContain('https://rustcc.cn');
   });
 
-  it('maxResults 透传', async () => {
+  it('passes maxResults through', async () => {
     invokeMock.mockResolvedValue({ results: [] });
     await execOf(buildTavilySearchTool(CTX))({ query: 'x', maxResults: 3 });
     expect(invokeMock).toHaveBeenCalledWith('tavily_search', { query: 'x', maxResults: 3 });
   });
 
-  it('无结果：占位提示', async () => {
+  it('no results: placeholder hint', async () => {
     invokeMock.mockResolvedValue({ results: [] });
     const r = (await execOf(buildTavilySearchTool(CTX))({ query: '空' })) as string;
     expect(r).toContain('（无结果）');
   });
 
-  it('invoke 失败（如未配 Key）→ { ok:false }，不 throw', async () => {
+  it('invoke failure (for example, no key configured) -> { ok:false }, no throw', async () => {
     invokeMock.mockRejectedValue(new Error('尚未配置 Tavily API Key'));
     const r = await execOf(buildTavilySearchTool(CTX))({ query: 'y' });
     expect(r).toEqual({ ok: false, error: '尚未配置 Tavily API Key' });
@@ -62,7 +62,7 @@ describe('tavily 兜底工具', () => {
 });
 
 describe('formatResults', () => {
-  it('内容节选截断到 300 字', () => {
+  it('content excerpt is truncated to 300 characters', () => {
     const long = 'x'.repeat(500);
     const s = formatResults({ results: [{ title: 't', url: 'u', content: long }] });
     expect(s).toContain('x'.repeat(300));
