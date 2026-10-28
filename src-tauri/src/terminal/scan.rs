@@ -1,14 +1,14 @@
-//! StreamScanner — PTY 字节流同步扫描器（原 src/terminal/pipeline/streamDispatcher.ts 的下沉）。
+//! StreamScanner: synchronous PTY byte-stream scanner (moved down from streamDispatcher.ts).
 //!
-//! 单趟扫描，事件顺序 = 字节顺序：
-//!   - OSC (\x1b]...\x07 或 \x1b]...\x1b\\) → Osc 事件，从 data 剥离
-//!   - alt-screen CSI (\x1b[?1049/1047/47 h|l) → AltEnter/AltExit 事件，从 data 剥离
-//!   - 其余字节（含 SGR 等普通 CSI）原样进 Data 事件
+//! One pass, events in byte order:
+//!   - OSC (\x1b]...\x07 or \x1b]...\x1b\\) becomes an Osc event and is removed from data.
+//!   - Alternate-screen CSI (\x1b[?1049/1047/47 h|l) becomes AltEnter/AltExit and is removed from data.
+//!   - Remaining bytes, including SGR and ordinary CSI, flow into Data events unchanged.
 //!
-//! chunk 尾部不完整的 ESC 序列存入 pending，下次拼接。
+//! An incomplete ESC sequence at a chunk boundary is kept in pending for the next push.
 //!
-//! 输入是 StreamDecoder 解码后的 UTF-8 字符串；扫描对象全是 ASCII 单字节
-//! 控制字符，按字节索引安全（所有切分点都落在字符边界）。
+//! Input is UTF-8 from StreamDecoder; scanning only targets ASCII single bytes and
+//! control characters, so byte indexing is safe and every split point is a character boundary.
 
 use serde::Serialize;
 
@@ -40,7 +40,7 @@ impl StreamScanner {
         let mut text_start = 0usize;
         let mut i = 0usize;
 
-        // flush [text_start, end) 为一条 data 事件（end 必须是字符边界）
+        // Flush [text_start, end) as one Data event; end must be a character boundary.
         macro_rules! flush_data {
             ($end:expr) => {
                 if $end > text_start {
@@ -55,18 +55,18 @@ impl StreamScanner {
                 continue;
             }
             if i + 1 >= len {
-                break; // 孤立 ESC → pending
+                break; // A lone ESC stays pending.
             }
             match bytes[i + 1] {
                 b']' => {
-                    // OSC：找 BEL 或 ESC\
+                    // OSC: find BEL or ESC\.
                     let bel = s[i + 2..].find('\x07');
                     let st = s[i + 2..].find("\x1b\\");
                     let (end, term_len) = match (bel, st) {
                         (Some(b), Some(t)) if b < t => (i + 2 + b, 1),
                         (_, Some(t)) => (i + 2 + t, 2),
                         (Some(b), _) => (i + 2 + b, 1),
-                        _ => break, // 不完整 OSC → pending
+                        _ => break, // Incomplete OSC stays pending.
                     };
                     let raw = s[i..end + term_len].to_string();
                     let (code, payload) = parse_osc(&s[i + 2..end]);
@@ -76,13 +76,13 @@ impl StreamScanner {
                     text_start = i;
                 }
                 b'[' => {
-                    // CSI：参数字节 [0-9;?]* + 终止字节
+                    // CSI: parameter bytes [0-9;?]* followed by a final byte.
                     let mut j = i + 2;
                     while j < len && matches!(bytes[j], b'0'..=b'9' | b';' | b'?') {
                         j += 1;
                     }
                     if j >= len {
-                        break; // 不完整 CSI → pending
+                        break; // Incomplete CSI stays pending.
                     }
                     // Invalid sequences remain data for the terminal parser. In particular,
                     // a non-ASCII character must never become a one-byte string slice.
@@ -100,15 +100,15 @@ impl StreamScanner {
                         });
                         text_start = j + 1;
                     }
-                    // 非 alt CSI：不处理，留在 data 中
+                    // Non-alt CSI stays in data unchanged.
                     i = j + 1;
                 }
-                // 其他 ESC 序列（ESC ( 0 等）：不拆解，留在 data
+                // Other ESC sequences such as ESC ( 0 stay in data.
                 _ => i += 1,
             }
         }
 
-        // 循环因不完整序列 break：结算已扫文本，残余进 pending
+        // A break on an incomplete sequence settles scanned text and keeps the tail in pending.
         if i < len {
             flush_data!(i);
             self.pending = s[i..].to_string();
@@ -119,7 +119,7 @@ impl StreamScanner {
     }
 }
 
-/// 解析 OSC body 的 code/payload：133 族取两段（'133;A'/'133;D'），其余取分号前第一段。
+/// Parse an OSC body into code and payload. The 133 family keeps two segments ('133;A'/'133;D'); others use the first segment.
 fn parse_osc(body: &str) -> (String, String) {
     match body.find(';') {
         None => (body.to_string(), String::new()),
@@ -319,7 +319,7 @@ mod tests {
         assert!(matches!(&d.push("[0m")[..], [ScanEvent::Data { text }] if text == "\x1b[0m"));
     }
 
-    /// 测试用 base64（std 无公开 base64；133;E payload 只需往返一致）。
+    /// Test-only base64 (std has no public base64; the 133;E payload only needs to round-trip).
     fn base64(s: &str) -> String {
         const T: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
         let bytes = s.as_bytes();
