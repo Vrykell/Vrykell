@@ -97,7 +97,7 @@ describe('gate', () => {
     }
     expect(authorize).not.toHaveBeenCalled();
   });
-  it('allow：带回租约且不打扰用户', async () => {
+  it('allow: returns a lease without disturbing the user', async () => {
     reset();
     setToolAuthorizer(async () => allow('lease-x'));
     const ctx = mkCtx();
@@ -106,7 +106,7 @@ describe('gate', () => {
     expect(ctx.states).toEqual([]);
   });
 
-  it('ask：先 approval-pending，用户允许后由后端签发租约', async () => {
+  it('ask: approval-pending first, then the backend issues a lease after the user allows', async () => {
     reset();
     setToolAuthorizer(async () => ASK);
     setToolApprover(async (tool, command, _args, scope) => {
@@ -121,7 +121,7 @@ describe('gate', () => {
     expect(ctx.states.map((s) => s.state)).toEqual(['approval-pending', 'running']);
   });
 
-  it('ask：用户拒绝 → denied 哨兵，不落 running', async () => {
+  it('ask: user denial → denied sentinel, never enters running', async () => {
     reset();
     setToolAuthorizer(async () => ASK);
     const ctx = mkCtx();
@@ -136,7 +136,7 @@ describe('gate', () => {
     expect(ctx.states.map((s) => s.state)).toEqual(['approval-pending', 'denied']);
   });
 
-  it('后端 deny：带原因直接拒绝，节点转灰环', async () => {
+  it('backend deny: rejects directly with a reason and turns the node into a grey ring', async () => {
     reset();
     setToolAuthorizer(async () => ({ decision: 'deny', reason: 'danger.recursive_delete' }));
     const ctx = mkCtx();
@@ -182,7 +182,7 @@ describe('gate', () => {
     await second;
   });
 
-  it('授权后端不可用：失败关闭', async () => {
+  it('authorization backend unavailable: fails closed', async () => {
     reset();
     setToolAuthorizer(async () => {
       throw new Error('ipc down');
@@ -192,7 +192,7 @@ describe('gate', () => {
     if (!g.proceed) expect(g.result.denied).toBe(true);
   });
 
-  it('无交互上下文（缺 tabId/setToolState）的 ask 按拒绝处理', async () => {
+  it('an ask without an interactive context (missing tabId/setToolState) is treated as a denial', async () => {
     reset();
     setToolAuthorizer(async () => ASK);
     const g = await gate('write_file', { path: '/x' }, 'tc1', {}, 'write_file_text');
@@ -200,7 +200,7 @@ describe('gate', () => {
     if (!g.proceed) expect(g.result.error).toContain('无法发起审批');
   });
 
-  it('shape：卡片拿到后端派生的形态，作答时按形态回传', async () => {
+  it('shape: the card receives the backend-derived shape and returns it with the answer', async () => {
     reset();
     setToolAuthorizer(async () => ({ decision: 'ask', shape: 'npm run' }));
     setToolApprover(async (tool, command, _args, scope) => {
@@ -217,7 +217,7 @@ describe('gate', () => {
     expect(ctx.states.map((s) => s.state)).toEqual(['approval-pending', 'running']);
   });
 
-  it('denyAllPending：挂起审批按拒绝放行（防悬挂）', async () => {
+  it('denyAllPending: pending approvals are released as denials (no dangling approvals)', async () => {
     reset();
     setToolAuthorizer(async () => ASK);
     const ctx = mkCtx();
@@ -230,7 +230,7 @@ describe('gate', () => {
   });
 });
 
-describe('审批超时（无人应答）', () => {
+describe('approval timeout (no response)', () => {
   it('keeps an unanswered approval reason in the transcript without a notification', async () => {
     vi.useFakeTimers();
     try {
@@ -258,7 +258,7 @@ describe('审批超时（无人应答）', () => {
     }
   });
 
-  it('到期前作答照常生效，超时定时器不再触发', async () => {
+  it('answering before expiry still applies, and the timeout timer no longer fires', async () => {
     vi.useFakeTimers();
     try {
       reset();
@@ -280,7 +280,7 @@ describe('审批超时（无人应答）', () => {
     }
   });
 
-  it('设定值夹在 1–30 分钟之间', () => {
+  it('the configured value is clamped between 1 and 30 minutes', () => {
     reset();
     expect(usePermissions.getState().approvalTimeoutSeconds).toBe(DEFAULT_APPROVAL_TIMEOUT_SECONDS);
     const set = usePermissions.getState().setApprovalTimeout;
@@ -293,8 +293,8 @@ describe('审批超时（无人应答）', () => {
   });
 });
 
-describe('levelOf（镜像 + UI 模式）', () => {
-  it('standard 用镜像表，strict 全部询问，relaxed 全部放行', () => {
+describe('levelOf (mirror + UI modes)', () => {
+  it('standard uses the mirror table, strict asks for everything, relaxed allows everything', () => {
     reset();
     expect(levelOf('read_file')).toBe('allow');
     expect(levelOf('run_command')).toBe('ask');

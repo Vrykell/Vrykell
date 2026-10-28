@@ -111,12 +111,12 @@ describe('UsageView', () => {
     expect(screen.getByTestId('usage-page')).toBeInTheDocument();
     expect(screen.getByTestId('usage-total-tokens')).toHaveTextContent('0');
     expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('0');
-    // 没有输入时命中率没有意义，显示占位符
+    // The hit rate is meaningless without input, so show a placeholder
     expect(screen.getByTestId('usage-cache-hit')).toHaveTextContent('—');
     expect(screen.getByTestId('usage-trend-chart')).toBeInTheDocument();
     expect(screen.getByText('这段时间没有记录到用量。')).toBeInTheDocument();
     expect(screen.getByTestId('usage-clear')).toBeDisabled();
-    // 页脚的口径说明整段移除（口径改挂在指标标签的悬停提示上）
+    // The footer's counting note is removed entirely (the rule now lives on the metric label tooltip)
     expect(screen.queryByText(/暂未计入/)).toBeNull();
   });
 
@@ -128,14 +128,14 @@ describe('UsageView', () => {
     expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('1');
     expect(screen.getByTestId('usage-fresh-input')).toHaveTextContent('400');
     expect(screen.getByTestId('usage-cache-hit')).toHaveTextContent('66.7%');
-    // 其余指标一次性展示，不再折叠
+    // The remaining metrics are shown at once, no longer collapsed
     expect(screen.getByTestId('usage-output')).toHaveTextContent('300');
     expect(screen.getByTestId('usage-cache-read')).toHaveTextContent('800');
     expect(screen.getByTestId('usage-steps')).toHaveTextContent('2');
     expect(screen.getByTestId('usage-tool-calls')).toHaveTextContent('3');
     expect(screen.queryByTestId('usage-more-metrics')).toBeNull();
 
-    // 口径提示挂在文字上（没有额外的 ⓘ 图标）
+    // The counting hint lives on the text (no extra info icon)
     const card = screen.getByTestId('usage-fresh-input').parentElement!;
     const tip = card.querySelector('[data-tip-description]');
     expect(tip).not.toBeNull();
@@ -145,7 +145,7 @@ describe('UsageView', () => {
   it('keeps four metric cards per row regardless of the page width', () => {
     seedSonnetTurn();
     render(<UsageView />);
-    // 固定四列：窗口变窄也不会挤成三列（卡片位置不跳动）
+    // Fixed four columns: the window never squeezes them into three (cards do not jump)
     expect(screen.getByTestId('usage-metrics').getAttribute('style')).toContain('repeat(4, minmax(0, 1fr))');
   });
 
@@ -175,7 +175,7 @@ describe('UsageView', () => {
     expect(bar).toHaveAttribute('rx', '3');
     expect(screen.queryByTestId('usage-trend-tooltip')).toBeNull();
 
-    // 悬停整列 → 显示完整时间与该项的数值；高亮只覆盖这一根柱（宽度跟着柱走）
+    // Hovering the whole column → shows the full time and this bucket's value; the highlight covers only this bar (width follows the bar)
     fireEvent.mouseEnter(screen.getByTestId('usage-trend-slot-0'));
     const tooltip = screen.getByTestId('usage-trend-tooltip');
     expect(tooltip).toHaveTextContent(/^\d{4}\/\d{2}\/\d{2} \d{2}:00/);
@@ -184,7 +184,7 @@ describe('UsageView', () => {
     const lane = screen.getByTestId('usage-trend-hover');
     expect(Number(lane.getAttribute('width'))).toBe(Number(bar.getAttribute('width')) + 8);
     expect(lane).toHaveAttribute('rx', '3');
-    // 左侧刻度列与绘图区等高：刻度才能落在自己的网格线上（不被标签行拉高）
+    // The left tick column matches the plot height so ticks land on their own grid lines (not stretched by the label row)
     const ticks = screen.getByTestId('usage-trend-ticks');
     expect(ticks.style.height).toBe('88px');
     expect([...ticks.children].map((child) => child.textContent)).toEqual(['1500', '750', '0']);
@@ -198,7 +198,7 @@ describe('UsageView', () => {
     seedSonnetTurn();
     render(<UsageView />);
 
-    // 行首的品牌标记：按模型家族取色（Claude → Anthropic 品牌色）
+    // Brand marker at the start of the row: colored by model family (the Claude family uses its vendor brand color)
     const dot = within(screen.getByTestId('usage-log-row')).getByTestId('usage-vendor-dot');
     expect(dot).toHaveAttribute('data-vendor', 'Anthropic');
     expect(dot).toHaveStyle({ color: 'var(--brand-anthropic)' });
@@ -235,7 +235,7 @@ describe('UsageView', () => {
       cachedInputTokens: 100, at: Date.now() - 10 * DAY,
     });
     render(<UsageView />);
-    // 默认「当天」：只有今天那条
+    // Defaults to "today": only today's entry
     expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('1');
 
     fireEvent.click(screen.getByTestId('usage-range'));
@@ -272,7 +272,7 @@ describe('UsageView', () => {
     expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('1');
     expect(screen.queryByTestId('usage-refreshed-at')).toBeNull();
 
-    // 另一个实例写进存储的记录：刷新后应当出现在页面里
+    // A record written to storage by another instance should appear after refreshing
     const stored = JSON.parse(localStorage.getItem('vrykell-usage') ?? '{}') as {
       state?: { records?: unknown[] };
     };
@@ -295,7 +295,7 @@ describe('UsageView', () => {
 
   it('filters models across reporting sources from the left chip bar', () => {
     seedSonnetTurn();
-    // 未来的 ACP harness（这里用 opencode 代指）报上来的一轮
+    // A turn reported by a future ACP harness (opencode stands in for it here)
     useUsageStore.getState().recordTurn({
       source: 'opencode', provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 100, outputTokens: 10,
     });
@@ -309,7 +309,7 @@ describe('UsageView', () => {
     expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('2');
     expect(screen.getByTestId('usage-total-tokens')).toHaveTextContent('1610');
 
-    // 再点一次回到全部来源
+    // Clicking again returns to all sources
     fireEvent.click(screen.getByTestId('usage-model-claude-sonnet-4'));
     expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('2');
     expect(screen.getByTestId('usage-model-all')).toHaveAttribute('aria-pressed', 'true');
@@ -332,7 +332,7 @@ describe('UsageView', () => {
     expect(screen.getByTestId('usage-range')).toBeInTheDocument();
     expect(screen.getByTestId('usage-clear')).toBeEnabled();
 
-    // 回到全部来源，token 视图恢复
+    // Back to all sources, the token view is restored
     fireEvent.click(screen.getByTestId('usage-model-all'));
     expect(screen.getByTestId('usage-metrics')).toBeInTheDocument();
     expect(screen.getByTestId('usage-record-count')).toBeInTheDocument();
@@ -346,7 +346,7 @@ describe('UsageView', () => {
     usage.acpToolCall('Claude Code');
     render(<UsageView />);
 
-    // ACP 不再是独立卡片：没有页签外的行，切到 ACP 页签才看到
+    // ACP is no longer a separate card: no row outside the tabs, it appears only on the ACP tab
     expect(screen.queryByTestId('usage-acp-row')).toBeNull();
     fireEvent.click(screen.getByTestId('usage-tab-acp'));
 

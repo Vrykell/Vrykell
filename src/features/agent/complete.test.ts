@@ -1,7 +1,8 @@
 /**
- * complete（M8）测试：本地级（历史前缀/路径）零网络可用；AI 增强叠加与降级。
- * 模块级 mock 'ai' + '@tauri-apps/api/core'；不用 beforeEach（vitest 4 陷阱），
- * 各用例开头调 reset()。
+ * complete (M8) tests: the local tier (history prefix/path) works with no network;
+ * AI enhancement layers on top and degrades gracefully.
+ * Module-level mocks for 'ai' and '@tauri-apps/api/core'; no beforeEach (a vitest 4 trap),
+ * each case calls reset() at the start.
  */
 import { describe, it, expect, vi } from 'vitest';
 
@@ -34,7 +35,7 @@ function reset() {
 
 const entry = (command: string) => ({ command, cwd: '/tmp', timestamp: 1, exitCode: 0 });
 
-describe('本地级（无 AI 也工作）', () => {
+describe('local tier (works without AI)', () => {
   it('excludes failed commands from every completion path but preserves searchable history', async () => {
     reset();
     useHistoryStore.setState({ entries: [
@@ -54,17 +55,17 @@ describe('本地级（无 AI 也工作）', () => {
     expect(prompt).not.toContain('git broken');
     expect(prompt).not.toContain('git interrupted');
   });
-  it('历史前缀匹配返回后缀，最近优先', () => {
+  it('history prefix match returns the suffix, most recent first', () => {
     reset();
     useHistoryStore.setState({
       entries: [entry('git checkout dev'), entry('git cherry-pick abc'), entry('ls')],
     });
     expect(localComplete('git che')).toBe('ckout dev');
-    expect(localComplete('ls -la')).toBeNull(); // 不比前缀长不给建议
+    expect(localComplete('ls -la')).toBeNull(); // no suggestion unless it is longer than the prefix
     expect(localComplete('npm')).toBeNull();
   });
 
-  it('looksLikePath 判定', () => {
+  it('looksLikePath detection', () => {
     expect(looksLikePath('/usr/b')).toBe(true);
     expect(looksLikePath('./src')).toBe(true);
     expect(looksLikePath('../x')).toBe(true);
@@ -73,7 +74,7 @@ describe('本地级（无 AI 也工作）', () => {
     expect(looksLikePath('git')).toBe(false);
   });
 
-  it('路径补全：相对路径拼 cwd，目录补结尾 /', async () => {
+  it('path completion: relative paths join cwd, directories get a trailing slash', async () => {
     reset();
     invokeMock.mockResolvedValue([
       { name: 'components', is_dir: true },
@@ -84,24 +85,24 @@ describe('本地级（无 AI 也工作）', () => {
     expect(r).toBe('onents/');
   });
 
-  it('路径补全：绝对路径直接用；~ 放弃；无 cwd 的相对路径放弃', async () => {
+  it('path completion: absolute paths are used directly; ~ is skipped; relative paths without cwd are skipped', async () => {
     reset();
     invokeMock.mockResolvedValue([{ name: 'bin', is_dir: true }]);
-    expect(await pathComplete('ls /us', undefined)).toBeNull(); // /us → dir '/', base 'us' 无匹配
+    expect(await pathComplete('ls /us', undefined)).toBeNull(); // /us resolves to dir '/', base 'us' has no match
     expect(invokeMock).toHaveBeenCalledWith('fs_list', { path: '/' });
     expect(await pathComplete('cd ~/doc', '/repo')).toBeNull();
     expect(await pathComplete('cd src/x', undefined)).toBeNull();
   });
 
-  it('路径补全：fs_list 失败静默返回 null', async () => {
+  it('path completion: fs_list failure silently returns null', async () => {
     reset();
     invokeMock.mockRejectedValue(new Error('目录不可读'));
     expect(await pathComplete('cat /etc/h', undefined)).toBeNull();
   });
 });
 
-describe('AI 增强', () => {
-  it('本地无结果且有 key → generateText，前缀校验通过才给后缀', async () => {
+describe('AI enhancement', () => {
+  it('no local result and a key present → generateText, suffix only when prefix validation passes', async () => {
     reset();
     useAiConfigStore.setState({ providerKeys: ['openai-compatible|https://api.example.com/v1'] });
     mockGenerate.mockResolvedValue({ text: 'kubectl get pods -n prod' });
@@ -111,34 +112,35 @@ describe('AI 增强', () => {
     expect(prompt).toContain('Input prefix: kubectl get po');
   });
 
-  it('AI 返回不以前缀开头 → null（不误导）', async () => {
+  it('AI result does not start with the prefix → null (no misleading suggestion)', async () => {
     reset();
     useAiConfigStore.setState({ providerKeys: ['openai-compatible|https://api.example.com/v1'] });
     mockGenerate.mockResolvedValue({ text: '完全不同的命令' });
     expect(await completeCommand('kubectl', {})).toBeNull();
   });
 
-  it('无 key → 跳过 AI（本地降级仍生效）', async () => {
+  it('no key → AI skipped (local fallback still applies)', async () => {
     reset();
     useHistoryStore.setState({ entries: [entry('docker ps -a')] });
-    expect(await completeCommand('docker p', {})).toBe('s -a'); // 本地命中
+    expect(await completeCommand('docker p', {})).toBe('s -a'); // local hit
     expect(mockGenerate).not.toHaveBeenCalled();
-    expect(await completeCommand('zz', {})).toBeNull(); // 本地无命中且无 key
+    expect(await completeCommand('zz', {})).toBeNull(); // no local hit and no key
     expect(mockGenerate).not.toHaveBeenCalled();
   });
 
-  it('completeModel 覆盖聊天模型', async () => {
+  it('completeModel overrides the chat model', async () => {
     reset();
     useAiConfigStore.setState({ providerKeys: ['openai-compatible|https://api.example.com/v1'], model: 'big-model' });
     useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS, completeModel: 'small-fast' }, overrides: {} });
     mockGenerate.mockResolvedValue({ text: 'xyz-done' });
     await completeCommand('xyz', {});
-    // createChatModel 收到的 model 是 completeModel（经 provider 工厂间接断言：
-    // 模型名进了生成调用的 prompt 无关，这里只断言生成被调用且结果正确即可）
+    // createChatModel receives completeModel (asserted indirectly through the provider
+    // factory: the model name does not affect the generation prompt, so asserting that
+    // generation ran and returned the right result is enough)
     expect(mockGenerate).toHaveBeenCalledTimes(1);
   });
 
-  it('abort 后返回 null', async () => {
+  it('returns null after abort', async () => {
     reset();
     useAiConfigStore.setState({ providerKeys: ['openai-compatible|https://api.example.com/v1'] });
     mockGenerate.mockImplementation(({ abortSignal }: { abortSignal: AbortSignal }) => {

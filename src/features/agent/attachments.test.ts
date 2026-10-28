@@ -1,7 +1,7 @@
 /**
- * attachments（M5）测试：序列化 roundtrip / 视觉启发式 / 模型映射降级。
- * 注意：不用 beforeEach（本仓库 vitest 4 陷阱，见 files.test.ts 头注释），
- * 各用例自设 mock 实现。
+ * attachments (M5) tests: serialization roundtrip / vision heuristic / model mapping fallback.
+ * Note: no beforeEach (a vitest 4 trap in this repository, see the header comment in
+ * files.test.ts); each case sets up its own mock implementation.
  */
 import { describe, it, expect, vi } from 'vitest';
 
@@ -26,8 +26,8 @@ const file: AttachmentMeta = {
   id: 'a2', kind: 'file', name: 'log.txt', mime: 'text/plain', size: 11, textContent: 'hello world',
 };
 
-describe('序列化', () => {
-  it('roundtrip；空/脏数据 → undefined', () => {
+describe('serialization', () => {
+  it('roundtrip; empty/dirty data → undefined', () => {
     const raw = serializeAttachments([img, file]);
     expect(deserializeAttachments(raw)).toEqual([img, file]);
     expect(serializeAttachments([])).toBe('');
@@ -38,12 +38,12 @@ describe('序列化', () => {
   });
 });
 
-describe('supportsVision 启发式', () => {
-  it('anthropic/gemini 原生支持', () => {
+describe('supportsVision heuristic', () => {
+  it('anthropic/gemini support it natively', () => {
     expect(supportsVision('anthropic', 'claude-sonnet-5')).toBe(true);
     expect(supportsVision('gemini', 'gemini-2.5-pro')).toBe(true);
   });
-  it('openai-compatible 按模型名', () => {
+  it('openai-compatible by model name', () => {
     expect(supportsVision('openai-compatible', 'gpt-4o')).toBe(true);
     expect(supportsVision('openai-compatible', 'qwen2.5-vl-72b')).toBe(true);
     expect(supportsVision('openai-compatible', 'deepseek-chat')).toBe(false);
@@ -51,7 +51,7 @@ describe('supportsVision 启发式', () => {
 });
 
 describe('attachmentsForModel', () => {
-  it('视觉模型：图片读 blob → dataUrl image part', async () => {
+  it('vision model: image reads blob → dataUrl image part', async () => {
     invokeMock.mockResolvedValue('aGVsbG8='); // read_attachment
     const r = await attachmentsForModel([img, file], true);
     expect(r.images).toEqual(['data:image/png;base64,aGVsbG8=']);
@@ -59,20 +59,20 @@ describe('attachmentsForModel', () => {
     expect(r.text).toContain('hello world');
   });
 
-  it('非视觉模型：图片降级为占位提示', async () => {
+  it('non-vision model: images fall back to a placeholder hint', async () => {
     const r = await attachmentsForModel([img], false);
     expect(r.images).toEqual([]);
     expect(r.text).toContain('不支持图片输入');
   });
 
-  it('blob 读取失败降级为占位提示而不抛出', async () => {
+  it('blob read failure falls back to a placeholder hint without throwing', async () => {
     invokeMock.mockRejectedValue(new Error('附件不存在'));
     const r = await attachmentsForModel([img], true);
     expect(r.images).toEqual([]);
     expect(r.text).toContain('读取失败');
   });
 
-  it('paste 附件标记为粘贴的文本', async () => {
+  it('paste attachment is labelled as pasted text', async () => {
     const p = makePasteAttachment('x'.repeat(600));
     const r = await attachmentsForModel([p], true);
     expect(r.text).toContain('【粘贴的文本】');
@@ -80,8 +80,8 @@ describe('attachmentsForModel', () => {
   });
 });
 
-describe('限额', () => {
-  it('totalSize 累加；粘贴阈值 500', () => {
+describe('limits', () => {
+  it('totalSize accumulates; paste threshold 500', () => {
     expect(totalSize([img, file])).toBe(1245);
     expect(LIMITS.pasteFoldChars).toBe(500);
     expect(LIMITS.imageBytes).toBe(5 * 1024 * 1024);

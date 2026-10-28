@@ -15,20 +15,20 @@ describe('anthropicStream', () => {
     listenMock.mockReset();
   });
 
-  it('后端报错时抛出错误', async () => {
+  it('throws when the backend reports an error', async () => {
     listenMock.mockResolvedValue(() => {});
     invokeMock.mockRejectedValue('尚未配置 API Key');
     await expect(anthropicStream([], () => {})).rejects.toThrow('尚未配置 API Key');
   });
 
-  it('把 ai-chunk 事件逐块转发给 onChunk', async () => {
+  it('forwards ai-chunk events to onChunk chunk by chunk', async () => {
     let handler: ((e: { payload: { id: string; text: string } }) => void) | undefined;
     listenMock.mockImplementation(async (_event: string, cb: typeof handler) => {
       handler = cb;
       return () => {};
     });
     invokeMock.mockImplementation(async (_cmd: string, args: { id: string }) => {
-      // 模拟后端逐块 emit，id 用真实调用参数，验证按 id 过滤
+      // Simulate the backend emitting chunks; use the real call id to verify id filtering
       handler?.({ payload: { id: args.id, text: '你好' } });
       handler?.({ payload: { id: args.id, text: '！' } });
       handler?.({ payload: { id: 'other-id', text: '（应被过滤）' } });
@@ -42,19 +42,19 @@ describe('anthropicStream', () => {
   });
 });
 
-describe('ai 镜像函数（新增）', () => {
+describe('ai mirror helpers (new)', () => {
   beforeEach(() => {
     invokeMock.mockReset();
   });
 
-  it('activeModelProfile：优先列表命中，空列表回退镜像字段', () => {
+  it('activeModelProfile: prefers a list hit, falls back to mirror fields when the list is empty', () => {
     useAiConfigStore.setState({ models: [{ id: 'a', name: 'A', provider: 'anthropic', baseUrl: 'u', model: 'm1' }], activeModel: 'a' });
     expect(activeModelProfile().model).toBe('m1');
     useAiConfigStore.setState({ models: [], activeModel: '', provider: 'gemini', baseUrl: 'u2', model: 'm2' });
     expect(activeModelProfile().model).toBe('m2');
   });
 
-  it('isApiKeyConfigured：按 provider 检查 key', () => {
+  it('isApiKeyConfigured: checks the key per provider', () => {
     useAiConfigStore.setState({
       providerKeys: ['openai-compatible|https://api.openai.com/v1'],
       provider: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', models: [], activeModel: '',
@@ -66,19 +66,19 @@ describe('ai 镜像函数（新增）', () => {
     expect(isApiKeyConfigured()).toBe(false);
   });
 
-  it('getModel / getAiBaseUrl 返回镜像值', () => {
+  it('getModel / getAiBaseUrl return the mirror values', () => {
     useAiConfigStore.setState({ model: 'm3', baseUrl: 'u3' });
     expect(getModel()).toBe('m3');
     expect(getAiBaseUrl()).toBe('u3');
   });
 
-  it('getModel / getAiBaseUrl 空值时回退默认', () => {
+  it('getModel / getAiBaseUrl fall back to defaults when empty', () => {
     useAiConfigStore.setState({ model: '', baseUrl: '' });
     expect(getModel()).toBe('gpt-4o-mini');
     expect(getAiBaseUrl()).toBe('https://api.openai.com/v1');
   });
 
-  it('activeModelProfile：列表无命中时取第一项', () => {
+  it('activeModelProfile: takes the first entry when the list has no match', () => {
     useAiConfigStore.setState({
       models: [{ id: 'a', name: 'A', provider: 'gemini', baseUrl: 'u', model: 'g1' }],
       activeModel: '不存在的id',
@@ -86,7 +86,7 @@ describe('ai 镜像函数（新增）', () => {
     expect(activeModelProfile().model).toBe('g1');
   });
 
-  it('isApiKeyConfigured：gemini 分支', () => {
+  it('isApiKeyConfigured: gemini branch', () => {
     useAiConfigStore.setState({
       providerKeys: ['gemini|https://generativelanguage.googleapis.com/v1beta'],
       provider: 'gemini', baseUrl: '', models: [], activeModel: '',
@@ -96,7 +96,7 @@ describe('ai 镜像函数（新增）', () => {
     expect(isApiKeyConfigured()).toBe(false);
   });
 
-  it('refreshAiConfig：同步 Rust 配置；后端不可用时保持默认', async () => {
+  it('refreshAiConfig: syncs the Rust config; keeps defaults when the backend is unavailable', async () => {
     invokeMock.mockResolvedValue({
       has_key: true, base_url: 'u', model: 'm', provider: 'anthropic',
       has_anthropic_key: true, has_gemini_key: false, has_tavily_key: true,
@@ -117,7 +117,7 @@ describe('ai 镜像函数（新增）', () => {
     expect(useAiConfigStore.getState().model).toBe('keep');
   });
 
-  it('refreshAiConfig：models 缺省时兜底为空数组', async () => {
+  it('refreshAiConfig: falls back to an empty array when models is missing', async () => {
     invokeMock.mockResolvedValue({ has_key: false, base_url: 'u', model: 'm', provider: 'openai-compatible' });
     await refreshAiConfig();
     expect(useAiConfigStore.getState().models).toEqual([]);
@@ -151,7 +151,7 @@ describe('ai 镜像函数（新增）', () => {
     expect(useAiConfigStore.getState().provider).toBe('gemini');
   });
 
-  it('setAiModels：替换列表并同步镜像字段，未命中时回退默认', async () => {
+  it('setAiModels: replaces the list and syncs mirror fields, falling back to defaults on a miss', async () => {
     await setAiModels([{ id: 'a', name: 'A', provider: 'anthropic', baseUrl: 'u', model: 'm1' }], 'a');
     expect(invokeMock).toHaveBeenCalledWith('set_ai_models', expect.objectContaining({ activeModel: 'a' }));
     const s = useAiConfigStore.getState();
@@ -164,7 +164,7 @@ describe('ai 镜像函数（新增）', () => {
     expect(s2.model).toBe('gpt-4o-mini');
   });
 
-  it('setActiveModel：切换生效模型，未命中回退默认', async () => {
+  it('setActiveModel: switches the effective model, falls back to defaults on a miss', async () => {
     useAiConfigStore.setState({ models: [{ id: 'b', name: 'B', provider: 'gemini', baseUrl: 'u', model: 'g9' }], activeModel: '' });
     await setActiveModel('b');
     expect(invokeMock).toHaveBeenCalledWith('set_active_model', { id: 'b' });
@@ -179,7 +179,7 @@ describe('ai 镜像函数（新增）', () => {
     expect(useAiConfigStore.getState().provider).toBe('openai-compatible');
   });
 
-  it('setProviderKey / clearProviderKey：按 provider 身份各存各的', async () => {
+  it('setProviderKey / clearProviderKey: stores keys separately per provider identity', async () => {
     await setProviderKey('anthropic|https://api.anthropic.com/v1', ' key-a ');
     expect(invokeMock).toHaveBeenCalledWith('set_provider_key', {
       providerId: 'anthropic|https://api.anthropic.com/v1', key: 'key-a',
@@ -207,7 +207,7 @@ describe('ai 镜像函数（新增）', () => {
     expect(useAiConfigStore.getState().hasTavilyKey).toBe(false);
   });
 
-  it('selectProvider：记住选择并写入 localStorage，null 清空', () => {
+  it('selectProvider: remembers the choice in localStorage, null clears it', () => {
     selectProvider('anthropic|https://api.anthropic.com/v1');
     const s = useAiConfigStore.getState();
     expect(s.selectedProvider).toBe('anthropic|https://api.anthropic.com/v1');

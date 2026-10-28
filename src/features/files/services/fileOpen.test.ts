@@ -30,23 +30,23 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('模板文本解析/序列化', () => {
+describe('template text parsing/serialization', () => {
   it('quotes every remote file placeholder and refuses control characters', () => {
     const config = cfg({ remoteTemplates: { txt: 'diff {file} {file}' } });
     expect(remoteOpenCommand(config, "/tmp/it's.txt")).toBe("diff '/tmp/it'\\''s.txt' '/tmp/it'\\''s.txt'\n");
     expect(() => remoteOpenCommand(config, '/tmp/\x15echo unsafe\r#')).toThrow();
   });
-  it('每行 ext=命令，忽略注释和空行', () => {
+  it('each line is ext=command, comments and blank lines are ignored', () => {
     const t = parseTemplatesText('md=code\n# 注释\n\n.PNG=__system__\n坏行\n=log');
     expect(t).toEqual({ md: 'code', png: SYSTEM_DEFAULT });
   });
-  it('序列化往返', () => {
+  it('serialization roundtrip', () => {
     const t = { md: 'code', png: SYSTEM_DEFAULT };
     expect(parseTemplatesText(serializeTemplates(t))).toEqual(t);
   });
 });
 
-describe('openFile（策略在 Rust，前端只做副作用）', () => {
+describe('openFile (policy lives in Rust, the frontend only performs side effects)', () => {
   it('passes the selected terminal shell to command construction', async () => {
     invokeMock.mockResolvedValue({ via: 'terminal', editor: 'vim', command: "vim 'C:/a''b.txt'", fellBack: false });
     const write = vi.fn();
@@ -54,7 +54,7 @@ describe('openFile（策略在 Rust，前端只做副作用）', () => {
     expect(invokeMock).toHaveBeenCalledWith('file_open', { path: "C:/a'b.txt", cfg: { ...cfg(), shell: 'pwsh' } });
     expect(write).toHaveBeenCalledWith("vim 'C:/a''b.txt'");
   });
-  it('Rust 返回 terminal → 写命令', async () => {
+  it('Rust returns terminal → writes the command', async () => {
     invokeMock.mockResolvedValue({
       via: 'terminal',
       editor: 'vim',
@@ -68,7 +68,7 @@ describe('openFile（策略在 Rust，前端只做副作用）', () => {
     expect(r).toEqual({ via: 'terminal', editor: 'vim', fellBack: false });
   });
 
-  it('Rust 返回 terminal fellBack → 标记降级', async () => {
+  it('Rust returns terminal fellBack → marks degradation', async () => {
     invokeMock.mockResolvedValue({
       via: 'terminal',
       editor: 'nano',
@@ -79,33 +79,33 @@ describe('openFile（策略在 Rust，前端只做副作用）', () => {
     expect(r).toEqual({ via: 'terminal', editor: 'nano', fellBack: true });
   });
 
-  it('Rust 返回 system → openPath 且非降级', async () => {
+  it('Rust returns system → openPath without degradation', async () => {
     invokeMock.mockResolvedValue({ via: 'system', degraded: false });
     const r = await openFile('/tmp/a.png', vi.fn());
     expect(openPath).toHaveBeenCalledWith('/tmp/a.png');
     expect(r).toEqual({ via: 'system', degraded: false });
   });
 
-  it('Rust 返回 system degraded → openPath 且标记降级', async () => {
+  it('Rust returns system degraded → openPath and marks degradation', async () => {
     invokeMock.mockResolvedValue({ via: 'system', degraded: true });
     const r = await openFile('/tmp/a.txt', vi.fn());
     expect(r).toEqual({ via: 'system', degraded: true });
   });
 });
 
-describe('配置读写', () => {
-  it('无存储时返回默认配置', () => {
+describe('config read/write', () => {
+  it('returns the default config when storage is empty', () => {
     expect(loadConfig()).toEqual(DEFAULT_CONFIG);
   });
-  it('损坏 JSON 返回默认配置', () => {
+  it('returns the default config for corrupt JSON', () => {
     localStorage.setItem('vrykell-file-open', '{bad');
     expect(loadConfig()).toEqual(DEFAULT_CONFIG);
   });
-  it('空 defaultEditor 回退 vim', () => {
+  it('falls back to vim when defaultEditor is empty', () => {
     localStorage.setItem('vrykell-file-open', JSON.stringify({ defaultEditor: '  ', templates: { md: 'code' } }));
     expect(loadConfig()).toEqual({ defaultEditor: 'vim', templates: { md: 'code' }, remoteEditor: 'vim', remoteTemplates: {} });
   });
-  it('save/load 往返', () => {
+  it('save/load roundtrip', () => {
     const c = cfg({ defaultEditor: 'emacs', templates: { rs: 'nvim' } });
     expect(saveConfig(c)).toBe(true);
     expect(loadConfig()).toEqual(c);

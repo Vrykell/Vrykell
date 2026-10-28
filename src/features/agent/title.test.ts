@@ -1,8 +1,10 @@
 /**
- * title（M7）测试：触发算法 —— 充分性（≥3 done 块或 ≥50 字首轮回答）、
- * 手动命名保护、titleAuto 覆盖、60s 冷却、无 key 跳过、开关、sanitize。
- * 模块级 mock 'ai'（generateText）+ '@tauri-apps/api/core'；不用 beforeEach
- * （本仓库 vitest 4 陷阱，见 files.test.ts 头注释），各用例开头调 reset()。
+ * title (M7) tests: the trigger algorithm - sufficiency (>=3 done blocks or a >=50-character
+ * first answer), manual naming protection, titleAuto override, 60s cooldown, skipping without
+ * a key, the toggle, and sanitize.
+ * Module-level mocks for 'ai' (generateText) and '@tauri-apps/api/core'; no beforeEach
+ * (a vitest 4 trap in this repository, see the header comment in files.test.ts), each case
+ * calls reset() at the start.
  */
 import { describe, it, expect, vi } from 'vitest';
 
@@ -55,15 +57,15 @@ function setThreeDoneBlocks(tabId: string) {
   });
 }
 
-describe('智能标题触发', () => {
-  it('信息不足（<3 done 块且无长回答）→ 不生成', async () => {
+describe('automatic title trigger', () => {
+  it('insufficient information (<3 done blocks and no long answer) → no generation', async () => {
     reset();
     useBlockStore.setState({ byTab: { t1: [doneBlock('b1', 'ls')] } });
     expect(await maybeAutoTitle('t1')).toBe(false);
     expect(mockGenerate).not.toHaveBeenCalled();
   });
 
-  it('≥3 done 块 → 生成并落标题（sanitize 去引号尾标点）', async () => {
+  it('>=3 done blocks → generate and set the title (sanitize strips quotes and trailing punctuation)', async () => {
     reset();
     setThreeDoneBlocks('t1');
     expect(await maybeAutoTitle('t1')).toBe(true);
@@ -88,7 +90,7 @@ describe('智能标题触发', () => {
     expect(prompt).toContain('cargo test');
   });
 
-  it('首轮 AI 回答 ≥50 字也触发（无命令块）', async () => {
+  it('a first AI answer of >=50 characters also triggers (no command blocks)', async () => {
     reset();
     useChatStore.setState({
       byTab: {
@@ -104,7 +106,7 @@ describe('智能标题触发', () => {
     expect(prompt).toContain('讲讲 Rust 生命周期');
   });
 
-  it('手动命名的标签不被覆盖', async () => {
+  it('a manually named tab is not overwritten', async () => {
     reset();
     useSessionStore.setState({ tabs: [mkTab('t1', { title: '我的窗口', titleSource: 'manual' })], activeId: 't1' });
     setThreeDoneBlocks('t1');
@@ -112,7 +114,7 @@ describe('智能标题触发', () => {
     expect(mockGenerate).not.toHaveBeenCalled();
   });
 
-  it('截断兜底命名的标签（command 来源）可被 AI 标题升级', async () => {
+  it('a tab with a truncated fallback name (command source) can be upgraded by an AI title', async () => {
     reset();
     useSessionStore.setState({
       tabs: [mkTab('t1', { title: 'git status', titleSource: 'command' })],
@@ -123,19 +125,19 @@ describe('智能标题触发', () => {
     expect(useSessionStore.getState().tabs[0]!.title).toBe('Rust 学习笔记');
   });
 
-  it('冷却：60s 内第二次尝试直接跳过', async () => {
+  it('cooldown: a second attempt within 60s is skipped', async () => {
     reset();
     setThreeDoneBlocks('t1');
     expect(await maybeAutoTitle('t1', 100_000)).toBe(true);
-    // 同一 tab 立即再来 → 冷却拦截
+    // The same tab immediately again → blocked by the cooldown
     expect(await maybeAutoTitle('t1', 100_001)).toBe(false);
     expect(mockGenerate).toHaveBeenCalledTimes(1);
-    // 61s 后放行
+    // Allowed again after 61s
     expect(await maybeAutoTitle('t1', 161_001)).toBe(true);
     expect(mockGenerate).toHaveBeenCalledTimes(2);
   });
 
-  it('开关关闭 → 不生成', async () => {
+  it('toggle off → no generation', async () => {
     reset();
     useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS, autoTitle: false }, overrides: {} });
     setThreeDoneBlocks('t1');
@@ -143,7 +145,7 @@ describe('智能标题触发', () => {
     expect(mockGenerate).not.toHaveBeenCalled();
   });
 
-  it('无 key → 启发式总结（首个提问首行）', async () => {
+  it('no key → heuristic summary (first line of the first question)', async () => {
     reset();
     useAiConfigStore.setState({ providerKeys: [] });
     setThreeDoneBlocks('t1');
@@ -161,7 +163,7 @@ describe('智能标题触发', () => {
     expect(tab?.title).toContain('帮我看看这个报错');
   });
 
-  it('generateText 失败 → false 不抛出，冷却仍计时', async () => {
+  it('generateText failure → false, does not throw, cooldown still runs', async () => {
     reset();
     setThreeDoneBlocks('t1');
     mockGenerate.mockRejectedValue(new Error('网络错误'));
@@ -172,7 +174,7 @@ describe('智能标题触发', () => {
 });
 
 describe('sanitizeTitle', () => {
-  it('去引号/换行/尾标点，限长 16 字', () => {
+  it('strips quotes/newlines/trailing punctuation, capped at 16 characters', () => {
     expect(sanitizeTitle('  「标题」。\n')).toBe('标题');
     expect(sanitizeTitle('a'.repeat(30))).toBe('a'.repeat(16));
     expect(sanitizeTitle('"\n')).toBe('');
