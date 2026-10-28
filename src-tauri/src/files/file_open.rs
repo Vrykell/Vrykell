@@ -1,17 +1,18 @@
-//! file_open — 文件面板的文件打开策略（原 src/lib/fileOpen.ts 的下沉）。
+//! file_open — file open policy for the file panel (originally implemented in src/lib/fileOpen.ts).
 //!
-//! 纯策略（shell 引用 / 扩展名 / 模板解析 / 命令构造 / 编辑器可用性降级）
-//! 收在 Rust，前端只保留 localStorage 配置读写、openPath（系统默认应用）与
-//! ptyWrite（把命令写进终端）两个副作用。这样可注入 check 的可用性检测、
-//! 降级链不再往返多次 IPC。
+//! Pure policy (shell quoting / extension / template resolution / command construction /
+//! editor availability fallback) lives in Rust; the frontend keeps only localStorage config
+//! reads/writes, openPath (system default app) and ptyWrite (writing the command into the
+//! terminal) as side effects. This keeps the injectable availability check and the fallback
+//! chain from needing multiple IPC round trips.
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 
-/// 模板特殊值：用系统默认应用打开
+/// Template sentinel: open with the system default application
 const SYSTEM_DEFAULT: &str = "__system__";
 
-/// 编辑器不可用时的降级链（配置的编辑器优先，系统默认应用兜底）
+/// Fallback chain when no editor is available (configured editor first, system default app last)
 const FALLBACK_EDITORS: [&str; 3] = ["vim", "nano", "vi"];
 
 #[derive(Clone, Debug, Deserialize)]
@@ -23,7 +24,8 @@ pub struct FileOpenConfig {
     pub shell: Option<String>,
 }
 
-/// file_open 命令的返回：terminal 附带最终命令行，system 表示走系统默认应用。
+/// Result of the file_open command: terminal carries the final command line, system means the
+/// system default application.
 #[derive(Serialize, Debug, PartialEq)]
 #[serde(tag = "via", rename_all = "camelCase", rename_all_fields = "camelCase")]
 pub enum FileOpenResult {
@@ -37,14 +39,14 @@ pub enum FileOpenResult {
     },
 }
 
-// ── 命令构造 ──
+// ── Command construction ──
 
-/// POSIX shell 单引号引用
+/// POSIX shell single-quote quoting
 fn shell_quote(p: &str) -> String {
     format!("'{}'", p.replace('\'', "'\\''"))
 }
 
-/// 取小写扩展名（无点或点开头隐藏文件返回空串）
+/// Lowercase extension (empty when there is no dot or for dot-prefixed hidden files)
 fn ext_of(path: &str) -> String {
     let base = path.rsplit('/').next().unwrap_or("");
     match base.rfind('.') {
@@ -58,7 +60,7 @@ enum Target {
     Command(String),
 }
 
-/// 按扩展名解析打开方式
+/// Resolve the open method by extension
 fn resolve_target(path: &str, cfg: &FileOpenConfig) -> Target {
     let tpl = cfg
         .templates
@@ -72,7 +74,7 @@ fn resolve_target(path: &str, cfg: &FileOpenConfig) -> Target {
     }
 }
 
-/// 模板 → 完整命令行（有 {file} 替换，无则追加引用路径）
+/// Template → full command line (substitute {file} when present, otherwise append the quoted path)
 fn build_command(template: &str, path: &str, shell: Option<&str>) -> Result<String, String> {
     if path.chars().any(char::is_control) {
         return Err("Files with control characters cannot be opened in a terminal.".into());
@@ -94,7 +96,7 @@ fn build_command(template: &str, path: &str, shell: Option<&str>) -> Result<Stri
     }
 }
 
-/// 模板的主命令名（第一个 token），用于可用性检测
+/// Primary command name of the template (first token), used for availability detection
 fn template_bin(template: &str) -> String {
     template
         .split_whitespace()
@@ -103,9 +105,10 @@ fn template_bin(template: &str) -> String {
         .to_string()
 }
 
-// ── 可用性检测与降级 ──
+// ── Availability detection and fallback ──
 
-/// 选出第一个可用的编辑器；都不可用返回 None。check 可注入便于测试。
+/// Pick the first available editor; returns None when none is available. check is injectable
+/// for tests.
 fn pick_editor<F>(preferred: &str, check: F) -> Result<Option<String>, String>
 where
     F: Fn(&str) -> Result<bool, String>,
@@ -127,7 +130,7 @@ where
     Ok(None)
 }
 
-/// 打开文件的核心策略（同步实现，命令层用 spawn_blocking 包裹）。
+/// Core file open policy (synchronous; the command layer wraps it in spawn_blocking).
 fn file_open_sync<F>(
     path: &str,
     cfg: &FileOpenConfig,
@@ -140,7 +143,7 @@ where
         Target::System => Ok(FileOpenResult::System { degraded: false }),
         Target::Command(template) => {
             let bin = template_bin(&template);
-            // 模板主命令可用 → 原样执行（保留参数/占位符）
+            // Template binary available → run as-is (keep arguments/placeholders)
             if !bin.is_empty() && check(&bin)? {
                 return Ok(FileOpenResult::Terminal {
                     editor: bin,
@@ -148,7 +151,7 @@ where
                     fell_back: false,
                 });
             }
-            // 不可用 → 降级链（配置的编辑器 → vim → nano → vi）
+            // Unavailable → fallback chain (configured editor → vim → nano → vi)
             let preferred = if bin.is_empty() {
                 cfg.default_editor.clone()
             } else {
@@ -168,7 +171,8 @@ where
 
 #[tauri::command]
 pub async fn file_open(path: String, cfg: FileOpenConfig) -> Result<FileOpenResult, String> {
-    // which_cmd_sync 会 spawn 登录 shell 解析 PATH，阻塞；放到阻塞线程池避免卡事件循环。
+    // which_cmd_sync spawns a login shell to resolve PATH and blocks; run it on the blocking
+    // pool so the event loop stays responsive.
     tauri::async_runtime::spawn_blocking(move || {
         file_open_sync(&path, &cfg, |c| crate::files::fs::which_cmd_sync(c.to_string()))
     })
@@ -176,9 +180,10 @@ pub async fn file_open(path: String, cfg: FileOpenConfig) -> Result<FileOpenResu
     .map_err(|e| e.to_string())?
 }
 
-/// 用系统「打开方式」对话框打开文件：Windows 弹 OpenAs_RunDLL 选择器，
-/// macOS 在 Finder 中显示该文件（右键即可选应用），Linux 退回默认应用。
-/// 仅发起，不等待用户选择（spawn 后立即返回）。
+/// Open a file with the system "open with" dialog: Windows shows the OpenAs_RunDLL picker,
+/// macOS reveals the file in Finder (right-click to choose an app), Linux falls back to the
+/// default application. Fire and forget; does not wait for the user's choice (returns right
+/// after spawning).
 #[tauri::command]
 pub fn file_open_with(path: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
@@ -197,7 +202,7 @@ pub fn file_open_with(path: String) -> Result<(), String> {
     }
     #[cfg(all(unix, not(target_os = "macos")))]
     {
-        // Linux 无统一「打开方式」对话框，退回默认应用打开
+        // Linux has no unified "open with" dialog; fall back to the default application
         std::process::Command::new("xdg-open")
             .arg(&path)
             .spawn()

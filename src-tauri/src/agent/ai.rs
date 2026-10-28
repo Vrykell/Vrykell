@@ -1,9 +1,9 @@
-//! AI 调用下沉到 Rust：API key / Base URL / 模型存后端（持久化到
-//! ~/.vrykell/config.json），不进 webview 的 localStorage。
-//! 前端只负责把消息发来、订阅 `ai-chunk` 事件收流式文本。
+//! AI calls are handled in Rust: API key / Base URL / model stay in the backend (persisted to
+//! ~/.vrykell/config.json) and never enter the webview's localStorage.
+//! The frontend only sends messages and subscribes to the `ai-chunk` event for streamed text.
 //!
-//! 采用 OpenAI 兼容的 `/chat/completions` 流式协议（可配 Base URL），
-//! 因此支持 OpenAI / DeepSeek / 通义 / Moonshot / GLM 等各类兼容服务。
+//! Uses the OpenAI-compatible `/chat/completions` streaming protocol (configurable Base URL),
+//! so any service exposing that protocol works.
 
 use base64::Engine as _;
 use futures_util::future::{AbortHandle, Abortable};
@@ -19,13 +19,14 @@ const DEFAULT_BASE_URL: &str = "https://api.openai.com/v1";
 const DEFAULT_MODEL: &str = "gpt-4o-mini";
 const DEFAULT_PROVIDER: &str = "openai-compatible";
 
-/// 全局 AI 配置（provider / 各家 key / base_url / model），Mutex 保护 + 落盘持久化。
+/// Global AI configuration (provider / per-provider keys / base_url / model), guarded by a Mutex
+/// and persisted to disk.
 pub struct AiConfig(Mutex<AiConfigInner>);
 
-/// 一个可用的模型配置（命名 profile）：独立 provider/base_url/model。
-/// API key 仍按 provider 复用（api_key / anthropic_key / gemini_key）。
-/// 注意：字段序列化为 camelCase（baseUrl），与前端 ModelProfile 对齐。
-/// 模型能力标记（创建时由前端探测，随 profile 持久化）。
+/// One usable model configuration (named profile): independent provider/base_url/model.
+/// API keys are still reused per provider (api_key / anthropic_key / gemini_key).
+/// Note: fields serialize as camelCase (baseUrl) to match the frontend ModelProfile.
+/// Model capability flags (detected by the frontend on creation, persisted with the profile).
 #[derive(Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct ModelCapabilities {
@@ -51,19 +52,19 @@ pub struct ModelProfile {
     pub model: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_name: Option<String>,
-    /// 自定义分组名；缺省按厂商自动分组
+    /// Custom group name; defaults to automatic grouping by vendor
     #[serde(default)]
     pub group: Option<String>,
-    /// 能力标记（缺省 = 未探测，前端按名字启发式兜底）
+    /// Capability flags (default = not detected; the frontend falls back to name heuristics)
     #[serde(default)]
     pub capabilities: Option<ModelCapabilities>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
 struct AiConfigInner {
-    /// Key 不进 config.json（`skip_serializing`）：它们存在平台密钥存储里（Windows DPAPI /
-    /// macOS 钥匙串 / 其它平台的 0600 文件，见 `crate::secret`）。字段仍可反序列化，用于把
-    /// 旧版明文文件里的 key 一次性迁移出去。
+    /// Keys never enter config.json (`skip_serializing`): they live in the platform secret store
+    /// (Windows DPAPI / macOS keychain / a 0600 file on other platforms, see `crate::secret`).
+    /// The fields still deserialize so keys in legacy plaintext files can be migrated out once.
     #[serde(default, skip_serializing)]
     api_key: Option<String>,
     #[serde(default = "default_base_url")]
@@ -79,18 +80,19 @@ struct AiConfigInner {
     gemini_key: Option<String>,
     #[serde(default, skip_serializing)]
     tavily_key: Option<String>,
-    /// 多模型列表（命名 profile）
+    /// Model list (named profiles)
     #[serde(default)]
     models: Vec<ModelProfile>,
-    /// 当前生效模型 id（对应 models 里某一项）
+    /// Active model id (one of the entries in models)
     #[serde(default)]
     active_model: String,
-    /// 已配置密钥的 provider 身份列表（`kind|生效端点`）；密钥本体在平台密钥存储里。
+    /// Provider identities that have a configured key (`kind|effective endpoint`); the keys
+    /// themselves live in the platform secret store.
     #[serde(default)]
     provider_keys: Vec<String>,
 }
 
-/// 平台密钥存储里的账户名（`crate::secret`）。
+/// Account names in the platform secret store (`crate::secret`).
 const SECRET_OPENAI: &str = "ai.openai";
 const SECRET_ANTHROPIC: &str = "ai.anthropic";
 const SECRET_GEMINI: &str = "ai.gemini";
@@ -117,8 +119,9 @@ fn is_default_base_url(url: &str) -> bool {
         || url == DEFAULT_BASE_URL_OPENCODE
 }
 
-/// provider 身份（家族 + 生效端点），与前端 `providerList.providerId` 的算法一致；
-/// 密钥按这个身份各存各的，换服务商就换密钥。
+/// Provider identity (family + effective endpoint), matching the frontend
+/// `providerList.providerId` algorithm; keys are stored per identity, so switching providers
+/// switches keys.
 fn provider_identity(kind: &str, base_url: &str) -> String {
     let trimmed = base_url.trim().trim_end_matches('/');
     let effective = if trimmed.is_empty() || is_default_base_url(trimmed) {
@@ -129,7 +132,8 @@ fn provider_identity(kind: &str, base_url: &str) -> String {
     format!("{kind}|{effective}")
 }
 
-/// 平台密钥存储里的账户名：按 provider 身份的稳定散列命名，URL 不进文件名。
+/// Account name in the platform secret store: a stable hash of the provider identity keeps URLs
+/// out of file names.
 fn provider_secret_name(provider_id: &str) -> String {
     let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
     for byte in provider_id.as_bytes() {
@@ -139,7 +143,8 @@ fn provider_secret_name(provider_id: &str) -> String {
     format!("ai.provider.{hash:016x}")
 }
 
-/// 某个 provider 的 key：只读平台密钥存储（明文不进配置文件）。
+/// Key for one provider: read-only from the platform secret store (plaintext never enters the
+/// config file).
 fn read_provider_key(provider_id: &str) -> Option<String> {
     crate::secret::get_secret(&provider_secret_name(provider_id)).filter(|key| !key.trim().is_empty())
 }
@@ -172,7 +177,8 @@ impl Default for AiConfigInner {
 }
 
 impl AiConfigInner {
-    /// 从旧单模型字段迁移出首个 model profile，并保证 active_model 有效。
+    /// Migrate the first model profile out of the legacy single-model fields and keep
+    /// active_model valid.
     fn normalize(&mut self) {
         if self.models.is_empty() {
             self.models.push(ModelProfile {
@@ -192,7 +198,8 @@ impl AiConfigInner {
         self.sync_legacy();
     }
 
-    /// 把 active model 的 provider/base_url/model 同步到旧字段（向后兼容旧命令/旧前端）。
+    /// Sync the active model's provider/base_url/model to the legacy fields (backward
+    /// compatibility with old commands/frontends).
     fn sync_legacy(&mut self) {
         if let Some(m) = self.models.iter().find(|m| m.id == self.active_model).cloned() {
             self.provider = m.provider;
@@ -294,7 +301,8 @@ impl AiConfig {
 
     fn save(&self) {
         let Ok(c) = self.0.lock() else { return };
-        // Key 只写平台密钥存储；缺省项不在这里删除（clear_* 命令负责），省掉空写的文件/钥匙串往返。
+        // Keys are written only to the platform secret store; missing entries are not deleted
+        // here (the clear_* commands handle that), avoiding pointless file/keychain round trips.
         for (account, value) in [
             (SECRET_OPENAI, &c.api_key),
             (SECRET_ANTHROPIC, &c.anthropic_key),
@@ -316,7 +324,8 @@ impl AiConfig {
         }
         if let Ok(s) = serde_json::to_string_pretty(&*c) {
             let path = config_path();
-            // 文件里不再有 key（`skip_serializing`），权限收紧仍是纵深防御
+            // Keys no longer appear in the file (`skip_serializing`); tightening permissions is
+            // still defense in depth
             let _ = std::fs::write(&path, s);
         }
     }
@@ -331,11 +340,11 @@ pub struct AiConfigInfo {
     pub has_anthropic_key: bool,
     pub has_gemini_key: bool,
     pub has_tavily_key: bool,
-    /// 已配置密钥的 provider 身份列表
+    /// Provider identities that have a configured key
     pub provider_keys: Vec<String>,
-    /// 多模型列表
+    /// Model list
     pub models: Vec<ModelProfile>,
-    /// 当前生效模型 id
+    /// Active model id
     pub active_model: String,
 }
 
@@ -418,7 +427,7 @@ pub fn set_ai_provider(state: State<'_, AiConfig>, provider: String) {
     });
 }
 
-/// 一次性替换整个模型列表 + 当前生效模型。
+/// Replace the entire model list and the active model in one call.
 #[tauri::command]
 pub fn set_ai_models(state: State<'_, AiConfig>, models: Vec<ModelProfile>, active_model: String) {
     set_field(&state, |c| {
@@ -428,7 +437,7 @@ pub fn set_ai_models(state: State<'_, AiConfig>, models: Vec<ModelProfile>, acti
     });
 }
 
-/// 切换当前生效模型（按 id）。
+/// Switch the active model by id.
 #[tauri::command]
 pub fn set_active_model(state: State<'_, AiConfig>, id: String) {
     set_field(&state, |c| {
@@ -475,7 +484,8 @@ pub fn clear_provider_key(state: State<'_, AiConfig>, provider_id: String) {
     set_field(&state, |c| c.provider_keys.retain(|id| id != &provider_id));
 }
 
-/// 密钥掩码：保留头尾便于辨认，中间用固定长度的星号；过短的 key 整体遮蔽。
+/// Key mask: keep the head and tail for recognition and use a fixed run of asterisks in the
+/// middle; very short keys are masked entirely.
 fn mask_key(key: &str) -> String {
     let chars: Vec<char> = key.chars().collect();
     if chars.len() <= 8 {
@@ -486,19 +496,22 @@ fn mask_key(key: &str) -> String {
     format!("{head}********{tail}")
 }
 
-/// 设置页展示用的掩码密钥；明文只经 provider_key_reveal 显式返回。
+/// Masked key for display in settings; plaintext is returned only explicitly through
+/// provider_key_reveal.
 #[tauri::command]
 pub fn provider_key_hint(provider_id: String) -> Option<String> {
     read_provider_key(&provider_id).map(|key| mask_key(&key))
 }
 
-/// 用户显式查看时返回明文密钥（前端只用于当前会话的展示/复制）。
+/// Return the plaintext key on explicit user request (the frontend uses it only for
+/// display/copy in the current session).
 #[tauri::command]
 pub fn provider_key_reveal(provider_id: String) -> Option<String> {
     read_provider_key(&provider_id)
 }
 
-/// 模型列表请求的地址与认证头（检测与同步共用；与聊天请求同一 base 约定）。
+/// URL and auth headers for a model-list request (shared by detection and sync; same base
+/// convention as chat requests).
 fn models_request(provider: &str, base_url: &str, key: &str) -> Result<(String, Vec<(&'static str, String)>), String> {
     let base = base_url.trim().trim_end_matches('/');
     if base.is_empty() {
@@ -515,7 +528,7 @@ fn models_request(provider: &str, base_url: &str, key: &str) -> Result<(String, 
     Ok((format!("{base}/models"), headers))
 }
 
-/// 解析模型列表响应：OpenAI/Anthropic 的 `data[].id` 与 Gemini 的 `models[].name` 都认。
+/// Parse a model-list response: accepts both `data[].id` and `models[].name` shapes.
 fn parse_models(body: &str) -> Vec<String> {
     let Ok(value) = serde_json::from_str::<serde_json::Value>(body) else { return Vec::new() };
     let mut ids: Vec<String> = Vec::new();
@@ -538,7 +551,8 @@ fn parse_models(body: &str) -> Vec<String> {
     ids
 }
 
-/// 用已存密钥向服务商拉取模型列表：「检测」验证密钥，「同步」把新模型并入列表。
+/// Fetch the model list from the provider with the stored key: "detect" validates the key and
+/// "sync" merges new models into the list.
 #[tauri::command]
 pub async fn provider_fetch_models(
     provider_id: String,
@@ -612,8 +626,9 @@ pub fn get_ai_config(state: State<'_, AiConfig>) -> AiConfigInfo {
         })
 }
 
-/// Tavily 搜索转发：openai-compatible 无原生搜索能力时的兜底。
-/// key 由 Rust 附加，不进 webview；返回 Tavily 原始 JSON（前端截取展示）。
+/// Search API forwarding: fallback when the openai-compatible provider has no native search
+/// capability. The key is attached by Rust and never enters the webview; returns the raw
+/// search JSON (the frontend extracts what it displays).
 #[tauri::command]
 pub async fn tavily_search(
     state: State<'_, AiConfig>,
@@ -706,8 +721,9 @@ pub async fn ai_stream(
         return Err(format!("AI 服务返回 {status}：{text}"));
     }
 
-    // OpenAI 兼容 SSE：`data: {json}` 行 + `data: [DONE]` 结束标记。
-    // 用字节缓冲按 `\n` 切完整行再解码，避免多字节 UTF-8 被 chunk 边界切断变成乱码。
+    // Compatible SSE stream: `data: {json}` lines plus a `data: [DONE]` terminator.
+    // Buffer bytes and split complete lines on `\n` before decoding, so multi-byte UTF-8 split
+    // across chunk boundaries is not corrupted.
     let mut stream = resp.bytes_stream();
     let mut buf: Vec<u8> = Vec::new();
     while let Some(chunk) = stream.next().await {
@@ -737,17 +753,18 @@ pub async fn ai_stream(
     Ok(())
 }
 
-// ── LLM 代理（AI SDK 前端 agent 的网络层）──────────────────────────────
+// ── LLM proxy (network layer for the frontend agent) ────────────────────
 //
-// 前端 AI SDK provider 注入自定义 fetch：请求体经 invoke('llm_stream') 到这里，
-// Rust 按目标 host 附加真实 API key 后发 HTTPS，响应字节流经 Channel 以 base64
-// 块原样透传（不解析内容，SSE/JSON 由前端 AI SDK 处理）。效果：
-//   - API key 永不进 webview；
-//   - 不依赖 WebKit 的流式 fetch。
-// 安全边界：只允许打向白名单 host（已配置的 base_url / api.anthropic.com /
-// generativelanguage.googleapis.com），防止被滥用成带 key 的开放代理。
+// The frontend injects a custom fetch into its provider: request bodies arrive here through
+// invoke('llm_stream'), Rust attaches the real API key for the target host and sends HTTPS,
+// and the response byte stream is forwarded verbatim as base64 chunks over a Channel (content
+// is not parsed; the frontend handles SSE/JSON). Effects:
+//   - the API key never enters the webview;
+//   - no dependency on the webview's streaming fetch.
+// Security boundary: only allowlisted hosts (configured base_url / api.anthropic.com /
+// generativelanguage.googleapis.com), preventing abuse as an open proxy that carries keys.
 
-/// 进行中的代理请求（前端 abort → llm_abort → AbortHandle 取消 reqwest）。
+/// In-flight proxy requests (frontend abort → llm_abort → AbortHandle cancels reqwest).
 #[derive(Default)]
 pub struct LlmStreamState(pub Mutex<HashMap<String, AbortHandle>>);
 
@@ -767,7 +784,8 @@ pub struct LlmStreamEvent {
     status: Option<u16>,
     #[serde(skip_serializing_if = "Option::is_none")]
     headers: Option<Vec<(String, String)>>,
-    /// base64 编码的原始字节（chunk 可能切断多字节 UTF-8，前端拼好再解码）
+    /// Base64-encoded raw bytes (a chunk may split multi-byte UTF-8; the frontend reassembles
+    /// before decoding)
     #[serde(skip_serializing_if = "Option::is_none")]
     data: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -894,7 +912,8 @@ async fn run_proxy(
         .map_err(|e| format!("无效 HTTP 方法：{e}"))?;
     let client = credential_client_builder()
         .connect_timeout(std::time::Duration::from_secs(15))
-        // 流式响应可能持续很久，不设总超时，靠 llm_abort 取消
+        // Streaming responses can last a long time, so there is no overall timeout; llm_abort
+        // cancels them
         .build()
         .map_err(|e| format!("初始化 HTTP 客户端失败：{e}"))?;
 
@@ -940,7 +959,8 @@ async fn run_proxy(
         .collect::<Vec<_>>();
     let _ = on_event.send(LlmStreamEvent::started(status, headers));
 
-    // 无论状态码都原样透传 body，AI SDK 需要错误体生成可读报错
+    // Forward the body verbatim regardless of status code; the frontend needs error bodies to
+    // build readable errors
     let mut stream = resp.bytes_stream();
     while let Some(chunk) = stream.next().await {
         let bytes = chunk.map_err(|e| format!("读取 AI 响应失败：{e}"))?;
@@ -973,7 +993,7 @@ pub async fn llm_stream(
     }
     match result {
         Ok(r) => r,
-        // 前端主动 abort：静默结束，不算错误
+        // Explicit frontend abort: finish silently, not an error
         Err(_) => Ok(()),
     }
 }
@@ -1019,7 +1039,7 @@ mod config_tests {
         for leaked in ["sk-secret", "sk-ant-secret", "tv-secret", "api_key", "anthropic_key", "tavily_key"] {
             assert!(!json.contains(leaked), "config.json must not carry {leaked}: {json}");
         }
-        // 非密钥字段照常落盘
+        // Non-secret fields are persisted as usual
         assert!(json.contains("base_url") || json.contains("baseUrl"));
     }
 

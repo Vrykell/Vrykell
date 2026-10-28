@@ -1,9 +1,12 @@
-//! SSH 连接管理：连接 CRUD 存后端 SQLite（见 history.rs 的 ssh_connections 表）。
+//! SSH connection management: connection CRUD lives in backend SQLite (see the ssh_connections
+//! table in history.rs).
 //!
-//! 连接测试 / 远程目录列出走 **SFTP**（ssh2 crate，SSH 自带的文件子系统），
-//! 不经过远端 shell、不注入脚本，天然支持特殊字符与文件元数据（对齐 WindTerm 的做法）。
+//! Connection tests and remote directory listings use **SFTP** (the ssh2 crate, the file
+//! subsystem built into SSH); they do not go through a remote shell or inject scripts, and
+//! naturally support special characters and file metadata.
 //!
-//! 终端会话本身仍由前端经 `pty_spawn`（pty.rs）用 `ssh` CLI 拉起（交互式），这里只做非交互式后端操作。
+//! The terminal session itself is still started by the frontend through `pty_spawn` (pty.rs)
+//! with the `ssh` CLI (interactive); this module handles non-interactive backend operations only.
 
 use crate::db::{HistoryState, SshConnection};
 use crate::files::fs::{FileOpOutcome, FileOpPair};
@@ -258,7 +261,8 @@ pub struct SshFsEntry {
     pub is_dir: bool,
 }
 
-/// 目录列表响应：条目 + 实际目录的真实路径（空请求 = 远程 home）。
+/// Directory listing response: entries plus the real path of the actual directory (empty
+/// request = remote home).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SshListResponse {
@@ -335,7 +339,8 @@ fn ssh_search_sync(conn: &SshConnection, root: &str, query: &str, cancelled: &st
     Ok(result)
 }
 
-/// 建立 TCP 连接 + SSH 握手（不含主机密钥校验与认证）。
+/// Establish a TCP connection and perform the SSH handshake (without host key verification or
+/// authentication).
 fn tcp_handshake(conn: &SshConnection) -> Result<Session, String> {
     tcp_handshake_with_timeout(conn, None)
 }
@@ -356,7 +361,8 @@ fn tcp_handshake_with_timeout(conn: &SshConnection, timeout: Option<Duration>) -
     Ok(sess)
 }
 
-/// 建立 TCP 连接 + SSH 握手 + 主机密钥校验 + 认证，返回已认证的会话。
+/// Establish a TCP connection, perform the SSH handshake, verify the host key and authenticate;
+/// returns an authenticated session.
 fn connect(conn: &SshConnection) -> Result<Session, String> {
     connect_with_timeout(conn, None)
 }
@@ -391,7 +397,8 @@ fn connect_authenticated(conn: &SshConnection, timeout: Option<Duration>, creden
         return Err("跳板机连接请使用交互终端；文件管理暂不支持跳板机".into());
     }
     let user = conn.user.trim();
-    // 用户名为空时直接报错，绝不静默默认 root（误留空表单会以 root 登录）
+    // Reject an empty username outright; never silently default to root (an accidentally blank
+    // form would log in as root)
     if user.is_empty() {
         return Err("用户名不能为空".to_string());
     }
@@ -404,7 +411,7 @@ fn connect_authenticated(conn: &SshConnection, timeout: Option<Duration>, creden
     Ok(sess)
 }
 
-/// 主机指纹（OpenSSH 风格 SHA256:base64）。
+/// Host fingerprint (SHA256:base64).
 fn fingerprint_of(sess: &Session) -> String {
     match sess.host_key_hash(ssh2::HashType::Sha256) {
         Some(hash) => format!("SHA256:{}", base64::engine::general_purpose::STANDARD_NO_PAD.encode(hash)),
@@ -412,9 +419,11 @@ fn fingerprint_of(sess: &Session) -> String {
     }
 }
 
-/// 主机密钥校验（TOFU）：已记录 → 严格比对；未记录 → **不自动记录**，
-/// 返回 `HOST_KEY_UNKNOWN:<指纹>` 要求用户显式确认后再信任（见 ssh_trust_host_key）。
-/// 整个「读-改-写」在进程级锁内串行，避免多个 SSH 连接并发写互相覆盖。
+/// Host key verification (TOFU): recorded → strict comparison; not recorded → **not recorded
+/// automatically**, returns `HOST_KEY_UNKNOWN:<fingerprint>` and requires explicit user
+/// confirmation before trusting (see ssh_trust_host_key). The whole read-modify-write sequence
+/// is serialized behind a process-wide lock so concurrent SSH connections cannot overwrite each
+/// other.
 fn verify_host_key(sess: &Session, host: &str, port: u16) -> Result<(), String> {
     let _guard = KH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
 
@@ -437,7 +446,7 @@ fn verify_host_key(sess: &Session, host: &str, port: u16) -> Result<(), String> 
     }
 }
 
-/// 记录主机密钥到 known_hosts（用户显式信任后调用）。
+/// Record the host key in known_hosts (called after the user explicitly trusts it).
 fn record_host_key(sess: &Session, host: &str, port: u16, expected_fingerprint: &str) -> Result<(), String> {
     let _guard = KH_LOCK.lock().unwrap_or_else(|e| e.into_inner());
 
@@ -509,14 +518,14 @@ fn authenticate(sess: &Session, conn: &SshConnection, user: &str, credential: Op
             .map_err(|error| format!("SSH_AUTH_FAILED: Private key authentication failed: {error}"))?;
         return Ok(());
     }
-    // 密码认证
+    // Password authentication
     if conn.auth_method == "password" && !conn.password.is_empty() {
         sess.userauth_password(user, &conn.password)
             .map_err(|error| format!("SSH_AUTH_FAILED: Password authentication failed: {error}"))?;
         return Ok(());
     }
 
-    // 密钥认证：先 SSH Agent，再默认密钥文件
+    // Key authentication: SSH agent first, then default key files
     if sess.userauth_agent(user).is_ok() && sess.authenticated() {
         return Ok(());
     }
@@ -547,7 +556,8 @@ fn ssh_list_sync(conn: &SshConnection, path: Option<String>) -> Result<SshListRe
     let sftp = connection_stage(conn, "sftp-open", || sess.sftp().map_err(|error| format!("SFTP_UNAVAILABLE: {error}")))?;
 
     let dir = path.unwrap_or_default();
-    // 空路径 → 远程 home（SFTP 的当前目录即登录主目录）；其它路径 realpath 规范化
+    // Empty path → remote home (the SFTP current directory is the login home); other paths are
+    // normalized with realpath
     let base = sftp
         .realpath(Path::new(if dir.is_empty() { "." } else { &dir }))
         .map(|p| p.to_string_lossy().to_string())
@@ -559,8 +569,9 @@ fn ssh_list_sync(conn: &SshConnection, path: Option<String>) -> Result<SshListRe
 
     let mut result: Vec<SshFsEntry> = Vec::new();
     for (listed, stat) in entries {
-        // ssh2 用宿主平台的 join 返回路径（Windows 上会出现反斜杠），因此只取文件名，
-        // 再由平台层的 POSIX 拼接生成条目路径。
+        // ssh2 returns paths joined by the host platform (backslashes on Windows), so take only
+        // the file name and let the platform layer join it with POSIX rules to build the entry
+        // path.
         let Some(name) = crate::platform::path::name_from_listing(&listed.to_string_lossy(), &base) else {
             continue;
         };
@@ -574,7 +585,7 @@ fn ssh_list_sync(conn: &SshConnection, path: Option<String>) -> Result<SshListRe
     Ok(SshListResponse { entries: result, base })
 }
 
-// ── 连接 CRUD（后端 SQLite） ──
+// ── Connection CRUD (backend SQLite) ──
 
 #[tauri::command]
 pub fn ssh_connections_list(state: State<'_, HistoryState>) -> Result<Vec<SshConnection>, String> {
@@ -653,9 +664,10 @@ pub fn ssh_connection_touch(state: State<'_, HistoryState>, id: String) -> Resul
     db.touch_ssh_connection(&id, now)
 }
 
-// ── 连接测试 / 主机指纹 / 远程目录 ──
+// ── Connection test / host fingerprint / remote directory ──
 
-/// 主机密钥信息（用于首次连接确认：展示指纹 + 是否已记录）。
+/// Host key information (for first-connection confirmation: fingerprint plus whether it is
+/// already recorded).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SshHostKeyInfo {
@@ -664,7 +676,7 @@ pub struct SshHostKeyInfo {
     pub key_type: String,
 }
 
-/// 查询主机指纹与 known_hosts 记录状态（不做任何写入）。
+/// Query the host fingerprint and its known_hosts status (never writes anything).
 #[tauri::command]
 pub async fn ssh_host_key_info(host: String, port: Option<u16>, options: Option<SshOptions>) -> Result<SshHostKeyInfo, String> {
     let conn = SshConnection {
@@ -697,7 +709,7 @@ pub async fn ssh_host_key_info(host: String, port: Option<u16>, options: Option<
     .map_err(|e| e.to_string())?
 }
 
-/// 用户确认指纹后，记录主机密钥到 known_hosts（幂等）。
+/// Record the host key in known_hosts after the user confirms the fingerprint (idempotent).
 #[tauri::command]
 pub async fn ssh_trust_host_key(host: String, port: Option<u16>, expected_fingerprint: String, options: Option<SshOptions>) -> Result<(), String> {
     let conn = SshConnection {
@@ -720,7 +732,7 @@ pub async fn ssh_trust_host_key(host: String, port: Option<u16>, expected_finger
     .map_err(|e| e.to_string())?
 }
 
-/// 测试连接（显式参数，供表单在保存前测试）。
+/// Test a connection with explicit parameters, so a form can test before saving.
 #[tauri::command]
 pub async fn ssh_test(
     host: String,
@@ -746,7 +758,8 @@ pub async fn ssh_test(
         .map_err(|e| e.to_string())?
 }
 
-/// 列出远程目录（按连接 id，密码由后端解析）。返回条目 + 实际目录真实路径。
+/// List a remote directory by connection id (the backend resolves the password). Returns
+/// entries plus the real path of the actual directory.
 #[tauri::command]
 pub async fn ssh_list(
     state: State<'_, HistoryState>,
@@ -852,7 +865,7 @@ pub(crate) fn downloads_dir() -> Result<std::path::PathBuf, String> {
     Ok(dir)
 }
 
-/// 递归下载远程目录到本地 dest，返回累计字节数。
+/// Recursively download a remote directory to the local dest, returning the total byte count.
 #[cfg(test)]
 fn download_dir_recursive(sftp: &Sftp, remote: &Path, local: &Path, depth: u32) -> Result<u64, String> {
     if depth > 40 {
@@ -867,7 +880,8 @@ fn download_dir_recursive(sftp: &Sftp, remote: &Path, local: &Path, depth: u32) 
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_default();
-        // 校验为安全单组件：拒绝 `.`/`..` 与含分隔符的名称，防止路径遍历逃逸
+        // Enforce a safe single component: reject `.`/`..` and names containing separators to
+        // prevent path traversal escapes
         if name.is_empty() || name == "." || name == ".." || name.contains('/') || name.contains('\\') {
             continue;
         }
@@ -887,7 +901,7 @@ fn download_dir_recursive(sftp: &Sftp, remote: &Path, local: &Path, depth: u32) 
     Ok(total)
 }
 
-/// 下载远程文件/目录到 ~/.vrykell/downloads，返回 (本地路径, 字节数)。
+/// Download a remote file/directory to ~/.vrykell/downloads, returning (local path, byte count).
 #[cfg(test)]
 fn ssh_download_sync(conn: &SshConnection, remote_path: &str) -> Result<(String, u64), String> {
     let sess = connect(conn)?;
@@ -915,7 +929,7 @@ fn ssh_download_sync(conn: &SshConnection, remote_path: &str) -> Result<(String,
     }
 }
 
-/// 下载远程文件/目录，返回本地路径，并写入下载历史。
+/// Download a remote file/directory, return the local path and record it in download history.
 #[tauri::command]
 pub async fn ssh_download(app: tauri::AppHandle, state: State<'_, HistoryState>, id: String, path: String) -> Result<String, String> {
     let conn = state.0.lock().map_err(|e| e.to_string())?.get_ssh_connection(&id)?;
@@ -923,8 +937,9 @@ pub async fn ssh_download(app: tauri::AppHandle, state: State<'_, HistoryState>,
         .await.map_err(|e| e.to_string())?
 }
 
-/// 远端目录里为 name 找可用路径：同名时按 `name (1)`、`name (2)`… 递增（保留扩展名）。
-/// 序号规则来自平台层（`crate::platform::path::numbered_name`），远端只负责判断是否存在。
+/// Find an available path for name in a remote directory: on collision, increment through
+/// `name (1)`, `name (2)`... (keeping the extension). The numbering rule lives in the platform
+/// layer (`crate::platform::path::numbered_name`); the remote side only checks existence.
 pub(super) fn unique_remote_path(sftp: &Sftp, dir: &str, name: &str) -> String {
     let candidate = crate::platform::path::available_name(name, |candidate| {
         sftp.stat(Path::new(&crate::platform::path::join(dir, candidate))).is_ok()
@@ -932,7 +947,8 @@ pub(super) fn unique_remote_path(sftp: &Sftp, dir: &str, name: &str) -> String {
     crate::platform::path::join(dir, &candidate)
 }
 
-/// 重命名远程文件/目录；目标名被占用时自动加序号，返回最终路径。
+/// Rename a remote file/directory; append a sequence number when the target name is taken,
+/// returning the final path.
 fn ssh_rename_sync(conn: &SshConnection, path: &str, new_name: &str) -> Result<String, String> {
     validate_remote_name(new_name)?;
     let sess = connect(conn)?;
@@ -949,7 +965,8 @@ fn ssh_rename_sync(conn: &SshConnection, path: &str, new_name: &str) -> Result<S
     Ok(dst)
 }
 
-/// 移动远程文件/目录到目标目录（SFTP rename 支持跨目录；原地移动拒绝，重名自动加序号）。
+/// Move a remote file/directory to a destination directory (SFTP rename works across
+/// directories; same-place moves are rejected and name collisions get a sequence number).
 fn ssh_move_sync(conn: &SshConnection, path: &str, dest_dir: &str) -> Result<String, String> {
     let name = crate::platform::path::file_name(path).ok_or("无法定位文件名")?;
     let sess = connect(conn)?;
@@ -968,7 +985,8 @@ fn ssh_move_sync(conn: &SshConnection, path: &str, dest_dir: &str) -> Result<Str
     Ok(dst)
 }
 
-/// 新建远程文件（空文件）或目录；同名时自动加序号，返回最终路径。
+/// Create a remote file (empty) or directory; append a sequence number on collision, returning
+/// the final path.
 fn ssh_create_sync(conn: &SshConnection, dir: &str, name: &str, is_dir: bool) -> Result<String, String> {
     validate_remote_name(name)?;
     let sess = connect(conn)?;
@@ -978,7 +996,8 @@ fn ssh_create_sync(conn: &SshConnection, dir: &str, name: &str, is_dir: bool) ->
     }
     let direct = crate::platform::path::join(dir, name);
     let path = if sftp.stat(Path::new(&direct)).is_ok() {
-        // 同名时按 name (1) 递增避让（unique_remote_path 只在重名时调用）
+        // On collision, step through name (1), name (2), ... (unique_remote_path is called only
+        // on collision)
         unique_remote_path(&sftp, dir, name)
     } else {
         direct
@@ -991,9 +1010,9 @@ fn ssh_create_sync(conn: &SshConnection, dir: &str, name: &str, is_dir: bool) ->
     Ok(path)
 }
 
-// ── 远程面板：复制 / 可回退删除（远端暂存） ──
+// ── Remote panel: copy / undoable delete (remote staging) ──
 
-/// 远端 shell 单引号转义（与前端 shellQuote 同规则）。
+/// Remote shell single-quote escaping (same rule as the frontend shellQuote).
 fn shell_quote_remote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
 }
@@ -1008,7 +1027,7 @@ fn validate_remote_name(name: &str) -> Result<(), String> {
     }
 }
 
-/// 远端暂存目录（可回退删除）：<home>/.vrykell/undo
+/// Remote staging directory for undoable delete: <home>/.vrykell/undo
 fn ssh_undo_dir(sftp: &Sftp) -> Result<String, String> {
     let home = sftp
         .realpath(Path::new("."))
@@ -1017,24 +1036,26 @@ fn ssh_undo_dir(sftp: &Sftp) -> Result<String, String> {
     Ok(crate::platform::path::join(&crate::platform::path::join(&home, ".vrykell"), "undo"))
 }
 
-/// 逐级创建远端目录（已存在时忽略）。
+/// Create a remote directory level by level (existing levels are ignored).
 fn ensure_remote_dir(sftp: &Sftp, dir: &str) -> Result<(), String> {
     let normalized = crate::platform::path::normalize(dir);
     let mut current = String::new();
     for segment in normalized.split('/').filter(|part| !part.is_empty()) {
         current = crate::platform::path::join(&current, segment);
-        let _ = sftp.mkdir(Path::new(&current), 0o755); // 已存在会报错，忽略
+        let _ = sftp.mkdir(Path::new(&current), 0o755); // errors when it already exists; ignore
     }
     Ok(())
 }
 
-/// 递归删除远端路径（目录先清空再 rmdir；用于暂存项清理）。
+/// Recursively delete a remote path (empties directories before rmdir; used to clean up staged
+/// items).
 fn remove_remote_recursive(sftp: &Sftp, target: &str) -> Result<(), String> {
     let stat = sftp.lstat(Path::new(target)).map_err(|e| format!("读取远端信息失败：{e}"))?;
     if stat.is_dir() {
         if let Ok(children) = sftp.readdir(Path::new(target)) {
             for (child, _) in children {
-                // readdir 的路径由宿主平台拼接（Windows 上是 `\`），只取名字再按 POSIX 拼
+                // readdir paths are joined by the host platform (`\` on Windows), so take only
+                // the name and rejoin with POSIX rules
                 let Some(name) = crate::platform::path::name_from_listing(&child.to_string_lossy(), target) else {
                     continue;
                 };
@@ -1047,7 +1068,8 @@ fn remove_remote_recursive(sftp: &Sftp, target: &str) -> Result<(), String> {
     }
 }
 
-/// 远端复制单条到指定目标路径（`cp -R`，参数单引号转义；目标必须尚不存在）。
+/// Copy one remote entry to an explicit target path (`cp -R`, arguments single-quote escaped;
+/// the target must not exist yet).
 fn remote_copy_one(sess: &Session, from: &str, to: &str) -> Result<(), String> {
     let command = format!("cp -R -- {} {}", shell_quote_remote(from), shell_quote_remote(to));
     let mut channel = sess.channel_session().map_err(|e| format!("打开远端通道失败：{e}"))?;
@@ -1063,11 +1085,13 @@ fn remote_copy_one(sess: &Session, from: &str, to: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 复制远程文件/目录到目标目录（逐项预检：原地、自身子树、目标同名都拒绝）。
+/// Copy remote files/directories to a destination directory (each item is pre-checked: same
+/// place, its own subtree and target name collisions are rejected).
 fn ssh_copy_sync(conn: &SshConnection, paths: Vec<String>, dest_dir: String) -> Result<FileOpOutcome, String> {
     let sess = connect(conn)?;
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
-    // 绝对/相对判断必须按远端（POSIX）规则：Windows 宿主上 Path::is_absolute("/home") 为 false
+    // Absolute/relative checks must follow remote (POSIX) rules: Path::is_absolute("/home") is
+    // false on a Windows host
     if !crate::platform::path::is_absolute(&dest_dir) {
         return Err("目标目录必须是绝对路径".into());
     }
@@ -1088,7 +1112,8 @@ fn ssh_copy_sync(conn: &SshConnection, paths: Vec<String>, dest_dir: String) -> 
             continue;
         }
         let direct = crate::platform::path::join(&dest_dir, &name);
-        // 目标重名（含复制到自己所在目录）→ 自动加序号，不产生重名文件
+        // Target name collision (including copying into the source directory) → add a sequence
+        // number instead of creating a duplicate
         let target = if direct == path || sftp.stat(Path::new(&direct)).is_ok() {
             unique_remote_path(&sftp, &dest_dir, &name)
         } else {
@@ -1102,7 +1127,7 @@ fn ssh_copy_sync(conn: &SshConnection, paths: Vec<String>, dest_dir: String) -> 
     Ok(FileOpOutcome { completed, errors })
 }
 
-/// 可回退删除：把远程条目移动到远端暂存目录。
+/// Undoable delete: move remote entries into the remote staging directory.
 fn ssh_stage_delete_sync(conn: &SshConnection, paths: Vec<String>) -> Result<FileOpOutcome, String> {
     let sess = connect(conn)?;
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
@@ -1127,7 +1152,8 @@ fn ssh_stage_delete_sync(conn: &SshConnection, paths: Vec<String>) -> Result<Fil
     Ok(FileOpOutcome { completed, errors })
 }
 
-/// 回退删除：把暂存项移回原位（原位置已有同名项时该项报错）。
+/// Undo delete: move staged items back to their original location (an item fails when the
+/// original path already has an entry with that name).
 fn ssh_restore_staged_sync(conn: &SshConnection, items: Vec<FileOpPair>) -> Result<FileOpOutcome, String> {
     let sess = connect(conn)?;
     let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
@@ -1146,7 +1172,7 @@ fn ssh_restore_staged_sync(conn: &SshConnection, items: Vec<FileOpPair>) -> Resu
     Ok(FileOpOutcome { completed, errors })
 }
 
-/// 把暂存项永久删除（回退窗口结束）。
+/// Permanently delete staged items (when the undo window ends).
 fn ssh_purge_staged_sync(conn: &SshConnection, paths: Vec<String>) {
     let Ok(sess) = connect(conn) else { return };
     let Ok(sftp) = sess.sftp() else { return };
@@ -1337,7 +1363,8 @@ mod tests {
 
     #[test]
     fn remote_entry_paths_follow_posix_rules() {
-        // 条目路径由平台层 POSIX 拼接产生：Windows 宿主上也不能出现反斜杠或双斜杠
+        // Entry paths are produced by the platform layer's POSIX join: no backslashes or doubled
+        // slashes even on a Windows host
         let path = crate::platform::path::join("/home/user/", "docs");
         assert_eq!(path, "/home/user/docs");
         assert!(!path.contains('\\'));
@@ -1347,7 +1374,7 @@ mod tests {
 
     #[test]
     fn sftp_entry_shape_is_stable() {
-        // 仅验证结构体字段序列化形状（camelCase 由前端消费）
+        // Only verify the serialized shape of the struct fields (the frontend consumes camelCase)
         let e = SshFsEntry { name: "a".into(), path: "/a".into(), is_dir: true };
         let json = serde_json::to_string(&e).unwrap();
         assert!(json.contains("\"name\":\"a\""));
@@ -1390,9 +1417,9 @@ mod tests {
         assert_eq!(dir_stat.modified_ms, None);
     }
 
-    // 说明：connect / ssh_list_sync 依赖真实 SSH 服务，无法离线单测，
-    // 由 e2e（mock ssh_list）+ 手动真机验证覆盖。
-    // 真机手动验证：`cargo test manual_local_sftp -- --ignored --nocapture`
+    // Note: connect / ssh_list_sync need a real SSH service, so they cannot be unit tested
+    // offline; e2e (with a mocked ssh_list) and manual verification on a real machine cover them.
+    // Manual verification on a real machine: `cargo test manual_local_sftp -- --ignored --nocapture`
     #[test]
     #[ignore]
     fn manual_local_sftp() {
@@ -1414,12 +1441,12 @@ mod tests {
             println!("  {}  {}", if e.is_dir { "d" } else { "-" }, e.name);
         }
         assert!(!res.entries.is_empty(), "远程 home 不应为空");
-        // 下载一个文件验证 ssh_download
+        // Download a file to verify ssh_download
         let (local, size) = ssh_download_sync(&conn, "/Users/wuzhe/.DS_Store").expect("下载失败");
         println!("下载到: {local}（{size} 字节）");
         assert!(std::path::Path::new(&local).exists());
     }
-    /// 从屏幕文本里找出「单个数字用空格分隔」的验证码行。
+    /// Find a verification-code line in the screen text (single digits separated by spaces).
     fn captcha_digits(text: &str) -> Option<String> {
         text.lines().rev().find_map(|line| {
             let tokens: Vec<&str> = line.split_whitespace().collect();
@@ -1428,9 +1455,10 @@ mod tests {
         })
     }
 
-    // 真机手动验证（需要网络与外部服务）：
+    // Manual verification on a real machine (requires network access and an external service):
     // `cargo test manual_chat_server_flow -- --ignored --nocapture`
-    // 走「前置指纹校验 → 生产命令构造 → PTY 启动 → 密码 → 验证码 → 交互界面 → 退出」。
+    // Exercises the flow: initial fingerprint check → production command construction → PTY start
+    // → password → verification code → interactive UI → quit.
     #[test]
     #[ignore]
     fn manual_chat_server_flow() {
@@ -1453,7 +1481,7 @@ mod tests {
             options: Default::default(),
         };
 
-        // 1) 与前端 prepareSshHost 相同的前置校验
+        // 1) Same pre-checks as the frontend prepareSshHost
         let mut host_key_type: Option<String> = None;
         match tcp_handshake(&conn) {
             Ok(sess) => {
@@ -1465,7 +1493,7 @@ mod tests {
             Err(error) => println!("前置校验失败（继续用真实 ssh 验证）：{error}"),
         }
 
-        // 2) 用生产命令构造器启动交互会话
+        // 2) Start an interactive session with the production command builder
         let target: crate::terminal::ssh_command::SshTarget = serde_json::from_value(serde_json::json!({
             "host": host, "user": "vrykell_probe", "port": port,
             "hostKeyType": host_key_type,

@@ -1,10 +1,10 @@
-//! Shell integration：向 zsh/bash 注入 OSC 133（Final Term 语义标记）。
+//! Shell integration: injects OSC 133 semantic markers into zsh/bash.
 //!
-//! - `OSC 133 ; A` prompt 开始（precmd）
-//! - `OSC 133 ; C` 命令输出开始（preexec）
-//! - `OSC 133 ; D ; <exit>` 命令结束（precmd，带退出码）
-//! - `OSC 133 ; E ; <base64>` 命令文本（preexec，自定义扩展，供历史/块头使用）
-//! - `OSC 133 ; G ; <base64>` git 分支（precmd，自定义扩展）
+//! - `OSC 133 ; A` prompt start (precmd)
+//! - `OSC 133 ; C` command output start (preexec)
+//! - `OSC 133 ; D ; <exit>` command end (precmd, with exit code)
+//! - `OSC 133 ; E ; <base64>` command text (preexec, custom extension for history/block headers)
+//! - `OSC 133 ; G ; <base64>` git branch (precmd, custom extension)
 
 use base64::Engine;
 use std::fs;
@@ -86,10 +86,12 @@ __ait_preexec() {
 trap '__ait_preexec' DEBUG
 "#;
 
-/// PowerShell 集成：`prompt` 函数做 precmd（133;D/A/G + OSC 7），
-/// PSReadLine 拦 Enter 做 preexec（133;E/C）。裸 REPL 会照常进入 block 交互模式。
-/// 注意：脚本必须纯 ASCII —— PowerShell 5.1 无 BOM 时按 ANSI 读 .ps1，
-/// 中文字节在中文区域被当 GBK 解析会吞掉换行、破坏脚本。
+/// PowerShell integration: the `prompt` function acts as precmd (133;D/A/G + OSC 7),
+/// PSReadLine intercepts Enter as preexec (133;E/C). A bare REPL still enters block
+/// interaction mode as usual.
+/// Note: the script must be pure ASCII - PowerShell 5.1 reads .ps1 as ANSI without a BOM,
+/// and non-ASCII bytes in a Chinese locale are parsed as GBK, swallowing newlines and
+/// breaking the script.
 const PS_RC: &str = r#"# vrykell shell integration (PowerShell / pwsh)
 
 # The host decodes PTY bytes as UTF-8; keep both console directions on the same encoding.
@@ -185,8 +187,9 @@ fn write_script(path: &Path, script: &str) -> Result<(), String> {
 pub fn integration_dir() -> Result<PathBuf, String> {
     static WRITE_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
     let _guard = WRITE_LOCK.lock().unwrap_or_else(|error| error.into_inner());
-    // 用 dirs::home_dir 而非 HOME 环境变量 —— Windows 原生环境没有 HOME，
-    // 从 Git Bash 启动时 HOME 又是 MSYS 路径，都不适合作为 Windows 侧写盘位置。
+    // Use dirs::home_dir rather than the HOME environment variable - native Windows has no
+    // HOME, and when launched from a POSIX shell HOME is a POSIX-style path; neither is a
+    // suitable write location on Windows.
     let home = dirs::home_dir().ok_or_else(|| "无法定位用户主目录".to_string())?;
     let dir = home.join(".vrykell").join("shell");
     fs::create_dir_all(dir.join("zsh")).map_err(|e| e.to_string())?;
@@ -198,20 +201,25 @@ pub fn integration_dir() -> Result<PathBuf, String> {
     Ok(dir)
 }
 
-/// SSH 远端 shell integration 注入命令（安全性最高版本）。
+/// SSH remote shell integration injection command (hardened variant).
 ///
-/// 作为 `ssh -t host '<此命令>'` 的远程命令执行。安全设计：
-///   1. 脚本内容是编译进二进制的静态常量（ZSH_RC/BASH_RC），base64 编码传递，
-///      不拼接任何远端数据 → 远端无法通过环境/变量影响注入内容；
-///   2. 传输防篡改由 SSH 加密 + 主机密钥校验（OpenSSH TOFU 确认）保证；
-///   3. 远端解码用 `umask 077` + `mktemp` 随机临时文件（防符号链接/目录穿越），
-///      仅当前用户可读写；解码失败静默回退，不污染终端；
-///   4. 按远端 shell 类型（zsh/bash）分支注入，其余环境 `exec "$SHELL" -i`
-///      走经典模式 —— 注入失败也保证交互 shell 可用，不破坏连接。
+/// Executed as the remote command of `ssh -t host '<this command>'`. Security design:
+///   1. The script content is a static constant compiled into the binary (ZSH_RC/BASH_RC)
+///      and passed base64-encoded; no remote data is concatenated, so the remote side cannot
+///      influence the injected content through its environment/variables;
+///   2. Tamper protection in transit comes from SSH encryption plus host key verification
+///      (trust-on-first-use confirmation);
+///   3. Remote decoding uses `umask 077` and a random `mktemp` temporary file (guards against
+///      symlinks/directory traversal), readable and writable only by the current user; decode
+///      failures fall back silently without polluting the terminal;
+///   4. Injection branches on the remote shell type (zsh/bash); other environments use
+///      `exec "$SHELL" -i` in classic mode - even a failed injection keeps an interactive
+///      shell available without breaking the connection.
 pub fn ssh_remote_command() -> String {
     let zsh_b64 = base64::engine::general_purpose::STANDARD.encode(ZSH_RC);
     let bash_b64 = base64::engine::general_purpose::STANDARD.encode(BASH_RC);
-    // base64 字符集为 [A-Za-z0-9+/=]，不含单引号/美元符，外层单引号包裹安全。
+    // The base64 alphabet is [A-Za-z0-9+/=] with no single quotes or dollar signs, so wrapping
+    // it in single quotes is safe.
     format!(
         r#"b64d() {{ printf %s "$1" | base64 -d 2>/dev/null || printf %s "$1" | base64 -D 2>/dev/null; }}
 case ${{SHELL##*/}} in
@@ -262,21 +270,23 @@ mod tests {
     #[test]
     fn ssh_remote_command_contains_safe_wrapper_and_decodable_scripts() {
         let cmd = ssh_remote_command();
-        // 外层包装：按 shell 分支 + 兜底 exec（经典回退）
+        // Outer wrapper: branch by shell + fallback exec (classic fallback)
         assert!(cmd.contains("SHELL##*/"));
         assert!(cmd.contains("zsh)"));
         assert!(cmd.contains("bash)"));
         assert!(cmd.contains("exec \"${SHELL:-sh}\" -i"));
-        // 安全细节：umask 077 + mktemp + 双 base64 实现 + 静默失败
+        // Security details: umask 077 + mktemp + two base64 implementations + silent failure
         assert!(cmd.contains("umask 077"));
         assert!(cmd.contains("mktemp"));
         assert!(cmd.contains("base64 -d"));
         assert!(cmd.contains("base64 -D"));
         assert!(cmd.contains("2>/dev/null"));
-        // 无单引号冲突面：外层用单引号包裹 base64，内容不得含单引号
+        // No single-quote conflict surface: the outer wrapper quotes base64 in single quotes,
+        // so the payload must not contain one
         for (label, b64) in [("zsh", extract_b64(&cmd, "zsh")), ("bash", extract_b64(&cmd, "bash"))] {
             assert!(!b64.contains('\''), "{label} base64 不应含单引号");
-            // 解码回原脚本：与本地注入脚本同源（含 OSC 133 标记）
+            // Decode back to the original script: same source as the local injection script
+            // (including the OSC 133 markers)
             use base64::Engine;
             let script = String::from_utf8(
                 base64::engine::general_purpose::STANDARD.decode(&b64).unwrap(),
@@ -284,12 +294,13 @@ mod tests {
             .unwrap();
             assert!(script.contains("133;A"));
             assert!(script.contains("133;C"));
-            // 提示符结束标记：文件打开等延后命令依赖它判断行编辑器已就绪
+            // Prompt-end marker: delayed commands such as file open rely on it to know the
+            // line editor is ready
             assert!(script.contains("133;B"));
         }
     }
 
-    /// 从远程命令中提取对应 shell 分支的 base64（测试辅助）。
+    /// Extract the base64 payload of a shell branch from the remote command (test helper).
     fn extract_b64(cmd: &str, shell: &str) -> String {
         let marker = format!("{shell})");
         let start = cmd.find(&marker).expect("分支存在");
@@ -484,7 +495,7 @@ HISTTIMEFORMAT='%F %T '
         assert!(PS_RC.contains("$script:__vrykell_git_cwd -ne $PWD.Path"));
     }
 
-    /// 真起一个 zsh 验证钩子发出 OSC 133 标记（zsh 只在 Unix 上可用）。
+    /// Start a real zsh to verify the hooks emit OSC 133 markers (zsh is only available on Unix).
     #[cfg(unix)]
     #[test]
     fn zsh_emits_osc133_marks() {
@@ -533,7 +544,7 @@ HISTTIMEFORMAT='%F %T '
                         && s.contains("\u{1b}]133;D;0") && s.contains("\u{1b}]133;E;")
                         && s.contains("\u{1b}]7;file://")
                     {
-                        return; // 成功
+                        return; // success
                     }
                 }
                 Err(_) => break,
@@ -545,7 +556,7 @@ HISTTIMEFORMAT='%F %T '
         );
     }
 
-    /// Windows：真起一个 PowerShell 验证集成脚本发出 OSC 133 标记。
+    /// Windows: start a real PowerShell to verify the integration script emits OSC 133 markers.
     #[cfg(target_os = "windows")]
     #[test]
     fn powershell_emits_osc133_marks() {
@@ -584,7 +595,7 @@ HISTTIMEFORMAT='%F %T '
         let mut reader = pair.master.try_clone_reader().unwrap();
         let mut writer = pair.master.take_writer().unwrap();
 
-        // 后台线程持续读取输出（读是阻塞的，放线程里避免测试卡死）
+        // A background thread keeps reading output (reads block, so keep them off the test thread)
         let (tx, rx) = mpsc::channel::<String>();
         std::thread::spawn(move || {
             let mut out = Vec::new();
