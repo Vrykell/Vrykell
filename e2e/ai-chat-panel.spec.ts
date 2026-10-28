@@ -1,16 +1,16 @@
 /**
- * AI 聊天面板 e2e：面板对话 / 模型菜单 / 思考强度 / 深思与 Agent 开关 / 输入锁定。
+ * AI chat panel e2e: panel conversation, model menu, thinking effort, deep-thinking and Agent toggles, input locking.
  */
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, mockAnthropic, aiModelCalls, ensureChatSettingsOpen, paceLlmStream, mockAnthropicToolCall, clipboardText } from './tauri-mock';
 
 type MockOptions = Parameters<typeof setupTauriMock>[1];
 
-/** 每个测试独立初始化：mockAnthropic 的 init script 必须在 goto 前注册 */
+/** Sets up each test independently: the mockAnthropic init script must be registered before goto */
 async function boot(page: import('@playwright/test').Page, reply: string, options?: MockOptions) {
   await mockAnthropic(page, reply);
   await setupTauriMock(page, options);
-  // 种入 dock 布局：chat 面板按钮在左区（默认布局里 chat 不在任何 zone）
+  // Seed the dock layout: the chat panel button sits in the left zone (the default layout keeps chat out of every zone)
   await page.addInitScript(() => {
     if (!localStorage.getItem('dock-layout-v6')) localStorage.setItem('dock-layout-v6', JSON.stringify({
       layoutVersion: 6, leftZone: [], rightZone: ['files', 'git', 'command-history', 'chat'],
@@ -21,7 +21,7 @@ async function boot(page: import('@playwright/test').Page, reply: string, option
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 }
 
-test.describe('AI 对话面板', () => {
+test.describe('AI chat panel', () => {
   test('opening the panel does not move focus into the chat composer', async ({ page }) => {
     await boot(page, 'OK');
     const trigger = page.locator('[data-dock-btn="chat"]');
@@ -42,7 +42,7 @@ test.describe('AI 对话面板', () => {
     await expect(status.getByRole('button', { name: '添加附件' })).toBeVisible();
   });
 
-  test('打开面板发送消息，流式渲染回复', async ({ page }) => {
+  test('opening the panel sends a message and streams the reply', async ({ page }) => {
     await boot(page, '面板回复内容');
     await page.locator('[data-dock-btn="chat"]').click();
     const input = page.locator('[data-chat-composer]:visible');
@@ -52,7 +52,7 @@ test.describe('AI 对话面板', () => {
     await expect(page.getByText('面板回复内容')).toBeVisible({ timeout: 10000 });
   });
 
-  test('停止生成：中断后收尾回到发送按钮（读取器不再永久挂起）', async ({ page }) => {
+  test('stop generation: an interrupted reply settles back to the send button (the reader no longer hangs forever)', async ({ page }) => {
     // Deliver the answer piece by piece so it is still arriving when Stop is pressed, and keep the
     // single send slot free: the default schedule seed would fire a background turn at boot.
     await paceLlmStream(page, 30);
@@ -74,12 +74,12 @@ test.describe('AI 对话面板', () => {
     await expect(sendButton).toHaveAttribute('aria-label', '停止生成', { timeout: 5000 });
     await sendButton.click();
 
-    // 中断必须真正收尾：对话框回到可发送状态，而不是一直停在「生成中」。
+    // The interruption must really settle: the composer returns to a sendable state instead of staying in "generating".
     await expect(sendButton).toHaveAttribute('aria-label', '发送', { timeout: 5000 });
     await expect(input).toBeEnabled();
   });
 
-  test('复制被终止的回复：还没有正文时复制工具日志，而不是空串', async ({ page }) => {
+  test('copying a stopped reply: with no body yet, copy returns the tool log instead of an empty string', async ({ page }) => {
     await mockAnthropic(page, '收尾文字');
     await mockAnthropicToolCall(page, 'run_command', { command: 'npm run build' });
     await setupTauriMock(page, {});
@@ -103,8 +103,8 @@ test.describe('AI 对话面板', () => {
     expect(await clipboardText(page)).toContain('[执行命令: npm run build');
   });
 
-  test('复制被终止的回复：停止后复制按钮给出已经收到的正文', async ({ page }) => {
-    // 流式放慢，保证点「停止」时正文只到了一部分。
+  test('copying a stopped reply: after stopping, copy returns the body received so far', async ({ page }) => {
+    // Slow the stream so only part of the body has arrived when Stop is pressed.
     await paceLlmStream(page, 60);
     await boot(page, '这是一段足够长的流式回复内容。'.repeat(40), {});
     await page.locator('[data-dock-btn="chat"]').click();
@@ -120,7 +120,7 @@ test.describe('AI 对话面板', () => {
 
     const sendButton = page.locator('.chat-send-button');
     await expect(sendButton).toHaveAttribute('aria-label', '停止生成', { timeout: 5000 });
-    // 等第一部分正文到达再中断，此时回答里已经有可复制的内容。
+    // Wait for the first part of the body before interrupting so the answer already holds copyable content.
     await expect(page.locator('.ai-block-answer')).toContainText('流式回复内容', { timeout: 5000 });
     await sendButton.click();
     await expect(sendButton).toHaveAttribute('aria-label', '发送', { timeout: 5000 });
@@ -139,44 +139,44 @@ test.describe('AI 对话面板', () => {
     await expect(page.locator('[data-chat-composer]:visible')).toHaveValue('');
   });
 
-  test('模型选择窗口：搜索过滤 + 能力标签过滤 + 点击选中', async ({ page }) => {
+  test('model picker: search filtering, capability badge filtering and click to select', async ({ page }) => {
     await boot(page, '好的');
     await page.locator('[data-dock-btn="chat"]').click();
     await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
-    // 打开模型选择窗口
+    // Open the model picker
     await ensureChatSettingsOpen(page);
     await page.locator('[data-tip="切换模型"]').click();
     await expect(page.getByText('选择模型', { exact: true })).toBeVisible();
     await expect(page.getByPlaceholder('搜索模型…')).toBeVisible();
-    // 两个模型列表项（带能力徽标）
+    // Both model rows are listed with their capability badges
     await expect(page.getByTestId('model-pick-m-main')).toBeVisible();
     await expect(page.getByTestId('model-pick-m-local')).toBeVisible();
     await expect(page.getByText('推理', { exact: true }).first()).toBeVisible();
 
-    // 能力标签过滤：点「推理」→ 只剩主力模型
+    // Capability filter: clicking "Reasoning" leaves only the main model
     await page.getByRole('button', { name: /推理/ }).click();
     await expect(page.getByTestId('model-pick-m-main')).toBeVisible();
     await expect(page.getByTestId('model-pick-m-local')).toHaveCount(0);
-    await page.getByRole('button', { name: /推理/ }).click(); // 取消
+    await page.getByRole('button', { name: /推理/ }).click(); // clear the filter
 
-    // 搜索过滤：按名字
+    // Search filtering by name
     await page.getByPlaceholder('搜索模型…').fill('本地');
     await expect(page.getByTestId('model-pick-m-local')).toBeVisible();
     await expect(page.getByTestId('model-pick-m-main')).toHaveCount(0);
     await page.getByPlaceholder('搜索模型…').fill('不存在的模型');
     await expect(page.getByText('无匹配模型')).toBeVisible();
 
-    // 点击列表项选中模型
+    // Clicking a row selects the model
     await page.getByPlaceholder('搜索模型…').fill('');
     await page.getByTestId('model-pick-m-main').click();
     const calls = await aiModelCalls(page);
     expect(calls.some((c) => c.kind === 'set_active' && c.id === 'm-main')).toBe(true);
     await expect(page.getByText('已切换到 主力模型')).toBeVisible();
-    // 选中后窗口关闭
+    // The picker closes after a selection
     await expect(page.getByText('选择模型', { exact: true })).toHaveCount(0);
   });
 
-  test('模型选择窗口：思考强度只在模型配置页调整', async ({ page }) => {
+  test('model picker: thinking effort is only adjusted on the model settings page', async ({ page }) => {
     await boot(page, '好的');
     await page.locator('[data-dock-btn="chat"]').click();
     await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
@@ -187,7 +187,7 @@ test.describe('AI 对话面板', () => {
     const select = row.getByTestId('think-level-m-main');
     await expect(select).toHaveCount(0);
     await expect(page.getByTestId('model-pick-m-local').locator('select')).toHaveCount(0);
-    // 关闭窗口
+    // Close the picker
     await page.keyboard.press('Escape');
     await expect(page.getByText('选择模型', { exact: true })).toHaveCount(0);
   });

@@ -4,12 +4,12 @@ import { setupTauriMock, revealedPaths, sshOps, ensureTabsOpen } from './tauri-m
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
-  // 打开 SSH 管理面板
+  // Open the SSH management panel
   await page.locator('[data-dock-btn="ssh"]').click();
   await expect(page.locator('[data-testid="ssh-search"]')).toBeVisible();
 });
 
-test.describe('SSH 远程连接管理侧栏', () => {
+test.describe('SSH remote connection management sidebar', () => {
   test('Enter on an edit button opens the form without connecting', async ({ page }) => {
     await page.getByTestId('ssh-row-ssh-1').press('Shift+F10');
     const edit = page.getByRole('button', { name: '编辑连接', exact: true });
@@ -43,13 +43,13 @@ test.describe('SSH 远程连接管理侧栏', () => {
     await expect(page.locator('[data-tab-row-id]').first()).toHaveClass(/folder-tab/);
     await expect(page.locator('[data-tab-row-id] [role="tab"] svg').first()).toHaveCSS('width', '18px');
   });
-  test('顶栏：搜索 + 编辑 + 新建按钮', async ({ page }) => {
+  test('top bar: search, edit and new-connection buttons', async ({ page }) => {
     await expect(page.locator('[data-testid="ssh-search"]')).toBeVisible();
     await page.getByTestId('ssh-row-ssh-1').click({ button: 'right' }); await expect(page.getByRole('button', { name: '编辑连接', exact: true })).toBeVisible();
     await expect(page.locator('[data-testid="ssh-new-btn"]')).toBeVisible();
   });
 
-  test('展示已有连接并支持按名字搜索', async ({ page }) => {
+  test('lists existing connections and searches them by name', async ({ page }) => {
     await expect(page.getByText('生产服务器')).toBeVisible();
     await page.locator('[data-testid="ssh-search"]').fill('不存在的');
     await expect(page.getByText('无匹配连接')).toBeVisible();
@@ -57,18 +57,18 @@ test.describe('SSH 远程连接管理侧栏', () => {
     await expect(page.getByText('生产服务器')).toBeVisible();
   });
 
-  test('双击连接新建活跃会话标签页，按需打开文件面板', async ({ page }) => {
+  test('double-clicking a connection opens an active session tab and the file panel on demand', async ({ page }) => {
     await page.getByText('生产服务器').dblclick();
     await page.locator('[data-dock-btn="files"]').click();
     // Open the optional file service separately from the terminal session.
     await expect(page.getByText('app.log')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('Documents')).toBeVisible();
-    // 标签面板出现以连接名命名的标签页
+    // The tab strip shows a tab named after the connection
     await ensureTabsOpen(page);
     await expect(page.locator('[data-testid^="tab-row-"]', { hasText: '生产服务器' })).toHaveCount(1);
   });
 
-  test('新建连接：填写表单并保存', async ({ page }) => {
+  test('new connection: fills in and saves the form', async ({ page }) => {
     await page.locator('[data-testid="ssh-new-btn"]').click();
     await page.locator('[data-testid="ssh-form-name"]').fill('测试机');
     await page.locator('[data-testid="ssh-form-host"]').fill('staging.example.com');
@@ -77,8 +77,8 @@ test.describe('SSH 远程连接管理侧栏', () => {
     await expect(page.getByText('测试机')).toBeVisible();
   });
 
-  test('编辑选中连接并删除', async ({ page }) => {
-    await page.getByText('生产服务器').click(); // 选中
+  test('edits and deletes the selected connection', async ({ page }) => {
+    await page.getByText('生产服务器').click(); // select the connection
     await page.getByTestId('ssh-row-ssh-1').click({ button: 'right' }); await page.getByRole('button', { name: '编辑连接', exact: true }).click();
     await expect(page.locator('[data-testid="ssh-form-name"]')).toHaveValue('生产服务器');
     await page.locator('[data-testid="ssh-delete-btn"]').click();
@@ -86,7 +86,7 @@ test.describe('SSH 远程连接管理侧栏', () => {
     await expect(page.getByText(/暂无 SSH 连接/)).toBeVisible();
   });
 
-  test('测试连接：成功与失败提示', async ({ page }) => {
+  test('tests a connection: success and failure feedback', async ({ page }) => {
     await page.locator('[data-testid="ssh-new-btn"]').click();
     await page.locator('[data-testid="ssh-form-host"]').fill('bad.example.com');
     await page.locator('[data-testid="ssh-test-btn"]').click();
@@ -96,28 +96,28 @@ test.describe('SSH 远程连接管理侧栏', () => {
     await expect(page.locator('[data-testid="ssh-test-result"]')).toContainText('认证成功');
   });
 
-  test('远程目录可下载，下载管理可定位到文件管理器', async ({ page }) => {
+  test('downloads remote directories and reveals transfers in the file manager', async ({ page }) => {
     await page.getByText('生产服务器').dblclick();
     await page.locator('[data-dock-btn="files"]').click();
     await expect(page.locator('[data-testid="remote-file-Documents"]')).toBeVisible({ timeout: 5000 });
-    // ⋯ 菜单可直接打开下载管理，返回后回到文件浏览
+    // The overflow menu opens download management directly; going back returns to file browsing
     await page.locator('[data-testid="remote-more-btn"]').click();
     await page.getByRole('button', { name: '下载管理' }).click();
     await expect(page.getByText('暂无传输记录')).toBeVisible();
     await page.getByTestId('downloads-back').click();
-    // 右键远程目录 → 下载文件夹到本地；下载开始后面板自动切到下载管理
+    // Right-click a remote directory, then download the folder locally; the panel switches to download management once the transfer starts
     await page.locator('[data-testid="remote-file-Documents"]').click({ button: 'right' });
     await page.getByRole('button', { name: '下载文件夹到本地' }).click();
     await expect(page.getByText(/已下载到/)).toBeVisible();
     await expect(page.getByText('下载管理')).toBeVisible();
     await expect(page.locator('[data-testid="download-item-Documents"]')).toBeVisible();
-    // 定位到系统文件管理器（行操作按钮悬停才显现）
+    // Reveal in the system file manager (row actions appear on hover)
     await page.locator('[data-testid="download-item-Documents"]').hover();
     await page.locator('[data-testid="download-reveal-Documents"]').click();
     expect(await revealedPaths(page)).toContain('/tmp/Documents');
   });
 
-  test('远程面板：右键属性显示远端元数据且没有创建时间', async ({ page }) => {
+  test('remote panel: the properties context menu shows remote metadata without a creation time', async ({ page }) => {
     await page.getByText('生产服务器').dblclick();
     await page.locator('[data-dock-btn="files"]').click();
     await expect(page.locator('[data-testid="remote-file-app.log"]')).toBeVisible({ timeout: 5000 });
@@ -137,55 +137,55 @@ test.describe('SSH 远程连接管理侧栏', () => {
     await expect(dialog).toHaveCount(0);
   });
 
-  test('远程面板：单击选中、Ctrl 加选、双击进入、回退还原视图与选中', async ({ page }) => {
+  test('remote panel: click selects, Ctrl-click adds to the selection, double-click enters a folder and back restores the view and selection', async ({ page }) => {
     await page.getByText('生产服务器').dblclick();
     await page.locator('[data-dock-btn="files"]').click();
     const tree = page.locator('[data-testid="remote-file-tree"]');
     const folder = page.locator('[data-testid="remote-file-Documents"]');
     await expect(folder).toBeVisible({ timeout: 5000 });
 
-    // 单击只选中，不进入目录
+    // A single click only selects; it does not enter the folder
     await folder.click();
     await expect(folder).toHaveAttribute('data-selected', 'true');
     await expect(tree).toHaveAttribute('data-path', '/home/root');
 
-    // Ctrl 点击加选文件行
+    // Ctrl-click adds the file row to the selection
     await page.locator('[data-testid="remote-file-app.log"]').click({ modifiers: ['Control'] });
     await expect(page.locator('[data-testid="remote-file-app.log"]')).toHaveAttribute('data-selected', 'true');
 
-    // 路径编辑跳转到上层目录
+    // Editing the path navigates to the parent directory
     await page.locator('[data-testid="remote-crumb-bar"]').click();
     const input = page.locator('[data-testid="remote-path-input"]');
     await input.fill('/home');
     await input.press('Enter');
     await expect(tree).toHaveAttribute('data-path', '/home');
 
-    // 回退 = 上一个视图快照：路径与多选都还原
+    // Back restores the previous view snapshot, including the path and multi-selection
     await page.locator('[data-testid="remote-back-btn"]').click();
     await expect(tree).toHaveAttribute('data-path', '/home/root');
     await expect(page.locator('[data-testid="remote-file-Documents"]')).toHaveAttribute('data-selected', 'true');
     await expect(page.locator('[data-testid="remote-file-app.log"]')).toHaveAttribute('data-selected', 'true');
 
-    // 键盘 Enter 进入当前锚点目录
+    // Enter opens the focused anchor directory
     await folder.click();
     await tree.focus();
     await page.keyboard.press('Enter');
     await expect(tree).toHaveAttribute('data-path', '/home/root/Documents');
 
-    // 双击同样进入目录
+    // Double-click also enters the folder
     await page.locator('[data-testid="remote-back-btn"]').click();
     await expect(tree).toHaveAttribute('data-path', '/home/root');
     await folder.dblclick();
     await expect(tree).toHaveAttribute('data-path', '/home/root/Documents');
   });
 
-  test('远程面板：面包屑可编辑跳转，删除可从更多菜单回退', async ({ page }) => {
+  test('remote panel: the breadcrumb is editable and a deletion can be reverted from the more menu', async ({ page }) => {
     await page.getByText('生产服务器').dblclick();
     await page.locator('[data-dock-btn="files"]').click();
     const tree = page.locator('[data-testid="remote-file-tree"]');
     await expect(page.locator('[data-testid="remote-file-app.log"]')).toBeVisible({ timeout: 5000 });
 
-    // 面包屑 → 编辑路径，回车跳转
+    // Clicking the breadcrumb edits the path; Enter navigates
     await page.locator('[data-testid="remote-crumb-bar"]').click();
     const input = page.locator('[data-testid="remote-path-input"]');
     await expect(input).toBeVisible();
@@ -193,7 +193,7 @@ test.describe('SSH 远程连接管理侧栏', () => {
     await input.press('Enter');
     await expect(tree).toHaveAttribute('data-path', '/var/log');
 
-    // 删除 = 移到远端暂存，可从更多菜单回退
+    // Deleting moves the entry to a remote staging area and the more menu can restore it
     await page.locator('[data-testid="remote-file-app.log"]').click({ button: 'right' });
     await page.getByRole('button', { name: '删除', exact: true }).click();
     await page.locator('[data-testid="confirm-ok"]').click();
@@ -206,13 +206,13 @@ test.describe('SSH 远程连接管理侧栏', () => {
     expect(await sshOps(page)).toEqual(expect.arrayContaining([{ op: 'restore', path: '/var/log/app.log' }]));
   });
 
-  test('远程面板：右键新建按落点决定目录，拖入同名文件避让后回退用真实路径', async ({ page }) => {
+  test('remote panel: context-menu creation targets the click location, name clashes are avoided and a revert uses the real path', async ({ page }) => {
     await page.getByText('生产服务器').dblclick();
     await page.locator('[data-dock-btn="files"]').click();
     const tree = page.locator('[data-testid="remote-file-tree"]');
     await expect(page.locator('[data-testid="remote-file-app.log"]')).toBeVisible({ timeout: 5000 });
 
-    // 右键文件夹 → 新建文件落在该文件夹内，并立即进入重命名
+    // Right-click a folder: the new file lands inside it and its rename starts immediately
     await page.locator('[data-testid="remote-file-Documents"]').click({ button: 'right' });
     await page.getByRole('button', { name: '新建文件', exact: true }).click();
     const input = page.locator('[data-testid="rename-input"]');
@@ -220,14 +220,14 @@ test.describe('SSH 远程连接管理侧栏', () => {
     expect(await sshOps(page)).toEqual(expect.arrayContaining([{ op: 'create-file', path: '/home/root/Documents/Untitled' }]));
     await input.press('Escape');
 
-    // 右键空白处 → 新建文件夹落在当前目录
+    // Right-click empty space: the new folder lands in the current directory
     const box = (await tree.boundingBox())!;
     await page.mouse.click(box.x + 40, box.y + box.height - 12, { button: 'right' });
     await page.getByRole('button', { name: '新建文件夹', exact: true }).click();
     expect(await sshOps(page)).toEqual(expect.arrayContaining([{ op: 'create-dir', path: '/home/root/NewFolder' }]));
     await page.locator('[data-testid="rename-input"]').press('Escape');
 
-    // 拖动 app.log 到 Documents：目标已有同名 → 后端返回带序号路径，回退按真实路径移回
+    // Drag app.log into Documents with a name clash: the backend returns a numbered path and the revert moves it back by real path
     const source = page.locator('[data-testid="remote-file-app.log"][data-path="/home/root/app.log"]');
     const targetRow = page.locator('[data-testid="remote-file-Documents"][data-path="/home/root/Documents"]');
     const from = (await source.boundingBox())!;
@@ -245,7 +245,7 @@ test.describe('SSH 远程连接管理侧栏', () => {
     expect(await sshOps(page)).toEqual(expect.arrayContaining([{ op: 'move', path: '/home/root/Documents/app (1).log', destDir: '/home/root' }]));
   });
 
-  test('远程面板：点击面包屑根目录回到根目录，而不是重新解析主目录', async ({ page }) => {
+  test('remote panel: clicking the root breadcrumb returns to the root instead of resolving the home directory again', async ({ page }) => {
     await page.getByText('生产服务器').dblclick();
     await page.locator('[data-dock-btn="files"]').click();
     const tree = page.locator('[data-testid="remote-file-tree"]');
@@ -254,29 +254,29 @@ test.describe('SSH 远程连接管理侧栏', () => {
 
     await page.locator('[data-testid="remote-crumb-bar"]').getByText('/', { exact: true }).click();
     await expect(tree).toHaveAttribute('data-path', '/');
-    // 停留一拍：确认没有被「未解析 → 回主目录」的逻辑改回 /home/root
+    // Wait a beat: confirm the unresolved-to-home fallback does not send it back to /home/root
     await page.waitForTimeout(300);
     await expect(tree).toHaveAttribute('data-path', '/');
   });
 
-  test('远程面板：展开箭头懒加载子项，菜单只显示远程可用项', async ({ page }) => {
+  test('remote panel: the expander lazy-loads children and menus list only remote-capable actions', async ({ page }) => {
     await page.getByText('生产服务器').dblclick();
     await page.locator('[data-dock-btn="files"]').click();
     const folder = page.locator('[data-testid="remote-file-Documents"][data-path="/home/root/Documents"]');
     await expect(folder).toBeVisible({ timeout: 5000 });
 
-    // 展开箭头（而不是单击行）懒加载子项
+    // The expander, not a single row click, lazy-loads the children
     await folder.locator('[data-testid="remote-row-expander"]').click();
     await expect(page.locator('[data-testid="remote-file-app.log"][data-path="/home/root/Documents/app.log"]').first()).toBeVisible();
 
-    // 行菜单：有下载，无工作区 / 终端编辑器等本地专有项
+    // Row menu: downloads are available, local-only entries such as workspace and terminal editor are not
     await folder.click({ button: 'right' });
     await expect(page.getByRole('button', { name: /下载文件夹到本地/ })).toBeVisible();
     await expect(page.getByRole('button', { name: '添加到工作区' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '使用终端编辑器打开' })).toHaveCount(0);
     await page.keyboard.press('Escape');
 
-    // ⋯ 菜单：有上传与下载管理，没有本地专有的新建标签页
+    // Overflow menu: upload and download management are available, the local-only new tab is not
     await page.locator('[data-testid="remote-more-btn"]').click();
     await expect(page.getByRole('button', { name: '上传文件', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: '上传文件夹', exact: true })).toBeVisible();
