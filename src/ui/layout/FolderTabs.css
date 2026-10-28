@@ -1,5 +1,5 @@
 .folder-header { display: flex; align-items: stretch; min-width: 0; flex-shrink: 0; min-height: 34px; background: var(--surface); container-type: inline-size; }
-.folder-tab-list { display: flex; align-items: stretch; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; scroll-padding-inline: 8px; padding-inline: 8px; container-type: inline-size; }
+.folder-tab-list { display: flex; align-items: stretch; flex: 1; min-width: 0; overflow-x: auto; scrollbar-width: none; scroll-padding-inline: 4px 8px; padding-inline: 4px 8px; container-type: inline-size; }
 .folder-tab-list::-webkit-scrollbar { display: none; }
 .folder-tab-list[data-empty="true"] { flex: 0 1 auto; }
 .folder-tab-empty { display: flex; flex: 1; min-width: 0; align-items: stretch; }
@@ -36,6 +36,9 @@
 .folder-tab-preview:not([data-active="true"]) { background: var(--surface); }
 .folder-tab-preview:not([data-active="true"]) > .folder-tab-content { background: var(--hover); }
 .folder-actions { display: flex; align-items: center; gap: 2px; padding: 0 6px; flex-shrink: 0; }
+.folder-actions button.icon-button, .folder-actions button.icon-button[data-compact="true"] { width: var(--control-size); height: var(--control-size); }
+/* Toolbar geometry owns icon size, including icons with inline dimensions. */
+.folder-actions button.icon-button svg { width: var(--workspace-toolbar-icon-size) !important; height: var(--workspace-toolbar-icon-size) !important; flex-shrink: 0; }
 .folder-actions button.icon-button[aria-pressed="true"] { background: transparent; color: var(--icon-color); }
 .folder-actions button.icon-button[aria-pressed="true"]:is(:hover, :focus-visible) { background: var(--control-hover-bg); color: var(--icon-hover-color); }
 .folder-tab-list .sidebar-reorder-placeholder { position: relative; margin: 0; border: 0; border-radius: 0; background: transparent; }

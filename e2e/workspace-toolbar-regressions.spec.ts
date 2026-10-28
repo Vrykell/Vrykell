@@ -27,6 +27,13 @@ for (const area of ['terminal', 'code', 'ai', 'unified'] as const) {
     const bar = page.getByTestId('workspace-instance-bar');
     await expect(bar.locator('.folder-more').getByTestId('workspace-resource-switcher')).toBeVisible();
     await expect(bar.locator('.folder-actions').getByTestId('workspace-resource-switcher')).toHaveCount(0);
+    for (const button of await bar.locator('.folder-actions button.icon-button').all()) {
+      if (!await button.isVisible()) continue;
+      const bounds = (await button.boundingBox())!;
+      expect(bounds.width).toBe(32); expect(bounds.height).toBe(32);
+      const icon = button.locator('svg').first();
+      if (await icon.count()) { await expect(icon).toHaveCSS('width', '18px'); await expect(icon).toHaveCSS('height', '18px'); }
+    }
     await expect(bar.getByRole('button', { name: '拆分标签页', exact: true })).toHaveCount(0);
     await expect(bar.getByRole('button', { name: '选择项目文件夹', exact: true })).toHaveCount(0);
     await expect(bar.getByRole('button', { name: '在终端中打开', exact: true })).toHaveCount(0);

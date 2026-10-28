@@ -1,8 +1,8 @@
-import { useId, useRef, useState, type ReactNode } from 'react';
+import { useId, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { IconButton } from '@ui/actions/IconButton';
 import EditorActions from '@ui/menus/EditorActions';
 import ContextMenu, { type ContextMenuItem, type MenuAnchor } from '@ui/menus/ContextMenu';
-import { X } from '@ui/icons';
+import { X, iconSizes } from '@ui/icons';
 import { t } from '@i18n';
 import '@ui/layout/FolderTabs.css';
 import { TextInput } from '@ui/fields/TextInput';
@@ -40,7 +40,7 @@ export default function FolderTabs({ items, selected, label, listId, className =
     const labels = new Set<string>();
     return items.filter(item => { if (labels.has(item.label)) return false; labels.add(item.label); return true; });
   };
-  return <div className={`folder-header ${headerClassName}`}>
+  return <div className={`folder-header ${headerClassName}`} style={{ '--workspace-toolbar-icon-size': `${iconSizes.control}px` } as CSSProperties}>
     {(leading || menuItems) && <div className="folder-more">{leading ?? <EditorActions label={menuLabel} items={menuItems ?? []} />}</div>}
     <GroupedTabList items={items} selected={selected} label={label} listId={listId ?? instanceId} className={className} grouping={grouping} empty={empty}
       onSelect={onSelect} onClose={onClose} onMove={onMove} onRename={beginRename} tabActions={actionsForTab} onBlankContext={onBlankContext ?? (menuItems ? setBlankMenu : undefined)}

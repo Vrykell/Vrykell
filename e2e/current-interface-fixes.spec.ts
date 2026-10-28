@@ -92,12 +92,12 @@ test('shares close-safe workspace resource navigation and reserves identical lea
   expect(menuBounds.x).toBeCloseTo(triggerBounds.x, 0);
   expect(menuBounds.y - triggerBounds.y - triggerBounds.height).toBeCloseTo(4, 0);
   await menu.getByRole('menuitem', { name: 'Stable shell' }).click();
-  for (const area of ['terminal', 'code', 'ai']) {
+  for (const area of ['terminal', 'code', 'unified', 'ai']) {
     await page.getByTestId(`workspace-area-${area}`).click();
     const bar = page.getByTestId('workspace-instance-bar');
     const more = (await bar.locator('.folder-more').boundingBox())!;
     const first = (await bar.locator('.folder-tab-list .folder-tab').first().boundingBox())!;
-    expect(first.x - more.x - more.width).toBeCloseTo(8, 0);
+    expect(first.x - more.x - more.width).toBeCloseTo(4, 0);
     const track = (await bar.locator('.folder-tab-list').boundingBox())!;
     expect(track.x).toBeGreaterThanOrEqual(more.x + more.width);
     expect(await bar.locator('.folder-more-button').evaluate(element => { const bounds = element.getBoundingClientRect(); return element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2)); })).toBe(true);
