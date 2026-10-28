@@ -8,7 +8,11 @@ Each terminal pane exposes one movable content host. The common workspace places
 
 Creation reuses the profile, saved-host and external-agent pickers. Local profiles and saved hosts have separate scopes, including keyboard defaults. File creation and opening remain separate. Actions initiated in the common workspace remain there.
 
+All four workspace strips place the shared resource switcher in the leading slot. The right toolbar omits duplicate resource switching and splitting controls; editor opening-in-terminal and conversation project selection remain available through menus. Tab and pane context menus expose a Split tab submenu containing the resource types allowed in that scope. Terminal, server and agent choices retain their full launchers, and resources are created only after placement. The common toolbar offers side docking for its focused native or external conversation; a dock that cannot fit leaves the main placement intact.
+
 ## History and restoration
+
+Startup restores terminal owners referenced by the saved workbench, including mixed layouts, rather than every leftover active database record. Composition records never spawn terminal processes. Old inactive, untouched, default-titled empty conversation placements are filtered without deleting conversation history; selected, named, grouped, shared and nonempty drafts remain. Sidebar-only owners do not suppress the AI start tab.
 
 The existing history repository stores a composition as a `workspace` metadata record. Its versioned payload contains the shared layout, focus and bounded references, never transcripts, commands, document contents or credentials. Resizing, focus and membership changes update the identity of that tab; restoring retains it. Each tab has its own serialized writer, so switching tabs cannot redirect pending writes. Atomic historical writes prevent startup from mistaking a composition for a terminal process.
 

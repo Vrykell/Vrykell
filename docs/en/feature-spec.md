@@ -18,6 +18,12 @@ The unified container, pane, scoped group, lifecycle and persistence behavior is
 
 See [Workspace compositions](workspace-compositions.md) for composition ownership, restoration and the regression checklist.
 
+- Terminal paste retains its foreground owner across clipboard reads, confirmation and chunked delivery. Native command/prompt and alternate-screen boundaries invalidate queued chunks before webview delivery. Cover exits from running blocks, manual fullscreen and alternate screens, native partial writes, stale epochs, confirmation and clipboard races, normal paste framing and intentional subsequent input. Already accepted terminal bytes remain outside cancellation's guarantee; see the security model.
+
+- All four scopes use a leading all-workspace switcher and typed Split tab context submenus without duplicate toolbar buttons. Cover resource-specific launchers, delayed creation, native layout retention and common-workspace AI docking, including insufficient space.
+- Startup excludes stale active terminal records and untouched inactive blank conversation placements while retaining named, grouped, selected and shared resources. Sidebar-only AI owners leave the start tab available.
+- Image input works in pure chat when the selected model supports it; unsupported image input reports an explicit error. Sent text/image attachment cards sit below the user question. Preview clicks remain open; outside presses and Escape close them and Escape restores chip focus. Expanded editor find/replace keeps its close action centered in the find row. Cover narrow/wide layouts and request payloads without tools.
+
 - Main and split conversation tabs keep all tools in the shared tab toolbar, with no duplicate title/action row inside their content. Cover opening and reopening an independent sidebar in both themes and narrow/wide layouts.
 
 - Opening the AI sidebar restores its independent conversation or creates a draft without moving main or split content. Explicit movement retains the mounted owner and draft. Native execution confirmation remains available in the background and still rejects timeout or late approval. Completed question cards retain only the selected option or typed content with horizontal insets. Code execution actions use the shared terminal icon. Cover both themes, narrow/wide layouts, split ownership, reopen and explicit movement.
