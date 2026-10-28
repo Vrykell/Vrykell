@@ -27,11 +27,12 @@ impl HistoryDb {
         }
         tx.commit().map_err(|e| e.to_string())
     }
-    // ── 会话 CRUD ──
+    // -- Session CRUD --
 
     pub fn create_session(&self, id: &str, title: &str, timestamp: u64, cwd: &str, kind: &str, payload: &str) -> Result<(), String> {
-        // 用 UPSERT：若 record_block/append_chat_message 先以兜底行（title=''、created_at=0）
-        // 落库，这里要把真实 title/created_at/cwd/kind/payload 补回，避免「INSERT OR IGNORE」静默丢弃真信息。
+        // Use UPSERT: if record_block/append_chat_message inserted a fallback row first
+        // (title='', created_at=0), restore the real title/created_at/cwd/kind/payload instead of
+        // letting INSERT OR IGNORE silently discard it.
         self.conn()
             .execute(
                 "INSERT INTO sessions (id, title, status, created_at, cwd, kind, payload) VALUES (?1, ?2, 'active', ?3, ?4, ?5, ?6)
@@ -52,9 +53,9 @@ impl HistoryDb {
         Ok(())
     }
 
-    /// 追加/更新一条 AI 对话消息（助手流式完成时按 id 覆盖）。
-    /// parts = 消息 parts 渲染层的 JSON 串（'' = 无，见前端 messageParts.ts）。
-    // 参数与前端 IPC 调用契约一一对应，折叠结构体需同步改前端
+    /// Insert or update an AI message; a completed assistant stream overwrites by id.
+    /// `parts` is the renderer JSON for message parts (empty means none; see messageParts.ts).
+    // Arguments mirror the frontend IPC contract one-to-one; update both when collapsing the struct.
     #[allow(clippy::too_many_arguments)]
     pub fn append_chat_message(
         &self,
@@ -80,7 +81,7 @@ impl HistoryDb {
             crate::redact::redact_json(parts),
             crate::redact::redact_json(attachments),
         );
-        // 会话行兜底（同 record_block）
+        // Session-row fallback, matching record_block.
         self.conn()
             .execute(
                 "INSERT OR IGNORE INTO sessions (id, title, status, created_at) VALUES (?1, '', 'active', 0)",
@@ -97,7 +98,7 @@ impl HistoryDb {
         Ok(())
     }
 
-    /// 读取某会话的 AI 对话消息（按时间升序）。
+    /// Read a session's AI messages in ascending time order.
     pub fn get_chat_messages(&self, session_id: &str) -> Result<Vec<ChatMessageEntry>, String> {
         let mut stmt = self
             .conn()
@@ -111,8 +112,8 @@ impl HistoryDb {
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
 
-    /// 删除单条 AI 对话消息（M4：重新生成/编辑重发/删除交换）。
-    /// 幂等：id 不存在不报错。
+    /// Delete one AI message (regenerate, edit-and-resend, or delete exchange).
+    /// Idempotent: a missing id is not an error.
     pub fn delete_chat_message(&self, id: &str) -> Result<(), String> {
         self.conn()
             .execute("DELETE FROM chat_messages WHERE id = ?1", params![id])
@@ -155,7 +156,7 @@ impl HistoryDb {
         Ok(())
     }
 
-    /// 更新会话当前工作目录（cd 后 OSC 7 上报）。
+    /// Update the session working directory from an OSC 7 report after cd.
     pub fn update_session_cwd(&self, id: &str, cwd: &str) -> Result<(), String> {
         self.conn()
             .execute(
@@ -166,7 +167,7 @@ impl HistoryDb {
         Ok(())
     }
 
-    /// 覆盖会话 payload JSON（分屏布局等变体状态的持久化）。
+    /// Overwrite the session payload JSON (split layouts and other variant state).
     pub fn update_session_payload(&self, id: &str, payload: &str) -> Result<(), String> {
         self.conn()
             .execute(
@@ -177,7 +178,7 @@ impl HistoryDb {
         Ok(())
     }
 
-    /// 读取单个会话（含 cwd），供恢复时取回工作目录。
+    /// Read one session, including cwd, so restoration can recover its working directory.
     pub fn get_session(&self, id: &str) -> Result<SessionEntry, String> {
         self.conn()
             .query_row(
@@ -190,19 +191,19 @@ impl HistoryDb {
             .map_err(|e| e.to_string())
     }
 
-    /// ⚠ 预留：删除会话及关联 block
+    /// Reserved: delete a session and its blocks.
     #[allow(dead_code)]
     pub fn delete_session(&self, id: &str) -> Result<(), String> {
-        // ON DELETE CASCADE 自动清理 blocks
+        // ON DELETE CASCADE removes blocks.
         self.conn()
             .execute("DELETE FROM sessions WHERE id = ?1", params![id])
             .map_err(|e| e.to_string())?;
         Ok(())
     }
 
-    // ── 块持久化 ──
+    // -- Block persistence --
 
-    // 参数与前端 IPC 调用契约一一对应，折叠结构体需同步改前端
+    // Arguments mirror the frontend IPC contract one-to-one; update both when collapsing the struct.
     #[allow(clippy::too_many_arguments)]
     pub fn record_block(
         &self,
@@ -232,8 +233,9 @@ impl HistoryDb {
         let (command, output_raw, output_clean, output_html) = (
             crate::redact::redact_text(command), raw, clean, safe_html,
         );
-        // 会话行可能因 create_session 的异步时序尚未落库（首个命令先于 create 到达），
-        // 此处兜底 INSERT OR IGNORE 保证外键满足，块不会被静默丢弃。
+        // The session row may not exist yet because create_session is asynchronous (the first command
+        // can arrive before create). This INSERT OR IGNORE fallback satisfies the foreign key so blocks
+        // are never silently dropped.
         self.conn()
             .execute(
                 "INSERT OR IGNORE INTO sessions (id, title, status, created_at) VALUES (?1, '', 'active', 0)",
@@ -259,7 +261,7 @@ impl HistoryDb {
         Ok(())
     }
 
-    // ── 搜索 ──
+    // -- Search --
 
     pub fn search_blocks(
         &self,
@@ -269,7 +271,7 @@ impl HistoryDb {
     ) -> Result<Vec<BlockEntry>, String> {
         let pattern = format!("%{}%", query);
 
-        // 参数化构建，避免把用户可控的 filter_session_status 拼进 SQL（SQL 注入）
+        // Build parameterized SQL so caller-controlled filter_session_status cannot inject SQL.
         let mut conditions = vec!["(b.command LIKE ?1 OR b.output_raw LIKE ?1)".to_string()];
         let mut params_vec: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
         params_vec.push(Box::new(pattern));
@@ -324,7 +326,7 @@ impl HistoryDb {
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
 
-    /// 列出全部会话（活跃 + 历史），按创建时间倒序，带 block 计数。
+    /// List every session (active and historical) newest first, with block counts.
     pub fn list_sessions(&self) -> Result<Vec<SessionEntry>, String> {
         let mut stmt = self
             .conn()
@@ -358,7 +360,7 @@ impl HistoryDb {
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
 
-    // ── 分组 CRUD ──
+    // -- Group CRUD --
 
     pub fn create_group(&self, id: &str, title: &str, timestamp: u64) -> Result<(), String> {
         let next: i64 = self
@@ -388,7 +390,7 @@ impl HistoryDb {
         Ok(())
     }
 
-    /// 删除分组：组内会话回到未分组（保留会话），仅删分组容器。
+    /// Delete a group: its sessions become ungrouped and only the container is removed.
     pub fn delete_group(&self, id: &str) -> Result<(), String> {
         self.conn()
             .execute("UPDATE sessions SET group_id = NULL WHERE group_id = ?1", params![id])
@@ -399,7 +401,7 @@ impl HistoryDb {
         Ok(())
     }
 
-    /// 删除分组及其组内全部会话（blocks/chat 级联删除）。
+    /// Delete a group and every session in it; blocks and chat cascade.
     pub fn delete_group_with_sessions(&self, id: &str) -> Result<(), String> {
         self.conn()
             .execute("DELETE FROM sessions WHERE group_id = ?1", params![id])
@@ -443,7 +445,7 @@ impl HistoryDb {
         Ok(())
     }
 
-    /// 把会话移到某分组（或未分组，group_id=None），追加到末尾。
+    /// Move a session into a group (or ungroup with group_id=None) at the end.
     pub fn session_set_group(&self, session_id: &str, group_id: Option<&str>) -> Result<(), String> {
         let next: i64 = self
             .conn()
@@ -485,7 +487,7 @@ impl HistoryDb {
         Ok(())
     }
 
-    /// 恢复分组内所有历史会话为 active（前端随后重建标签页）。
+    /// Restore every historical session in a group to active; the frontend then rebuilds the tabs.
     pub fn restore_group(&self, id: &str) -> Result<(), String> {
         self.conn()
             .execute(
@@ -499,7 +501,7 @@ impl HistoryDb {
         Ok(())
     }
 
-    /// 归档分组：把组内所有活跃会话标记为历史（关闭），组本身保留并标记为已归档。
+    /// Archive a group: mark its active sessions historical, keep the group and mark it archived.
     pub fn archive_group(&self, id: &str, timestamp: u64) -> Result<(), String> {
         self.conn()
             .execute(
@@ -514,7 +516,7 @@ impl HistoryDb {
     }
 }
 
-/// 块记录（来自 blocks 表 JOIN sessions）
+/// Block record (blocks joined with sessions).
 #[derive(Clone, Serialize, Debug)]
 pub struct BlockEntry {
     pub id: String,
@@ -552,7 +554,7 @@ fn map_block_entry(row: &rusqlite::Row) -> rusqlite::Result<BlockEntry> {
     })
 }
 
-/// 会话记录
+/// Session record.
 #[derive(Clone, Serialize, Debug)]
 pub struct SessionEntry {
     pub id: String,
@@ -584,7 +586,7 @@ fn map_session_entry(row: &rusqlite::Row) -> rusqlite::Result<SessionEntry> {
     })
 }
 
-/// 分组记录
+/// Group record.
 #[derive(Clone, Serialize, Debug)]
 pub struct GroupEntry {
     pub id: String,
@@ -608,7 +610,7 @@ fn map_group_entry(row: &rusqlite::Row) -> rusqlite::Result<GroupEntry> {
     })
 }
 
-/// AI 对话消息记录（会话恢复时回填聊天区）。
+/// AI message record used to refill the chat when a session is restored.
 #[derive(Clone, Serialize, Debug)]
 pub struct ChatMessageEntry {
     pub id: String,
@@ -616,7 +618,7 @@ pub struct ChatMessageEntry {
     pub content: String,
     pub created_at: u64,
     pub parts: String,
-    /// 附件元数据 JSON（M5，'' = 无/旧数据）
+    /// Attachment metadata JSON (empty means none or legacy data).
     pub attachments: String,
     pub pane_id: Option<String>,
 }
