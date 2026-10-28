@@ -23,7 +23,7 @@ pub fn run_app_mcp_helper() -> Option<i32> { agent::app_mcp::run_helper() }
 pub fn run() {
     #[cfg(target_os = "macos")]
     configure_keyboard_input();
-    // 打开失败降级为内存库（历史功能不可用），而不是启动即崩溃
+    // On failure, fall back to an in-memory database (history unavailable) instead of crashing at startup.
     let history_db = match db::HistoryDb::open() {
         Ok(db) => db,
         Err(e) => {
@@ -31,8 +31,8 @@ pub fn run() {
             db::HistoryDb::open_in_memory()
         }
     };
-    // 不再归档 active 会话：active = 「上次打开未关闭的标签」，启动时由前端恢复；
-    // 仅用户显式关闭标签时才归档为历史（archive_session）。
+    // Active sessions are no longer archived: active means "tabs left open last time", restored by the frontend at startup;
+    // a session becomes history only when the user explicitly closes its tab (archive_session).
     let history_state = HistoryState(Mutex::new(history_db));
 
     let app = tauri::Builder::default()
@@ -76,12 +76,12 @@ pub fn run() {
                     .grant(paths.iter().map(std::path::PathBuf::from));
             }
         })
-        // asset 协议 scope 已收窄：启动时把已保存的壁纸文件动态授权
+        // The asset protocol scope is narrowed: saved wallpaper files are granted dynamically at startup.
         .setup(|app| {
             if let Err(error) = terminal::debug::initialize(app.handle()) {
                 eprintln!("[terminal-debug] log initialization failed: {error}");
             }
-            // 上次会话残留的可回退删除暂存项：补送入系统回收站（后台执行，不阻塞启动）
+            // Staged items from undoable deletions left over from the previous session: send them to the system trash (background, non-blocking at startup).
             std::thread::spawn(files::fs::sweep_undo_dir);
             if let Some(cfg) = app.try_state::<theme::ThemeState>() {
                 let path = cfg.0.lock().ok().map(|c| c.background_image.clone());
@@ -317,7 +317,7 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    // 退出时不再归档 active 会话：保留「上次打开未关闭的标签」供下次启动恢复。
+    // Active sessions are no longer archived on exit: tabs left open are kept for restoration on the next start.
     app.run(|app_handle, event| {
         if matches!(event, tauri::RunEvent::Exit) {
             // Do not rely on the operating system closing handles: terminate every

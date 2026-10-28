@@ -3,9 +3,9 @@ use rusqlite::params;
 use serde::Serialize;
 
 impl HistoryDb {
-    // ── 下载历史 ──
+    // ── Download history ──
 
-    // 参数与前端 IPC 调用契约一一对应，折叠结构体需同步改前端
+    // Parameters map one-to-one to the frontend IPC contract; collapsing them into a struct requires a matching frontend change.
     #[allow(clippy::too_many_arguments)]
     pub fn record_download(
         &self,
@@ -48,7 +48,7 @@ impl HistoryDb {
         Ok(())
     }
 
-    /// 移除某条下载历史（按本地路径；丢弃拖出取消后遗留的临时副本时调用）。
+    /// Remove one download history entry by local path (called when discarding a temporary copy left behind by a cancelled drag-out).
     pub fn remove_download(&self, local_path: &str) -> Result<(), String> {
         self.conn()
             .execute("DELETE FROM downloads WHERE local_path = ?1", params![local_path])
@@ -62,7 +62,7 @@ impl HistoryDb {
     }
 }
 
-/// 下载历史记录（文件管理「下载管理」页使用）。
+/// A download history entry (used by the download manager page under file management).
 #[derive(Clone, Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DownloadEntry {

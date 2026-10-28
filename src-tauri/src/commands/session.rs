@@ -10,7 +10,7 @@ pub fn delete_terminal_panes(state: tauri::State<'_, HistoryState>, session_id: 
     state.0.lock().map_err(|error| error.to_string())?.delete_terminal_panes(&session_id, &pane_ids)
 }
 
-/// 创建会话（新建标签页时调用），携带类型判别 kind 与变体专属 JSON payload。
+/// Create a session (called when a new tab is opened), carrying the kind discriminant and a variant-specific JSON payload.
 #[tauri::command]
 pub fn create_session(
     state: tauri::State<'_, HistoryState>,
@@ -90,7 +90,7 @@ pub fn get_session(
     db.get_session(&id)
 }
 
-/// 删除会话及关联 block / 聊天（级联删除）
+/// Delete a session together with its associated blocks and chat messages (cascade delete).
 #[tauri::command]
 pub fn delete_session(
     state: tauri::State<'_, HistoryState>,
@@ -101,7 +101,7 @@ pub fn delete_session(
 }
 
 #[tauri::command]
-// 参数镜像前端 IPC 调用契约（record_block 逐字段传参），折叠结构体需同步改前端
+// Parameters mirror the frontend IPC contract (record_block passes each field separately); collapsing them into a struct requires a matching frontend change.
 #[allow(clippy::too_many_arguments)]
 pub fn record_block(
     state: tauri::State<'_, HistoryState>,
@@ -136,7 +136,7 @@ pub fn record_block(
 }
 
 #[tauri::command]
-// 参数镜像前端 IPC 调用契约（append_chat_message 逐字段传参），折叠结构体需同步改前端
+// Parameters mirror the frontend IPC contract (append_chat_message passes each field separately); collapsing them into a struct requires a matching frontend change.
 #[allow(clippy::too_many_arguments)]
 pub fn append_chat_message(
     state: tauri::State<'_, HistoryState>,
@@ -165,7 +165,7 @@ pub fn list_chat_messages(
     db.get_chat_messages(&session_id)
 }
 
-/// 删除单条 AI 对话消息（M4：重新生成/编辑重发/删除交换）。幂等。
+/// Delete a single AI chat message (M4: regenerate, edit-and-resend and delete flows). Idempotent.
 #[tauri::command]
 pub fn delete_chat_message(
     state: tauri::State<'_, HistoryState>,

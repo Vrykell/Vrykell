@@ -3,7 +3,7 @@ use rusqlite::params;
 use serde::Serialize;
 
 impl HistoryDb {
-    /// 记录一条命令。如果同命令已存在则更新 run_count 和时间戳。
+    /// Record a command. If the same command already exists, update its run_count and timestamp.
     pub fn record(
         &self,
         command: &str,
@@ -12,7 +12,7 @@ impl HistoryDb {
         timestamp: u64,
     ) -> Result<(), String> {
         let command = crate::redact::redact_text(command);
-        // 先查是否已有相同命令
+        // Check first whether the same command already exists
         let existing: Option<(i64, u32)> = self
             .conn()
             .query_row(
@@ -40,7 +40,7 @@ impl HistoryDb {
         Ok(())
     }
 
-    /// 搜索命令历史
+    /// Search command history.
     pub fn search(
         &self,
         query: &str,
@@ -97,7 +97,7 @@ impl HistoryDb {
         Ok(result)
     }
 
-    /// 清空命令历史（与前端 in-memory 缓存一致，消除双写漂移）。
+    /// Clear command history (keeps the frontend in-memory cache consistent and removes double-write drift).
     pub fn clear_history(&self) -> Result<(), String> {
         self.conn()
             .execute_batch("DELETE FROM history; DELETE FROM command_history_runs;")
