@@ -119,7 +119,8 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByTestId('remote-file-Documents').click({ button: 'right' });
     await page.getByRole('button', { name: '下载文件夹到本地' }).click();
     await expect(page.getByText(/已下载到/)).toBeVisible();
-    // 下载开始后面板自动切到下载管理；行操作为悬停显现的图标按钮，不属于轮廓按钮审计
+    // The panel switches to download management once a download starts; row actions are icon buttons
+    // revealed on hover and are not part of the outlined button audit.
     await expect(page.getByTestId('download-reveal-Documents')).toHaveCount(1);
     await testInfo.attach('outlined-action-audit', { body: JSON.stringify(report, null, 2), contentType: 'application/json' });
   });

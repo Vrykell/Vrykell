@@ -108,7 +108,7 @@ test('the full panel preview accepts release and shares its surface with split p
   await expect(zone).toHaveCSS('border-color', colors.border);
   await expect(zone).toHaveCSS('border-radius', colors.radius);
   await expect(zone).toHaveCSS('backdrop-filter', colors.blur);
-  // 指针离开布局区后预览消失，不残留网格描边
+  // Once the pointer leaves the layout region the preview disappears and leaves no grid outline behind.
   const dock = (await page.locator('[data-dock-btn="files"]').boundingBox())!;
   await page.mouse.move(dock.x + dock.width / 2, dock.y + dock.height / 2);
   await expect(zone).toHaveCount(0);

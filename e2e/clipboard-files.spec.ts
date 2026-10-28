@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { clipboardFiles, setupTauriMock } from './tauri-mock';
 
 /** Copying or cutting a row must also put the real path on the system file clipboard. */
-test('复制与剪切文件行会把真实路径写入系统剪贴板', async ({ page }) => {
+test('copying and cutting a file row writes the real path to the system clipboard', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await page.locator('[data-dock-btn="files"]').click();

@@ -12,7 +12,7 @@ async function ready(page: Page) {
   }, TERM_STORE);
 }
 
-test('切回标签时重新绘制被隐藏的终端画面', async ({ page }) => {
+test('switching back to a tab repaints the hidden terminal view', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await ready(page);

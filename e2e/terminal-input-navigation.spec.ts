@@ -227,7 +227,7 @@ test('font family, weight and spacing update existing terminal history and persi
   }
   const preview = page.getByLabel('终端字体预览');
   await expect(preview).toHaveCSS('font-weight', '350');
-  // 行高来自字体实测（字号公式会与画布网格差数像素）
+  // Row height comes from measuring the font (a size-based formula would be a few pixels off the canvas grid).
   const rowHeightAtOnePointTwo = await terminalRowHeight(page);
   await expect(preview).toHaveCSS('line-height', `${rowHeightAtOnePointTwo}px`);
   await expect(preview).toHaveCSS('font-family', /Maple Mono NF CN/);

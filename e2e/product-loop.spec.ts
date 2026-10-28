@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, mockAnthropic, ensureTabsOpen } from './tauri-mock';
 
-test('AI 草稿和附件按会话保留，关闭面板后仍能继续发送', async ({ page }) => {
+test('AI drafts and attachments are kept per conversation and can still be sent after the panel closes', async ({ page }) => {
   await setupTauriMock(page);
   await mockAnthropic(page, '任务完成');
   await page.goto('/');

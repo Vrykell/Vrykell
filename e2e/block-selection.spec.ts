@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
-test('命令块头部（路径等）与命令行可被鼠标选中复制', async ({ page }) => {
+test('command block header (including the path) and command line can be selected and copied with the mouse', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   const input = page.getByPlaceholder(/输入命令/);
