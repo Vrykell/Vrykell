@@ -5,7 +5,7 @@ test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
 });
 
-test.describe('多标签工作区', () => {
+test.describe('Multi-tab workspace', () => {
   test('terminal instances isolate output while the assistant retains its independent conversation', async ({ page }) => {
     await mockAnthropic(page, '回复一');
     await page.goto('/');
@@ -43,18 +43,18 @@ test.describe('多标签工作区', () => {
     await expect(assistant.getByText('回复一', { exact: true })).toBeVisible();
   });
 
-  test('关闭标签后激活相邻标签', async ({ page }) => {
+  test('closing a tab activates the adjacent tab', async ({ page }) => {
     await page.goto('/');
-    // 等待应用加载完成
+    // Wait for the app to finish loading.
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
-    // 用快捷键新建标签
+    // Create a new tab with the keyboard shortcut.
     await page.keyboard.press('Meta+t');
-    // 打开标签面板验证第二个标签存在
+    // Open the tab panel and verify the second tab exists.
     await ensureTabsOpen(page);
     await expect(page.getByText('终端').first()).toBeVisible();
-    // 快捷键关闭标签（会关闭当前激活的标签）
+    // Close the tab with the keyboard shortcut (this closes the currently active tab).
     await page.keyboard.press('Meta+w');
-    // 标签面板中至少保留一个标签
+    // The tab panel keeps at least one tab.
     await expect(page.getByText('终端').first()).toBeVisible();
   });
 });

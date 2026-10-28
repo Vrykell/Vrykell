@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, emitPtyOutput } from './tauri-mock';
 
-/** 找到 block 列表滚动容器 */
+/** Find the scroll container of the block list. */
 async function scrollEl(page: import('@playwright/test').Page) {
   const handle = await page.evaluateHandle(() => {
     const card = document.querySelector('[data-testid^="command-block-"] [data-testid="exit-code"]')
@@ -17,20 +17,20 @@ async function scrollEl(page: import('@playwright/test').Page) {
 const exitCodes = (page: import('@playwright/test').Page) =>
   page.locator('[data-testid^="command-block-"] [data-testid="exit-code"]');
 
-test('用户上滚后运行新命令，应重新贴底', async ({ page }) => {
+test('running a new command after scrolling up re-pins to the bottom', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   const input = page.getByPlaceholder(/输入命令/);
   await expect(input).toBeVisible({ timeout: 5000 });
 
-  // 跑 15 条命令制造溢出
+  // Run 15 commands to force overflow.
   for (let i = 1; i <= 15; i++) {
     await input.fill(`echo line-${i}`);
     await input.press('Enter');
     await expect(exitCodes(page)).toHaveCount(i, { timeout: 5000 });
   }
 
-  // 用户上滚 300px 读历史输出
+  // The user scrolls up 300px to read earlier output.
   const el = await scrollEl(page);
   await el.evaluate((e) => { e.scrollTop -= 300; });
   await page.waitForTimeout(100);
@@ -39,7 +39,7 @@ test('用户上滚后运行新命令，应重新贴底', async ({ page }) => {
   );
   expect(gapAfterScrollUp).toBeGreaterThan(32);
 
-  // 用户运行新命令 —— ：应跳回底部
+  // The user runs a new command: the view must jump back to the bottom.
   await input.fill('echo after-scroll');
   await input.press('Enter');
   await expect(exitCodes(page)).toHaveCount(16, { timeout: 5000 });
@@ -52,7 +52,7 @@ test('用户上滚后运行新命令，应重新贴底', async ({ page }) => {
   expect(gapAfterNewCmd).toBeLessThan(32);
 });
 
-test('改变终端宽度时保持阅读位置，贴底状态保持贴底', async ({ page }) => {
+test('resizing the terminal preserves the reading position and keeps a pinned view pinned', async ({ page }) => {
   await setupTauriMock(page);
   await page.setViewportSize({ width: 1100, height: 500 });
   await page.goto('/');

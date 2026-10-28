@@ -15,7 +15,7 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByTestId('running-term').locator('.xterm')).toBeVisible();
 });
 
-test('运行中命令块以图标显示统一尺寸的操作按钮', async ({ page }) => {
+test('a running command block shows uniformly sized icon action buttons', async ({ page }) => {
   const block = page.locator('[data-testid^="running-block-"]').first();
   await page.mouse.move(0, 0);
   await expect(block.locator('.command-block-info')).toHaveCSS('opacity', '1');
@@ -51,7 +51,7 @@ test('运行中命令块以图标显示统一尺寸的操作按钮', async ({ pa
   await page.screenshot({ path: test.info().outputPath('termination-armed.png') });
 });
 
-test('运行中块右键菜单前置工具栏快捷操作并可直接触发', async ({ page }) => {
+test('the running block context menu puts toolbar shortcuts first and triggers them directly', async ({ page }) => {
   const block = page.locator('[data-testid^="running-block-"]').first();
   await block.click({ button: 'right' });
   const menu = page.getByRole('menu', { name: '操作菜单' });
@@ -78,14 +78,14 @@ test('运行中块右键菜单前置工具栏快捷操作并可直接触发', as
   await expect(page.getByTestId('tui-fullscreen')).toHaveCount(0);
 });
 
-test('运行中块不再叠加第二个 xterm 滚动条', async ({ page }) => {
+test('a running block no longer stacks a second xterm scrollbar', async ({ page }) => {
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm-viewport')).toHaveCSS('overflow-y', 'hidden');
   await expect(host.locator('.xterm-scrollable-element > .xterm-scrollbar.xterm-vertical')).toHaveCSS('display', 'none');
   await expect(host.locator('.xterm-scrollable-element > .xterm-scrollbar.xterm-horizontal')).toHaveCSS('display', 'none');
 });
 
-test('运行块在重画为更小帧后收敛高度，不再留下整屏黑尾', async ({ page }) => {
+test('a running block settles to a smaller repaint frame without a full-screen black tail', async ({ page }) => {
   const block = page.locator('[data-testid^="running-block-"]').first();
   await emitPtyOutput(page, Array.from({ length: 30 }, (_, index) => `frame row ${index}`).join('\r\n') + '\r\n');
   await expect.poll(async () => (await block.boundingBox())!.height).toBeGreaterThan(200);
@@ -97,7 +97,7 @@ test('运行块在重画为更小帧后收敛高度，不再留下整屏黑尾',
   await expect.poll(async () => (await block.boundingBox())!.height).toBeLessThan(tallHeight - 100);
 });
 
-test('重绘循环的中间态不会让运行块高度来回跳', async ({ page }) => {
+test('intermediate repaint frames do not make the running block height oscillate', async ({ page }) => {
   const block = page.locator('[data-testid^="running-block-"]').first();
   const frame = Array.from({ length: 24 }, (_, index) => `frame row ${index}`).join('\r\n') + '\r\n';
   await emitPtyOutput(page, frame);
