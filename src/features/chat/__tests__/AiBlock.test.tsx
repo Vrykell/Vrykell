@@ -21,6 +21,23 @@ const exchange: ChatExchange = { id: 'question', createdAt: 1,
   answer: { id: 'answer', role: 'assistant', content: 'Check the **configuration**.', createdAt: 2 },
 };
 
+it('keeps sent attachments beneath the question and dismisses previews on outside press and Escape', () => {
+  const view = render(<AiBlock presentation="conversation" exchange={{ ...exchange, question: { ...exchange.question!, attachments: [{ id: 'paste', kind: 'paste', name: 'Pasted sample', mime: 'text/plain', size: 11, textContent: 'sample text' }] } }} />);
+  const question = view.container.querySelector('.ai-block-question')!;
+  expect(question.nextElementSibling).toHaveClass('chat-question-attachments');
+  const trigger = screen.getByRole('button', { name: 'Pasted sample' });
+  fireEvent.click(trigger);
+  expect(screen.getByRole('dialog')).toHaveTextContent('sample text');
+  fireEvent.pointerDown(screen.getByRole('dialog'));
+  expect(screen.getByRole('dialog')).toBeVisible();
+  fireEvent.pointerDown(document.body);
+  expect(screen.queryByRole('dialog')).toBeNull();
+  fireEvent.click(trigger);
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(trigger).toHaveFocus();
+});
+
 it('shows one copy action without unsupported native mutations for external replies', () => {
   const view = render(<AiBlock exchange={exchange} allowExchangeActions={false} presentation="conversation" />);
   expect(view.container.querySelectorAll('.chat-answer-actions')).toHaveLength(1);

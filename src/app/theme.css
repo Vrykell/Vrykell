@@ -684,6 +684,9 @@ button.window-control-button {
 .chat-attachment-chip > svg { flex-shrink: 0; color: var(--text-muted); }
 .chat-context-tray .chat-references { max-height: 150px; overflow: auto; }
 .chat-attachments { position: relative; display: flex; flex-wrap: wrap; gap: 5px; min-width: 0; max-width: 100%; }
+.chat-question-attachments { min-width: 0; margin-bottom: 12px; }
+.chat-exchange > .chat-question-attachments { width: fit-content; max-width: 90%; margin: -8px 0 16px auto; }
+.chat-exchange > .chat-question-attachments:first-child { margin-top: 0; }
 .search-scope-chip.chat-attachment-chip { max-width: min(100%, 220px); color: var(--text-secondary); }
 /* The whole chip carries the hover/preview highlight; the name button stays flat. */
 .search-scope-chip.chat-attachment-chip:is(:hover, :focus-within),

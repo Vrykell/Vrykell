@@ -88,14 +88,14 @@ export default function AiBlock({ exchange, conversationId, toolContextId, onAsk
       </span>
     </div>}
     {!!question?.content.trim() && <div className={plain ? 'ai-block-question' : 'command-block-command ai-block-question'} data-selectable>{question.content}</div>}
+    {expanded && !!question?.attachments?.length && <div className="chat-question-attachments"><AttachmentChips atts={question.attachments} previewId={attPreviewId}
+      onPreview={id => setAttPreviewId(attPreviewId === id ? null : id)} /></div>}
     {plain && !!question?.content.trim() && <div className="chat-question-meta">
       <span>{formatMessageTime(question.createdAt)}</span>
       <CopyButton className="chat-question-copy" testId="chat-question-copy" text={question.content}
         label={t('Copy message')} style={{ width: 20, height: 20 }} />
     </div>}
     {expanded && question?.references?.length ? <TerminalReferences references={question.references} framed={plain} /> : null}
-    {expanded && !!question?.attachments?.length && <AttachmentChips atts={question.attachments} previewId={attPreviewId}
-      onPreview={id => setAttPreviewId(attPreviewId === id ? null : id)} />}
     {answer && expanded && <div className={plain ? 'ai-block-answer' : 'command-block-output ai-block-answer'} data-selectable>
       {answer.reasoning && <ThinkingBlock text={answer.reasoning} streaming={answer.pending ?? false} />}
       {parts ? parts.map((part, index) => part.kind === 'tool'

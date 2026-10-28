@@ -128,7 +128,7 @@ export function useAttachmentComposer(state?: AttachmentComposerState) {
     return true;
   }, [addAttachments]);
 
-  const togglePreview = useCallback((id: string) => {
+  const togglePreview = useCallback((id: string | null) => {
     setPreviewId((current) => (current === id ? null : id));
   }, []);
 

@@ -26,6 +26,7 @@ import { useAgentSettings } from '@features/agent/stores/agentSettings';
 import { agentStream } from '@features/agent/services/agentStream';
 import { useUsageStore } from '@features/agent/stores/usage';
 import { setToolAuthorizer } from './stores/permissions';
+import { t } from '@i18n';
 
 const mockInvoke = vi.mocked(invoke);
 
@@ -40,7 +41,7 @@ function toChunks(s: string, size: number): string[] {
   return out;
 }
 
-function setupInvoke(sseBody: string, status = 200) {
+function setupInvoke(sseBody: string, status = 200, vision = false) {
   mockInvoke.mockImplementation(async (...rest) => {
     const [cmd, args] = rest as [string, { onEvent: Channel<unknown> } | undefined];
     console.log('INVOKE>', String(cmd), rest.length, JSON.stringify(args)?.slice(0, 100));
@@ -53,10 +54,11 @@ function setupInvoke(sseBody: string, status = 200) {
         has_anthropic_key: false,
         has_gemini_key: false,
         has_tavily_key: false,
-        models: [{ id: 'default', name: '默认', provider: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', capabilities: { vision: false, reasoning: false, tools: true, search: false } }],
+        models: [{ id: 'default', name: '默认', provider: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', capabilities: { vision, reasoning: false, tools: true, search: false } }],
         active_model: 'default',
       } as never;
     }
+    if (cmd === 'read_attachment') return 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aCKcAAAAASUVORK5CYII=' as never;
     if (cmd === 'llm_stream') {
       const ch = (args as { onEvent: Channel<unknown> }).onEvent;
       const send = ch.onmessage as (ev: unknown) => void;
@@ -71,6 +73,25 @@ function setupInvoke(sseBody: string, status = 200) {
 }
 
 describe('agentStream（mock IPC 边界）', () => {
+  it('sends image parts in discussion mode without enabling tools', async () => {
+    setupInvoke('data: {"choices":[{"delta":{"content":"Image received"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n', 200, true);
+    const initial = useAgentSettings.getState().global;
+    useAgentSettings.setState({ global: { ...initial, agentMode: false } });
+    try {
+      await agentStream([{ role: 'user', content: 'Read this image', attachments: [{ id: 'image', kind: 'image', name: 'sample.png', mime: 'image/png', size: 68, blobPath: '/attachments/sample.png' }] }], () => {});
+      const raw = mockInvoke.mock.calls.find(([name]) => name === 'llm_stream')?.[1] as { req: { body: string } };
+      const request = JSON.parse(raw.req.body) as { messages: { role: string; content: { type: string; image_url?: { url: string } }[] }[]; tools?: unknown };
+      expect(request.messages.find(message => message.role === 'user')?.content.some(part => part.type === 'image_url' && part.image_url?.url.startsWith('data:image/png;base64,'))).toBe(true);
+      expect(request.tools).toBeUndefined();
+    } finally { useAgentSettings.setState({ global: initial }); }
+  });
+
+  it('reports unsupported image input instead of silently discarding the new image', async () => {
+    setupInvoke('');
+    await expect(agentStream([{ role: 'user', content: 'Read this image', attachments: [{ id: 'image', kind: 'image', name: 'sample.png', mime: 'image/png', size: 68, blobPath: '/attachments/sample.png' }] }], () => {}))
+      .rejects.toThrow(t('The selected model does not support image input. Choose a model with image input enabled.'));
+    expect(mockInvoke.mock.calls.some(([command]) => command === 'llm_stream')).toBe(false);
+  });
   it('replays the complete persisted tool result into the next model request', async () => {
     setupInvoke('data: {"choices":[{"delta":{"content":"Using the previous result"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
     const original = useAgentSettings.getState().global;

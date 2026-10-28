@@ -96,6 +96,10 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   const vision =
     (info.models ?? []).find((m) => m.id === info.active_model)?.capabilities?.vision ??
     supportsVision(info.provider, info.model);
+  const latestQuestion = [...messages].reverse().find(message => message.role === 'user');
+  if (!vision && latestQuestion?.attachments?.some(attachment => attachment.mime.startsWith('image/'))) {
+    throw new Error(t('The selected model does not support image input. Choose a model with image input enabled.'));
+  }
   const sized: SizedMessage[] = [];
   for (const m of messages) {
     if (m.role === 'assistant' && m.parts?.some(part => part.kind === 'tool')) {

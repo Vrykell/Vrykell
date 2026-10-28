@@ -2519,6 +2519,8 @@ const zh: Record<string, string> = {
   'The agent closed the connection.': '代理已关闭连接。',
   'The agent did not respond in time; the turn was stopped.': '代理长时间没有响应，本轮已停止。',
   'The agent ended the turn without a reply. Check its model, sign-in and service quota, then try again.': '代理已结束本轮，但没有返回回复。请检查模型、登录状态和服务额度后重试。',
+  'The selected model does not support image input. Choose a model with image input enabled.': '当前模型不支持图片输入，请切换到支持图片输入的模型。',
+  'Paste stopped because the foreground application changed. The remaining text was not sent.': '前台应用已变化，粘贴已停止，剩余文本未发送。',
 };
 
 export default zh;
