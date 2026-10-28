@@ -25,7 +25,7 @@ fn lock_unpoisoned<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner())
 }
 
-/// 流式 UTF-8 解码器：跨 read 边界缓冲不完整的多字节序列。
+/// Streaming UTF-8 decoder: buffers incomplete multi-byte sequences across read boundaries.
 pub struct StreamDecoder {
     tail: Vec<u8>,
 }
@@ -35,7 +35,7 @@ impl StreamDecoder {
         Self { tail: Vec::new() }
     }
 
-    /// 喂入新字节，返回可完整解码的字符串前缀；不完整尾部留存。
+    /// Feeds new bytes in and returns the prefix that decodes completely; an incomplete tail stays buffered.
     pub fn push(&mut self, bytes: &[u8]) -> String {
         self.tail.extend_from_slice(bytes);
         let mut out = String::new();
@@ -50,12 +50,12 @@ impl StreamDecoder {
                     let valid = e.valid_up_to();
                     out.push_str(&String::from_utf8_lossy(&self.tail[..valid]));
                     match e.error_len() {
-                        // 非法字节：丢 n 字节补 U+FFFD，继续循环（可能还有）
+                        // Invalid bytes: drop n bytes and substitute U+FFFD, then continue (more may follow)
                         Some(bad) => {
                             out.push('\u{FFFD}');
                             self.tail.drain(..valid + bad);
                         }
-                        // 尾部是合法但不完整的多字节前缀：留存等下次
+                        // The tail is a valid but incomplete multi-byte prefix: keep it for next time
                         None => {
                             self.tail.drain(..valid);
                             break;
@@ -242,14 +242,14 @@ struct PtyExit {
     code: Option<i32>,
 }
 
-/// read 线程 → 主循环的消息（Windows 无 poll，用 channel + recv_timeout 做空闲超时冲刷）。
+/// Messages from the read thread to the main loop (Windows has no poll, so a channel plus recv_timeout drives the idle-timeout flush).
 enum ReadMsg {
     Data(Vec<u8>),
     End(&'static str),
 }
 
 #[cfg(test)]
-#[allow(dead_code)] // master/child 只被 unix 用例读取，Windows 下保持结构完整
+#[allow(dead_code)] // master/child are only read by Unix tests; keep the struct complete on Windows
 struct TestSession {
     master: Box<dyn MasterPty + Send>,
     reader: Box<dyn Read + Send>,
@@ -278,16 +278,16 @@ pub use super::ssh_command::SshTarget;
 #[cfg(test)]
 use super::ssh_command::{ssh_args, verified_ssh_options};
 
-/// 按用户选择的 shell / ssh 目标构建启动命令，并注入 OSC 133 shell integration。
+/// Builds the launch command for the selected shell or SSH target and injects OSC 133 shell integration.
 fn build_shell_cmd(
     cwd: Option<String>,
     shell: Option<String>,
     ssh: Option<SshTarget>,
     open_mode: Option<String>,
 ) -> Result<CommandBuilder, String> {
-    // 1. SSH 连接：`ssh -t [-p port] [user@]host [<远端注入命令>]`
-    //    -t 强制分配 TTY；打开模式为 block 时附加远端注入命令（OSC 133 shell integration，
-    //    安全性最高版本，注入失败自动回退经典模式）；classic 则不注入（传统交互）。
+    // 1. SSH connection: `ssh -t [-p port] [user@]host [<remote injected command>]`
+    //    -t forces a TTY; block mode appends the remote injected command (OSC 133 shell integration,
+    //    the safest variant, falling back to classic mode when injection fails); classic injects nothing (plain interaction).
     if let Some(target) = ssh {
         let remote = (open_mode.as_deref() != Some("classic")).then(shell_integration::ssh_remote_command);
         return super::ssh_command::build_ssh_command_in_directory(&target, remote.as_deref(), cwd.as_deref());
@@ -296,7 +296,7 @@ fn build_shell_cmd(
     let integ_dir = shell_integration::integration_dir().ok();
     let requested = shell.as_deref().unwrap_or_default();
 
-    // 2. 显式选择 shell：zsh/bash/powershell 注入集成脚本；cmd 无集成，走 classic 回退
+    // 2. Explicit shell: zsh/bash/powershell get the integration script injected; cmd has no integration and falls back to classic
     match requested {
         "zsh" => {
             let mut cmd = CommandBuilder::new("zsh");
@@ -327,8 +327,8 @@ fn build_shell_cmd(
         _ => {}
     }
 
-    // 3. 未显式选择：Windows 默认 pwsh → powershell → cmd（不再默认 Git Bash/MINGW64）；
-    //    Unix 沿用 $SHELL 探测。
+    // 3. No explicit choice: Windows prefers pwsh, then powershell, then cmd (no bundled Unix shell default anymore);
+    //    Unix keeps probing $SHELL.
     #[cfg(target_os = "windows")]
     {
         match default_windows_shell() {
@@ -357,14 +357,14 @@ fn build_shell_cmd(
                 return Ok(cmd);
             }
         }
-        // 兜底：不做 shell integration
+        // Fallback: no shell integration
         let mut cmd = CommandBuilder::new_default_prog();
         if let Some(d) = cwd { cmd.cwd(d); }
         Ok(cmd)
     }
 }
 
-/// 构造 PowerShell / pwsh 启动命令（注入 OSC 133 集成脚本）。
+/// Builds the PowerShell / pwsh launch command (injects the OSC 133 integration script).
 fn powershell_command(
     prog: &str,
     integ_dir: &Option<std::path::PathBuf>,
@@ -387,20 +387,20 @@ fn set_shell_open_mode(cmd: &mut CommandBuilder, open_mode: Option<&str>) {
     cmd.env("VRYKELL_BLOCK_MODE", if open_mode == Some("block") { "1" } else { "0" });
 }
 
-/// 构造 cmd 启动命令（无集成）。
+/// Builds the cmd launch command (no integration).
 fn cmd_command(cwd: Option<String>) -> CommandBuilder {
     let mut cmd = CommandBuilder::new("cmd");
     if let Some(d) = cwd { cmd.cwd(d); }
     cmd
 }
 
-/// 把常见用户 bin 目录补进 PTY 子进程的 PATH。
+/// Adds common user bin directories to the PTY child's PATH.
 ///
-/// GUI 应用（Finder/Dock 启动）的 PATH 只有系统默认值
-/// （/usr/bin:/bin:/usr/sbin:/sbin），不含 /usr/local/bin（brew/手动安装）
-/// 等用户工具目录 —— 终端里跑 opencode/claude/node 等会 command not found，
-/// 且用户 .zshrc 里 `npm config get prefix` 这类依赖也会失败。
-/// 已存在的目录排在系统 PATH 前面（作为种子，最终 PATH 仍由 .zshrc 决定）。
+/// A GUI app (launched from the desktop) inherits only the system default PATH
+/// (/usr/bin:/bin:/usr/sbin:/sbin) without user tool directories such as /usr/local/bin
+/// (package manager or manual installs); running CLI tools in the terminal ends in
+/// command not found, and .zshrc dependencies such as `npm config get prefix` fail too.
+/// Existing directories precede the system PATH (as a seed; .zshrc still decides the final PATH).
 fn merge_user_bin_paths(cmd: &mut CommandBuilder) {
     merge_inherited_bin_paths(cmd, std::env::var_os("PATH").unwrap_or_default());
 }
@@ -548,7 +548,7 @@ fn merge_locale_env(cmd: &mut CommandBuilder) {
     }
 }
 
-/// Windows 默认 shell：pwsh → powershell → cmd（进程内缓存，避免每次建终端都 spawn 探测）。
+/// Windows default shell: pwsh -> powershell -> cmd (cached in-process, so every new terminal does not spawn a probe).
 #[cfg(target_os = "windows")]
 pub(crate) fn default_windows_shell() -> &'static str {
     use std::sync::OnceLock;
@@ -624,7 +624,7 @@ fn spawn_pty(
 }
 
 #[tauri::command]
-// 参数镜像前端 IPC 调用契约（pty_spawn 逐字段传参），折叠结构体需同步改前端
+// Parameters mirror the frontend IPC contract (pty_spawn passes every field), so folding them into a struct requires a matching frontend change
 #[allow(clippy::too_many_arguments)]
 pub async fn pty_spawn(
     state: State<'_, PtyState>,
@@ -702,9 +702,9 @@ pub async fn pty_spawn(
     let tid = id.clone();
     let closed_flag = closed;
     std::thread::spawn(move || {
-        // 阻塞 read 放独立线程；主循环用 recv_timeout 实现「空闲超时冲刷」。
-        // 否则最后一段输出（如 cmd/PowerShell 的提示符）会卡在 pending 里，
-        // 直到下一次输入/输出才 flush（Windows 上没有 poll，这里统一用 channel）。
+        // The blocking read runs on its own thread; the main loop uses recv_timeout for the idle-timeout flush.
+        // Otherwise the last burst of output (such as the cmd/PowerShell prompt) stays in pending
+        // until the next input/output flushes it (Windows has no poll, so everything goes through one channel).
         let (tx, rx) = std::sync::mpsc::channel::<ReadMsg>();
         std::thread::spawn(move || {
             let mut buf = [0u8; 8192];
@@ -727,9 +727,9 @@ pub async fn pty_spawn(
 
         let mut decoder = StreamDecoder::new();
         let mut scanner = StreamScanner::new();
-        // 输出合批：把高频 read 事件聚成窗口再 emit，避免大输出时 IPC + React 风暴。
-        // 冲刷时机：累积达到阈值 / 距上次冲刷超过 FLUSH_INTERVAL / 空闲超时 / 读到 EOF 或出错。
-        // pending 存扫描后的结构化事件，pending_bytes 追踪原始负载字节数作阈值依据。
+        // Output batching: group high-frequency read events into a window before emitting, avoiding an IPC + React storm on large output.
+        // Flush triggers: accumulated threshold / FLUSH_INTERVAL since the last flush / idle timeout / EOF or read error.
+        // pending holds the scanned structured events; pending_bytes tracks the raw payload byte count as the threshold basis.
         let mut pending: Vec<ScanEvent> = Vec::new();
         let mut pending_bytes = 0usize;
         let mut batch = super::output_batch::OutputBatchWindow::new(std::time::Instant::now());
@@ -755,12 +755,12 @@ pub async fn pty_spawn(
                         debug::write("pty-io", line);
                     }
                     if data.is_empty() {
-                        continue; // 不完整尾部，等下次 read
+                        continue; // incomplete tail, wait for the next read
                     }
                     let events = scanner.push(&data);
                     advance_input_epoch(&input_epoch, &events);
                     if events.is_empty() {
-                        continue; // 全是 pending（孤立 ESC 等）
+                        continue; // all pending (lone ESC and the like)
                     }
                     pending_bytes += data.len();
                     pending.extend(events);
@@ -776,7 +776,7 @@ pub async fn pty_spawn(
                         batch.flushed(std::time::Instant::now());
                     }
                 }
-                // EOF / 出错 / 读线程意外断开：冲刷剩余，收敛会话
+                // EOF / error / read thread dropped unexpectedly: flush the rest and settle the session
                 Ok(ReadMsg::End(reason)) => {
                     if let Some(stats) = flush_output(&app, &tid, &mut pending, &mut pending_bytes) {
                         window.output(stats);
@@ -805,7 +805,7 @@ pub async fn pty_spawn(
                     let _ = app.emit("pty-exit", PtyExit { id: tid.clone(), code });
                     break;
                 }
-                // 空闲超时（FLUSH_INTERVAL 内无新数据）：冲刷 pending 尾巴，让最后一段输出及时上屏
+                // Idle timeout (no new data within FLUSH_INTERVAL): flush the pending tail so the last output reaches the screen promptly
                 Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
                     let now = std::time::Instant::now();
                     if !pending.is_empty() {
@@ -855,7 +855,7 @@ fn shell_kind(value: &str) -> &'static str {
     }
 }
 
-/// 冲刷累积输出（结构化事件）；emit 失败（窗口已关闭）时顺手收敛会话。
+/// Flushes accumulated output (structured events); when emit fails (the window is gone) it also settles the session.
 /// Returns what the batch carried, for the per-second window; `None` when there was nothing.
 fn flush_output(
     app: &AppHandle,
@@ -905,16 +905,16 @@ pub fn pty_input_epoch(state: State<'_, PtyState>, id: String) -> Result<u64, St
 
 #[tauri::command]
 pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String, expected_epoch: Option<u64>) -> Result<(), String> {
-    // Windows 控制台 Enter 是 CR(0x0D)；\n(0x0A) 是 Ctrl+J，PSReadLine/cmd 都不当回车，
-    // 前端命令发送统一用 \n，这里归一化成 CR，否则 PowerShell 等收不到回车、命令无响应。
+    // On the Windows console Enter is CR (0x0D); \n (0x0A) is Ctrl+J, which PSReadLine/cmd do not treat as Return.
+    // The frontend sends commands with \n, so normalize it to CR here; otherwise PowerShell and the like never receive Return and the command does nothing.
     #[cfg(windows)]
     let data = normalize_enter(&data);
     let data_len = data.len();
     if debug::enabled() {
         debug::write("write-start", format!("id={} bytes={}", id, data_len));
     }
-    // 只从全局表取 Arc 句柄，不持锁做 IO——写 PTY 可能因前台进程不读 stdin 而阻塞，
-    // 若持全局锁会冻结其它会话的 resize/signal/close。
+    // Take only the Arc handle from the global table and never hold the lock during IO - writing to the PTY
+    // can block when the foreground process does not read stdin, and holding the global lock would freeze resize/signal/close for other sessions.
     let session = {
         let sessions = lock_unpoisoned(&state.0);
         sessions.get(&id).cloned().ok_or("session not found")?
@@ -978,7 +978,7 @@ fn write_guarded_input(writer: &mut dyn Write, data: &[u8], input_epoch: &Atomic
     writer.flush().map_err(|error| error.to_string())
 }
 
-/// Windows：把换行统一成 CR（Enter）。\n 是 Ctrl+J，PSReadLine/cmd 都不认。
+/// Windows: normalize newlines to CR (Enter). \n is Ctrl+J, which PSReadLine/cmd do not accept.
 #[cfg(windows)]
 fn normalize_enter(data: &str) -> String {
     data.replace("\r\n", "\r").replace('\n', "\r")
@@ -1026,7 +1026,7 @@ pub async fn pty_close(state: State<'_, PtyState>, kill: State<'_, KillState>, i
         .map_err(|e| e.to_string())?;
         lock_unpoisoned(&state.0).remove(&id);
     }
-    // 同步清理「结束升级」状态，避免长时间使用后无限增长
+    // Clear the "kill escalation" state in step so it cannot grow without bound during long use
     lock_unpoisoned(&kill.0).remove(&id);
     Ok(())
 }
@@ -1065,8 +1065,8 @@ pub fn lifecycle_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
         .build()
 }
 
-/// 会话退出后的收敛：从状态表移除并回收子进程，释放 master/writer fd。
-/// 由读线程在读到 EOF 或出错时调用；等待有上限，避免残留句柄把关闭顶死。
+/// Settles a session after it exits: removes it from the state table, reaps the child and releases the master/writer fds.
+/// Called by the read thread on EOF or read error; the wait is bounded so a leftover handle cannot stall the close.
 /// Returns the child exit code so the session can tell a clean exit from a dropped connection.
 fn reap_session(app: &AppHandle, id: &str) -> Option<i32> {
     let session = lock_unpoisoned(&app.state::<PtyState>().0).remove(id);
@@ -1083,17 +1083,17 @@ fn reap_session(app: &AppHandle, id: &str) -> Option<i32> {
             let _ = wait_child_bounded(&mut *state.child, CLOSE_ALL_DEADLINE);
         }
     }
-    // 同步清理该会话的「结束升级」状态，避免长时间使用后无限增长
+    // Clear this session's "kill escalation" state in step so it cannot grow without bound during long use
     lock_unpoisoned(&app.state::<KillState>().0).remove(id);
     code
 }
 
-/// 允许发送的信号白名单（防止前端传任意信号乱杀无关进程）
+/// Allowlist of signals that may be sent (prevents the frontend from killing unrelated processes with arbitrary signals)
 #[cfg(unix)]
 const ALLOWED_SIGNALS: [i32; 3] = [libc::SIGINT, libc::SIGTERM, libc::SIGKILL];
 
-/// 给 PTY 前台进程组发信号（结束按钮的「强」路径）。
-/// 防护：前台进程组 == shell 自身（即没有应用在跑）时拒绝，避免误杀 shell。
+/// Sends a signal to the PTY foreground process group (the "force" path of the stop button).
+/// Guard: refuse when the foreground process group is the shell itself (no app is running), so the shell is never killed by mistake.
 #[cfg(unix)]
 fn signal_fg_process_group(
     master: &dyn MasterPty,
@@ -1117,9 +1117,9 @@ fn signal_fg_process_group(
     Ok(())
 }
 
-/// 结束子进程；Windows 上只 TerminateProcess 根 shell 会留下孤儿前台应用，
-/// 因此先按进程树整棵终结，再补一发 child.kill() 兜底（根进程已在树内，幂等）。
-/// Unix 上 SIGHUP 之后补 SIGTERM：忽略挂断信号的 shell 仍能被终止。
+/// Terminates the child; on Windows terminating only the root shell leaves the foreground app orphaned,
+/// so the whole process tree goes first and a child.kill() follows as a fallback (the root is already in the tree, making this idempotent).
+/// On Unix SIGTERM follows SIGHUP: a shell that ignores the hangup signal can still be terminated.
 fn kill_child_tree(child: &mut dyn Child) {
     #[cfg(windows)]
     if let Some(pid) = child.process_id() {
@@ -1135,22 +1135,22 @@ fn kill_child_tree(child: &mut dyn Child) {
     let _ = child.kill();
 }
 
-/// Windows「结束」首击：向 PTY 输入写入 ETX(0x03)。ConPTY 的输入状态机
-/// 会把 0x03 转成 Ctrl+C 按键（keydown+keyup），由 console host 触发
-/// CTRL_C 处理，等价于用户按下 Ctrl+C——与前端「发送 Ctrl+C」按钮走同一条
-/// writer 路径（见 src/terminal/TerminalView.tsx 的 sendCtrlC）。
+/// Windows first press of "stop": write ETX (0x03) to the PTY input. The ConPTY input state machine
+/// turns 0x03 into a Ctrl+C key press (keydown+keyup), and the console host raises
+/// CTRL_C, exactly as if the user pressed Ctrl+C - the same writer path the frontend
+/// "send Ctrl+C" button uses (see sendCtrlC in src/terminal/TerminalView.tsx).
 #[cfg(windows)]
 fn send_ctrl_c(writer: &mut dyn Write) -> Result<(), String> {
     writer.write_all(b"\x03").map_err(|e| e.to_string())?;
     writer.flush().map_err(|e| e.to_string())
 }
 
-/// Windows 强杀：终结以 root_pid 为根的进程树。
-/// ConPTY 下前台应用是 shell 的后代进程，portable-pty 的 child.kill() 只
-/// TerminateProcess 根进程，会留下孤儿应用；这里用 Toolhelp 快照收集后代，
-/// 从最深的子进程开始逐个 TerminateProcess。
-/// `include_root=false` 时保留根进程（shell）本身——用于「结束前台应用」：
-/// 只杀前台应用子树，外层 shell 存活并在前台退出后重新给出提示符。
+/// Windows force kill: terminate the process tree rooted at root_pid.
+/// Under ConPTY the foreground app is a descendant of the shell, and portable-pty's child.kill() only
+/// calls TerminateProcess on the root, leaving the app orphaned; this collects descendants from a Toolhelp
+/// snapshot and calls TerminateProcess on each, starting from the deepest child.
+/// With `include_root=false` the root process (the shell) is kept - used by "stop foreground app":
+/// only the foreground app subtree dies, the outer shell survives and shows its prompt again once the foreground exits.
 #[cfg(windows)]
 fn terminate_process_tree(root_pid: u32, include_root: bool) -> Result<(), String> {
     use std::collections::{HashMap, VecDeque};
@@ -1162,7 +1162,7 @@ fn terminate_process_tree(root_pid: u32, include_root: bool) -> Result<(), Strin
     };
     use winapi::um::winnt::PROCESS_TERMINATE;
 
-    // 快照进程表，构建 ppid -> children 映射
+    // Snapshot the process table and build the ppid -> children map
     let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) };
     if snapshot.is_null() {
         return Err(format!(
@@ -1183,8 +1183,8 @@ fn terminate_process_tree(root_pid: u32, include_root: bool) -> Result<(), Strin
     }
     unsafe { CloseHandle(snapshot) };
 
-    // BFS 收集要杀的进程（root 及全部后代，或仅 root 的后代）；反转后从最深先杀，
-    // 避免父进程先死导致子进程被系统重新挂到别的父进程下而漏杀。
+    // BFS collects the processes to kill (root and all descendants, or only root's descendants); iterating in reverse kills the deepest first,
+    // so a parent dying first cannot let the system reparent its children elsewhere and escape the kill.
     let mut pids = Vec::new();
     let mut queue: VecDeque<u32> = VecDeque::new();
     if include_root {
@@ -1202,11 +1202,11 @@ fn terminate_process_tree(root_pid: u32, include_root: bool) -> Result<(), Strin
     let self_pid = std::process::id();
     for &pid in pids.iter().rev() {
         if pid == self_pid {
-            continue; // 防御：绝不杀自己
+            continue; // Guard: never kill ourselves
         }
         let handle = unsafe { OpenProcess(PROCESS_TERMINATE, 0, pid) };
         if handle.is_null() {
-            continue; // 已退出或无权限：尽力而为
+            continue; // Already exited or access denied: best effort
         }
         unsafe { TerminateProcess(handle, 1) };
         unsafe { CloseHandle(handle) };
@@ -1214,10 +1214,10 @@ fn terminate_process_tree(root_pid: u32, include_root: bool) -> Result<(), Strin
     Ok(())
 }
 
-/// 升级式结束的窗口：首次点击后，该时长内再点升级为 SIGKILL。
+/// Escalating-stop window: a second press within this duration after the first escalates to SIGKILL.
 const ESCALATE_WINDOW: std::time::Duration = std::time::Duration::from_secs(3);
 
-/// 每会话「上次结束尝试」时间，升级逻辑收口到 Rust（跨窗口重载保持）。
+/// Per-session "last stop attempt" time; escalation lives in Rust so it survives a window reload.
 #[derive(Default)]
 pub struct KillState(pub Mutex<HashMap<String, std::time::Instant>>);
 
@@ -1228,9 +1228,9 @@ fn should_escalate(elapsed_since_last: Option<std::time::Duration>) -> bool {
     }
 }
 
-/// 结束 PTY 前台应用（结束按钮）。升级式：首次 SIGTERM（Windows 上为 Ctrl+C），
-/// 窗口内再点升级 SIGKILL（Windows 上为终结整棵进程树）。
-/// 返回本次级别（"term" / "kill"），前端据此切换按钮文案。
+/// Stops the PTY foreground app (the stop button). Escalating: the first press sends SIGTERM (Ctrl+C on Windows),
+/// a second press within the window escalates to SIGKILL (terminating the whole process tree on Windows).
+/// Returns the level used ("term" / "kill") so the frontend can switch the button label.
 #[tauri::command]
 pub async fn pty_kill_foreground(
     state: State<'_, PtyState>,
@@ -1263,7 +1263,7 @@ pub async fn pty_kill_foreground(
     Ok(if escalate { "kill" } else { "term" }.to_string())
 }
 
-/// 平台相关的「结束前台应用」实现：Unix 用信号打到前台进程组。
+/// Platform-specific "stop foreground app" implementation: on Unix a signal goes to the foreground process group.
 #[cfg(unix)]
 fn kill_foreground_impl(session: &mut PtySession, escalate: bool) -> Result<(), String> {
     let sig = if escalate { libc::SIGKILL } else { libc::SIGTERM };
@@ -1294,13 +1294,13 @@ fn send_ctrl_c_when_writable(session: &PtySession) -> Result<(), String> {
     }
 }
 
-/// 平台相关的「结束前台应用」实现：Windows 首击发 Ctrl+C（等价用户按键），
-/// 再击强杀整棵进程树（只杀 shell 会留下孤儿前台应用）。
+/// Platform-specific "stop foreground app" implementation: on Windows the first press sends Ctrl+C (equivalent to a user key press),
+/// a second press force-kills the whole process tree (killing only the shell leaves the foreground app orphaned).
 #[cfg(windows)]
 fn kill_foreground_impl(session: &mut PtySession, escalate: bool) -> Result<(), String> {
     if escalate {
         match session.child.process_id() {
-            // 只杀前台应用子树，保留外层 shell（前台退出后 shell 重新给提示符）
+            // Kill only the foreground app subtree and keep the outer shell (it shows a prompt again once the foreground exits)
             Some(pid) => terminate_process_tree(pid, false),
             None => session.child.kill().map_err(|e| e.to_string()),
         }
@@ -1309,7 +1309,7 @@ fn kill_foreground_impl(session: &mut PtySession, escalate: bool) -> Result<(), 
     }
 }
 
-/// 平台相关的「结束前台应用」实现：其它平台暂无信号机制。
+/// Platform-specific "stop foreground app" implementation: other platforms have no signal mechanism yet.
 #[cfg(not(any(unix, windows)))]
 fn kill_foreground_impl(_session: &mut PtySession, _escalate: bool) -> Result<(), String> {
     Err("当前平台不支持信号结束，请用 Ctrl+C".into())
@@ -1411,12 +1411,12 @@ mod tests {
 
     #[test]
     fn escalate_within_window_and_not() {
-        assert!(!should_escalate(None)); // 首次
-        assert!(should_escalate(Some(std::time::Duration::from_secs(2)))); // 3s 内
-        assert!(!should_escalate(Some(std::time::Duration::from_secs(4)))); // 超窗口
+        assert!(!should_escalate(None)); // first press
+        assert!(should_escalate(Some(std::time::Duration::from_secs(2)))); // within 3s
+        assert!(!should_escalate(Some(std::time::Duration::from_secs(4)))); // past the window
     }
 
-    /// Windows：命令发送的 \n 要归一化成 CR（Enter），否则 PSReadLine/cmd 不认。
+    /// Windows: \n sent with a command must normalize to CR (Enter), which PSReadLine/cmd require.
     #[cfg(windows)]
     #[test]
     fn normalize_enter_converts_newlines_to_cr() {
@@ -1464,7 +1464,7 @@ mod tests {
 
     }
 
-    /// GUI 启动 TERM 为空：补 xterm-256color + truecolor；已显式设置时不动。
+    /// GUI launch with an empty TERM: fill in xterm-256color + truecolor; explicit values are left alone.
     #[test]
     fn merge_term_env_fills_empty_and_keeps_explicit() {
         std::env::remove_var("TERM");
@@ -1514,15 +1514,15 @@ mod tests {
         assert_eq!(cmd.get_env("LC_CTYPE").unwrap().to_str().unwrap(), DEFAULT_UTF8_LOCALE);
     }
 
-    /// 多字节 UTF-8 字符跨 read 边界不应产生 U+FFFD。
+    /// A multi-byte UTF-8 character split across a read boundary must not produce U+FFFD.
     #[test]
     fn utf8_split_across_reads_is_buffered() {
-        // "中" = E4 B8 AD。模拟分两次到达：E4 | B8 AD
+        // U+4E2D = E4 B8 AD. Simulated arrival in two parts: E4 | B8 AD
         let mut decoder = super::StreamDecoder::new();
-        assert_eq!(decoder.push(&[0xE4]), "");           // 不完整 → 不输出
-        assert_eq!(decoder.push(&[0xB8, 0xAD]), "中");   // 补齐 → 输出
-        assert_eq!(decoder.push(b"hello"), "hello");     // ASCII 直出
-        // 非法字节降级为替换符（不 panic）
+        assert_eq!(decoder.push(&[0xE4]), "");           // incomplete -> no output
+        assert_eq!(decoder.push(&[0xB8, 0xAD]), "中");   // completed -> output
+        assert_eq!(decoder.push(b"hello"), "hello");     // ASCII passes straight through
+        // Invalid bytes degrade to the replacement character (no panic)
         assert_eq!(decoder.push(&[0xFF, 0xFE]), "��");
     }
 
@@ -1794,7 +1794,7 @@ mod tests {
         unsafe { libc::tcgetpgrp(session.master.as_raw_fd().unwrap()) }
     }
 
-    /// 只有 shell 在跑时拒绝发信号（防止误杀 shell 自己）
+    /// Refuse to signal while only the shell is running (never kill the shell itself)
     #[cfg(unix)]
     #[test]
     fn signal_fg_rejects_when_only_shell_running() {
@@ -1806,7 +1806,7 @@ mod tests {
         drop(session);
     }
 
-    /// 白名单外的信号直接拒绝
+    /// Signals outside the allowlist are rejected outright
     #[cfg(unix)]
     #[test]
     fn signal_fg_rejects_disallowed_signal() {
@@ -1816,12 +1816,12 @@ mod tests {
         assert!(err.contains("not allowed"), "unexpected: {err}");
     }
 
-    /// SIGTERM 能杀掉忽略 Ctrl+C 的前台应用，且 shell 本体存活
+    /// SIGTERM kills a foreground app that ignores Ctrl+C while the shell itself survives
     #[cfg(unix)]
     #[test]
     fn signal_fg_term_kills_foreground_app_shell_survives() {
-        // 需要交互式 shell 才有作业控制（tcsetpgrp 切前台进程组）；
-        // new_default_prog 的非交互 sh 不切，fg 永远是 shell
+        // Job control (tcsetpgrp switching the foreground process group) needs an interactive shell;
+        // new_default_prog's non-interactive sh never switches, so the foreground stays the shell
         let pty_system = native_pty_system();
         let pair = pty_system
             .openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 })
@@ -1835,11 +1835,11 @@ mod tests {
         let writer = pair.master.take_writer().map_err(|e| e.to_string()).unwrap();
         let mut session = TestSession { master: pair.master, reader, writer, child };
         let shell_pid = session.child.process_id().expect("shell pid");
-        // sleep 无 SIGINT 处理器也会退，这里重点是验证「发到前台进程组而非 shell」
+        // sleep exits even without a SIGINT handler; the point here is that the signal reaches the foreground process group, not the shell
         session.writer.write_all(b"sleep 30\n").unwrap();
         session.writer.flush().unwrap();
 
-        // 等前台进程组切到 sleep
+        // Wait for the foreground process group to switch to sleep
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         while fg_pgid(&session) == shell_pid as i32 && std::time::Instant::now() < deadline {
             std::thread::sleep(std::time::Duration::from_millis(20));
@@ -1848,7 +1848,7 @@ mod tests {
 
         signal_fg_process_group(&*session.master, Some(shell_pid), libc::SIGTERM).expect("sigterm");
 
-        // 前台切回 shell，且 shell 还能执行命令
+        // The foreground switches back to the shell, and the shell can still run commands
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         while fg_pgid(&session) != shell_pid as i32 && std::time::Instant::now() < deadline {
             std::thread::sleep(std::time::Duration::from_millis(20));
@@ -1869,7 +1869,7 @@ mod tests {
         assert!(out.contains("shell-alive"), "shell died, got: {out:?}");
     }
 
-    /// 快照进程表，返回 ppid 的直接子进程中可执行文件名包含 name_fragment 的 pid。
+    /// Snapshots the process table and returns the pid of a direct child of ppid whose executable name contains name_fragment.
     #[cfg(windows)]
     fn find_descendant_pid(ppid: u32, name_fragment: &str) -> Option<u32> {
         use winapi::shared::minwindef::DWORD;
@@ -1901,7 +1901,7 @@ mod tests {
         found
     }
 
-    /// 判断 pid 是否仍在运行（OpenProcess + GetExitCodeProcess == STILL_ACTIVE）。
+    /// Whether pid is still running (OpenProcess + GetExitCodeProcess == STILL_ACTIVE).
     #[cfg(windows)]
     fn pid_alive(pid: u32) -> bool {
         use winapi::shared::minwindef::DWORD;
@@ -1920,13 +1920,13 @@ mod tests {
         alive
     }
 
-    /// Windows：强杀必须连带终结 shell 的子孙进程（只杀 shell 会留下孤儿前台应用）。
+    /// Windows: a force kill must take the shell's descendants with it (killing only the shell leaves the foreground app orphaned).
     #[cfg(windows)]
     #[test]
     fn terminate_tree_kills_descendants() {
         use std::time::{Duration, Instant};
 
-        // cmd -> ping 127.0.0.1 -n 30（约 30s），形成两代进程树
+        // cmd -> ping 127.0.0.1 -n 30 (about 30s), forming a two-generation process tree
         let pty_system = native_pty_system();
         let pair = pty_system
             .openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 })
@@ -1942,7 +1942,7 @@ mod tests {
         drop(pair.slave);
         let shell_pid = child.process_id().expect("shell pid");
 
-        // 等 ping 子进程出现
+        // Wait for the ping child to appear
         let deadline = Instant::now() + Duration::from_secs(10);
         let ping_pid = loop {
             if let Some(pid) = find_descendant_pid(shell_pid, "ping") {
@@ -1956,7 +1956,7 @@ mod tests {
 
         terminate_process_tree(shell_pid, true).expect("terminate tree");
 
-        // 根与后代都应在数秒内消失
+        // Both the root and the descendants should be gone within seconds
         let deadline = Instant::now() + Duration::from_secs(5);
         while (pid_alive(shell_pid) || pid_alive(ping_pid)) && Instant::now() < deadline {
             std::thread::sleep(Duration::from_millis(50));
