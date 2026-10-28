@@ -8,7 +8,7 @@ async function textForwarding(page: Page, panel: Page | Locator = page) {
   await page.getByRole('option', { name: '文本模式' }).click();
 }
 
-test('导入 SSH 配置里的主机别名，转发与自动重连随连接保存', async ({ page }) => {
+test('imports host aliases from the SSH config and saves forwarding and auto-reconnect with the connection', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
@@ -49,7 +49,7 @@ test('导入 SSH 配置里的主机别名，转发与自动重连随连接保存
   await expect(reopened).toHaveCount(0);
 });
 
-test('非法端口转发在保存时被拒绝', async ({ page }) => {
+test('an invalid port forward is rejected on save', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();

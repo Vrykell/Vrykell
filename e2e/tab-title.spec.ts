@@ -5,8 +5,8 @@ test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
 });
 
-test.describe('终端标题', () => {
-  test('运行中程序设置的窗口标题显示在标题栏，程序结束后还原', async ({ page }) => {
+test.describe('terminal titles', () => {
+  test('a title set by a running program shows in the tab bar and is restored once the program ends', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
@@ -31,7 +31,7 @@ test.describe('终端标题', () => {
     await expect(title).toHaveText('终端');
   });
 
-  test('复制的会话仍响应前台程序设置的窗口标题', async ({ page }) => {
+  test('a duplicated session still follows the title set by a foreground program', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
     await ensureTabsOpen(page);

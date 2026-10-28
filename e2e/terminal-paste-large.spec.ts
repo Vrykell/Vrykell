@@ -30,7 +30,7 @@ const seedClipboard = (page: Page, text: string) => page.evaluate((value) => {
   (window as unknown as Record<string, string>).__CLIPBOARD_TEXT__ = value;
 }, text);
 
-test('经典场景多行粘贴先确认：取消不写入，确认后按行尾归一化写入', async ({ page }) => {
+test('classic scene asks before a multiline paste: cancel writes nothing, confirm writes with normalized line endings', async ({ page }) => {
   await openClassicShell(page);
   await seedClipboard(page, MULTI_LINE);
 
@@ -53,7 +53,7 @@ test('经典场景多行粘贴先确认：取消不写入，确认后按行尾�
     .toEqual(['one\rtwo\rthree\rfour\rfive\rsix\r']);
 });
 
-test('前台程序开启 bracketed paste 后多行粘贴不再确认且保持包裹', async ({ page }) => {
+test('with bracketed paste enabled by a foreground program, a multiline paste skips confirmation and keeps the wrapper', async ({ page }) => {
   await openClassicShell(page);
   await emitPtyOutput(page, '\x1b[?2004h');
   await expect.poll(() => page.evaluate(() => {
@@ -69,7 +69,7 @@ test('前台程序开启 bracketed paste 后多行粘贴不再确认且保持包
   await expect(page.getByTestId('confirm-dialog')).toBeHidden();
 });
 
-test('超过 64K 字符的粘贴先确认，确认后分块送达完整内容', async ({ page }) => {
+test('a paste over 64K characters asks first, then delivers the full content in chunks', async ({ page }) => {
   await openClassicShell(page);
   const large = 'x'.repeat(64 * 1024 + 8);
   await seedClipboard(page, large);
@@ -89,7 +89,7 @@ test('超过 64K 字符的粘贴先确认，确认后分块送达完整内容', 
   expect(chunks.join('')).toBe(large);
 });
 
-test('运行中块的多行粘贴同样先确认', async ({ page }) => {
+test('a running block asks for confirmation before a multiline paste as well', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });

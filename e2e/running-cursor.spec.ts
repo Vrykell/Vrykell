@@ -7,7 +7,7 @@ import { setupTauriMock, emitPtyOutput } from './tauri-mock';
  * hairline that reads as a vanished cursor on Retina displays, so the terminal keeps a
  * solid block instead. The DOM renderer is forced so the cursor cell is inspectable.
  */
-test('运行中块在命令输入框获得焦点后仍保持实心光标', async ({ page }) => {
+test('a running block keeps a solid cursor after the command input takes focus', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { terminalRenderer: 'dom', terminalCursorBlink: true } }));
   });
@@ -51,7 +51,7 @@ test('运行中块在命令输入框获得焦点后仍保持实心光标', async
  * shape must still follow the request, but the blink animation must stay disabled so
  * typing does not make the cursor flash on every redraw.
  */
-test('停用闪烁后程序的光标闪烁请求只改变形状', async ({ page }) => {
+test('with blinking disabled, a program cursor blink request only changes the shape', async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { terminalRenderer: 'dom', terminalCursorBlink: false } }));
   });

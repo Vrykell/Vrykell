@@ -22,11 +22,11 @@ test('numeric feedback shows the actual saved value after bounds and rounding', 
 
 test('model text waits for a pause and the last write carries the whole row', async ({ page }) => {
   await gotoSetting(page, '模型配置');
-  // 地址在端点卡片里，先落盘
+  // The address lives in the endpoint card, so persist it first.
   await page.getByTestId('provider-endpoint-input').fill('https://new.example/v1');
   await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
   const before = (await aiModelCalls(page)).length;
-  // 名称在行编辑（齿轮）里，停顿后单独落盘并带上已保存的地址
+  // The name lives in the row editor (gear): after a pause it saves separately and carries the saved address.
   await page.getByTestId('model-settings').first().click();
   const name = page.getByTestId('model-settings-dialog').getByPlaceholder('模型名称');
   await name.fill('新的模型名称');
@@ -61,7 +61,7 @@ test('save failures keep the draft visible and allow retry', async ({ page }) =>
     };
   });
   await gotoSetting(page, '模型配置');
-  // 名称在行编辑（齿轮）里
+  // The name lives in the row editor (gear).
   await page.getByTestId('model-settings').first().click();
   const name = page.getByPlaceholder('模型名称').first();
   await name.fill('失败时保留的草稿');

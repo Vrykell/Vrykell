@@ -32,7 +32,7 @@ for (const theme of ['深色', '浅色']) {
     expect(bodyColors.actual).toBe(bodyColors.expected);
     await expect(dialog.getByText('6 个搜索来源')).toBeVisible();
     await expect(dialog.locator('.global-search-sources > button')).toHaveCount(6);
-    // 指令字符卡片：无边框 + 灰色底
+    // The prefix badge: no border and a grey background.
     const prefixBadge = dialog.locator('.global-search-sources kbd').first();
     await expect(prefixBadge).toHaveCSS('border-top-style', 'none');
     const badgeBackground = await prefixBadge.evaluate(element => {
@@ -48,7 +48,7 @@ for (const theme of ['深色', '浅色']) {
     await dialog.screenshot({ path: test.info().outputPath('search-empty.png'), animations: 'disabled' });
     await dialog.getByTestId('search-filter-button').click();
     const history = dialog.getByRole('menuitemcheckbox', { name: /历史命令/ });
-    // 勾选框与 SSH 连接面板一致：主题化原生复选框，16px 尺寸
+    // The checkbox matches the SSH connection panel: a themed native checkbox, 16px.
     const historyBox = history.locator('input.themed-checkbox');
     await expect(historyBox).toBeChecked();
     expect(await historyBox.evaluate(el => { const r = el.getBoundingClientRect(); return { width: r.width, height: r.height }; }))

@@ -69,7 +69,7 @@ test.describe('harness session', () => {
     await expect(page.getByTestId('harness-send')).toBeVisible({ timeout: 10000 });
     // One tab opens one session, however many times the effects run.
     expect((await acpCalls(page)).filter((call) => call.startsWith('acp_open'))).toEqual(['acp_open:Fake ACP']);
-    // 回归：严格模式下 effect 会被跑两遍，但会话只能开一次
+    // Regression: strict mode runs the effect twice, but only one session may open.
     await expect(page.getByTestId('harness-page')).toBeVisible();
 
     // The agent's modes and models arrive with the session and become quiet controls.
@@ -84,7 +84,7 @@ test.describe('harness session', () => {
     await emitAcpSession(page, acpUpdate(SESSION, {
       sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Working on it.' },
     }));
-    // 诊断：页面读到什么、命令调了哪些
+    // Diagnostics: what the page read and which commands ran.
 
 
 await expect(page.getByTestId('harness-page')).toContainText('Working on it.');

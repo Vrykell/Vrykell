@@ -108,7 +108,7 @@ test('dragging onto a file row drops into that file parent folder', async ({ pag
   const sibling = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/branch-30/sibling.txt"]');
   await expect(sibling).toBeVisible();
 
-  // 拖到文件行 = 放进该文件的同级目录（这里即它所在的 branch-30）
+  // Dropping on a file row means dropping into that file's sibling folder (here, its branch-30).
   const source = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/branch-28"]');
   await source.scrollIntoViewIfNeeded();
   const from = await source.boundingBox();
@@ -127,7 +127,7 @@ test('dragging onto a file row drops into that file parent folder', async ({ pag
 
 test('going back returns to the previous view, not the parent folder', async ({ page }) => {
   const tree = page.getByTestId('local-file-tree');
-  // project 根目录展开 branch-30 后，直接双击其中的嵌套目录进入更深层
+  // With branch-30 expanded under the project root, double-click its nested folder to go one level deeper.
   const branch = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/branch-30"]');
   await branch.locator('[data-testid="file-row-expander"]').click();
   const nestedDir = tree.locator('[data-testid="file-row"][data-path="/home/e2e/project/branch-30/nested-dir"]');
@@ -135,7 +135,7 @@ test('going back returns to the previous view, not the parent folder', async ({ 
   await expect(tree).toHaveAttribute('data-path', '/home/e2e/project/branch-30/nested-dir');
   await expect(tree.getByText('deep.txt', { exact: true })).toBeVisible();
 
-  // 回退 = 上一个视图快照（project 根 + branch-30 展开 + nested-dir 选中），而不是父目录 branch-30
+  // Going back restores the previous view snapshot (project root + branch-30 expanded + nested-dir selected), not the parent branch-30 folder.
   await page.getByTestId('local-back-btn').click();
   await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
   await expect(tree.getByText('nested-notes.txt', { exact: true })).toBeVisible();

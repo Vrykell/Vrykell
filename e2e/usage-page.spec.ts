@@ -55,7 +55,7 @@ test.describe('usage statistics page', () => {
     await expect(page.getByTestId('usage-fresh-input')).toHaveText('10');
     await expect(page.getByTestId('usage-trend-chart')).toBeVisible();
 
-    // 蓝色圆角柱 + 悬停显示该桶的完整时间与数值（命中区是整列）
+    // Rounded blue bars, with a hover showing the bucket's full time and value (the hit area is the whole column).
     await expect(page.getByTestId('usage-trend-bar').first()).toHaveAttribute('rx', '3');
     await page.getByTestId('usage-trend-slot-0').hover();
     const tooltip = page.getByTestId('usage-trend-tooltip');
@@ -63,7 +63,7 @@ test.describe('usage statistics page', () => {
     await expect(tooltip).toContainText(/^\d{4}\/\d{2}\/\d{2} \d{2}:00/);
     await expect(tooltip).toContainText('Tokens');
     await expect(tooltip).toContainText('15 tokens');
-    // 高亮只覆盖这一根柱：宽度跟着柱走，不会铺满整个时间槽
+    // The highlight covers only this bar: its width follows the bar instead of filling the whole time slot.
     const laneWidth = Number(await page.getByTestId('usage-trend-hover').getAttribute('width'));
     expect(laneWidth).toBeLessThan(80);
 
@@ -75,7 +75,7 @@ test.describe('usage statistics page', () => {
     await page.getByTestId('usage-model-all').click();
     await expect(page.getByTestId('usage-model-all')).toHaveAttribute('aria-pressed', 'true');
 
-    // 刷新按钮：重读存储并给出刷新时间
+    // The refresh button re-reads storage and reports the refresh time.
     await expect(page.getByTestId('usage-refreshed-at')).toHaveCount(0);
     await page.getByTestId('usage-refresh').click();
     await expect(page.getByTestId('usage-refreshed-at')).toContainText('刷新于');

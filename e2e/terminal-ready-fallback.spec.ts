@@ -2,10 +2,12 @@ import { expect, test } from '@playwright/test';
 import { ptyWrites, setupTauriMock } from './tauri-mock';
 
 /**
- * 老版本 shell 钩子（或未发送 133;B 的 shell）不能让文件打开命令永远排队：
- * 输出停止一段时间后应把输入视为就绪，并照常写入命令。
+ * An older shell hook (or a shell that never sends 133;B) must not leave file-open commands
+ * queued forever: once output has stopped for a while, input should count as ready and the
+ * command is written as usual.
  *
- * 文件默认在编辑器页打开，所以这里先把偏好设回终端编辑器，测试的是终端写入的就绪回退。
+ * Files open in the editor page by default, so the preference is set back to the terminal editor
+ * here; the test covers the readiness fallback of the terminal write.
  */
 const useTerminalOpen = async (page: import('@playwright/test').Page) => {
   await page.addInitScript(() => {

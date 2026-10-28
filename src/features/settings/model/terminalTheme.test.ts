@@ -1,5 +1,5 @@
 /**
- * terminalTheme — 主题配置 store（load/update/import/export + 壁纸缓存）。
+ * terminalTheme - theme config store (load/update/import/export + wallpaper cache).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -23,7 +23,7 @@ beforeEach(() => {
 });
 
 describe('terminalTheme store', () => {
-  it('load：成功应用配置并缓存壁纸 URL', async () => {
+  it('load: applies the config and caches the wallpaper URL', async () => {
     convertFileSrcMock.mockReturnValue('asset:///wall.jpg');
     invokeMock.mockResolvedValue({ opacity: 0.8, backgroundImage: '/a/wall.jpg', vars: { '--x': '1' } });
     await useTerminalThemeStore.getState().load();
@@ -34,20 +34,20 @@ describe('terminalTheme store', () => {
     expect(localStorage.getItem('vrykell-wallpaper-url')).toBe('asset:///wall.jpg');
   });
 
-  it('load：后端失败时标记 loaded 不抛错', async () => {
+  it('load: a backend failure marks loaded without throwing', async () => {
     invokeMock.mockRejectedValue(new Error('no backend'));
     await useTerminalThemeStore.getState().load();
     expect(useTerminalThemeStore.getState().loaded).toBe(true);
   });
 
-  it('load：背景图为空时不缓存', async () => {
+  it('load: no caching when the background image is empty', async () => {
     invokeMock.mockResolvedValue({ ...baseConfig });
     await useTerminalThemeStore.getState().load();
     expect(useTerminalThemeStore.getState().wallpaperDataUrl).toBeNull();
     expect(localStorage.getItem('vrykell-wallpaper-url')).toBeNull();
   });
 
-  it('update：合并配置、换壁纸时更新缓存、后端失败静默', async () => {
+  it('update: merges config, refreshes the cache when the wallpaper changes, and stays silent on backend failure', async () => {
     convertFileSrcMock.mockReturnValue('asset:///new.jpg');
     invokeMock.mockResolvedValue(undefined);
     const s = useTerminalThemeStore.getState();
@@ -64,7 +64,7 @@ describe('terminalTheme store', () => {
     expect(useTerminalThemeStore.getState().config.opacity).toBe(0.3);
   });
 
-  it('update：后端授权完成前不应用壁纸 URL', async () => {
+  it('update: does not apply the wallpaper URL before the backend authorization completes', async () => {
     convertFileSrcMock.mockReturnValue('asset:///late.jpg');
     let release: () => void = () => {};
     invokeMock.mockImplementation(() => new Promise<void>(resolve => { release = () => resolve(); }));
@@ -76,7 +76,7 @@ describe('terminalTheme store', () => {
     expect(localStorage.getItem('vrykell-wallpaper-url')).toBe('asset:///late.jpg');
   });
 
-  it('exportTo / importFrom 透传后端', async () => {
+  it('exportTo / importFrom pass through to the backend', async () => {
     convertFileSrcMock.mockReturnValue('asset:///imp.jpg');
     invokeMock.mockResolvedValueOnce(undefined);
     await useTerminalThemeStore.getState().exportTo('/tmp/t.json');
@@ -87,13 +87,13 @@ describe('terminalTheme store', () => {
     expect(useTerminalThemeStore.getState().wallpaperDataUrl).toBe('asset:///imp.jpg');
   });
 
-  it('getThemePath：返回后端主题文件路径', async () => {
+  it('getThemePath: returns the backend theme file path', async () => {
     invokeMock.mockResolvedValueOnce('/home/me/.vrykell/theme.json');
     await expect(getThemePath()).resolves.toBe('/home/me/.vrykell/theme.json');
     expect(invokeMock).toHaveBeenLastCalledWith('get_theme_path');
   });
 
-  it('applyCachedWallpaper：有缓存时同步应用', () => {
+  it('applyCachedWallpaper: applies synchronously when a cache exists', () => {
     localStorage.setItem('vrykell-wallpaper-url', 'asset:///cached.jpg');
     applyCachedWallpaper();
     expect(useTerminalThemeStore.getState().wallpaperDataUrl).toBe('asset:///cached.jpg');
@@ -103,7 +103,7 @@ describe('terminalTheme store', () => {
     expect(useTerminalThemeStore.getState().wallpaperDataUrl).toBeNull();
   });
 
-  it('reapplyXtermTheme / applyTerminalTheme 不抛错', () => {
+  it('reapplyXtermTheme / applyTerminalTheme do not throw', () => {
     expect(() => reapplyXtermTheme()).not.toThrow();
     expect(() => applyTerminalTheme({ opacity: 1, backgroundImage: null, vars: { '--xterm-bg': '#111' } })).not.toThrow();
     expect(() => applyTerminalTheme({ opacity: 1, backgroundImage: null, vars: {} }, 'dark')).not.toThrow();
