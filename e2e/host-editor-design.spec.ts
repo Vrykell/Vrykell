@@ -9,8 +9,8 @@ for (const theme of ['dark', 'light']) test(`host editor and toolbars match the 
   await page.evaluate(() => { document.documentElement.dataset.nativeMaterial = 'fallback'; });
   const terminal = page.getByTestId('start-page');
   await expect(terminal.getByTestId('terminal-start-new')).toBeVisible();
-  expect((await terminal.getByTestId('terminal-start-new').boundingBox())!.height).toBeCloseTo(88, 0);
-  expect((await terminal.locator('.launch-stats > div').first().boundingBox())!.height).toBeCloseTo(72, 0);
+  await expect.poll(async () => Math.round((await terminal.getByTestId('terminal-start-new').boundingBox())!.height)).toBe(88);
+  await expect.poll(async () => Math.round((await terminal.locator('.launch-stats > div').first().boundingBox())!.height)).toBe(72);
   await page.screenshot({ path: info.outputPath(`terminal-${theme}.png`), animations: 'disabled' });
   await page.getByTestId('workspace-area-ai').click();
   const ai = page.getByTestId('ai-start-page');
