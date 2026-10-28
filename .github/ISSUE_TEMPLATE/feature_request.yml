@@ -1,0 +1,34 @@
+name: Feature request / 功能建议
+description: Describe a workflow and the improvement you need. 中文或英文均可。
+title: "[Feature]: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow and problem / 使用场景与问题
+      description: What are you trying to accomplish, and where does the current workflow get in the way?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior / 预期方案
+      description: Describe the user-visible outcome, including interactions or examples when useful.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and current workaround / 替代方案
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and constraints / 范围与约束
+      description: Mention relevant platforms, local or remote targets, and any compatibility requirements.
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution / 参与意愿
+      options:
+        - label: I would like to help with implementation, tests or documentation after discussing scope.

@@ -1,222 +1,133 @@
 <div align="center">
 
-<img src="public/app-icon.svg" width="88" alt="Vrykell" />
+<img src="public/app-icon.svg" width="80" height="80" alt="Vrykell" />
 
 # Vrykell
 
-**终端、AI 对话和代码，在同一个桌面工作区。**
+### 写代码、跑命令、连服务器，让 Agent 就在工作现场。
+
+围绕终端构建的桌面工作区。把编辑器、SSH、AI 对话和 Agent 自由组合在同一组标签与分屏中。
+
+[开始使用](#开始使用) · [使用场景](#把工作区摆成你的工作方式) · [参与贡献](CONTRIBUTING.md) · [English](README.en.md)
 
 <p>
-  <a href="#快速开始"><img src="https://img.shields.io/badge/Quick_start-169AF0?style=for-the-badge&logo=rocket&logoColor=white" alt="Quick start" /></a>
-  <a href="docs/zh/feature-spec.md"><img src="https://img.shields.io/badge/Docs-0F172A?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Documentation" /></a>
-  <a href="README.en.md"><img src="https://img.shields.io/badge/English-374151?style=for-the-badge&logo=googletranslate&logoColor=white" alt="English" /></a>
-</p>
-
-<p>
-  <img src="https://img.shields.io/badge/Windows-0078D4?style=flat-square&logo=windows11&logoColor=white" alt="Windows" />
-  <img src="https://img.shields.io/badge/macOS-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS" />
-  <img src="https://img.shields.io/badge/Linux-FCC624?style=flat-square&logo=linux&logoColor=black" alt="Linux" />
-  <img src="https://img.shields.io/badge/Tauri_2-24C8D8?style=flat-square&logo=tauri&logoColor=white" alt="Tauri 2" />
-  <img src="https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" />
-  <img src="https://img.shields.io/badge/Rust-000000?style=flat-square&logo=rust&logoColor=white" alt="Rust" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="Apache-2.0" /></a>
+  <a href="https://github.com/Vrykell/Vrykell/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/CI-checks-64748b?style=flat-square" alt="CI checks" /></a>
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-3b82f6?style=flat-square" alt="Windows, macOS, Linux" />
 </p>
 
 </div>
 
-<p align="center">
-  <a href="docs/images/hero-dark.png">
-    <img src="docs/images/hero-dark.png" width="100%" alt="Vrykell 工作区：命令块终端与 AI 对话并排" />
-  </a>
-</p>
+<a href="docs/images/hero-workspace-zh.png"><img src="docs/images/hero-workspace-zh.png" width="1600" alt="代码、构建终端与 Agent 工作区" /></a>
 
-<p align="center"><sub>左侧是命令块终端，右侧是能引用命令输出并执行工具的 AI 对话。</sub></p>
+## 把工作区摆成你的工作方式
 
-## Vrykell 是什么
+开发时需要的往往不止一个终端。你还要看代码、对照日志、检查远程环境，再把上下文交给 AI。Vrykell 让这些内容留在同一个工作区：每个标签可以组合不同类型的资源，最多容纳四个窗格；切换、移动和调整布局时，正在运行的终端与会话保持各自的状态。
 
-Vrykell 是一个终端优先的桌面工作台，面向每天在终端里工作的开发者。它把每条命令保存成结构化的命令块，把 AI Agent 放进命令旁边，并让终端、文件、编辑器和对话共享同一套标签、分屏与分组。
+### 左边改代码，右边看构建
 
-大多数 AI 终端只是把聊天窗口贴在终端旁边。Vrykell 让 AI 能引用具体命令块、读取输出，并在需要时执行命令、编辑文件或继续分屏处理。应用使用 Tauri 2 构建，支持 Windows、macOS 和 Linux。
+打开项目文件，在旁边保留构建或测试终端。修改代码、运行命令、查看结果，沿着同一条工作流往前走。需要排查时，再加入一个 Agent 窗格，协助阅读相关文件和命令输出。
 
-**设计原则**
+编辑器支持语法高亮、查找替换、编码选择、只读状态和保存冲突提示，也能查看 Markdown 与 Git 差异。终端输出按命令组织，目录、分支、耗时和退出状态随块保留；构建失败后，可以直接引用那一块继续提问。
 
-- **终端是主界面**：AI 是命令块和工作区的一部分，不是另一个需要来回切换的应用。
-- **操作可回看、可撤销**：命令块保留上下文，工具调用先确认，文件修改可以回到差异页检查。
-- **本地优先**：自带 API Key 直连模型服务，密钥留在本机；诊断日志只记录运行元数据。
+<a href="docs/images/scenario-build-zh.png"><img src="docs/images/scenario-build-zh.png" width="1600" alt="并排编辑代码与运行构建" /></a>
 
-## 快速开始
+### 左边 SSH，右边 AI
 
-需要 Node.js 20+、Rust 工具链，以及当前平台的 [Tauri 2 系统依赖](https://v2.tauri.app/start/prerequisites/)。
+连接服务器，检查服务状态、磁盘空间或部署日志，在旁边讨论下一步。把实际的终端输出作为上下文，让 AI 帮你梳理排查顺序、检查配置或准备回滚方案。工具执行和文件写入遵循权限策略，操作记录可以展开检查。
+
+主机管理覆盖密码与密钥认证、主机密钥确认和端口转发。直接连接支持 SFTP 浏览、上传、下载和远程编辑。交互终端支持跳板机；经跳板机的文件浏览与资源监控仍有限制。
+
+<a href="docs/images/scenario-remote-zh.png"><img src="docs/images/scenario-remote-zh.png" width="1600" alt="远程服务检查与 AI 部署讨论" /></a>
+
+### 给 Agent 一张完整的工作台
+
+既可以在应用内发起 AI 对话，也可以通过 ACP 接入外部 Agent。让一个窗格保留执行终端，另一个窗格承载规划、工具调用和回复；需要时打开文件或差异页面，边检查边推进任务。
+
+内联 AI、侧边对话与独立会话适合不同的工作节奏。工具调用、审批、重试和会话状态有自己的界面。技能、MCP 和本地记忆扩展上下文与工具能力；具体能力取决于你配置的模型服务或 Agent。
+
+### 日常工作也能少绕几步
+
+| 你正在做什么 | 可以怎样安排 |
+| --- | --- |
+| 调试接口 | 一个终端启动服务，另一个终端发请求，旁边打开处理函数或日志。 |
+| 排查构建失败 | 保留失败命令块，让 AI 分析对应输出，再打开文件核对修复。 |
+| 维护多个项目 | 按项目组织标签分组，用颜色区分；暂时不用的组可以收起。 |
+| 检查远程变更 | SSH 终端旁边放远程文件或 AI 对话，核对目标后再执行操作。 |
+| 审查 Agent 的工作 | 对照工具记录、文件内容与 Git 差异，确认变更后再继续。 |
+| 重复工作流程 | 从命令历史搜索、收藏、分组或重新运行命令。 |
+
+## 能力一览
+
+| 领域 | 已有能力 |
+| --- | --- |
+| 终端 | 本地 Shell、SSH、命令块、经典终端视图、TUI 与备用屏幕、中文输入、复制与搜索。 |
+| 工作区 | 混合资源标签、最多四窗格、拖放与排序、命名分组、组颜色、收起分组、聚焦与调整分屏。 |
+| AI 与 Agent | 多模型配置、自带密钥、流式对话、命令输出引用、工具权限、ACP、技能、MCP、本地记忆。 |
+| 代码与文件 | 本地与远程文件浏览、上传下载、内置编辑器、Markdown 预览、Git 状态与差异比较。 |
+| 远程连接 | 主机配置、密码与密钥认证、主机密钥校验、端口转发、直接连接下的资源监控。 |
+| 历史与检索 | 命令历史、会话历史、收藏与分组、搜索筛选、工作区布局恢复。 |
+| 显示与输入 | 主题、应用/终端/编辑器字体设置、内置字体、快捷键、中文与英文界面。 |
+
+截图来自应用界面，使用示例项目与模拟会话数据；点击可查看原始分辨率。
+
+## 开始使用
+
+当前版本为 **0.1.0**，仍处于早期开发。可以从源码运行；`main` 的成功流水线也会提供各平台安装包，获取方式见[构建说明](docs/zh/ci.md)。目前不承诺稳定版本发布频率。
+
+准备 Node.js **22.12+**、Rust 稳定工具链，以及对应平台的[桌面构建依赖](https://v2.tauri.app/start/prerequisites/)。
 
 ```bash
 git clone https://github.com/Vrykell/Vrykell.git
 cd Vrykell
-npm install
-npm run tauri dev      # 启动完整桌面应用
-npm run tauri build    # 构建安装包
+npm ci
+npm run tauri dev
 ```
 
-只开发前端时运行 `npm run dev`（固定端口 1420）。
+只开发前端时使用 `npm run dev`，默认端口为 `1420`。需要安装包时运行 `npm run tauri -- build`。
 
 <details>
-<summary>平台依赖</summary>
+<summary>平台准备</summary>
 
-- **Windows**：使用系统 WebView2。
-- **macOS**：需要 Xcode Command Line Tools、Perl 和 Make。SSH/SFTP 依赖由 Cargo 从源码构建，不需要 Homebrew 或系统 OpenSSL。
-- **Linux**：需要 Tauri 2 系统依赖，完整安装命令见 [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/)。
-- **测试**：`npm run test`、`npm run test:e2e`、`cargo test --manifest-path src-tauri/Cargo.toml`。
+- **Windows**：需要 C++ 构建工具、系统 WebView2 运行时，以及原生上下文菜单构建所需的桌面 SDK。
+- **macOS**：需要命令行开发工具、Perl 和 Make。SSH 相关原生库由依赖工具链从源码构建，无需单独安装系统加密库。
+- **Linux**：安装桌面 WebView、图形界面及应用指示器等系统开发依赖，具体见上方构建依赖链接。
 
 </details>
 
-## 从一条命令开始
+### 连接模型或 Agent
 
-### 1. 命令变成块
+在设置中添加模型服务的地址、密钥和模型，再选择当前配置。内置对话支持原生 Messages 接口、原生生成接口和 OpenAI 兼容接口，也可连接提供兼容接口的本地模型服务。请求直接发送至你配置的服务，应用不提供模型中转。
 
-在底部输入 `git status`，执行后不会只留下滚动的输出。每个块记录工作目录、耗时、退出码和 Git 分支；命令、输出和操作都在同一个块里。运行中的命令使用真实终端渲染，TUI、备用屏幕、选区复制和输入法都能工作。
+外部 Agent 在 ACP 设置中配置启动命令与工作目录。检查工具权限，再开始会话。使用远程目标时，请同时核对执行终端和工作目录，确认实际执行环境。
 
-块内菜单可以复制命令或输出、重新运行、清除，或把这块输出交给 AI。命令历史按项目、目录、Shell 和状态筛选，支持收藏、自定义分组、排序和 AI 自动分组。
+### 当前边界
 
-<p align="center">
-  <a href="docs/images/feature-terminal.png"><img src="docs/images/feature-terminal.png" width="100%" alt="命令块终端" /></a>
-</p>
+- 会话和组合布局可以进入历史；未保存的编辑器草稿、文件浏览状态不能作为可靠的跨重启保存方式。
+- 模型服务、外部 Agent 和远程主机需要自行配置；费用与能力取决于所选服务。
+- 跳板机目前主要用于交互终端，文件浏览与监控尚未覆盖同等连接路径。
+- 分发签名与公证尚未配置，详见[持续集成说明](docs/zh/ci.md)。
 
-### 2. 把失败输出交给 AI
+## 欢迎一起建设
 
-点击块内的「询问 AI」，或打开侧栏对话。Agent 会拿到当前命令块作为引用，可以读取输出、搜索文件、执行命令和编辑文件；执行和写入默认需要确认，危险命令还会走系统级确认。
+欢迎提交问题、使用场景、文档改进、翻译、测试与代码。第一次贡献可以从复现一个问题、补充缺失说明或增加一条回归用例开始。较大的功能建议先开 Issue，明确场景、边界和预期行为。
 
-```text
-为什么刚才的构建失败了？定位原因，给出最小修复，并说明要改哪些文件。
-```
-
-内联 Agent 和侧栏对话共享会话、草稿和流式状态。模型可以来自 Anthropic、Gemini 或 OpenAI 兼容服务；工具、Skills、MCP 服务器和记忆使用同一套设置。
-
-<p align="center">
-  <a href="docs/images/feature-ai.png"><img src="docs/images/feature-ai.png" width="100%" alt="AI 读取命令输出并给出建议" /></a>
-</p>
-
-### 3. 终端和编辑器共享工作区
-
-每个区域有自己的标签条。终端、编辑器、Git 对比、文件和对话可以拖动排序、命名分组，最多拆成四个窗格；聚合工作区允许把不同类型的资源放进同一个标签或分屏，打开新资源不会打乱已有布局。
-
-会话历史只恢复终端和对话。编辑器内容、未保存草稿和文件浏览状态留在当前工作区，避免重启后悄悄恢复过期文件。
-
-<p align="center">
-  <a href="docs/images/feature-unified.png"><img src="docs/images/feature-unified.png" width="100%" alt="聚合工作区开始页" /></a>
-</p>
-
-### 4. 远程主机也在同一工作区
-
-SSH/SFTP 主机管理器支持密码或密钥、端口转发和主机指纹确认；跳板机可用于交互终端，但文件浏览和资源监控暂不支持跳板机。直连主机的远程目录可以浏览、上传、下载和打开编辑，远程终端与本地终端一样使用命令块和 AI。
-
-<p align="center">
-  <a href="docs/images/feature-ssh.png"><img src="docs/images/feature-ssh.png" width="100%" alt="SSH 主机管理" /></a>
-</p>
-
-## 功能细节
-
-<table>
-<tr>
-<td width="50%" valign="top">
-  <img src="docs/images/icons/terminal.svg" width="44" alt="" /><br /><br />
-  <b>终端与命令历史</b><br />
-  每条命令保留工作目录、耗时、退出码、分支和完整输出；运行中的块支持 TUI、备用屏幕和输入法。历史按项目、环境、Shell 和目录归属，支持搜索、收藏、分组、排序和 AI 分组预览。
-</td>
-<td width="50%" valign="top">
-  <img src="docs/images/icons/ai.svg" width="44" alt="" /><br /><br />
-  <b>AI 与工具</b><br />
-  Anthropic、Gemini 和 OpenAI 兼容服务；内联 Agent 与侧栏对话共享会话。支持工具审批、Skills、MCP 服务器、本地记忆，以及通过 ACP 接入的外部 Agent。
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-  <img src="docs/images/icons/workspace.svg" width="44" alt="" /><br /><br />
-  <b>工作区与分屏</b><br />
-  每个区域独立标签条，支持拖拽排序、命名分组、折叠、配色和空组清理。最多四个窗格，可拆出、合并或切换焦点；聚合工作区把终端、文件、编辑器和对话放进同一标签。
-</td>
-<td width="50%" valign="top">
-  <img src="docs/images/icons/remote.svg" width="44" alt="" /><br /><br />
-  <b>远程、文件与编辑器</b><br />
-  SSH/SFTP、主机管理、端口转发和指纹确认；跳板机用于交互终端。本地与远程文件面板共享浏览、拖放、上传下载和撤销；远程文件暂不支持跳板机。内置编辑器、Markdown 预览、Git 差异和命令面板。
-</td>
-</tr>
-</table>
-
-## 模型与工具
-
-打开 **设置 → 模型配置**，添加上游地址、API Key 和模型，然后选择当前模型。请求直接发给模型服务商，不经过 Vrykell 的中转服务；API Key 保存在本机。
-
-| 服务 | 说明 |
-| --- | --- |
-| Anthropic | 原生 Messages API |
-| Gemini | 原生 API |
-| OpenAI compatible | Ollama、LM Studio、vLLM 等兼容 `/v1` 的服务 |
-
-工具权限在 **设置 → 工具权限** 中调整。标准档按工具规则询问，严格档逐次询问，放行档仍会确认危险命令和凭据路径。Skills、MCP 服务器和记忆分别有独立设置页。
-
-## 项目状态
-
-- 当前版本 **0.1.0**，仍在早期开发，界面和行为可能变化。
-- 会话历史只保存终端和对话；文件、编辑器缓冲区和未保存草稿不会跨重启恢复。
-- macOS 的 SSH/SFTP 依赖由 Cargo 从源码构建；Linux 需要 Tauri 2 系统依赖。
-- 原创代码和文档采用 [Apache-2.0](LICENSE)；第三方软件与资源保留各自许可证，见 [NOTICE](NOTICE)。
-
-## 本地开发
+**贡献 PR 以 `dev` 为目标分支。** `main` 用于维护者集成和版本构建。分支命名、开发环境、检查要求和提交流程见[贡献指南](CONTRIBUTING.md)。
 
 ```bash
-npx tsc --noEmit                 # 类型检查
-npm run test                     # 单元测试
-npm run test:e2e                 # Playwright 浏览器回归
-cargo test --manifest-path src-tauri/Cargo.toml
-npm run check:architecture       # 导入边界与 IPC 注册表检查
-npm run build                    # 生产构建
+npx tsc --noEmit
+npm run test
+npm run check:architecture
 ```
 
-提交前至少运行类型检查、单元测试和架构检查。终端、工作区和 AI 相关改动还需要运行对应的浏览器回归。
+交互改动还需对应端到端测试，后端改动需运行原生测试。提交信息使用英文和约定前缀；仓库提供提交、PR 和 Issue 模板。
 
-自动检查与 `main` 分支安装包构建流程见[持续集成与安装包](docs/zh/ci.md)。
+## 深入了解
 
-## 文档
-
-<table>
-<tr>
-<td width="50%">
-  <img src="docs/images/icons/book.svg" width="40" alt="" /><br /><br />
-  <b><a href="docs/zh/feature-spec.md">功能规格</a></b><br />
-  <sub>每个功能的行为、边界和回归用例。</sub>
-</td>
-<td width="50%">
-  <img src="docs/images/icons/layers.svg" width="40" alt="" /><br /><br />
-  <b><a href="docs/zh/architecture.md">架构</a></b><br />
-  <sub>模块划分、终端管线和依赖方向。</sub>
-</td>
-</tr>
-<tr>
-<td width="50%">
-  <img src="docs/images/icons/rules.svg" width="40" alt="" /><br /><br />
-  <b><a href="docs/zh/development-rules.md">开发规则</a></b><br />
-  <sub>硬约束、共享组件、测试和提交要求。</sub>
-</td>
-<td width="50%">
-  <img src="docs/images/icons/shield.svg" width="40" alt="" /><br /><br />
-  <b><a href="docs/zh/security-model.md">安全模型</a></b><br />
-  <sub>IPC、渲染、文件访问和工具授权边界。</sub>
-</td>
-</tr>
-</table>
-
-其他文档：[工作区底层](docs/zh/workspace-foundation.md) · [工作区组合](docs/zh/workspace-compositions.md) · [应用工具](docs/zh/application-tools.md) · [SSH 配置](docs/zh/ssh-profiles.md) · [踩坑记录](docs/zh/pitfalls.md)
-
-## 贡献
-
-欢迎提交 Issue 和 PR。开始之前请阅读[开发规则](docs/zh/development-rules.md)和[项目约定](.agents/skills/vrykell-conventions/SKILL.md)。
-
-除非明确另作说明，为纳入本项目而提交的贡献按项目许可证提供。第三方材料的原始声明和许可证必须保留。
+[功能与回归清单](docs/zh/feature-spec.md) · [架构](docs/zh/architecture.md) · [工作区组合](docs/zh/workspace-compositions.md) · [开发规则](docs/zh/development-rules.md) · [安全模型](docs/zh/security-model.md) · [CI 与安装包](docs/zh/ci.md) · [已知陷阱](docs/zh/pitfalls.md)
 
 ## 许可
 
-除另有说明外，原创代码和文档采用 [Apache License 2.0](LICENSE)。版权归属：Copyright 2026 Vrykell contributors。
+原创代码与文档采用 [Apache License 2.0](LICENSE)，另有声明的文件除外。Copyright 2026 Vrykell contributors。
 
-第三方软件、字体与图标保留各自许可证。署名、源码获取方式及分发要求见 [NOTICE](NOTICE)、[第三方声明](THIRD_PARTY_NOTICES.md)和[许可说明](docs/zh/licensing.md)。
-
-<p align="center">
-  <a href="https://github.com/Vrykell/Vrykell/stargazers"><img src="https://img.shields.io/github/stars/Vrykell/Vrykell?style=social" alt="GitHub stars" /></a>
-</p>
+第三方软件、字体和图标保留各自的许可与署名，详见 [NOTICE](NOTICE)、[第三方声明](THIRD_PARTY_NOTICES.md) 和[许可说明](docs/zh/licensing.md)。提交用于纳入本项目的贡献，除非明确另有说明，按项目许可提供。

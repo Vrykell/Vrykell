@@ -1,0 +1,22 @@
+name: Documentation / 文档改进
+description: Report unclear, missing or outdated documentation. 中文或英文均可。
+labels: [documentation]
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Page or section / 页面或章节
+      description: Link the document or name the missing topic.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What needs improvement? / 需要改进什么？
+      description: Explain what you tried and what was unclear, incorrect or missing.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested change / 修改建议

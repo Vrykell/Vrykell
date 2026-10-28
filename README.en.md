@@ -1,222 +1,133 @@
 <div align="center">
 
-<img src="public/app-icon.svg" width="88" alt="Vrykell" />
+<img src="public/app-icon.svg" width="80" height="80" alt="Vrykell" />
 
 # Vrykell
 
-**Terminals, AI conversations and code in one desktop workspace.**
+### Write code, run commands, connect to servers. Keep your agent beside the work.
+
+A desktop workspace built around the terminal. Combine editors, SSH sessions, AI conversations and agents in the same tabs and split panes.
+
+[Get started](#get-started) · [Workflows](#arrange-the-workspace-around-your-work) · [Contribute](CONTRIBUTING.en.md) · [简体中文](README.md)
 
 <p>
-  <a href="#quick-start"><img src="https://img.shields.io/badge/Quick_start-169AF0?style=for-the-badge&logo=rocket&logoColor=white" alt="Quick start" /></a>
-  <a href="docs/en/feature-spec.md"><img src="https://img.shields.io/badge/Docs-0F172A?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Documentation" /></a>
-  <a href="README.md"><img src="https://img.shields.io/badge/Chinese-374151?style=for-the-badge&logo=googletranslate&logoColor=white" alt="Chinese" /></a>
-</p>
-
-<p>
-  <img src="https://img.shields.io/badge/Windows-0078D4?style=flat-square&logo=windows11&logoColor=white" alt="Windows" />
-  <img src="https://img.shields.io/badge/macOS-000000?style=flat-square&logo=apple&logoColor=white" alt="macOS" />
-  <img src="https://img.shields.io/badge/Linux-FCC624?style=flat-square&logo=linux&logoColor=black" alt="Linux" />
-  <img src="https://img.shields.io/badge/Tauri_2-24C8D8?style=flat-square&logo=tauri&logoColor=white" alt="Tauri 2" />
-  <img src="https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=black" alt="React 19" />
-  <img src="https://img.shields.io/badge/Rust-000000?style=flat-square&logo=rust&logoColor=white" alt="Rust" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="Apache-2.0" /></a>
+  <a href="https://github.com/Vrykell/Vrykell/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/CI-checks-64748b?style=flat-square" alt="CI checks" /></a>
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-3b82f6?style=flat-square" alt="Windows, macOS, Linux" />
 </p>
 
 </div>
 
-<p align="center">
-  <a href="docs/images/hero-en-dark.png">
-    <img src="docs/images/hero-en-dark.png" width="100%" alt="The Vrykell workspace: command blocks on the left, an AI conversation on the right" />
-  </a>
-</p>
+<a href="docs/images/hero-workspace-en.png"><img src="docs/images/hero-workspace-en.png" width="1600" alt="Code, a build terminal and an agent in Vrykell" /></a>
 
-<p align="center"><sub>Command blocks on the left; an AI conversation that can reference the output on the right.</sub></p>
+## Arrange the workspace around your work
 
-## What is Vrykell?
+Development usually takes more than a terminal. There is code to read, output to compare, a remote environment to inspect and context to share with an agent. Vrykell keeps those resources in one workspace: each tab can combine different resource types in up to four panes. Running terminals and conversations retain their own state as you switch, move and resize the layout.
 
-Vrykell is a terminal-first desktop workbench for developers who spend their day in a terminal. It turns every command into a structured block, puts an AI agent next to it, and gives terminals, files, editors and conversations one shared model for tabs, splits and groups.
+### Edit on the left. Build on the right.
 
-Most AI terminals put a chat window beside the terminal. Vrykell lets AI reference a specific command block, read its output, and then run commands, edit files or continue in a split. The app is built with Tauri 2 and runs on Windows, macOS and Linux.
+Open a project file beside a build or test terminal. Change code, run a command and inspect the result without leaving the task. Add an agent pane when you need help reading relevant files and command output.
 
-**Design principles**
+The editor provides syntax highlighting, find and replace, encoding selection, read-only states and save-conflict feedback, alongside Markdown preview and Git comparisons. Command blocks retain the directory, branch, duration and exit status. Reference a failed block directly in the next conversation.
 
-- **The terminal is the main surface.** AI is part of the command block and workspace, not another app to switch to.
-- **Actions stay reviewable.** Blocks keep their context, tool calls ask for approval, and file changes can be checked on a diff page.
-- **Local first.** Bring your own API key, connect directly to the provider and keep the key on this machine. Diagnostics record runtime metadata only.
+<a href="docs/images/scenario-build-en.png"><img src="docs/images/scenario-build-en.png" width="1600" alt="Editing code beside a build terminal" /></a>
 
-## Quick start
+### SSH on the left. AI on the right.
 
-You need Node.js 20+, a Rust toolchain and the [Tauri 2 system dependencies](https://v2.tauri.app/start/prerequisites/) for your platform.
+Connect to a server, inspect service status, disk space or deployment logs, and discuss the next step beside the session. Share actual terminal output to help the agent organize an investigation, inspect configuration or prepare a rollback plan. Tool execution and writes follow your permission policy, with inspectable operation records.
+
+Host management covers password and key authentication, host-key confirmation and port forwarding. Direct connections support SFTP browsing, uploads, downloads and remote editing. Jump hosts work for interactive terminals; file browsing and resource monitoring through them remain limited.
+
+<a href="docs/images/scenario-remote-en.png"><img src="docs/images/scenario-remote-en.png" width="1600" alt="A remote service check beside an AI deployment discussion" /></a>
+
+### Give your agent a complete workbench
+
+Start a built-in AI conversation or connect an external agent through ACP. Keep an execution terminal in one pane and planning, tool calls and replies in another. Open a file or diff when you need to inspect a change before continuing.
+
+Inline AI, side conversations and independent sessions support different ways of working. Tool calls, approvals, retries and session state have dedicated interfaces. Skills, MCP and local memory extend context and tools. Specific capabilities depend on the model service or agent you configure.
+
+### Make everyday tasks easier to follow
+
+| Your task | A workspace arrangement |
+| --- | --- |
+| Debug an API | Run the service in one terminal, send requests in another, and keep the handler or logs nearby. |
+| Investigate a failed build | Keep the failed command block, ask AI about its output, and open the affected file to check the fix. |
+| Work across projects | Organize tabs into named, colored groups and collapse groups you are not using. |
+| Check a remote change | Place remote files or AI beside SSH, then confirm the target before acting. |
+| Review an agent's work | Compare tool records, file contents and Git diffs before continuing. |
+| Repeat a workflow | Search, favorite, group and rerun commands from history. |
+
+## Capabilities
+
+| Area | Available features |
+| --- | --- |
+| Terminal | Local shells, SSH, command blocks, classic terminal view, TUI and alternate screens, IME, copy and search. |
+| Workspace | Mixed resource tabs, up to four panes, drag ordering, named groups, group colors, collapsing, pane focus and resizing. |
+| AI and agents | Multiple models, bring your own key, streaming, command-output references, tool permissions, ACP, skills, MCP and local memory. |
+| Code and files | Local and remote browsing, transfer, built-in editor, Markdown preview, Git status and comparisons. |
+| Remote connections | Host profiles, password and key authentication, host-key verification, port forwarding and resource monitoring over direct connections. |
+| History and search | Command and session history, favorites, grouping, filters and workspace layout restoration. |
+| Appearance and input | Themes, application/terminal/editor typography, bundled fonts, shortcuts and Chinese/English interfaces. |
+
+Screenshots use the application UI with a sample project and simulated session data. Click an image for its original resolution.
+
+## Get started
+
+Version **0.1.0** is in early development. Run from source, or obtain installers from a successful `main` workflow as described in the [build guide](docs/en/ci.md). There is no fixed stable-release schedule yet.
+
+Install Node.js **22.12+**, a stable Rust toolchain and your platform's [desktop build prerequisites](https://v2.tauri.app/start/prerequisites/).
 
 ```bash
 git clone https://github.com/Vrykell/Vrykell.git
 cd Vrykell
-npm install
-npm run tauri dev      # full desktop app
-npm run tauri build    # installer
+npm ci
+npm run tauri dev
 ```
 
-For frontend-only work, run `npm run dev` (fixed port 1420).
+For frontend-only development, use `npm run dev` on port `1420`. To build an installer, run `npm run tauri -- build`.
 
 <details>
-<summary>Platform requirements</summary>
+<summary>Platform preparation</summary>
 
-- **Windows**: uses the system WebView2 runtime.
-- **macOS**: needs Xcode Command Line Tools, Perl and Make. SSH/SFTP libraries are built from source by Cargo; Homebrew and system OpenSSL are not required.
-- **Linux**: needs the Tauri 2 system dependencies; see [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
-- **Tests**: `npm run test`, `npm run test:e2e`, `cargo test --manifest-path src-tauri/Cargo.toml`.
+- **Windows**: C++ build tools, the system WebView2 runtime and the desktop SDK needed by the native context menu.
+- **macOS**: command-line development tools, Perl and Make. Native SSH dependencies build from source without a separately installed system cryptography library.
+- **Linux**: desktop WebView, GUI and application-indicator development dependencies; see the prerequisites above.
 
 </details>
 
-## Start with one command
+### Connect a model or agent
 
-### 1. Commands become blocks
+Add a model service URL, key and model in settings, then select the active configuration. Built-in conversations support native Messages and generation interfaces and OpenAI-compatible endpoints, including compatible local model services. Requests go directly to the service you configure; the application does not provide a model relay.
 
-Type `git status` into the input at the bottom. The result is not just scrollback: the block keeps the working directory, duration, exit status and Git branch together with the command and output. Running commands use a real terminal surface, so TUI apps, alternate screens, selection and IME input work as expected.
+Configure an external agent's startup command and working directory in ACP settings. Review tool permissions before starting. With remote targets, also check the selected execution terminal and directory so the execution environment is clear.
 
-The block menu can copy the command or output, rerun it, clear it, or send it to AI. Command history is scoped by project, directory, shell and status, with favorites, custom groups, ordering and AI-assisted grouping.
+### Current boundaries
 
-<p align="center">
-  <a href="docs/images/feature-terminal-en.png"><img src="docs/images/feature-terminal-en.png" width="100%" alt="Command blocks" /></a>
-</p>
+- Sessions and composition layouts can enter history. Unsaved editor drafts and file browsing state are not a reliable way to preserve work across restarts.
+- Model services, external agents and remote hosts require your configuration. Their costs and capabilities depend on the services you choose.
+- Jump-host support focuses on interactive terminals; browsing and monitoring do not cover the same connection paths yet.
+- Distribution signing and notarization are not configured. See [CI and packages](docs/en/ci.md).
 
-### 2. Hand a failure to AI
+## Build it with us
 
-Choose **Ask AI** in the block, or open the side conversation. The agent receives the current block as a reference and can read its output, search files, run commands and edit files. Execution and writes require approval by default; dangerous commands also go through the system confirmation.
+Issues, use cases, documentation, translations, tests and code contributions are welcome. A first contribution can be a reproducible bug report, a missing explanation or a regression test. Open an issue before a substantial feature to agree on its use case, boundaries and behavior.
 
-```text
-Why did the build fail? Find the cause, propose the smallest fix and list the files to change.
-```
-
-Inline agents and the side panel share conversations, drafts and streaming state. Models can come from Anthropic, Gemini or an OpenAI-compatible service; tools, skills, MCP servers and memory use the same settings.
-
-<p align="center">
-  <a href="docs/images/feature-ai-en.png"><img src="docs/images/feature-ai-en.png" width="100%" alt="AI reading command output and suggesting next steps" /></a>
-</p>
-
-### 3. Terminal and editor share a workspace
-
-Each area has its own tab strip. Terminals, editors, Git comparisons, files and conversations can be reordered, placed in named groups and split into up to four panes. The unified workspace mixes resource kinds in one tab or split without disturbing the layout already open.
-
-Session history restores terminals and conversations only. Editor buffers, unsaved drafts and file browsing state stay in the live workspace instead of silently coming back after a restart.
-
-<p align="center">
-  <a href="docs/images/feature-unified-en.png"><img src="docs/images/feature-unified-en.png" width="100%" alt="Unified workspace start page" /></a>
-</p>
-
-### 4. Remote hosts stay in the same workspace
-
-The SSH/SFTP host manager supports passwords or keys, port forwarding and host-key confirmation; jump hosts work for interactive terminals, while file browsing and resource monitoring do not support jump hosts yet. Direct connections can browse, upload, download and edit remote directories, and remote terminals use the same command blocks and AI as local ones.
-
-<p align="center">
-  <a href="docs/images/feature-ssh-en.png"><img src="docs/images/feature-ssh-en.png" width="100%" alt="SSH host management" /></a>
-</p>
-
-## Feature details
-
-<table>
-<tr>
-<td width="50%" valign="top">
-  <img src="docs/images/icons/terminal.svg" width="44" alt="" /><br /><br />
-  <b>Terminal and command history</b><br />
-  Every command keeps its working directory, duration, exit status, branch and full output. Running blocks support TUI apps, alternate screens and IME. History is scoped by project, environment, shell and directory, with search, favorites, groups, ordering and AI grouping previews.
-</td>
-<td width="50%" valign="top">
-  <img src="docs/images/icons/ai.svg" width="44" alt="" /><br /><br />
-  <b>AI and tools</b><br />
-  Anthropic, Gemini and OpenAI-compatible providers; inline agents and side conversations share sessions. Approval policies, skills, MCP servers, local memory and external agents through ACP are all supported.
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-  <img src="docs/images/icons/workspace.svg" width="44" alt="" /><br /><br />
-  <b>Workspace and splits</b><br />
-  An independent tab strip per area with drag ordering, named groups, folding, colors and empty-group cleanup. Up to four panes can be detached, merged or focused; the unified workspace puts terminals, files, editors and conversations in one tab.
-</td>
-<td width="50%" valign="top">
-  <img src="docs/images/icons/remote.svg" width="44" alt="" /><br /><br />
-  <b>Remote, files and editor</b><br />
-  SSH/SFTP, host management, port forwarding and host-key confirmation; jump hosts work for interactive terminals. Local and remote file panels share browsing, drag and drop, upload/download and undo; remote files do not support jump hosts yet. Built-in editor, Markdown preview, Git comparisons and a command palette.
-</td>
-</tr>
-</table>
-
-## Models and tools
-
-Open **Settings → Model configuration**, add an upstream URL, API key and model, then choose the active model. Requests go directly to the provider, not through a Vrykell relay; the API key stays on this machine.
-
-| Service | Notes |
-| --- | --- |
-| Anthropic | Native Messages API |
-| Gemini | Native API |
-| OpenAI compatible | Ollama, LM Studio, vLLM and other services exposing `/v1` |
-
-Tool permissions live in **Settings → Tool permissions**. Standard asks according to tool rules, strict asks every time, and permissive still confirms dangerous commands and credential paths. Skills, MCP servers and memory have their own settings pages.
-
-## Project status
-
-- Current version: **0.1.0**, still in early development; UI and behavior may change.
-- Session history restores terminals and conversations only; files, editor buffers and unsaved drafts do not survive a restart.
-- On macOS, SSH/SFTP libraries are built from source by Cargo. Linux needs the Tauri 2 system dependencies.
-- Original project code and documentation are licensed under [Apache-2.0](LICENSE). Third-party software and assets retain their own licenses; see [NOTICE](NOTICE).
-
-## Local development
+**Contribution PRs target `dev`.** Maintainers use `main` for integration and version builds. Read the [contributing guide](CONTRIBUTING.en.md) for branch naming, setup, checks and review.
 
 ```bash
-npx tsc --noEmit                 # typecheck
-npm run test                     # unit tests
-npm run test:e2e                 # Playwright browser regressions
-cargo test --manifest-path src-tauri/Cargo.toml
-npm run check:architecture       # import boundaries and IPC registry
-npm run build                    # production build
+npx tsc --noEmit
+npm run test
+npm run check:architecture
 ```
 
-Run typechecking, unit tests and the architecture check before committing. Changes touching the terminal, workspace or AI also need the matching browser regressions.
+Interactive changes also need matching browser regressions, and backend changes need native tests. Commit messages use English and the agreed prefixes. Commit, PR and issue templates are included.
 
-See [continuous integration and packages](docs/en/ci.md) for automated checks and installer builds from `main`.
+## Read more
 
-## Documentation
-
-<table>
-<tr>
-<td width="50%">
-  <img src="docs/images/icons/book.svg" width="40" alt="" /><br /><br />
-  <b><a href="docs/en/feature-spec.md">Feature spec</a></b><br />
-  <sub>Behavior, boundaries and regression cases for every feature.</sub>
-</td>
-<td width="50%">
-  <img src="docs/images/icons/layers.svg" width="40" alt="" /><br /><br />
-  <b><a href="docs/en/architecture.md">Architecture</a></b><br />
-  <sub>Modules, the terminal pipeline and dependency direction.</sub>
-</td>
-</tr>
-<tr>
-<td width="50%">
-  <img src="docs/images/icons/rules.svg" width="40" alt="" /><br /><br />
-  <b><a href="docs/en/development-rules.md">Development rules</a></b><br />
-  <sub>Hard constraints, shared components, testing and commits.</sub>
-</td>
-<td width="50%">
-  <img src="docs/images/icons/shield.svg" width="40" alt="" /><br /><br />
-  <b><a href="docs/en/security-model.md">Security model</a></b><br />
-  <sub>IPC, rendering, file access and tool authorization boundaries.</sub>
-</td>
-</tr>
-</table>
-
-More: [Workspace foundation](docs/en/workspace-foundation.md) · [Workspace compositions](docs/en/workspace-compositions.md) · [Application tools](docs/en/application-tools.md) · [SSH profiles](docs/en/ssh-profiles.md) · [Pitfalls](docs/en/pitfalls.md)
-
-## Contributing
-
-Issues and pull requests are welcome. Read the [development rules](docs/en/development-rules.md) and the [project conventions](.agents/skills/vrykell-conventions/SKILL.md) before you start.
-
-Unless explicitly stated otherwise, contributions submitted for inclusion are offered under the project license. Preserve the notices and licenses of third-party materials.
+[Features and regression checklist](docs/en/feature-spec.md) · [Architecture](docs/en/architecture.md) · [Workspace compositions](docs/en/workspace-compositions.md) · [Development rules](docs/en/development-rules.md) · [Security model](docs/en/security-model.md) · [CI and packages](docs/en/ci.md) · [Known pitfalls](docs/en/pitfalls.md)
 
 ## License
 
-Original project code and documentation are licensed under the [Apache License, Version 2.0](LICENSE), except where otherwise stated. Copyright 2026 Vrykell contributors.
+Original code and documentation use the [Apache License, Version 2.0](LICENSE), except where otherwise stated. Copyright 2026 Vrykell contributors.
 
-Third-party software, fonts and icons retain their respective licenses. See [NOTICE](NOTICE), the [third-party notices](THIRD_PARTY_NOTICES.md) and the [licensing guide](docs/en/licensing.md) for attribution, source locations and distribution requirements.
-
-<p align="center">
-  <a href="https://github.com/Vrykell/Vrykell/stargazers"><img src="https://img.shields.io/github/stars/Vrykell/Vrykell?style=social" alt="GitHub stars" /></a>
-</p>
+Third-party software, fonts and icons retain their own terms and attribution. See [NOTICE](NOTICE), [third-party notices](THIRD_PARTY_NOTICES.md) and the [licensing guide](docs/en/licensing.md). Unless explicitly stated otherwise, contributions submitted for inclusion are offered under the project license.

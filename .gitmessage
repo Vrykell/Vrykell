@@ -1,0 +1,7 @@
+# English subject; choose feat, fix, docs, test or refactor.
+# Example: fix: preserve the cursor after resizing a pane
+<type>: <imperative summary>
+
+# Optional body: explain the problem and resulting behavior.
+# Mention the validation actually performed and any material limitation.
+# Reference a related issue when applicable, for example: Fixes #123
