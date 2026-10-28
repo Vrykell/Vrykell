@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { setupTauriMock, ensureTabsOpen } from './tauri-mock';
 
-test.describe('新建标签类型快捷配置', () => {
+test.describe('new tab type quick settings', () => {
   test('restored default shell icons follow the resolved default and nested settings stay on screen', async ({ page }, info) => {
     await ensureTabsOpen(page);
     const restored = page.locator('[data-tab-kind="session"]').first().locator('[role="tab"] svg');
@@ -51,7 +51,7 @@ test.describe('新建标签类型快捷配置', () => {
     await ensureTabsOpen(page);
   });
 
-  test('右击终端类型切换打开模式并影响新标签', async ({ page }) => {
+  test('right-clicking a terminal type switches the open mode and affects new tabs', async ({ page }) => {
     await page.getByTestId('tab-new-btn').click();
     const zsh = page.getByTestId('new-tab-option-shell:zsh');
     await expect(zsh).toBeVisible();
@@ -63,7 +63,7 @@ test.describe('新建标签类型快捷配置', () => {
     await page.getByRole('menuitemradio', { name: '经典模式' }).click();
     await expect(page.getByRole('menu', { name: '操作菜单' })).toHaveCount(0);
 
-    // 重新打开菜单，选中项已切换
+    // Reopen the menu; the selected item has switched
     await zsh.click({ button: 'right' });
     await page.getByRole('menuitem', { name: '打开方式', exact: true }).click();
     await expect(page.getByRole('menuitemradio', { name: '经典模式' })).toHaveAttribute('aria-checked', 'true');
@@ -71,7 +71,7 @@ test.describe('新建标签类型快捷配置', () => {
     await page.keyboard.press('Escape');
     await expect(page.getByRole('menu', { name: '操作菜单' })).toHaveCount(0);
 
-    // 使用该类型新建的标签按新模式启动
+    // A tab created with this type starts in the new mode
     await zsh.click();
     await expect(page.locator('[data-testid^="tab-row-"]')).toHaveCount(2);
     await expect.poll(() => page.evaluate(() =>
@@ -80,7 +80,7 @@ test.describe('新建标签类型快捷配置', () => {
     )).toBe(true);
   });
 
-  test('右击终端类型设为默认终端', async ({ page }) => {
+  test('right-clicking a terminal type sets it as the default terminal', async ({ page }) => {
     await page.getByTestId('tab-new-btn').click();
     await page.getByTestId('new-tab-option-shell:bash').click({ button: 'right' });
     await page.getByRole('menuitemradio', { name: '设为默认终端' }).click();
@@ -90,7 +90,7 @@ test.describe('新建标签类型快捷配置', () => {
     expect(stored.state.shell).toBe('bash');
   });
 
-  test('右击 SSH 连接切换快捷开关并打开编辑弹窗', async ({ page }) => {
+  test('right-clicking an SSH connection toggles a quick switch and opens the edit dialog', async ({ page }) => {
     await page.getByTestId('tab-new-btn').click();
     const row = page.getByTestId('new-tab-option-ssh:ssh-1');
     await expect(row).toBeVisible();
@@ -103,14 +103,14 @@ test.describe('新建标签类型快捷配置', () => {
     await expect(page.getByRole('menuitemradio', { name: 'Shell 集成' })).toHaveAttribute('aria-checked', 'true');
     await page.getByRole('menuitemradio', { name: '自动重连' }).click();
 
-    // 保存完成后再打开菜单，勾选状态已更新
+    // Reopen the menu after the save completes; the checked state is updated
     await expect.poll(async () => {
       await row.click({ button: 'right' });
       return page.getByRole('menuitemradio', { name: '自动重连' }).getAttribute('aria-checked');
     }).toBe('true');
     await page.keyboard.press('Escape');
 
-    // 编辑连接打开 SSH 表单，关闭后回到选择器
+    // Edit connection opens the SSH form; closing it returns to the picker
     await row.click({ button: 'right' });
     await page.getByText('编辑连接').click();
     const form = page.getByTestId('ssh-host-editor');
@@ -121,7 +121,7 @@ test.describe('新建标签类型快捷配置', () => {
     await expect(page.getByTestId('ssh-workspace')).toBeVisible();
   });
 
-  test('右击 SSH 连接删除需二次确认', async ({ page }) => {
+  test('deleting an SSH connection from its right-click menu requires confirmation', async ({ page }) => {
     await page.getByTestId('tab-new-btn').click();
     await page.getByTestId('new-tab-option-ssh:ssh-1').click({ button: 'right' });
     await page.getByText('删除连接').click();

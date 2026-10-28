@@ -30,7 +30,7 @@ const tabOrder = (page: Page) =>
   page.locator('[data-tab-row-id]')
     .evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.reorderItem));
 
-test.describe('侧栏列表拖拽排序', () => {
+test.describe('sidebar list drag reordering', () => {
   for (const singleton of [false, true]) {
     test(`dragging out of a group uses the empty ungrouped area${singleton ? ' with singleton pages' : ''}`, async ({ page }) => {
       await setupTauriMock(page);
@@ -71,13 +71,13 @@ test.describe('侧栏列表拖拽排序', () => {
       await expect(list.locator(`[data-group-id="${groupId}"] [data-tab-row-id="${first}"]`)).toHaveCount(0);
     });
   }
-  test('SSH 连接：拖动时源行让位并出现虚线占位，落下后顺序持久化', async ({ page }) => {
+  test('SSH connections: the source row makes way with a dashed placeholder while dragging, and the order persists after dropping', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     await page.locator('[data-dock-btn="ssh"]').click();
     await expect(page.locator('[data-testid="ssh-search"]')).toBeVisible();
 
-    // mock 默认只有一条连接：再造一条用于排序
+    // The mock has only one connection by default: create another one for reordering
     await page.locator('[data-testid="ssh-new-btn"]').click();
     await page.locator('[data-testid="ssh-form-name"]').fill('备用机');
     await page.locator('[data-testid="ssh-form-host"]').fill('backup.example.com');
@@ -89,18 +89,18 @@ test.describe('侧栏列表拖拽排序', () => {
     const [first, second] = before as [string, string];
 
     await startDragRow(page, `ssh-row-${first}`, `ssh-row-${second}`, 0.85);
-    // 拖动中：源行让位（隐藏），落点用虚线占位
+    // While dragging: the source row makes way (hidden) and the drop slot uses a dashed placeholder
     await expect(page.locator(`[data-testid="ssh-row-${first}"]`)).toHaveAttribute('data-reorder-dragging', 'true');
     await expect(page.locator('[data-reorder-placeholder]')).toHaveCount(1);
     await page.mouse.up();
 
     expect(await sshOrder(page)).toEqual([second, first]);
-    // 新顺序写入本地存储（store 的 load 会按它排列，单测覆盖该路径）
+    // The new order is written to local storage (the store's load arranges by it; unit tests cover that path)
     const stored = await page.evaluate(() => localStorage.getItem('vrykell-ssh-order'));
     expect(JSON.parse(stored ?? 'null')).toEqual([second, first]);
   });
 
-  test('标签页：拖动让位 + 占位，落下后标签顺序更新', async ({ page }) => {
+  test('tabs: the source row makes way with a placeholder while dragging, and the tab order updates after dropping', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
@@ -123,7 +123,7 @@ test.describe('侧栏列表拖拽排序', () => {
     expect(after.slice(0, -1)).toEqual(before.slice(1));
   });
 
-  test('标签拖入分组与组内换序：空位都出现在组内', async ({ page }) => {
+  test('dragging a tab into a group and reordering within it: the open slot always appears inside the group', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
@@ -134,15 +134,15 @@ test.describe('侧栏列表拖拽排序', () => {
     expect(tabs.length).toBeGreaterThanOrEqual(2);
     const [a, b] = tabs as [string, string];
 
-    // 在 a 上右键新建分组：a 进组，b 仍是未分组
+    // Right-click a to create a group: a joins the group while b stays ungrouped
     await page.getByTestId(`tab-row-${a}`).click({ button: 'right' });
     await page.getByRole('button', { name: '新建分组', exact: true }).click();
     await page.keyboard.press('Escape');
     const group = page.locator('[data-group-id]').first();
     await expect(group).toBeVisible();
 
-    // 把未分组的 b 拖到组内 a 上：空位出现在组内，而不是列表里最近的行
-    // 前缘判定按“移除源标签后的理想位置”计算，因此从右侧扫动，直到组内出现占位。
+    // Drag ungrouped b onto a inside the group: the slot appears inside the group, not at the nearest row in the list
+    // The leading-edge decision uses the ideal position after removing the source tab, so sweep in from the right until a placeholder appears inside the group.
     const dragUntilGroupPlaceholder = async (sourceId: string, memberId: string) => {
       const source = (await page.getByTestId(`tab-row-${sourceId}`).boundingBox())!;
       const y = source.y + source.height / 2;
@@ -160,12 +160,12 @@ test.describe('侧栏列表拖拽排序', () => {
     await page.mouse.up();
     await expect(group.locator(`[data-testid="tab-row-${b}"]`)).toHaveAttribute('data-tab-group', /.+/);
 
-    // 组内换序：a 拖到组内 b 上，空位同样在组内出现
+    // Reorder within the group: drag a onto b in the group; the slot also appears inside the group
     await dragUntilGroupPlaceholder(a, b);
     await expect(group.locator('[data-reorder-placeholder]')).toHaveCount(1);
     await page.mouse.up();
 
-    // 组内标签的右键菜单可以显式移出分组（不必非要拖到「未分组」区）
+    // The group tab's context menu can move it out explicitly (no need to drag it to the "ungrouped" area)
     await group.locator(`[data-testid="tab-row-${b}"]`).click({ button: 'right' });
     await page.getByRole('button', { name: '移出分组', exact: true }).click();
     await expect(group.locator(`[data-testid="tab-row-${b}"]`)).toHaveCount(0);

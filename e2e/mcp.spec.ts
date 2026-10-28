@@ -1,5 +1,5 @@
 /**
- * MCP 服务器设置页 e2e：草稿卡片校验 / 保存落库 / 连接断开 / 启用 / 删除。
+ * MCP server settings page e2e: draft card validation / save persistence / connect and disconnect / enable / delete.
  */
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, mcpServers, mcpOps } from './tauri-mock';
@@ -11,7 +11,7 @@ test.beforeEach(async ({ page }) => {
   await gotoSetting(page, 'MCP 服务器');
 });
 
-test.describe('MCP 设置页', () => {
+test.describe('MCP settings page', () => {
   test('deleting during an automatic rename waits for the save and removes the renamed server', async ({ page }) => {
     await page.evaluate(() => {
       const bridge = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__;
@@ -29,7 +29,7 @@ test.describe('MCP 设置页', () => {
     await expect(page.getByPlaceholder('服务器名')).toHaveCount(0);
     expect(await mcpServers(page)).toEqual([]);
   });
-  test('已保存服务器：连接状态徽标与工具数', async ({ page }) => {
+  test('saved server: connection status badge and tool count', async ({ page }) => {
     const nameInput = page.locator('section').getByPlaceholder('服务器名').first();
     await expect(nameInput).toHaveValue('文件系统');
     const card = nameInput.locator('xpath=../..');
@@ -37,9 +37,9 @@ test.describe('MCP 设置页', () => {
     await expect(card.getByRole('button', { name: '断开' })).toBeVisible();
   });
 
-  test('添加服务器：空名校验 / 缺 command 校验 / 保存落库', async ({ page }) => {
+  test('adding a server: empty-name validation / missing command validation / save persistence', async ({ page }) => {
     await page.getByRole('button', { name: /添加服务器/ }).click();
-    // 草稿卡片出现（服务器名输入变为 2 个）
+    // The draft card appears (there are now 2 server-name inputs)
     const nameInputs = page.locator('section').getByPlaceholder('服务器名');
     await expect(nameInputs).toHaveCount(2);
     const draftCard = nameInputs.nth(1).locator('xpath=../..');
@@ -61,7 +61,7 @@ test.describe('MCP 设置页', () => {
     expect(cfg.command).toBe('npx');
     expect(cfg.args).toEqual(['-y', '@scope/server']);
     expect(cfg.env).toEqual({ TOKEN: 'abc' });
-    // 落库后显示未连接 + 连接按钮
+    // After saving it shows disconnected + a connect button
     const servers = await mcpServers(page);
     expect(servers.some((s) => s.name === 'e2e-mcp')).toBe(true);
     const savedCard = page.locator('section').getByPlaceholder('服务器名').nth(1).locator('xpath=../..');
@@ -69,15 +69,15 @@ test.describe('MCP 设置页', () => {
     await expect(savedCard.getByText('未连接')).toBeVisible();
   });
 
-  test('草稿可取消；连接/断开/启停/删除', async ({ page }) => {
-    // 取消草稿
+  test('a draft can be cancelled; connect/disconnect/toggle/delete', async ({ page }) => {
+    // Cancel the draft
     await page.getByRole('button', { name: /添加服务器/ }).click();
     const nameInputs = page.locator('section').getByPlaceholder('服务器名');
     await expect(nameInputs).toHaveCount(2);
     await nameInputs.nth(1).locator('xpath=../..').getByRole('button', { name: '取消' }).click();
-    await expect(nameInputs).toHaveCount(1); // 只剩已保存的
+    await expect(nameInputs).toHaveCount(1); // Only the saved server remains
 
-    // 连接
+    // Connect
     const card = nameInputs.first().locator('xpath=../..');
     await card.getByRole('button', { name: '断开' }).click();
     await expect(card.getByText('未连接')).toBeVisible();
@@ -85,14 +85,14 @@ test.describe('MCP 设置页', () => {
     await expect(page.getByText('已连接 文件系统')).toBeVisible();
     await expect(card.getByText(/已连接 · 2 工具/)).toBeVisible();
 
-    // 启用开关（默认开 → 关）
+    // Enable toggle (on by default → off)
     const toggle = card.getByRole('switch');
     await toggle.click();
     await expect(toggle).toHaveAttribute('aria-checked', 'false');
     const ops = await mcpOps(page);
     expect(ops.some((o) => o.op === 'toggle' && o.name === '文件系统')).toBe(true);
 
-    // 删除
+    // Delete
     await card.locator('[data-tip="删除服务器"]').click();
     await expect(page.getByText('已删除 文件系统')).toBeVisible();
     await expect(nameInputs).toHaveCount(0);

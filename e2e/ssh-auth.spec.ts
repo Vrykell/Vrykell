@@ -55,7 +55,7 @@ test('the connection screen keeps no scrollbar of its own', async ({ page }) => 
 test('the connection screen snaps its character cells to whole pixels', async ({ page }) => {
   await openSsh(page, 'known');
   await emitPtyOutput(page, 'ready\r\n');
-  // 整数字符格：否则画布右边缘会剩一条亚像素列，选区旁边就像有一条细线
+  // Whole-pixel character cells: otherwise a sub-pixel column remains at the canvas's right edge, looking like a thin line beside a selection
   const cellWidth = await page.evaluate(() => {
     const map = (window as unknown as { __vrykellTerms?: Map<string, unknown> }).__vrykellTerms!;
     const term = [...map.values()][0] as {
@@ -133,7 +133,7 @@ test('first SSH connection confirms its fingerprint and accepts authentication i
   const sshSpawns = (await ipcRecords(page, '__PTY_SPAWNS__')).filter(s => s.ssh);
   expect(sshSpawns).toHaveLength(1);
   expect(sshSpawns[0]?.ssh).toMatchObject({ hostKeyType: 'ed25519' });
-  // 认证输入跟随远端输出：只有服务端真的索要密码时才出现
+  // Authentication input follows remote output: it appears only when the server actually asks for a password
   await emitPtyOutput(page, '请输入远端密码：');
   await expect(surface.locator('pre')).toContainText('请输入远端密码：');
   const response = surface.getByLabel('SSH 认证响应');
@@ -173,7 +173,7 @@ test('canceling authentication closes the PTY and leaves no editable password fi
   expect(await ptyWrites(page)).not.toContain('unsent-secret\r');
   expect(await ptyWrites(page)).not.toContain('\x03');
   await emitPtyOutput(page, 'late password prompt');
-  // 断开后定格的是断开那一刻的屏幕：迟到的输出不会再画到页面上
+  // After disconnecting the screen freezes at that moment: late output is no longer painted on the page
   await expect(surface.getByTestId('ssh-terminal-ended')).not.toContainText('late password prompt');
 });
 
@@ -204,11 +204,11 @@ test('SSH block mode remains directly interactive when the remote server has no 
   await expect(surface.getByLabel('SSH 认证响应')).toHaveCount(0);
   await expect(surface.locator('.xterm-screen')).toBeVisible();
 
-  // 输入方式是显式单选（共享 Select），不再是会翻转文字的按钮
+  // The input mode is an explicit single choice (shared Select), no longer a button that flips its label
   await page.getByTestId('ssh-input-mode').last().click();
   await page.getByRole('option', { name: '密码输入' }).click();
   await expect(surface.getByLabel('SSH 认证响应')).toBeVisible();
-  // 屏幕冻结成快照（live 渲染停下，不会再留下终端光标）
+  // The screen freezes into a snapshot (live rendering stops and no terminal cursor remains)
   await expect(surface.locator('pre[data-testid="ssh-terminal-screen"]')).toBeVisible();
   await expect(surface.locator('.xterm-screen')).toBeHidden();
   await page.getByTestId('ssh-input-mode').last().click();
@@ -221,7 +221,7 @@ test('SSH block mode remains directly interactive when the remote server has no 
   expect(await ptyWrites(page)).toEqual(expect.arrayContaining(['\x1b[B', '\r', '\x1b']));
   await page.getByTestId('ssh-session-toolbar').last().getByRole('button', { name: '断开连接' }).click();
   await expect(page.getByTestId('ssh-session-toolbar').last().getByRole('status')).toHaveText('已断开 SSH 连接');
-  // 原因直接印在屏幕上，不用展开任何折叠区
+  // The reason is printed straight on the screen without expanding any collapsed section
   await expect(surface.getByTestId('ssh-terminal-ended')).toContainText('已登录交互程序');
 });
 
@@ -252,7 +252,7 @@ test('canceling host trust does not spawn SSH or record a key', async ({ page })
   await expect(page.getByTestId('ssh-terminal-ended')).toContainText('已取消 SSH 连接');
   expect(await ipcRecords(page, '__SSH_TRUSTS__')).toEqual([]);
   expect((await ipcRecords(page, '__PTY_SPAWNS__')).filter(s => s.ssh)).toEqual([]);
-  // 未出现密码提示时没有可输入的认证框
+  // Without a password prompt there is no authentication input box
   await expect(page.getByLabel('SSH 认证响应')).toHaveCount(0);
 });
 
@@ -264,7 +264,7 @@ test('changed host keys fail without asking to overwrite trust', async ({ page }
   expect((await ipcRecords(page, '__PTY_SPAWNS__')).filter(s => s.ssh)).toEqual([]);
 });
 
-test('认证输入条在终端区内左右对称（不再被 8px 左边距推右）', async ({ page }) => {
+test('the authentication input bar is horizontally symmetric inside the terminal area (no longer pushed right by an 8px left margin)', async ({ page }) => {
   await openSsh(page, 'known');
   const surface = page.getByTestId('ssh-connection-input');
   await emitPtyOutput(page, "user@server's password: ");
@@ -281,6 +281,6 @@ test('认证输入条在终端区内左右对称（不再被 8px 左边距推右
     };
   });
   expect(gaps).not.toBeNull();
-  // 与终端区左右边界对称：左边距不再比右边多出 8px
+  // Symmetric with the terminal area's left and right edges: the left gap is no longer 8px wider than the right one
   expect(Math.abs((gaps?.left ?? 0) - (gaps?.right ?? 0))).toBeLessThanOrEqual(1);
 });

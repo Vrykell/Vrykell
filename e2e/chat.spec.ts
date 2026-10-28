@@ -1,28 +1,28 @@
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, mockAnthropic } from './tauri-mock';
 
-test.describe('chat 对话链路（内联 AI 模式）', () => {
-  test('AI 模式发送消息后流式渲染 AI 回复', async ({ page }) => {
+test.describe('chat conversation flow (inline AI mode)', () => {
+  test('AI mode streams the reply after a message is sent', async ({ page }) => {
     await mockAnthropic(page, '好的，这是**加粗内容**测试。');
     await setupTauriMock(page);
     await page.goto('/');
-    // 等待终端就绪（blockList 场景下 xterm 隐藏，输入栏可见）
+    // Wait for the terminal to be ready (in the blockList scene xterm is hidden and the input bar is visible)
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
-    // 点击 ⚡ 切换到 AI 模式
+    // Click ⚡ to switch to AI mode
     await page.getByRole('button', { name: '询问 AI', exact: true }).click();
 
-    // 输入自然语言并发送
+    // Type natural language and send it
     const input = page.locator('[data-chat-composer]:visible');
     await expect(input).toBeVisible();
     await input.fill('你好');
     await input.press('Enter');
 
-    // 等待 AI 回复出现在内联 AI 区
+    // Wait for the AI reply to appear in the inline AI area
     await expect(page.getByText('加粗内容')).toBeVisible({ timeout: 10000 });
   });
 
-  test('AI 回复包含文本内容', async ({ page }) => {
+  test('AI reply contains text content', async ({ page }) => {
     await mockAnthropic(page, '欧拉公式：e^{i*pi} + 1 = 0 是数学中最美的公式之一。');
     await setupTauriMock(page);
     await page.goto('/');
@@ -33,11 +33,11 @@ test.describe('chat 对话链路（内联 AI 模式）', () => {
     await input.fill('写个公式');
     await input.press('Enter');
 
-    // 内联 AI 区显示回复文本
+    // The inline AI area shows the reply text
     await expect(page.getByText(/欧拉公式/)).toBeVisible({ timeout: 10000 });
   });
 
-  test('首条消息自动命名标签', async ({ page }) => {
+  test('the first message names the tab automatically', async ({ page }) => {
     await mockAnthropic(page, '好的');
     await setupTauriMock(page);
     await page.goto('/');
@@ -51,7 +51,7 @@ test.describe('chat 对话链路（内联 AI 模式）', () => {
     await expect(page.locator('.chat-conversation-title:visible')).toHaveText('麦克斯韦方程组', { timeout: 10000 });
   });
 
-  test('发送中输入禁用，完成后恢复', async ({ page }) => {
+  test('the input is disabled while sending and restored afterwards', async ({ page }) => {
     await mockAnthropic(page, '完成');
     await setupTauriMock(page);
     await page.goto('/');
