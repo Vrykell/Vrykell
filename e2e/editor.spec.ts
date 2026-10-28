@@ -1,9 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-import { setupTauriMock } from './tauri-mock';
+import { setupTauriMock, useWindowsPlatform, waitForWorkbench } from './tauri-mock';
 test.setTimeout(60_000);
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page }, info) => {
   await setupTauriMock(page.context(), { launchDirectory: '/home/e2e/project', terminalDirectories: true });
+  if (info.title.includes('administrator opening')) await useWindowsPlatform(page);
   await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await waitForWorkbench(page);
   await page.getByRole('button', { name: '版本控制', exact: true }).click();
 });
 async function openWorking(page: Page, path = 'src/main.ts', scope = 'unstaged') {

@@ -88,12 +88,12 @@ test('更换窗格位置：悬停目标落点后点击即可移动窗格', async
   await expect(page.locator(`[data-testid="${movedId}"]`)).toHaveAttribute('data-focused', 'true');
 });
 
-test('a single terminal omits reposition while split remains available', async ({ page }) => {
+test('a single terminal disables reposition while split remains available', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.locator('.terminal-pane:visible').first().click({ button: 'right' });
-  await expect(page.getByRole('button', { name: '更换窗格位置', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '更换窗格位置', exact: true })).toBeDisabled();
   await expect(page.getByRole('button', { name: '拆分标签页', exact: true })).toBeVisible();
   await expect(page.getByTestId('placement-overlay')).toHaveCount(0);
 });

@@ -4,7 +4,7 @@
  * server gets when it is the selected source.
  */
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, mockAnthropic, ensureChatSettingsOpen, emitAcpSession, acpUpdate } from './tauri-mock';
+import { setupTauriMock, mockAnthropic, ensureChatSettingsOpen, emitAcpSession, acpUpdate, waitForWorkbench } from './tauri-mock';
 
 /** Opens the usage page from the AI panel's conversation settings, reusing the panel when visible. */
 async function openUsagePage(page: import('@playwright/test').Page) {
@@ -106,6 +106,7 @@ test.describe('usage statistics page', () => {
     await expect(page.getByTestId('usage-total-tokens')).toHaveText('15');
 
     await page.reload();
+    await waitForWorkbench(page);
     await page.evaluate(async () => {
       const path = '/src/features/workspace/stores/workspace.ts';
       const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
@@ -126,9 +127,9 @@ test.describe('usage statistics page', () => {
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
     // Connect the configured server, then let it report a session the way the backend forwards it.
-    await page.keyboard.press('Control+,');
-    await page.getByText('ACP', { exact: true }).first().click();
-    await page.getByTestId('harness-connect-0').click();
+    await page.getByTestId('workspace-area-ai').click();
+    await page.getByTestId('harness-add-session').click();
+    await page.getByTestId('acp-launcher-Fake ACP').click();
     await expect(page.getByTestId('harness-send')).toBeVisible({ timeout: 10000 });
     const session = 'sess_e2e';
     await emitAcpSession(page, acpUpdate(session, {
@@ -148,6 +149,7 @@ test.describe('usage statistics page', () => {
     await expect(page.getByTestId('usage-range')).toBeVisible();
 
     await page.reload();
+    await waitForWorkbench(page);
     await page.evaluate(async () => {
       const path = '/src/features/workspace/stores/workspace.ts';
       const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');

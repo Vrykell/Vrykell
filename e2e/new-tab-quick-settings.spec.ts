@@ -30,8 +30,23 @@ test.describe('新建标签类型快捷配置', () => {
     await expect(restored).toHaveAttribute('data-shell-mark', 'bash');
     await page.screenshot({ path: info.outputPath('restored-default-color.png') });
   });
-  test.beforeEach(async ({ page }) => {
+  test.beforeEach(async ({ page }, info) => {
     await setupTauriMock(page);
+    if (info.title.startsWith('restored default shell')) await page.addInitScript(() => {
+      const api = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__;
+      const original = api.invoke;
+      api.invoke = async (command, args) => {
+        const result = await original(command, args);
+        if (command !== 'list_sessions' && command !== 'get_session') return result;
+        const update = (row: { id: string; payload: string }) => {
+          if (row.id !== 't1') return row;
+          const payload = JSON.parse(row.payload) as { layout: { terminal: { shellType?: string } } };
+          delete payload.layout.terminal.shellType;
+          return { ...row, payload: JSON.stringify(payload) };
+        };
+        return Array.isArray(result) ? result.map(update) : result ? update(result as { id: string; payload: string }) : result;
+      };
+    });
     await page.goto('/');
     await ensureTabsOpen(page);
   });

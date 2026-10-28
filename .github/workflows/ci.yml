@@ -91,11 +91,11 @@ jobs:
       - name: Run backend tests
         if: runner.os != 'Linux'
         working-directory: src-tauri
-        run: cargo test --locked -- --test-threads=4
+        run: cargo test --locked -- --test-threads=1
       - name: Run backend tests with a display
         if: runner.os == 'Linux'
         working-directory: src-tauri
-        run: xvfb-run -a cargo test --locked -- --test-threads=4
+        run: xvfb-run -a cargo test --locked -- --test-threads=1
 
   packages:
     name: Package (${{ matrix.target }})

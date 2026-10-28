@@ -48,7 +48,7 @@ test('original groups remain intact across classifications, filters and persiste
   await page.screenshot({ path: testInfo.outputPath('original-history-card.png'), animations: 'disabled' });
 });
 
-test('filtered and whole-group restores retain original membership and order after closing each tab', async ({ page }, testInfo) => {
+test('restores original membership and order and retains history after the last group member closes', async ({ page }, testInfo) => {
   const card = page.getByTestId('history-group-card-source:archived-group');
   await fillHistorySearch(page, 'unified-history-search', 'Backend');
   await card.getByRole('button', { name: '分组操作' }).click();
@@ -73,7 +73,10 @@ test('filtered and whole-group restores retain original membership and order aft
   }
   await openHistory(page);
   await fillHistorySearch(page, 'unified-history-search', '');
-  await expect(card.locator('.history-row')).toHaveCount(3);
-  await expect(card.getByRole('heading', { name: '已归档分组' })).toBeVisible();
+  // Closing the last member removes its empty group, while each session remains in history.
+  await expect(card).toHaveCount(0);
+  for (const title of ['归档分组中的会话', 'Backend', 'Frontend']) {
+    await expect(page.getByTestId('unified-history-page').locator('.history-row').filter({ hasText: title })).toHaveCount(1);
+  }
   await page.screenshot({ path: testInfo.outputPath('original-group-after-individual-close.png'), animations: 'disabled' });
 });

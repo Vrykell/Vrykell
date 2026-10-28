@@ -256,8 +256,9 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     const A = '\x1b]133;A\x07';
     const C = '\x1b]133;C\x07';
     const D = (ec: number) => `\x1b]133;D;${ec}\x07`;
-    const E = (cmd: string) => `\x1b]133;E;${btoa(cmd)}\x07`;
-    const G = (branch: string) => `\x1b]133;G;${btoa(branch)}\x07`;
+    const encodeText = (text: string) => btoa(Array.from(new TextEncoder().encode(text), byte => String.fromCharCode(byte)).join(''));
+    const E = (cmd: string) => `\x1b]133;E;${encodeText(cmd)}\x07`;
+    const G = (branch: string) => `\x1b]133;G;${encodeText(branch)}\x07`;
     const OSC7 = (p: string) => `\x1b]7;file://host${p}\x07`;
 
     function emit(event: string, payload: unknown) {
@@ -379,7 +380,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
         // 与真实 RC 同序：OSC7 在 D/A 之前
         results.push(OSC7('/home/e2e/project'));
         results.push(D(0));
-        results.push(`${A}~/project${G('main')} $ `);
+        results.push(`${A}~/project${G('main')} $ ${enableReadyMarker ? '\x1b]133;B\x07' : ''}`);
       }
       return results;
     }
@@ -1776,6 +1777,23 @@ export async function mockAnthropic(page: Page, replyText: string) {
   }, replyText);
 }
 
+/** Let startup restoration finish before a test changes navigation or resource ownership. */
+export async function waitForWorkbench(page: Page): Promise<void> {
+  await expect.poll(() => page.evaluate(async () => {
+    const path = '/src/features/workspace/stores/workbench.ts';
+    const { useWorkbenchStore } = await import(path) as typeof import('../src/features/workspace/stores/workbench');
+    return useWorkbenchStore.getState().ready;
+  }), { timeout: 20_000 }).toBe(true);
+}
+
+/** Exercise platform-specific controls independently of the runner operating system. */
+export async function useWindowsPlatform(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, 'platform', { value: 'Win32' });
+    Object.defineProperty(navigator, 'userAgent', { value: navigator.userAgent.replace(/\([^)]*\)/, '(Windows NT 10.0; Win64; x64)') });
+  });
+}
+
 /** Make the mocked model ask for one tool call before it answers; `times` scripts several turns. */
 export async function mockAnthropicToolCall(
   page: Page, tool: string, args: Record<string, unknown>, times = 1,
@@ -2031,8 +2049,9 @@ export async function expectAnyTermContains(page: Page, text: string, timeout = 
 
 /** 确保会话列表面板打开，兼容默认布局与按需打开状态。 */
 export async function ensureTabsOpen(page: Page): Promise<void> {
+  await waitForWorkbench(page);
   const terminal = page.getByTestId('workspace-area-terminal');
-  if (await terminal.getAttribute('aria-current') !== 'page' || await page.locator('.settings-screen').isVisible()) {
+  if (await terminal.getAttribute('aria-current') !== 'page' || await page.locator('.settings-view').isVisible()) {
     if (!(await terminal.isVisible())) await page.getByTestId('workspace-sidebar-expand').click();
     await terminal.click();
   }

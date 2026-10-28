@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 import { pickPlacementZone } from './placement';
+import { openWorkspaceResource } from './workbench';
 
 for (const theme of ['dark', 'light']) test(`common start scopes creation correctly in ${theme} and retains its workspace`, async ({ page }, info) => {
   await setupTauriMock(page, {});
@@ -40,6 +41,7 @@ test('filters a mixed history item by each member and restores the complete layo
   await setupTauriMock(page, {});
   await page.goto('/'); await page.getByTestId('workspace-area-unified').click();
   const workspace = page.getByTestId('unified-workspace'); const bar = page.getByTestId('workspace-instance-bar');
+  await openWorkspaceResource(page);
   const terminalTitle = await bar.getByRole('tab').nth(0).innerText();
   await bar.getByRole('button', { name: '新建工作区标签', exact: true }).click();
   await page.getByRole('menuitem', { name: '新对话', exact: true }).click();
@@ -84,7 +86,7 @@ test('only offers pane removal for a real split and keeps the remaining terminal
   await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-unified').click();
   const workspace = page.getByTestId('unified-workspace'); const bar = page.getByTestId('workspace-instance-bar');
-  await bar.getByRole('tab').nth(0).click();
+  await openWorkspaceResource(page);
   const pane = workspace.locator('.terminal-pane').first();
   await pane.click({ button: 'right', position: { x: 90, y: 90 } });
   await expect(page.getByRole('button', { name: '移除此分屏', exact: true })).toHaveCount(0);
@@ -186,7 +188,7 @@ test('shows creation choices directly when a split has no existing tabs to add',
   await setupTauriMock(page, {}); await page.goto('/');
   await page.getByTestId('workspace-area-unified').click();
   const bar = page.getByTestId('workspace-instance-bar');
-  await bar.getByRole('tab').nth(0).click();
+  await openWorkspaceResource(page);
   await bar.getByRole('button', { name: '拆分标签页', exact: true }).click();
   await expect(page.getByRole('menuitem', { name: '新建工作区标签', exact: true })).toHaveCount(0);
   await expect(page.getByRole('menuitem', { name: '新终端', exact: true })).toBeVisible();

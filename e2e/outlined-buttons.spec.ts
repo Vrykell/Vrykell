@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { ensureChatSettingsOpen, ensureTabsOpen, setupTauriMock } from './tauri-mock';
+import { ensureChatSettingsOpen, ensureTabsOpen, setupTauriMock, useWindowsPlatform } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 async function themeColor(page: Page, variable: string) {
@@ -41,6 +41,7 @@ for (const theme of ['dark', 'light'] as const) {
   test(`outlined actions share hover and focus feedback in ${theme}`, async ({ page }, testInfo) => {
     test.setTimeout(90_000);
     await setupTauriMock(page, { sshHost: 'known', sshTrustConfirmed: true });
+    await useWindowsPlatform(page);
     await page.goto('/');
     await gotoSetting(page, '主题');
     await page.getByRole('radio', { name: theme === 'dark' ? '深色' : '浅色', exact: true }).click();

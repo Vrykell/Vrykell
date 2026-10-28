@@ -109,6 +109,7 @@ test(`real vi receives normal-mode, insertion and Escape commands from ${integra
     // Exercise the composed native commit path that may omit keypress in a webview.
     await page.locator('.terminal-pane:visible .xterm-helper-textarea').first().evaluate(element => {
       element.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Unidentified', keyCode: 229 }));
+      (element as HTMLTextAreaElement).value += 'i';
       element.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: 'i' }));
     });
     await page.keyboard.type('delta');

@@ -8,9 +8,10 @@ test('settings navigation has static headings and save feedback appears once the
   const nav = page.locator('.settings-navigation');
   await expect(nav.locator('.settings-nav-heading')).toHaveCount(7);
   const rows = nav.locator('.settings-navigation-list').getByRole('button');
-  await expect(rows).toHaveCount(29);
+  const expectedRows = await page.evaluate(() => /Win/.test(navigator.platform) ? 27 : 26);
+  await expect(rows).toHaveCount(expectedRows);
   await expect(nav.locator('.settings-navigation-list [aria-expanded]')).toHaveCount(0);
-  await expect(rows.locator('svg')).toHaveCount(29);
+  await expect(rows.locator('svg')).toHaveCount(expectedRows);
   await expect(nav).toHaveCSS('width', '224px');
   for (const row of await rows.all()) expect((await row.boundingBox())!.height).toBe(32);
   const rowHeight = (await rows.first().boundingBox())!.height;

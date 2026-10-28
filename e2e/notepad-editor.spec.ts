@@ -1,10 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-import { setupTauriMock } from './tauri-mock';
+import { setupTauriMock, waitForWorkbench } from './tauri-mock';
 
 test.setTimeout(60_000);
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page.context(), {});
   await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await waitForWorkbench(page);
   await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/navigation.ts';
     const { useWorkspaceNavigation } = await import(path) as typeof import('../src/features/workspace/stores/navigation');

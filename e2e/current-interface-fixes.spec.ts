@@ -1,11 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { setupTauriMock } from './tauri-mock';
+import { setupTauriMock, waitForWorkbench } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 test.setTimeout(60_000);
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page, { launchDirectory: '/home/e2e/project' });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await waitForWorkbench(page);
 });
 
 test('keeps a fixed shared rename field, right-pinned actions and one aligned transcript column', async ({ page }, info) => {

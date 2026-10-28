@@ -1,10 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { ptyWrites, setupTauriMock } from './tauri-mock';
+import { ptyWrites, setupTauriMock, waitForWorkbench } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page, { launchDirectory: '/home/e2e/project', terminalDirectories: true, sshHost: 'known' });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await waitForWorkbench(page);
 });
 
 test('restores the last directory on launch without restoring the navigation trail', async ({ page }, info) => {

@@ -1,11 +1,12 @@
 import { expect, test } from '@playwright/test';
-import { setupTauriMock, clipboardText } from './tauri-mock';
+import { setupTauriMock, clipboardText, waitForWorkbench } from './tauri-mock';
 import { openSettings } from './settings';
 
 test.setTimeout(60_000);
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page.context(), { launchDirectory: '/home/e2e/project' });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await waitForWorkbench(page);
 });
 
 test('adds a custom provider, retains the first-entered key and confirms endpoint migration', async ({ page }, info) => {
@@ -69,7 +70,7 @@ test('restores sidebar history, fits rename inputs and colors complete fenced bl
     const second = store.createConversation(); store.renameConversation(second, 'Recent response');
     const workspacePath = '/src/features/chat/stores/aiWorkspace.ts';
     const { useAiWorkspace } = await import(workspacePath) as typeof import('../src/features/chat/stores/aiWorkspace');
-    useAiWorkspace.getState().ensureNative(first);
+    useAiWorkspace.getState().selectSide(`chat:${first}`);
     useAiWorkspace.getState().selectSide(`chat:${second}`);
     useChatStore.setState(state => ({ byTab: { ...state.byTab, [second]: [
       { id: 'question', role: 'user', content: 'Code sample', createdAt: 1 },

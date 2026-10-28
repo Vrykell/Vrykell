@@ -33,11 +33,12 @@ test.describe('标签页管理侧栏', () => {
     await page.locator('[data-testid="tab-new-btn"]').click();
     // 无中间菜单，直接弹出类型选择弹窗
     await expect(page.getByRole('dialog', { name: '新建标签页' })).toBeVisible();
-    await expect(page.getByText('Zsh', { exact: true })).toBeVisible();
-    await expect(page.getByText('Bash', { exact: true })).toBeVisible();
+    const picker = page.getByRole('dialog', { name: '新建标签页' });
+    await expect(picker.getByText('Zsh', { exact: true })).toBeVisible();
+    await expect(picker.getByText('Bash', { exact: true })).toBeVisible();
 
     // 创建 bash 标签
-    await page.getByText('Bash', { exact: true }).click();
+    await picker.getByText('Bash', { exact: true }).click();
     await expect(page.locator('[data-testid^="tab-row-"]')).toHaveCount(2);
     // 弹窗关闭
     await expect(page.getByRole('dialog', { name: '新建标签页' })).toHaveCount(0);
@@ -62,7 +63,7 @@ test.describe('标签页管理侧栏', () => {
       }));
     });
 
-    const menu = page.getByRole('menu', { name: '操作菜单' });
+    const menu = page.getByRole('menu', { name: '标签页操作' });
     await expect(menu).toBeVisible();
     const bounds = await menu.boundingBox();
     const viewport = page.viewportSize();

@@ -23,7 +23,7 @@ test.describe('技能设置页', () => {
     await expect(page.getByText('旧脚本技能')).toBeVisible();
     const row = rowOf('旧脚本技能')(page);
     await expect(row.getByText('未信任', { exact: true })).toBeVisible();
-    await expect(row.getByText('禁用', { exact: true })).toBeVisible();
+    await expect(row.getByText('已关闭', { exact: true })).toBeVisible();
     await expect(row.getByText('含脚本', { exact: true })).toBeVisible();
     await expect(row.getByText('已修改', { exact: true })).toBeVisible();
     await expect(row.getByText('market', { exact: true })).toBeVisible();

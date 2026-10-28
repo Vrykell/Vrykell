@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { setupTauriMock } from './tauri-mock';
+import { setupTauriMock, waitForWorkbench } from './tauri-mock';
 
 async function setupNativeDropMock(page: Page) {
   await setupTauriMock(page, {});
@@ -55,6 +55,7 @@ async function setupNativeDropMock(page: Page) {
 test('uploads a dragged folder once per drop after returning from the transfer manager', async ({ page }) => {
   await setupNativeDropMock(page);
   await page.goto('/');
+  await waitForWorkbench(page);
   await page.evaluate(async () => {
     const modulePath = '/src/features/workspace/stores/workspace.ts';
     const { useWorkspaceStore } = await import(modulePath) as typeof import('../src/features/workspace/stores/workspace');

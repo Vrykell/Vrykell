@@ -39,7 +39,7 @@ test('all text surfaces retain literal input and settings search focuses an indi
 test('classic terminal input helpers remain invisible and selected cells have no ruler seam after resizing', async ({ page }) => {
   await setupTauriMock(page, { integration: false });
   await page.addInitScript(() => localStorage.setItem('vrykell-agent-settings', JSON.stringify({
-    version: 8, state: { global: { openModeByShell: { zsh: 'classic' } }, overrides: {} },
+    version: 8, state: { global: { openModeByShell: { zsh: 'classic', bash: 'classic' } }, overrides: {} },
   })));
   await page.goto('/');
   const terminal = page.locator('.xterm:visible').first();

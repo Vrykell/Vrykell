@@ -38,7 +38,7 @@ test.describe('终端标题', () => {
 
     const rows = page.locator('[data-testid^="tab-row-"]');
     await rows.first().click({ button: 'right' });
-    await expect(page.getByRole('menu', { name: '操作菜单' })).toBeVisible();
+    await expect(page.getByRole('menu', { name: '标签页操作' })).toBeVisible();
     await page.getByText('复制会话', { exact: true }).click();
 
     await expect(rows).toHaveCount(2);

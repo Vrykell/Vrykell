@@ -112,9 +112,9 @@ for (const theme of ['dark', 'light'] as const) {
     await setupTauriMock(page, {});
     await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
     await page.goto('/');
-    await page.keyboard.press('Control+,');
-    await page.getByText('ACP', { exact: true }).first().click();
-    await page.getByTestId('harness-connect-0').click();
+    await page.getByTestId('workspace-area-ai').click();
+    await page.getByTestId('harness-add-session').click();
+    await page.getByTestId('acp-launcher-Fake ACP').click();
     const composer = page.getByTestId('harness-composer');
     await expect(composer).toBeVisible();
     const selector = page.getByTestId('harness-selector-mode');

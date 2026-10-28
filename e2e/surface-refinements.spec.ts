@@ -14,7 +14,7 @@ for (const theme of ['深色', '浅色']) {
     await row.click();
     const original = await row.locator('[data-shell-mark]').getAttribute('data-shell-mark');
     await row.click({ button: 'right' });
-    const menu = page.getByRole('menu', { name: '操作菜单' });
+    const menu = page.getByRole('menu', { name: '标签页操作' });
     const close = menu.getByRole('button', { name: '关闭标签', exact: true });
     const danger = await close.evaluate(element => getComputedStyle(element).color);
     expect(danger).not.toBe(await menu.getByRole('button', { name: '复制会话', exact: true }).evaluate(element => getComputedStyle(element).color));

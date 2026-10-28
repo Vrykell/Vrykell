@@ -1,5 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { emitPtyOutput, ptyWrites, setupTauriMock } from './tauri-mock';
+import { openWorkspaceResource } from './workbench';
 
 test('routes input and manual fullscreen to a running block placed in the unified workspace', async ({ page }) => {
   await setupTauriMock(page, {});
@@ -15,7 +16,7 @@ test('routes input and manual fullscreen to a running block placed in the unifie
 
   await page.getByTestId('workspace-area-unified').click();
   const workspace = page.getByTestId('unified-workspace');
-  await page.getByTestId('workspace-instance-bar').getByRole('tab').nth(0).click();
+  await openWorkspaceResource(page);
   const pane = workspace.locator('.unified-pane').filter({ has: page.locator('.terminal-pane') }).first();
   await expect(pane.locator('.terminal-pane')).toBeVisible();
   await pane.click({ position: { x: 120, y: 220 } });

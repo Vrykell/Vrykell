@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { setupTauriMock, acpCalls } from './tauri-mock';
 import { pickPlacementZone } from './placement';
+import { openWorkspaceResource } from './workbench';
 
 test('uses the shared split picker from the agent workspace and creates a distinct agent only after placement', async ({ page }) => {
   await setupTauriMock(page, {}); await page.goto('/');
@@ -22,6 +23,9 @@ test('uses the shared split picker from the agent workspace and creates a distin
   await expect(page.locator('.workspace-layout')).toHaveAttribute('data-area', 'ai');
   await mixed.getByTestId('harness-page').last().click({ button: 'right', position: { x: 90, y: 90 } });
   await page.getByRole('menu', { name: '窗格操作', exact: true }).getByRole('menuitem', { name: '移除此分屏', exact: true }).click();
+  const confirmation = page.getByRole('dialog', { name: '关闭 ACP 会话？', exact: true });
+  await expect(confirmation).toBeVisible();
+  await confirmation.getByRole('button', { name: '关闭会话', exact: true }).click();
   await expect(page.locator('[data-testid="harness-page"]:visible')).toHaveCount(1);
   expect((await acpCalls(page)).filter(call => call.startsWith('acp_open:')).length).toBe(before + 1);
 });
@@ -34,8 +38,7 @@ test('moves a connected agent into the common workspace and retains its guarded 
   await input.fill('Do not discard this agent draft'); const original = await input.elementHandle();
   const before = (await acpCalls(page)).filter(call => call.startsWith('acp_open:')).length;
   await page.getByTestId('workspace-area-unified').click();
-  const strip = page.getByTestId('workspace-instance-bar').getByRole('tablist');
-  await strip.getByRole('tab', { name: 'Fake ACP', exact: true }).click();
+  await openWorkspaceResource(page, 'Fake ACP');
   await expect(page.getByTestId('unified-workspace').getByTestId('harness-composer')).toHaveValue('Do not discard this agent draft');
   expect(await original!.evaluate(element => element.isConnected)).toBe(true);
   await page.keyboard.press('Control+w');

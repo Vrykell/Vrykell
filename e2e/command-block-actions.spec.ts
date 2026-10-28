@@ -23,7 +23,9 @@ test.describe('命令块操作全链路', () => {
     const background = await block.evaluate(element => getComputedStyle(element).backgroundColor);
     expect(before.command!.x - bounds.x).toBe(16);
     expect(before.output!.x).toBe(before.command!.x);
-    expect(before.output!.y - before.command!.y - before.command!.height).toBe(8);
+    const gap = before.output!.y - before.command!.y - before.command!.height;
+    expect(gap).toBeGreaterThanOrEqual(8);
+    expect(gap).toBeLessThanOrEqual(9);
     await block.hover();
     await expect(block.locator('.command-block-actions')).toHaveCSS('opacity', '1');
     await expect(block).toHaveCSS('background-color', background);

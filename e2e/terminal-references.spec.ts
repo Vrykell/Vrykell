@@ -37,6 +37,9 @@ for (const theme of ['深色', '浅色']) {
       useComposerDrafts.getState().updateAttachments('reference-test', () => [{
         id: 'image', kind: 'image', name: 'reference.png', mime: 'image/png', size: 100,
       }]);
+      const workspacePath = '/src/features/chat/stores/aiWorkspace.ts';
+      const { useAiWorkspace } = await import(workspacePath) as typeof import('../src/features/chat/stores/aiWorkspace');
+      useAiWorkspace.getState().selectSide('chat:reference-test');
     });
     const draft = page.locator('.chat-composer .chat-reference');
     const sent = page.locator('.chat-exchange .chat-reference');

@@ -10,7 +10,7 @@ for (const theme of ['深色', '浅色']) {
     await page.getByRole('radio', { name: theme, exact: true }).click();
     await page.locator('aside').getByRole('button', { name: '字体与显示', exact: true }).click();
     const group = page.getByRole('group', { name: '字体与显示' });
-    await expect(group.getByRole('combobox')).toHaveCount(7);
+    await expect(group.getByRole('combobox')).toHaveCount(8);
     const row = fieldOf(page, '页面字号');
     const label = row.getByText('页面字号', { exact: true });
     const control = row.getByRole('combobox', { name: '页面字号' });

@@ -10,7 +10,9 @@ test('compact AI cards keep their color on disclosure, react to hover and review
     const permissionsPath = '/src/features/agent/stores/permissions.ts';
     const { useChatStore } = await import(chatPath) as typeof import('../src/features/chat/stores/chat');
     const { gate, usePermissions } = await import(permissionsPath) as typeof import('../src/features/agent/stores/permissions');
-    const id = useChatStore.getState().activeConversationId;
+    const workspacePath = '/src/features/chat/stores/aiWorkspace.ts';
+    const { useAiWorkspace } = await import(workspacePath) as typeof import('../src/features/chat/stores/aiWorkspace');
+    const id = useAiWorkspace.getState().sideSelected.slice(5);
     useChatStore.setState({ byTab: { [id]: [
       { id: 'question', role: 'user', content: 'Check the project', createdAt: 1 },
       { id: 'answer', role: 'assistant', content: '', reasoning: 'Inspect the workspace before running checks.', createdAt: 2,

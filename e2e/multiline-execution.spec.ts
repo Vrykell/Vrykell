@@ -28,7 +28,7 @@ function runLinuxPty(payload: string): Promise<{ code: number | null; output: st
   return new Promise((resolve, reject) => {
     if (!linux) { reject(new Error('Linux pseudoterminal unavailable')); return; }
     const child = spawn(linux.file, [...linux.prefix, '-c',
-      'export PS1="" PS2="" TERM=dumb; timeout 8 script -q -e -c "stty -echo; printf \'__PTY_READY__\\n\'; exec /bin/sh -i" /dev/null'], { windowsHide: true });
+      'export PS1="" PS2="" TERM=dumb; timeout 8 script -q -e -c "stty -echo; printf \'__PTY_READY__\\n\'; exec /bin/bash --noprofile --norc -i" /dev/null'], { windowsHide: true });
     let output = ''; let submitted = false; let checked = false;
     const deadline = setTimeout(() => { child.kill(); reject(new Error(`Pseudoterminal timed out: ${output}`)); }, 12000);
     child.on('error', error => { clearTimeout(deadline); reject(error); });

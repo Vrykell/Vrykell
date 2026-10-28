@@ -31,15 +31,18 @@ for (const theme of ['dark', 'light']) test(`compact creation, opacity and long 
   await page.evaluate(async () => {
     const chatPath = '/src/features/chat/stores/chat.ts';
     const aiPath = '/src/features/chat/stores/aiWorkspace.ts';
-    const workspacePath = '/src/features/workspace/stores/workspace.ts';
+    const navigationPath = '/src/features/workspace/services/selectWorkspaceArea.ts';
+    const panesPath = '/src/features/workspace/stores/paneWorkspace.ts';
     const { useChatStore } = await import(chatPath) as typeof import('../src/features/chat/stores/chat');
     const { useAiWorkspace } = await import(aiPath) as typeof import('../src/features/chat/stores/aiWorkspace');
-    const { useWorkspaceStore } = await import(workspacePath) as typeof import('../src/features/workspace/stores/workspace');
+    const { selectWorkspaceArea } = await import(navigationPath) as typeof import('../src/features/workspace/services/selectWorkspaceArea');
+    const { workspaceAreaStores } = await import(panesPath) as typeof import('../src/features/workspace/stores/paneWorkspace');
     const id = useChatStore.getState().createConversation();
     useAiWorkspace.getState().openNative(id);
-    useWorkspaceStore.getState().openHarnessTab();
+    selectWorkspaceArea('ai');
+    workspaceAreaStores.ai.getState().show(`chat:${id}`);
   });
-  const chat = page.locator('.ai-native-surface .ai-chat-panel');
+  const chat = page.locator('.ai-chat-panel:visible');
   await expect(chat).toBeVisible();
   await expect(chat.locator('.chat-empty')).toHaveCount(0);
   await page.evaluate(async () => {

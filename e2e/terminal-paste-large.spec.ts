@@ -9,7 +9,7 @@ import { setupTauriMock, emitPtyOutput, ptyWrites } from './tauri-mock';
 async function openClassicShell(page: Page) {
   await page.addInitScript(() => localStorage.setItem('vrykell-agent-settings', JSON.stringify({
     version: 8,
-    state: { global: { openModeByShell: { zsh: 'classic' } }, overrides: {} },
+    state: { global: { openModeByShell: { zsh: 'classic', bash: 'classic' } }, overrides: {} },
   })));
   await setupTauriMock(page);
   await page.goto('/');

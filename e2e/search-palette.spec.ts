@@ -47,7 +47,7 @@ for (const theme of ['深色', '浅色']) {
     expect(badgeBackground.actual).toBe(badgeBackground.expected);
     await dialog.screenshot({ path: test.info().outputPath('search-empty.png'), animations: 'disabled' });
     await dialog.getByTestId('search-filter-button').click();
-    const history = dialog.getByRole('menuitemcheckbox', { name: /命令历史/ });
+    const history = dialog.getByRole('menuitemcheckbox', { name: /历史命令/ });
     // 勾选框与 SSH 连接面板一致：主题化原生复选框，16px 尺寸
     const historyBox = history.locator('input.themed-checkbox');
     await expect(historyBox).toBeChecked();

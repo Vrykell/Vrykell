@@ -1,7 +1,9 @@
 import { expect, type Page } from '@playwright/test';
+import { waitForWorkbench } from './tauri-mock';
 
 /** Open settings and wait for the static navigation. */
 export async function openSettings(page: Page): Promise<void> {
+  await waitForWorkbench(page);
   if (!(await page.locator('.settings-view').isVisible())) {
     const settings = page.getByRole('button', { name: '设置', exact: true });
     if (await settings.isVisible()) await settings.click();

@@ -1,9 +1,10 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, forwardLaunchDirectory } from './tauri-mock';
+import { setupTauriMock, forwardLaunchDirectory, useWindowsPlatform } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 test('settings require certificate trust and manage registration explicitly', async ({ page }) => {
   await setupTauriMock(page);
+  await useWindowsPlatform(page);
   await page.goto('/');
   await gotoSetting(page, 'Windows 右键菜单');
   const enable = page.getByRole('button', { name: '启用右键菜单' });

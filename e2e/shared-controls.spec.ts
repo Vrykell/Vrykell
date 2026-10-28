@@ -42,7 +42,7 @@ test('settings use concise explanations and icon badges for completion keys', as
   await gotoSetting(page, '模型行为');
   await expect(page.locator('.settings-completion-keys [data-key-icon="Tab"]')).toBeVisible();
   await expect(page.locator('.settings-completion-keys [data-key-icon="Escape"]')).toBeVisible();
-  await expect(page.getByText('每个工具结果的字符上限。', { exact: true })).toBeVisible();
+  await expect(page.getByText('仅限制工具预览的字符数，完整结果仍保留在会话历史中。', { exact: true })).toBeVisible();
   await page.screenshot({ path: test.info().outputPath('shared-controls-settings.png') });
 });
 

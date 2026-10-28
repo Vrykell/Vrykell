@@ -51,7 +51,12 @@ for (const mode of ['dark', 'light'] as const) {
     await region.evaluate(element => { element.scrollTop = 0; });
     await expect.poll(() => region.evaluate(element => element.scrollTop)).toBe(0);
     const bounds = (await region.boundingBox())!;
-    const divider = (await page.getByTestId('command-block-track-4').boundingBox())!;
+    const thumb = (await page.getByRole('scrollbar', { name: '滚动命令历史' }).locator('.overlay-scrollbar-thumb').boundingBox())!;
+    const divider = await region.locator('[data-testid^="command-block-track-"]').evaluateAll((elements, minY) => {
+      const candidate = elements.map(element => element.getBoundingClientRect()).find(bounds => bounds.y > minY + 8 && bounds.bottom < window.innerHeight - 16);
+      if (!candidate) throw new Error('No visible divider outside the scrollbar thumb');
+      return { y: candidate.y };
+    }, thumb.y + thumb.height);
     const png = await region.screenshot({ path: test.info().outputPath(`transparent-track-${mode}.png`) });
     const pixels = await page.evaluate(async ({ png, y }) => {
       const image = new Image();
@@ -142,7 +147,7 @@ test('completed wide output follows the window width without a horizontal scroll
 test('classic terminal retains its native themed scrollbar and drag navigation', async ({ page }) => {
   await setupTauriMock(page, { integration: false });
   await page.addInitScript(() => localStorage.setItem('vrykell-agent-settings', JSON.stringify({
-    version: 8, state: { global: { openModeByShell: { zsh: 'classic' } }, overrides: {} },
+    version: 8, state: { global: { openModeByShell: { zsh: 'classic', bash: 'classic' } }, overrides: {} },
   })));
   await page.goto('/');
   const terminal = page.locator('.xterm').first();

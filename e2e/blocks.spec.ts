@@ -33,7 +33,7 @@ test.describe('命令块（OSC 133）', () => {
     // 打开方式设经典模式（zsh）→ 新页面经典终端直出
     await page.addInitScript(() => {
       localStorage.setItem('vrykell-agent-settings', JSON.stringify({
-        state: { global: { openModeByShell: { zsh: 'classic' } }, overrides: {} },
+        state: { global: { openModeByShell: { zsh: 'classic', bash: 'classic' } }, overrides: {} },
         version: 8,
       }));
     });
@@ -219,7 +219,7 @@ test.describe('命令块（OSC 133）', () => {
     await page.getByTestId('search-filter-button').click();
     await expect(page.getByText('搜索范围')).toBeVisible({ timeout: 3000 });
     // 切换一个源后不崩溃，搜索框仍可交互
-    await page.getByText('命令历史').first().click();
+    await page.getByRole('menuitemcheckbox', { name: /历史命令/ }).click();
     await expect(searchInput).toBeVisible();
   });
 
