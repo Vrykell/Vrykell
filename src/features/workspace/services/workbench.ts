@@ -468,7 +468,7 @@ export async function restoreWorkbench(mode: 'restore' | 'default' | 'empty', on
   const area = useWorkspaceNavigation.getState().area;
   const workspace = useWorkspaceStore.getState();
   const page = workspace.tabs.find(tab => tab.id === workspace.activeId);
-  const utility = page && (page.kind === 'history' || page.kind === 'ai-history' || page.kind === 'usage' || page.kind.startsWith('start'));
+  const utility = page && (page.kind === 'history' || page.kind === 'ai-history' || page.kind === 'usage');
   if (!utility && !useUiStore.getState().settingsOpen && (area === 'terminal' || area === 'code' || area === 'ai' || area === 'unified')) {
     const id = useWorkbenchStore.getState().snapshot.selected[area];
     if (id) activateContainer(id);

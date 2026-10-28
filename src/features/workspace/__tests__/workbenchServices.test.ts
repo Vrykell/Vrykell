@@ -421,6 +421,17 @@ it('activates the selected container after restoring later peers with different 
   useWorkspaceNavigation.setState({ area: 'history' }); await restoreWorkbench('empty', vi.fn());
 });
 
+it('replaces a temporary start page with the selected conversation after hydration', async () => {
+  const first = conversation('restored'); synchronizeWorkbench();
+  const saved = structuredClone(useWorkbenchStore.getState().snapshot); saved.selected.ai = first;
+  useWorkspaceNavigation.setState({ area: 'ai' });
+  useWorkspaceStore.setState({ tabs: [{ id: 'temporary-start', kind: 'start-ai', title: 'Start' }], activeId: 'temporary-start' });
+  useAiWorkspace.setState({ selected: '' });
+  await restoreWorkbench('restore', vi.fn(), saved);
+  expect(useAiWorkspace.getState().selected).toBe(first);
+  expect(useWorkspaceStore.getState().tabs.find(tab => tab.id === useWorkspaceStore.getState().activeId)?.kind).toBe('harness');
+});
+
 it('restores empty conversation references in one batch without activating or duplicating background owners', async () => {
   useWorkbenchStore.setState({ snapshot: emptyWorkbench(), ready: false });
   const saved = emptyWorkbench();
