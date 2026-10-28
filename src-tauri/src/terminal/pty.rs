@@ -153,22 +153,28 @@ fn force_kill_foreground(session: &PtySession) {
 #[cfg(not(unix))]
 fn force_kill_foreground(_session: &PtySession) {}
 
-/// Terminate one session and reap it within `deadline`. Every close path goes
-/// through here so a failed state lookup can never leave an unreachable child.
-fn close_session(session: &Arc<Mutex<PtySession>>, deadline: std::time::Instant) {
-    let mut state = lock_unpoisoned(session);
+fn begin_session_close(state: &mut PtySession) {
     state.closed.store(true, Ordering::Release);
     #[cfg(unix)]
-    signal_foreground_close(&state);
+    signal_foreground_close(state);
     kill_child_tree(&mut *state.child);
-    if std::time::Instant::now() >= deadline { return; }
+}
+
+fn force_session_close(state: &mut PtySession) {
+    force_kill_foreground(state);
+    force_kill_child(&mut *state.child);
+}
+
+/// Terminate one session and reap it within `deadline`.
+fn close_session(session: &Arc<Mutex<PtySession>>, deadline: std::time::Instant) {
+    let mut state = lock_unpoisoned(session);
+    begin_session_close(&mut state);
     // Leave time to reap a child that ignores the graceful signals.
     let grace = deadline.saturating_duration_since(std::time::Instant::now()) / 2;
     if wait_child_bounded(&mut *state.child, grace).is_some() {
         return;
     }
-    force_kill_foreground(&state);
-    force_kill_child(&mut *state.child);
+    force_session_close(&mut state);
     let remaining = deadline.saturating_duration_since(std::time::Instant::now());
     let _ = wait_child_bounded(&mut *state.child, remaining);
 }
@@ -185,8 +191,23 @@ fn close_session_by_id(app: &AppHandle, id: &str) {
 
 /// Terminate a batch of sessions within one shared deadline.
 fn close_sessions(sessions: Vec<Arc<Mutex<PtySession>>>, deadline: std::time::Instant) {
-    for session in sessions {
-        close_session(&session, deadline);
+    // Signal the entire batch before waiting so one slow child cannot starve the others.
+    for session in &sessions {
+        begin_session_close(&mut lock_unpoisoned(session));
+    }
+    let graceful_deadline = std::time::Instant::now()
+        + deadline.saturating_duration_since(std::time::Instant::now()) / 2;
+    for session in &sessions {
+        let remaining = graceful_deadline.saturating_duration_since(std::time::Instant::now());
+        let _ = wait_child_bounded(&mut *lock_unpoisoned(session).child, remaining);
+    }
+    for session in &sessions {
+        let mut state = lock_unpoisoned(session);
+        if !matches!(state.child.try_wait(), Ok(Some(_))) { force_session_close(&mut state); }
+    }
+    for session in &sessions {
+        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+        let _ = wait_child_bounded(&mut *lock_unpoisoned(session).child, remaining);
     }
 }
 
@@ -1506,6 +1527,34 @@ mod tests {
             let mut state = lock_unpoisoned(session);
             assert!(state.closed.load(Ordering::Acquire), "sweep must flag the session closed");
             assert!(state.child.try_wait().ok().flatten().is_some(), "every child must be reaped");
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn close_sessions_escalates_the_entire_batch_before_its_deadline() {
+        let mut sessions = Vec::new();
+        for _ in 0..2 {
+            let pair = native_pty_system()
+                .openpty(PtySize { rows: 24, cols: 80, pixel_width: 0, pixel_height: 0 }).expect("openpty");
+            let mut command = CommandBuilder::new("sh");
+            command.args(["-c", "trap '' HUP TERM; printf ready; exec sleep 30"]);
+            let child = pair.slave.spawn_command(command).expect("spawn");
+            drop(pair.slave);
+            let mut reader = pair.master.try_clone_reader().expect("reader");
+            let mut ready = [0; 5]; reader.read_exact(&mut ready).expect("child readiness");
+            assert_eq!(&ready, b"ready");
+            let writer = pair.master.take_writer().expect("writer");
+            sessions.push(Arc::new(Mutex::new(PtySession {
+                master: pair.master, writer: Arc::new(Mutex::new(writer)), child,
+                input_pending: Arc::new(AtomicBool::new(false)), closed: Arc::new(AtomicBool::new(false)),
+            })));
+        }
+        let started = std::time::Instant::now();
+        close_sessions(sessions.clone(), started + std::time::Duration::from_millis(500));
+        assert!(started.elapsed() < std::time::Duration::from_secs(2), "batch close must remain bounded");
+        for session in sessions {
+            assert!(lock_unpoisoned(&session).child.try_wait().unwrap().is_some(), "every forced child must be reaped");
         }
     }
 
