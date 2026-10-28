@@ -1,15 +1,20 @@
-//! skills — 文件夹式技能系统（对齐 Agent Skills 开放规范 + 主流产品实现）。
+//! skills — folder-based skill system (aligned with the Agent Skills open specification and
+//! mainstream product implementations).
 //!
-//! 每个技能是一个目录，含必需的 `SKILL.md`（YAML frontmatter：name/description/allowed-tools
-//! 与 Markdown 正文），可选的 `scripts/`、`references/`、`assets/` 等。技能统一放在
-//! `~/.vrykell/skills/<name>/`，索引（来源/信任/启停/内容哈希）存 `~/.vrykell/skill-index.json`。
+//! Each skill is a directory containing a required `SKILL.md` (YAML frontmatter: name/description/
+//! allowed-tools plus the Markdown body) and optional `scripts/`, `references/`, `assets/` and similar.
+//! Skills live under `~/.vrykell/skills/<name>/`; the index (source, trust, enabled state, content
+//! hash) is stored in `~/.vrykell/skill-index.json`.
 //!
-//! 安全模型：
-//!   1. 目录名净化、zip 大小/文件数上限、zip-slip 防穿越、跳过隐藏文件/符号链接；
-//!   2. 原子安装（临时目录复制 + 哈希校验 + rename 提交）+ 失败回滚；
-//!   3. 内容哈希变更检测（列表标「已修改」防篡改）；
-//!   4. 文件读取防路径穿越 + 2MB 预览上限；
-//!   5. 信任分级：未信任技能不进 agent 上下文；脚本执行仍走 agent 权限门，不绕过。
+//! Security model:
+//!   1. Directory name sanitization, zip size/file-count limits, zip-slip traversal prevention,
+//!      hidden files and symbolic links skipped;
+//!   2. Atomic install (copy to a temporary directory, hash verification, rename commit) with
+//!      rollback on failure;
+//!   3. Content-hash change detection (flagged as "modified" in listings to deter tampering);
+//!   4. Path traversal protection for file reads plus a 2MB preview limit;
+//!   5. Trust levels: untrusted skills never enter the agent context; script execution still passes
+//!      through the agent permission gate and is never bypassed.
 
 use serde::{Deserialize, Serialize};
 use futures_util::{stream, StreamExt};
@@ -19,31 +24,31 @@ use std::path::{Path, PathBuf};
 
 use crate::agent::web::{fetch_public_unchecked, http_client_trusted, read_body_capped};
 
-/// 技能市场 SKILL.md 抓取上限（字节）。
+/// Maximum size in bytes for fetching a marketplace SKILL.md.
 const MARKET_MD_CAP: usize = 1024 * 1024;
 
-// ── 对外类型 ──
+// ── Public types ──
 
 #[derive(Serialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillMeta {
     pub name: String,
     pub description: String,
-    /// 技能目录绝对路径
+    /// Absolute path of the skill directory
     pub dir: String,
-    /// 目录内辅助文件相对路径（含 scripts/references/assets 等，不含 SKILL.md）
+    /// Relative paths of auxiliary files in the directory (scripts/references/assets and similar, excluding SKILL.md)
     pub files: Vec<String>,
-    /// 是否含可执行脚本（scripts/ 目录或常见脚本扩展名）
+    /// Whether the skill contains executable scripts (a scripts/ directory or common script extensions)
     pub has_scripts: bool,
-    /// frontmatter 声明的允许工具（allowed-tools），可能为空
+    /// Tools allowed by the frontmatter (allowed-tools); may be empty
     pub allowed_tools: String,
-    /// 来源：内置 / AI 安装 / 导入路径
+    /// Source: built-in / installed by AI / import path
     pub source: String,
-    /// 是否已信任
+    /// Whether the skill is trusted
     pub trusted: bool,
-    /// 是否启用
+    /// Whether the skill is enabled
     pub enabled: bool,
-    /// 内容哈希与安装时不一致（文件被改动过）
+    /// Content hash differs from install time (files were modified)
     pub modified: bool,
 }
 
@@ -52,7 +57,7 @@ pub struct SkillMeta {
 pub struct SkillDetail {
     pub name: String,
     pub description: String,
-    /// SKILL.md 正文（完整指令）
+    /// SKILL.md body (full instructions)
     pub prompt: String,
     pub dir: String,
     pub files: Vec<String>,
@@ -64,7 +69,7 @@ pub struct SkillDetail {
     pub modified: bool,
 }
 
-// ── 路径 / 索引 sidecar ──
+// ── Paths / index sidecar ──
 
 fn skills_dir() -> PathBuf {
     dirs::home_dir()
@@ -124,7 +129,7 @@ fn remove_record(name: &str) {
     }
 }
 
-/// 技能名 → 目录名：去掉路径分隔符/控制字符，兜底 "skill"。
+/// Skill name → directory name: strip path separators and control characters, falling back to "skill".
 fn sanitize_name(name: &str) -> String {
     let s: String = name
         .trim()
@@ -138,7 +143,7 @@ fn sanitize_name(name: &str) -> String {
     }
 }
 
-// ── SKILL.md 解析 ──
+// ── SKILL.md parsing ──
 
 fn split_frontmatter(content: &str) -> (String, String) {
     if !content.starts_with("---") {
@@ -179,7 +184,7 @@ fn parse_skill_md(content: &str) -> (String, String, String, String) {
     )
 }
 
-// ── 脚本判定 / 文件树 / 哈希 ──
+// ── Script detection / file tree / hashing ──
 
 fn is_script_path(rel: &str) -> bool {
     let lower = rel.to_lowercase();
@@ -248,7 +253,7 @@ fn collect_hash_paths(base: &Path, dir: &Path, out: &mut Vec<String>) {
     }
 }
 
-/// 整个技能目录的确定性哈希（相对路径 + 内容），用于变更检测。
+/// Deterministic hash of the whole skill directory (relative paths plus contents) for change detection.
 fn compute_dir_hash(dir: &Path) -> String {
     let mut paths = Vec::new();
     collect_hash_paths(dir, dir, &mut paths);
@@ -265,7 +270,7 @@ fn compute_dir_hash(dir: &Path) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-// ── 目录复制（原子 + 校验） ──
+// ── Directory copy (atomic + verified) ──
 
 fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
     std::fs::create_dir_all(dst).map_err(|e| format!("创建技能目录失败：{e}"))?;
@@ -329,7 +334,7 @@ fn commit_skill_dir(
     Ok(())
 }
 
-/// 读取一个技能目录 → SkillMeta。
+/// Read a skill directory into a SkillMeta.
 fn read_skill_meta(dir: &Path) -> Option<SkillMeta> {
     let content = std::fs::read_to_string(dir.join("SKILL.md")).ok()?;
     let (name, description, _, allowed_tools) = parse_skill_md(&content);
@@ -388,7 +393,7 @@ fn import_skill_dir(src: &Path, source: &str) -> Result<SkillMeta, String> {
     let name = sanitize_name(if name.trim().is_empty() { &fallback } else { name.trim() });
     let dst = skills_dir().join(&name);
     copy_dir_atomic(src, &dst)?;
-    // 导入默认：未信任、启用，记录来源与哈希
+    // Import defaults: untrusted and enabled, with source and hash recorded
     upsert_record(&name, |_r| SkillRecord {
         source: source.to_string(),
         trusted: false,
@@ -398,7 +403,7 @@ fn import_skill_dir(src: &Path, source: &str) -> Result<SkillMeta, String> {
     read_skill_meta(&dst).ok_or_else(|| "导入后读取技能失败".to_string())
 }
 
-// ── zip 解压（限额 + 防穿越） ──
+// ── Zip extraction (limits + traversal protection) ──
 
 const MAX_EXTRACTED_SIZE: u64 = 100 * 1024 * 1024;
 const MAX_FILES_COUNT: usize = 2000;
@@ -413,7 +418,7 @@ fn extract_zip(path: &Path, dst: &Path) -> Result<(), String> {
         let mut entry = zip.by_index(i).map_err(|e| format!("读取压缩包条目失败：{e}"))?;
         let out_path = match entry.enclosed_name() {
             Some(p) => dst.join(p),
-            None => continue, // zip-slip 路径被 enclosed_name 拒绝
+            None => continue, // zip-slip path rejected by enclosed_name
         };
         if entry.is_dir() {
             std::fs::create_dir_all(&out_path).map_err(|e| format!("创建目录失败：{e}"))?;
@@ -426,8 +431,8 @@ fn extract_zip(path: &Path, dst: &Path) -> Result<(), String> {
                 std::fs::create_dir_all(parent).map_err(|e| format!("创建目录失败：{e}"))?;
             }
             let mut outfile = std::fs::File::create(&out_path).map_err(|e| format!("写出文件失败：{e}"))?;
-            // 流式写入并统计实际字节数：zip 头声明的 size 不可信（zip bomb 可虚报），
-            // 必须在读取阶段按实际写出量限制
+            // Stream to disk while counting actual bytes: the size declared in the zip header is
+            // untrusted (a zip bomb can overstate it), so enforce the limit on bytes actually written
             let mut buf = [0u8; 64 * 1024];
             loop {
                 let n = entry.read(&mut buf).map_err(|e| format!("读取压缩包条目失败：{e}"))?;
@@ -445,7 +450,7 @@ fn extract_zip(path: &Path, dst: &Path) -> Result<(), String> {
     Ok(())
 }
 
-// ── 标准技能预置 ──
+// ── Built-in standard skills ──
 
 const STANDARD_SKILLS: &[(&str, &str, &str)] = &[
     (
@@ -494,7 +499,7 @@ fn ensure_standard_skills() {
         }
         return;
     }
-    // 目录已存在（旧版升级）：为内置技能回填来源/信任，避免显示「来源未知」
+    // Directory already exists (upgrade from an older version): backfill source and trust for built-in skills so they do not show "unknown source"
     for (name, _, _) in STANDARD_SKILLS {
         let rec = record_of(name);
         if rec.source.is_empty() {
@@ -511,7 +516,7 @@ fn ensure_standard_skills() {
     }
 }
 
-// ── Tauri 命令 ──
+// ── Tauri commands ──
 
 #[tauri::command]
 pub async fn list_skills() -> Result<Vec<SkillMeta>, String> {
@@ -568,7 +573,7 @@ pub async fn get_skill(name: String) -> Result<SkillDetail, String> {
     })
 }
 
-/// 设置技能的信任/启停状态。
+/// Set a skill's trust and enabled state.
 #[tauri::command]
 pub async fn set_skill_state(
     name: String,
@@ -593,7 +598,7 @@ pub async fn set_skill_state(
     Ok(())
 }
 
-/// 读取技能目录内的一个文件（防路径穿越 + 2MB 上限），供详情预览。
+/// Read a file inside a skill directory (path traversal protection plus a 2MB limit) for the detail preview.
 #[tauri::command]
 pub async fn read_skill_file(name: String, relative_path: String) -> Result<String, String> {
     let root = skills_dir().join(sanitize_name(&name));
@@ -627,7 +632,7 @@ pub async fn remove_skill(name: String) -> Result<(), String> {
     Ok(())
 }
 
-/// 安装/更新一个技能（agent 替用户安装，写入最小技能目录）。
+/// Install or update a skill (installed by the agent on the user's behalf, writing a minimal skill directory).
 #[tauri::command]
 pub async fn install_skill_md(
     name: String,
@@ -644,14 +649,14 @@ pub async fn install_skill_md(
     std::fs::write(dir.join("SKILL.md"), md).map_err(|e| format!("写入 SKILL.md 失败：{e}"))?;
     upsert_record(&folder, |_| SkillRecord {
         source: "AI 安装".to_string(),
-        trusted: true, // 用户明确要求安装，默认信任
+        trusted: true, // the user explicitly asked for the install, so trust it by default
         enabled: true,
         content_hash: compute_dir_hash(&dir),
     });
     read_skill_meta(&dir).ok_or_else(|| "写入后读取技能失败".to_string())
 }
 
-/// 导入技能：文件夹（递归 SKILL.md）/ zip 压缩包 / 单个 Markdown。
+/// Import skills: a folder (searching recursively for SKILL.md), a zip archive, or a single Markdown file.
 #[tauri::command]
 pub async fn import_skills_from_path(path: String) -> Result<Vec<SkillMeta>, String> {
     let trimmed = path.trim();
@@ -708,7 +713,7 @@ pub async fn import_skills_from_path(path: String) -> Result<Vec<SkillMeta>, Str
     Ok(imported)
 }
 
-/// 某个技能路径/文本对应的信任信息。
+/// Trust information for a skill path or text reference.
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillTrustInfo {
@@ -717,8 +722,8 @@ pub struct SkillTrustInfo {
     pub enabled: bool,
 }
 
-/// 判断一个路径或命令文本是否引用了某个技能目录，返回其信任信息。
-/// 用于 agent 侧：读取/运行未信任技能的文件/脚本前弹「信任此技能」确认。
+/// Determine whether a path or command text references a skill directory and return its trust information.
+/// Used by the agent to confirm trust before reading or running files/scripts from an untrusted skill.
 #[tauri::command]
 pub async fn find_skill_reference(text: String) -> Option<SkillTrustInfo> {
     let t = text.trim();
@@ -726,7 +731,7 @@ pub async fn find_skill_reference(text: String) -> Option<SkillTrustInfo> {
         return None;
     }
     let root = skills_dir();
-    // 1) 作为路径：canonicalize 后是否落在技能根内
+    // 1) As a path: whether the canonicalized form falls inside the skills root
     if let Ok(canon) = std::fs::canonicalize(Path::new(t)) {
         if let Ok(root_canon) = std::fs::canonicalize(&root) {
             if let Ok(rel) = canon.strip_prefix(&root_canon) {
@@ -741,7 +746,7 @@ pub async fn find_skill_reference(text: String) -> Option<SkillTrustInfo> {
             }
         }
     }
-    // 2) 文本中是否含技能目录路径
+    // 2) Whether the text contains a skill directory path
     if root.is_dir() {
         for e in std::fs::read_dir(&root).into_iter().flatten().flatten() {
             let p = e.path();
@@ -766,27 +771,27 @@ pub async fn find_skill_reference(text: String) -> Option<SkillTrustInfo> {
     None
 }
 
-// ── GitHub 技能市场 ──
+// ── GitHub skill marketplace ──
 
-/// 市场搜索结果：GitHub 仓库内的一个技能。
+/// Marketplace search result: one skill inside a GitHub repository.
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct MarketSkill {
     pub name: String,
     pub description: String,
-    /// 仓库内技能目录相对路径（install 用）
+    /// Relative path of the skill directory inside the repository (used for install)
     pub dir: String,
 }
 
-/// 把 GitHub 仓库地址解析成 (owner, repo)。
-/// 支持完整 URL（https://github.com/owner/repo[/tree/branch...]）与 owner/repo 简写。
+/// Parse a GitHub repository address into (owner, repo).
+/// Accepts full URLs (https://github.com/owner/repo[/tree/branch...]) and the owner/repo shorthand.
 fn parse_github_repo(input: &str) -> Result<(String, String), String> {
     let s = input.trim().trim_end_matches('/');
     if s.is_empty() {
         return Err("请输入 GitHub 仓库 URL（如 https://github.com/anthropics/skills）".to_string());
     }
 
-    // 完整 URL：用标准解析器，避免字符串切割误判分支路径 / 查询参数
+    // Full URL: use the standard parser so branch paths or query parameters are not mistaken for repository segments
     if s.starts_with("http://") || s.starts_with("https://") {
         let url = url::Url::parse(s).map_err(|_| "URL 格式无效".to_string())?;
         let host = url.host_str().unwrap_or("").to_lowercase();
@@ -808,7 +813,7 @@ fn parse_github_repo(input: &str) -> Result<(String, String), String> {
         return Ok((owner, repo));
     }
 
-    // 兜底：owner/repo 简写（含 .git 后缀）
+    // Fallback: owner/repo shorthand (with an optional .git suffix)
     let segs: Vec<&str> = s.split('/').filter(|x| !x.is_empty()).collect();
     if segs.len() >= 2 {
         let owner = segs[segs.len() - 2].to_string();
@@ -825,7 +830,7 @@ const GITHUB_RAW: &str = "https://raw.githubusercontent.com";
 
 async fn github_tree(owner: &str, repo: &str, client: &reqwest::Client) -> Result<serde_json::Value, String> {
     let url = format!("{GITHUB_API}/{owner}/{repo}/git/trees/HEAD?recursive=1");
-    // 主机为硬编码的 api.github.com（用户输入只进路径段），无需 SSRF 校验
+    // The host is hardcoded to api.github.com (user input only reaches path segments), so no SSRF check is needed
     let resp = fetch_public_unchecked(client, &url).await?;
     if !resp.status().is_success() {
         return Err(format!("GitHub 返回 {}（仓库可能不存在）", resp.status()));
@@ -890,7 +895,7 @@ pub async fn market_github_list(repo: String) -> Result<Vec<MarketSkill>, String
     Ok(loaded.into_iter().map(|(_, skill)| skill).collect())
 }
 
-/// 安装仓库内某目录的技能：拉取目录内文件写入技能目录（默认未信任）。
+/// Install the skill in a repository directory: fetch its files into the skill directory (untrusted by default).
 #[tauri::command]
 pub async fn market_github_install(repo: String, dir: String) -> Result<SkillMeta, String> {
     let (owner, name) = parse_github_repo(&repo)?;
@@ -919,16 +924,16 @@ pub async fn market_github_install(repo: String, dir: String) -> Result<SkillMet
     if files.len() > 40 {
         files.truncate(40);
     }
-    // 技能名 = 目录名
+    // Skill name = directory name
     let skill_name = sanitize_name(dir.rsplit('/').next().unwrap_or("skill"));
     let dst = skills_dir().join(&skill_name);
     std::fs::create_dir_all(&dst).map_err(|e| format!("创建技能目录失败：{e}"))?;
     let mut wrote = 0usize;
     for rel in &files {
         let raw_url = format!("{GITHUB_RAW}/{owner}/{name}/HEAD/{dir}/{rel}");
-        // 主机为硬编码的 raw.githubusercontent.com，无需 SSRF 校验
+        // The host is hardcoded to raw.githubusercontent.com, so no SSRF check is needed
         let Ok(resp) = fetch_public_unchecked(&client, &raw_url).await else { continue };
-        // 流式截断 2MB，避免先整读大文件占满内存
+        // Stream with a 2MB truncation limit instead of reading a large file fully into memory first
         let Ok((bytes, over)) = read_body_capped(resp, 2 * 1024 * 1024).await else { continue };
         if over {
             continue;
@@ -1077,12 +1082,12 @@ mod tests {
             parse_github_repo("https://github.com/agentskills/agentskills").unwrap(),
             ("agentskills".to_string(), "agentskills".to_string())
         );
-        // 带分支路径的完整 URL：应只取 owner/repo，忽略 /tree/main 等后续段
+        // Full URL with a branch path: only owner/repo should be taken, ignoring later segments such as /tree/main
         assert_eq!(
             parse_github_repo("https://github.com/anthropics/skills/tree/main/docs").unwrap(),
             ("anthropics".to_string(), "skills".to_string())
         );
-        // 尾部斜杠与 .git 后缀
+        // Trailing slash and .git suffix
         assert_eq!(
             parse_github_repo("https://github.com/anthropics/skills.git/").unwrap(),
             ("anthropics".to_string(), "skills".to_string())
@@ -1091,9 +1096,9 @@ mod tests {
             parse_github_repo("anthropics/skills.git").unwrap(),
             ("anthropics".to_string(), "skills".to_string())
         );
-        // 非 github.com 主机拒绝
+        // Reject hosts other than github.com
         assert!(parse_github_repo("https://gitlab.com/anthropics/skills").is_err());
-        // 无效输入
+        // Invalid input
         assert!(parse_github_repo("   ").is_err());
         assert!(parse_github_repo("not-a-repo").is_err());
     }

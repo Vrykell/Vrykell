@@ -1,10 +1,10 @@
-//! 无 key 的联网能力（一等工具）：
-//!   - `web_search`：DuckDuckGo HTML 抓取（不依赖 Tavily/原生搜索）。
-//!   - `web_fetch`：抓取任意 URL → 结构化 Markdown 文本（标题/标题层级/链接保留结构）。
-//!   - `web_crawl`：从起始 URL 广度优先爬取多个页面（同域、限深度/页数），逐页结构化。
+//! Network access without an API key (first-class tools):
+//!   - `web_search`: DuckDuckGo HTML scraping (no search API or native search dependency).
+//!   - `web_fetch`: fetch any URL and return structured Markdown text (heading hierarchy and links preserved).
+//!   - `web_crawl`: breadth-first crawl from a starting URL (same domain, depth and page limits), structured per page.
 //!
-//! 都走 Rust 的 reqwest 直连，key/令牌不出 webview；结果转结构化文本截断，
-//! 供模型阅读与 ToolRunCard 展开展示。
+//! All requests go directly through Rust's reqwest, so keys and tokens never enter the webview; results
+//! become truncated structured text for the model to read and for the ToolRunCard to expand.
 
 use futures_util::StreamExt;
 use regex::Regex;
@@ -18,15 +18,15 @@ use url::Url;
 const USER_AGENT: &str =
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36";
 
-/// web_fetch 结构化文本截断上限（字符）。
+/// Character limit for structured web_fetch text.
 const FETCH_TEXT_CAP: usize = 24_000;
-/// web_crawl 单页文本截断上限（字符）。
+/// Character limit for a single web_crawl page.
 const CRAWL_PAGE_CAP: usize = 8_000;
-/// 抓取响应体上限（字节）。超出即流式截断丢弃，防恶意/意外大响应耗尽内存。
+/// Response body limit in bytes. Excess is streamed and discarded to keep malicious or unexpectedly large responses from exhausting memory.
 const FETCH_BODY_CAP: usize = 10 * 1024 * 1024;
 
-/// 流式读取响应体，超过 max_bytes 即截断（返回 over=true）。
-/// 不得用 `resp.text()/bytes()` 全量读入后再判断——读取阶段就会占满内存。
+/// Read the response body as a stream and stop at max_bytes (returning over=true).
+/// Do not read everything via `resp.text()/bytes()` and check afterwards: memory is exhausted during the read.
 pub(crate) async fn read_body_capped(
     resp: reqwest::Response,
     max_bytes: usize,
@@ -48,7 +48,7 @@ pub(crate) async fn read_body_capped(
     Ok((body, false))
 }
 
-/// 单条搜索/抓取结果。
+/// One search or fetch result.
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct WebResultItem {
@@ -63,7 +63,7 @@ pub struct WebSearchResponse {
     pub results: Vec<WebResultItem>,
 }
 
-/// 页面内超链接（结构化输出用）。
+/// A hyperlink found on a page (for structured output).
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct WebLink {
@@ -71,24 +71,24 @@ pub struct WebLink {
     pub url: String,
 }
 
-/// web_fetch 结果：结构化文本 + 元信息。
+/// web_fetch result: structured text plus metadata.
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WebFetchResponse {
     pub title: String,
-    /// 重定向后的最终 URL
+    /// Final URL after redirects
     pub url: String,
     pub content_type: String,
-    /// 结构化 Markdown 文本（标题/列表/链接保留结构；纯文本/JSON 原样返回）
+    /// Structured Markdown text (headings, lists and links keep their structure; plain text and JSON are returned as-is)
     pub text: String,
-    /// 各级标题文本（h1–h6）
+    /// Heading text at each level (h1–h6)
     pub headings: Vec<String>,
-    /// 页面内绝对链接（去重、去 fragment）
+    /// Absolute links on the page (deduplicated, fragments removed)
     pub links: Vec<WebLink>,
     pub truncated: bool,
 }
 
-/// web_crawl 的单个页面。
+/// One page from web_crawl.
 #[derive(Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct CrawlPage {
@@ -102,7 +102,7 @@ pub struct CrawlPage {
 #[serde(rename_all = "camelCase")]
 pub struct WebCrawlResponse {
     pub pages: Vec<CrawlPage>,
-    /// 达到页数上限提前停止时为 true
+    /// True when crawling stopped early at the page limit
     pub truncated: bool,
 }
 
@@ -110,13 +110,13 @@ fn http_client() -> Result<reqwest::Client, String> {
     http_client_impl(true)
 }
 
-/// follow_redirects=false 的客户端：重定向由 fetch_public 逐跳校验，防 SSRF。
+/// Client with follow_redirects=false: fetch_public validates every redirect hop to prevent SSRF.
 pub(crate) fn http_client_impl(follow_redirects: bool) -> Result<reqwest::Client, String> {
     http_client_impl_ext(follow_redirects, true)
 }
 
-/// 受信端点的客户端（技能市场 GitHub API/raw）：仅钉扎不校验内网。
-/// 主机受 is_github_host 白名单约束，无需 DNS 级拦截。
+/// Client for trusted endpoints (skill marketplace GitHub API/raw): pins DNS only, without private-network validation.
+/// Hosts are constrained by the is_github_host allowlist, so DNS-level blocking is unnecessary.
 pub(crate) fn http_client_trusted() -> Result<reqwest::Client, String> {
     http_client_impl_ext(false, false)
 }
@@ -126,20 +126,20 @@ fn http_client_impl_ext(follow_redirects: bool, validate_dns: bool) -> Result<re
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(30))
         .user_agent(USER_AGENT)
-        // DNS 钉扎：解析一次并校验/缓存，连接复用同一结果，防 DNS 交替应答（重绑定）
+        // DNS pinning: resolve once, validate and cache, then reuse the same result for connections to prevent alternating answers (rebinding)
         .dns_resolver(std::sync::Arc::new(PinnedResolver::new(validate_dns, proxy_hostnames())));
     if !follow_redirects {
         b = b.redirect(reqwest::redirect::Policy::none());
     }
-    // 尊重环境变量代理（HTTPS_PROXY/HTTP_PROXY/ALL_PROXY/NO_PROXY）。
-    // 无代理时返回 None，保持直连。
+    // Honor proxy environment variables (HTTPS_PROXY/HTTP_PROXY/ALL_PROXY/NO_PROXY).
+    // Returns None when no proxy is set, keeping direct connections.
     if let Some(proxy) = env_system_proxy() {
         b = b.proxy(proxy);
     }
     b.build().map_err(|e| format!("初始化 HTTP 客户端失败：{e}"))
 }
 
-/// 环境变量里配置的代理主机（用户信任，不参与内网校验）。
+/// Proxy hosts configured through environment variables (trusted by the user, excluded from private-network validation).
 fn proxy_hostnames() -> HashSet<String> {
     let mut set = HashSet::new();
     for k in ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy"] {
@@ -147,7 +147,7 @@ fn proxy_hostnames() -> HashSet<String> {
         let host = if let Ok(u) = url::Url::parse(&v) {
             u.host_str().map(|s| s.to_string())
         } else {
-            // 裸地址 host:port（无 scheme）
+            // Bare host:port address (no scheme)
             v.split(':').next().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
         };
         if let Some(h) = host {
@@ -157,18 +157,19 @@ fn proxy_hostnames() -> HashSet<String> {
     set
 }
 
-/// DNS 钉扎解析缓存：域名 → 已验证的公网地址（TTL 内复用）。
+/// DNS pinning cache: domain name → verified public addresses (reused within the TTL).
 type DnsCache = std::sync::Arc<Mutex<HashMap<String, (Instant, Vec<std::net::SocketAddr>)>>>;
 
-/// DNS 钉扎解析器：解析一次 → 校验（私网即拒）→ 缓存（TTL 内复用）。
+/// DNS-pinning resolver: resolve once → validate (reject private networks) → cache (reuse within the TTL).
 ///
-/// 防 DNS 交替应答（重绑定）攻击：校验时解析到的公网地址被缓存并直接用于连接，
-/// 攻击者在校验通过后把域名切到内网 IP 也无法得逞——连接用的是已验证的缓存结果。
+/// Prevents DNS rebinding attacks: the public addresses seen during validation are cached and used
+/// directly for connections, so switching the domain to a private IP after validation cannot succeed —
+/// connections use the verified cached result.
 struct PinnedResolver {
     cache: DnsCache,
-    /// 是否校验解析结果（false = 受信端点，仅钉扎）
+    /// Whether to validate resolution results (false = trusted endpoint, pinning only)
     validate: bool,
-    /// 用户配置的代理主机：直连代理本身是用户信任的，不校验
+    /// User-configured proxy hosts: the proxy itself is trusted by the user, so it is not validated
     trusted_hosts: HashSet<String>,
 }
 
@@ -182,7 +183,7 @@ impl PinnedResolver {
     }
 }
 
-/// 解析结果校验：任何地址解析到内网即拒（含 IPv4-mapped IPv6）。
+/// Validate resolution results: reject when any address resolves to a private network (including IPv4-mapped IPv6).
 fn validate_resolved(host: &str, addrs: &[std::net::SocketAddr]) -> Result<(), String> {
     if addrs.is_empty() {
         return Err("域名解析无结果".to_string());
@@ -193,8 +194,8 @@ fn validate_resolved(host: &str, addrs: &[std::net::SocketAddr]) -> Result<(), S
     Ok(())
 }
 
-/// DNS 钉扎缓存有效期：期间连接复用已验证的解析结果，交替应答窗口归零。
-/// 到期重新解析仍会再次校验（只会短暂不可用，不会穿透）。
+/// DNS pinning TTL: connections reuse the verified result during this window, leaving no room for alternating answers.
+/// Re-resolving after expiry validates again (it may be briefly unavailable, but it never bypasses validation).
 const DNS_PIN_TTL: Duration = Duration::from_secs(300);
 
 impl Resolve for PinnedResolver {
@@ -204,7 +205,7 @@ impl Resolve for PinnedResolver {
         let validate = self.validate && !trusted;
         let cache = std::sync::Arc::clone(&self.cache);
         Box::pin(async move {
-            // 命中未过期缓存 → 直接复用已验证结果（钉扎的核心）
+            // Cache hit and not expired → reuse the verified result directly (the core of pinning)
             {
                 let c = cache.lock().unwrap();
                 if let Some((at, addrs)) = c.get(&host) {
@@ -233,7 +234,7 @@ fn env_nonempty(key: &str) -> Option<String> {
         .filter(|v| !v.is_empty())
 }
 
-/// 从环境变量构建系统代理（与 proxy_configured_for 同一套读取规则）。
+/// Build the system proxy from environment variables (same reading rules as proxy_configured_for).
 fn env_system_proxy() -> Option<reqwest::Proxy> {
     let all = env_nonempty("ALL_PROXY").or_else(|| env_nonempty("all_proxy"));
     let https = env_nonempty("HTTPS_PROXY").or_else(|| env_nonempty("https_proxy")).or_else(|| all.clone());
@@ -248,15 +249,17 @@ fn env_system_proxy() -> Option<reqwest::Proxy> {
     Some(proxy.no_proxy(reqwest::NoProxy::from_env()))
 }
 
-/// 目标 (scheme, host) 是否经由「远端解析」型代理访问（读取环境变量）。
+/// Whether the target (scheme, host) is reached through a remote-resolving proxy (reads environment variables).
 ///
-/// 远端解析型代理（HTTP(S) 正向代理、socks4a/socks5h）接管目标域名解析，
-/// 本地 DNS 结果不代表实际连接目标，SSRF 校验应跳过「本地 DNS → 内网拦截」这一级。
-/// 但 socks4/socks5 由本地解析域名后经隧道连接，连接目标仍是本地解析结果，
-/// 必须保留校验 —— 否则解析到内网的域名会被直接放行。
+/// Remote-resolving proxies (HTTP(S) forward proxies, socks4a/socks5h) resolve the target domain themselves,
+/// so local DNS results do not reflect the actual connection target and SSRF validation should skip the
+/// local DNS → private-network blocking step. But socks4/socks5 resolve locally before tunnelling, so the
+/// connection still targets the local result and validation must stay — otherwise domains resolving to a
+/// private network would pass.
 ///
-/// NO_PROXY 中出现 IP/CIDR 条目时，无法排除「该域名绕过代理直连内网」，
-/// 保守视为直连（保留 DNS 校验），避免 reqwest 与校验逻辑不一致造成绕过。
+/// When NO_PROXY contains IP or CIDR entries, a direct private-network connection that bypasses the proxy
+/// cannot be ruled out, so treat it conservatively as direct (keep DNS validation) and avoid bypasses caused
+/// by divergence between reqwest and the validation logic.
 fn proxy_does_remote_dns_for(scheme: &str, host: &str) -> bool {
     let mut keys: Vec<&str> = Vec::new();
     if scheme.eq_ignore_ascii_case("https") {
@@ -267,7 +270,7 @@ fn proxy_does_remote_dns_for(scheme: &str, host: &str) -> bool {
     let Some(proxy) = keys.iter().find_map(|k| env_nonempty(k)) else {
         return false;
     };
-    // NO_PROXY：匹配条目（精确/子域/前导点）→ 直连，保留 DNS 校验
+    // NO_PROXY: a matching entry (exact/subdomain/leading dot) → direct connection, keep DNS validation
     let no_proxy = std::env::var("NO_PROXY")
         .or_else(|_| std::env::var("no_proxy"))
         .unwrap_or_default();
@@ -280,7 +283,7 @@ fn proxy_does_remote_dns_for(scheme: &str, host: &str) -> bool {
         if e.is_empty() {
             continue;
         }
-        // IP / CIDR 条目：域名可能解析到这些地址后绕过代理直连 → 保守视为直连
+        // IP or CIDR entry: the domain could resolve to these addresses and bypass the proxy → treat as direct, conservatively
         if e.parse::<std::net::IpAddr>().is_ok() || e.contains('/') {
             has_ip_entry = true;
             continue;
@@ -292,14 +295,14 @@ fn proxy_does_remote_dns_for(scheme: &str, host: &str) -> bool {
     if has_ip_entry {
         return false;
     }
-    // 代理类型：仅远端解析型才接管域名
+    // Proxy type: only remote-resolving proxies take over domain resolution
     let Ok(u) = url::Url::parse(&proxy) else {
-        return true; // 裸地址（host:port）按 HTTP 正向代理处理
+        return true; // Bare address (host:port) is treated as an HTTP forward proxy
     };
     matches!(u.scheme(), "http" | "https" | "socks4a" | "socks5h")
 }
 
-/// 是否为内网/保留地址（SSRF 防护）。
+/// Whether an address is private or reserved (SSRF protection).
 fn is_private_ip(ip: std::net::IpAddr) -> bool {
     match ip {
         std::net::IpAddr::V4(v4) => {
@@ -312,8 +315,8 @@ fn is_private_ip(ip: std::net::IpAddr) -> bool {
                 || v4.is_multicast()
         }
         std::net::IpAddr::V6(v6) => {
-            // IPv4-mapped IPv6（::ffff:127.0.0.1 等）：连接实际落到对应 IPv4 地址，
-            // 必须按 IPv4 语义判断，否则可绕过内网拦截
+            // IPv4-mapped IPv6 (::ffff:127.0.0.1 and similar): the connection lands on the corresponding
+            // IPv4 address, so it must be judged with IPv4 semantics or private-network blocking can be bypassed
             if let Some(v4) = v6.to_ipv4_mapped() {
                 return is_private_ip(std::net::IpAddr::V4(v4));
             }
@@ -326,7 +329,7 @@ fn is_private_ip(ip: std::net::IpAddr) -> bool {
     }
 }
 
-/// 校验 URL 是否指向公网地址（拦截 SSRF：内网/回环/链路本地/账号信息）。
+/// Validate that a URL points to a public address (blocks SSRF: private networks, loopback, link-local, credentials).
 async fn validate_public_url(url: &str) -> Result<(), String> {
     let u = url::Url::parse(url).map_err(|e| format!("无效 URL：{e}"))?;
     let scheme = u.scheme();
@@ -337,20 +340,20 @@ async fn validate_public_url(url: &str) -> Result<(), String> {
         return Err("URL 不允许包含账号信息".to_string());
     }
     let host = u.host_str().ok_or("URL 缺少主机名")?;
-    // 字面 IP：无论是否走代理都拦截内网地址（最强的 SSRF 信号，不受 DNS 影响）
+    // Literal IP: block private addresses whether or not a proxy is used (the strongest SSRF signal, unaffected by DNS)
     if let Ok(ip) = host.parse::<std::net::IpAddr>() {
         if is_private_ip(ip) {
             return Err("禁止访问内网地址".to_string());
         }
         return Ok(());
     }
-    // 经「远端解析」型代理（http/https 正向、socks4a/socks5h）：域名由代理解析，
-    // 本地 DNS 不代表实际连接目标，按本地解析结果拦截会误伤代理用户，故跳过。
-    // socks4/socks5（本地解析）与直连场景照常校验。
+    // Through a remote-resolving proxy (http/https forward, socks4a/socks5h): the proxy resolves the domain,
+    // local DNS does not reflect the connection target, and blocking on local results would break proxy users, so skip it.
+    // socks4/socks5 (local resolution) and direct connections are still validated.
     if proxy_does_remote_dns_for(scheme, host) {
         return Ok(());
     }
-    // 直连：本地 DNS 解析，解析到内网即拦截（防 DNS 重绑定/内网服务探测）
+    // Direct connection: resolve with local DNS and block private results (prevents DNS rebinding and private-service probing)
     let port = u.port().unwrap_or_else(|| if scheme == "https" { 443 } else { 80 });
     let addrs: Vec<std::net::IpAddr> = tokio::net::lookup_host((host, port))
         .await
@@ -366,7 +369,7 @@ async fn validate_public_url(url: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// 逐跳抓取（重定向由调用方传入的校验器把关）。
+/// Fetch hop by hop (redirects are checked by the validator supplied by the caller).
 async fn fetch_with_validation<F>(
     client: &reqwest::Client,
     url: &str,
@@ -400,12 +403,12 @@ where
     Err("重定向次数过多".to_string())
 }
 
-/// 逐跳校验重定向的公网抓取（SSRF 防护）。
+/// Public fetch that validates every redirect hop (SSRF protection).
 pub(crate) async fn fetch_public(client: &reqwest::Client, url: &str) -> Result<reqwest::Response, String> {
     fetch_with_validation(client, url, |u| Box::pin(validate_public_url(u))).await
 }
 
-/// GitHub 相关域名白名单：unchecked 抓取的第一跳与重定向都只允许落在这些主机。
+/// GitHub-related host allowlist: both the first hop and redirects of an unchecked fetch must stay on these hosts.
 fn is_github_host(host: &str) -> bool {
     let h = host.to_lowercase();
     [
@@ -419,10 +422,10 @@ fn is_github_host(host: &str) -> bool {
     .any(|d| h == *d || h.ends_with(&format!(".{d}")))
 }
 
-/// 不做 SSRF 校验的抓取。仅用于**主机名硬编码**的受信端点（如技能市场的
-/// GitHub API / raw 文件）：用户输入只进入路径段，永远不会成为主机名。
-/// 重定向同样限制在 GitHub 域名内，避免「硬编码主机」承诺被重定向打破。
-/// 用户/LLM 提供的任意 URL 必须走 `fetch_public`。
+/// Fetch without SSRF validation. Only for trusted endpoints with a **hardcoded hostname** (such as
+/// skill marketplace GitHub API/raw files): user input only reaches path segments and never becomes a hostname.
+/// Redirects are likewise restricted to GitHub domains, so the "hardcoded host" promise cannot be broken by a redirect.
+/// Arbitrary URLs from the user or the LLM must go through `fetch_public`.
 pub(crate) async fn fetch_public_unchecked(client: &reqwest::Client, url: &str) -> Result<reqwest::Response, String> {
     fetch_with_validation(client, url, |u| {
         Box::pin(async move {
@@ -438,7 +441,7 @@ pub(crate) async fn fetch_public_unchecked(client: &reqwest::Client, url: &str) 
     .await
 }
 
-/// 简单 URL 百分号编码（保留 RFC3986 非保留字符，空格 → `+`）。
+/// Simple URL percent-encoding (keeps RFC3986 unreserved characters, spaces become `+`).
 fn url_encode(s: &str) -> String {
     let mut out = String::with_capacity(s.len() * 3);
     for b in s.bytes() {
@@ -451,7 +454,7 @@ fn url_encode(s: &str) -> String {
     out
 }
 
-/// 百分号解码（用于 DuckDuckGo 的 uddg 跳转参数）。
+/// Percent-decoding (for DuckDuckGo's uddg redirect parameter).
 fn percent_decode(s: &str) -> Option<String> {
     let bytes = s.as_bytes();
     let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
@@ -484,7 +487,7 @@ fn decode_entities(s: &str) -> String {
         .replace("&nbsp;", " ")
 }
 
-/// HTML → 可读纯文本：去掉 script/style/head、块级标签转换行、剥标签、实体解码、空白折叠。
+/// HTML → readable plain text: remove script/style/head, turn block tags into newlines, strip tags, decode entities and collapse whitespace.
 fn html_to_text(html: &str) -> String {
     let mut s = html.to_string();
     for tag in ["script", "style", "noscript", "head", "svg"] {
@@ -502,10 +505,10 @@ fn html_to_text(html: &str) -> String {
     s.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-/// HTML → 结构化 Markdown：标题/列表/代码/链接保留结构，正文按段落分行。
+/// HTML → structured Markdown: headings, lists, code and links keep their structure; body text is split into paragraphs.
 fn html_to_markdown(html: &str) -> String {
     let mut s = html.to_string();
-    // 去掉非正文块
+    // Remove non-content blocks
     for tag in ["script", "style", "noscript", "head", "svg", "iframe", "form", "nav", "footer"] {
         if let Ok(re) = Regex::new(&format!(r"(?is)<{tag}\b[^>]*>.*?</{tag}>")) {
             s = re.replace_all(&s, " ").to_string();
@@ -520,7 +523,7 @@ fn html_to_markdown(html: &str) -> String {
             })
             .to_string();
     }
-    // code → 行内代码
+    // code → inline code
     if let Ok(re) = Regex::new(r"(?is)<code\b[^>]*>(.*?)</code>") {
         s = re
             .replace_all(&s, |c: &regex::Captures| {
@@ -529,7 +532,7 @@ fn html_to_markdown(html: &str) -> String {
             })
             .to_string();
     }
-    // 标题 h1–h6 → # … ######（单遍匹配保文档顺序；闭合标签用通用 h[1-6]，假定良构 HTML）
+    // Headings h1–h6 → # … ###### (a single pass keeps document order; closing tags use a generic h[1-6], assuming well-formed HTML)
     if let Ok(re) = Regex::new(r"(?is)<(h[1-6])\b[^>]*>(.*?)</h[1-6]>") {
         s = re
             .replace_all(&s, |c: &regex::Captures| {
@@ -540,7 +543,7 @@ fn html_to_markdown(html: &str) -> String {
             })
             .to_string();
     }
-    // 列表项 → - item
+    // List item → - item
     if let Ok(re) = Regex::new(r"(?is)<li\b[^>]*>(.*?)</li>") {
         s = re
             .replace_all(&s, |c: &regex::Captures| {
@@ -549,7 +552,7 @@ fn html_to_markdown(html: &str) -> String {
             })
             .to_string();
     }
-    // 链接 → [text](href)
+    // Link → [text](href)
     if let Ok(re) = Regex::new(r#"(?is)<a\b[^>]*href="([^"]*)"[^>]*>(.*?)</a>"#) {
         s = re
             .replace_all(&s, |c: &regex::Captures| {
@@ -563,21 +566,21 @@ fn html_to_markdown(html: &str) -> String {
             })
             .to_string();
     }
-    // 块级闭合标签 → 换行
+    // Block closing tags → newline
     if let Ok(re) = Regex::new(r"(?i)</(p|div|li|tr|h[1-6]|article|section|blockquote|br|pre|table|ul|ol)>") {
         s = re.replace_all(&s, "\n").to_string();
     }
-    // 行内格式标签直接剥除（不留空格，避免「正文 加粗」断词）
+    // Strip inline formatting tags without leaving spaces, so words around them stay joined
     if let Ok(re) = Regex::new(r"(?i)</?(b|i|u|em|strong|span|small|mark|sub|sup|del|ins)\b[^>]*>") {
         s = re.replace_all(&s, "").to_string();
     }
-    // 剥剩余标签
+    // Strip remaining tags
     if let Ok(re) = Regex::new(r"<[^>]+>") {
         s = re.replace_all(&s, " ").to_string();
     }
     s = decode_entities(&s);
 
-    // 逐行 trim + 折叠连续空行
+    // Trim each line and collapse consecutive blank lines
     let mut out = String::new();
     let mut blank = 0usize;
     for line in s.lines() {
@@ -607,7 +610,7 @@ fn extract_title(html: &str) -> String {
         .unwrap_or_default()
 }
 
-/// 各级标题文本（h1–h6，按出现顺序）。
+/// Heading text at each level (h1–h6, in document order).
 fn extract_headings(html: &str) -> Vec<String> {
     let mut out = Vec::new();
     if let Ok(re) = Regex::new(r"(?is)<(h[1-6])\b[^>]*>(.*?)</h[1-6]>") {
@@ -621,7 +624,7 @@ fn extract_headings(html: &str) -> Vec<String> {
     out
 }
 
-/// 去掉 URL fragment 作为去重键（crawler 用）。
+/// Remove the URL fragment to form a deduplication key (used by the crawler).
 fn normalize_url(url: &str) -> String {
     match Url::parse(url) {
         Ok(mut u) => {
@@ -632,7 +635,7 @@ fn normalize_url(url: &str) -> String {
     }
 }
 
-/// 提取页面内绝对链接（相对链接按 base 解析；去 fragment 去重；可限同域）。
+/// Extract absolute links from a page (relative links resolve against base; fragments removed before deduplication; optionally same-domain only).
 fn extract_links(html: &str, base: &str, same_domain: bool) -> Vec<WebLink> {
     let Ok(re) = Regex::new(r#"(?is)<a\b[^>]*href="([^"]*)"[^>]*>(.*?)</a>"#) else {
         return Vec::new();
@@ -679,8 +682,8 @@ fn extract_links(html: &str, base: &str, same_domain: bool) -> Vec<WebLink> {
     out
 }
 
-/// DuckDuckGo 结果链接通常是 `//duckduckgo.com/l/?uddg=<urlencoded>&rut=...`，
-/// 取 uddg 参数还原真实目标 URL。
+/// DuckDuckGo result links are usually `//duckduckgo.com/l/?uddg=<urlencoded>&rut=...`;
+/// return the real target URL from the uddg parameter.
 fn resolve_duckduckgo_url(href: &str) -> String {
     if let Some(pos) = href.find("uddg=") {
         let rest = &href[pos + 5..];
@@ -692,7 +695,7 @@ fn resolve_duckduckgo_url(href: &str) -> String {
     href.to_string()
 }
 
-/// 从 DuckDuckGo HTML 提取 title/url/snippet；结构变化时可能返回空。
+/// Extract title/url/snippet from DuckDuckGo HTML; may return empty when the structure changes.
 fn parse_duckduckgo(html: &str, n: usize) -> Vec<WebResultItem> {
     let link_re = Regex::new(
         r#"(?is)<a[^>]*class="[^"]*result__a[^"]*"[^>]*href="([^"]+)"[^>]*>(.*?)</a>"#,
@@ -729,7 +732,7 @@ fn parse_duckduckgo(html: &str, n: usize) -> Vec<WebResultItem> {
     out
 }
 
-/// 无 key 搜索：抓 DuckDuckGo HTML 结果页并解析；解析失败退化为整页可读文本。
+/// Keyless search: fetch and parse the DuckDuckGo HTML results page; if parsing fails, fall back to the readable page text.
 #[tauri::command]
 pub async fn web_search(query: String, max_results: Option<u32>) -> Result<WebSearchResponse, String> {
     let q = query.trim().to_string();
@@ -757,7 +760,7 @@ pub async fn web_search(query: String, max_results: Option<u32>) -> Result<WebSe
     }
     let results = parse_duckduckgo(&html, n);
     if results.is_empty() {
-        // 解析失败（结构变化/验证页）：整页可读文本作为单条结果，模型仍可自行提炼
+        // Parsing failed (structure change or challenge page): return the readable page text as one result so the model can still extract what it needs
         let text = truncate_chars(&html_to_text(&html), 4000);
         return Ok(WebSearchResponse {
             results: vec![WebResultItem { title: q, url, content: text }],
@@ -766,7 +769,7 @@ pub async fn web_search(query: String, max_results: Option<u32>) -> Result<WebSe
     Ok(WebSearchResponse { results })
 }
 
-/// webfetch：抓取任意 URL → 结构化 Markdown 文本（一等工具，与 read_file 同级）。
+/// web_fetch: fetch any URL → structured Markdown text (a first-class tool on par with read_file).
 #[tauri::command]
 pub async fn web_fetch(url: String) -> Result<WebFetchResponse, String> {
     let u = url.trim().to_string();
@@ -814,7 +817,7 @@ pub async fn web_fetch(url: String) -> Result<WebFetchResponse, String> {
     })
 }
 
-/// web_crawl：从起始 URL 广度优先爬取，逐页结构化（同域、限深度/页数）。
+/// web_crawl: breadth-first crawl from a starting URL with per-page structure (same domain, depth and page limits).
 #[tauri::command]
 pub async fn web_crawl(
     start_url: String,
@@ -851,7 +854,7 @@ pub async fn web_crawl(
         }
         let resp = match fetch_public(&client, &url).await {
             Ok(r) => r,
-            Err(_) => continue, // 单页失败/内网拒绝不中断整次爬取
+            Err(_) => continue, // A failed page or private-network rejection does not abort the whole crawl
         };
         if !resp.status().is_success() {
             continue;
@@ -882,7 +885,7 @@ pub async fn web_crawl(
             headings,
         });
 
-        // 未达深度上限才继续扩展同页链接
+        // Expand links from this page only while the depth limit has not been reached
         if depth < max_depth && is_html {
             for link in extract_links(&body, &final_url, same_domain) {
                 let lkey = normalize_url(&link.url);
@@ -896,9 +899,9 @@ pub async fn web_crawl(
     Ok(WebCrawlResponse { pages, truncated })
 }
 
-// ── 技能清单（统一协议 vrykell-skills/v1） ──
+// ── Skill registry (unified protocol vrykell-skills/v1) ──
 
-/// 网络技能清单里的单条技能。
+/// One skill in a remote skill registry.
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase", default)]
 pub struct RemoteSkill {
@@ -916,7 +919,7 @@ struct SkillRegistryManifest {
     skills: Vec<RemoteSkill>,
 }
 
-/// 解析技能清单：兼容裸数组 `[...]` 或 `{ protocol, skills: [...] }`。
+/// Parse a skill registry: accepts a bare array `[...]` or `{ protocol, skills: [...] }`.
 fn parse_skill_registry(body: &str) -> Result<Vec<RemoteSkill>, String> {
     if let Ok(list) = serde_json::from_str::<Vec<RemoteSkill>>(body) {
         return Ok(list);
@@ -932,7 +935,7 @@ fn parse_skill_registry(body: &str) -> Result<Vec<RemoteSkill>, String> {
     Ok(manifest.skills)
 }
 
-/// 通过统一协议从网络获取技能清单。
+/// Fetch a skill registry over the network using the unified protocol.
 #[tauri::command]
 pub async fn fetch_skill_registry(url: String) -> Result<Vec<RemoteSkill>, String> {
     let u = url.trim().to_string();
@@ -1031,7 +1034,7 @@ mod tests {
     fn extract_links_resolves_relative_and_dedups() {
         let html = "<a href=\"/a\">A</a><a href=\"b\">B</a><a href=\"#top\">锚点</a><a href=\"https://other.com/x\">外域</a>";
         let base = "https://example.com/docs/page.html";
-        // 同域：外域被过滤；#top 折叠成当前页，与起始无关，但会被去重保留
+        // Same domain: external links are filtered; #top collapses to the current page, unrelated to the start URL but kept after deduplication
         let links = extract_links(html, base, true);
         let urls: Vec<&str> = links.iter().map(|l| l.url.as_str()).collect();
         assert!(urls.contains(&"https://example.com/a"));
@@ -1077,7 +1080,7 @@ mod tests {
         assert!(is_private_ip("fd00::1".parse().unwrap()));
         assert!(!is_private_ip("8.8.8.8".parse().unwrap()));
         assert!(!is_private_ip("1.1.1.1".parse().unwrap()));
-        // IPv4-mapped IPv6：实际落到对应 IPv4，必须按 IPv4 语义拦截
+        // IPv4-mapped IPv6: resolves to the corresponding IPv4, so it must be blocked with IPv4 semantics
         assert!(is_private_ip("::ffff:127.0.0.1".parse().unwrap()));
         assert!(is_private_ip("::ffff:192.168.1.1".parse().unwrap()));
         assert!(is_private_ip("::ffff:169.254.169.254".parse().unwrap()));
@@ -1104,66 +1107,66 @@ mod tests {
         let priv1: SocketAddr = "127.0.0.1:80".parse().unwrap();
         let mapped: SocketAddr = "[::ffff:192.168.1.1]:443".parse().unwrap();
         assert!(validate_resolved("x.com", &[pub1]).is_ok());
-        // 混合公网+内网 → 拒（DNS 交替应答/多记录场景）
+        // Mixed public and private → reject (alternating DNS answers or multiple records)
         assert!(validate_resolved("x.com", &[pub1, priv1]).is_err());
-        // IPv4-mapped IPv6 内网 → 拒
+        // Private IPv4-mapped IPv6 → reject
         assert!(validate_resolved("x.com", &[mapped]).is_err());
-        // 空结果 → 拒
+        // Empty result → reject
         assert!(validate_resolved("x.com", &[]).is_err());
     }
 
-    // 环境变量是进程级状态，串行化避免测试间互相干扰
+    // Environment variables are process-wide state; serialize tests to avoid interference
     static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     #[test]
     fn proxy_remote_dns_follows_env_no_proxy_and_proxy_type() {
         let _g = ENV_LOCK.lock().unwrap();
-        // 清空环境
+        // Clear the environment
         for k in ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy"] {
             std::env::remove_var(k);
         }
 
-        // 无代理 → false
+        // No proxy → false
         assert!(!proxy_does_remote_dns_for("https", "github.com"));
 
-        // http/https 正向代理 → 远端解析
+        // http/https forward proxy → remote resolution
         std::env::set_var("HTTPS_PROXY", "http://127.0.0.1:7890");
         assert!(proxy_does_remote_dns_for("https", "github.com"));
         assert!(!proxy_does_remote_dns_for("http", "github.com"));
 
-        // ALL_PROXY 兜底两种 scheme
+        // ALL_PROXY covers both schemes
         std::env::remove_var("HTTPS_PROXY");
         std::env::set_var("ALL_PROXY", "http://127.0.0.1:7890");
         assert!(proxy_does_remote_dns_for("https", "example.com"));
         assert!(proxy_does_remote_dns_for("http", "example.com"));
 
-        // NO_PROXY 精确域名排除 → 直连，保留校验
+        // NO_PROXY exact-domain exclusion → direct connection, validation kept
         std::env::set_var("NO_PROXY", "internal.corp,api.github.com");
         assert!(!proxy_does_remote_dns_for("https", "api.github.com"));
         assert!(proxy_does_remote_dns_for("https", "github.com"));
         assert!(!proxy_does_remote_dns_for("https", "internal.corp"));
 
-        // NO_PROXY 通配 `*` 全排除
+        // NO_PROXY wildcard `*` excludes everything
         std::env::set_var("NO_PROXY", "*");
         assert!(!proxy_does_remote_dns_for("https", "github.com"));
 
-        // 子域匹配（前导点）
+        // Subdomain match (leading dot)
         std::env::set_var("NO_PROXY", ".corp.example");
         assert!(!proxy_does_remote_dns_for("https", "svc.corp.example"));
         assert!(proxy_does_remote_dns_for("https", "corp.example.com"));
 
-        // NO_PROXY 含 IP/CIDR 条目 → 保守视为直连（无法排除域名解析到这些地址后绕过代理）
+        // NO_PROXY contains IP/CIDR entries → conservatively treated as direct (cannot rule out a domain resolving to them and bypassing the proxy)
         std::env::set_var("NO_PROXY", "127.0.0.1,192.168.1.0/24");
         assert!(!proxy_does_remote_dns_for("https", "github.com"));
 
-        // socks5 本地解析 → 保留校验；socks5h 远端解析 → 跳过
+        // socks5 resolves locally → validation kept; socks5h resolves remotely → skipped
         std::env::remove_var("NO_PROXY");
         std::env::set_var("ALL_PROXY", "socks5://127.0.0.1:1080");
         assert!(!proxy_does_remote_dns_for("https", "github.com"));
         std::env::set_var("ALL_PROXY", "socks5h://127.0.0.1:1080");
         assert!(proxy_does_remote_dns_for("https", "github.com"));
 
-        // 清理
+        // Clean up
         for k in ["HTTPS_PROXY", "https_proxy", "HTTP_PROXY", "http_proxy", "ALL_PROXY", "all_proxy", "NO_PROXY", "no_proxy"] {
             std::env::remove_var(k);
         }
