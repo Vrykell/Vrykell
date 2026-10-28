@@ -44,7 +44,7 @@ for (const theme of ['dark', 'light'] as const) {
     await useWindowsPlatform(page);
     await page.goto('/');
     await gotoSetting(page, '主题');
-    await page.getByRole('radio', { name: theme === 'dark' ? '深色' : '浅色', exact: true }).click();
+    await page.getByRole('radio', { name: theme === 'dark' ? '始终深色' : '始终浅色', exact: true }).click();
     const gray = await themeColor(page, '--action-button-hover-bg');
     const report: Record<string, string[]> = {};
     const body = page.locator('.settings-page-body');

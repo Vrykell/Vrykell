@@ -1,7 +1,8 @@
-.segmented-control { position: relative; display: inline-flex; align-items: stretch; width: fit-content; max-width: 100%; padding: 3px; border-radius: var(--radius-inner); background: var(--field-bg); box-sizing: border-box; isolation: isolate; }
-.segmented-selection { position: absolute; z-index: -1; left: 0; top: 3px; bottom: 3px; border-radius: 4px; background: var(--selection-bg); transition: transform 160ms var(--ease), width 160ms var(--ease); pointer-events: none; }
-.segmented-control > button { display: inline-flex; flex: 1 1 0; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 26px; padding: 3px 10px; border: 0; border-radius: 4px; background: transparent; color: var(--text-muted); font: var(--fs-caption)/1.5 var(--font-ui); white-space: nowrap; cursor: pointer; }
-.segmented-control > button[aria-checked="true"], .segmented-control > button[aria-pressed="true"] { background: transparent; color: var(--text-primary); }
-.segmented-control > button:enabled:is(:hover, :focus-visible) { background: transparent; color: var(--text-primary); }
-.segmented-control > button:focus-visible { outline: 1px solid var(--border-strong); outline-offset: -1px; }
+.segmented-control { position: relative; display: inline-flex; flex-wrap: wrap; align-items: stretch; gap: 2px; width: fit-content; max-width: 100%; padding: 3px; border-radius: var(--radius-inner); background: var(--segmented-track); box-sizing: border-box; isolation: isolate; }
+.segmented-selection { position: absolute; z-index: -1; left: 0; top: 0; border-radius: 4px; background: var(--segmented-thumb); box-shadow: var(--shadow-sm); transition: transform 160ms var(--ease), width 160ms var(--ease), height 160ms var(--ease); pointer-events: none; }
+.segmented-control > button { display: inline-flex; flex: 1 0 auto; align-items: center; justify-content: center; gap: 6px; min-width: max-content; min-height: calc(26px * var(--ui-font-scale)); padding: 3px 14px; border: 0; border-radius: 4px; background: transparent; color: var(--text-secondary); font: var(--fs-caption)/1.5 var(--font-ui); white-space: nowrap; cursor: pointer; box-shadow: none; }
+.segmented-control > button > svg { flex-shrink: 0; }
+.segmented-control > button[aria-checked="true"], .segmented-control > button[aria-pressed="true"] { background: transparent; color: var(--segmented-text); }
+.segmented-control > button:enabled:is(:hover, :focus-visible) { background: transparent; color: var(--segmented-text); }
+.segmented-control > button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: -2px; }
 @media (prefers-reduced-motion: reduce) { .segmented-selection { transition: none; } }

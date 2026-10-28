@@ -94,6 +94,6 @@ test('the native window border follows the neutral gray theme border', async ({ 
   await page.goto('/');
   await expect.poll(async () => (await windowFrameCalls(page)).at(-1)?.color).toBe('#4B4E52');
   await gotoSetting(page, '主题');
-  await page.getByRole('radio', { name: '浅色', exact: true }).click();
+  await page.getByRole('radio', { name: '始终浅色', exact: true }).click();
   await expect.poll(async () => (await windowFrameCalls(page)).at(-1)?.color).toBe('#B9C2C8');
 });

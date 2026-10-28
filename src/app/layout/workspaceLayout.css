@@ -12,7 +12,7 @@
 .workspace-layout:is([data-settings-open], [data-area="ssh"], [data-area="dashboard"], [data-area="history"]) .workspace-instance-bar { display: none; }
 .workspace-layout .workspace-titlebar[data-platform="macos"][data-fullscreen="false"] { --workspace-title-inset: max(16px, calc(92px - var(--workspace-sidebar-width))); }
 .workspace-layout .workspace-titlebar[data-sidebar-collapsed="true"] { --workspace-title-inset: 7px; }
-.workspace-sidebar { grid-column: 1; grid-row: 1 / -1; display: flex; flex-direction: column; min-height: 0; background: var(--sidebar-bg); border-right: 1px solid var(--border); overflow: hidden; }
+.workspace-sidebar { grid-column: 1; grid-row: 1 / -1; display: flex; flex-direction: column; min-height: 0; background: var(--sidebar-bg); border-right: 1px solid var(--resize-divider); overflow: hidden; }
 .application-window[data-desktop-tint="true"] .workspace-sidebar { background: var(--chrome-translucent-bg); }
 .workspace-sidebar[data-collapsed="true"] { visibility: hidden; border: 0; }
 .workspace-sidebar-heading { height: 42px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; color: var(--text-muted); font-size: var(--fs-caption); user-select: none; }

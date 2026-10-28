@@ -12,15 +12,18 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { invoke } from '@platform/diagnostics';
 import {
   applyTheme,
+  cacheThemePresets,
+  readThemePresets,
   getCurrentTheme,
   setThemeOverrides,
   type ThemeMode,
+  type ThemePresetSelection,
 } from '@config/theme/tokens';
 import { termInstances } from '@features/terminal';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 import { syncWindowFrame } from '@platform/windowChrome';
 
-export interface TerminalThemeConfig {
+export interface TerminalThemeConfig extends ThemePresetSelection {
   /** Native desktop color is visible only through the outer navigation frame. */
   desktopTint?: boolean;
   /** Application opacity, 0.5..=1 (1 = fully opaque). */
@@ -32,6 +35,7 @@ export interface TerminalThemeConfig {
 }
 
 const DEFAULT_CONFIG: TerminalThemeConfig = {
+  ...readThemePresets(),
   desktopTint: true,
   opacity: 1,
   backgroundImage: null,
@@ -106,6 +110,7 @@ export function reapplyXtermTheme(): void {
 
 /** Applies synchronously: color overrides + terminal theme. mode defaults to the current data-theme. */
 export function applyTerminalTheme(config: TerminalThemeConfig, mode?: ThemeMode): void {
+  cacheThemePresets({ darkPreset: config.darkPreset, lightPreset: config.lightPreset });
   setThemeOverrides(config.vars ?? {});
   applyTheme(mode ?? getCurrentTheme());
   reapplyXtermTheme();
@@ -150,7 +155,8 @@ export const useTerminalThemeStore = create<TerminalThemeState>((set, get) => ({
       // Persist first: the backend authorizes the new wallpaper file, and the webview must not
       // request its asset URL before that, or the one-shot image request is denied (403).
       await invoke('set_theme_config', { config });
-    } catch {
+    } catch (cause) {
+      if ('darkPreset' in patch || 'lightPreset' in patch) throw cause;
       /* Ignore when the backend is unavailable: the frontend state already applied. */
     }
     if (config.backgroundImage !== prev.backgroundImage) {

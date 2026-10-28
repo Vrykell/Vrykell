@@ -23,7 +23,8 @@ export interface TauriMockOptions {
   /** Keep the prompt but omit the OSC 133;B ready marker (older hooks / exotic shells). */
   shellReadyMarker?: boolean;
   /** Seed model list (default 2: main model + local model) */
-  aiModels?: { id: string; name: string; provider: string; baseUrl: string; model: string }[];
+  aiModels?: { id: string; name: string; provider: string; baseUrl: string; model: string;
+    capabilities?: { vision: boolean; reasoning: boolean; tools: boolean; search: boolean } }[];
   /** Active model id (default '' = mirrors the config fields) */
   aiActive?: string;
   /** Seed skill list (default 2: write unit tests / legacy script skill) */
@@ -181,7 +182,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       { id: 'legacy', key: 'legacy:memory.md:0', content: 'Old editor preference', scope: 'global', status: 'pending', source: 'memory.md', updatedAt: 1, expiresAt: 1, revision: 1 },
     ];
     // ── Theme ──
-    const theme = { opacity: 1, backgroundImage: null, vars: {} as Record<string, string> };
+    const theme = { opacity: 1, backgroundImage: null, vars: {} as Record<string, string>, ...JSON.parse(localStorage.getItem('e2e-theme-config') || '{}') };
     // ── Search / history ──
     const historyEntries: Record<string, unknown>[] = [
       { command: 'npm run dev', cwd: '/home/e2e/project', timestamp: Date.now() - 1000, exit_code: 0 },
@@ -1059,12 +1060,14 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return { ...theme, vars: { ...theme.vars } };
           case 'set_theme_config':
             Object.assign(theme, args.config);
+            localStorage.setItem('e2e-theme-config', JSON.stringify(theme));
             return undefined;
           case 'theme_export':
             return undefined;
           case 'theme_import': {
             const cfg = args.config ?? theme;
             Object.assign(theme, cfg);
+            localStorage.setItem('e2e-theme-config', JSON.stringify(theme));
             return { ...theme, vars: { ...theme.vars } };
           }
           case 'get_theme_path':

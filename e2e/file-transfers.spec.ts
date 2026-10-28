@@ -145,7 +145,7 @@ for (const theme of ['dark', 'light'] as const) {
       await page.goto('/');
       await page.locator('[data-dock-btn="settings"]').click();
       await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
-      await page.getByRole('radio', { name: theme === 'light' ? '浅色' : '深色', exact: true }).click();
+      await page.getByRole('radio', { name: theme === 'light' ? '始终浅色' : '始终深色', exact: true }).click();
       await page.locator('[data-dock-btn="settings"]').click();
       await page.locator('[data-dock-btn="files"]').click();
       await page.getByTestId('local-more-btn').click();

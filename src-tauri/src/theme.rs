@@ -24,6 +24,11 @@ pub struct ThemeState(pub Mutex<ThemeConfig>);
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ThemeConfig {
+    /// Independent built-in palette selections; absent values retain the original colors.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dark_preset: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub light_preset: Option<String>,
     /// Blend desktop color into the outer navigation frame.
     #[serde(default = "default_desktop_tint")]
     pub desktop_tint: bool,
@@ -49,6 +54,8 @@ fn default_desktop_tint() -> bool {
 impl Default for ThemeConfig {
     fn default() -> Self {
         Self {
+            dark_preset: None,
+            light_preset: None,
             desktop_tint: default_desktop_tint(),
             opacity: default_opacity(),
             background_image: None,
@@ -223,6 +230,7 @@ mod tests {
             opacity: 1.5,
             background_image: None,
             vars: HashMap::new(),
+            ..ThemeConfig::default()
         };
         cfg.normalize();
         assert_eq!(cfg.opacity, 1.0);
@@ -252,12 +260,16 @@ mod tests {
             opacity: 0.8,
             background_image: Some("/tmp/bg.png".to_string()),
             vars: HashMap::from([("--canvas".to_string(), "#101010".to_string())]),
+            dark_preset: Some("nord-dark".to_string()),
+            light_preset: Some("nord-light".to_string()),
         };
         let s = serde_json::to_string(&cfg).unwrap();
         // camelCase serialization: backgroundImage
         assert!(s.contains("\"backgroundImage\":\"/tmp/bg.png\""));
         let back: ThemeConfig = serde_json::from_str(&s).unwrap();
         assert!(!back.desktop_tint);
+        assert_eq!(back.dark_preset.as_deref(), Some("nord-dark"));
+        assert_eq!(back.light_preset.as_deref(), Some("nord-light"));
         assert_eq!(back.background_image.as_deref(), Some("/tmp/bg.png"));
         assert_eq!(back.vars.get("--canvas").map(String::as_str), Some("#101010"));
     }

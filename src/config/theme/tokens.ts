@@ -4,6 +4,8 @@
  * A new theme only needs another palette object.
  */
 
+import { presetPalette, resolveThemePreset } from './presets';
+
 // ── Types ──
 
 export interface ThemePalette {
@@ -43,6 +45,9 @@ export interface ThemePalette {
   chromeField: string;
   tabMenuBg: string;
   selectionBg: string;
+  segmentedTrack: string;
+  segmentedThumb: string;
+  segmentedText: string;
   // Background layers (darkest to lightest)
   canvas: string;
   surface: string;
@@ -91,6 +96,8 @@ export interface ThemePalette {
   accentUserDim: string;
   /** Primary actions keep the send-button blue in both palette modes. */
   primaryAction: string;
+  primaryActionText: string;
+  primaryActionHover: string;
 
   // Semantic colors
   success: string;
@@ -227,6 +234,9 @@ const dark: ThemePalette = {
   chromeField: DARK_SURFACES.control,
   tabMenuBg: '#202020',
   selectionBg: '#484848',
+  segmentedTrack: '#3A3A3A',
+  segmentedThumb: '#626262',
+  segmentedText: '#FFFFFF',
   canvas: DARK_SURFACES.canvas,
   surface: DARK_SURFACES.card,
   cardBg: DARK_SURFACES.elevated,
@@ -264,6 +274,8 @@ const dark: ThemePalette = {
   accentUser: '#183C57',
   accentUserDim: 'rgba(24,60,87,0.35)',
   primaryAction: '#2C67C5',
+  primaryActionText: '#FFFFFF',
+  primaryActionHover: 'color-mix(in srgb, var(--primary-action) 85%, var(--primary-button-text))',
 
   // Semantic colors remain independent from decorative accents.
   success: DARK_ACCENTS.green,
@@ -402,6 +414,9 @@ const light: ThemePalette = {
   chromeField: LIGHT_SURFACES.control,
   tabMenuBg: '#E6E6E6',
   selectionBg: '#FFFFFF',
+  segmentedTrack: '#CCD2D9',
+  segmentedThumb: '#FFFFFF',
+  segmentedText: '#242B30',
   canvas: LIGHT_SURFACES.canvas,
   surface: LIGHT_SURFACES.card,
   cardBg: '#E7E9EB',
@@ -436,6 +451,8 @@ const light: ThemePalette = {
   accentUser: '#D9E4F7',
   accentUserDim: 'rgba(23,62,118,0.12)',
   primaryAction: '#2C67C5',
+  primaryActionText: '#FFFFFF',
+  primaryActionHover: 'color-mix(in srgb, var(--primary-action) 85%, var(--primary-button-text))',
 
   success: LIGHT_ACCENTS.green,
   successDim: 'rgba(48,209,88,0.12)',
@@ -517,6 +534,29 @@ export type ThemeMode = 'dark' | 'light';
 
 export const themes: Record<ThemeMode, ThemePalette> = { dark, light };
 
+const PRESET_CACHE_KEY = 'vrykell-theme-presets';
+export interface ThemePresetSelection { darkPreset?: string; lightPreset?: string }
+
+export function cacheThemePresets(selection: ThemePresetSelection): void {
+  try { localStorage.setItem(PRESET_CACHE_KEY, JSON.stringify(selection)); } catch { /* storage unavailable */ }
+}
+
+export function readThemePresets(): ThemePresetSelection {
+  try {
+    const cached: unknown = JSON.parse(localStorage.getItem(PRESET_CACHE_KEY) ?? '{}');
+    if (!cached || typeof cached !== 'object') return {};
+    const value = (mode: ThemeMode) => {
+      const id: unknown = Reflect.get(cached, `${mode}Preset`);
+      return resolveThemePreset(mode, typeof id === 'string' ? id : undefined).id;
+    };
+    return { darkPreset: value('dark'), lightPreset: value('light') };
+  } catch { return {}; }
+}
+
+export function getPresetPalette(mode: ThemeMode, id?: string): ThemePalette {
+  return presetPalette(themes[mode], resolveThemePreset(mode, id));
+}
+
 /** Stored appearance choice; 'system' follows the operating system. */
 export type ThemePreference = ThemeMode | 'system';
 
@@ -570,6 +610,9 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--chrome-field': p.chromeField,
     '--tab-menu-bg': p.tabMenuBg,
     '--selection-bg': p.selectionBg,
+    '--segmented-track': p.segmentedTrack,
+    '--segmented-thumb': p.segmentedThumb,
+    '--segmented-text': p.segmentedText,
     '--canvas': p.canvas,
     '--surface': p.surface,
     '--card-bg': p.cardBg,
@@ -597,6 +640,8 @@ export function paletteToCssVars(p: ThemePalette): Record<string, string> {
     '--accent-user': p.accentUser,
     '--accent-user-dim': p.accentUserDim,
     '--primary-action': p.primaryAction,
+    '--primary-action-text': p.primaryActionText,
+    '--primary-action-hover': p.primaryActionHover,
     '--success': p.success,
     '--success-dim': p.successDim,
     '--error': p.error,
@@ -682,7 +727,8 @@ export function getThemeOverrides(): Record<string, string> {
 
 /** Writes the palette (plus user overrides) to :root and marks data-theme. */
 export function applyTheme(mode: ThemeMode): void {
-  const base = paletteToCssVars(themes[mode]);
+  const preset = resolveThemePreset(mode, readThemePresets()[`${mode}Preset`]);
+  const base = paletteToCssVars(getPresetPalette(mode, preset.id));
   const vars = { ...base, ...overrides };
   const root = document.documentElement;
   // Remove overrides absent from the new map, so the stylesheet inherits the current palette again.
@@ -693,6 +739,7 @@ export function applyTheme(mode: ThemeMode): void {
     root.style.setProperty(k, v);
   }
   root.dataset.theme = mode;
+  root.dataset.themePreset = preset.id;
   appliedOverrideKeys = new Set(Object.keys(overrides));
 }
 

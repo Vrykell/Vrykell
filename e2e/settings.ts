@@ -1,6 +1,11 @@
 import { expect, type Page } from '@playwright/test';
 import { waitForWorkbench } from './tauri-mock';
 
+export async function selectThemeMode(page: Page, label: string): Promise<void> {
+  const name = label === '深色' ? '始终深色' : label === '浅色' ? '始终浅色' : label;
+  await page.getByRole('radiogroup', { name: '主题模式' }).getByRole('radio', { name, exact: true }).click();
+}
+
 /** Open settings and wait for the static navigation. */
 export async function openSettings(page: Page): Promise<void> {
   await waitForWorkbench(page);

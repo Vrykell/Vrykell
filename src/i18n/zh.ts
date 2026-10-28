@@ -1,5 +1,14 @@
 ﻿/** Simplified Chinese messages for shared UI and feature namespaces. */
 const zh: Record<string, string> = {
+  'Default dark': '默认深色',
+  'Always dark': '始终深色',
+  'Always light': '始终浅色',
+  'Default light': '默认浅色',
+  'Dark color scheme': '深色配色',
+  'Light color scheme': '浅色配色',
+  'Apply a color scheme to the interface, editor and terminal.': '将配色应用于页面、编辑器和终端。',
+  'Your custom colors remain applied.': '已有的自定义颜色仍会保留并优先生效。',
+  'Custom colors': '自定义颜色',
   'Tab actions': '标签页操作',
   'Workspace actions': '工作区操作',
   'Organize with AI': '让 AI 整理',

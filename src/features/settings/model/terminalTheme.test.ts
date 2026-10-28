@@ -23,6 +23,18 @@ beforeEach(() => {
 });
 
 describe('terminalTheme store', () => {
+  it('persists independent built-in choices and exposes save failures for retry', async () => {
+    invokeMock.mockResolvedValue(undefined);
+    await useTerminalThemeStore.getState().update({ darkPreset: 'dracula', lightPreset: 'alucard' });
+    applyTerminalTheme(useTerminalThemeStore.getState().config, 'light');
+    expect(document.documentElement.dataset.themePreset).toBe('alucard');
+    expect(invokeMock).toHaveBeenCalledWith('set_theme_config', { config: expect.objectContaining({ darkPreset: 'dracula', lightPreset: 'alucard' }) });
+    invokeMock.mockRejectedValue(new Error('disk unavailable'));
+    await expect(useTerminalThemeStore.getState().update({ lightPreset: 'nord-light' })).rejects.toThrow('disk unavailable');
+    expect(document.documentElement.dataset.themePreset).toBe('nord-light');
+    invokeMock.mockResolvedValue(undefined);
+    await expect(useTerminalThemeStore.getState().update({ lightPreset: 'nord-light' })).resolves.toBeUndefined();
+  });
   it('load: applies the config and caches the wallpaper URL', async () => {
     convertFileSrcMock.mockReturnValue('asset:///wall.jpg');
     invokeMock.mockResolvedValue({ opacity: 0.8, backgroundImage: '/a/wall.jpg', vars: { '--x': '1' } });

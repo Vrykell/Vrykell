@@ -20,7 +20,7 @@ for (const theme of ['dark', 'light'] as const) {
     });
     await page.reload();
     await gotoSetting(page, '主题');
-    await page.getByRole('radio', { name: theme === 'dark' ? '深色' : '浅色', exact: true }).click();
+    await page.getByRole('radio', { name: theme === 'dark' ? '始终深色' : '始终浅色', exact: true }).click();
     await page.locator('aside').getByRole('button', { name: '主题文件', exact: true }).click();
     const importTheme = page.getByRole('button', { name: '导入主题', exact: true });
     await importTheme.scrollIntoViewIfNeeded();

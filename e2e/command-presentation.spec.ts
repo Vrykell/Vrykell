@@ -67,7 +67,7 @@ test('command coloring is optional, persists and leaves native input editing int
   await input.press('Enter');
   await expect(page.locator('.command-block-command [data-kind]')).toHaveCount(0);
   await gotoSetting(page, '主题');
-  await page.getByRole('radio', { name: '浅色', exact: true }).click();
+  await page.getByRole('radio', { name: '始终浅色', exact: true }).click();
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await expect(page.getByPlaceholder(/输入命令/)).toHaveCSS('caret-color', 'rgb(0, 111, 219)');
 });

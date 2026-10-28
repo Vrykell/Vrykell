@@ -68,7 +68,7 @@ test('typography settings apply globally and are absent from other settings page
   await expect(fonts.getByRole('combobox', { name: '终端渲染器' })).toHaveText('WebGL（默认）');
   await page.screenshot({ path: test.info().outputPath('settings.png') });
   await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
-  await page.getByRole('radio', { name: '浅色', exact: true }).click();
+  await page.getByRole('radio', { name: '始终浅色', exact: true }).click();
   await page.screenshot({ path: test.info().outputPath('settings-light.png') });
 });
 

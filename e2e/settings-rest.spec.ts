@@ -3,7 +3,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, themeConfig, aiKeyCalls } from './tauri-mock';
-import { gotoSetting, fieldOf, rowOf } from './settings';
+import { gotoSetting, fieldOf, rowOf, selectThemeMode } from './settings';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
@@ -15,29 +15,26 @@ test.describe('Theme settings page', () => {
     await gotoSetting(page, '主题');
     const theme = await page.evaluate(() => document.documentElement.dataset.theme);
     expect(theme).toBe('dark');
-    await page.getByRole('radio', { name: '浅色' }).click();
+    await selectThemeMode(page, '浅色');
     await expect
       .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
       .toBe('light');
-    await page.getByRole('radio', { name: '深色' }).click();
+    await selectThemeMode(page, '深色');
     await expect
       .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
       .toBe('dark');
   });
 
-  test('Three theme mode previews sit in one row and follow the system color scheme', async ({ page }) => {
+  test('color scheme cards remain available when following the system', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await gotoSetting(page, '主题');
-    const group = page.getByRole('radiogroup', { name: '主题模式' });
-    await expect(group.getByRole('radio')).toHaveCount(3);
-    await group.getByRole('radio', { name: '跟随系统', exact: true }).click();
-    // One row: every option shares the same vertical position.
-    const tops = await group.getByRole('radio')
-      .evaluateAll(elements => elements.map(element => Math.round(element.getBoundingClientRect().top)));
-    expect(new Set(tops).size).toBe(1);
-    await expect(group.locator('.theme-mode-preview')).toHaveCount(3);
+    await selectThemeMode(page, '跟随系统');
+    await expect(page.getByRole('radiogroup', { name: '深色配色' }).getByRole('radio')).toHaveCount(5);
+    await expect(page.getByRole('radiogroup', { name: '浅色配色' })).toHaveCount(0);
     await page.emulateMedia({ colorScheme: 'light' });
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+    await expect(page.getByRole('radiogroup', { name: '深色配色' })).toHaveCount(0);
+    await expect(page.getByRole('radiogroup', { name: '浅色配色' }).getByRole('radio')).toHaveCount(5);
   });
 
   test('Opacity slider updates the backend config and percentage display', async ({ page }) => {

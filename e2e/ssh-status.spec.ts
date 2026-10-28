@@ -23,7 +23,7 @@ test('the docked status panel follows the light theme and shows event history di
   await page.goto('/');
   await page.getByRole('button', { name: '设置', exact: true }).click();
   await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
-  await page.getByRole('radio', { name: '浅色', exact: true }).click();
+  await page.getByRole('radio', { name: '始终浅色', exact: true }).click();
   await page.locator('[data-dock-btn="ssh"]').click();
   await page.getByTestId('ssh-row-ssh-1').dblclick();
   await emitPtyOutput(page, 'Warning: Permanently added server to the list of known hosts.\r\n');

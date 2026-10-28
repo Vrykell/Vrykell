@@ -5,19 +5,23 @@ export default function SegmentedControl<Value extends string>({ label, value, o
   label: string; value: Value; options: readonly { value: Value; label: string; ariaLabel?: string; icon?: ReactNode }[]; onChange: (value: Value) => void; variant?: 'radio' | 'buttons';
 }) {
   const container = useRef<HTMLDivElement>(null);
-  const [selection, setSelection] = useState({ left: 3, width: 0 });
+  const [selection, setSelection] = useState({ left: 3, top: 3, width: 0, height: 0 });
   useLayoutEffect(() => {
     const root = container.current;
     if (!root) return;
     const update = () => {
       const index = options.findIndex(option => option.value === value);
       const button = root.querySelectorAll<HTMLButtonElement>('button')[index];
-      if (button) setSelection(previous => previous.left === button.offsetLeft && previous.width === button.offsetWidth ? previous : { left: button.offsetLeft, width: button.offsetWidth });
+      if (!button) return;
+      const next = { left: button.offsetLeft, top: button.offsetTop, width: button.offsetWidth, height: button.offsetHeight };
+      setSelection(previous => Object.keys(next).every(key => previous[key as keyof typeof next] === next[key as keyof typeof next]) ? previous : next);
     };
     update();
     const observer = typeof ResizeObserver === 'undefined' ? undefined : new ResizeObserver(update);
     observer?.observe(root);
-    return () => observer?.disconnect();
+    root.querySelectorAll('button').forEach(button => observer?.observe(button));
+    document.fonts?.addEventListener('loadingdone', update);
+    return () => { observer?.disconnect(); document.fonts?.removeEventListener('loadingdone', update); };
   }, [value, options]);
   return <div ref={container} className="segmented-control" role={variant === 'radio' ? 'radiogroup' : 'group'} aria-label={label} onKeyDown={event => {
     if (!options.length || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -27,7 +31,7 @@ export default function SegmentedControl<Value extends string>({ label, value, o
     onChange(options[next].value);
     event.currentTarget.querySelectorAll<HTMLButtonElement>('button')[next]?.focus();
   }}>
-    <span className="segmented-selection" aria-hidden="true" style={{ transform: `translateX(${selection.left}px)`, width: selection.width }} />
+    <span className="segmented-selection" aria-hidden="true" style={{ transform: `translate(${selection.left}px, ${selection.top}px)`, width: selection.width, height: selection.height }} />
     {options.map(option => <button key={option.value} type="button" data-subtle role={variant === 'radio' ? 'radio' : undefined} aria-label={option.ariaLabel}
       aria-checked={variant === 'radio' ? option.value === value : undefined} aria-pressed={variant === 'buttons' ? option.value === value : undefined}
       tabIndex={option.value === value ? 0 : -1} onClick={() => onChange(option.value)}>{option.icon}<span>{option.label}</span></button>)}

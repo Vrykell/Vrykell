@@ -17,7 +17,7 @@ test('the native window frame follows the neutral border color', async ({ page }
   expect(boot.color).toBe(await border());
 
   await gotoSetting(page, '主题');
-  await page.getByRole('radio', { name: '浅色', exact: true }).click();
+  await page.getByRole('radio', { name: '始终浅色', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   const light = await border();
   expect(light).not.toBe(boot.color);

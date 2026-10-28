@@ -4,6 +4,7 @@
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import { t } from '@i18n';
 import { RangeInput } from '@ui/fields/RangeInput';
+import SegmentedControl from '@ui/fields/SegmentedControl';
 import type { ThemePreference } from '@config/theme/tokens';
 import { iconSizes, Image as ImageIcon, Trash2 } from '@ui/icons';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
@@ -14,16 +15,18 @@ import { useToastStore } from '@ui/feedback/Toast';
 import { SettingsGroup, Field, Toggle } from '@features/settings/components/ui';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
 import { isWallpaperImage, wallpaperExtensions } from '../services/wallpaper';
+import { ThemePresetPicker } from '../components/ThemePresetPicker';
 
 /** Appearance choices offered in order; 'system' follows the operating system. */
 const THEME_PREFERENCES: { value: ThemePreference; label: string }[] = [
-  { value: 'light', label: 'Light' },
-  { value: 'dark', label: 'Dark' },
+  { value: 'dark', label: 'Always dark' },
+  { value: 'light', label: 'Always light' },
   { value: 'system', label: 'Follow system' },
 ];
 
 export function ThemePage() {
-  const { preference, setMode } = useTheme();
+  const { mode, preference, setMode } = useTheme();
+  const displayedMode = preference === 'system' ? mode : preference;
   const config = useTerminalThemeStore((s) => s.config);
   const themeUpdate = useTerminalThemeStore((s) => s.update);
   const { save } = useSettingsSave();
@@ -60,26 +63,19 @@ export function ThemePage() {
   return (
     <SettingsGroup title={t('Appearance')}>
       <Field title={t('Theme mode')} description={t('Choose a light or dark appearance.')}>
-        <div className="theme-mode-choices" role="radiogroup" aria-label={t('Theme mode')}>
-          {THEME_PREFERENCES.map(option => {
-            const active = preference === option.value;
-            return (
-              <button
-                key={option.value}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                className="theme-mode-choice"
-                data-mode={option.value}
-                onClick={() => { void save(() => setMode(option.value)); }}
-              >
-                <span className="theme-mode-preview" aria-hidden="true"><span className="theme-preview-navigation" /><span className="theme-preview-lines"><i /><i /><i /></span></span>
-                <span>{t(option.label)}</span>
-              </button>
-            );
-          })}
-        </div>
+        <SegmentedControl label={t('Theme mode')} value={preference}
+          options={THEME_PREFERENCES.map(option => ({ ...option, label: t(option.label) }))}
+          onChange={value => { void save(() => setMode(value)); }} />
       </Field>
+
+      <Field title={t(displayedMode === 'dark' ? 'Dark color scheme' : 'Light color scheme')}
+        description={t('Apply a color scheme to the interface, editor and terminal.')} layout="stacked">
+        <ThemePresetPicker mode={displayedMode} value={config[`${displayedMode}Preset`]}
+          onChange={id => { void save(() => themeUpdate({ [`${displayedMode}Preset`]: id })); }} />
+      </Field>
+      {Object.keys(config.vars).length > 0 && <Field title={t('Custom colors')} description={t('Your custom colors remain applied.')}>
+        <span>{t('Enabled')}</span>
+      </Field>}
 
       {supportsNativeMaterial && (
         <Field title={t('Desktop material')} description={t('Use acrylic material in the left sidebar. Other regions stay opaque.')}>

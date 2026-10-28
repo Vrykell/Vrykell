@@ -103,6 +103,10 @@ for (const item of nativePackages.values()) {
 }
 
 const assetLicenses = [
+  ['palette:Dracula and Alucard', 'MIT', 'dracula-MIT.txt', 'https://draculatheme.com/spec'],
+  ['palette:Nord', 'MIT', 'nord-MIT.txt', 'https://www.nordtheme.com/docs/colors-and-palettes/'],
+  ['palette:Solarized', 'MIT', 'solarized-MIT.txt', 'https://ethanschoonover.com/solarized/'],
+  ['palette:Catppuccin', 'MIT', 'catppuccin-MIT.txt', 'https://github.com/catppuccin/palette/blob/main/palette.json'],
   ['icons:devicon and devicon-plain', 'MIT', 'devicon-MIT.txt', 'https://github.com/devicons/devicon/blob/master/LICENSE'],
   ['icons:mdi', 'Apache-2.0', 'material-icons-notice.txt', 'https://github.com/Templarian/MaterialDesign/blob/master/LICENSE'],
   ['icons:codicons', 'CC-BY-4.0', 'codicons-CC-BY-4.0.txt', 'https://github.com/microsoft/vscode-codicons'],
@@ -128,7 +132,8 @@ const lines = [
   'Original copyright and license texts below are reproduced in their original language.',
   'The project license does not replace the licenses of these components.', '',
   'Scope: frontend output modules; four desktop target dependency graphs, including',
-  'build tools; bundled native dependency sources; imported icon sets; bundled fonts.',
+  'build tools; bundled native dependency sources; imported icon sets; bundled fonts;',
+  'published color palettes, independently mapped to application roles.',
   'A listing is conservative and does not imply every listed build dependency is linked.',
   'Covered source packages, including unmodified MPL-2.0 sources, are available at the',
   'exact-version source URLs below. Preserve these notices with redistributed copies.',

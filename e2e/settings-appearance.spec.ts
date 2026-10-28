@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock } from './tauri-mock';
-import { gotoSetting } from './settings';
+import { setupTauriMock, themeConfig } from './tauri-mock';
+import { gotoSetting, selectThemeMode } from './settings';
 
 /** Inject a bare block so the stylesheet contract can be probed without real output. */
 async function injectBlock(page: import('@playwright/test').Page, className: string, id: string) {
@@ -33,16 +33,18 @@ const readColors = (page: import('@playwright/test').Page, id: string) => page.e
 const blockField = (page: import('@playwright/test').Page, title: string) =>
   page.locator('.settings-field').filter({ hasText: title }).first();
 
-test('appearance offers light, dark and follow system as one radio group', async ({ page }) => {
+test('appearance offers light, dark and follow system through one sliding control', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await gotoSetting(page, '主题');
-  const group = page.getByRole('radiogroup', { name: '主题模式' });
-  await expect(group.getByRole('radio')).toHaveCount(3);
-  await expect(group.getByRole('radio', { name: '深色', exact: true })).toHaveAttribute('aria-checked', 'true');
-  await group.getByRole('radio', { name: '浅色', exact: true }).click();
+  const mode = page.getByRole('radiogroup', { name: '主题模式' });
+  await expect(mode.getByRole('radio')).toHaveCount(3);
+  await expect(mode.getByRole('radio', { name: '始终深色', exact: true })).toHaveAttribute('aria-checked', 'true');
+  await selectThemeMode(page, '浅色');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
-  await expect(group.getByRole('radio', { name: '浅色', exact: true })).toHaveAttribute('aria-checked', 'true');
+  await expect(mode.getByRole('radio', { name: '始终浅色', exact: true })).toHaveAttribute('aria-checked', 'true');
+  await expect(page.getByRole('radiogroup', { name: '深色配色' })).toHaveCount(0);
+  await expect(page.getByRole('radiogroup', { name: '浅色配色' }).getByRole('radio')).toHaveCount(5);
 });
 
 test('follow system tracks the operating system appearance', async ({ page }) => {
@@ -50,7 +52,7 @@ test('follow system tracks the operating system appearance', async ({ page }) =>
   await page.goto('/');
   await gotoSetting(page, '主题');
   await page.emulateMedia({ colorScheme: 'dark' });
-  await page.getByRole('radio', { name: '跟随系统', exact: true }).click();
+  await selectThemeMode(page, '跟随系统');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await page.emulateMedia({ colorScheme: 'light' });
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
@@ -59,6 +61,43 @@ test('follow system tracks the operating system appearance', async ({ page }) =>
   await gotoSetting(page, '主题');
   await expect(page.getByRole('radio', { name: '跟随系统', exact: true })).toHaveAttribute('aria-checked', 'true');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+});
+
+test('built-in schemes update live colors, survive reload, follow the system and restore original defaults', async ({ page }, info) => {
+  test.setTimeout(60_000);
+  await setupTauriMock(page);
+  await page.goto('/');
+  await gotoSetting(page, '主题');
+  const original = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim());
+  await page.getByRole('radio', { name: 'Dracula', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme-preset', 'dracula');
+  await expect.poll(() => themeConfig(page)).toMatchObject({ darkPreset: 'dracula' });
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--xterm-bg').trim())).toBe('#282A36');
+  await page.setViewportSize({ width: 1240, height: 900 });
+  await page.screenshot({ path: info.outputPath('schemes-wide.png') });
+  await selectThemeMode(page, '浅色');
+  await page.getByRole('radio', { name: 'Catppuccin Latte', exact: true }).click();
+  await expect.poll(() => themeConfig(page)).toMatchObject({ darkPreset: 'dracula', lightPreset: 'catppuccin-latte' });
+  await page.reload();
+  await gotoSetting(page, '主题');
+  await expect(page.locator('html')).toHaveAttribute('data-theme-preset', 'catppuccin-latte');
+  await expect(page.getByRole('radiogroup', { name: '深色配色' })).toHaveCount(0);
+  await selectThemeMode(page, '跟随系统');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(page.locator('html')).toHaveAttribute('data-theme-preset', 'dracula');
+  await expect(page.getByRole('radiogroup', { name: '浅色配色' })).toHaveCount(0);
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect(page.locator('html')).toHaveAttribute('data-theme-preset', 'catppuccin-latte');
+  await page.setViewportSize({ width: 760, height: 800 });
+  await page.screenshot({ path: info.outputPath('schemes-narrow.png') });
+  expect(await page.locator('.settings-content').evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  await selectThemeMode(page, '深色');
+  const selected = page.getByRole('radio', { name: 'Dracula', exact: true });
+  await selected.focus();
+  await selected.press('Home');
+  await expect(page.getByRole('radio', { name: '默认深色' })).toBeFocused();
+  await expect(page.locator('html')).toHaveAttribute('data-theme-preset', 'default-dark');
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim())).toBe(original);
 });
 
 test('a block colour row shows a swatch and name, matching swatches in the menu, and the switch to its left', async ({ page }) => {

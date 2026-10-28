@@ -31,7 +31,6 @@
 .ssh-forwarding-address > input:first-child { flex: 1; min-width: 0; }
 .ssh-forwarding-address > input:last-child { width: 72px; min-width: 0; }
 .ssh-forwarding-dialog .segmented-control { width: 100%; box-sizing: border-box; }
-.ssh-forwarding-dialog .segmented-control > button { padding-inline: 6px; }
 .ssh-forwarding-checkbox > span:last-child { display: flex; align-items: center; gap: 8px; }
 .ssh-forwarding-dialog > footer { display: flex; justify-content: flex-end; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
 @media (max-width: 760px) {

@@ -78,11 +78,10 @@ test('language and appearance choices apply immediately and persist', async ({ p
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await page.locator('.settings-navigation').getByRole('button', { name: 'Theme', exact: true }).click();
   const modes = page.getByRole('radiogroup', { name: 'Theme mode', exact: true });
-  await expect(modes.locator('.theme-mode-preview')).toHaveCount(3);
-  const selectedPreview = modes.getByRole('radio', { checked: true }).locator('.theme-mode-preview');
-  await expect(selectedPreview).toHaveCSS('border-top-width', '3px');
-  await expect(selectedPreview).toHaveCSS('outline-style', 'none');
-  await modes.getByRole('radio', { name: 'Light', exact: true }).click();
+  await expect(page.locator('.theme-preset-preview')).toHaveCount(5);
+  const selectedPreview = page.locator('.theme-preset-choice[aria-checked="true"] .theme-preset-preview');
+  await expect(selectedPreview).toHaveCSS('outline-width', '2px');
+  await modes.getByRole('radio', { name: 'Always light', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
   const tint = page.getByRole('switch', { name: 'Desktop material', exact: true });
   if (await tint.count()) {
@@ -94,7 +93,7 @@ test('language and appearance choices apply immediately and persist', async ({ p
   }
   await expect(page.locator('.workspace-sidebar')).toHaveCSS('background-color', 'rgb(233, 240, 250)');
   await page.screenshot({ path: info.outputPath('appearance-light.png') });
-  await modes.getByRole('radio', { name: 'Dark', exact: true }).click();
+  await modes.getByRole('radio', { name: 'Always dark', exact: true }).click();
   await page.screenshot({ path: info.outputPath('appearance-dark.png') });
   await modes.getByRole('radio', { name: 'Follow system', exact: true }).click();
   await page.emulateMedia({ colorScheme: 'light' });

@@ -5,7 +5,8 @@ Original copyright and license texts below are reproduced in their original lang
 The project license does not replace the licenses of these components.
 
 Scope: frontend output modules; four desktop target dependency graphs, including
-build tools; bundled native dependency sources; imported icon sets; bundled fonts.
+build tools; bundled native dependency sources; imported icon sets; bundled fonts;
+published color palettes, independently mapped to application roles.
 A listing is conservative and does not imply every listed build dependency is linked.
 Covered source packages, including unmodified MPL-2.0 sources, are available at the
 exact-version source URLs below. Preserve these notices with redistributed copies.
@@ -5604,6 +5605,34 @@ License expression: MIT
 Source: https://www.npmjs.com/package/zustand/v/5.0.14
 Notice file: LICENSE
 License text reference: license-text-384a8fa756d4ca7e
+
+==============================================================================
+palette:Catppuccin
+License expression: MIT
+Source: https://github.com/catppuccin/palette/blob/main/palette.json
+Notice file: catppuccin-MIT.txt
+License text reference: license-text-d5d1e7a11f84cd34
+
+==============================================================================
+palette:Dracula and Alucard
+License expression: MIT
+Source: https://draculatheme.com/spec
+Notice file: dracula-MIT.txt
+License text reference: license-text-6dead4f6c565096c
+
+==============================================================================
+palette:Nord
+License expression: MIT
+Source: https://www.nordtheme.com/docs/colors-and-palettes/
+Notice file: nord-MIT.txt
+License text reference: license-text-807770acd37c3dc0
+
+==============================================================================
+palette:Solarized
+License expression: MIT
+Source: https://ethanschoonover.com/solarized/
+Notice file: solarized-MIT.txt
+License text reference: license-text-7fb9a5cfbc9f17ee
 
 ==============================================================================
 license-text-008f1b11c6d18763
@@ -14502,6 +14531,31 @@ Apache License
    limitations under the License.
 
 ==============================================================================
+license-text-6dead4f6c565096c
+
+The MIT License (MIT)
+
+Copyright (c) 2023 Dracula Theme
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+==============================================================================
 license-text-6e2add96be069099
 
                                Apache License
@@ -16319,6 +16373,29 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 
 ==============================================================================
+license-text-7fb9a5cfbc9f17ee
+
+Copyright (c) 2011 Ethan Schoonover
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
+
+==============================================================================
 license-text-7fdbca77dec6709a
 
 Copyright (c) Jacob Pratt et al.
@@ -16347,6 +16424,31 @@ license-text-806766baa9009e38
 The MIT License (MIT)
 
 Copyright (c) 2016 - present Microsoft Corporation
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+==============================================================================
+license-text-807770acd37c3dc0
+
+MIT License (MIT)
+
+Copyright (c) 2016-present Sven Greb <development@svengreb.de> (https://www.svengreb.de)
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -23436,6 +23538,31 @@ license-text-d3c8c167dfa0a8a7
 The MIT License (MIT)
 
 Copyright (c) 2013-2020 Khan Academy and other contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+==============================================================================
+license-text-d5d1e7a11f84cd34
+
+MIT License
+
+Copyright (c) 2021 Catppuccin
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

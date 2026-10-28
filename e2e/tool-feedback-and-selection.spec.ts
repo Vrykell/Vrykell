@@ -8,7 +8,7 @@ for (const theme of ['dark', 'light']) for (const width of [900, 1440]) {
     await page.setViewportSize({ width, height: 800 });
     await page.goto('/');
     await gotoSetting(page, '主题');
-    await page.getByRole('radio', { name: theme === 'dark' ? '深色' : '浅色', exact: true }).click();
+    await page.getByRole('radio', { name: theme === 'dark' ? '始终深色' : '始终浅色', exact: true }).click();
     await page.locator('[data-dock-btn="chat"]').click();
     const side = page.getByTestId('ai-sidebar-content');
     await expect(side.locator('[data-chat-composer]')).toBeVisible();
