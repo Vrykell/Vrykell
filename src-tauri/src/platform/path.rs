@@ -1,15 +1,15 @@
-//! 远端（POSIX）路径语义。
+//! Remote POSIX path semantics.
 //!
-//! 远端主机的路径规则与宿主平台无关：在 Windows 上 `std::path::Path` 会把 `/home/user`
-//! 判成相对路径、`join` 会插入反斜杠、`is_absolute` 会返回 false。因此远端路径的
-//! 「绝对/相对判断、拼接、取父目录、取文件名、规范化」一律走这里，不要用 std::path。
+//! Remote path rules do not depend on the host platform. On Windows, `std::path::Path` treats `/home/user`
+//! as relative, inserts backslashes in `join`, and returns false from `is_absolute`. Remote path
+//! checks, joining, parents, file names and normalization must go through this module instead.
 
-/// 是否绝对路径（POSIX：以 `/` 开头）。
+/// Whether a path is absolute under POSIX rules (starts with `/`).
 pub fn is_absolute(path: &str) -> bool {
     path.starts_with('/')
 }
 
-/// 规范化：折叠重复分隔符、去掉 `.` 与结尾 `/`，处理 `..`（不会越过根）。
+/// Normalize by collapsing repeated separators, removing `.` and trailing `/`, and resolving `..` without leaving the root.
 pub fn normalize(path: &str) -> String {
     if path.is_empty() {
         return "/".to_string();
@@ -27,7 +27,7 @@ pub fn normalize(path: &str) -> String {
     format!("/{}", parts.join("/"))
 }
 
-/// 拼接目录与名称（目录为根时不会产生 `//`）。
+/// Join a directory and name without producing `//` at the root.
 pub fn join(dir: &str, name: &str) -> String {
     if dir.is_empty() {
         return if name.starts_with('/') { name.to_string() } else { format!("/{name}") };
@@ -39,7 +39,7 @@ pub fn join(dir: &str, name: &str) -> String {
     format!("{base}/{name}")
 }
 
-/// 父目录；根目录或空路径返回 None。
+/// Parent directory; the root or an empty path returns None.
 pub fn parent(path: &str) -> Option<String> {
     let normalized = normalize(path);
     if normalized == "/" {
@@ -52,7 +52,7 @@ pub fn parent(path: &str) -> Option<String> {
     Some(normalized[..cut].to_string())
 }
 
-/// 文件名（末段）；根目录或空路径返回 None。
+/// Final path component; the root or an empty path returns None.
 pub fn file_name(path: &str) -> Option<String> {
     let normalized = normalize(path);
     if normalized == "/" {
@@ -61,9 +61,9 @@ pub fn file_name(path: &str) -> Option<String> {
     normalized.rsplit('/').next().map(|name| name.to_string())
 }
 
-/// 从「目录 + 文件名」的列表结果里取出文件名。
-/// ssh2 的便捷 readdir 会用宿主平台的分隔符拼路径（Windows 上是 `\`），这里按请求的目录
-/// 前缀剥离，兼容两种分隔符后再取末段。
+/// Extract the file name from a "directory + name" listing result.
+/// ssh2's convenience readdir uses the host separator (a backslash on Windows). Strip the requested
+/// directory prefix, accept either separator, then take the final component.
 pub fn name_from_listing(listed: &str, dir: &str) -> Option<String> {
     let base = dir.trim_end_matches('/');
     let stripped = listed
@@ -77,7 +77,7 @@ pub fn name_from_listing(listed: &str, dir: &str) -> Option<String> {
     }
 }
 
-/// 判断 `child` 是否位于 `ancestor` 之内（含自身）。
+/// Whether `child` is inside `ancestor`, including the ancestor itself.
 pub fn is_within(child: &str, ancestor: &str) -> bool {
     let child = normalize(child);
     let ancestor = normalize(ancestor);
@@ -95,8 +95,8 @@ pub fn is_safe_component(name: &str) -> bool {
     !name.is_empty() && name != "." && name != ".." && !name.contains('/') && !name.contains('\\')
 }
 
-/// 在目录内生成带序号的安全名：`name (1).ext`、`Documents (1)`（序号在扩展名前）。
-/// `exists` 由调用方提供（本地磁盘 / 远端 stat）。
+/// Generate a numbered name inside a directory: `name (1).ext` or `Documents (1)` with the number before the extension.
+/// The caller supplies `exists` for the local disk or remote stat.
 pub fn numbered_name<F: Fn(&str) -> bool>(name: &str, exists: F) -> String {
     let (stem, extension) = split_extension(name);
     for index in 1..10_000u32 {
@@ -119,7 +119,7 @@ pub fn available_name<F: Fn(&str) -> bool>(name: &str, exists: F) -> String {
     if exists(name) { numbered_name(name, exists) } else { name.to_string() }
 }
 
-/// 拆出「主干 + 扩展名」（无扩展名时扩展名为 None，点开头的隐藏文件整体视为主干）。
+/// Split a stem and extension; a missing extension is None and a leading-dot file is all stem.
 pub fn split_extension(name: &str) -> (String, Option<String>) {
     match name.rfind('.') {
         Some(index) if index > 0 && index < name.len() - 1 => {
@@ -157,7 +157,7 @@ mod tests {
         assert_eq!(join("/home/user/", "docs"), "/home/user/docs");
         assert_eq!(join("/", "docs"), "/docs");
         assert_eq!(join("", "docs"), "/docs");
-        // Windows 宿主上也必须是 POSIX 结果
+        // The result must remain POSIX even on a Windows host.
         assert!(!join("/home/user", "docs").contains('\\'));
     }
 

@@ -8,7 +8,7 @@ use std::sync::{atomic::{AtomicBool, Ordering}, Arc, LazyLock, Mutex};
 static FILE_SEARCHES: LazyLock<Mutex<std::collections::HashMap<String, Arc<AtomicBool>>>> =
     LazyLock::new(|| Mutex::new(std::collections::HashMap::new()));
 
-/// 文件匹配结果
+/// File match result.
 #[derive(Clone, Serialize, Debug)]
 pub struct FileMatch {
     pub name: String,
@@ -20,10 +20,10 @@ pub struct FileMatch {
     pub content_snippet: Option<String>,
 }
 
-/// 文件系统搜索 — 使用 ripgrep 的 `ignore` crate 进行遍历：
-/// - 自动尊重 .gitignore / .ignore / 全局 gitignore
-/// - 跳过隐藏文件和二进制文件
-/// - 支持文件名 / 路径 / 内容匹配
+/// Filesystem search traversal using ripgrep's `ignore` crate:
+/// - Respects .gitignore, .ignore and global gitignore rules.
+/// - Skips hidden and binary files.
+/// - Supports name, path and content matches.
 fn search_files_sync(
     query: String,
     max_results: usize,
@@ -33,7 +33,7 @@ fn search_files_sync(
     cancelled: &AtomicBool,
     mut on_progress: impl FnMut(&[FileMatch]),
 ) -> Vec<FileMatch> {
-    // 合并 root 和 roots 参数
+    // Merge the root and roots arguments.
     let search_roots: Vec<String> = if let Some(roots) = roots {
         roots
     } else if let Some(root) = root {
@@ -82,7 +82,7 @@ fn search_files_sync(
             let path = entry.path();
             let path_str = path.to_string_lossy().to_string();
 
-            // 跨工作区去重
+            // Deduplicate across workspaces.
             if seen.contains(&path_str) {
                 continue;
             }
@@ -140,7 +140,7 @@ fn search_files_sync(
         }
     }
 
-    // 目录优先，然后按修改时间降序
+    // Directories first, then newest modification time.
     results.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then_with(|| b.modified.cmp(&a.modified)));
     results
 }
@@ -161,7 +161,7 @@ pub async fn search_files(
     if let Some(id) = &request_id {
         if let Ok(mut searches) = FILE_SEARCHES.lock() { searches.insert(id.clone(), cancelled.clone()); }
     }
-    // 整树遍历 + 内容读取是重 IO，移出主线程（同步 command 会冻结 UI）
+    // Whole-tree traversal and content reads are heavy I/O; keep them off the main thread so the UI does not freeze.
     let result = tauri::async_runtime::spawn_blocking(move || {
         search_files_sync(query, max_results, search_content, root, roots, &cancelled, |matches| {
             if let Some(channel) = &on_progress { let _ = channel.send(matches.to_vec()); }
@@ -182,11 +182,11 @@ pub fn search_files_cancel(request_id: String) {
     }
 }
 
-/// 用 regex 在文本文件中搜索，返回匹配行上下文（最多 100 字符）
+/// Search a text file with a regex and return up to 100 characters of matching context.
 fn match_in_file(path: &std::path::Path, re: &regex::Regex) -> Option<String> {
     let metadata = fs::metadata(path).ok()?;
 
-    // 跳过超过 512KB 的文件
+    // Skip files larger than 512 KB.
     if metadata.len() > 512 * 1024 {
         return None;
     }
@@ -197,7 +197,7 @@ fn match_in_file(path: &std::path::Path, re: &regex::Regex) -> Option<String> {
         let match_len = m.end() - m.start();
         let raw_start = pos.saturating_sub(40);
         let raw_end = std::cmp::min(pos + match_len + 40, content.len());
-        // 上下文窗口可能落在多字节 UTF-8 中间，先对齐到字符边界避免切片 panic
+        // The context window may land inside a multi-byte UTF-8 sequence; align to character boundaries to avoid a slice panic.
         let start = content.floor_char_boundary(raw_start);
         let end = content.ceil_char_boundary(raw_end);
         let snippet = &content[start..end];
@@ -214,7 +214,7 @@ fn match_in_file(path: &std::path::Path, re: &regex::Regex) -> Option<String> {
     }
 }
 
-/// 搜索命令历史（后端 SQLite 查询）
+/// Search command history through SQLite.
 #[tauri::command]
 pub fn search_history(
     state: tauri::State<'_, HistoryState>,
@@ -234,7 +234,7 @@ pub fn search_history(
     )
 }
 
-/// 记录命令到 SQLite 历史
+/// Record a command in SQLite history.
 #[tauri::command]
 pub fn record_history(
     state: tauri::State<'_, HistoryState>,
@@ -247,14 +247,14 @@ pub fn record_history(
     db.record(&command, &cwd, exit_code, timestamp)
 }
 
-/// 清空命令历史
+/// Clear command history.
 #[tauri::command]
 pub fn clear_history(state: tauri::State<'_, HistoryState>) -> Result<(), String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
     db.clear_history()
 }
 
-/// 按关键词搜索命令块（联表 sessions 拿标题/状态）
+/// Search command blocks, joining sessions for title and status.
 #[tauri::command]
 pub fn search_blocks(
     state: tauri::State<'_, HistoryState>,
@@ -266,7 +266,7 @@ pub fn search_blocks(
     db.search_blocks(&query, max_results, filter_session_status.as_deref())
 }
 
-/// 按标题搜索会话
+/// Search sessions by title.
 #[tauri::command]
 pub fn search_sessions(
     state: tauri::State<'_, HistoryState>,
