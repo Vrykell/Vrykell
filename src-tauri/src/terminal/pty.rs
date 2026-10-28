@@ -198,17 +198,24 @@ fn close_sessions(sessions: Vec<Arc<Mutex<PtySession>>>, deadline: std::time::In
     }
     let graceful_deadline = std::time::Instant::now()
         + deadline.saturating_duration_since(std::time::Instant::now()) / 2;
-    for session in &sessions {
-        let remaining = graceful_deadline.saturating_duration_since(std::time::Instant::now());
-        let _ = wait_child_bounded(&mut *lock_unpoisoned(session).child, remaining);
-    }
+    wait_sessions_bounded(&sessions, graceful_deadline);
     for session in &sessions {
         let mut state = lock_unpoisoned(session);
         if !matches!(state.child.try_wait(), Ok(Some(_))) { force_session_close(&mut state); }
     }
-    for session in &sessions {
+    wait_sessions_bounded(&sessions, deadline);
+}
+
+fn wait_sessions_bounded(sessions: &[Arc<Mutex<PtySession>>], deadline: std::time::Instant) {
+    loop {
+        let mut all_exited = true;
+        for session in sessions {
+            let exited = matches!(lock_unpoisoned(session).child.try_wait(), Ok(Some(_)));
+            all_exited &= exited;
+        }
         let remaining = deadline.saturating_duration_since(std::time::Instant::now());
-        let _ = wait_child_bounded(&mut *lock_unpoisoned(session).child, remaining);
+        if all_exited || remaining.is_zero() { return; }
+        std::thread::sleep(remaining.min(std::time::Duration::from_millis(10)));
     }
 }
 
@@ -1132,6 +1139,9 @@ fn kill_child_tree(child: &mut dyn Child) {
             libc::kill(pid as i32, libc::SIGTERM);
         }
     }
+    // The portable child helper owns a separate grace wait on Unix. This caller already
+    // owns the deadline, so invoking that helper would spend the batch budget per child.
+    #[cfg(not(unix))]
     let _ = child.kill();
 }
 
@@ -1641,7 +1651,8 @@ mod tests {
         for session in &refs {
             let mut state = lock_unpoisoned(session);
             assert!(state.closed.load(Ordering::Acquire), "sweep must flag the session closed");
-            assert!(state.child.try_wait().ok().flatten().is_some(), "every child must be reaped");
+            let status = state.child.try_wait();
+            assert!(matches!(status, Ok(Some(_))), "every child must be reaped: pid={:?}, status={status:?}", state.child.process_id());
         }
     }
 
@@ -1669,7 +1680,9 @@ mod tests {
         close_sessions(sessions.clone(), started + std::time::Duration::from_millis(500));
         assert!(started.elapsed() < std::time::Duration::from_secs(2), "batch close must remain bounded");
         for session in sessions {
-            assert!(lock_unpoisoned(&session).child.try_wait().unwrap().is_some(), "every forced child must be reaped");
+            let mut state = lock_unpoisoned(&session);
+            let status = state.child.try_wait();
+            assert!(matches!(status, Ok(Some(_))), "every forced child must be reaped: pid={:?}, status={status:?}", state.child.process_id());
         }
     }
 
