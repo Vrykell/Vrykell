@@ -68,9 +68,11 @@ for (const mode of ['dark', 'light'] as const) {
       const context = canvas.getContext('2d')!;
       context.drawImage(image, 0, 0);
       const color = (x: number, row: number) => Array.from(context.getImageData(x, row, 1, 1).data).join(',');
+      // Fractional screenshot clips can include the neighboring pane border in their final column.
+      const trackX = image.width - 4;
       return {
-        divider: color(image.width - 20, y), edgeDivider: color(image.width - 1, y),
-        background: color(image.width - 20, y + 8), edgeBackground: color(image.width - 1, y + 8),
+        divider: color(image.width - 20, y), edgeDivider: color(trackX, y),
+        background: color(image.width - 20, y + 8), edgeBackground: color(trackX, y + 8),
       };
     }, { png: png.toString('base64'), y: Math.round(divider.y - bounds.y) });
     expect(pixels.edgeDivider).toBe(pixels.divider);
