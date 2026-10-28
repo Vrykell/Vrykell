@@ -6,8 +6,8 @@ test.beforeEach(async ({ page }) => {
   await page.goto('/');
 });
 
-test.describe('应用布局', () => {
-  test('TopDock 功能区：标签/资源按钮 + 设置入口', async ({ page }) => {
+test.describe('Application layout', () => {
+  test('TopDock actions: tabs and files buttons plus the settings entry', async ({ page }) => {
     // Navigation actions remain discoverable in the activity bar.
     await expect(page.locator('[data-dock-btn="tabs"]')).toBeVisible();
     await expect(page.locator('[data-dock-btn="files"]')).toBeVisible();
@@ -17,8 +17,8 @@ test.describe('应用布局', () => {
     await expect(page.locator('[data-testid="ssh-search"]')).toBeHidden();
   });
 
-  test('Windows/Linux 使用应用内窗口控制按钮', async ({ page }) => {
-    test.skip(await page.evaluate(() => /Mac/.test(navigator.userAgent)), 'macOS 使用原生交通灯');
+  test('Windows/Linux use in-app window controls', async ({ page }) => {
+    test.skip(await page.evaluate(() => /Mac/.test(navigator.userAgent)), 'macOS uses the native traffic lights');
     const controls = page.locator('[data-testid="window-controls"]');
     await expect(controls).toBeVisible();
     await expect(controls.locator('button')).toHaveCount(3);
@@ -61,42 +61,42 @@ test.describe('应用布局', () => {
     await controls.locator('[data-testid="window-close"]').click();
   });
 
-  test('文件面板：点击资源按钮后显示目录和文件', async ({ page }) => {
-    // 点击 "资源" dock 按钮打开文件面板
+  test('files panel: clicking the files button shows directories and files', async ({ page }) => {
+    // Click the "files" dock button to open the files panel.
     await page.locator('[data-dock-btn="files"]').click();
     await expect(page.getByText('Documents')).toBeVisible({ timeout: 3000 });
     await expect(page.getByText('notes.txt')).toBeVisible();
   });
 
-  test('终端区：xterm 挂载且有底部输入栏', async ({ page }) => {
-    // 新管线默认进入 blockList，xterm 仍挂载但隐藏；底部输入栏应可见
+  test('terminal area: xterm is mounted and the bottom input bar is present', async ({ page }) => {
+    // The new pipeline starts in blockList, so xterm stays mounted but hidden; the bottom input bar should be visible.
     await expect(page.locator('.xterm')).toBeAttached();
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   });
 
-  test('底部输入栏支持 AI 模式切换', async ({ page }) => {
+  test('the bottom input bar supports switching to AI mode', async ({ page }) => {
     await page.getByRole('button', { name: '询问 AI', exact: true }).click();
     await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
     await page.locator('[data-dock-btn="chat"]').click();
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   });
 
-  test('标签面板：打开面板 → 新建标签 → 切换', async ({ page }) => {
-    // 新标签同样进入 blockList，xterm 挂载但隐藏
+  test('tab panel: open the panel, create a tab and switch', async ({ page }) => {
+    // A new tab also enters blockList, so xterm is mounted but hidden.
     await expect(page.locator('.xterm')).toBeAttached();
-    // 点击 "标签" dock 按钮打开标签面板
+    // Click the "tabs" dock button to open the tab panel.
     await ensureTabsOpen(page);
-    // 面板内点击顶部新建按钮 → 直接弹出类型选择弹窗（无中间菜单）
+    // Clicking the panel's top new button opens the shell picker directly (no intermediate menu).
     await page.locator('[data-testid="tab-new-btn"]').click();
     await page.getByText('Zsh', { exact: true }).click();
-    // 验证两个标签都在面板中可见
+    // Verify both tabs are visible in the panel.
     await expect(page.locator('[data-testid^="tab-row-"]')).toHaveCount(2);
-    // 点击第一个标签切换回去
+    // Click the first tab to switch back.
     await page.getByText('终端').first().click();
     await expect(page.locator('[data-testid^="tab-row-"]')).toHaveCount(2);
   });
 
-  test('文档级滚动已锁定 — html/body overflow 裁剪', async ({ page }) => {
+  test('document scrolling is locked: html/body overflow clips', async ({ page }) => {
     const check = () => page.evaluate(() => ({
       scrollHeight: document.documentElement.scrollHeight,
       innerHeight: window.innerHeight,
@@ -105,16 +105,16 @@ test.describe('应用布局', () => {
       htmlOverflow: getComputedStyle(document.documentElement).overflow,
     }));
 
-    // html/body overflow 应为 hidden
+    // html/body overflow should be hidden.
     let s = await check();
     expect(s.htmlOverflow).toBe('hidden');
     expect(s.bodyOverflow).toBe('hidden');
 
-    // 初始文档不可滚动
+    // The document cannot scroll initially.
     expect(s.scrollHeight).toBeLessThanOrEqual(s.innerHeight + 2);
     expect(s.scrollY).toBe(0);
 
-    // 打开面板后重新验证
+    // Verify again after opening the panel.
     await ensureTabsOpen(page);
     await page.waitForTimeout(300);
 

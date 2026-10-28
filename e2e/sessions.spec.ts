@@ -12,23 +12,23 @@ test.beforeEach(async ({ page }, testInfo) => {
   await page.goto('/');
 });
 
-test.describe('会话历史管理', () => {
-  test('启动时自动恢复上次活跃会话', async ({ page }) => {
-    // mock list_sessions 返回 status=active 的 t1 → 启动后自动恢复为标签
-    // （恢复的标签 id 为 t1，区别于模块级默认标签）
+test.describe('Session history management', () => {
+  test('startup restores the last active session automatically', async ({ page }) => {
+    // The mock list_sessions returns t1 with status=active, so it is restored as a tab on startup
+    // (the restored tab id is t1, distinct from the module-level default tab).
     await ensureTabsOpen(page);
     await expect(page.locator('[data-testid="tab-row-t1"]')).toBeVisible({ timeout: 5000 });
   });
 
-  test('筛选：搜索框 + 筛选菜单过滤会话，状态同会话内记忆', async ({ page }) => {
+  test('filtering: the search box and filter menu narrow sessions and the state is remembered within the session', async ({ page }) => {
     await openHistory(page);
     await expect(page.getByText('旧的调试会话')).toBeVisible();
-    // 搜索过滤
+    // Search filtering.
     await fillHistorySearch(page, 'unified-history-search', '不存在的会话');
     await expect(page.getByText('旧的调试会话')).toHaveCount(0);
     await fillHistorySearch(page, 'unified-history-search', '');
     await expect(page.getByText('旧的调试会话')).toBeVisible();
-    // 筛选菜单：选 SSH（历史会话是 local → 消失）
+    // Filter menu: pick SSH (the history session is local, so it disappears).
     await page.locator('[data-testid="unified-history-filter"]').click();
     const menu = page.locator('[data-testid="unified-history-filter-menu"]');
     await menu.getByRole('button', { name: 'SSH' }).click();
@@ -39,7 +39,7 @@ test.describe('会话历史管理', () => {
     // The selected filters survive a reload in the same application session.
     await page.locator('[data-testid="unified-history-filter-menu"]').getByRole('button', { name: 'SSH' }).click();
     await page.reload();
-    // 幂等打开会话历史页（面板状态可能已被持久化，避免 toggle 关掉它）
+    // Open the session history page idempotently (the panel state may be persisted, so avoid toggling it closed).
     await expect(page.locator('[data-testid^="tab-row-"]').first()).toBeVisible();
     if (!(await page.locator('[data-testid="tab-history-btn"]').isVisible().catch(() => false))) {
       await ensureTabsOpen(page);
@@ -49,7 +49,7 @@ test.describe('会话历史管理', () => {
     await expect(page.getByText('旧的调试会话')).toHaveCount(0);
   });
 
-  test('历史会话可删除', async ({ page }) => {
+  test('history sessions can be deleted', async ({ page }) => {
     await openHistory(page);
     await expect(page.getByText('旧的调试会话')).toBeVisible();
     const record = page.getByTestId('unified-history-session:hist-1');
@@ -66,14 +66,14 @@ test.describe('会话历史管理', () => {
     await expect(page.getByText('暂无历史记录')).toBeVisible();
   });
 
-  test('恢复历史会话连带恢复命令块', async ({ page }) => {
+  test('restoring a history session restores its command blocks', async ({ page }) => {
     await openHistory(page);
-    // 点击历史会话恢复
+    // Click the history session to restore it.
     await page.getByText('旧的调试会话').click();
-    // 新标签页标题为会话标题，命令块输出恢复出来
+    // The new tab takes the session title and the command block output is restored.
     await expect(page.getByText('total 1')).toBeVisible({ timeout: 5000 });
     await expect(page.getByRole('button', { name: /^(展开|折叠)(全部)?$/ })).toHaveCount(0);
-    // 恢复的块带颜色快照（output_html 持久化回读，非纯文本）
+    // The restored block carries a colored snapshot (output_html read back from persistence, not plain text).
     await expect(page.locator('span[style*="#4e9a06"]')).toBeVisible({ timeout: 5000 });
     await expect(page.locator('[data-testid^="tab-row-"]', { hasText: '旧的调试会话' })).toHaveCount(1);
   });
@@ -91,8 +91,8 @@ test.describe('会话历史管理', () => {
   });
 });
 
-test.describe('文件双击打开', () => {
-  test('双击文件默认在编辑器页打开，而不是写入终端', async ({ page }) => {
+test.describe('Opening files by double-click', () => {
+  test('double-clicking a file opens it in an editor page by default instead of typing into the terminal', async ({ page }) => {
     await page.locator('[data-dock-btn="files"]').click();
     await expect(page.getByText('notes.txt')).toBeVisible();
     await page.getByText('notes.txt').dblclick();

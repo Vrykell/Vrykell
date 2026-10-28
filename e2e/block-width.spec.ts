@@ -35,18 +35,19 @@ test('output longer than the viewport stays complete without a false truncation 
 });
 
 /**
- * 满宽 TUI 输出（box-drawing）在块卡片内的渲染诊断/回归：
- * 快照 HTML 每行已按网格 cols 预分行（<br> 分隔，每行 ≤ cols 字符）。
- * 若卡片内容盒宽度放不下 cols 个字符，pre-wrap 会在网格行中间软换行 → TUI 框线撕裂。
+ * Rendering diagnostics/regression for full-width TUI output (box-drawing) inside a block card:
+ * each line of the snapshot HTML is already pre-split to the grid cols (<br>-separated, at most
+ * cols characters per line). If the card content box cannot fit cols characters, pre-wrap
+ * soft-wraps in the middle of grid rows and tears the TUI frame lines.
  */
 
 interface Diag {
-  cols: number; // 网格列数（满宽行的字符数）
-  gridRows: number; // 快照网格行数（<br> + 1）
-  visualLines: number; // 实际视觉行数（scrollHeight / 行高）
-  clientWidth: number; // BlockOutput 内容盒宽（CSS px）
-  charWidth: number; // 实测字符宽（CSS px）
-  capacityChars: number; // 内容盒能放下的整字符数
+  cols: number; // Grid columns (characters in a full-width row).
+  gridRows: number; // Snapshot grid rows (<br> + 1).
+  visualLines: number; // Actual visual lines (scrollHeight / line height).
+  clientWidth: number; // BlockOutput content box width (CSS px).
+  charWidth: number; // Measured character width (CSS px).
+  capacityChars: number; // Whole characters the content box can fit.
   lineHeightPx: number;
   innerWidth: number;
 }
@@ -58,7 +59,7 @@ test('long box-drawing rows reflow to the available columns without horizontal s
   const input = page.getByPlaceholder(/输入命令/);
   await expect(input).toBeVisible({ timeout: 5000 });
 
-  // 一个 done block：3 行各 400 个 ─（必然超过 cols，离屏 xterm 按 cols 折行）
+  // One done block: 3 rows of 400 ─ each (well beyond cols, so the offscreen xterm wraps at cols).
   const E = `\x1b]133;E;${btoa('tui-box')}\x07`;
   const C = '\x1b]133;C\x07';
   const rows = Array(3).fill('─'.repeat(400)).join('\r\n') + '\r\n';
@@ -67,8 +68,8 @@ test('long box-drawing rows reflow to the available columns without horizontal s
     `\x1b]133;A\x07~/project\x1b]133;G;${btoa('main')}\x07 $ `;
   await emitPtyOutput(page, E + C + rows + tail);
 
-  // 等输出渲染（快照提取是异步的）。
-  // 注意取「最内层」匹配 div：外层容器同样 includes('<br>')，会误中。
+  // Wait for the output to render (snapshot extraction is asynchronous).
+  // Use the innermost matching div: outer containers also include('<br>') and would match too.
   const findOutput = () =>
     page.evaluate(() => {
       const matches = Array.from(document.querySelectorAll('div')).filter(
@@ -92,11 +93,11 @@ test('long box-drawing rows reflow to the available columns without horizontal s
 
     const cs = getComputedStyle(el);
     const lineHeightPx = parseFloat(cs.lineHeight);
-    // scrollHeight 含上下 padding，计算视觉行数需扣除
+    // scrollHeight includes top and bottom padding, so subtract it when counting visual lines.
     const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
     const contentHeight = el.scrollHeight - padY;
 
-    // 实测字符宽：在该元素内插一个 100 字符的 probe（继承字体）
+    // Measure the character width with a 100-character probe inserted into the element (inherits the font).
     const probe = document.createElement('span');
     probe.style.whiteSpace = 'pre';
     probe.textContent = '─'.repeat(100);
@@ -122,8 +123,8 @@ test('long box-drawing rows reflow to the available columns without horizontal s
   // Logical rows wrap to the measured available columns without horizontal scrolling.
   expect(diag.clientWidth).toBeGreaterThan(0);
   expect(diag.scrollWidth - diag.clientWidth).toBeLessThanOrEqual(1);
-  // 行高 1.0 下字形 font metrics 有亚像素溢出，scrollHeight 会多计 ~0.1 行；
-  // 折行则会差 1 行以上 —— 用容差区分。
+  // At line-height 1.0 glyph font metrics overflow by sub-pixels, so scrollHeight over-counts by
+  // about 0.1 rows, while wrapping differs by a full row or more; a tolerance separates the two.
   expect(Math.abs(diag.visualLines - diag.gridRows)).toBeLessThan(0.2);
 });
 
@@ -206,7 +207,7 @@ test('line-editor repaint does not add a prompt or inherited blank rows to comma
   expect(await grid.evaluate(el => el.clientHeight)).toBeLessThanOrEqual((await terminalRowHeight(page)) * 2 + 2);
 });
 
-test('运行中卡片：PTY/块终端宽度跟随卡片内容宽（右缘不裁剪）', async ({ page }) => {
+test('running card: the PTY and block terminal width follow the card content width with no clipped right edge', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
@@ -219,39 +220,40 @@ test('运行中卡片：PTY/块终端宽度跟随卡片内容宽（右缘不裁�
     return Object.values(useTerminalStore.getState().startupStates).includes('ready');
   });
 
-  // 运行中块（活 xterm 挂载进卡片）
+  // Running block (the live xterm is mounted into the card).
   await emitPtyOutput(page, `\x1b]133;E;${btoa('sleep 100')}\x07\x1b]133;C\x07`);
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
 
-  // RunningTerm 宿主 ResizeObserver 首回调 → syncTermWidth → pty_resize 收窄到卡片宽
-  //（回归：PTY 曾恒为主终端全宽，卡片比主表面窄 ~50px，输出右缘被裁掉
-  //  ——「输出宽度与可显示宽度不一致导致部分边缘看不到」）
+  // The first ResizeObserver callback on the RunningTerm host triggers syncTermWidth, and
+  // pty_resize narrows the PTY to the card width
+  // (regression: the PTY stayed at the main terminal's full width while the card is about 50px
+  // narrower, clipping the right edge of the output).
   await expect(async () => {
     const rs = await ptyResizes(page);
     expect(rs.length).toBeGreaterThan(0);
 
     const probe = await host.evaluate((el) => {
       const screen = el.querySelector<HTMLElement>('.xterm-screen')!;
-      // WebGL renderer 下 xterm 不向 DOM 注入字体，canvas 按 renderer 内部
-      // cellWidth（实测 8px）排布；PTY cols 也由同一 cellWidth 计算。
-      // 断言画布完整容纳 PTY 列数（右缘不裁剪），cellWidth 用 8 作参考容差。
+      // Under the WebGL renderer xterm does not inject a font into the DOM; the canvas lays out by
+      // the renderer's internal cellWidth (measured at 8px) and the PTY cols use the same cellWidth.
+      // Assert the canvas fully fits the PTY columns (no clipped right edge), using 8 as the reference.
       return {
         screenW: screen.getBoundingClientRect().width,
         hostContentW: el.clientWidth, // The command block supplies all horizontal spacing.
       };
     });
 
-    // 画布不超宽：screen ≤ 宿主内容宽（+1 容差防亚像素取整）
+    // The canvas is not too wide: screen ≤ host content width (+1 tolerance for sub-pixel rounding).
     expect(probe.screenW).toBeLessThanOrEqual(probe.hostContentW + 1);
 
-    // 右缘不裁剪：PTY 全部列能完整放进画布（cellWidth≈8px，容差亚像素）
+    // No clipped right edge: every PTY column fits inside the canvas (cellWidth≈8px, sub-pixel tolerance).
     const last = rs[rs.length - 1]!;
     expect(last.cols * 8).toBeLessThanOrEqual(probe.screenW + 1);
   }).toPass({ timeout: 5000 });
 });
 
-test('运行中输出与完成快照保持相同字符宽度', async ({ page }) => {
+test('running output and the completed snapshot keep the same character width', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
@@ -288,7 +290,7 @@ test('运行中输出与完成快照保持相同字符宽度', async ({ page }) 
   expect(Math.abs(completed.width - running.screenWidth)).toBeLessThanOrEqual(1);
 });
 
-test('命令块分隔线延伸到终端左右边缘', async ({ page }) => {
+test('command block separators extend to the left and right terminal edges', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();

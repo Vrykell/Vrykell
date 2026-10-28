@@ -7,10 +7,11 @@ interface RunningTermScrollProbe {
 }
 
 /**
- * 运行中 block 的活终端：block 卡片直接挂载真实可见的 xterm 实例
- *（RunningTerm / getExecutingTerm），输出走 xterm 原生渲染管线 ——
- * 光标、IME、选区、CJK 栅格对齐全部天然正确，不再有 250ms HTML 快照。
- * 块完成后活终端 dispose，done 块回退到静态 HTML 快照。
+ * Live terminal of a running block: the block card mounts a real, visible xterm instance
+ * (RunningTerm / getExecutingTerm) and output flows through xterm's native rendering pipeline,
+ * so cursor, IME, selection and CJK grid alignment are all correct as rendered, with no 250ms
+ * HTML snapshot. When the block finishes the live terminal is disposed and the done block falls
+ * back to a static HTML snapshot.
  */
 
 async function startRunningBlock(page: import('@playwright/test').Page) {
@@ -26,20 +27,20 @@ async function startRunningBlock(page: import('@playwright/test').Page) {
   await expect(page.locator('[data-tip="终止命令"]')).toBeVisible({ timeout: 5000 });
 }
 
-test('运行中 block 挂载可见 xterm，输出实时渲染，完成后换成快照', async ({ page }) => {
+test('a running block mounts a visible xterm with live output and switches to a snapshot once finished', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await startRunningBlock(page);
 
-  // 活 xterm 挂在 running-term 宿主里（open() 产出 .xterm DOM）
+  // The live xterm lives in the running-term host (open() produces the .xterm DOM).
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
 
-  // PTY 输出实时出现在块终端的渲染里（WebGL 下读 buffer 断言，无 250ms 快照延迟）
+  // PTY output appears in the block terminal's rendering in real time (assert against the buffer under WebGL, with no 250ms snapshot delay).
   await emitPtyOutput(page, 'hello world\r\n');
   await expectAnyTermContains(page, 'hello world', 3000);
 
-  // 块完成（D）：活 xterm 消失，done 块显示静态 HTML 快照
+  // The block completes (D): the live xterm disappears and the done block shows a static HTML snapshot.
   await emitPtyOutput(page, `\x1b]133;D;0\x07`);
   await expect(host.locator('.xterm')).toBeHidden({ timeout: 3000 });
   await expect(page.getByText('hello world')).toBeVisible({ timeout: 3000 });
@@ -74,7 +75,7 @@ test('running block redraw preserves its output and process without sending PTY 
   await expectAnyTermContains(page, 'live-after-redraw');
 });
 
-test('已有历史命令时，运行中的输出会持续保持在可见区域', async ({ page }) => {
+test('running output stays in view when earlier command history is present', async ({ page }) => {
   await setupTauriMock(page);
   await page.setViewportSize({ width: 800, height: 320 });
   await page.goto('/');
@@ -96,7 +97,7 @@ test('已有历史命令时，运行中的输出会持续保持在可见区域',
   await expect(page.getByTestId('exit-code')).toHaveCount(1);
 });
 
-test('重新加载会话模块后仍能取得运行中的活终端', async ({ page }) => {
+test('the running live terminal is still reachable after reloading the session module', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await startRunningBlock(page);
@@ -110,12 +111,12 @@ test('重新加载会话模块后仍能取得运行中的活终端', async ({ pa
   expect(available).toBe(true);
 });
 
-test('运行中焦点落在块内活 xterm 的 textarea（而非隐藏主 xterm）', async ({ page }) => {
+test('focus lands in the textarea of the block live xterm rather than the hidden main xterm', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await startRunningBlock(page);
 
-  // 焦点从 body 收归活终端（useTerminalFocus 优先 getExecutingTerm）
+  // Focus returns from the body to the live terminal (useTerminalFocus prefers getExecutingTerm).
   await expect
     .poll(() =>
       page.evaluate(() => {
@@ -129,7 +130,7 @@ test('运行中焦点落在块内活 xterm 的 textarea（而非隐藏主 xterm�
     .toBe(true);
 });
 
-test('手动全屏：块内活终端搬进全屏宿主，退出后搬回卡片', async ({ page }) => {
+test('manual fullscreen moves the block live terminal into the fullscreen host and back into the card on exit', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await startRunningBlock(page);
@@ -137,15 +138,17 @@ test('手动全屏：块内活终端搬进全屏宿主，退出后搬回卡片',
   const cardHost = page.getByTestId('running-term');
   await expectAnyTermContains(page, 'tui-content-line', 3000);
 
-  // 进入全屏：el 搬进 tui-fullscreen，内容仍在（块路由下主 xterm 是空壳）
+  // Enter fullscreen: the element moves into tui-fullscreen and its content stays (under block routing the main xterm is an empty shell).
   await page.locator('[data-testid^="running-block-"]').first().hover();
   await page.locator('[data-tip="进入全屏交互"]').click();
   const fs = page.getByTestId('tui-fullscreen');
   await expect(fs.locator('.xterm')).toBeVisible();
   await expect(cardHost.locator('.xterm')).toHaveCount(0);
 
-  // 全屏宿主铺满整个终端区：块终端画布应填满宿主内容宽/高，两侧无黑条
-  //（回归：PTY/块终端曾按单 pane 宽换算列数，全屏时画布居中 → 左右露底色）
+  // The fullscreen host fills the whole terminal area: the block terminal canvas should fill the
+  // host content width and height with no dark bands on either side
+  // (regression: the PTY and block terminal derived columns from a single pane width, so the
+  // canvas sat centered in fullscreen and exposed the background on both sides).
   await expect(async () => {
     const probe = await fs.evaluate((host) => {
       const screen = host.querySelector<HTMLElement>('.xterm-screen')!;
@@ -161,17 +164,17 @@ test('手动全屏：块内活终端搬进全屏宿主，退出后搬回卡片',
     expect(probe.screenH).toBeGreaterThanOrEqual(probe.hostH - 20);
   }).toPass({ timeout: 5000 });
 
-  // 全屏中输出继续实时到达
+  // Output keeps arriving in real time while fullscreen.
   await emitPtyOutput(page, 'tui-second-line\r\n');
   await expectAnyTermContains(page, 'tui-second-line');
 
-  // esc 退出全屏 → el 搬回卡片
+  // Escape leaves fullscreen, moving the element back into the card.
   await page.locator('[data-tip="退出全屏"]').click();
   await expect(cardHost.locator('.xterm')).toBeVisible();
   await expect(page.getByTestId('tui-fullscreen')).toHaveCount(0);
 });
 
-test('全屏终端右键菜单提供快捷操作与复制/粘贴', async ({ page }) => {
+test('the fullscreen terminal context menu offers shortcuts plus copy and paste', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await startRunningBlock(page);
@@ -216,7 +219,7 @@ test('全屏终端右键菜单提供快捷操作与复制/粘贴', async ({ page
   await expect(page.locator('[data-testid^="running-block-"]').first()).toBeVisible();
 });
 
-test('手动全屏中进入真 alt 屏：让出可见面，显示主 xterm 的 TUI', async ({ page }) => {
+test('entering the real alternate screen during manual fullscreen yields the surface to the main xterm TUI', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await startRunningBlock(page);
@@ -225,8 +228,9 @@ test('手动全屏中进入真 alt 屏：让出可见面，显示主 xterm 的 T
   await page.locator('[data-tip="进入全屏交互"]').click();
   await expect(page.getByTestId('tui-fullscreen')).toBeVisible();
 
-  // 前台程序切到备用缓冲区：内容只写主 xterm，块终端收不到任何字节。
-  // 手动全屏必须让出表面，否则遮罩用冻结的块内容盖住真正的 TUI（用户看到黑屏）。
+  // The foreground program switches to the alternate buffer: content goes only to the main
+  // xterm and the block terminal receives no bytes at all. Manual fullscreen must yield the
+  // surface, otherwise the overlay covers the real TUI with frozen block content (a black screen).
   await emitPtyOutput(page, '\x1b[?1049h' + 'ALT SCREEN CONTENT');
 
   await expect(page.getByTestId('tui-fullscreen')).toHaveCount(0);
@@ -234,7 +238,7 @@ test('手动全屏中进入真 alt 屏：让出可见面，显示主 xterm 的 T
   await expectAnyTermContains(page, 'ALT SCREEN CONTENT', 5000);
 });
 
-test('真 alt 屏 TUI 的窗格右键菜单提供顶栏快捷操作', async ({ page }) => {
+test('the pane context menu of a real alternate-screen TUI offers the banner shortcuts', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await startRunningBlock(page);
@@ -258,16 +262,16 @@ test('真 alt 屏 TUI 的窗格右键菜单提供顶栏快捷操作', async ({ p
   await expect.poll(async () => (await ptyWrites(page)).slice(before)).toContain('\x03');
 });
 
-test('运行中块接管滚轮：xterm 回溯时不滚动外层命令历史', async ({ page }) => {
+test('a running block owns the wheel: xterm scrollback moves without scrolling the outer command history', async ({ page }) => {
   await setupTauriMock(page);
-  // 小视口保证块列表溢出可滚（卡片高度跟随内容行数增长）
+  // A small viewport keeps the block list overflowing so it can scroll (card height grows with content rows).
   await page.setViewportSize({ width: 800, height: 320 });
   await page.goto('/');
   await startRunningBlock(page);
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
 
-  // 输出足够多行让块列表溢出
+  // Emit enough rows for the block list to overflow.
   await emitPtyOutput(
     page,
     Array.from({ length: 40 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n',
@@ -300,7 +304,7 @@ test('运行中块接管滚轮：xterm 回溯时不滚动外层命令历史', as
   await expect.poll(() => parent.evaluate((el) => el.scrollTop)).toBe(parentTop);
 });
 
-test('运行块挂载前到达的输出不破坏首次滚轮回溯', async ({ page }) => {
+test('output that arrives before the running block mounts does not break the first wheel scrollback', async ({ page }) => {
   await setupTauriMock(page);
   await page.setViewportSize({ width: 1000, height: 520 });
   await page.goto('/');
@@ -348,7 +352,7 @@ test('运行块挂载前到达的输出不破坏首次滚轮回溯', async ({ pa
   expect(before.viewportY - after.viewportY).toBeLessThanOrEqual(20);
 });
 
-test('运行中块的实时输出可选中并复制', async ({ page }) => {
+test('live output of a running block can be selected and copied', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await startRunningBlock(page);
@@ -372,7 +376,7 @@ test('运行中块的实时输出可选中并复制', async ({ page }) => {
   await expect.poll(() => clipboardText(page)).toContain('live-selection');
 });
 
-test('运行中块不抢走已完成块文本的选区', async ({ page }) => {
+test('a running block does not steal the selection from completed block text', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   const input = page.getByPlaceholder(/输入命令/);
@@ -398,7 +402,7 @@ test('运行中块不抢走已完成块文本的选区', async ({ page }) => {
   // mocked clipboard plugin; the selection surviving is what the app must guarantee.
 });
 
-test('块终端与页面同色且无圆角，裁剪仍落在 el', async ({ page }) => {
+test('the block terminal matches the page color with no rounded corners and keeps clipping on the inner element', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   await startRunningBlock(page);

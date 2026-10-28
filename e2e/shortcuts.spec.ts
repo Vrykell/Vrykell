@@ -7,38 +7,38 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
 });
 
-test.describe('全局快捷键', () => {
-  test('Cmd+T 新建标签，Cmd+W 关闭标签', async ({ page }) => {
-    // 打开标签面板
+test.describe('Global shortcuts', () => {
+  test('Cmd+T creates a tab and Cmd+W closes it', async ({ page }) => {
+    // Open the tab panel.
     await ensureTabsOpen(page);
-    // 应有至少一个标签
+    // There should be at least one tab.
     await expect(page.locator('[data-testid^="tab-row-"]')).toHaveCount(1);
-    // 新建标签
+    // Create a tab.
     await page.keyboard.press('Meta+t');
-    // 面板中应有两个标签
+    // The panel should now hold two tabs.
     await expect(page.locator('[data-testid^="tab-row-"]')).toHaveCount(2);
-    // 面板内点击顶部新建按钮 → 直接弹出类型选择弹窗（无中间菜单），选 zsh
+    // Clicking the panel's top new button opens the shell picker directly (no intermediate menu); pick zsh.
     await page.locator('[data-testid="tab-new-btn"]').click();
     await page.getByText('Zsh', { exact: true }).click();
     await expect(page.locator('[data-testid^="tab-row-"]')).toHaveCount(3);
-    // Cmd+W 关闭当前标签
+    // Cmd+W closes the current tab.
     await page.keyboard.press('Meta+w');
     await expect(page.locator('[data-testid^="tab-row-"]')).toHaveCount(2);
   });
 
-  test('Cmd+数字切换标签', async ({ page }) => {
+  test('Cmd+number switches tabs', async ({ page }) => {
     await page.keyboard.press('Meta+t');
     await page.keyboard.press('Meta+t');
-    // 打开标签面板验证多个标签存在
+    // Open the tab panel to verify multiple tabs exist.
     await ensureTabsOpen(page);
     await expect(page.getByText('终端').first()).toBeVisible();
-    // 切换回第一个标签（验证 activate 生效）
+    // Switch back to the first tab (verifies activate takes effect).
     await page.keyboard.press('Meta+1');
-    // 确认第一个标签仍可见
+    // Confirm the first tab is still visible.
     await expect(page.getByText('终端').first()).toBeVisible();
   });
 
-  test('Cmd+F 打开全局搜索并聚焦', async ({ page }) => {
+  test('Cmd+F opens global search and focuses it', async ({ page }) => {
     await page.keyboard.press('Meta+f');
     const searchInput = page.getByPlaceholder(/搜索文件/);
     await expect(searchInput).toBeVisible();
@@ -47,23 +47,23 @@ test.describe('全局快捷键', () => {
     await expect(searchInput).not.toBeVisible();
   });
 
-  test('Cmd+, 打开设置页', async ({ page }) => {
+  test('Cmd+, opens the settings page', async ({ page }) => {
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
     await page.keyboard.press('Meta+,');
     await expect(page.getByTestId('provider-endpoint-input').first()).toBeVisible();
   });
 
-  test('Cmd+P 打开命令面板', async ({ page }) => {
+  test('Cmd+P opens the command palette', async ({ page }) => {
     await page.keyboard.press('Meta+p');
     await expect(page.getByPlaceholder('搜索命令…')).toBeVisible({ timeout: 3000 });
-    // 第一次 Escape 清空输入，第二次 Escape 关闭面板
+    // The first Escape clears the input, the second closes the panel.
     await page.keyboard.press('Escape');
     await page.waitForTimeout(200);
     await page.keyboard.press('Escape');
     await expect(page.getByPlaceholder('搜索命令…')).not.toBeVisible({ timeout: 3000 });
   });
 
-  test('页面缩放快捷键和滚轮不会改变字号或页面比例', async ({ page }) => {
+  test('page zoom shortcuts and the wheel do not change the font size or page scale', async ({ page }) => {
     const initialFontSize = await page.evaluate(() => getComputedStyle(document.documentElement).fontSize);
     await page.keyboard.press('Meta+=');
     await page.keyboard.press('Meta+-');
@@ -83,17 +83,17 @@ test.describe('全局快捷键', () => {
     expect(result.wheelPrevented).toBe(true);
   });
 
-  test('点击 TopDock 搜索触发器打开居中搜索窗', async ({ page }) => {
+  test('clicking the TopDock search trigger opens the centered search window', async ({ page }) => {
     const trigger = page.getByTestId('global-search-trigger');
     await expect(trigger).toBeVisible({ timeout: 3000 });
-    // 点击触发器 → 打开居中搜索窗
+    // Clicking the trigger opens the centered search window.
     await trigger.click();
     const searchInput = page.getByPlaceholder(/搜索文件/);
     await expect(searchInput).toBeVisible({ timeout: 3000 });
-    // 输入搜索词 → 触发搜索
+    // Entering a query triggers the search.
     await searchInput.fill('test');
     await page.waitForTimeout(1000);
-    // Escape 关闭弹窗
+    // Escape closes the dialog.
     await page.keyboard.press('Escape');
     await expect(searchInput).not.toBeVisible();
   });
