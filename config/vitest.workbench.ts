@@ -1,5 +1,5 @@
 import { defineConfig } from 'vitest/config';
-import applicationConfig from './vite.config';
+import applicationConfig from '../vite.config';
 
 /** The workspace foundation has a stricter gate than unrelated application features. */
 export default defineConfig(async environment => {

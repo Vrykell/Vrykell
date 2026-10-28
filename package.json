@@ -20,7 +20,7 @@
     "tauri": "node scripts/tauri-cli.mjs",
     "tauri:cli": "tauri",
     "test": "vitest run",
-    "test:workbench": "vitest run --config vitest.workbench.config.ts src/features/workspace src/core/__tests__/paneLayout.test.ts src/core/__tests__/paneTree.test.ts src/features/chat/__tests__/useAiWorkspaceTabs.test.tsx src/ui/layout/__tests__/resourcePlacements.test.ts src/ui/layout/__tests__/ResourceContent.test.tsx src/app/bootstrap/__tests__/sharedStartupTask.test.ts --coverage",
+    "test:workbench": "vitest run --config config/vitest.workbench.ts src/features/workspace src/core/__tests__/paneLayout.test.ts src/core/__tests__/paneTree.test.ts src/features/chat/__tests__/useAiWorkspaceTabs.test.tsx src/ui/layout/__tests__/resourcePlacements.test.ts src/ui/layout/__tests__/ResourceContent.test.tsx src/app/bootstrap/__tests__/sharedStartupTask.test.ts --coverage",
     "test:e2e": "playwright test",
     "check:architecture": "node scripts/check-architecture.mjs",
     "licenses:generate": "node scripts/generate-third-party-notices.mjs",

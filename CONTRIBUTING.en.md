@@ -57,6 +57,8 @@ Read [AGENTS.md](AGENTS.md), the [development rules](docs/en/development-rules.m
 
 ## Validation
 
+Root configuration files are limited to standard tool entry points: package manifests, compiler settings, the application bundler and browser-test runner. Specialized test configuration lives in `config/`; operational helpers live in `scripts/`; CI and contribution templates live in `.github/`. Keep `.vscode/` and other local editor preferences untracked. Share project requirements through this guide rather than machine-specific editor settings.
+
 Run these before every commit:
 
 ```bash
