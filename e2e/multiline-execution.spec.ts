@@ -36,7 +36,7 @@ function runLinuxPty(payload: string): Promise<{ code: number | null; output: st
       output += bytes.toString('utf8');
       if (!submitted && output.includes('__PTY_READY__')) {
         submitted = true;
-        child.stdin.write(payload.replace(/\r\n|\n/g, '\r'));
+        child.stdin.write("PS1= PS2=; printf '\\n'; " + payload.replace(/\r\n|\n/g, '\r'));
       }
       if (!checked && /(?:^|\n)__SCRIPT_DONE__\r?(?:\n|$)/.test(output)) {
         checked = true;

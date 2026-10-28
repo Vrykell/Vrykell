@@ -8,7 +8,7 @@ async function highlighted(rows: Locator) {
 
 async function checkMenuInput(page: Page, menu: Locator) {
   await expect(menu).toBeVisible();
-  const rows = menu.locator('.workspace-floating-row:not(:disabled):not([aria-haspopup="menu"])');
+  const rows = menu.locator('.workspace-floating-row:not(:disabled)');
   expect(await rows.count()).toBeGreaterThan(1);
   await rows.first().focus();
   await page.keyboard.press('Home');

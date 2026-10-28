@@ -80,11 +80,11 @@ test.describe('Tab management sidebar', () => {
     const box = (await list.boundingBox())!;
     await page.mouse.click(box.x + box.width / 2, box.y + box.height - 12, { button: 'right' });
 
-    const menu = page.getByRole('menu', { name: '操作菜单' });
+    const menu = page.getByRole('menu', { name: '更多终端操作' });
     await expect(menu).toBeVisible();
     // The panel menu owns blank areas only, so it carries no row actions.
-    await expect(menu.getByRole('button', { name: 'AI 自动分组', exact: true })).toBeVisible();
-    await expect(menu.getByRole('button', { name: '关闭标签', exact: true })).toHaveCount(0);
+    await expect(menu.getByRole('menuitem', { name: 'AI 自动分组', exact: true })).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: '关闭标签', exact: true })).toHaveCount(0);
     await page.keyboard.press('Escape');
     await expect(menu).toHaveCount(0);
   });
