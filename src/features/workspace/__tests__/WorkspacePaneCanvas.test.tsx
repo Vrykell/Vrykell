@@ -48,7 +48,7 @@ it('provides shared editor and agent pane menus without exposing removal for the
   useUiStore.getState().cancelPaneMove();
   view.rerender(<WorkspacePaneCanvas {...props} layout={first} />);
   fireEvent.contextMenu(view.container.querySelector('[data-resource-id="file:first"]')!, { clientX: 20, clientY: 20 });
-  expect(screen.getByRole('menuitem', { name: '移除此分屏' })).toBeDisabled();
+  expect(screen.queryByRole('menuitem', { name: '移除此分屏' })).toBeNull();
   expect(screen.getByRole('menuitem', { name: '更换窗格位置' })).toBeDisabled();
   expect(screen.getByRole('menuitem', { name: '拆分标签页' })).toBeEnabled();
   window.removeEventListener('contextmenu', preventNative, true);

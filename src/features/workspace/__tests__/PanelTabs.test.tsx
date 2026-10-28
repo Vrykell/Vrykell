@@ -7,6 +7,7 @@ import { useTerminalDefaults } from '@config/terminalDefaults';
 import { getAvailableShells } from '@platform/shells';
 import { useWorkspaceNavigation } from '../stores/navigation';
 import { groupRename } from '@platform/api/group';
+import { useWorkbenchStore } from '../stores/workbench';
 
 vi.mock('@platform/api/group', async original => ({ ...await original<typeof import('@platform/api/group')>(), groupRename: vi.fn().mockResolvedValue(undefined) }));
 
@@ -59,6 +60,27 @@ it('uses shell identity and removes terminal icon color controls', () => {
   expect(screen.queryByRole('menuitem', { name: '图标颜色' })).toBeNull();
   expect(row.querySelector('svg')).toHaveAttribute('data-shell-mark', 'bash');
   expect(useSessionStore.getState().activeId).toBe('ai-history');
+});
+
+it('routes container menu actions to their terminal owner and keeps the container selected', () => {
+  const previous = useWorkbenchStore.getState();
+  const duplicateTab = vi.fn();
+  useSessionStore.setState({ activeId: 'local', duplicateTab });
+  useWorkbenchStore.setState({ ready: true, snapshot: { version: 2, groups: [], order: {},
+    tabs: [{ id: 'layout-local', scope: 'terminal', focused: 'local-pane', layout: { type: 'pane', id: 'local-pane', resourceId: 'terminal:local#0' } }],
+    selected: { terminal: 'layout-local' },
+  } });
+  try {
+    render(<PanelTabs />);
+    const row = screen.getByTestId('tab-row-layout-local');
+    expect(within(row).getByRole('tab')).toHaveAttribute('aria-selected', 'true');
+    fireEvent.contextMenu(row);
+    fireEvent.click(screen.getByRole('button', { name: '复制会话' }));
+    expect(duplicateTab).toHaveBeenCalledExactlyOnceWith('local');
+  } finally {
+    cleanup();
+    useWorkbenchStore.setState(previous, true);
+  }
 });
 
 afterEach(() => { cleanup(); useListReorder.getState().end(); useSessionStore.setState(snapshot, true); });

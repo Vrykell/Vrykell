@@ -163,6 +163,8 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
       origin: { top: bounds.top, offsetX: event.clientX - bounds.left, minLeft: listBounds.left, maxLeft: Math.max(listBounds.left, listBounds.right - bounds.width) },
     } : {}) } : {};
     const { pointerId, clientX, clientY } = event;
+    // A tab press can replace its header; the captured gesture retains its original drop handler.
+    const drop = dropRef.current;
     const match = (dragKind: string, itemKind: string) =>
       (acceptsRef.current ?? ((drag: string, over: string) => drag === over))(dragKind, itemKind);
     // Grouped horizontal lists (terminal tabs) follow the browser tab-strip model: one
@@ -403,7 +405,7 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
       if (next.pointerId !== pointerId) return;
       if (started && !canceled) {
         preview(next.clientX, next.clientY);
-        dropRef.current({ listId, id: item.id, kind: item.kind, ...dimensions }, useListReorder.getState().target);
+        drop({ listId, id: item.id, kind: item.kind, ...dimensions }, useListReorder.getState().target);
       }
       clean();
     };

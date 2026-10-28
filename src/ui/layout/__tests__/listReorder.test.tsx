@@ -194,6 +194,22 @@ describe('list reorder', () => {
     parked.remove();
   });
 
+  it('keeps the captured drop handler when selecting a tab replaces its header', () => {
+    const onDrop = vi.fn(); const inactiveDrop = vi.fn();
+    const { rerender } = render(<Harness onDrop={onDrop} axis="horizontal" />);
+    const rows = ['a', 'b', 'c'].map(id => screen.getByTestId(`row-${id}`));
+    rows.forEach((row, index) => vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({
+      ...rowRect(0), left: index * 120, right: (index + 1) * 120, x: index * 120,
+    }));
+    vi.spyOn(rows[0]!.parentElement!, 'getBoundingClientRect').mockReturnValue({ ...rowRect(0), width: 360, right: 360 });
+    fireEvent.pointerDown(rows[0]!, { pointerId: 1, button: 0, isPrimary: true, clientX: 20, clientY: 10 });
+    rerender(<Harness onDrop={inactiveDrop} axis="horizontal" />);
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 300, clientY: 10 });
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 300, clientY: 10 });
+    expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }), { itemId: 'c', after: true });
+    expect(inactiveDrop).not.toHaveBeenCalled();
+  });
+
   it.each([['left', false], ['right', false], ['left', true], ['right', true]] as const)('exchanges unequal horizontal items toward the %s with grouped=%s while the pointer stays over the source gap', (direction, grouped) => {
     const onDrop = vi.fn(); render(<Harness onDrop={onDrop} axis="horizontal" grouped={grouped} />);
     const rows = ['a', 'b', 'c'].map(id => screen.getByTestId(`row-${id}`));

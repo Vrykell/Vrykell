@@ -70,7 +70,7 @@ export default function WorkspacePaneCanvas({ containerId, layout, focused, reso
         setMenu(null);
       } }] : []),
       ...(onDetach ? [{ label: t('Move pane to new tab'), disabled: cells.length < 2, onClick: () => onDetach(menu.id) }] : []),
-      ...(onRemove ? [{ label: t('Remove pane'), disabled: cells.length < 2, onClick: () => onRemove(menu.id) }] : []),
+      ...(onRemove && cells.length > 1 ? [{ label: t('Remove pane'), onClick: () => onRemove(menu.id) }] : []),
     ]} />}
   </div>;
 }

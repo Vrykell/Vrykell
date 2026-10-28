@@ -626,6 +626,8 @@ export class SessionController {
   }
 
   private onCommandDone(payload: string): void {
+    // Completion is an authoritative boundary even when the shell omits its preexec hook.
+    if (this.activeBlock?.status === 'pending' && this.pendingUiCommand) this.onPreexec();
     const ab = this.activeBlock;
     if (!ab || ab.status !== 'executing') return;
     const ec = parseInt(payload, 10);

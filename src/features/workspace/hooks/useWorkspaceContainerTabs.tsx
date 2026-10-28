@@ -65,8 +65,8 @@ export function useWorkspaceContainerTabs(scope: WorkspaceScope, resourceHandles
         ...[
           { label: t('Change pane position'), disabled: cells.length < 2, onClick: () => { activateContainer(id); useUiStore.getState().beginPaneMove(id, focused.id); } },
           { label: t('Move pane to new tab'), disabled: cells.length < 2, onClick: () => { activateContainer(id); detachWorkspacePane(scope, focused.resourceId); } },
-          { label: t('Remove pane'), disabled: cells.length < 2, onClick: () => removeContainerPane(id, focused.resourceId) },
         ],
+        ...(cells.length > 1 ? [{ label: t('Remove pane'), onClick: () => removeContainerPane(id, focused.resourceId) }] : []),
         ...(peers.length ? [{ label: t('Merge tab into this tab'), submenu: { items: peers.map(peer => ({ label: peer.title || panesOf(peer).map(pane => handlesById.get(pane.resourceId)?.label ?? '').join(' + '),
           onClick: () => { activateContainer(id); workspaceAreaStores[scope].getState().chooseMerge(peer.id); } })) } }] : []),
       ];

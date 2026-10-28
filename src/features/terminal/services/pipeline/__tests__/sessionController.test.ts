@@ -306,6 +306,19 @@ describe('SessionController', () => {
     ctrl.dispose();
   });
 
+  it('captures fast command output when completion arrives before the missing-preexec fallback', async () => {
+    const { st, ctrl, feed } = wire('fast-fallback', true);
+    feed(A);
+    for (const command of ['ls', 'pwd']) {
+      ctrl.setPendingCommand(command);
+      feed(`${command}\r\nresult-${command}\r\n${D(0)}${A}`);
+    }
+    await waitFor(() => st.completed.length === 2);
+    expect(ctrl.blocks.slice(0, 2).map(block => [block.command, block.outputText, block.exitCode]))
+      .toEqual([['ls', 'result-ls', 0], ['pwd', 'result-pwd', 0]]);
+    ctrl.dispose();
+  });
+
   it('clears a pending submission and its fallback timer', async () => {
     const { ctrl, feed } = wire('cleared', true, undefined, 10);
     feed(A);

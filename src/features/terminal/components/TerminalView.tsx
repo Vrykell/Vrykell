@@ -112,9 +112,8 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
     }, {
       label: t('Move pane to new tab'), group: 'view' as const, disabled: !multiPane,
       onClick: () => unified ? detachCompositionPane(`terminal:${focusedTermId}`) : useSessionStore.getState().detachTerminalPane(focusedTermId),
-    }, {
-      label: t('Remove pane'), group: 'view' as const, disabled: !multiPane, onClick: () => closeTerminalPane(focusedTermId),
     }],
+    ...(multiPane ? [{ label: t('Remove pane'), group: 'view' as const, onClick: () => closeTerminalPane(focusedTermId) }] : []),
     ...(!unified && !multiPane ? [{ label: t('Close this terminal'), group: 'view' as const, danger: true, onClick: () => closeTerminalPane(focusedTermId) }] : []),
   ];
   const paneActions: ContextMenuItem[] = [

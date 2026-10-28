@@ -21,6 +21,8 @@ import NewTabModal from './NewTabModal';
 import SshResourcesAction from './SshResourcesAction';
 import WorkspaceResourceSwitcher from './WorkspaceResourceSwitcher';
 import { synchronizeWorkbench } from '../services/workbench';
+import { useWorkbenchStore } from '../stores/workbench';
+import { panesOf } from '../model/workbench';
 
 /** Terminal-specific creation tools surround the shared container strip. */
 export default function PanelTabs({ active = true }: { active?: boolean }) {
@@ -34,6 +36,16 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
   const [modal, setModal] = useState<{ groupId?: string } | null>(null);
   const [panelMenu, setPanelMenu] = useState<MenuAnchor | null>(null);
   const native = tabs.filter(isSessionTab);
+  const containers = useWorkbenchStore(state => state.snapshot.tabs);
+  const nativeOwner = (id: string) => {
+    const direct = native.find(tab => tab.id === id);
+    if (direct) return direct;
+    const container = containers.find(tab => tab.id === id && tab.scope === 'terminal');
+    if (!container) return undefined;
+    const cells = panesOf(container);
+    const focused = cells.find(pane => pane.id === container.focused) ?? cells[0];
+    return native.find(tab => terminalsOf(tab).some(terminal => focused?.resourceId === `terminal:${terminal.id}`));
+  };
   const resourceHandles = native.flatMap(tab => terminalsOf(tab).map(terminal => {
     const title = resolveDisplayTitle(tab.title, tab.titleSource, terminalsOf(tab).map(item => programTitles[item.id]).find(value => value?.trim()) ?? '');
     return { ...terminalTabHandle({ ...tab, layout: leaf(terminal) }, title, defaultShellType), id: `terminal:${terminal.id}` };
@@ -41,8 +53,10 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
   const pages = tabs.filter(tab => tab.kind === 'history' || tab.kind === 'start');
   const strip = useWorkspaceContainerTabs('terminal', resourceHandles, undefined, pages.map(tab => tab.id));
   const handles = [...strip.handles.map(handle => {
-    const tab = native.find(tab => tab.id === handle.id);
-    const title = tab ? resolveDisplayTitle(tab.title, tab.titleSource, terminalsOf(tab).map(item => programTitles[item.id]).find(value => value?.trim()) ?? '') : handle.label;
+    const tab = nativeOwner(handle.id);
+    const container = containers.find(tab => tab.id === handle.id);
+    const title = tab && (!container || panesOf(container).length === 1)
+      ? resolveDisplayTitle(tab.title, tab.titleSource, terminalsOf(tab).map(item => programTitles[item.id]).find(value => value?.trim()) ?? '') : handle.label;
     return { ...handle, label: title, tip: title, closeTestId: `tab-close-${handle.id}`,
       dataAttributes: { ...handle.dataAttributes, 'data-testid': `tab-row-${handle.id}`, 'data-tab-row-id': handle.id, 'data-tab-kind': 'session' } };
   }), ...pages.map(tab => ({ ...terminalTabHandle(tab, tab.title, defaultShellType, `tab-close-${tab.id}`), surface: 'canvas' as const,
@@ -58,7 +72,8 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
   const close = (id: string) => { if (pages.some(page => page.id === id)) useWorkspaceStore.getState().closeTab(id); else strip.onClose(id); };
   const filtered = handles.filter(handle => handle.label.toLowerCase().includes(query.trim().toLowerCase()));
   const grouping = strip.grouping && { ...strip.grouping, add: (id: string) => setModal({ groupId: id }) };
-  return <WorkspaceHeader active={active}><FolderTabs items={filtered} selected={activeId} label={t('Terminal sessions')} listId="session-tabs" className="terminal-tab-list"
+  const selected = native.some(tab => tab.id === activeId) ? strip.selected ?? activeId : activeId;
+  return <WorkspaceHeader active={active}><FolderTabs items={filtered} selected={selected} label={t('Terminal sessions')} listId="session-tabs" className="terminal-tab-list"
     headerClassName="terminal-instance-header" grouping={grouping} onSelect={select} onClose={close} onMove={strip.onMove} onRename={strip.onRename}
     empty={query.trim() && <div className="search-empty-state">{t('No matching terminal sessions')}</div>}
     onBlankContext={setPanelMenu} menuLabel={t('More terminal actions')} menuItems={[
@@ -69,12 +84,17 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
       { label: t('ACP'), onClick: () => useWorkspaceStore.getState().openHarnessTab() },
       { label: t('Search session titles…'), onClick: () => setSearchOpen(true) },
       { label: t('AI auto-group'), disabled: !native.length, onClick: openGrouping },
-    ]} tabActions={id => native.some(tab => tab.id === id) ? [
-      ...(strip.tabActions?.(id) ?? []),
-      { label: t('Regenerate tab title'), onClick: () => { void regenerateTitle(id); } },
-      { label: t('Duplicate session'), onClick: () => useWorkspaceStore.getState().duplicateTab(id) },
-      { label: t('AI auto-group'), onClick: openGrouping },
-    ] : []} toolbar={<>
+    ]} tabActions={id => {
+      const owner = nativeOwner(id);
+      return [
+        ...(strip.tabActions?.(id) ?? []),
+        ...(owner ? [
+          { label: t('Regenerate tab title'), onClick: () => { void regenerateTitle(owner.id); } },
+          { label: t('Duplicate session'), onClick: () => useWorkspaceStore.getState().duplicateTab(owner.id) },
+          { label: t('AI auto-group'), onClick: openGrouping },
+        ] : []),
+      ];
+    }} toolbar={<>
       <WorkspaceResourceSwitcher /><SshResourcesAction />
       <IconBtn title={t('Search session titles…')} data-testid="tab-search-toggle" onClick={() => { setSearchOpen(!searchOpen); setQuery(''); }}><Search size={iconSizes.control} /></IconBtn>
       {searchOpen && <TextInput variant="field" autoFocus value={query} onChange={event => setQuery(event.target.value)} placeholder={t('Search session titles…')} data-testid="tab-search" className="terminal-tab-search" />}

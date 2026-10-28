@@ -1269,7 +1269,7 @@ button.md-code-block-action.text-control { min-height: 22px; gap: 4px; padding: 
   animation: var(--terminal-ime-cursor-animation, none);
 }
 /* The overview border otherwise cuts through selected cells near the right edge. */
-.xterm .xterm-decoration-overview-ruler { display: none; }
+.xterm .xterm-decoration-overview-ruler { display: none !important; }
 
 button.global-search-source { border: none; background: transparent; padding: 0; text-align: left; font: inherit; }
 .global-search-source > span { flex: 1; }
