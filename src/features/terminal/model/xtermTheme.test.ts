@@ -12,7 +12,7 @@ describe('readXtermTheme', () => {
     document.documentElement.style.setProperty('--text-caret', '#4DA3FF');
     expect(readXtermTheme().cursor).toBe('#ECEFF4');
   });
-  it('读取终端背景、前景和 ANSI 颜色变量', () => {
+  it('reads the terminal background, foreground and ANSI color variables', () => {
     document.documentElement.style.setProperty('--xterm-bg', '#121820');
     document.documentElement.style.setProperty('--xterm-foreground', '#DDE4EE');
     document.documentElement.style.setProperty('--xterm-blue', '#8DB7E8');

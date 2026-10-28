@@ -46,7 +46,7 @@ describe('filePanelConfig menus', () => {
     for (const config of [local, ssh]) {
       expect(config.menus.blank).toEqual(expect.arrayContaining(config.menus.more));
     }
-    // 空白处多出「粘贴」（落点是当前目录），本地还多「从当前文件夹新建标签页」
+    // The blank area adds paste (targeting the current directory); local panels also add new tab from the current folder
     expect(local.menus.blank).toEqual(expect.arrayContaining(['paste', 'new-tab-here']));
     expect(ssh.menus.blank).toEqual(expect.arrayContaining(['paste', 'upload-file', 'upload-dir']));
   });

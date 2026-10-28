@@ -1,5 +1,5 @@
 /**
- * api/search — 搜索/历史 API 包装参数测试。
+ * api/search — argument tests for the search/history API wrappers.
  */
 import { describe, it, expect, vi } from 'vitest';
 
@@ -12,7 +12,7 @@ import {
 } from '@platform/api/search';
 
 describe('api/search', () => {
-  it('searchFiles：默认参数与显式 roots/root', async () => {
+  it('searchFiles: default arguments and explicit roots/root', async () => {
     invokeMock.mockResolvedValueOnce([]);
     await searchFiles('q');
     expect(invokeMock).toHaveBeenLastCalledWith('search_files', {
@@ -25,7 +25,7 @@ describe('api/search', () => {
     });
   });
 
-  it('searchHistory：默认参数与过滤条件', async () => {
+  it('searchHistory: default arguments and filters', async () => {
     invokeMock.mockResolvedValueOnce([]);
     await searchHistory('q');
     expect(invokeMock).toHaveBeenLastCalledWith('search_history', {

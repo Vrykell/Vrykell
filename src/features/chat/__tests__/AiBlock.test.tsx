@@ -118,7 +118,7 @@ it('rotates the disclosure chevron a quarter turn instead of pointing it sideway
   useChatStore.setState({ sendingTabs: [] });
   const { container } = render(<AiBlock exchange={exchange} conversationId="conversation" />);
   const arrow = () => container.querySelector('.ai-block-actions svg') as SVGElement;
-  // 展开时朝上（▴ = 朝下的箭头翻 180°），收起时朝下（▾）——AI 面板的展开箭头统一这一套
+  // Points up when expanded (▴ = the down arrow rotated 180°) and down when collapsed (▾); every AI panel disclosure follows this rule
   expect(arrow().style.transform).toBe('rotate(90deg)');
   fireEvent.click(screen.getByRole('button', { name: '收起回答' }));
   expect(arrow().style.transform).toBe('');

@@ -1,5 +1,5 @@
 /**
- * blocks — 命令块 store 测试。
+ * blocks — command block store tests.
  */
 import { describe, it, expect } from 'vitest';
 import type { TermBlock } from '../services/pipeline/termBlock';
@@ -26,7 +26,7 @@ describe('blocks store', () => {
     expect(useBlockStore.getState().byTab.t1).toBeUndefined();
   });
 
-  it('不存在的 tab / block：各操作安全无副作用', () => {
+  it('missing tab / block: every operation is safe and has no side effects', () => {
     useBlockStore.setState({ byTab: {} });
     const s = useBlockStore.getState();
     s.addBlock('t1', mk('b1'));
@@ -36,7 +36,7 @@ describe('blocks store', () => {
     expect(useBlockStore.getState().byTab).toEqual(before);
   });
 
-  it('selectBlocks：缺 tab 返回稳定空引用', () => {
+  it('selectBlocks: a missing tab returns a stable empty reference', () => {
     useBlockStore.setState({ byTab: { t1: [mk('b1')] } });
     const state = useBlockStore.getState;
     const sel = selectBlocks('t1');

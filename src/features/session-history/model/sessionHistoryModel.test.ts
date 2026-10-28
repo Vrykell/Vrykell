@@ -98,7 +98,7 @@ describe('session history model', () => {
     expect(title).toMatchObject({ query: 'server', type: 'ssh', date: '7d', dateField: 'created', sort: 'title-desc', groupBy: 'terminal' });
     expect(updateSessionHistoryFilter(created, { dateField: 'closed' })).toMatchObject({ sort: 'closed-asc', dateField: 'closed' });
   });
-  it('只展示历史会话并按分组和顺序组织', () => {
+  it('shows only historical sessions and organizes them by group and order', () => {
     const result = deriveSessionHistorySections([
       session({ id: 'active', status: 'active' }),
       session({ id: 'b', group_id: 'g1', sort_order: 2 }),
@@ -111,7 +111,7 @@ describe('session history model', () => {
     expect(result.ungrouped.map((item) => item.id)).toEqual(['free']);
   });
 
-  it('正确判断过滤条件是否启用', () => {
+  it('detects whether a filter is active', () => {
     expect(hasSessionHistoryFilter({ query: 'ssh', type: 'all', date: 'all' })).toBe(false);
     expect(hasSessionHistoryFilter({ query: '', type: 'ssh', date: 'all' })).toBe(true);
   });

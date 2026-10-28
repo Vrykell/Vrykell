@@ -14,7 +14,7 @@ function createDependencies(): ApplicationBootstrapDependencies {
 }
 
 describe('createApplicationBootstrap', () => {
-  it('按固定顺序启动所有应用级任务', () => {
+  it('starts every application-level task in a fixed order', () => {
     const order: string[] = [];
     const instrumented = createDependencies();
     const names: Array<keyof ApplicationBootstrapDependencies> = [
@@ -53,7 +53,7 @@ describe('createApplicationBootstrap', () => {
     ]);
   });
 
-  it('销毁时逆序清理，并且清理操作幂等', () => {
+  it('cleans up in reverse order on dispose and cleanup is idempotent', () => {
     const deps = createDependencies();
     const firstCleanup = vi.fn();
     deps.subscribeAutoTitle = vi.fn(() => firstCleanup);
@@ -65,7 +65,7 @@ describe('createApplicationBootstrap', () => {
     expect(firstCleanup).toHaveBeenCalledOnce();
   });
 
-  it('隔离启动任务错误，不阻断其他初始化', () => {
+  it('isolates startup task failures without blocking other initialization', () => {
     const deps = createDependencies();
     const errors: string[] = [];
     deps.refreshAiConfig = vi.fn(() => {

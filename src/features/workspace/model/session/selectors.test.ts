@@ -6,13 +6,13 @@ const session = { id: 'session', title: '终端', kind: 'session' as const, layo
 const history = { id: 'history', title: '会话历史', kind: 'history' as const };
 
 describe('session selectors', () => {
-  it('只把当前真实会话标签作为 active session', () => {
+  it('treats only the current real session tab as the active session', () => {
     expect(selectActiveSessionTab({ tabs: [session, history], activeId: 'session' })).toEqual(session);
     expect(selectActiveSessionTab({ tabs: [session, history], activeId: 'history' })).toBeNull();
     expect(selectActiveSessionTab({ tabs: [session, history], activeId: 'missing' })).toBeNull();
   });
 
-  it('过滤出所有真实会话标签', () => {
+  it('selects every real session tab', () => {
     expect(selectSessionTabs({ tabs: [session, history] })).toEqual([session]);
   });
 });

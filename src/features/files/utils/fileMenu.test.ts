@@ -74,7 +74,7 @@ describe('fileMenu', () => {
     more[0]!.onClick?.();
     expect(onRevealDir).toHaveBeenCalledWith('/work');
 
-    // 没有对应 handler（面板不支持，例如远端）时不渲染
+    // Renders nothing without the matching handler (unsupported panel, such as a remote one)
     expect(buildFileMenuItems(['reveal'], ctx({ entry: file, targets: [file] }))).toHaveLength(0);
     expect(buildFileMenuItems(['reveal'], ctx())).toHaveLength(0);
   });
@@ -107,7 +107,7 @@ describe('fileMenu', () => {
     withHandler[0]!.onClick?.();
     expect(onSyncToCwd).toHaveBeenCalledTimes(1);
 
-    // 远程面板不提供 handler → 不渲染
+    // Remote panels provide no handler, so nothing renders
     expect(buildFileMenuItems(['sync-cwd'], ctx())).toHaveLength(0);
   });
 

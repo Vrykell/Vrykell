@@ -13,7 +13,7 @@ describe('history store', () => {
 
     const results = useHistoryStore.getState().search('npm');
     expect(results).toHaveLength(2);
-    expect(results[0]!.command).toBe('npm test'); // 倒序，最新在前
+    expect(results[0]!.command).toBe('npm test'); // Newest first
     expect(results[1]!.command).toBe('npm install');
   });
 
@@ -29,7 +29,7 @@ describe('history store', () => {
 
     const entries = useHistoryStore.getState().search('ls');
     expect(entries).toHaveLength(1);
-    expect(entries[0]!.exitCode).toBe(1); // 最新的
+    expect(entries[0]!.exitCode).toBe(1); // The latest one
   });
 
   it('limits search results', () => {
@@ -46,7 +46,7 @@ describe('history store', () => {
     expect(useHistoryStore.getState().entries).toHaveLength(0);
   });
 
-  it('历史单一权威在后端：不再写 localStorage', () => {
+  it('the backend is the single source of history: nothing is written to localStorage', () => {
     useHistoryStore.getState().record('deploy', '/', 0);
     expect(localStorage.getItem('vrykell-cmd-history')).toBeNull();
   });

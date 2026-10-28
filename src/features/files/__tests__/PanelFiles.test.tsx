@@ -45,7 +45,7 @@ it('opens a file in the built-in editor by default without sending terminal inpu
   expect(open).toHaveBeenCalledWith({ path: '/tmp/config.ini' });
 });
 
-it('本地面板：无记忆时用终端 cwd 起始，导航后记住目录，重挂载恢复', () => {
+it('local panel: starts at the terminal cwd without a remembered path, remembers the directory after navigating and restores it on remount', () => {
   render(<PanelFiles />);
   expect(screen.getByTestId('panel-start')).toHaveTextContent(JSON.stringify({ initialPath: '/tmp', initialResolved: false }));
 
@@ -57,7 +57,7 @@ it('本地面板：无记忆时用终端 cwd 起始，导航后记住目录，�
   expect(screen.getByTestId('panel-start')).toHaveTextContent(JSON.stringify({ initialPath: '/remembered', initialResolved: true }));
 });
 
-it('本地面板：记忆的盘符视图（null）按已确定目录处理', () => {
+it('local panel: treats a remembered drive view (null) as a resolved directory', () => {
   useLocalPathStore.setState({ remembered: { path: null } });
   render(<PanelFiles />);
   expect(screen.getByTestId('panel-start')).toHaveTextContent(JSON.stringify({ initialPath: null, initialResolved: true }));

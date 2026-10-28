@@ -5,20 +5,20 @@ vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import { killForeground } from '@utils/killForeground';
 
-describe('killForeground（升级决策已下沉 Rust）', () => {
+describe('killForeground (escalation decisions moved down to Rust)', () => {
   beforeEach(() => {
     invokeMock.mockReset();
     invokeMock.mockResolvedValue('term');
   });
 
-  it('调用 pty_kill_foreground 并透传后端级别', async () => {
+  it('calls pty_kill_foreground and passes the backend level through', async () => {
     invokeMock.mockResolvedValue('kill');
     const level = await killForeground('s1');
     expect(level).toBe('kill');
     expect(invokeMock).toHaveBeenCalledWith('pty_kill_foreground', { id: 's1' });
   });
 
-  it('后端拒绝时错误透传', async () => {
+  it('propagates the error when the backend refuses', async () => {
     invokeMock.mockRejectedValueOnce(new Error('前台是 shell 本身'));
     await expect(killForeground('s1')).rejects.toThrow('前台是 shell 本身');
   });

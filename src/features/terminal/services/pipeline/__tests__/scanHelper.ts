@@ -1,9 +1,10 @@
 import type { DispatchEvent } from '@core/terminal/events';
 
 /**
- * 测试用字节流扫描器 —— 生产路径的扫描已在 Rust 端（src-tauri/src/scan.rs），
- * 前端不再持有扫描器；这里保留一份语义等价的实现，仅供 SessionController 测试
- * 把原始 chunk（内嵌 OSC/alt CSI）切成 DispatchEvent 列表。
+ * Test-only byte stream scanner — production scanning already happens on the Rust side
+ * (src-tauri/src/scan.rs), so the frontend no longer owns a scanner; this keeps a
+ * semantically equivalent implementation so SessionController tests can split raw
+ * chunks (with embedded OSC/alt CSI) into a DispatchEvent list.
  */
 
 const ESC = '\x1b';

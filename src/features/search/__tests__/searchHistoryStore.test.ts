@@ -7,7 +7,7 @@ describe('search history store', () => {
     useSearchHistoryStore.setState({ items: [] });
   });
 
-  it('忽略空查询并去重，最新查询排最前', () => {
+  it('ignores empty queries, deduplicates and keeps the newest query first', () => {
     const { add } = useSearchHistoryStore.getState();
 
     add('  ');
@@ -18,7 +18,7 @@ describe('search history store', () => {
     expect(useSearchHistoryStore.getState().items).toEqual(['alpha', 'beta']);
   });
 
-  it('最多保留 20 条记录', () => {
+  it('keeps at most 20 entries', () => {
     const { add } = useSearchHistoryStore.getState();
     for (let index = 0; index < 25; index += 1) add(`query-${index}`);
 
@@ -28,7 +28,7 @@ describe('search history store', () => {
     expect(items[items.length - 1]).toBe('query-5');
   });
 
-  it('支持删除单条和清空', () => {
+  it('removes a single entry and clears the list', () => {
     useSearchHistoryStore.getState().add('alpha');
     useSearchHistoryStore.getState().add('beta');
 

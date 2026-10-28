@@ -118,7 +118,7 @@ describe('source', () => {
   });
 
   it('reads rows written before the source field existed as this app', async () => {
-    // 旧版本写下的载荷没有 source：合并时补上本机来源，而不是把它们归到未知来源
+    // Payloads written by older versions have no source: merging fills in this app's source instead of filing them under an unknown source
     localStorage.setItem('vrykell-usage', JSON.stringify({
       version: 2,
       state: {

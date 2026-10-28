@@ -234,7 +234,7 @@ describe('tokensSeries', () => {
       now,
     );
     expect(unit).toBe('day');
-    // 数据桶 + 之后到今天的空桶（图会展示到当前时刻）
+    // The bucket with data plus the empty buckets that follow it through today (the chart draws up to the current moment)
     expect(buckets).toHaveLength(3);
     expect(buckets[0]).toMatchObject({ tokens: 150, turns: 2 });
     expect(buckets[0]!.label).toBe('10/12');
@@ -244,7 +244,7 @@ describe('tokensSeries', () => {
   it('keeps at most the last 60 buckets', () => {
     const { buckets } = tokensSeries([record({ at: now - 200 * DAY })], 'all', now);
     expect(buckets.length).toBeLessThanOrEqual(MAX_USAGE_BUCKETS);
-    // 200 天前的记录落在窗口外，不显示为柱子
+    // A record from 200 days ago falls outside the window and draws no bar
     expect(buckets.every((bucket) => bucket.tokens === 0)).toBe(true);
   });
 });
