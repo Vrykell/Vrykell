@@ -3,7 +3,7 @@ use rusqlite::params;
 use serde::Serialize;
 
 impl HistoryDb {
-    // ── 工作区 CRUD ──
+    // ── Workspace CRUD ──
 
     pub fn add_workspace(&self, path: &str, name: &str, timestamp: u64) -> Result<(), String> {
         self.conn()
@@ -34,7 +34,7 @@ impl HistoryDb {
     }
 }
 
-/// 工作区记录
+/// A workspace record
 #[derive(Clone, Serialize, Debug)]
 pub struct WorkspaceEntry {
     pub id: i64,

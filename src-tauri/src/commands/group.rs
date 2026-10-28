@@ -34,14 +34,14 @@ pub fn group_set_collapsed(state: tauri::State<'_, HistoryState>, id: String, co
     db.set_group_collapsed(&id, collapsed)
 }
 
-/// 删除分组（保留组内会话，回到未分组）。
+/// Deletes a group (its sessions are kept and become ungrouped).
 #[tauri::command]
 pub fn group_delete(state: tauri::State<'_, HistoryState>, id: String) -> Result<(), String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
     db.delete_group(&id)
 }
 
-/// 删除分组及其组内全部会话历史。
+/// Deletes a group and all session history it contains.
 #[tauri::command]
 pub fn group_delete_with_sessions(state: tauri::State<'_, HistoryState>, id: String) -> Result<(), String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;

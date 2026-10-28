@@ -1,4 +1,4 @@
-//! terminal — 终端后端：PTY、输出扫描、shell 集成、shell 列表。
+//! terminal — terminal backend: PTY, output scanning, shell integration, shell list.
 pub mod pty;
 pub mod completion;
 mod output_batch;

@@ -1,5 +1,5 @@
-//! Tauri 命令层：按领域拆分，避免单一 god module。
-//! 每个子模块只暴露 `#[tauri::command]`，数据访问一律走 `crate::db`。
+//! Tauri command layer: split by domain to avoid a single god module.
+//! Each submodule exposes only `#[tauri::command]`; all data access goes through `crate::db`.
 
 pub mod clipboard;
 pub mod conversation;

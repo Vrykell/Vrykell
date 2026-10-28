@@ -1046,7 +1046,7 @@ mod tests {
         ] {
             assert!(danger_reason(command, Some("powershell")).is_some(), "{command}");
         }
-        // 包装器之外仍不误报
+        // Still no false positives outside wrapper invocations.
         assert_eq!(danger_reason("grep -rn shutdown docs/", Some("bash")), None);
         assert_eq!(danger_reason("echo \"sudo is required\"", Some("bash")), None);
         assert_eq!(danger_reason("env | grep PATH", Some("bash")), None);
@@ -1063,7 +1063,7 @@ mod tests {
             ("cat /etc/shadow", "path.system_accounts"),
             ("/home/u/backup/id_ed25519", "path.private_key"),
             ("/home/u/keys/vault.kdbx", "path.key_store"),
-            // Windows 写法（反斜杠）同样命中
+            // Backslash-style paths match as well.
             (r"type C:\Users\u\.ssh\id_rsa", "path.ssh_dir"),
             (r"copy C:\proj\.env D:\tmp\env.txt", "path.env_file"),
             (r"Get-Content C:\Users\u\.vrykell\config.json", "path.app_config"),
