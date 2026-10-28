@@ -5,9 +5,10 @@ use serde::{Deserialize, Serialize};
 use crate::terminal::ssh_command::{SshOptions, validate_options, validate_ssh_host};
 
 impl HistoryDb {
-    // ── SSH 连接 CRUD ──
+    // ── SSH connection CRUD ──
 
-    /// 列出全部 SSH 连接（密码脱敏：password 置空，has_password 标记是否已存）。
+    /// List all SSH connections (password masked: `password` is emptied and `has_password` marks
+    /// whether one is stored).
     pub fn list_ssh_connections(&self) -> Result<Vec<SshConnection>, String> {
         let mut stmt = self
             .conn()
@@ -22,7 +23,7 @@ impl HistoryDb {
         Ok(rows.filter_map(|r| r.ok()).collect())
     }
 
-    /// 按 id 取连接（含密码，供后端执行 ssh 命令）。
+    /// Load a connection by id, including the password, so the backend can run ssh commands.
     pub fn get_ssh_connection(&self, id: &str) -> Result<SshConnection, String> {
         let mut conn = self
             .conn()
@@ -46,8 +47,10 @@ impl HistoryDb {
         Ok(conn)
     }
 
-    /// 新增或更新连接。密码为空且连接已存在时保留旧密码（编辑不回显密码）。
-    /// 密码不落 SQLite：非空时写入密钥存储（macOS 钥匙串 / 平台回退文件）。
+    /// Insert or update a connection. When the password is empty and the connection already exists,
+    /// the stored password is kept (editing never echoes the password back).
+    /// Passwords never reach SQLite: a non-empty one goes to secret storage (system keychain,
+    /// with a platform fallback file).
     pub fn save_ssh_connection(&self, conn: &SshConnection) -> Result<(), String> {
         validate_ssh_host(&conn.host)?;
         validate_options(&conn.options)?;
@@ -55,7 +58,8 @@ impl HistoryDb {
         if !conn.password.is_empty() {
             secret::set_secret(&conn.id, &conn.password)?;
         } else {
-            // 空密码：编辑未改密码 → 迁移旧库列里的明文遗留（如有）
+            // Empty password: the editor kept the current one, so migrate any plaintext left in the
+            // legacy column.
             let legacy: String = self
                 .conn()
                 .query_row(
@@ -68,7 +72,7 @@ impl HistoryDb {
                 secret::set_secret(&conn.id, &legacy)?;
             }
         }
-        // 库内一律不存明文密码
+        // Never persist a plaintext password in the database.
         self.conn()
             .execute(
                 "INSERT INTO ssh_connections (id, name, host, port, user, password, auth_method, last_opened_at, options_json) \
@@ -111,8 +115,8 @@ impl HistoryDb {
     }
 }
 
-/// SSH 连接记录。`password` 仅在「保存输入」与「后端执行」时使用；
-/// 列表输出（mask=true）时置空，用 `has_password` 标记是否已存密码。
+/// An SSH connection record. `password` is only used when saving input and when the backend runs
+/// ssh; list output (mask=true) empties it and reports `has_password` instead.
 #[derive(Clone, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SshConnection {

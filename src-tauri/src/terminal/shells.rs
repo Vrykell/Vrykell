@@ -1,9 +1,10 @@
-//! 可用 shell 探测：新建标签页弹窗按机器实际可用的 shell 展示类型。
+//! Available shell detection: the new-tab dialog offers the shell types the machine really has.
 //!
-//! - Unix/macOS：探测 zsh / bash
-//! - Windows：cmd 恒可用，探测 PowerShell / pwsh
+//! - Unix/macOS: probe zsh / bash
+//! - Windows: cmd is always available, probe PowerShell / pwsh
 //!
-//! 每个 `ShellInfo` 带 `default` 标记，前端用它决定「默认终端」选项的排序权重。
+//! Each `ShellInfo` carries a `default` flag, which the frontend uses as the sort weight for
+//! the "default terminal" option.
 
 use serde::Serialize;
 
@@ -14,7 +15,7 @@ pub struct ShellInfo {
     pub default: bool,
 }
 
-/// 探测某程序是否在 PATH 上可用（跑 `--version`，成功即视为可用）。Unix 用。
+/// Probe whether a program is available on PATH (runs `--version`; success means available). Unix only.
 #[cfg(not(target_os = "windows"))]
 fn cmd_ok(program: &str) -> bool {
     std::process::Command::new(program)
@@ -24,8 +25,8 @@ fn cmd_ok(program: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// Windows 探测：Windows PowerShell 5.1 不接受 `--version`（那是 pwsh 7+ 的），
-/// 统一走 `-NoProfile -NonInteractive -Command "exit 0"`，5.1 与 pwsh 都支持。
+/// Windows probe: Windows PowerShell 5.1 does not accept `--version` (that flag belongs to pwsh 7+),
+/// so both go through `-NoProfile -NonInteractive -Command "exit 0"`, which 5.1 and pwsh support.
 #[cfg(target_os = "windows")]
 pub(crate) fn shell_ok(program: &str) -> bool {
     use std::os::windows::process::CommandExt;
@@ -38,7 +39,7 @@ pub(crate) fn shell_ok(program: &str) -> bool {
         .unwrap_or(false)
 }
 
-/// 从 `$SHELL` 取默认 shell 名（去路径）。
+/// Take the default shell name from `$SHELL` (basename only).
 #[cfg(not(target_os = "windows"))]
 fn default_shell_id() -> String {
     std::env::var("SHELL")
@@ -92,7 +93,7 @@ fn detect_shells() -> Vec<ShellInfo> {
         }
     }
     if shells.is_empty() {
-        // 探测失败兜底：至少返回默认 shell 名，保证弹窗有可选项
+        // Detection fallback: return at least the default shell name so the dialog has an option.
         shells.push(ShellInfo {
             id: default_id.clone(),
             label: default_id,
@@ -106,7 +107,8 @@ fn detect_shells() -> Vec<ShellInfo> {
 
 #[tauri::command]
 pub async fn list_shells() -> Vec<ShellInfo> {
-    // 探测要跑多个 `Command::output()`（Windows pwsh 可达数百 ms），移出主线程避免冻结 UI
+    // Detection runs several `Command::output()` calls (up to hundreds of ms for pwsh on Windows),
+    // so move it off the main thread to avoid freezing the UI.
     tauri::async_runtime::spawn_blocking(detect_shells)
         .await
         .unwrap_or_default()
@@ -116,12 +118,13 @@ pub async fn list_shells() -> Vec<ShellInfo> {
 mod tests {
     use super::*;
 
-    /// 兜底逻辑：无可探测 shell 时返回以默认 shell 为名的单一项并标记 default。
+    /// Fallback behaviour: with no detectable shell, return a single entry named after the default
+    /// shell and marked default.
     #[test]
     fn empty_shells_falls_back_to_default() {
         let shells: Vec<ShellInfo> = Vec::new();
         let default_id = "zsh".to_string();
-        // 复现 detect_shells 的兜底分支（不依赖真实 PATH）
+        // Reproduce the fallback branch of detect_shells (independent of the real PATH)
         let mut out = shells;
         if out.is_empty() {
             out.push(ShellInfo {
@@ -135,7 +138,7 @@ mod tests {
         assert_eq!(out[0].id, "zsh");
     }
 
-    /// 无任何 default 标记时，首个 shell 被提升为 default。
+    /// When nothing is marked default, the first shell is promoted to default.
     #[test]
     fn first_shell_becomes_default_when_none_marked() {
         let mut out = [
