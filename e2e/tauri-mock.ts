@@ -11,8 +11,8 @@ export interface TauriMockOptions {
   /** Directories a second process forwarded before the window could listen (drains at startup). */
   pendingLaunchDirectories?: string[];
   contextMenu?: { available?: boolean; enabled?: boolean; stale?: boolean; certificateTrusted?: boolean };
-  /** 是否启用 OSC 133 shell integration（默认 true）。
-   *  false 时 mock 保持 classic 场景，用于测试无 integration 回退。 */
+  /** Whether OSC 133 shell integration is enabled (default true).
+   *  When false the mock stays in the classic scene, for testing the fallback without integration. */
   integration?: boolean;
   sshHost?: 'known' | 'unknown' | 'changed';
   sshTrustConfirmed?: boolean;
@@ -22,29 +22,29 @@ export interface TauriMockOptions {
   groupedHistoricalSession?: boolean;
   /** Keep the prompt but omit the OSC 133;B ready marker (older hooks / exotic shells). */
   shellReadyMarker?: boolean;
-  /** 预置模型列表（默认 2 个：主力模型 + 本地模型） */
+  /** Seed model list (default 2: main model + local model) */
   aiModels?: { id: string; name: string; provider: string; baseUrl: string; model: string }[];
-  /** 当前生效模型 id（默认 '' = 镜像字段） */
+  /** Active model id (default '' = mirrors the config fields) */
   aiActive?: string;
-  /** 预置技能列表（默认 2 个：写单测 / 旧脚本技能） */
+  /** Seed skill list (default 2: write unit tests / legacy script skill) */
   skills?: Record<string, unknown>[];
   /** Seed the SSH workspace mode; management remains the default for existing workflows. */
   sshWorkspaceView?: 'dashboard' | 'manage';
 }
 
 /**
- * 注入 Tauri IPC 的浏览器端假实现：
- * - pty_* 命令：假 shell（回显写入内容到 pty-output 事件）
- * - fs_list：固定假目录
- * - plugin:event|listen/unlisten：事件注册表
- * 同时预置 API Key 跳过 ApiKeyField。
+ * Browser-side fake that injects Tauri IPC:
+ * - pty_* commands: fake shell (echoes what is written into the pty-output event)
+ * - fs_list: fixed fake directory
+ * - plugin:event|listen/unlisten: event registry
+ * Also seeds an API key so ApiKeyField is skipped.
  *
- * 新终端管线由 OSC 133 shell integration 驱动场景切换，
- * 因此 mock 的 PTY 输出默认 emit 完整 OSC 133 序列。
+ * The new terminal pipeline drives scene switches through OSC 133 shell integration,
+ * so the mocked PTY output emits the full OSC 133 sequence by default.
  *
- * @tauri-apps/api v2 契约（见 node_modules/@tauri-apps/api/core.js）：
+ * @tauri-apps/api v2 contract (see node_modules/@tauri-apps/api/core.js):
  * invoke → __TAURI_INTERNALS__.invoke(cmd, args)
- * listen → transformCallback 注册 window[`_${id}`]，再 invoke('plugin:event|listen', {event, handler: id})
+ * listen → transformCallback registers window[`_${id}`], then invoke('plugin:event|listen', {event, handler: id})
  */
 export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMockOptions = {}) {
   const integration = opts.integration !== false;
@@ -113,7 +113,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     const killAttempts = new Map<string, number>();
     const resizes: { cols: number; rows: number }[] = [];
     const fsOps: { op: string; path: string; newName?: string }[] = [];
-    /** 新建出来的条目（让后续列表能看到，便于断言「新建后立即重命名」）。 */
+    /** Entries created by the mock (visible to later listings, so a spec can assert "create then rename immediately"). */
     const createdEntries: { name: string; path: string; is_dir: boolean }[] = [];
     const sshOps: { op: string; path: string; newName?: string; destDir?: string }[] = [];
     const downloads: Record<string, unknown>[] = [];
@@ -137,7 +137,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       baseUrl: activeProfile?.baseUrl ?? 'https://api.openai.com/v1',
       model: activeProfile?.model ?? 'gpt-4o-mini',
     };
-    // ── AI 多模型配置（设置页「模型配置」读写） ──
+    // ── AI multi-model configuration (read and written by the settings page's model configuration) ──
     const aiModels: { id: string; name: string; provider: string; baseUrl: string; model: string }[] = models;
     let aiActive = active;
     let aiProvider: string = activeProfile?.provider ?? 'openai-compatible';
@@ -146,7 +146,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     let aiHasTavily = false;
     const aiKeyCalls: { provider: string; key?: string }[] = [];
     const aiModelCalls: { kind: string; models?: unknown[]; active?: string; id?: string }[] = [];
-    // ── 技能系统 ──
+    // ── Skill system ──
     const skills: Record<string, unknown>[] = skillsSeed;
     const skillOps: { op: string; name: string; trusted?: boolean | null; enabled?: boolean | null; prompt?: string }[] = [];
     // ── MCP ──
@@ -154,7 +154,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       { name: '文件系统', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem'], url: '', env: {}, enabled: true, connected: true, toolCount: 3 },
     ];
     const mcpOps: { op: string; name: string; config?: unknown }[] = [];
-    // ── 工具授权（Rust 侧策略的镜像） ──
+    // ── Tool authorization (mirror of the Rust-side policy) ──
     const policyLevels: Record<string, string> = {
       run_command: 'ask', read_file: 'allow', write_file: 'ask', edit_file: 'ask',
       list_dir: 'allow', search_files: 'allow', web_search: 'allow', web_fetch: 'allow',
@@ -176,13 +176,13 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     };
     let leaseCounter = 0;
     const nextLease = () => `e2e-lease-${++leaseCounter}`;
-    // ── 记忆 ──
+    // ── Memory ──
     const memory: import('../src/features/agent/services/platform').MemoryRecord[] = [
       { id: 'legacy', key: 'legacy:memory.md:0', content: 'Old editor preference', scope: 'global', status: 'pending', source: 'memory.md', updatedAt: 1, expiresAt: 1, revision: 1 },
     ];
-    // ── 主题 ──
+    // ── Theme ──
     const theme = { opacity: 1, backgroundImage: null, vars: {} as Record<string, string> };
-    // ── 搜索 / 历史 ──
+    // ── Search / history ──
     const historyEntries: Record<string, unknown>[] = [
       { command: 'npm run dev', cwd: '/home/e2e/project', timestamp: Date.now() - 1000, exit_code: 0 },
       { command: 'git status', cwd: '/home/e2e/project', timestamp: Date.now() - 2000, exit_code: 0 },
@@ -279,7 +279,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       return finalByte === 'h';
     }
 
-    /** 极简 OSC/alt 扫描器：把 raw 字节流切成前端 `DispatchEvent`（对应 Rust StreamScanner）。 */
+    /** Minimal OSC/alt scanner: splits the raw byte stream into frontend `DispatchEvent`s (mirrors the Rust StreamScanner). */
     function scanEvents(chunk: string): { kind: string; text?: string; code?: string; payload?: string; raw?: string }[] {
       const events: { kind: string; text?: string; code?: string; payload?: string; raw?: string }[] = [];
       const flushData = (end: number) => {
@@ -349,21 +349,21 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       setTimeout(() => emit('pty-output', { id: 'e2e-session', events, inputEpoch: epoch }), 10);
     }
 
-    /** 发送初始 prompt，把场景从 classic 切到 blockList。
-     *  顺序与真实 RC 一致（shell_integration.rs：OSC7 → D → A → G），防 cwd 归属回归。 */
+    /** Send the initial prompt, switching the scene from classic to blockList.
+     *  Order matches the real RC (shell_integration.rs: OSC7 → D → A → G) so cwd attribution cannot regress. */
     function emitInitialPrompt(cwd = '/home/e2e/project') {
       if (!integrationEnabled) return;
       const ready = enableReadyMarker ? '\x1b]133;B\x07' : '';
       emitOutput(`${OSC7(cwd)}${A}~/project${G('main')} $ ${ready}`);
     }
 
-    /** 发送 OSC 133 序列模拟 shell integration 输出 */
+    /** Send OSC 133 sequences to simulate shell integration output */
     function emitOsc133(data: string): string[] {
       if (!integrationEnabled) {
         return [data];
       }
 
-      // 累积命令文本直到收到换行
+      // Accumulate command text until a newline arrives
       pendingCmd += data;
       if (!pendingCmd.includes('\n') && !pendingCmd.includes('\r')) return [];
 
@@ -380,7 +380,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           results.push(C);
         }
         if (output) results.push(`${output}\r\n`);
-        // 与真实 RC 同序：OSC7 在 D/A 之前
+        // Same order as the real RC: OSC7 comes before D/A
         results.push(OSC7('/home/e2e/project'));
         results.push(D(0));
         results.push(`${A}~/project${G('main')} $ ${enableReadyMarker ? '\x1b]133;B\x07' : ''}`);
@@ -388,7 +388,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       return results;
     }
 
-    /** 为几个固定命令生成可断言的输出 */
+    /** Generate assertable output for a few fixed commands */
     function generateOutput(cmd: string): string {
       if (cmd === 'echo hello-e2e') return 'hello-e2e';
       if (cmd === 'echo e2e-block-test') return 'e2e-block-test';
@@ -653,14 +653,14 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'pty_spawn': {
             spawns.push(args);
             sshSession = Boolean(args.ssh);
-            // 注册完 listener 后再发初始 prompt，避免瞬间丢失
+            // Send the initial prompt only after the listener is registered, so nothing is lost
             setTimeout(() => emitInitialPrompt(terminalDirectories ? args.cwd || '/home/e2e/project' : undefined), 20);
             return 'e2e-session';
           }
           case 'pty_write': {
             if (args.expectedEpoch !== undefined && args.expectedEpoch !== inputEpoch) throw new Error('terminal input target changed');
             writes.push(args.data as string);
-            // 假 shell + OSC 133 shell integration
+            // Fake shell plus OSC 133 shell integration
             const chunks = emitOsc133(args.data as string);
             const data = chunks.length > 0 ? chunks.join('') : (args.data as string);
             emitOutput(data);
@@ -720,9 +720,9 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             });
           }
           case 'llm_stream': {
-            // AI SDK 代理流：后端侧是「按回调 id 推事件」；浏览器 mock 等价于
-            // 调 window[`_${id}`]({ index, message })，Channel 内部按 index 保序 + end 清理。
-            // 按请求 URL 区分 Anthropic / OpenAI 的 SSE 格式。
+            // AI SDK proxy stream: the backend pushes events keyed by callback id; the browser mock is
+            // equivalent to calling window[`_${id}`]({ index, message }), while Channel keeps index order and cleans up on end.
+            // The request URL distinguishes the Anthropic / OpenAI SSE formats.
             const raw = args.onEvent as unknown;
             const idStr =
               typeof raw === 'string' ? raw : ((raw as { toJSON?: () => string })?.toJSON?.() ?? String(raw));
@@ -732,7 +732,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             const url = (args.req as { url?: string })?.url ?? '';
             searchCalls.push({ cmd: 'llm_stream', args: { url, method: (args.req as { method?: string })?.method } });
             const isAnthropic = /anthropic|\/v1\/messages/.test(url);
-            // generateText 走非流式 JSON；streamText 走 SSE（请求体带 "stream":true）
+            // generateText uses non-streaming JSON; streamText uses SSE (the request body carries "stream":true)
             const reqBody = (args.req as { body?: string })?.body ?? '';
             const wantsStream = /"stream"\s*:\s*true/.test(reqBody);
             const streamId = String((args as { id?: unknown }).id ?? '');
@@ -934,7 +934,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'web_crawl':
             searchCalls.push({ cmd: 'web_crawl', args });
             return { pages: [{ title: '首页', url: args.startUrl, text: '爬到的第一页' }], truncated: false };
-          // ── 技能系统 ──
+          // ── Skill system ──
           case 'list_skills':
             return skills.map((s) => ({ ...s }));
           case 'get_skill': {
@@ -1050,7 +1050,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             if (existing) Object.assign(existing, record); else memory.push(record);
             return { ...record };
           }
-          // ── 主题 ──
+          // ── Theme ──
           case 'apply_window_frame':
             windowFrameCalls.push({ label: windowLabel, color: String(args.color) });
             return undefined;
@@ -1069,7 +1069,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           }
           case 'get_theme_path':
             return '/home/e2e/.vrykell/theme.json';
-          // ── 搜索 / 历史 ──
+          // ── Search / history ──
           case 'search_files':
             searchCalls.push({ cmd: 'search_files', args });
             return [{ path: '/home/e2e/project/notes.txt', name: 'notes.txt', is_dir: false, size: 1234, modified: Date.now() - 3600_000, line: null, snippet: null }];
@@ -1553,7 +1553,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               { name: 'Documents', path: '/home/e2e/Documents', is_dir: true },
               { name: 'Downloads', path: '/home/e2e/Downloads', is_dir: true },
               { name: 'notes.txt', path: '/home/e2e/notes.txt', is_dir: false },
-              // 新建出来的条目出现在列表里（模拟真实文件系统）
+              // Newly created entries appear in the listing (simulating a real filesystem)
               ...createdEntries,
               // Changes made outside the panel (test-injected), visible after a refresh.
               ...((window as unknown as { __FS_EXTRA_ENTRIES__?: { name: string; path: string; is_dir: boolean }[] }).__FS_EXTRA_ENTRIES__ ?? []),
@@ -1584,7 +1584,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             const oldPath = args.oldPath as string;
             const parent = oldPath.slice(0, oldPath.lastIndexOf('/'));
             const name = args.newName as string;
-            // 同名避让（真实实现在后端）：目标已被占用时返回带序号的路径
+            // Name collision avoidance (the real implementation lives in the backend): return a numbered path when the target is taken
             const taken = ['Documents', 'Downloads', 'notes.txt'].includes(name)
               || createdEntries.some((item) => item.path === `${parent}/${name}`);
             return `${parent}/${taken ? `${name.replace(/(\.[^.]*)?$/, ' (1)$1')}` : name}`;
@@ -1593,7 +1593,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'fs_create_dir': {
             const dir = String(args.dir ?? '');
             const name = args.name as string;
-            // 同名避让：真实后端会加序号并返回最终路径，mock 按已新建条目模拟
+            // Name collision avoidance: the real backend appends a number and returns the final path; the mock imitates it from created entries
             let finalName = name;
             let path = `${dir}/${name}`;
             if (createdEntries.some((item) => item.path === path)) {
@@ -1619,7 +1619,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               completed: paths.map((path) => {
                 const name = path.split('/').pop() ?? 'file';
                 const candidate = `${destDir}/${name}`;
-                // 同名避让（真实实现在后端）：目标已被占用时返回带序号的路径
+                // Name collision avoidance (the real implementation lives in the backend): return a numbered path when the target is taken
                 const taken = ['Documents', 'Downloads', 'notes.txt'].includes(name)
                   || createdEntries.some((item) => item.path === candidate);
                 return { from: path, to: taken ? candidate.replace(/(\.[^.]*)?$/, ' (1)$1') : candidate };
@@ -1666,7 +1666,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             const name = source.split('/').pop();
             const dir = String(args.destDir);
             const candidate = `${dir === '/' ? '' : dir}/${name}`;
-            // 目标已有同名项：返回带序号的真实目标路径（真实实现在后端）
+            // The target already has an entry with the same name: return the numbered real target path (the real implementation lives in the backend)
             const taken = [...createdEntries, { name: 'app.log', path: `${dir}/app.log`, is_dir: false }]
               .some((item) => item.path === candidate);
             return taken ? candidate.replace(/(\.[^.]*)?$/, ' (1)$1') : candidate;
@@ -1760,7 +1760,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return null;
         }
       },
-      // 测试可直接注入任意 PTY 输出字节（如 altScreen 序列）
+      // Tests can inject arbitrary PTY output bytes directly (for example altScreen sequences)
       emitPtyExit: (code: number | null) => emit('pty-exit', { id: 'e2e-session', code }),
       emitEvent: (event: string, payload: unknown) => emit(event, payload),
       emitPtyOutput: (data: string) => {
@@ -1775,8 +1775,8 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
   }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, pendingDirs: opts.pendingLaunchDirectories ?? [], menuSeed: opts.contextMenu, terminalDirectories: opts.terminalDirectories ?? false, mainPermissions: mainCapability.permissions.filter((permission): permission is string => typeof permission === 'string'), sshWorkspaceView: opts.sshWorkspaceView ?? 'manage', shells: opts.shells });
 }
 
-/** 预置 AI 回复文本：mock 的 ai_stream 会按 chunk 流式 emit ai-chunk 事件。
- *  AI 流式已下沉 Rust（invoke ai_stream + ai-chunk 事件），不再走浏览器 HTTP。 */
+/** Seed the AI reply text: the mock ai_stream emits ai-chunk events chunk by chunk.
+ *  AI streaming now lives in Rust (invoke ai_stream + ai-chunk events) instead of browser HTTP. */
 export async function mockAnthropic(page: Page, replyText: string) {
   await page.addInitScript((text: string) => {
     (window as unknown as Record<string, string>).__AI_REPLY__ = text;
@@ -1830,7 +1830,7 @@ export async function paceLlmStream(page: Page, delayMs: number) {
   }, delayMs);
 }
 
-/** 读取假 PTY 收到的全部写入 */
+/** Read every write the fake PTY received */
 export function ptyWrites(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as Record<string, string[]>).__PTY_WRITES__);
 }
@@ -1847,26 +1847,26 @@ export function clipboardFiles(page: Page): Promise<{ paths: string[]; mode: str
   );
 }
 
-/** 读取 pty_signal 调用记录（结束按钮升级链路断言用） */
+/** Read the pty_signal call log (used to assert the end button's escalation chain) */
 export function ptySignals(page: Page): Promise<{ id: string; sig: number }[]> {
   return page.evaluate(
     () => (window as unknown as Record<string, { id: string; sig: number }[]>).__PTY_SIGNALS__,
   );
 }
 
-/** 读取 pty_resize 调用记录（宽度跟随卡片断言用） */
+/** Read the pty_resize call log (used to assert the width follows the card) */
 export function ptyResizes(page: Page): Promise<{ cols: number; rows: number }[]> {
   return page.evaluate(
     () => (window as unknown as Record<string, { cols: number; rows: number }[]>).__PTY_RESIZES__,
   );
 }
 
-/** 读取文件面板调用的 fs_rename / fs_delete 记录（删除/重命名断言用） */
+/** Read the fs_rename / fs_delete calls made by the file panel (for delete/rename assertions) */
 export function fsOps(page: Page): Promise<{ op: string; path: string; newName?: string }[]> {
   return page.evaluate(() => (window as unknown as Record<string, { op: string; path: string; newName?: string }[]>).__FS_OPS__);
 }
 
-/** 读取远程文件面板调用的 ssh_rename / ssh_move / ssh_copy / ssh_stage_delete 等记录 */
+/** Read the ssh_rename / ssh_move / ssh_copy / ssh_stage_delete calls made by the remote file panel */
 export function sshOps(page: Page): Promise<{ op: string; path: string; newName?: string; destDir?: string }[]> {
   return page.evaluate(() => (window as unknown as Record<string, { op: string; path: string; newName?: string }[]>).__SSH_OPS__);
 }
@@ -1904,7 +1904,7 @@ export function acpUpdate(sessionId: string, update: Record<string, unknown>): R
   return { sessionId, kind: 'update', payload: { sessionId, update } };
 }
 
-/** 读取下载管理里「定位」调用的 reveal 路径记录 */
+/** Read the reveal path log for the download manager's reveal action */
 export function revealedPaths(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as Record<string, string[]>).__REVEALED__);
 }
@@ -1914,14 +1914,14 @@ export function openedPaths(page: Page): Promise<string[]> {
   return page.evaluate(() => (window as unknown as Record<string, string[]>).__OPENED__);
 }
 
-/** 读取 update_session_payload 记录（分屏布局持久化断言用） */
+/** Read the update_session_payload log (used to assert split layout persistence) */
 export function sessionPayloads(page: Page): Promise<{ id: string; payload: string }[]> {
   return page.evaluate(
     () => (window as unknown as Record<string, { id: string; payload: string }[]>).__SESSION_PAYLOADS__,
   );
 }
 
-/** 通过 mock 直接注入任意 PTY 输出 */
+/** Inject arbitrary PTY output directly through the mock */
 export async function emitPtyOutput(page: Page, data: string): Promise<void> {
   await page.evaluate((d) => {
     const internals = (window as unknown as Record<string, (data: string) => void>).__TAURI_INTERNALS__;
@@ -1941,22 +1941,22 @@ export async function forwardLaunchDirectory(page: Page, directory: string): Pro
   }, directory);
 }
 
-/** 读取 set_provider_key / set_tavily_key 调用记录 */
+/** Read the set_provider_key / set_tavily_key call log */
 export function aiKeyCalls(page: Page): Promise<{ provider: string; key?: string }[]> {
   return page.evaluate(() => (window as unknown as { __AI_KEY_CALLS__: { provider: string; key?: string }[] }).__AI_KEY_CALLS__);
 }
 
-/** 读取 set_ai_models / set_active_model 调用记录 */
+/** Read the set_ai_models / set_active_model call log */
 export function aiModelCalls(page: Page): Promise<{ kind: string; models?: unknown[]; active?: string; id?: string }[]> {
   return page.evaluate(() => (window as unknown as { __AI_MODEL_CALLS__: { kind: string; models?: unknown[]; active?: string; id?: string }[] }).__AI_MODEL_CALLS__);
 }
 
-/** 读取技能操作记录（set_state/remove/install/market_install） */
+/** Read the skill operation log (set_state/remove/install/market_install) */
 export function skillOps(page: Page): Promise<{ op: string; name: string; trusted?: boolean | null; enabled?: boolean | null; prompt?: string }[]> {
   return page.evaluate(() => (window as unknown as { __SKILL_OPS__: { op: string; name: string; trusted?: boolean | null; enabled?: boolean | null; prompt?: string }[] }).__SKILL_OPS__);
 }
 
-/** 读取 MCP 服务器状态与操作记录 */
+/** Read MCP server state and the operation log */
 export function mcpServers(page: Page): Promise<Record<string, unknown>[]> {
   return page.evaluate(() => (window as unknown as { __MCP_SERVERS__: Record<string, unknown>[] }).__MCP_SERVERS__);
 }
@@ -1964,7 +1964,7 @@ export function mcpOps(page: Page): Promise<{ op: string; name: string; config?:
   return page.evaluate(() => (window as unknown as { __MCP_OPS__: { op: string; name: string; config?: unknown }[] }).__MCP_OPS__);
 }
 
-/** 读取工具权限的写入记录与当前表（Rust 侧策略的镜像） */
+/** Read the tool permission write log and current table (mirror of the Rust-side policy) */
 export function policyOps(page: Page): Promise<{ op: string; tool?: string; level?: string }[]> {
   return page.evaluate(() => (window as unknown as { __POLICY_OPS__: { op: string; tool?: string; level?: string }[] }).__POLICY_OPS__);
 }
@@ -1973,25 +1973,25 @@ export function policyLevels(page: Page): Promise<Record<string, string>> {
   return page.evaluate(() => (window as unknown as { __POLICY_LEVELS__: Record<string, string> }).__POLICY_LEVELS__);
 }
 
-/** 读取搜索 invoke 调用记录 */
+/** Read the search invoke call log */
 export function searchCalls(page: Page): Promise<{ cmd: string; args: Record<string, unknown> }[]> {
   return page.evaluate(() => (window as unknown as { __SEARCH_CALLS__: { cmd: string; args: Record<string, unknown> }[] }).__SEARCH_CALLS__);
 }
 
-/** 读取主题配置（get_theme_config / set_theme_config 之后的状态） */
+/** Read the theme configuration (state after get_theme_config / set_theme_config) */
 export function themeConfig(page: Page): Promise<{ opacity: number; backgroundImage: string | null; vars: Record<string, string> }> {
   return page.evaluate(() => (window as unknown as { __THEME__: { opacity: number; backgroundImage: string | null; vars: Record<string, string> } }).__THEME__);
 }
 
-/** 读取窗口边框颜色同步记录（apply_window_frame） */
+/** Read the window frame color sync log (apply_window_frame) */
 export function windowFrameCalls(page: Page): Promise<{ label: string; color: string }[]> {
   return page.evaluate(() => (window as unknown as { __WINDOW_FRAME_CALLS__: { label: string; color: string }[] }).__WINDOW_FRAME_CALLS__);
 }
 
 /**
- * 读取指定 pane 主 xterm 的当前可见画面文本（WebGL renderer 下终端输出不进 DOM，
- * 测试用 getByText 读不到，改走 __vrykellTerms 注册表读 buffer）。
- * 返回 null 表示该 pane 无 xterm 实例。
+ * Read the visible screen text of the given pane's main xterm (under the WebGL renderer terminal output does not
+ * reach the DOM, so getByText cannot read it in tests; read the buffer through the __vrykellTerms registry instead).
+ * Returns null when the pane has no xterm instance.
  */
 export async function readTermScreen(page: Page, paneId: string): Promise<string | null> {
   return page.evaluate((pid) => {
@@ -2011,7 +2011,7 @@ export async function readTermScreen(page: Page, paneId: string): Promise<string
   }, paneId);
 }
 
-/** 轮询直到 pane 的 xterm buffer 包含指定文本（WebGL 下替代 toContainText）。 */
+/** Poll until the pane's xterm buffer contains the given text (replaces toContainText under WebGL). */
 export async function expectTermContains(page: Page, paneId: string, text: string, timeout = 5000): Promise<void> {
   const { expect } = await import('@playwright/test');
   await expect
@@ -2019,7 +2019,7 @@ export async function expectTermContains(page: Page, paneId: string, text: strin
     .toContain(text);
 }
 
-/** 读取所有已注册 xterm 的画面文本（用于测试不确定 paneId 的场景）。 */
+/** Read the screen text of every registered xterm (for tests that do not know the paneId). */
 export async function readAllTermScreens(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const terms = (window as unknown as Record<string, Map<string, { buffer: { active: { viewportY: number; length: number; getLine(y: number): { translateToString(t?: boolean): string } | undefined } } }>>).__vrykellTerms;
@@ -2042,7 +2042,7 @@ export async function readAllTermScreens(page: Page): Promise<string[]> {
   });
 }
 
-/** 轮询直到任一 pane 的 xterm buffer 包含指定文本。 */
+/** Poll until any pane's xterm buffer contains the given text. */
 export async function expectAnyTermContains(page: Page, text: string, timeout = 5000): Promise<void> {
   const { expect } = await import('@playwright/test');
   await expect
@@ -2053,7 +2053,7 @@ export async function expectAnyTermContains(page: Page, text: string, timeout = 
     .toBe(true);
 }
 
-/** 确保会话列表面板打开，兼容默认布局与按需打开状态。 */
+/** Ensure the session list panel is open, covering both the default layout and open-on-demand states. */
 export async function ensureTabsOpen(page: Page): Promise<void> {
   await waitForWorkbench(page);
   const terminal = page.getByTestId('workspace-area-terminal');
