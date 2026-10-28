@@ -7,6 +7,6 @@ export default function ReloadButton({ label, onReload, busy = false, disabled =
 }) {
   const reload = useReloadFeedback(onReload);
   const active = reload.busy || busy;
-  return <IconButton compact={compact} data-testid={testId} aria-label={label} data-tip={label} aria-busy={active} disabled={disabled || active}
-    onClick={() => { void reload.run(); }}><RefreshCw size={iconSizes.control} className={active ? 'reload-spin' : undefined} /></IconButton>;
+  return <IconButton compact={compact} data-testid={testId} aria-label={label} data-tip={label} aria-busy={active} aria-disabled={disabled || active} disabled={disabled}
+    onClick={() => { if (!disabled && !active) void reload.run(); }}><RefreshCw size={iconSizes.control} className={active ? 'reload-spin' : undefined} /></IconButton>;
 }

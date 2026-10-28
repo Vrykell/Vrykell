@@ -41,7 +41,7 @@ describe('AiModelPage presets', () => {
     const sync = await screen.findByTestId('model-sync');
     fireEvent.click(sync);
     expect(sync).toHaveAttribute('aria-busy', 'true');
-    expect(sync).toBeDisabled();
+    expect(sync).toHaveAttribute('aria-disabled', 'true');
     fireEvent.click(sync);
     expect(invokeMock.mock.calls.filter(([command]) => command === 'provider_fetch_models')).toHaveLength(1);
     await act(async () => { finish(['extra-model']); });

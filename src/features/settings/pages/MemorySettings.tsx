@@ -25,7 +25,7 @@ export function MemorySettings() {
   }, [revision]);
   return <SettingsGroup title={t('Agent memory')}>
     <Field title={t('Memory retrieval')} description={<span aria-busy={loading}>{loading && !stats ? <span role="status">{t('Loading…')}</span> : stats ? <>{t('Total memories')}: <span data-testid="memory-count-total">{stats.total}</span> · {t('Active')}: <span data-testid="memory-count-active">{stats.active}</span> · {t('Needs review')}: <span data-testid="memory-count-pending">{stats.pending}</span></> : t('Could not load memory status')}</span>}>
-      <ReloadButton compact label={t('Reload')} busy={loading} disabled={loading} onReload={reload} />
+      <ReloadButton compact label={t('Reload')} busy={loading} onReload={reload} />
     </Field>
     <Field title={t('Review memories')} description={t('Review pending and expired memories, combine duplicates, and check outdated facts with the assistant.')}>
       <OutlineButton onClick={organizeMemoryWithAssistant}><Sparkles size={16} />{t('Organize with AI')}</OutlineButton>
