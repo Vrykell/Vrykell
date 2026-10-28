@@ -21,17 +21,17 @@ pub use session::{BlockEntry, ChatMessageEntry, GroupEntry, SessionEntry};
 pub use ssh_connection::SshConnection;
 pub use workspace::WorkspaceEntry;
 
-/// 历史数据库路径：~/.vrykell/history.db
+/// History database path: ~/.vrykell/history.db
 fn db_path() -> PathBuf {
-    // Windows 原生环境没有 HOME，不能用 "." 兜底（会写到 cwd）
+    // Native Windows has no HOME, so "." is not a safe fallback (it would write to the cwd).
     let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
     let dir = home.join(".vrykell");
     std::fs::create_dir_all(&dir).ok();
     dir.join("history.db")
 }
 
-/// 旧库检测：user_version < 2（v0/v1，缺 output_html 等新列）或无法读取 → 需要重置。
-/// 不做逐列迁移 —— 直接删库从零开始，避免旧库 SQL 因缺列静默失败（历史块消失）。
+/// Detect an old database: user_version < 2 (v0/v1 lacks columns such as output_html) or unreadable.
+/// Do not migrate column by column: recreate from scratch so old SQL cannot fail silently on missing columns.
 fn db_needs_reset(path: &std::path::Path) -> bool {
     if !path.exists() {
         return false;
@@ -43,7 +43,7 @@ fn db_needs_reset(path: &std::path::Path) -> bool {
     version < 2
 }
 
-/// 删除旧库文件（如有），让 open() 从零建表。
+/// Remove the old database file, if present, so open() creates the schema from scratch.
 fn reset_old_db(path: &std::path::Path) {
     if db_needs_reset(path) {
         std::fs::remove_file(path).ok();
@@ -57,7 +57,7 @@ pub struct HistoryDb {
 /// Initialize tables and add optional columns to compatible version 2 databases.
 /// Earlier incompatible schemas are reset by the existing open path.
 fn init_schema(conn: &Connection) -> Result<(), String> {
-    // 开启外键约束，使 blocks.session_id 的 ON DELETE CASCADE 真正生效
+    // Enable foreign keys so blocks.session_id ON DELETE CASCADE takes effect.
     let _ = conn.execute_batch("PRAGMA foreign_keys = ON;");
     conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS history (
@@ -192,8 +192,8 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
     command_history::init(conn)?;
     // Keep the existing schema version to avoid resetting compatible databases.
     conn.execute_batch("PRAGMA user_version = 2;")
-        .map_err(|e| format!("记录 schema 版本失败：{e}"))?;
-    // 索引幂等创建
+        .map_err(|e| format!("Failed to record the schema version: {e}"))?;
+    // Create indexes idempotently.
     conn.execute_batch("CREATE INDEX IF NOT EXISTS idx_sessions_group ON sessions(group_id);")
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -202,17 +202,17 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
 impl HistoryDb {
     pub fn open() -> Result<Self, String> {
         let path = db_path();
-        // 旧库（缺新列/版本过旧）不做逐列迁移 —— 直接删除历史从零开始
+        // Old databases with missing columns or an outdated version are not migrated column by column; history is recreated from scratch.
         reset_old_db(&path);
         let conn = Connection::open(path).map_err(|e| e.to_string())?;
         init_schema(&conn)?;
         Ok(Self { conn })
     }
 
-    /// 降级打开：磁盘 DB 失败时用内存库兜底（历史功能不可用，应用可继续跑）。
+    /// Degraded open: fall back to an in-memory database when the disk database fails, so history is unavailable but the app keeps running.
     pub fn open_in_memory() -> Self {
-        let conn = Connection::open_in_memory().expect("in-memory sqlite 打开失败");
-        init_schema(&conn).expect("in-memory schema 初始化失败");
+        let conn = Connection::open_in_memory().expect("Failed to open in-memory sqlite");
+        init_schema(&conn).expect("Failed to initialize the in-memory schema");
         Self { conn }
     }
 
@@ -221,7 +221,7 @@ impl HistoryDb {
     }
 }
 
-/// 全局 HistoryDb 实例（由 Tauri manage 持有）
+/// Global HistoryDb instance owned by Tauri state.
 pub struct HistoryState(pub Mutex<HistoryDb>);
 
 #[cfg(test)]
@@ -328,7 +328,7 @@ mod tests {
 
     #[test]
     fn v1_db_is_detected_and_reset_to_fresh() {
-        // 模拟 v1 旧库：blocks 缺 output_html 列（历史命令块颜色快照缺失的来源）
+        // Simulate a v1 database: blocks lacks output_html, the source of missing color snapshots in history.
         let dir = std::env::temp_dir().join(format!("vrykell-db-test-{}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("history.db");
@@ -343,8 +343,8 @@ mod tests {
         }
         assert!(db_needs_reset(&path));
         reset_old_db(&path);
-        assert!(!path.exists(), "旧库应被整库删除");
-        // 从零重建后：blocks 含 output_html，record_block 不再 SQL 失败
+        assert!(!path.exists(), "The old database should be removed as a whole");
+        // After rebuilding from scratch, blocks contains output_html and record_block no longer fails in SQL.
         let conn = Connection::open(&path).unwrap();
         init_schema(&conn).unwrap();
         conn.execute(
@@ -364,7 +364,7 @@ mod tests {
         let version: i64 = conn
             .query_row("PRAGMA user_version", [], |r| r.get(0))
             .unwrap();
-        assert!(version >= 2, "新库应标记当前 schema 版本");
+        assert!(version >= 2, "A fresh database should carry the current schema version");
         let _ = std::fs::remove_file(&path);
     }
 
@@ -377,21 +377,21 @@ mod tests {
         let conn = Connection::open(&path).unwrap();
         init_schema(&conn).unwrap();
         drop(conn);
-        assert!(!db_needs_reset(&path), "新库不应被重置");
+        assert!(!db_needs_reset(&path), "A fresh database should not be reset");
         let _ = std::fs::remove_file(&path);
     }
 
     #[test]
     fn record_block_persists_even_before_session_created() {
         let db = test_db();
-        // 不先 create_session，直接记 block —— 兜底 INSERT OR IGNORE 会话行
+        // Record a block without create_session first; the fallback INSERT OR IGNORE creates the session row.
         db.record_block("b1", "t9", None, "ls -la", "out", "out", "<span>out</span>", Some(0), "done", 100, Some(200), "/work")
             .unwrap();
         let blocks = db.get_session_blocks("t9").unwrap();
         assert_eq!(blocks.len(), 1);
         assert_eq!(blocks[0].command, "ls -la");
         assert_eq!(blocks[0].output_html, "<span>out</span>");
-        // list_sessions 的 block_count 也应 > 0
+        // list_sessions should also report block_count > 0.
         let sessions = db.list_sessions().unwrap();
         assert!(sessions.iter().any(|s| s.id == "t9" && s.block_count == 1));
     }
@@ -410,7 +410,7 @@ mod tests {
     #[test]
     fn delete_session_cascades_blocks_and_chat() {
         let db = test_db();
-        db.create_session("s1", "标题", 0, "", "local", "{}").unwrap();
+        db.create_session("s1", "Title", 0, "", "local", "{}").unwrap();
         db.record_block("b1", "s1", None, "ls", "o", "o", "oh", Some(0), "done", 1, Some(2), "/work").unwrap();
         db.append_chat_message("m1", "s1", "user", "hi", 1, "", "").unwrap();
         db.delete_session("s1").unwrap();
@@ -421,28 +421,28 @@ mod tests {
     #[test]
     fn chat_message_append_upserts_and_lists_in_order() {
         let db = test_db();
-        db.create_session("s1", "标题", 0, "", "local", "{}").unwrap();
-        db.append_chat_message("m1", "s1", "user", "第一", 1, "", "").unwrap();
-        db.append_chat_message("m2", "s1", "assistant", "答", 2, "", "").unwrap();
-        // 助手流式更新（同 id 覆盖）
-        db.append_chat_message("m2", "s1", "assistant", "答案", 2, "", "").unwrap();
+        db.create_session("s1", "Title", 0, "", "local", "{}").unwrap();
+        db.append_chat_message("m1", "s1", "user", "first", 1, "", "").unwrap();
+        db.append_chat_message("m2", "s1", "assistant", "answer", 2, "", "").unwrap();
+        // Assistant streaming updates overwrite by id.
+        db.append_chat_message("m2", "s1", "assistant", "answer updated", 2, "", "").unwrap();
         let msgs = db.get_chat_messages("s1").unwrap();
         assert_eq!(msgs.len(), 2);
-        assert_eq!(msgs[0].content, "第一");
-        assert_eq!(msgs[1].content, "答案");
-        // 未写 parts 的消息读回空串（迁移列默认值）
+        assert_eq!(msgs[0].content, "first");
+        assert_eq!(msgs[1].content, "answer updated");
+        // Messages without parts read back as an empty string (the migration column default).
         assert_eq!(msgs[1].parts, "");
     }
 
     #[test]
     fn chat_message_parts_roundtrip() {
         let db = test_db();
-        db.create_session("s1", "标题", 0, "", "local", "{}").unwrap();
+        db.create_session("s1", "Title", 0, "", "local", "{}").unwrap();
         let parts = r#"[{"kind":"text","text":"hi"},{"kind":"tool","tool":{"toolCallId":"t1","toolName":"run_command","input":{"command":"ls"},"state":"done","startedAt":1}}]"#;
         db.append_chat_message("m1", "s1", "assistant", "hi", 1, parts, "").unwrap();
         let msgs = db.get_chat_messages("s1").unwrap();
         assert_eq!(msgs[0].parts, parts);
-        // 同 id 覆盖时 parts 同步更新
+        // Overwriting the same id updates parts too.
         db.append_chat_message("m1", "s1", "assistant", "hi!", 1, "", "").unwrap();
         assert_eq!(db.get_chat_messages("s1").unwrap()[0].parts, "");
     }
@@ -450,15 +450,15 @@ mod tests {
     #[test]
     fn chat_message_delete_is_idempotent() {
         let db = test_db();
-        db.create_session("s1", "标题", 0, "", "local", "{}").unwrap();
-        db.append_chat_message("m1", "s1", "user", "问", 1, "", "").unwrap();
-        db.append_chat_message("m2", "s1", "assistant", "答", 2, "", "").unwrap();
-        // 删除其中一条，其余保留且顺序不变
+        db.create_session("s1", "Title", 0, "", "local", "{}").unwrap();
+        db.append_chat_message("m1", "s1", "user", "question", 1, "", "").unwrap();
+        db.append_chat_message("m2", "s1", "assistant", "answer", 2, "", "").unwrap();
+        // Delete one message; the others remain in order.
         db.delete_chat_message("m1").unwrap();
         let msgs = db.get_chat_messages("s1").unwrap();
         assert_eq!(msgs.len(), 1);
         assert_eq!(msgs[0].id, "m2");
-        // 幂等：重复删除 / 删除不存在的 id 均不报错
+        // Idempotent: repeated deletes and missing ids are not errors.
         db.delete_chat_message("m1").unwrap();
         db.delete_chat_message("nope").unwrap();
         assert_eq!(db.get_chat_messages("s1").unwrap().len(), 1);
@@ -474,7 +474,7 @@ mod tests {
         assert_eq!(s.payload, ssh_payload);
         assert_eq!(s.group_id, None);
 
-        // 本地会话带 shellType
+        // Local sessions carry shellType.
         db.create_session("local-1", "Zsh", 0, "/home/u", "local", r#"{"shellType":"zsh"}"#).unwrap();
         let s = db.get_session("local-1").unwrap();
         assert_eq!(s.kind, "local");

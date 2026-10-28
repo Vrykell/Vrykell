@@ -1,12 +1,12 @@
-//! 终端主题外观配置 —— 持久化到 `~/.vrykell/theme.json`。
+//! Terminal theme appearance persisted to `~/.vrykell/theme.json`.
 //!
-//! 前端通过 `get_theme_config` / `set_theme_config` 读写；主题导入导出走
-//! `theme_import` / `theme_export`（由前端 file dialog 提供路径）。
+//! The frontend reads and writes through `get_theme_config` / `set_theme_config`; import and export use
+//! `theme_import` / `theme_export` with paths chosen by the frontend file dialog.
 //!
-//! 结构：
+//! Shape:
 //!   - `opacity`: application opacity (0.5..=1.0; 1 = fully opaque).
-//!   - `backgroundImage`：终端背景图片绝对路径（None = 无图片）。
-//!   - `vars`：CSS 变量覆盖表（`--canvas` / `--xterm-bg` 等），用于调整终端主题外观。
+//!   - `backgroundImage`: absolute path to the terminal wallpaper (None means no image).
+//!   - `vars`: CSS variable overrides (`--canvas`, `--xterm-bg`, etc.) for the terminal theme.
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -30,10 +30,10 @@ pub struct ThemeConfig {
     /// Application opacity, 0.5..=1.0.
     #[serde(default = "default_opacity")]
     pub opacity: f32,
-    /// 终端背景图片绝对路径；None = 纯色背景。
+    /// Absolute terminal wallpaper path; None means a solid background.
     #[serde(default)]
     pub background_image: Option<String>,
-    /// CSS 变量覆盖表（主题外观）。
+    /// CSS variable overrides for the theme appearance.
     #[serde(default)]
     pub vars: HashMap<String, String>,
 }
@@ -58,7 +58,7 @@ impl Default for ThemeConfig {
 }
 
 impl ThemeConfig {
-    /// 夹紧非法值（NaN/Inf/越界不透明度），保证前端拿到的值始终可用。
+    /// Clamp invalid values (NaN, infinity or out-of-range opacity) so the frontend always gets a usable value.
     fn normalize(&mut self) {
         if !self.opacity.is_finite() || self.opacity < MIN_OPACITY {
             self.opacity = MIN_OPACITY;
@@ -77,7 +77,7 @@ fn theme_path() -> PathBuf {
 }
 
 impl ThemeState {
-    /// 启动时从磁盘加载（文件缺失/损坏时回退默认）。
+    /// Load from disk at startup and fall back to defaults when the file is missing or corrupt.
     pub fn load() -> Self {
         let mut cfg = std::fs::read_to_string(theme_path())
             .ok()
@@ -104,8 +104,8 @@ impl ThemeState {
     }
 }
 
-/// 把壁纸文件加入 asset 协议访问范围（scope 已收窄到 $APPDATA，壁纸可能在任何目录）。
-/// 只有用户明确设置过的壁纸路径才会被授权，WebView 无法读取任意家目录文件。
+/// Add a wallpaper file to the asset-protocol scope; the base scope is $APPDATA while wallpapers may live anywhere.
+/// Only a wallpaper path explicitly set by the user is granted; the WebView cannot read arbitrary home files.
 fn authorize_wallpaper(app: &tauri::AppHandle, path: Option<&str>) {
     if let Some(p) = path {
         if !p.trim().is_empty() {
@@ -123,7 +123,7 @@ pub fn get_theme_config(state: State<'_, ThemeState>) -> ThemeConfig {
         .unwrap_or_default()
 }
 
-/// 主题配置文件绝对路径（供 UI 展示 / 打开）。
+/// Absolute theme-config path for the UI to display or open.
 #[tauri::command]
 pub fn get_theme_path() -> String {
     theme_path().to_string_lossy().to_string()
@@ -144,25 +144,25 @@ pub fn set_theme_config(
     config
 }
 
-/// 导出当前主题到指定 JSON 文件路径。
+/// Export the current theme to a JSON path.
 #[tauri::command]
 pub fn theme_export(state: State<'_, ThemeState>, path: String) -> Result<(), String> {
     let mut cfg = state.0.lock().map(|c| c.clone()).unwrap_or_default();
     cfg.normalize();
-    let s = serde_json::to_string_pretty(&cfg).map_err(|e| format!("序列化主题失败：{e}"))?;
-    std::fs::write(&path, s).map_err(|e| format!("写入文件失败：{e}"))
+    let s = serde_json::to_string_pretty(&cfg).map_err(|e| format!("Failed to serialize the theme: {e}"))?;
+    std::fs::write(&path, s).map_err(|e| format!("Failed to write the file: {e}"))
 }
 
-/// 从指定 JSON 文件导入主题并保存、返回新配置。
+/// Import a theme from a JSON path, save it and return the new config.
 #[tauri::command]
 pub fn theme_import(
     app: tauri::AppHandle,
     state: State<'_, ThemeState>,
     path: String,
 ) -> Result<ThemeConfig, String> {
-    let s = std::fs::read_to_string(&path).map_err(|e| format!("读取文件失败：{e}"))?;
+    let s = std::fs::read_to_string(&path).map_err(|e| format!("Failed to read the file: {e}"))?;
     let mut cfg: ThemeConfig =
-        serde_json::from_str(&s).map_err(|e| format!("解析主题失败（不是有效的主题 JSON）：{e}"))?;
+        serde_json::from_str(&s).map_err(|e| format!("Failed to parse the theme (not valid theme JSON): {e}"))?;
     cfg.normalize();
     authorize_wallpaper(&app, cfg.background_image.as_deref());
     if let Ok(mut c) = state.0.lock() {
@@ -172,19 +172,19 @@ pub fn theme_import(
     Ok(cfg)
 }
 
-/// 读取本地图片为 data URL（Tauri webview 不能用 CSS url() 直接加载本地文件路径）。
-/// 同步实现（spawn_blocking 内执行）。
+/// Read a local image as a data URL; the Tauri webview cannot load local paths directly through CSS url().
+/// Synchronous implementation, run inside spawn_blocking.
 fn read_image_data_url_sync(path: String) -> Result<String, String> {
     use base64::Engine;
-    const MAX_BYTES: u64 = 20 * 1024 * 1024; // 20MB 上限
-    let meta = std::fs::metadata(&path).map_err(|e| format!("读取图片失败：{e}"))?;
+    const MAX_BYTES: u64 = 20 * 1024 * 1024; // 20 MB limit
+    let meta = std::fs::metadata(&path).map_err(|e| format!("Failed to read the image: {e}"))?;
     if meta.len() > MAX_BYTES {
         return Err(format!(
-            "图片超过 20MB 上限（{}MB）",
+            "The image exceeds the 20 MB limit ({} MB)",
             meta.len() / 1024 / 1024
         ));
     }
-    let bytes = std::fs::read(&path).map_err(|e| format!("读取图片失败：{e}"))?;
+    let bytes = std::fs::read(&path).map_err(|e| format!("Failed to read the image: {e}"))?;
     let ext = std::path::Path::new(&path)
         .extension()
         .and_then(|e| e.to_str())
@@ -254,7 +254,7 @@ mod tests {
             vars: HashMap::from([("--canvas".to_string(), "#101010".to_string())]),
         };
         let s = serde_json::to_string(&cfg).unwrap();
-        // camelCase 序列化：backgroundImage
+        // camelCase serialization: backgroundImage
         assert!(s.contains("\"backgroundImage\":\"/tmp/bg.png\""));
         let back: ThemeConfig = serde_json::from_str(&s).unwrap();
         assert!(!back.desktop_tint);
@@ -274,7 +274,7 @@ mod tests {
         let path = dir.join("vrykell_test_bg.png");
         std::fs::write(&path, b"fakeimage").unwrap();
         let url = read_image_data_url_sync(path.to_string_lossy().to_string()).unwrap();
-        // "fakeimage" 的 base64
+        // Base64 for "fakeimage".
         assert_eq!(url, "data:image/png;base64,ZmFrZWltYWdl");
         let _ = std::fs::remove_file(&path);
     }
