@@ -14,8 +14,9 @@ const openUrlMock = vi.mocked(openUrl);
 beforeEach(() => openUrlMock.mockClear());
 
 describe('Markdown', () => {
-  // 回归：`**` 是正文的一部分（glob、幂运算、模型漏掉的闭合符），渲染层不得吞掉。
-  it('保留字面量星号串，只把成对的解析为加粗', () => {
+  // Regression: `**` can be part of body text (globs, exponentiation, a closing marker the
+  // model dropped); the renderer must not swallow it.
+  it('keeps literal asterisk runs and only parses paired ones as bold', () => {
     const glob = render(<Markdown content={'删除 src/**/*.ts'} />);
     expect(glob.container.textContent).toContain('src/**/*.ts');
 
@@ -26,18 +27,18 @@ describe('Markdown', () => {
     expect(bold.container.querySelector('strong')?.textContent).toBe('重点');
   });
 
-  it('渲染 GFM 表格', () => {
+  it('renders GFM tables', () => {
     const { container } = render(<Markdown content={'| a | b |\n|---|---|\n| 1 | 2 |'} />);
     expect(container.querySelector('table')).toBeInTheDocument();
     expect(screen.getByText('1')).toBeInTheDocument();
   });
 
-  it('渲染 $$...$$ 为 KaTeX block', () => {
+  it('renders $$...$$ as a KaTeX block', () => {
     const { container } = render(<Markdown content={'公式：\n\n$$E = mc^2$$'} />);
     expect(container.querySelector('.katex-display')).toBeInTheDocument();
   });
 
-  it('渲染行内 $...$ 为 KaTeX inline', () => {
+  it('renders inline $...$ as KaTeX inline', () => {
     const { container } = render(<Markdown content={'其中 $x^2$ 是平方'} />);
     expect(container.querySelector('.katex')).toBeInTheDocument();
   });
@@ -69,12 +70,12 @@ describe('Markdown', () => {
     expect(formula.scrollLeft).toBe(30);
   });
 
-  it('渲染代码块', () => {
+  it('renders code blocks', () => {
     const { container } = render(<Markdown content={'```python\nprint(1)\n```'} />);
     expect(container.querySelector('pre code')).toBeInTheDocument();
   });
 
-  it('渲染删除线与任务列表（GFM 重组版功能完好）', () => {
+  it('renders strikethrough and task lists (the rebuilt GFM feature set stays intact)', () => {
     const { container } = render(
       <Markdown content={'~~删掉~~\n\n- [x] 已完成\n- [ ] 待办'} />,
     );
@@ -82,9 +83,9 @@ describe('Markdown', () => {
     expect(container.querySelectorAll('input[type="checkbox"]')).toHaveLength(2);
   });
 
-  // 回归：autolink-literal 已从插件集中剔除（其 lookbehind 正则在旧 WebKit 抛
-  // SyntaxError），裸 URL/邮箱必须保持纯文本，不得再自动生成 <a>。
-  it('裸 URL 与邮箱渲染为纯文本（不 linkify）', () => {
+  // Regression: autolink-literal is no longer in the plugin set (its lookbehind regex throws
+  // SyntaxError on older WebKit), so bare URLs and emails must stay plain text - no <a>.
+  it('renders bare URLs and emails as plain text (no linkify)', () => {
     const { container } = render(
       <Markdown content={'参见 https://example.com 或 www.example.com，联系 a@b.com'} />,
     );
@@ -92,9 +93,10 @@ describe('Markdown', () => {
     expect(container.textContent).toContain('https://example.com');
   });
 
-  // 回归：回复里的链接曾让整个应用窗口导航到目标页（应用界面消失）。现在 web 链接交系统
-  // 浏览器打开，应用窗口原地不动。测试里 jsdom 无法真的导航，断言「交给系统」+ rel 即可。
-  it('web 链接交给系统浏览器打开，不再导航应用窗口', async () => {
+  // Regression: a reply link once navigated the whole app window to the target page (the UI
+  // vanished). Web links now go to the system browser and the app window stays put; jsdom cannot
+  // navigate for real, so asserting the system hand-off plus rel is enough.
+  it('opens web links in the system browser without navigating the app window', async () => {
     render(<Markdown content={'[文档](https://example.com/a)'} />);
     const link = screen.getByRole('link', { name: '文档' });
     expect(link).toHaveAttribute('href', 'https://example.com/a');
@@ -103,9 +105,9 @@ describe('Markdown', () => {
     await waitFor(() => expect(openUrlMock).toHaveBeenCalledWith('https://example.com/a'));
   });
 
-  // react-markdown 的默认 URL 过滤把 file:/自定义 scheme 清成空 href；渲染层再把空 href
-  // 退化成纯文本，因此这类目标没有可点的锚点。
-  it('file 与自定义 scheme 不渲染成可点链接', () => {
+  // react-markdown's default URL filter blanks file:/custom schemes to an empty href, and the
+  // renderer degrades an empty href to plain text, so these targets have no clickable anchor.
+  it('does not render file and custom schemes as clickable links', () => {
     render(<Markdown content={'[本地](file:///C:/Windows/System32/calc.exe)'} />);
     expect(screen.queryByRole('link', { name: '本地' })).toBeNull();
     expect(screen.getByText('本地')).toBeInTheDocument();

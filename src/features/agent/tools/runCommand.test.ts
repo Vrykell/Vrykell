@@ -1,6 +1,7 @@
 /**
- * runCommandAndWait 测试：mock PTY 边界，用真实 blockStore 模拟块生命周期。
- * 覆盖：块模式完成（exitCode + agent 标记）、无会话、altScreen 拒绝、超时。
+ * runCommandAndWait tests: mock the PTY boundary and drive block lifecycles through the real
+ * blockStore. Covers block-mode completion (exit code + agent mark), no session, altScreen
+ * rejection and timeout.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
@@ -20,7 +21,7 @@ const initialTerm = useTerminalStore.getState();
 const initialWs = useSessionStore.getState();
 
 function setupPane(): string {
-  // 模拟启动后存在活跃标签（store 不再内置初始标签）
+  // Simulate an active tab after startup (the store no longer seeds an initial tab)
   useSessionStore.getState().addTab({});
   const tabId = useSessionStore.getState().activeId;
   const paneId = `${tabId}#0`;
@@ -34,8 +35,8 @@ function mkBlock(p: Partial<TermBlock>): TermBlock {
     command: 'ls',
     status: 'executing',
     exitCode: null,
-    // 认领判据是 startedAt >= 调用时刻 t0（preexec 在写入之后），
-    // 默认取「现在」模拟命令刚启动；t0 之前的旧块需显式传小时间戳
+    // The claim criterion is startedAt >= call time t0 (preexec runs after the write); default to
+    // "now" to simulate a just-started command, and pass an explicit small timestamp for older blocks
     startedAt: Date.now(),
     endedAt: null,
     wasLongRunning: false,
@@ -84,15 +85,15 @@ describe('runCommandAndWait', () => {
     vi.useRealTimers();
   });
 
-  it('块模式：新块转 done → 返回退出码与输出，块被打 agent 标记', async () => {
+  it('block mode: a new block turns done -> returns the exit code and output, and the block receives the agent mark', async () => {
     const paneId = setupPane();
     const promise = runCommandAndWait('ls');
-    await tick(); // 等 ptyWrite 落完、订阅就位
+    await tick(); // let ptyWrite settle and the subscription attach
     expect(agentControl.isControlled(paneId)).toBe(true);
 
     useBlockStore.getState().addBlock(paneId, mkBlock({}));
     await tick();
-    // 认领后打上投影标记
+    // claiming sets the projection mark
     expect(useBlockStore.getState().byTab[paneId]![0]!.agent).toBe(true);
 
     useBlockStore.getState().updateBlock(paneId, 'b1', {
@@ -108,7 +109,7 @@ describe('runCommandAndWait', () => {
 
   // Regression: one submitted script can become several blocks (PowerShell runs a multi-line
   // script statement by statement). Returning a single block handed the model just its last line.
-  it('块模式：多行脚本拆成多个块时返回每个块的命令与输出', async () => {
+  it('block mode: returns every block command and output when a multi-line script splits into several blocks', async () => {
     const paneId = setupPane();
     const promise = runCommandAndWait('$f = "x"\nSet-Content $f "hi"\nRemove-Item $f -Force');
     await tick();
@@ -132,12 +133,13 @@ describe('runCommandAndWait', () => {
     for (const id of ['b1', 'b2', 'b3']) expect(agentControl.hasBlock(id)).toBe(true);
   });
 
-  it('块模式：本次提交之外的块不计入结果', async () => {
+  it('block mode: blocks outside this submission do not count toward the result', async () => {
     const paneId = setupPane();
     const promise = runCommandAndWait('echo mine');
     await tick();
     useBlockStore.getState().addBlock(paneId, mkBlock({ id: 'mine', command: 'echo mine' }));
-    // 用户并发敲的命令：不属于本次提交，不能并进模型看到的结果
+    // A command the user typed concurrently: not part of this submission, so it must not join
+    // the result the model sees.
     useBlockStore.getState().addBlock(paneId, mkBlock({ id: 'user', command: 'git status' }));
     await tick();
     useBlockStore.getState().updateBlock(paneId, 'mine', { status: 'done', exitCode: 0, outputText: 'mine' });
@@ -150,7 +152,7 @@ describe('runCommandAndWait', () => {
     expect(agentControl.hasBlock('mine')).toBe(true);
   });
 
-  it('块模式：多块之中有一步失败 → ok:false 并给出该步退出码', async () => {    const paneId = setupPane();
+  it('block mode: one failing step among several -> ok:false with that step exit code', async () => {    const paneId = setupPane();
     const promise = runCommandAndWait('step one\nstep two');
     await tick();
     useBlockStore.getState().addBlock(paneId, mkBlock({ id: 'b1', command: 'step one' }));
@@ -168,7 +170,7 @@ describe('runCommandAndWait', () => {
     expect(r.error).toContain('3');
   });
 
-  it('超长输出保留头部与尾部，并标明省略', async () => {
+  it('keeps the head and tail of oversized output and marks the omission', async () => {
     const paneId = setupPane();
     const promise = runCommandAndWait('big');
     await tick();
@@ -188,7 +190,7 @@ describe('runCommandAndWait', () => {
     expect(r.output.length).toBeLessThan(8300);
   });
 
-  it('块模式：非零退出码 → ok:false 带错误说明', async () => {    const paneId = setupPane();
+  it('block mode: nonzero exit code -> ok:false with an error description', async () => {    const paneId = setupPane();
     const promise = runCommandAndWait('ls');
     await tick();
     useBlockStore.getState().addBlock(paneId, mkBlock({}));
@@ -205,13 +207,13 @@ describe('runCommandAndWait', () => {
     expect(r.error).toContain('2');
   });
 
-  it('无终端会话 → 结构化错误（不 throw）', async () => {
+  it('no terminal session -> structured error (never throws)', async () => {
     const r = await runCommandAndWait('ls');
     expect(r.ok).toBe(false);
     expect(r.error).toContain('没有可用的终端会话');
   });
 
-  it('altScreen 全屏应用 → 拒绝执行', async () => {
+  it('altScreen fullscreen app -> refuses execution', async () => {
     const paneId = setupPane();
     useTerminalStore.setState((s) => ({ scenes: { ...s.scenes, [paneId]: 'altScreen' } }));
     const r = await runCommandAndWait('ls');
@@ -219,7 +221,7 @@ describe('runCommandAndWait', () => {
     expect(r.error).toContain('altScreen');
   });
 
-  it('超时 → 返回部分输出与超时说明', async () => {
+  it('timeout -> returns partial output with a timeout description', async () => {
     vi.useFakeTimers();
     setupPane();
     const promise = runCommandAndWait('sleep 999', { timeoutMs: 50 });
@@ -233,7 +235,7 @@ describe('runCommandAndWait', () => {
     vi.useFakeTimers();
     setupPane();
     const promise = runCommandAndWait('ls');
-    // 1500ms 宽限（无块）→ 快照模式；输出稳定 2×500ms 后完成
+    // 1500ms grace (no blocks) -> snapshot mode; completes once output is stable for 2 x 500ms
     await vi.advanceTimersByTimeAsync(3000);
     const r = await promise;
     expect(r.ok).toBe(false);
@@ -241,11 +243,12 @@ describe('runCommandAndWait', () => {
     expect(r.error).toContain('无法确认');
   });
 
-  it('宽限期自愈：订阅错过的块在 1500ms 直扫时认领', async () => {
+  it('grace-period self-healing: a block missed by the subscription is claimed by the 1500ms direct scan', async () => {
     vi.useFakeTimers();
     const paneId = setupPane();
     const promise = runCommandAndWait('ls');
-    // 订阅就位前块已存在且直接 done（模拟事件时序错过）
+    // The block exists and is already done before the subscription attaches (simulating a
+    // missed event ordering).
     await vi.advanceTimersByTimeAsync(10);
     useBlockStore.setState((s) => ({
       byTab: {
@@ -253,23 +256,24 @@ describe('runCommandAndWait', () => {
         [paneId]: [mkBlock({ status: 'done', exitCode: 0, endedAt: 2, outputText: 'x' })],
       },
     }));
-    // setState 会触发订阅（正常认领）；此处主要验证不降级快照
+    // setState triggers the subscription (normal claim); the point here is that it does not
+    // fall back to snapshot mode.
     await vi.advanceTimersByTimeAsync(2000);
     const r = await promise;
     expect(r).toMatchObject({ ok: true, exitCode: 0, output: 'x' });
     expect(agentControl.hasBlock('b1')).toBe(true);
   });
 
-  it('回归：预存在的 pending 提示符块转 executing 后被认领（真实生命周期）', async () => {
+  it('regression: an existing pending prompt block is claimed after it turns executing (real lifecycle)', async () => {
     const paneId = setupPane();
-    // 提示符绘制时（133;A）就建好的 pending 空块 —— 它是本命令未来的家
+    // empty pending block created when the prompt is drawn (133;A) - the future home of this command
     useBlockStore.getState().addBlock(
       paneId,
       mkBlock({ id: 'prompt', command: '', status: 'pending', startedAt: null }),
     );
     const promise = runCommandAndWait('ls');
     await tick();
-    // 写入后：133;E/C 到达，同一块转 executing 并填上命令
+    // after the write: 133;E/C arrives, the same block turns executing and receives the command
     useBlockStore.getState().updateBlock(paneId, 'prompt', {
       command: 'ls',
       status: 'executing',
@@ -288,10 +292,10 @@ describe('runCommandAndWait', () => {
     expect(r).toMatchObject({ ok: true, exitCode: 0, output: 'a.txt\nb.txt' });
   });
 
-  it('t0 之前的同名旧块不被认领（无新块 → 快照降级）', async () => {
+  it('an older same-name block before t0 is not claimed (no new block -> snapshot fallback)', async () => {
     vi.useFakeTimers();
     const paneId = setupPane();
-    // 用户一小时前手动跑过 ls —— 不能误认成我们的块
+    // the user ran ls by hand an hour ago - it must not be mistaken for our block
     useBlockStore.getState().addBlock(
       paneId,
       mkBlock({ id: 'old', status: 'done', exitCode: 0, startedAt: 1, outputText: 'stale' }),
@@ -300,24 +304,24 @@ describe('runCommandAndWait', () => {
     await vi.advanceTimersByTimeAsync(3000);
     const r = await promise;
     expect(agentControl.hasBlock('old')).toBe(false);
-    expect(r.exitCode).toBeUndefined(); // 快照模式无退出码
+    expect(r.exitCode).toBeUndefined(); // snapshot mode has no exit code
     expect(r.completed).toBe(false);
     expect(r.error).toContain('无法确认');
   });
 
-  it('执行中途切入 altScreen（TUI）→ 立即收口，不干等超时', async () => {
+  it('switching to altScreen mid-execution (TUI) -> settles immediately instead of waiting for the timeout', async () => {
     vi.useFakeTimers();
     const paneId = setupPane();
     const promise = runCommandAndWait('claude');
     await vi.advanceTimersByTimeAsync(10);
-    // 命令把终端切进全屏交互（vim/claude 这类 TUI）
+    // the command switches the terminal into fullscreen interaction (a fullscreen TUI)
     useTerminalStore.setState((s) => ({ scenes: { ...s.scenes, [paneId]: 'altScreen' } }));
     const r = await promise;
     expect(r.ok).toBe(false);
     expect(r.error).toContain('全屏交互界面');
   });
 
-  it('认领时记录 toolCall→block 映射（内嵌命令块渲染用）', async () => {
+  it('records the toolCall->block mapping on claim (for inline command block rendering)', async () => {
     const paneId = setupPane();
     const promise = runCommandAndWait('ls', { toolCallId: 'tc-1' });
     await tick();

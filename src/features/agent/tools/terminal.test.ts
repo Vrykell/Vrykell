@@ -1,5 +1,5 @@
 /**
- * terminal 工具（read_terminal / terminal_keys）测试。
+ * Tests for the terminal tools (read_terminal / terminal_keys).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -46,7 +46,7 @@ beforeEach(() => {
   useBlockStore.setState({ byTab: {} });
 });
 
-describe('read_terminal 工具', () => {
+describe('read_terminal tool', () => {
   it('reports busy and unknown states without inferring completion from a quiet snapshot', async () => {
     termMock.state.sessions = { p1: 's1' };
     termMock.state.scenes = { p1: 'classic' };
@@ -58,12 +58,12 @@ describe('read_terminal 工具', () => {
     useBlockStore.setState({ byTab: { p1: [{ id: 'running', command: 'sleep 10', status: 'executing', outputText: '', outputHtml: '', outputRaw: '', startedAt: 1, endedAt: null, exitCode: null, wasLongRunning: false, linesTruncated: 0 }] } });
     expect(await read({})).toMatchObject({ executionState: 'busy' });
   });
-  it('无会话：结构化错误', async () => {
+  it('no session: structured error', async () => {
     const r = await execOf(buildTerminalTools(CTX).read_terminal)({});
     expect(r).toMatchObject({ ok: false, code: 'TERMINAL_DISCONNECTED', requiresUserAction: true });
   });
 
-  it('主 xterm 有画面：返回画面', async () => {
+  it('main xterm has content: returns the screen', async () => {
     termMock.state.sessions = { p1: 's1' };
     termMock.screen = { text: 'vim 画面' };
     const r = (await execOf(buildTerminalTools(CTX).read_terminal)({})) as { ok: boolean; text?: string };
@@ -71,7 +71,7 @@ describe('read_terminal 工具', () => {
     expect(r.text).toBe('vim 画面');
   });
 
-  it('块列表场景：用最近命令块输出拼画面', async () => {
+  it('block-list scene: composes the screen from the latest command block output', async () => {
     termMock.state.sessions = { p1: 's1' };
     termMock.state.scenes = { p1: 'blockList' };
     termMock.state.dims = { p1: { cols: 100, rows: 30 } };
@@ -87,7 +87,7 @@ describe('read_terminal 工具', () => {
     expect(r.content).toContain('a.txt');
   });
 
-  it('门控拒绝直接返回', async () => {
+  it('gate denial returns immediately', async () => {
     usePermissions.setState({ levels: { read_terminal: 'deny' } });
     const r = await execOf(buildTerminalTools(CTX).read_terminal)({});
     expect(r).toBeDefined();
@@ -95,7 +95,7 @@ describe('read_terminal 工具', () => {
   });
 });
 
-describe('terminal_keys 工具', () => {
+describe('terminal_keys tool', () => {
   it('waits without writing when empty keys request a screen update', async () => {
     vi.useFakeTimers();
     try {
@@ -106,7 +106,7 @@ describe('terminal_keys 工具', () => {
       expect(invokeMock).not.toHaveBeenCalled();
     } finally { vi.useRealTimers(); }
   });
-  it('发送按键：\\xNN 归一化、wait_ms 透传、返回场景', async () => {
+  it('sends keys: \\xNN normalization, wait_ms pass-through, returns the scene', async () => {
     termMock.state.sessions = { p1: 's1' };
     termMock.state.scenes = { p1: 'altScreen' };
     invokeMock.mockResolvedValue(undefined);
@@ -117,27 +117,27 @@ describe('terminal_keys 工具', () => {
     expect(r).toEqual({ ok: true, sent: 5, scene: 'altScreen', decoded: 'vi a\u001b' });
   });
 
-  it('解码模型误写的字面 \\uXXXX（多一层反斜杠），不发纯文本', async () => {
+  it('decodes literal \\uXXXX a model writes by mistake (an extra backslash) rather than sending plain text', async () => {
     termMock.state.sessions = { p1: 's1' };
     termMock.state.scenes = { p1: 'altScreen' };
     invokeMock.mockResolvedValue(undefined);
-    // 模型写成 {"keys": "\\u000b\\u0018"}：字符串里是字面 "\u000b\u0018" 而非控制字符
+    // The model writes {"keys": "\\u000b\\u0018"}: the string holds a literal "\u000b\u0018", not control characters
     await execOf(buildTerminalTools(CTX).terminal_keys)({ keys: '\\u000b\\u0018', wait_ms: 0 });
     expect(invokeMock).toHaveBeenCalledWith('pty_write', { id: 's1', data: '\u000b\u0018' });
   });
 
-  it('解码全部字面转义形式（\\b \\t \\r \\n \\e \\xNN \\uXXXX）', async () => {
+  it('decodes every literal escape form (\\b \\t \\r \\n \\e \\xNN \\uXXXX)', async () => {
     termMock.state.sessions = { p1: 's1' };
     invokeMock.mockResolvedValue(undefined);
-    // 模型把 vim 保存退出写成了双反斜杠字面形式
+    // the model wrote the editor save-and-quit sequence in doubled-backslash literal form
     await execOf(buildTerminalTools(CTX).terminal_keys)({ keys: 'i\\u001b:wq\\r', wait_ms: 0 });
     expect(invokeMock).toHaveBeenCalledWith('pty_write', { id: 's1', data: 'i\u001b:wq\r' });
-    // \\e = Esc、\\b = 退格、\\n = 换行、\\t = Tab、\\x1b = Esc
+    // \\e = Esc, \\b = backspace, \\n = newline, \\t = Tab, \\x1b = Esc
     await execOf(buildTerminalTools(CTX).terminal_keys)({ keys: '\\e\\b\\n\\t\\x1b[A', wait_ms: 0 });
     expect(invokeMock).toHaveBeenCalledWith('pty_write', { id: 's1', data: '\u001b\b\n\t\u001b[A' });
   });
 
-  it('无效转义（如 \\uZZZZ）报错而非原样发送', async () => {
+  it('invalid escapes (such as \\uZZZZ) report an error instead of being sent verbatim', async () => {
     termMock.state.sessions = { p1: 's1' };
     invokeMock.mockClear();
     const r = (await execOf(buildTerminalTools(CTX).terminal_keys)({ keys: 'a\\uZZZZ', wait_ms: 0 })) as {
@@ -148,7 +148,7 @@ describe('terminal_keys 工具', () => {
     expect(invokeMock).not.toHaveBeenCalled();
   });
 
-  it('空按键 / 超长按键：报错', async () => {
+  it('empty or oversized key sequences: reports an error', async () => {
     termMock.state.sessions = { p1: 's1' };
     invokeMock.mockClear();
     const empty = await execOf(buildTerminalTools(CTX).terminal_keys)({ keys: '', wait_ms: 0 });
@@ -158,7 +158,7 @@ describe('terminal_keys 工具', () => {
     expect(invokeMock).not.toHaveBeenCalled();
   });
 
-  it('无会话 / 写入失败：结构化错误', async () => {
+  it('no session / write failure: structured error', async () => {
     const noSession = await execOf(buildTerminalTools(CTX).terminal_keys)({ keys: 'x', wait_ms: 0 });
     expect(noSession).toMatchObject({ ok: false, code: 'TERMINAL_DISCONNECTED', requiresUserAction: true });
     termMock.state.sessions = { p1: 's1' };
@@ -167,7 +167,7 @@ describe('terminal_keys 工具', () => {
     expect(fail).toEqual({ ok: false, error: '写入终端失败: pty 已关闭' });
   });
 
-  it('门控拒绝直接返回', async () => {
+  it('gate denial returns immediately', async () => {
     usePermissions.setState({ levels: { terminal_keys: 'deny' } });
     const r = await execOf(buildTerminalTools(CTX).terminal_keys)({ keys: 'x', wait_ms: 0 });
     expect(r).toBeDefined();
