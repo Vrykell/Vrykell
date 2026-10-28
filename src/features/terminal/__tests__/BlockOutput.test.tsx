@@ -113,7 +113,7 @@ vi.mock('@xterm/xterm', () => {
 
 import { captureTerminalOutput, extractSnapshotFromBuffer } from '@features/terminal/model/terminalSnapshot';
 
-describe('extractSnapshotFromBuffer 宽字符', () => {
+describe('extractSnapshotFromBuffer wide characters', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mkCell = (chars: string, width: number): any => ({
     getChars: () => chars, getWidth: () => width,
@@ -125,7 +125,7 @@ describe('extractSnapshotFromBuffer 宽字符', () => {
     isStrikethrough: () => false, isDim: () => false, isInverse: () => false,
   });
 
-  it('CJK 全宽字符包 2ch inline-block（渲染宽度与网格对齐）', () => {
+  it('wraps CJK full-width cells in a 2ch inline-block so rendered width matches the grid', () => {
     const cells = [mkCell('a', 1), mkCell('你', 2), mkCell('', 0), mkCell('b', 1)];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buf: any = {
@@ -138,7 +138,7 @@ describe('extractSnapshotFromBuffer 宽字符', () => {
     expect(snap.plainText).toBe('a你b');
   });
 
-  it('快照可嵌入与实时 xterm 匹配的字距修正', () => {
+  it('embeds the letter-spacing correction that matches the live xterm', () => {
     const cells = [mkCell('o', 1), mkCell('k', 1)];
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const buf: any = {
@@ -159,8 +159,8 @@ describe('extractSnapshotFromBuffer 宽字符', () => {
 // captureTerminalOutput — ANSI → HTML + plainText
 // ═══════════════════════════════════════════
 
-describe('captureTerminalOutput ANSI 处理', () => {
-  it('移除 OSC 133 序列并截断提示符', async () => {
+describe('captureTerminalOutput ANSI handling', () => {
+  it('removes OSC 133 sequences and truncates the prompt', async () => {
     const input = 'hello\x1b]133;D;0\x07 world\x1b]133;A\x07!';
     const { html, plainText } = await captureTerminalOutput(input, 80);
     expect(html).not.toContain('133;D');
@@ -170,7 +170,7 @@ describe('captureTerminalOutput ANSI 处理', () => {
     expect(plainText).not.toContain('!');
   });
 
-  it('保留 SGR 颜色码并产出 styled HTML', async () => {
+  it('keeps SGR color codes and emits styled HTML', async () => {
     const input = '\x1b[32mgreen\x1b[0m text';
     const { html, plainText } = await captureTerminalOutput(input, 80);
     expect(html).toMatch(/color/);
@@ -180,28 +180,28 @@ describe('captureTerminalOutput ANSI 处理', () => {
     expect(plainText).not.toContain('\x1b');
   });
 
-  it('处理括号粘贴模式 CSI', async () => {
+  it('handles bracketed-paste CSI', async () => {
     const input = 'output\x1b[?2004h\nmore output';
     const { plainText } = await captureTerminalOutput(input, 80);
     expect(plainText).toContain('output');
     expect(plainText).toContain('more output');
   });
 
-  it('处理 DCS 序列', async () => {
+  it('handles DCS sequences', async () => {
     const input = 'before\x1bP0;0;0q"txt"\x1b\\after';
     const { plainText } = await captureTerminalOutput(input, 80);
     expect(plainText).toContain('before');
     expect(plainText).toContain('after');
   });
 
-  it('正确处理光标移动 CSI（被 mock 跳过，文字保留）', async () => {
+  it('handles cursor-movement CSI: the mock skips it and keeps the text', async () => {
     const input = '\x1b[2J\x1b[Hhello\x1b[10;1Hworld';
     const { plainText } = await captureTerminalOutput(input, 80);
     expect(plainText).toContain('hello');
     expect(plainText).toContain('world');
   });
 
-  it('OSC 133 E 序列被移除', async () => {
+  it('removes OSC 133 E sequences', async () => {
     const input = 'before\x1b]133;E;d2hpY2ggbHMK\x07after';
     const { html, plainText } = await captureTerminalOutput(input, 80);
     expect(plainText).not.toContain('d2hpY2ggbHMK');
@@ -210,41 +210,41 @@ describe('captureTerminalOutput ANSI 处理', () => {
     expect(html).not.toContain('d2hpY2ggbHMK');
   });
 
-  it('连续多个 OSC 133 序列：在最后一个 A 处截断', async () => {
+  it('truncates at the last A when several OSC 133 sequences arrive', async () => {
     const input = '\x1b]133;D;0\x07\x1b]133;A\x07prompt here';
     const { plainText } = await captureTerminalOutput(input, 80);
     expect(plainText).not.toContain('prompt here');
   });
 
-  it('加粗样式生成 font-weight:bold', async () => {
+  it('emits font-weight:bold for bold text', async () => {
     const { html } = await captureTerminalOutput('\x1b[1mbold\x1b[0m normal', 80);
     expect(html).toMatch(/font-weight:\s*bold/);
   });
 
-  it('斜体样式生成 font-style:italic', async () => {
+  it('emits font-style:italic for italic text', async () => {
     const { html } = await captureTerminalOutput('\x1b[3mitalic\x1b[0m normal', 80);
     expect(html).toMatch(/font-style:\s*italic/);
   });
 
-  it('下划线样式生成 text-decoration:underline', async () => {
+  it('emits text-decoration:underline for underlined text', async () => {
     const { html } = await captureTerminalOutput('\x1b[4munder\x1b[0m normal', 80);
     expect(html).toMatch(/text-decoration:\s*underline/);
   });
 
-  it('空格不转义为 &nbsp;（避免 HTML 检测失败）', async () => {
+  it('does not escape spaces as &nbsp; so HTML detection does not fail', async () => {
     const { html } = await captureTerminalOutput('  indented text', 80);
     expect(html).not.toContain('&nbsp;');
-    // 应以 <span> 开头（若样式存在）或直接是空格+文本
+    // It should start with <span> when styles exist, or be plain space plus text.
     expect(html).toContain('indented text');
   });
 });
 
 // ═══════════════════════════════════════════
-// 真实输出测试：提示符截断
+// Real output: prompt truncation
 // ═══════════════════════════════════════════
 
-describe('captureTerminalOutput 提示符截断', () => {
-  it('真实 ls 输出：末尾提示符行被移除', async () => {
+describe('captureTerminalOutput prompt truncation', () => {
+  it('removes the trailing prompt line from real ls output', async () => {
     const input = 'Desktop\r\nDocuments\r\nDownloads\r\n' +
       '\x1b]133;D;0\x07\x1b]133;A\x07' + 'wuzhe@wuzhedeMacBook-Pro ~ % ';
     const { html, plainText } = await captureTerminalOutput(input, 80);
@@ -255,7 +255,7 @@ describe('captureTerminalOutput 提示符截断', () => {
     expect(plainText).not.toContain('wuzhe@wuzhedeMacBook-Pro');
   });
 
-  it('git status 输出：末尾提示符行被移除', async () => {
+  it('removes the trailing prompt line from git status output', async () => {
     const input = 'On branch main\r\nnothing to commit, working tree clean\r\n' +
       '\x1b]133;D;0\x07\x1b]133;A\x07' + '\x1b[32mwuzhe@host\x1b[0m ~ % ';
     const { plainText } = await captureTerminalOutput(input, 80);
@@ -264,7 +264,7 @@ describe('captureTerminalOutput 提示符截断', () => {
     expect(plainText).not.toContain('wuzhe@host');
   });
 
-  it('python 输出：进度条 % 保留，提示符移除', async () => {
+  it('keeps the progress-bar percent and removes the prompt from python output', async () => {
     const input = 'Training: 100%|████| 100/100 [00:10<00:00]\r\nDone\r\n' +
       '\x1b]133;D;0\x07\x1b]133;A\x07' + 'user@host ~ % ';
     const { plainText } = await captureTerminalOutput(input, 80);
@@ -273,7 +273,7 @@ describe('captureTerminalOutput 提示符截断', () => {
     expect(plainText).not.toContain('user@host');
   });
 
-  it('空输出命令：仅提示符行被移除', async () => {
+  it('removes only the prompt line when a command has no output', async () => {
     const input = '\x1b]133;D;0\x07\x1b]133;A\x07' + 'user@host ~ $ ';
     const { html } = await captureTerminalOutput(input, 80);
     expect(html.trim()).toBe('');
@@ -281,27 +281,27 @@ describe('captureTerminalOutput 提示符截断', () => {
 });
 
 // ═══════════════════════════════════════════
-// plainText — HTML 转义
+// plainText — HTML escaping
 // ═══════════════════════════════════════════
 
-describe('plainText HTML 转义', () => {
-  it('HTML 特殊字符被转义', () => {
+describe('plainText HTML escaping', () => {
+  it('escapes HTML special characters', () => {
     expect(plainText('<script>alert("xss")</script>')).not.toContain('<script>');
     expect(plainText('<script>alert("xss")</script>')).toContain('&lt;script&gt;');
   });
-  it('保留普通文本不变', () => {
+  it('preserves ordinary text', () => {
     expect(plainText('hello world')).toBe('hello world');
   });
-  it('转义 & 符号', () => {
+  it('escapes ampersands', () => {
     expect(plainText('a & b')).toBe('a &amp; b');
   });
 });
 
 // ═══════════════════════════════════════════
-// BlockOutput 组件渲染
+// BlockOutput component rendering
 // ═══════════════════════════════════════════
 
-describe('BlockOutput 组件', () => {
+describe('BlockOutput component', () => {
   it('displays plain text entities once and highlights every decoded match safely', () => {
     const text = 'a < b & c < b &amp; <img src=x onerror=alert(1)>';
     const { container, rerender } = render(<BlockOutput text={text} highlight="< b" />);
@@ -327,13 +327,13 @@ describe('BlockOutput 组件', () => {
     expect(output.querySelectorAll('br')).toHaveLength(1);
     expect(output.textContent).toContain('128       file.txt');
   });
-  it('渲染纯文本', () => {
+  it('renders plain text', () => {
     const { container } = render(<BlockOutput text="hello: world" />);
     expect(container.innerHTML).toContain('hello');
     expect(container.innerHTML).toContain('world');
   });
 
-  it('渲染 styled HTML（outputHtml 模式，显式 isHtml）', () => {
+  it('renders styled HTML in outputHtml mode when isHtml is explicit', () => {
     const { container } = render(
       <BlockOutput isHtml text={'<span style="color:#cc0000">error</span>: <span style="font-weight:bold">failed</span>'} />
     );
@@ -341,24 +341,24 @@ describe('BlockOutput 组件', () => {
     expect(container.innerHTML).toContain('failed');
   });
 
-  it('HTML 模式使用 innerHTML 渲染（显式 isHtml）', () => {
+  it('uses innerHTML in HTML mode when isHtml is explicit', () => {
     const { container } = render(<BlockOutput isHtml text={'<span style="color:#4e9a06">success</span>'} />);
     const span = container.querySelector('span[style*="color:#4e9a06"]');
     expect(span).toBeTruthy();
     expect(span!.textContent).toBe('success');
   });
 
-  it('未传 isHtml 时不再嗅探 <span，历史输出按纯文本转义（防存储型 XSS）', () => {
+  it('does not sniff <span without isHtml and escapes historical output as text to prevent stored XSS', () => {
     const { container } = render(
       <BlockOutput text={'<span style="color:#cc0000">error</span><img src=x onerror=alert(1)>'} />
     );
-    // 不产生任何真实元素，全部转义为文本
+    // No real elements are created; everything is escaped as text.
     expect(container.querySelector('span')).toBeFalsy();
     expect(container.querySelector('img')).toBeFalsy();
     expect(container.textContent).toContain('<span');
   });
 
-  it('纯文本模式转义 HTML 字符', () => {
+  it('escapes HTML characters in plain-text mode', () => {
     const { container } = render(<BlockOutput text="<b>bold</b>" />);
     expect(container.querySelector('b')).toBeFalsy();
     expect(container.textContent).toBe('<b>bold</b>');
