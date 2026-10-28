@@ -1,11 +1,11 @@
-//! 密钥存储（SSH 密码、AI API Key 等敏感值）：
-//!   - macOS   ：系统钥匙串（`security` CLI，无新增依赖）
-//!   - Windows ：DPAPI 加密后写入 `~/.vrykell/secrets.json`（只有当前用户能解开）
-//!   - 其它平台：`~/.vrykell/secrets.json`（0600 权限），**明文** —— 已知限制，没有可用的
-//!     默认密钥环；在此平台上不要把该文件同步或共享出去。
+//! Secret storage for SSH passwords, AI API keys and other sensitive values:
+//!   - macOS: the system keychain (`security` CLI, no extra dependency)
+//!   - Windows: DPAPI-encrypted values in `~/.vrykell/secrets.json` (only the current user can unseal them)
+//!   - Other platforms: `~/.vrykell/secrets.json` (mode 0600), **plaintext** - a known limitation because no
+//!     default keyring is available. Do not sync or share this file on those platforms.
 //!
-//! Windows 的已存值形如 `dpapi:<base64>`；旧版本写入的明文值仍可读取，并在下一次写入时
-//! 自动改为加密形式。
+//! Windows values use the form `dpapi:<base64>`. Plaintext values written by older versions remain readable
+//! and are sealed automatically on the next write.
 
 use base64::Engine as _;
 
@@ -15,14 +15,15 @@ use std::path::PathBuf;
 #[cfg(target_os = "macos")]
 const SERVICE: &str = "com.vrykell.app";
 
-/// 旧版本只用钥匙串存 SSH 密码，服务名不同：读到旧值后就地迁移到统一服务名。
+/// Older versions stored SSH passwords under a different keychain service. Read them in place and
+/// migrate them to the shared service name.
 #[cfg(target_os = "macos")]
 const LEGACY_SSH_SERVICE: &str = "com.vrykell.app.ssh";
 
 #[cfg(not(target_os = "macos"))]
 const FALLBACK_NAME: &str = "secrets.json";
 
-/// Windows 加密值的标记前缀；无前缀按旧明文读取（读取时自动迁移）。
+/// Prefix for sealed Windows values. Values without it are read as legacy plaintext and migrated on read.
 const SEALED_PREFIX: &str = "dpapi:";
 
 #[cfg(not(target_os = "macos"))]
@@ -33,7 +34,7 @@ fn fallback_path() -> PathBuf {
         .join(FALLBACK_NAME)
 }
 
-// ── macOS：系统钥匙串（security CLI） ──
+// -- macOS: system keychain (`security` CLI) --
 
 #[cfg(target_os = "macos")]
 fn security(args: &[&str]) -> std::io::Result<std::process::Output> {
@@ -44,7 +45,7 @@ fn security(args: &[&str]) -> std::io::Result<std::process::Output> {
 pub fn set_secret(account: &str, secret: &str) -> Result<(), String> {
     let out = security(&[
         "add-generic-password",
-        "-U", // 已存在则更新
+        "-U", // update an existing entry
         "-s",
         SERVICE,
         "-a",
@@ -52,9 +53,9 @@ pub fn set_secret(account: &str, secret: &str) -> Result<(), String> {
         "-w",
         secret,
     ])
-    .map_err(|e| format!("钥匙串写入失败：{e}"))?;
+    .map_err(|e| format!("Keychain write failed: {e}"))?;
     if !out.status.success() {
-        return Err(format!("钥匙串写入失败：{}", String::from_utf8_lossy(&out.stderr).trim()));
+        return Err(format!("Keychain write failed: {}", String::from_utf8_lossy(&out.stderr).trim()));
     }
     Ok(())
 }
@@ -64,7 +65,7 @@ pub fn get_secret(account: &str) -> Option<String> {
     if let Some(value) = find_in(SERVICE, account) {
         return Some(value);
     }
-    // 旧服务名下的 SSH 密码：读到时顺手迁移，之后只查统一服务名
+    // SSH password under the legacy service name: migrate it on read, then use the shared service only.
     let legacy = find_in(LEGACY_SSH_SERVICE, account)?;
     if set_secret(account, &legacy).is_ok() {
         let _ = security(&["delete-generic-password", "-s", LEGACY_SSH_SERVICE, "-a", account]);
@@ -85,11 +86,11 @@ fn find_in(service: &str, account: &str) -> Option<String> {
 #[cfg(target_os = "macos")]
 pub fn delete_secret(account: &str) {
     let _ = security(&["delete-generic-password", "-s", SERVICE, "-a", account]);
-    // 旧服务名里可能还留着同一个账户
+    // The legacy service may still hold the same account.
     let _ = security(&["delete-generic-password", "-s", LEGACY_SSH_SERVICE, "-a", account]);
 }
 
-// ── Windows：DPAPI ──
+// -- Windows: DPAPI --
 
 #[cfg(windows)]
 mod dpapi {
@@ -116,7 +117,7 @@ mod dpapi {
                 &mut output,
             );
             if ok == 0 {
-                return Err(format!("DPAPI 加密失败：{}", std::io::Error::last_os_error()));
+                return Err(format!("DPAPI encryption failed: {}", std::io::Error::last_os_error()));
             }
             let sealed = std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec();
             LocalFree(output.pbData as *mut _);
@@ -141,7 +142,7 @@ mod dpapi {
                 &mut output,
             );
             if ok == 0 {
-                return Err(format!("DPAPI 解密失败：{}", std::io::Error::last_os_error()));
+                return Err(format!("DPAPI decryption failed: {}", std::io::Error::last_os_error()));
             }
             let plain = std::slice::from_raw_parts(output.pbData, output.cbData as usize).to_vec();
             LocalFree(output.pbData as *mut _);
@@ -150,7 +151,7 @@ mod dpapi {
     }
 }
 
-/// Windows 上把明文变成可落盘的加密串；其它平台原样返回（文件本身收 0600）。
+/// Seal plaintext for storage on Windows; other platforms return it unchanged (the file itself is mode 0600).
 #[cfg(windows)]
 fn seal(plain: &str) -> Result<String, String> {
     let sealed = dpapi::protect(plain.as_bytes())?;
@@ -165,7 +166,7 @@ fn seal(plain: &str) -> Result<String, String> {
     Ok(plain.to_string())
 }
 
-/// 加密串 → 明文；不是加密串（旧明文）或解不开的密文都返回 None。
+/// Sealed value to plaintext. Legacy plaintext or a value that cannot be unsealed returns None.
 #[cfg(windows)]
 fn unseal(stored: &str) -> Option<String> {
     let encoded = stored.strip_prefix(SEALED_PREFIX)?;
@@ -174,7 +175,7 @@ fn unseal(stored: &str) -> Option<String> {
     String::from_utf8(plain).ok()
 }
 
-/// 其它平台：本地文件（值按平台加密；unix 上收紧为 0600） ──
+/// Other platforms: a local file (values are platform-sealed; Unix tightens it to mode 0600).
 
 #[cfg(not(target_os = "macos"))]
 /// Serializes the read-modify-write of the whole file: two concurrent saves (settings plus the
@@ -214,12 +215,12 @@ fn write_map(map: &serde_json::Map<String, serde_json::Value>) -> Result<(), Str
             .mode(0o600)
             .open(&path)
             .and_then(|mut file| file.write_all(json.as_bytes()));
-        written.map_err(|e| format!("写入密钥文件失败：{e}"))?;
+        written.map_err(|e| format!("Failed to write the secrets file: {e}"))?;
         // Tighten a file that already existed with wider permissions.
         let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
     }
     #[cfg(not(unix))]
-    std::fs::write(&path, json).map_err(|e| format!("写入密钥文件失败：{e}"))?;
+    std::fs::write(&path, json).map_err(|e| format!("Failed to write the secrets file: {e}"))?;
     Ok(())
 }
 
@@ -231,8 +232,8 @@ fn write_secret(account: &str, secret: &str) -> Result<(), String> {
     write_map(&map)
 }
 
-/// Windows 只接受能解密的密文：旧明文与损坏的密文一律按“缺失”处理，绝不把未封存的原串
-/// 当作密钥使用（不做迁移——重新输入一次即会以密文覆盖）。
+/// Windows accepts only sealed values that can be decrypted. Legacy plaintext and corrupt values count
+/// as missing and are never used as keys (no migration; re-entering the value seals it).
 #[cfg(windows)]
 fn read_secret(account: &str) -> Option<String> {
     let raw = read_map()
@@ -242,7 +243,7 @@ fn read_secret(account: &str) -> Option<String> {
     unseal(&raw)
 }
 
-/// 其它平台没有系统密钥环：值按原文保存与读回，依赖文件权限（已知限制）。
+/// Other platforms have no system keyring: values are stored and read as plaintext and rely on file permissions (a known limitation).
 #[cfg(all(not(windows), not(target_os = "macos")))]
 fn read_secret(account: &str) -> Option<String> {
     read_map()
@@ -276,7 +277,7 @@ pub fn delete_secret(account: &str) {
     remove_secret(account);
 }
 
-/// macOS 把值放在钥匙串里，文件不参与；其它平台没有系统密钥环，保持原样。
+/// macOS keeps values in the keychain and does not use the file; other platforms have no system keyring and keep the file path.
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -284,33 +285,33 @@ mod tests {
     #[test]
     fn set_get_delete_roundtrip() {
         let account = format!("test-{}", std::process::id());
-        // 写入 → 读回 → 删除（删除后读回 None）
+        // Write, read back, then delete (reading after deletion returns None).
         set_secret(&account, "s3cr3t").unwrap();
         assert_eq!(get_secret(&account).as_deref(), Some("s3cr3t"));
         delete_secret(&account);
         assert_eq!(get_secret(&account), None);
-        // 幂等删除
+        // Deletion is idempotent.
         delete_secret(&account);
     }
 
     #[cfg(not(target_os = "macos"))]
     #[test]
     fn stored_value_never_keeps_the_plaintext() {
-        // macOS 在钥匙串里，文件路径不适用
+        // macOS uses the keychain, so the file path does not apply.
         let sealed = seal("sk-do-not-leak").unwrap();
         #[cfg(windows)]
         {
             assert!(!sealed.contains("sk-do-not-leak"), "sealed value must not embed the plaintext");
             assert!(sealed.starts_with(SEALED_PREFIX));
             assert_eq!(unseal(&sealed).as_deref(), Some("sk-do-not-leak"));
-            // 篡改过的密文解不开（不是静默返回垃圾）
+            // Tampered ciphertext cannot be unsealed (it does not silently return garbage).
             let mut broken = sealed.clone();
             broken.push('A');
             assert_eq!(unseal(&broken), None);
         }
         #[cfg(not(windows))]
         {
-            // 其它平台没有系统密钥环：值原样保存，依赖文件权限
+            // Other platforms have no system keyring: the value is stored as-is and relies on file permissions.
             assert_eq!(sealed, "sk-do-not-leak");
         }
     }
@@ -325,7 +326,7 @@ mod tests {
             map.insert(account.clone(), serde_json::Value::String("old-plain-value".into()));
             write_map(&map).unwrap();
         }
-        // 运行时只接受能解密的密文：旧明文按缺失处理，且不做任何迁移
+        // At runtime only decryptable values are accepted: legacy plaintext counts as missing and is never migrated.
         assert_eq!(read_secret(&account), None);
         let stored = read_map()
             .get(&account)
@@ -333,7 +334,7 @@ mod tests {
             .map(str::to_string)
             .unwrap();
         assert_eq!(stored, "old-plain-value", "no migration may rewrite the stored value");
-        // 篡改/损坏的密文同样按缺失处理，不会把原始串当作密钥
+        // Tampered or corrupt ciphertext also counts as missing and is never used as a key.
         {
             let _guard = STORE_LOCK.lock().unwrap();
             let mut map = read_map();
