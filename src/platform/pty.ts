@@ -20,6 +20,8 @@ export interface PtySpawnOptions {
   openMode?: 'classic' | 'block';
 }
 
+const observedInputEpochs = new Map<string, number>();
+
 export function ptySpawn(
   cols: number,
   rows: number,
@@ -36,8 +38,17 @@ export function ptySpawn(
   });
 }
 
-export function ptyWrite(id: string, data: string): Promise<void> {
-  return invoke('pty_write', { id, data });
+export function ptyWrite(id: string, data: string, expectedEpoch?: number): Promise<void> {
+  return invoke('pty_write', { id, data, ...(expectedEpoch === undefined ? {} : { expectedEpoch }) });
+}
+
+/** Bind pasted input to the native foreground boundary before awaiting clipboard or confirmation. */
+export async function ptyInputEpoch(id: string): Promise<number> {
+  const observed = observedInputEpochs.get(id);
+  if (observed === undefined) throw new Error('terminal input target changed');
+  const current = await invoke<number>('pty_input_epoch', { id });
+  if (current !== observed) throw new Error('terminal input target changed');
+  return observed;
 }
 
 export function ptyResize(id: string, cols: number, rows: number): Promise<void> {
@@ -54,9 +65,10 @@ export function ptyCloseAll(): Promise<number> {
 }
 
 export function onPtyOutput(cb: (id: string, events: DispatchEvent[]) => void): Promise<UnlistenFn> {
-  return listen<{ id: string; events: DispatchEvent[] }>('pty-output', (e) =>
-    cb(e.payload.id, e.payload.events),
-  );
+  return listen<{ id: string; events: DispatchEvent[]; inputEpoch?: number }>('pty-output', e => {
+    if (typeof e.payload.inputEpoch === 'number') observedInputEpochs.set(e.payload.id, e.payload.inputEpoch);
+    cb(e.payload.id, e.payload.events);
+  });
 }
 
 /** `code` is the child exit code, or null when the reader ended without one. */

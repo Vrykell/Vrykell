@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, MutexGuard};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use tauri::{AppHandle, Emitter, Manager, State};
 use uuid::Uuid;
 
@@ -76,6 +76,7 @@ pub struct PtySession {
     writer: Arc<Mutex<Box<dyn Write + Send>>>,
     child: Box<dyn Child + Send + Sync>,
     input_pending: Arc<AtomicBool>,
+    input_epoch: Arc<AtomicU64>,
     /// Set by the close path so the reader coordinator stops even when its reader
     /// handle stays open after the process tree was terminated.
     closed: Arc<AtomicBool>,
@@ -230,6 +231,8 @@ pub fn close_all_sessions<R: tauri::Runtime>(app: &AppHandle<R>) {
 struct PtyOutput {
     id: String,
     events: Vec<ScanEvent>,
+    #[serde(rename = "inputEpoch")]
+    input_epoch: u64,
 }
 
 #[derive(Clone, Serialize)]
@@ -660,6 +663,7 @@ pub async fn pty_spawn(
             .await
             .map_err(|e| e.to_string())??;
     let input_pending = Arc::new(AtomicBool::new(false));
+    let input_epoch = Arc::new(AtomicU64::new(0));
     let closed = Arc::new(AtomicBool::new(false));
     if debug::enabled() {
         debug::write(
@@ -690,6 +694,7 @@ pub async fn pty_spawn(
             writer: Arc::new(Mutex::new(writer)),
             child,
             input_pending: input_pending.clone(),
+            input_epoch: input_epoch.clone(),
             closed: closed.clone(),
         })),
     );
@@ -753,6 +758,7 @@ pub async fn pty_spawn(
                         continue; // 不完整尾部，等下次 read
                     }
                     let events = scanner.push(&data);
+                    advance_input_epoch(&input_epoch, &events);
                     if events.is_empty() {
                         continue; // 全是 pending（孤立 ESC 等）
                     }
@@ -871,7 +877,9 @@ fn flush_output(
     }
     let events = std::mem::take(pending);
     *pending_bytes = 0;
-    if app.emit("pty-output", PtyOutput { id: id.to_string(), events }).is_err() {
+    let session = lock_unpoisoned(&app.state::<PtyState>().0).get(id).cloned();
+    let input_epoch = session.map(|session| lock_unpoisoned(&session).input_epoch.load(Ordering::Acquire)).unwrap_or(0);
+    if app.emit("pty-output", PtyOutput { id: id.to_string(), events, input_epoch }).is_err() {
         // The window is gone: a session that can no longer reach any listener must be
         // terminated, not left running behind an id nobody owns.
         close_session_by_id(app, id);
@@ -879,8 +887,24 @@ fn flush_output(
     Some(stats)
 }
 
+/** Invalidate pending paste chunks before output batching or webview delivery. */
+fn advance_input_epoch(epoch: &AtomicU64, events: &[ScanEvent]) {
+    if events.iter().any(|event| match event {
+        ScanEvent::AltEnter { .. } | ScanEvent::AltExit { .. } => true,
+        ScanEvent::Osc { code, .. } => matches!(code.as_str(), "133;A" | "133;C" | "133;D"),
+        ScanEvent::Data { .. } => false,
+    }) { epoch.fetch_add(1, Ordering::AcqRel); }
+}
+
 #[tauri::command]
-pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String) -> Result<(), String> {
+pub fn pty_input_epoch(state: State<'_, PtyState>, id: String) -> Result<u64, String> {
+    let session = lock_unpoisoned(&state.0).get(&id).cloned().ok_or("session not found")?;
+    let epoch = lock_unpoisoned(&session).input_epoch.load(Ordering::Acquire);
+    Ok(epoch)
+}
+
+#[tauri::command]
+pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String, expected_epoch: Option<u64>) -> Result<(), String> {
     // Windows 控制台 Enter 是 CR(0x0D)；\n(0x0A) 是 Ctrl+J，PSReadLine/cmd 都不当回车，
     // 前端命令发送统一用 \n，这里归一化成 CR，否则 PowerShell 等收不到回车、命令无响应。
     #[cfg(windows)]
@@ -898,7 +922,7 @@ pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String) -> 
     // Blocking IO: run it on a blocking thread, and take only the writer lock.
     let log_id = id.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        let result = write_session(&session, data.as_bytes());
+        let result = write_session_guarded(&session, data.as_bytes(), expected_epoch);
         if debug::enabled() {
             debug::write(
                 "write-complete",
@@ -916,14 +940,42 @@ pub async fn pty_write(state: State<'_, PtyState>, id: String, data: String) -> 
 /// pty_resize / pty_close / pty_kill_foreground. Sharing one lock queues those behind a stuck
 /// write, and while they run on the main thread the whole UI freezes with them - the stop
 /// button included, so force-quitting the app becomes the only way out.
+#[cfg(test)]
 fn write_session(session: &Arc<Mutex<PtySession>>, data: &[u8]) -> Result<(), String> {
-    let (writer, input_pending) = {
+    write_session_guarded(session, data, None)
+}
+
+fn write_session_guarded(session: &Arc<Mutex<PtySession>>, data: &[u8], expected_epoch: Option<u64>) -> Result<(), String> {
+    let (writer, input_pending, input_epoch, closed) = {
         let state = lock_unpoisoned(session);
-        (state.writer.clone(), state.input_pending.clone())
+        (state.writer.clone(), state.input_pending.clone(), state.input_epoch.clone(), state.closed.clone())
     };
     input_pending.store(true, Ordering::Release);
     let mut writer = lock_unpoisoned(&writer);
-    writer.write_all(data).and_then(|()| writer.flush()).map_err(|e| e.to_string())
+    write_guarded_input(&mut **writer, data, &input_epoch, &closed, expected_epoch)
+}
+
+fn write_guarded_input(writer: &mut dyn Write, data: &[u8], input_epoch: &AtomicU64, closed: &AtomicBool, expected_epoch: Option<u64>) -> Result<(), String> {
+    let valid = || expected_epoch.is_none_or(|expected| input_epoch.load(Ordering::Acquire) == expected && !closed.load(Ordering::Acquire));
+    if !valid() { return Err("terminal input target changed".into()); }
+    if expected_epoch.is_none() {
+        return writer.write_all(data).and_then(|()| writer.flush()).map_err(|e| e.to_string());
+    }
+    let mut offset = 0;
+    while offset < data.len() {
+        if !valid() { return Err("terminal input target changed".into()); }
+        let limit = (offset + 128).min(data.len());
+        // Keep an execution key separate from preceding text so an exit during a partial
+        // text write cannot carry the following newline in the same native operation.
+        let end = if matches!(data[offset], b'\r' | b'\n') { offset + 1 }
+            else { data[offset..limit].iter().position(|byte| matches!(byte, b'\r' | b'\n')).map_or(limit, |index| offset + index) };
+        let written = writer.write(&data[offset..end]).map_err(|error| error.to_string())?;
+        if written == 0 { return Err("terminal input writer made no progress".into()); }
+        offset += written;
+        std::thread::yield_now();
+    }
+    if !valid() { return Err("terminal input target changed".into()); }
+    writer.flush().map_err(|error| error.to_string())
 }
 
 /// Windows：把换行统一成 CR（Enter）。\n 是 Ctrl+J，PSReadLine/cmd 都不认。
@@ -1266,6 +1318,66 @@ fn kill_foreground_impl(_session: &mut PtySession, _escalate: bool) -> Result<()
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn paste_epoch_tracks_foreground_boundaries_before_output_delivery() {
+        let epoch = AtomicU64::new(0);
+        let mut scanner = StreamScanner::new();
+        advance_input_epoch(&epoch, &scanner.push("ordinary output\x1b[?2004h"));
+        assert_eq!(epoch.load(Ordering::Acquire), 0);
+        advance_input_epoch(&epoch, &scanner.push("\x1b]133;"));
+        assert_eq!(epoch.load(Ordering::Acquire), 0);
+        for (expected, boundary) in ["C\x07", "\x1b]133;D;0\x07", "\x1b]133;A\x07", "\x1b[?1049h", "\x1b[?1049l"].iter().enumerate() {
+            advance_input_epoch(&epoch, &scanner.push(boundary));
+            assert_eq!(epoch.load(Ordering::Acquire), expected as u64 + 1);
+        }
+    }
+
+    #[test]
+    fn guarded_paste_rejects_stale_or_closed_targets_without_writing() {
+        let epoch = AtomicU64::new(2); let closed = AtomicBool::new(false);
+        let mut bytes = Vec::new();
+        assert!(write_guarded_input(&mut bytes, b"unintended command\r", &epoch, &closed, Some(1)).is_err());
+        assert!(bytes.is_empty());
+        closed.store(true, Ordering::Release);
+        assert!(write_guarded_input(&mut bytes, b"unintended command\r", &epoch, &closed, Some(2)).is_err());
+        assert!(bytes.is_empty());
+        closed.store(false, Ordering::Release);
+        write_guarded_input(&mut bytes, b"intentional input", &epoch, &closed, Some(2)).unwrap();
+        assert_eq!(bytes, b"intentional input");
+    }
+
+    #[test]
+    fn guarded_paste_stops_after_a_partial_write_when_the_foreground_exits() {
+        struct ChangingWriter<'a> { epoch: &'a AtomicU64, bytes: Vec<u8>, writes: usize }
+        impl Write for ChangingWriter<'_> {
+            fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
+                let count = data.len().min(3);
+                self.bytes.extend_from_slice(&data[..count]); self.writes += 1;
+                self.epoch.fetch_add(1, Ordering::AcqRel);
+                Ok(count)
+            }
+            fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
+        }
+        let epoch = AtomicU64::new(5); let closed = AtomicBool::new(false);
+        let mut writer = ChangingWriter { epoch: &epoch, bytes: Vec::new(), writes: 0 };
+        let result = write_guarded_input(&mut writer, b"payload\runintended command\r", &epoch, &closed, Some(5));
+        assert_eq!(result.unwrap_err(), "terminal input target changed");
+        assert_eq!(writer.bytes, b"pay"); assert_eq!(writer.writes, 1);
+    }
+
+    #[test]
+    fn guarded_paste_never_combines_a_newline_with_preceding_text() {
+        #[derive(Default)]
+        struct RecordingWriter(Vec<Vec<u8>>);
+        impl Write for RecordingWriter {
+            fn write(&mut self, data: &[u8]) -> std::io::Result<usize> { self.0.push(data.to_vec()); Ok(data.len()) }
+            fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
+        }
+        let mut writer = RecordingWriter::default();
+        write_guarded_input(&mut writer, b"first\r\nsecond\n", &AtomicU64::new(0), &AtomicBool::new(false), Some(0)).unwrap();
+        assert_eq!(writer.0, vec![b"first".to_vec(), b"\r".to_vec(), b"\n".to_vec(), b"second".to_vec(), b"\n".to_vec()]);
+    }
     use std::io::{Read, Write};
 
     #[test]
@@ -1468,6 +1580,7 @@ mod tests {
             writer: Arc::new(Mutex::new(writer)),
             child,
             input_pending: Arc::new(AtomicBool::new(false)),
+            input_epoch: Arc::new(AtomicU64::new(0)),
             closed: closed.clone(),
         }));
         drop(reader);
@@ -1497,6 +1610,7 @@ mod tests {
             writer: Arc::new(Mutex::new(writer)),
             child,
             input_pending: Arc::new(AtomicBool::new(false)),
+            input_epoch: Arc::new(AtomicU64::new(0)),
             closed: Arc::new(AtomicBool::new(false)),
         }));
         close_session(&session, std::time::Instant::now() + std::time::Duration::from_secs(2));
@@ -1517,6 +1631,7 @@ mod tests {
                 writer: Arc::new(Mutex::new(writer)),
                 child,
                 input_pending: Arc::new(AtomicBool::new(false)),
+                input_epoch: Arc::new(AtomicU64::new(0)),
                 closed: Arc::new(AtomicBool::new(false)),
             }));
             refs.push(session.clone());
@@ -1547,7 +1662,7 @@ mod tests {
             let writer = pair.master.take_writer().expect("writer");
             sessions.push(Arc::new(Mutex::new(PtySession {
                 master: pair.master, writer: Arc::new(Mutex::new(writer)), child,
-                input_pending: Arc::new(AtomicBool::new(false)), closed: Arc::new(AtomicBool::new(false)),
+                input_pending: Arc::new(AtomicBool::new(false)), input_epoch: Arc::new(AtomicU64::new(0)), closed: Arc::new(AtomicBool::new(false)),
             })));
         }
         let started = std::time::Instant::now();
@@ -1638,6 +1753,7 @@ mod tests {
             writer: Arc::new(Mutex::new(writer)),
             child,
             input_pending: Arc::new(AtomicBool::new(false)),
+            input_epoch: Arc::new(AtomicU64::new(0)),
             closed: Arc::new(AtomicBool::new(false)),
         }));
 
@@ -1863,7 +1979,7 @@ mod cmd_interaction_tests {
         command.args(["/d", "/c", "exit", "7"]);
         let child = pair.slave.spawn_command(command).unwrap();
         let writer = pair.master.take_writer().unwrap();
-        let session = Arc::new(Mutex::new(PtySession { master: pair.master, writer: Arc::new(Mutex::new(writer)), child, input_pending: Arc::new(AtomicBool::new(false)), closed: Arc::new(AtomicBool::new(false)) }));
+        let session = Arc::new(Mutex::new(PtySession { master: pair.master, writer: Arc::new(Mutex::new(writer)), child, input_pending: Arc::new(AtomicBool::new(false)), input_epoch: Arc::new(AtomicU64::new(0)), closed: Arc::new(AtomicBool::new(false)) }));
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         while !session_has_exited(&session) && std::time::Instant::now() < deadline {
             std::thread::sleep(std::time::Duration::from_millis(20));

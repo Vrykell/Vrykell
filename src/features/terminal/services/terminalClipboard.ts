@@ -5,11 +5,35 @@ import { requestPasteConfirm, type PasteConfirmReason } from '@features/terminal
 import { t } from '@i18n';
 import { useToastStore } from '@ui/feedback/Toast';
 import { terminalDebug } from './terminalDebug';
-import { writeTerminalInput } from './terminalWriteQueue';
+import { writeTerminalInput, writeTerminalPaste } from './terminalWriteQueue';
+import { ptyInputEpoch } from '@platform/pty';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 
 /** Pastes longer than this many characters are confirmed even when the program handles pastes. */
 const PASTE_CONFIRM_CHARS = 64 * 1024;
+
+function pasteTarget(paneId: string) {
+  const state = useTerminalStore.getState();
+  const sessionId = state.sessions[paneId];
+  const term = getPaneTerminal(paneId);
+  const scene = state.scenes[paneId];
+  const manual = state.manualFullscreen[paneId];
+  const bracketed = term?.modes.bracketedPasteMode;
+  const running = () => (useBlockStore.getState().byTab[paneId] ?? []).filter(block => block.status === 'executing').map(block => block.id).join(':');
+  const blockId = running();
+  return { sessionId, term, isCurrent: () => {
+    const current = useTerminalStore.getState();
+    return current.sessions[paneId] === sessionId && current.scenes[paneId] === scene
+      && current.manualFullscreen[paneId] === manual && getPaneTerminal(paneId) === term
+      && term?.modes.bracketedPasteMode === bracketed && running() === blockId;
+  } };
+}
+
+function cancelledPaste(paneId: string): false {
+  terminalDebug('terminal-paste-target-changed', { paneId });
+  useToastStore.getState().addToast(t('Paste stopped because the foreground application changed. The remaining text was not sent.'), 'info');
+  return false;
+}
 
 /** Lines the pasted text spans, counting the way a text editor shows it. */
 export function pasteLineCount(text: string): number {
@@ -75,7 +99,8 @@ export async function copyTerminalSelection(term: Terminal | null | undefined): 
  * multiline pastes require bracketed-paste support or confirmation before reaching the PTY.
  */
 export async function pasteClipboardIntoTerminal(paneId: string): Promise<boolean> {
-  const sessionId = useTerminalStore.getState().sessions[paneId];
+  const target = pasteTarget(paneId);
+  const sessionId = target.sessionId;
   if (!sessionId) {
     useToastStore.getState().addToast(t('terminal.clipboard.noSession'), 'error');
     return false;
@@ -91,28 +116,38 @@ export async function pasteClipboardIntoTerminal(paneId: string): Promise<boolea
     return false;
   }
   if (!text) return false;
-  if (!image) return pasteTextIntoTerminal(paneId, text);
+  if (!target.isCurrent()) return cancelledPaste(paneId);
+  if (!image) return pasteTextIntoTerminal(paneId, text, target);
   try {
     // Image paste is a native key, never a pasted text payload.
-    await writeTerminalInput(sessionId, text);
-    return true;
-  } catch {
+    const epoch = await ptyInputEpoch(sessionId);
+    await writeTerminalPaste(sessionId, { epoch, isCurrent: target.isCurrent }, () => { void writeTerminalInput(sessionId, text); });
+    return target.isCurrent() || cancelledPaste(paneId);
+  } catch (error) {
+    if (!target.isCurrent() || String(error).includes('terminal input target changed')) return cancelledPaste(paneId);
     useToastStore.getState().addToast(t('terminal.clipboard.pasteFailed'), 'error');
     return false;
   }
 }
 
 /** Route native paste events and clipboard shortcuts through the same multiline policy. */
-export async function pasteTextIntoTerminal(paneId: string, text: string): Promise<boolean> {
+export async function pasteTextIntoTerminal(paneId: string, text: string, target = pasteTarget(paneId)): Promise<boolean> {
   const state = useTerminalStore.getState();
-  const sessionId = state.sessions[paneId];
+  const sessionId = target.sessionId;
   if (!sessionId || !text) return false;
+  if (!target.isCurrent()) return cancelledPaste(paneId);
   const running = (useBlockStore.getState().byTab[paneId] ?? []).some(block => block.status === 'executing');
   if (state.scenes[paneId] === 'blockList' && !running && /[\r\n]/.test(text)) {
     state.stageCommand(paneId, text);
     return true;
   }
-  const term = getPaneTerminal(paneId);
+  const term = target.term;
+  let epoch: number;
+  try { epoch = await ptyInputEpoch(sessionId); }
+  catch (error) {
+    if (!target.isCurrent() || String(error).includes('terminal input target changed')) return cancelledPaste(paneId);
+    useToastStore.getState().addToast(t('terminal.clipboard.pasteFailed'), 'error'); return false;
+  }
   const reason = pasteConfirmReason(text, term?.modes.bracketedPasteMode ?? false);
   if (reason) {
     const confirmed = await requestPasteConfirm({ reason, lines: pasteLineCount(text), chars: text.length });
@@ -120,12 +155,15 @@ export async function pasteTextIntoTerminal(paneId: string, text: string): Promi
     if (!confirmed) return false;
   }
   // A dialog may outlive its original session or foreground terminal.
-  if (useTerminalStore.getState().sessions[paneId] !== sessionId || getPaneTerminal(paneId) !== term) return false;
+  if (!target.isCurrent()) return cancelledPaste(paneId);
   try {
-    if (term) term.paste(text);
-    else await writeTerminalInput(sessionId, text);
-    return true;
-  } catch {
+    await writeTerminalPaste(sessionId, { epoch, isCurrent: target.isCurrent }, () => {
+      if (term) term.paste(text);
+      else void writeTerminalInput(sessionId, text);
+    });
+    return target.isCurrent() || cancelledPaste(paneId);
+  } catch (error) {
+    if (!target.isCurrent() || String(error).includes('terminal input target changed')) return cancelledPaste(paneId);
     useToastStore.getState().addToast(t('terminal.clipboard.pasteFailed'), 'error');
     return false;
   }

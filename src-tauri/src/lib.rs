@@ -217,6 +217,7 @@ pub fn run() {
             remote::ssh::ssh_purge_staged,
             remote::ssh::ssh_upload,
             terminal::pty::pty_write,
+            terminal::pty::pty_input_epoch,
             terminal::pty::pty_resize,
             terminal::pty::pty_close,
             terminal::pty::pty_kill_foreground,

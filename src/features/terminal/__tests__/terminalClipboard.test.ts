@@ -13,7 +13,7 @@ vi.mock('@platform/clipboard', () => ({
   readClipboardText: readTextMock,
   hasClipboardImage: hasImageMock,
 }));
-vi.mock('@platform/pty', () => ({ ptyWrite: ptyWriteMock }));
+vi.mock('@platform/pty', () => ({ ptyWrite: ptyWriteMock, ptyInputEpoch: vi.fn(async () => 0) }));
 vi.mock('@features/terminal/stores/pasteConfirm', () => ({ requestPasteConfirm: requestConfirmMock }));
 vi.mock('@ui/feedback/Toast', () => ({
   useToastStore: {
@@ -35,6 +35,7 @@ import {
 import { termInstances, useTerminalStore } from '@features/terminal/stores/terminal';
 import { useInputStore } from '@features/terminal/stores/input';
 import { useBlockStore } from '@features/terminal/stores/blocks';
+import { ptyInputEpoch } from '@platform/pty';
 
 function fakeTerm(selection: string): Terminal {
   return { getSelection: () => selection } as unknown as Terminal;
@@ -55,6 +56,7 @@ describe('terminalClipboard', () => {
     ptyWriteMock.mockReset().mockResolvedValue(undefined);
     hasImageMock.mockReset().mockResolvedValue(false);
     requestConfirmMock.mockReset().mockResolvedValue(true);
+    vi.mocked(ptyInputEpoch).mockReset().mockResolvedValue(0);
     toasts.length = 0;
     useTerminalStore.setState({ sessions: {}, scenes: {}, manualFullscreen: {} });
     termInstances.clear();
@@ -133,7 +135,7 @@ describe('terminalClipboard', () => {
     useTerminalStore.setState({ sessions: { p1: 'sess-1' } });
     readTextMock.mockResolvedValue('echo pasted\n');
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
-    expect(ptyWriteMock).toHaveBeenCalledWith('sess-1', 'echo pasted\n');
+    expect(ptyWriteMock).toHaveBeenCalledWith('sess-1', 'echo pasted\n', 0);
     expect(requestConfirmMock).toHaveBeenCalledWith({ reason: 'lines', lines: 2, chars: 12 });
   });
 
@@ -182,6 +184,30 @@ describe('terminalClipboard', () => {
       return true;
     });
     await expect(pasteTextIntoTerminal('p1', 'echo one\necho two')).resolves.toBe(false);
+    expect(ptyWriteMock).not.toHaveBeenCalled();
+  });
+
+  it('drops a confirmed paste when the command ends without changing the terminal instance', async () => {
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' }, scenes: { p1: 'blockList' } });
+    const { term, paste } = pasteAwareTerm(); termInstances.set('block:p1', term);
+    useBlockStore.getState().setBlocks('p1', [{ id: 'run', command: 'application', status: 'executing', exitCode: null,
+      startedAt: 1, endedAt: null, wasLongRunning: false, outputHtml: '', outputText: '', outputRaw: '', linesTruncated: 0 }]);
+    requestConfirmMock.mockImplementation(async () => {
+      useBlockStore.getState().updateBlock('p1', 'run', { status: 'done' }); return true;
+    });
+    await expect(pasteTextIntoTerminal('p1', 'unintended command\n')).resolves.toBe(false);
+    expect(paste).not.toHaveBeenCalled(); expect(ptyWriteMock).not.toHaveBeenCalled();
+  });
+
+  it('drops clipboard results after the target changed and rejects unseen native exits', async () => {
+    useTerminalStore.setState({ sessions: { p1: 'sess-1' }, scenes: { p1: 'altScreen' } });
+    readTextMock.mockImplementation(async () => {
+      useTerminalStore.setState({ scenes: { p1: 'blockList' } }); return 'stale paste';
+    });
+    await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(false);
+    expect(ptyWriteMock).not.toHaveBeenCalled();
+    vi.mocked(ptyInputEpoch).mockRejectedValueOnce(new Error('terminal input target changed'));
+    await expect(pasteTextIntoTerminal('p1', 'stale paste')).resolves.toBe(false);
     expect(ptyWriteMock).not.toHaveBeenCalled();
   });
 
@@ -243,10 +269,11 @@ describe('terminalClipboard', () => {
     readTextMock.mockResolvedValue(large);
 
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
-    // Below the confirmation size: the paste goes out in two chunks, in order.
+    // Paste chunks stay small enough to recheck their owner between writes.
     expect(requestConfirmMock).not.toHaveBeenCalled();
     const chunks = ptyWriteMock.mock.calls.map((call) => call[1] as string);
-    expect(chunks.map((chunk) => chunk.length)).toEqual([16 * 1024, 4]);
+    expect(chunks).toHaveLength(17);
+    expect(chunks.every(chunk => chunk.length <= 1024)).toBe(true);
     expect(chunks.join('')).toBe(large);
   });
 
@@ -268,7 +295,7 @@ describe('terminalClipboard', () => {
     hasImageMock.mockResolvedValue(true);
     readTextMock.mockResolvedValue('alternative image text');
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
-    expect(ptyWriteMock).toHaveBeenCalledExactlyOnceWith('sess-1', '\x16');
+    expect(ptyWriteMock).toHaveBeenCalledExactlyOnceWith('sess-1', '\x16', 0);
     expect(readTextMock).not.toHaveBeenCalled();
   });
 
@@ -284,7 +311,7 @@ describe('terminalClipboard', () => {
 
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(true);
 
-    expect(ptyWriteMock).toHaveBeenCalledExactlyOnceWith('sess-1', '\x16');
+    expect(ptyWriteMock).toHaveBeenCalledExactlyOnceWith('sess-1', '\x16', 0);
     expect(block.paste).not.toHaveBeenCalled();
   });
 });

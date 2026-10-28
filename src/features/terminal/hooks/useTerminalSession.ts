@@ -486,6 +486,10 @@ export function useTerminalSession(
       terminalDebug('shell-input-ready', { paneId, sessionId, integrated });
     };
     const handleOutput = (events: DispatchEvent[]) => {
+      if (sessionId && events.some(event => event.kind === 'altExit' || event.kind === 'altEnter'
+        || event.kind === 'osc' && ['133;A', '133;C', '133;D'].includes(event.code))) {
+        cancelTerminalInput(sessionId);
+      }
       controller.handleEvents(events);
       if (spec?.kind === 'ssh') {
         // Shell output must never enter the connection log, including non-integrated sessions.

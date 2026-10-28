@@ -8,6 +8,7 @@ import {
   TERMINAL_INPUT_CHUNK_UNITS,
   cancelTerminalInput,
   writeTerminalInput,
+  writeTerminalPaste,
 } from '@features/terminal/services/terminalWriteQueue';
 
 interface PendingWrite {
@@ -137,5 +138,28 @@ describe('terminalWriteQueue', () => {
     await expect(write).resolves.toBeUndefined();
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(pending).toHaveLength(1);
+  });
+
+  it('never starts a paste whose foreground owner is already stale', async () => {
+    const paste = writeTerminalPaste('stale', { epoch: 7, isCurrent: () => false }, () => {
+      void writeTerminalInput('stale', 'unintended command\r');
+    });
+    await expect(paste).rejects.toThrow('terminal input target changed');
+    expect(ptyWriteMock).not.toHaveBeenCalled();
+  });
+
+  it('drops a paste tail when its owner exits while the first chunk is in flight', async () => {
+    const pending = deferredWrites(); let current = true;
+    const paste = writeTerminalPaste('owner', { epoch: 3, isCurrent: () => current }, () => {
+      void writeTerminalInput('owner', `${'x'.repeat(4096)}\runintended command\r`);
+    });
+    const stopped = expect(paste).rejects.toThrow('terminal input target changed');
+    expect(pending[0]!.data).toHaveLength(1024);
+    expect(ptyWriteMock).toHaveBeenCalledExactlyOnceWith('owner', pending[0]!.data, 3);
+    current = false; pending[0]!.settle(); await stopped;
+    expect(pending).toHaveLength(1);
+    const keyboard = writeTerminalInput('owner', 'intentional input');
+    await vi.waitFor(() => expect(pending).toHaveLength(2)); pending[1]!.settle(); await keyboard;
+    expect(pending[1]!.data).toBe('intentional input');
   });
 });

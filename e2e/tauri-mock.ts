@@ -341,9 +341,12 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       return events;
     }
 
+    let inputEpoch = 0;
     function emitOutput(data: string) {
       const events = scanEvents(data);
-      setTimeout(() => emit('pty-output', { id: 'e2e-session', events }), 10);
+      if (events.some(event => event.kind === 'altEnter' || event.kind === 'altExit' || event.kind === 'osc' && ['133;A', '133;C', '133;D'].includes(event.code))) inputEpoch++;
+      const epoch = inputEpoch;
+      setTimeout(() => emit('pty-output', { id: 'e2e-session', events, inputEpoch: epoch }), 10);
     }
 
     /** 发送初始 prompt，把场景从 classic 切到 blockList。
@@ -655,6 +658,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return 'e2e-session';
           }
           case 'pty_write': {
+            if (args.expectedEpoch !== undefined && args.expectedEpoch !== inputEpoch) throw new Error('terminal input target changed');
             writes.push(args.data as string);
             // 假 shell + OSC 133 shell integration
             const chunks = emitOsc133(args.data as string);
@@ -665,6 +669,8 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'pty_resize':
             resizes.push({ cols: args.cols as number, rows: args.rows as number });
             return undefined;
+          case 'pty_input_epoch':
+            return inputEpoch;
           case 'pty_close':
             closes.push({ id: args.id });
             return undefined;

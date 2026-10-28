@@ -1,9 +1,9 @@
 import { ptyWrite } from '@platform/pty';
 
 /**
- * Longest payload one PTY write carries, in UTF-16 code units. A write only returns once the
- * foreground program has drained it, so a long payload is split: a slow or stuck consumer then
- * holds back a single chunk instead of the whole text, and an interrupt can drop the remainder.
+ * Longest ordinary input payload in UTF-16 code units. A write can block when the consumer stops
+ * reading; completion means the system accepted bytes, not that the application consumed them.
+ * Paste uses smaller guarded chunks so a foreground change can drop unsent text promptly.
  */
 export const TERMINAL_INPUT_CHUNK_UNITS = 16 * 1024;
 
@@ -16,6 +16,24 @@ interface WriteJob {
   offset: number;
   resolve: () => void;
   reject: (error: unknown) => void;
+  guard?: TerminalInputGuard;
+}
+
+export interface TerminalInputGuard { epoch: number; isCurrent: () => boolean }
+const pasteScopes = new Map<string, { guard: TerminalInputGuard; writes: Promise<void>[] }>();
+
+/** Keep the parser's synchronous paste encoding while binding all emitted writes to one owner. */
+export async function writeTerminalPaste(sessionId: string, guard: TerminalInputGuard, emit: () => void): Promise<void> {
+  const previous = pasteScopes.get(sessionId);
+  const scope = { guard, writes: [] as Promise<void>[] };
+  pasteScopes.set(sessionId, scope);
+  try { emit(); }
+  finally { if (previous) pasteScopes.set(sessionId, previous); else pasteScopes.delete(sessionId); }
+  await Promise.all(scope.writes);
+}
+
+export class TerminalInputTargetChanged extends Error {
+  constructor() { super('terminal input target changed'); }
 }
 
 interface SessionQueue {
@@ -35,13 +53,16 @@ export function writeTerminalInput(sessionId: string, data: string): Promise<voi
   if (!data) return Promise.resolve();
   // An interrupt leads the queue: the text typed after it must not wait for the rest of a paste.
   if (data === INTERRUPT) cancelTerminalInput(sessionId);
-  return new Promise<void>((resolve, reject) => {
-    const job: WriteJob = { data, offset: 0, resolve, reject };
+  const scope = pasteScopes.get(sessionId);
+  const result = new Promise<void>((resolve, reject) => {
+    const job: WriteJob = { data, offset: 0, resolve, reject, guard: scope?.guard };
     const queue = queues.get(sessionId) ?? { jobs: [], draining: false };
     queues.set(sessionId, queue);
     queue.jobs.push(job);
     if (!queue.draining) void drain(sessionId, queue);
   });
+  scope?.writes.push(result);
+  return result;
 }
 
 /**
@@ -60,11 +81,15 @@ async function drain(sessionId: string, queue: SessionQueue): Promise<void> {
   try {
     while (queue.jobs.length > 0) {
       const job = queue.jobs[0]!;
-      const end = chunkEnd(job.data, job.offset);
+      if (job.guard && !job.guard.isCurrent()) {
+        queue.jobs.shift(); job.reject(new TerminalInputTargetChanged()); continue;
+      }
+      const end = chunkEnd(job.data, job.offset, job.guard ? 1024 : TERMINAL_INPUT_CHUNK_UNITS);
       const chunk = job.data.slice(job.offset, end);
       job.offset = end;
       try {
-        await ptyWrite(sessionId, chunk);
+        if (job.guard) await ptyWrite(sessionId, chunk, job.guard.epoch);
+        else await ptyWrite(sessionId, chunk);
       } catch (error) {
         // A session that is gone fails every remaining chunk: report once and stop.
         if (queue.jobs[0] === job) queue.jobs.shift();
@@ -78,6 +103,8 @@ async function drain(sessionId: string, queue: SessionQueue): Promise<void> {
         if (queue.jobs[0] === job) queue.jobs.shift();
         job.resolve();
       }
+      // Let output and foreground completion invalidate the owner before another paste chunk.
+      if (job.guard && queue.jobs[0] === job) await new Promise<void>(resolve => setTimeout(resolve, 0));
     }
   } finally {
     queue.draining = false;
@@ -90,8 +117,8 @@ function failQueue(queue: SessionQueue, error: unknown): void {
 }
 
 /** End of the next chunk, never inside a surrogate pair: a write must not split a code point. */
-function chunkEnd(data: string, offset: number): number {
-  const end = Math.min(offset + TERMINAL_INPUT_CHUNK_UNITS, data.length);
+function chunkEnd(data: string, offset: number, limit = TERMINAL_INPUT_CHUNK_UNITS): number {
+  const end = Math.min(offset + limit, data.length);
   if (end >= data.length) return data.length;
   const before = data.charCodeAt(end - 1);
   const after = data.charCodeAt(end);
