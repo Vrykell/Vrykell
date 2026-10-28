@@ -57,7 +57,7 @@ for (const theme of ['深色', '浅色']) {
     await setupTauriMock(page);
     await page.goto('/');
     await gotoSetting(page, '主题');
-    await page.getByRole('radio', { name: theme, exact: true }).click();
+    await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
     await page.keyboard.press('Meta+1');
     await search(page);
 

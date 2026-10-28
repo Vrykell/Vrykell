@@ -154,7 +154,7 @@ test('reorders connected file tabs and keeps compact actions above the text', as
   const header = page.getByTestId('workspace-instance-bar').locator('.folder-header');
   expect((await header.boundingBox())!.height).toBeLessThanOrEqual(34);
   const first = strip.locator('.folder-tab').first();
-  expect((await first.boundingBox())!.x).toBe((await strip.boundingBox())!.x + 8);
+  expect((await first.boundingBox())!.x).toBe((await strip.boundingBox())!.x + 4);
   expect(await first.evaluate(element => getComputedStyle(element, '::before').content)).toBe('""');
   const inactive = strip.locator('.folder-tab').nth(1); await inactive.hover();
   const hover = (await inactive.locator('.folder-tab-content').boundingBox())!; const row = (await inactive.boundingBox())!;

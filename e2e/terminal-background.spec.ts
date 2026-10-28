@@ -16,7 +16,7 @@ for (const mode of ['block', 'classic'] as const) {
       await page.getByRole('button', { name: '设置', exact: true }).click();
       const nav = page.locator('aside');
       await nav.getByRole('button', { name: '主题', exact: true }).click();
-      await page.getByRole('radio', { name: theme, exact: true }).click();
+      await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
       await page.getByRole('button', { name: '设置', exact: true }).click();
       await expect(pane).toBeVisible();
       const expected = await page.evaluate(() => {

@@ -7,7 +7,7 @@ for (const theme of ['深色', '浅色']) {
     await setupTauriMock(page);
     await page.goto('/');
     await gotoSetting(page, '主题');
-    await page.getByRole('radio', { name: theme, exact: true }).click();
+    await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
     await ensureTabsOpen(page);
     const row = page.locator('[data-tab-kind="session"]').first();
     const id = (await row.getAttribute('data-tab-row-id'))!;
@@ -35,7 +35,7 @@ for (const theme of ['深色', '浅色']) {
     await setupTauriMock(page);
     await page.goto('/');
     await gotoSetting(page, '主题');
-    await page.getByRole('radio', { name: theme, exact: true }).click();
+    await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
     await page.evaluate(() => document.documentElement.style.setProperty('--font-ui', 'Arial, sans-serif'));
     const navigation = page.locator('.settings-navigation');
     await navigation.getByRole('button', { name: '模型行为', exact: true }).click();

@@ -7,7 +7,7 @@ test.use({ userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebK
 
 for (const theme of ['深色', '浅色']) test(`acrylic is confined to navigation and region edges stay square in ${theme}`, async ({ page }, info) => {
   await setupTauriMock(page); await page.goto('/');
-  await gotoSetting(page, '主题'); await page.getByRole('radio', { name: theme, exact: true }).click();
+  await gotoSetting(page, '主题'); await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
   await page.keyboard.press('Escape');
   await page.locator('[data-dock-btn="files"]').click();
   const sidebar = page.getByTestId('workspace-sidebar');

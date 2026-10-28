@@ -17,7 +17,7 @@ for (const theme of ['深色', '浅色']) {
     await setupTauriMock(page);
     await page.goto('/');
     await gotoSetting(page, '主题');
-    await page.getByRole('radio', { name: theme, exact: true }).click();
+    await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
     const nav = page.locator('.settings-navigation');
     const labels = ['启动', '日志与诊断', '模型配置', '模型行为', '工具权限', '联网搜索', '技能',
       'MCP 服务器', '记忆', '编辑器设置', '本地文件打开方式', '远程文件打开方式', '主题',
@@ -56,7 +56,7 @@ for (const theme of ['深色', '浅色']) {
     await setupTauriMock(page);
     await page.goto('/');
     await gotoSetting(page, '主题');
-    await page.getByRole('radio', { name: theme, exact: true }).click();
+    await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
     await page.keyboard.press('Meta+1');
     const expectRestingEdge = async (input: Locator) => {
       await expectQuietFocus(input);
@@ -107,7 +107,7 @@ for (const theme of ['深色', '浅色']) {
     await page.addInitScript(() => localStorage.setItem('vrykell-search-history', JSON.stringify(['npm', '> f', '>', '@ 渲染'])));
     await page.goto('/');
     await gotoSetting(page, '主题');
-    await page.getByRole('radio', { name: theme, exact: true }).click();
+    await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
     await page.keyboard.press('Meta+1');
     await page.getByTestId('global-search-trigger').click();
     const dialog = page.getByRole('dialog', { name: '全局搜索' });

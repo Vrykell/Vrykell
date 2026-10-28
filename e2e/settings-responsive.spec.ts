@@ -7,7 +7,7 @@ for (const theme of ['深色', '浅色']) {
     await setupTauriMock(page);
     await page.goto('/');
     await gotoSetting(page, '主题');
-    await page.getByRole('radio', { name: theme, exact: true }).click();
+    await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
     const nav = page.locator('.settings-navigation');
     await nav.getByRole('button', { name: '模型配置', exact: true }).click();
     await expect(page.getByTestId('model-list-toolbar')).toHaveCSS('background-color', theme === '深色' ? 'rgb(60, 60, 60)' : 'rgb(255, 255, 255)');

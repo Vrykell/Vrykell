@@ -83,7 +83,7 @@ test('workspace and settings use the same themed icon family in both themes', as
   const header = page.locator('aside').getByRole('button', { name: '字体与显示', exact: true }).locator('svg');
   for (const theme of ['深色', '浅色']) {
     await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
-    await page.getByRole('radio', { name: theme, exact: true }).click();
+    await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
     await page.locator('aside').getByRole('button', { name: '字体与显示', exact: true }).click();
     await expect(header).toHaveAttribute('data-fui-icon');
     await expect(header).toHaveAttribute('viewBox', '0 0 24 24');

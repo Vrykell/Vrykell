@@ -7,7 +7,7 @@ for (const theme of ['深色', '浅色']) {
     await setupTauriMock(page, {});
     await page.goto('/');
     await gotoSetting(page, '主题');
-    await page.getByRole('radio', { name: theme, exact: true }).click();
+    await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
     await page.locator('[data-dock-btn="chat"]').click();
     await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
     await expect.poll(() => page.evaluate(async () => {

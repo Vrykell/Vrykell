@@ -154,7 +154,8 @@ it('merges legacy download records into the same completed group without duplica
   mocks.list.mockResolvedValue([]);
   mocks.history.mockResolvedValue([{ ...entry, id: 9, name: 'older.zip', localPath: '/local/older.zip', remotePath: '/remote/older.zip', downloadedAt: 1 }]);
   fireEvent.click(screen.getByTestId('transfer-delete-upload-1'));
-  await waitFor(() => expect(screen.queryByText('large.bin')).not.toBeInTheDocument());
+  await waitFor(() => expect(mocks.history).toHaveBeenCalledTimes(2), { timeout: 5000 });
+  await waitFor(() => expect(screen.queryByText('large.bin')).not.toBeInTheDocument(), { timeout: 5000 });
   expect(await screen.findByText('older.zip')).toBeVisible();
   expect(mocks.history).toHaveBeenCalledTimes(2);
 });

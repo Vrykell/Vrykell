@@ -4,7 +4,7 @@ import { gotoSetting } from './settings';
 
 for (const theme of ['深色', '浅色']) test(`workspace colors and model controls remain consistent in ${theme}`, async ({ page }, info) => {
   await setupTauriMock(page, {}); await page.goto('/');
-  await gotoSetting(page, '主题'); await page.getByRole('radio', { name: theme, exact: true }).click();
+  await gotoSetting(page, '主题'); await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
   await page.keyboard.press('Escape');
   const selected = page.getByTestId('workspace-area-terminal').locator('.sidebar-row-icon svg');
   const color = await selected.evaluate(element => getComputedStyle(element).color);

@@ -15,7 +15,7 @@ async function dragPanel(page: Page, id: string, side: 'left' | 'right') {
 
 for (const theme of ['深色', '浅色']) test(`left and right panels retain their content independently in ${theme}`, async ({ page }, info) => {
   await setupTauriMock(page, {}); await page.goto('/');
-  await gotoSetting(page, '主题'); await page.getByRole('radio', { name: theme, exact: true }).click();
+  await gotoSetting(page, '主题'); await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
   await page.keyboard.press('Escape');
   await page.locator('[data-dock-btn="chat"]').click();
   const composer = page.locator('[data-chat-composer]:visible');

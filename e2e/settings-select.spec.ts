@@ -30,7 +30,7 @@ test('settings dropdown supports keyboard selection, cancellation and theme colo
   const surface = page.locator('.ui-select-menu');
   for (const theme of ['深色', '浅色']) {
     await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
-    await page.getByRole('radio', { name: theme, exact: true }).click();
+    await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
     await page.locator('aside').getByRole('button', { name: '字体与显示', exact: true }).click();
     await trigger.click();
     // The floating surface carries the background; the listbox inside only scrolls.

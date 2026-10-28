@@ -67,7 +67,7 @@ test('terminal error notifications follow the active gray theme and can be close
   });
   for (const theme of ['深色', '浅色']) {
     await gotoSetting(page, '主题');
-    await page.getByRole('radio', { name: theme, exact: true }).click();
+    await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
     await page.keyboard.press('Meta+1');
     const input = page.getByPlaceholder(/输入命令/);
     const command = `echo notification-${theme === '浅色' ? 'light' : 'dark'}`;
@@ -186,7 +186,7 @@ test('settings use the auxiliary background and remain distinct from terminal co
   expect(await background('.settings-navigation')).not.toBe(terminalBg);
   await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
   for (const label of ['浅色', '深色']) {
-    await page.getByRole('radio', { name: label, exact: true }).click();
+    await page.getByRole('radio', { name: `始终${label}`, exact: true }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', label === '浅色' ? 'light' : 'dark');
     expect(await background('.workspace-titlebar')).not.toBe(await background('main'));
     const sidebarBg = await background('.workspace-side-panel[data-side="right"] > div:first-child');
