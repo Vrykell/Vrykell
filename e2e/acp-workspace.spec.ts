@@ -247,6 +247,7 @@ test('protects active work and only closes sessions after explicit confirmation'
 test('search navigation leaves settings and server dialogs retain keyboard focus', async ({ page }) => {
   await connect(page);
   await page.getByTestId('harness-add-session').click();
+  await expect(page.getByTestId('acp-launcher-search')).toBeFocused();
   await page.keyboard.press('Shift+Tab');
   await expect(page.getByRole('button', { name: '配置服务器', exact: true })).toBeFocused();
   await page.keyboard.press('Escape');
