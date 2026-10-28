@@ -27,7 +27,7 @@ beforeEach(() => {
   useTerminalStore.setState({ sessions: {}, scenes: { p: 'classic' } });
 });
 
-/** 输入方式是显式单选：点开下拉再选，而不是点一个会翻转文字的按钮。 */
+/** Input mode is an explicit choice: open the dropdown and pick, instead of clicking a button that flips its label. */
 function chooseInputMode(mode: '密码输入' | '直接输入') {
   fireEvent.click(screen.getByRole('combobox', { name: '输入方式' }));
   fireEvent.click(screen.getByRole('option', { name: mode }));
@@ -121,7 +121,7 @@ describe('SSH connection input', () => {
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
     chooseInputMode('密码输入');
     expect(screen.getByLabelText('SSH 认证响应')).toHaveAttribute('type', 'password');
-    // 冻结成快照：live xterm 会自己画光标，看起来像还能在屏幕上输入
+    // Freeze into a snapshot: a live xterm paints its own cursor, which makes the screen look like it still accepts input
     expect(screen.getByTestId('ssh-terminal-screen').tagName).toBe('PRE');
     expect(screen.getByTestId('ssh-terminal-screen')).toHaveClass('ssh-terminal-frame');
     expect(screen.queryByText('正在连接远端主机…')).not.toBeInTheDocument();
@@ -263,10 +263,10 @@ describe('SSH connection input', () => {
     expect(screen.queryByLabelText('SSH 认证响应')).toBeNull();
     expect(screen.getByTestId('ssh-terminal-screen')).toHaveStyle({ visibility: 'visible' });
   });
-  // 回归：SSH 画面快照同样走 dangerouslySetInnerHTML。快照由自家渲染器生成（文本转义），
-  // 但它会落库、恢复时重新渲染，所以这一层也要像命令块那样过净化。
+  // Regression: SSH screen snapshots also go through dangerouslySetInnerHTML. The snapshot comes from our own renderer (text escaped),
+  // but it is persisted and re-rendered on restore, so this layer must be sanitized like command blocks too.
   it('strips tags and handlers out of a tampered screen snapshot', () => {
-    // 快照只在密码提示遮挡屏幕时渲染，所以这里让屏幕看起来正在等密码。
+    // The snapshot only renders while a password prompt covers the screen, so make the screen look like it awaits a password.
     sessionView.frame.plainText = 'Password:';
     sessionView.frame.html = 'user@host:<br><img src=x onerror="alert(1)"><script>alert(2)</script>Password:';
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
@@ -274,7 +274,7 @@ describe('SSH connection input', () => {
     expect(snapshot.querySelector('img')).toBeNull();
     expect(snapshot.querySelector('script')).toBeNull();
     expect(snapshot.querySelector('[onerror]')).toBeNull();
-    // 文本内容保留（净化是解包标签，不是丢字）
+    // Text content is preserved (sanitizing unwraps tags rather than dropping text)
     expect(snapshot.textContent).toContain('Password:');
     expect(snapshot.querySelector('br')).not.toBeNull();
   });
@@ -301,7 +301,7 @@ describe('SSH connection input', () => {
     sessionView.frame.html = "user@server's password:<br>Connection closed by server";
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput sshTarget="user@server" />);
     expect(screen.getByRole('status')).toHaveTextContent('连接已断开');
-    // 原因就当终端输出印在屏幕上（可选中复制），退出信息只补一次
+    // The reason is printed on screen as terminal output (selectable and copyable); the exit notice is appended only once
     const ended = screen.getByTestId('ssh-terminal-ended');
     expect(ended).toHaveTextContent('Connection closed by server');
     expect(ended.textContent?.match(/\[进程已退出\]/g)).toHaveLength(1);
@@ -321,7 +321,7 @@ describe('SSH connection input', () => {
     chooseInputMode('密码输入');
     expect(area).toHaveAttribute('tabindex', '-1');
     expect(area).toHaveAttribute('aria-disabled', 'true');
-    // 屏幕同时冻结成快照，点不进去也没有终端光标
+    // The screen also freezes into a snapshot, so it cannot be clicked and shows no terminal cursor
     expect(screen.getByTestId('ssh-terminal-screen').tagName).toBe('PRE');
   });
 

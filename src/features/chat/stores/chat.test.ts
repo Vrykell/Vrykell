@@ -5,13 +5,13 @@ import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 const initialChat = useChatStore.getState();
 const initialWs = useWorkspaceStore.getState();
 
-describe('chat store（按标签隔离）', () => {
+describe('chat store (isolated per tab)', () => {
   beforeEach(() => {
     useChatStore.setState(initialChat, true);
     useWorkspaceStore.setState(initialWs, true);
   });
 
-  it('send 追加用户消息并流式填充助手消息', async () => {
+  it('send appends the user message and streams the assistant reply', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     const chunks = ['你好', '，世界', '！'];
     const fakeStream = async (_msgs: unknown, onChunk: (t: string) => void) => {
@@ -24,7 +24,7 @@ describe('chat store（按标签隔离）', () => {
     expect(msgs[1]).toMatchObject({ role: 'assistant', content: '你好，世界！', pending: false });
   });
 
-  it('流式失败时助手消息带错误提示', async () => {
+  it('keeps the error on the assistant message when streaming fails', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     const failStream = async () => { throw new Error('boom'); };
     await useChatStore.getState().send('hi', { streamFn: failStream });
@@ -34,7 +34,7 @@ describe('chat store（按标签隔离）', () => {
     expect(msgs[1]!.pending).toBe(false);
   });
 
-  it('不同标签页的消息互不影响', async () => {
+  it('keeps messages of different tabs independent', async () => {
     const t1 = useWorkspaceStore.getState().activeId;
     const noop = async (_m: unknown, _c: (t: string) => void) => {};
     await useChatStore.getState().send('标签一的消息', { streamFn: noop });
@@ -47,15 +47,15 @@ describe('chat store（按标签隔离）', () => {
     expect(useChatStore.getState().byTab[t2]).toHaveLength(2);
   });
 
-  it('首条消息自动命名标签', async () => {
-    // 模拟启动后存在一个标签（store 不再内置初始标签）
+  it('names the tab from the first message', async () => {
+    // Simulate the tab that exists after startup (the store no longer seeds one)
     useWorkspaceStore.getState().addTab({});
     const noop = async (_m: unknown, _c: (t: string) => void) => {};
     await useChatStore.getState().send('量子力学是什么', { streamFn: noop });
     expect(useWorkspaceStore.getState().tabs[0]!.title).toBe('量子力学是什么');
   });
 
-  it('appendDraft 累加草稿，send 后清空', async () => {
+  it('appendDraft appends to the draft and send clears it', async () => {
     const noop = async (_m: unknown, _c: (t: string) => void) => {};
     useChatStore.getState().appendDraft('/tmp/a.txt');
     useChatStore.getState().appendDraft('/tmp/b.txt');
@@ -64,7 +64,7 @@ describe('chat store（按标签隔离）', () => {
     expect(useChatStore.getState().draft).toBe('');
   });
 
-  it('send 携带 paneId 与 createdAt，错误时打 error 标记', async () => {
+  it('send carries paneId and createdAt and flags errors', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     const noop = async (_m: unknown, _c: (t: string) => void) => {};
     await useChatStore.getState().send('pane 的问题', { streamFn: noop, paneId: 'pane-1' });
@@ -79,7 +79,7 @@ describe('chat store（按标签隔离）', () => {
     expect(after[after.length - 1]!.error).toBe(true);
   });
 
-  it('send 缺省 paneId 时为 undefined（仅面板可见）', async () => {
+  it('leaves paneId undefined when omitted so the message stays panel-only', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     const noop = async (_m: unknown, _c: (t: string) => void) => {};
     await useChatStore.getState().send('无 pane', { streamFn: noop });
@@ -87,15 +87,15 @@ describe('chat store（按标签隔离）', () => {
   });
 });
 
-describe('chat store v2（parts / 工具事件）', () => {
+describe('chat store v2 (parts / tool events)', () => {
   beforeEach(() => {
     useChatStore.setState(initialChat, true);
     useWorkspaceStore.setState(initialWs, true);
-    // 模拟启动后存在活跃标签（store 不再内置初始标签）
+    // Simulate the active tab that exists after startup (the store no longer seeds one)
     useWorkspaceStore.getState().addTab({});
   });
 
-  it('纯文本回答 parts 恒为 undefined（legacy 渲染契约）', async () => {
+  it('keeps parts undefined for plain-text answers (legacy rendering contract)', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     const fake = async (_m: unknown, onChunk: (t: string) => void) => {
       onChunk('纯文本');
@@ -106,7 +106,7 @@ describe('chat store v2（parts / 工具事件）', () => {
     expect(assistant.parts).toBeUndefined();
   });
 
-  it('onToolEvent 惰性物化 parts，文本/工具保持时间序', async () => {
+  it('materializes parts lazily from onToolEvent and keeps text and tools in time order', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     const fake = async (
       _m: unknown,
@@ -140,11 +140,11 @@ describe('chat store v2（parts / 工具事件）', () => {
     expect(parts[0]).toEqual({ kind: 'text', text: '先看看' });
     expect(parts[2]).toEqual({ kind: 'text', text: '执行完了' });
     const tool = parts[1]!.kind === 'tool' ? parts[1]!.tool : null;
-    // 合并补丁：startedAt 不被 undefined 覆盖，终态字段落上
+    // Merge patch: startedAt is not overwritten by undefined and the terminal fields land
     expect(tool).toMatchObject({ toolCallId: 't1', state: 'done', startedAt: 100, endedAt: 200 });
   });
 
-  it('流式失败时未完结的工具落 error 终态', async () => {
+  it('moves unfinished tools to the error terminal state when streaming fails', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     const fail = async (
       _m: unknown,
@@ -168,7 +168,7 @@ describe('chat store v2（parts / 工具事件）', () => {
     expect(tool!.endedAt).toBeDefined();
   });
 
-  it('history 中助手消息追加工具摘要（模型可见本轮动作）', async () => {
+  it('appends a tool summary to the assistant history so the model sees the round actions', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     const first = async (
       _m: unknown,
@@ -196,15 +196,15 @@ describe('chat store v2（parts / 工具事件）', () => {
   });
 });
 
-describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () => {
+describe('chat store M4 (stop / regenerate / edit-resend / delete)', () => {
   beforeEach(() => {
     useChatStore.setState(initialChat, true);
     useWorkspaceStore.setState(initialWs, true);
-    // 模拟启动后存在活跃标签（store 不再内置初始标签）
+    // Simulate the active tab that exists after startup (the store no longer seeds one)
     useWorkspaceStore.getState().addTab({});
   });
 
-  it('regenerate：删旧回答、原地起新流，history 截止该提问', async () => {
+  it('regenerate removes the old answer, streams a new one in place and cuts history at that question', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     const first = async (_m: unknown, onChunk: (t: string) => void) => { onChunk('旧答案'); };
     await useChatStore.getState().send('问题一', { streamFn: first });
@@ -219,17 +219,17 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
     await useChatStore.getState().regenerate(tabId, userMsgId);
 
     const msgs = useChatStore.getState().byTab[tabId]!;
-    // 仍是两条：旧回答被替换而非追加
+    // Still two messages: the old answer was replaced, not appended
     expect(msgs).toHaveLength(2);
     expect(msgs[0]).toMatchObject({ id: userMsgId, role: 'user' });
     expect(msgs[1]).toMatchObject({ role: 'assistant', content: '新答案', pending: false });
     expect(msgs[1]!.id).not.toBe(oldAnswerId);
-    // history 截止该提问（不含旧回答）
+    // History ends at that question (the old answer is excluded)
     expect(seen).toEqual([{ role: 'user', content: '问题一' }]);
     expect(useChatStore.getState().sendingTabs).toEqual([]);
   });
 
-  it('regenerate：多轮历史只取到目标提问为止', async () => {
+  it('regenerate takes only the history up to the target question', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => { onChunk(answer); };
     await useChatStore.getState().send('问一', { streamFn: mk('答一') });
@@ -240,13 +240,13 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
     setDefaultStream(async (msgs, onChunk) => { seen = msgs; onChunk('重生一'); });
     await useChatStore.getState().regenerate(tabId, firstUserId);
 
-    // 只替换目标提问的回答；后续交换保留（但不再进入本次 history）
+    // Only the answer to the target question is replaced; later exchanges stay (but are not part of this history)
     const msgs = useChatStore.getState().byTab[tabId]!;
     expect(msgs.map((m) => m.content)).toEqual(['问一', '重生一', '问二', '答二']);
     expect(seen).toEqual([{ role: 'user', content: '问一' }]);
   });
 
-  it('deleteExchange：删除提问 + 紧随的回答，其余交换不动', async () => {
+  it('deleteExchange removes the question and the answer after it, leaving other exchanges untouched', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => { onChunk(answer); };
     await useChatStore.getState().send('问一', { streamFn: mk('答一') });
@@ -258,7 +258,7 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
     expect(msgs.map((m) => m.content)).toEqual(['问二', '答二']);
   });
 
-  it('editResend：该条及之后全删，提问灌回草稿', async () => {
+  it('editResend removes that message and everything after it and refills the draft with the question', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => { onChunk(answer); };
     await useChatStore.getState().send('问一', { streamFn: mk('答一') });
@@ -270,7 +270,7 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
     expect(useChatStore.getState().draft).toBe('问一');
   });
 
-  it('停止：abort 保留部分内容，不标错不追加错误文本', async () => {
+  it('stop keeps the partial content on abort without flagging an error or appending error text', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     let release!: () => void;
     const gate = new Promise<void>((r) => { release = r; });
@@ -284,7 +284,7 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
       throw new Error('aborted');
     };
     const p = useChatStore.getState().send('会慢慢说', { streamFn: stopStream });
-    // 等 50ms 合批 flush 落进 store 再停
+    // Wait for the 50 ms batched flush to land in the store before stopping
     await new Promise((r) => setTimeout(r, 80));
     useChatStore.getState().abortStream(tabId);
     release();
@@ -298,7 +298,7 @@ describe('chat store M4（停止 / 重新生成 / 编辑重发 / 删除）', () 
     expect(useChatStore.getState().sendingTabs).toEqual([]);
   });
 
-  it('立即停止的空壳回答被移除（不留空气泡）', async () => {
+  it('removes the empty shell answer when stopped immediately (no empty bubble)', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     let release!: () => void;
     const gate = new Promise<void>((r) => { release = r; });
