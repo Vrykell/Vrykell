@@ -4,6 +4,15 @@ import * as sessionManager from '@features/workspace/services/sessionManager';
 import { isSessionTab, isStartTab, serializeSession, useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { useStartupSettings, type StartupMode } from '@features/settings/stores/startup';
 import { t } from '@i18n';
+import { safeJsonParse, safeLocalStorageGet } from '@utils/errorHandler';
+import { parseWorkbench } from '../workbench';
+import { WORKBENCH_STORAGE_KEY } from '../../stores/workbench';
+
+const startupWorkbench = parseWorkbench(safeJsonParse<unknown>(safeLocalStorageGet(WORKBENCH_STORAGE_KEY) ?? 'null'));
+const startupSessionIds = startupWorkbench ? new Set(startupWorkbench.tabs.flatMap(tab => [
+  ...(tab.scope === 'terminal' ? [tab.id] : []),
+  ...(tab.restoreSnapshot?.members.filter(member => member.kind === 'terminal').map(member => member.reference) ?? []),
+])) : undefined;
 
 export interface WorkspaceSession {
   id: string;
@@ -11,6 +20,7 @@ export interface WorkspaceSession {
   groupId?: string;
   sortOrder: number;
   status: string;
+  kind?: string;
 }
 
 export interface PersistableSession {
@@ -24,6 +34,7 @@ export interface RestoreWorkspaceDependencies {
   launchDirectory?: string | null;
   openDirectory?: (cwd: string) => void;
   startupMode?: StartupMode;
+  restorableSessionIds?: ReadonlySet<string>;
   archiveSession?: (sessionId: string) => Promise<void>;
   listSessions: () => Promise<WorkspaceSession[]>;
   loadGroups: () => Promise<void>;
@@ -70,8 +81,15 @@ export async function restoreWorkspaceWithDependencies(
     onError(t('Failed to read session list'), error);
     return [];
   });
+  const canRestore = (session: WorkspaceSession) => session.kind !== 'workspace'
+    && (!dependencies.restorableSessionIds || dependencies.restorableSessionIds.has(session.id));
+  for (const session of sessions.filter(session => session.status === 'active' && !canRestore(session))) {
+    await dependencies.archiveSession?.(session.id).catch((error: unknown) => {
+      onError(t('Failed to archive previous session {{id}}', { id: session.id }), error);
+    });
+  }
   const activeSessions = sessions
-    .filter((session) => session.status === 'active')
+    .filter((session) => session.status === 'active' && canRestore(session))
     .sort((left, right) => left.sortOrder - right.sortOrder);
 
   if (activeSessions.length > 0) {
@@ -102,6 +120,7 @@ function toWorkspaceSession(session: BackendSessionEntry): WorkspaceSession {
     groupId: session.group_id ?? undefined,
     sortOrder: session.sort_order,
     status: session.status,
+    kind: session.kind,
   };
 }
 
@@ -128,6 +147,7 @@ export function restoreWorkspace(
     launchDirectory: options.launchDirectory,
     openDirectory: cwd => { useWorkspaceStore.getState().addTab({ cwd }); },
     startupMode: useStartupSettings.getState().mode,
+    restorableSessionIds: startupSessionIds,
     archiveSession: (id) => archiveSession(id, Date.now()),
     listSessions: async () => {
       const sessions = await listSessions();

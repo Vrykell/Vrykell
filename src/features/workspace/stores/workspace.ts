@@ -567,6 +567,8 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const state = get();
     const currentArea = useWorkspaceNavigation.getState().area;
     const ai = useAiWorkspace.getState();
+    const sideIds = new Set([...ai.sideSessions, ai.sideSelected]);
+    const conversations = new Set(useChatStore.getState().conversations.map(conversation => conversation.id));
     // Conversations and ACP sessions live in the AI stores, so they count as strip entries too.
     const connections = useHarnessWorkspace.getState().connections;
     const startKinds = { terminal: 'start', code: 'start-code', ai: 'start-ai' } as const;
@@ -579,7 +581,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       // Inactive areas are seeded when they become active; stale placeholders are always cleaned.
       if (area !== currentArea && !start) continue;
       const work = area === 'ai'
-        ? ai.nativeTabs.length + connections.length + tabs.filter(tab => tab.kind === 'ai-history' || tab.kind === 'usage').length
+        ? ai.nativeTabs.filter(id => conversations.has(id) && !sideIds.has(`chat:${id}`)).length
+          + connections.filter(connection => !sideIds.has(`acp:${connection.id}`)).length
+          + tabs.filter(tab => tab.kind === 'ai-history' || tab.kind === 'usage').length
         : tabs.filter(tab => workspaceAreaForKind(tab.kind) === area && !isStartTab(tab)).length;
       if (!work && !start) {
         const id = nextTabId();

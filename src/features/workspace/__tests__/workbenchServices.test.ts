@@ -3,6 +3,7 @@ import { editorFileKey, interceptEditorClose } from '@core/editor';
 import { interceptHarnessClose } from '@core/harness';
 import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useChatStore } from '@features/chat/stores/chat';
+import { useComposerDrafts } from '@features/chat/stores/composerDrafts';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { useHarnessStore } from '@features/chat/stores/harness';
 import { useBlockStore } from '@features/terminal/stores/blocks';
@@ -25,6 +26,7 @@ import { useUiStore } from '../stores/ui';
 import { parseWorkbench } from '../model/workbench';
 import { captureContainerHistory, createWorkspaceHistoryWriter, persistContainerHistory } from '../services/workspaceHistory';
 import { currentWorkspaceResources } from '../services/workspaceResources';
+import { t } from '@i18n';
 
 vi.mock('@platform/diagnostics', () => ({ invoke: vi.fn(async () => undefined), diagnostic: vi.fn() }));
 vi.mock('@platform/api/group', () => ({ groupsList: vi.fn(async () => []), groupCreate: vi.fn(async () => {}), groupRename: vi.fn(async () => {}), groupSetCollapsed: vi.fn(async () => {}), groupDelete: vi.fn(async () => {}), groupDeleteWithSessions: vi.fn(async () => {}), groupsReorder: vi.fn(async () => {}), sessionSetGroup: vi.fn(async () => {}), sessionsReorder: vi.fn(async () => {}), groupRestore: vi.fn(async () => {}), groupArchive: vi.fn(async () => {}) }));
@@ -58,6 +60,7 @@ function group(id: string, scope: WorkspaceContainer['scope'], tabIds: string[] 
 }
 
 beforeEach(() => {
+  useComposerDrafts.setState({ byTab: {} });
   vi.clearAllMocks(); vi.mocked(interceptEditorClose).mockReturnValue(false); vi.mocked(interceptHarnessClose).mockReturnValue(false);
   useWorkspaceStore.setState({ ...workspaceInitial, tabs: [], activeId: '', groups: [] }, true);
   useChatStore.setState({ ...chatInitial, conversations: [], byTab: {}, conversationsLoaded: true }, true);
@@ -381,6 +384,28 @@ it('restores saved containers by resource identity without removing previously r
   expect(useWorkbenchStore.getState().snapshot.tabs.filter(tab => tab.scope === 'code')).toHaveLength(2);
   expect(useWorkbenchStore.getState().snapshot.tabs.some(tab => tab.id === 'mixed')).toBe(true);
   expect(useWorkbenchStore.getState().snapshot.selected.code).toBe(saved.selected.code);
+});
+
+it('does not reopen untouched inactive blank conversations while preserving the selected draft', async () => {
+  const saved = structuredClone(useWorkbenchStore.getState().snapshot);
+  saved.tabs = Array.from({ length: 40 }, (_, index) => {
+    const id = `chat:blank-${index}`; const pane = { type: 'pane' as const, id: `pane-${index}`, resourceId: id };
+    return { id, scope: 'ai' as const, layout: pane, focused: pane.id, restoreSnapshot: { version: 1 as const, focused: pane.id, layout: pane,
+      members: [{ id, kind: 'conversation' as const, reference: `blank-${index}`, title: t('New conversation'), paneCount: 1, local: false, ssh: false, empty: true }] } };
+  });
+  saved.selected = { ai: 'chat:blank-0' }; saved.groups = []; saved.order = {};
+  useAiWorkspace.setState({ nativeTabs: Array.from({ length: 40 }, (_, index) => `blank-${index}`) });
+  saved.tabs[1]!.title = 'Deliberate title';
+  saved.tabs[2]!.groupId = 'saved-group';
+  saved.groups.push({ id: 'saved-group', title: 'Saved', scope: 'ai', collapsed: false });
+  saved.tabs[3]!.restoreSnapshot!.members[0]!.title = 'Named conversation';
+  useComposerDrafts.getState().setText('blank-4', 'Unsent question');
+  const shared = structuredClone(saved.tabs[5]!); shared.id = 'mixed-blank'; shared.scope = 'unified'; saved.tabs.push(shared);
+  useWorkbenchStore.setState({ snapshot: saved });
+  await restoreWorkbench('restore', vi.fn(), saved);
+  expect(useWorkbenchStore.getState().snapshot.tabs.filter(tab => tab.scope === 'ai').map(tab => tab.id)).toEqual(Array.from({ length: 6 }, (_, index) => `chat:blank-${index}`));
+  expect(useAiWorkspace.getState().nativeTabs).toEqual(Array.from({ length: 6 }, (_, index) => `blank-${index}`));
+  expect(useComposerDrafts.getState().byTab['blank-4']?.text).toBe('Unsent question');
 });
 
 it('activates the selected container after restoring later peers with different native selection', async () => {

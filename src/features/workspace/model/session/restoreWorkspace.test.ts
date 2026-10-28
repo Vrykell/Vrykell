@@ -14,6 +14,20 @@ function createDependencies(overrides: Partial<RestoreWorkspaceDependencies> = {
 }
 
 describe('restoreWorkspaceWithDependencies', () => {
+  it('restores only saved terminal owners and archives leftover active records without deleting history', async () => {
+    const deps = createDependencies({
+      restorableSessionIds: new Set(['saved', 'mixed-owner']), archiveSession: vi.fn(async () => {}), hasTabs: () => true,
+      listSessions: vi.fn(async () => [
+        { id: 'saved', title: 'Saved', status: 'active', sortOrder: 0, kind: 'session' },
+        { id: 'mixed-owner', title: 'Mixed owner', status: 'active', sortOrder: 1, kind: 'session' },
+        { id: 'closed', title: 'Closed', status: 'active', sortOrder: 2, kind: 'session' },
+        { id: 'layout', title: 'Layout', status: 'active', sortOrder: 3, kind: 'workspace' },
+      ]),
+    });
+    await restoreWorkspaceWithDependencies(deps);
+    expect(vi.mocked(deps.restoreSession).mock.calls.map(([session]) => session.id)).toEqual(['saved', 'mixed-owner']);
+    expect(vi.mocked(deps.archiveSession!).mock.calls.map(([id]) => id)).toEqual(['closed', 'layout']);
+  });
   it('opens a shell-requested directory without archiving or restoring saved sessions', async () => {
     const openDirectory = vi.fn();
     const deps = createDependencies({ launchDirectory: 'C:\\Work space\\project', openDirectory, startupMode: 'empty', archiveSession: vi.fn() });

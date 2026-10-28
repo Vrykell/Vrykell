@@ -2,6 +2,7 @@ import { interceptEditorClose } from '@core/editor';
 import { interceptHarnessClose } from '@core/harness';
 import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useChatStore } from '@features/chat/stores/chat';
+import { useComposerDrafts } from '@features/chat/stores/composerDrafts';
 import { hasChatContent } from '@features/chat/model/chatContent';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
@@ -412,6 +413,23 @@ export async function restoreWorkbench(mode: 'restore' | 'default' | 'empty', on
   try {
     if (mode !== 'restore') useWorkbenchStore.getState().update(() => emptyWorkbench());
     else {
+      // Old empty drafts can outlive their visible tabs. Retain intentional placements and every draft with content.
+      const placed = new Set(saved.tabs.filter(tab => tab.scope === 'unified' || panesOf(tab).length > 1).flatMap(panesOf).map(pane => pane.resourceId));
+      const stale = new Set(saved.tabs.filter(tab => {
+        const member = tab.restoreSnapshot?.members[0];
+        if (tab.scope !== 'ai' || tab.id === saved.selected.ai || tab.groupId || tab.title || panesOf(tab).length !== 1
+          || !member?.empty || member.kind !== 'conversation' || placed.has(member.id)
+          || ![t('New conversation'), 'New conversation'].includes(member.title)) return false;
+        const draft = useComposerDrafts.getState().byTab[member.reference];
+        return !draft?.text.trim() && !draft?.attachments.length && !draft?.references?.length
+          && !useChatStore.getState().byTab[member.reference]?.some(hasChatContent);
+      }).map(tab => tab.id));
+      if (stale.size) {
+        const removed = new Set(saved.tabs.filter(tab => stale.has(tab.id)).flatMap(panesOf).map(pane => pane.resourceId));
+        saved = removeContainers(saved, stale);
+        useWorkbenchStore.getState().update(state => removeContainers(state, stale));
+        useAiWorkspace.setState(state => ({ nativeTabs: state.nativeTabs.filter(id => !removed.has(`chat:${id}`)) }));
+      }
       const { restoreWorkspaceMember } = await import('./restoreWorkspaceHistory');
       const { remapWorkspaceHistory } = await import('../model/workspaceHistory');
       const conversations = saved.tabs.flatMap(tab => tab.restoreSnapshot?.members ?? []).filter(member => member.kind === 'conversation');
