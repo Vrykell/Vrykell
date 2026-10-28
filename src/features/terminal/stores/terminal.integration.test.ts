@@ -1,6 +1,6 @@
 /**
- * terminal store 的 getTerminalScreen 测试：用假 xterm buffer 验证
- * 可见视口读取（viewportY 偏移、尾部空行裁剪、光标位置、alt buffer 全屏）。
+ * Tests for the terminal store's getTerminalScreen: a fake xterm buffer verifies
+ * visible-viewport reads (viewportY offset, trailing blank-line trimming, cursor position, full-screen alt buffer).
  */
 import { describe, it, expect } from 'vitest';
 import type { Terminal } from '@xterm/xterm';
@@ -30,7 +30,7 @@ function fakeTerm(lines: string[], opts: {
 }
 
 describe('getTerminalScreen', () => {
-  it('读取可见视口并裁剪尾部空行，带行号', () => {
+  it('reads the visible viewport, trims trailing blank lines and adds line numbers', () => {
     useTerminalStore.setState({ scenes: { p1: 'classic' } });
     registerTerminal('p1', fakeTerm(['hello', 'world', '   '], { cursorY: 1, cursorX: 4, rows: 10 }));
 
@@ -43,7 +43,7 @@ describe('getTerminalScreen', () => {
     expect(s.content).toBe(' 1│hello\n 2│world');
   });
 
-  it('viewportY 偏移：只读当前可见的窗口行', () => {
+  it('viewportY offset: reads only the currently visible window lines', () => {
     useTerminalStore.setState({ scenes: { p1: 'classic' } });
     registerTerminal('p1', fakeTerm(['l0', 'l1', 'l2', 'l3', 'l4', 'l5'], {
       viewportY: 2, rows: 3,
@@ -53,7 +53,7 @@ describe('getTerminalScreen', () => {
     expect(s.content).toBe(' 1│l2\n 2│l3\n 3│l4');
   });
 
-  it('altScreen：viewportY=0，读满整个 alt buffer', () => {
+  it('altScreen: viewportY=0, reads the whole alt buffer', () => {
     useTerminalStore.setState({ scenes: { p1: 'altScreen' } });
     registerTerminal('p1', fakeTerm(['vim 第1行', '~', '-- INSERT --'], { rows: 24 }));
 
@@ -62,7 +62,7 @@ describe('getTerminalScreen', () => {
     expect(s.content).toBe(' 1│vim 第1行\n 2│~\n 3│-- INSERT --');
   });
 
-  it('无 xterm 实例返回 null', () => {
+  it('returns null when there is no xterm instance', () => {
     useTerminalStore.setState({ scenes: {} });
     expect(getTerminalScreen('missing')).toBeNull();
   });

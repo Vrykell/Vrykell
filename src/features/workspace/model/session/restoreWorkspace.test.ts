@@ -42,7 +42,7 @@ describe('restoreWorkspaceWithDependencies', () => {
     await restoreWorkspaceWithDependencies(createDependencies({ launchDirectory: '/tmp', openDirectory, hasTabs: () => true }));
     expect(openDirectory).not.toHaveBeenCalled();
   });
-  it('按 sortOrder 恢复 active 会话，并跳过非 active 会话', async () => {
+  it('restores active sessions by sortOrder and skips non-active sessions', async () => {
     const restored: string[] = [];
     const deps = createDependencies({
       listSessions: vi.fn(async () => [
@@ -64,7 +64,7 @@ describe('restoreWorkspaceWithDependencies', () => {
     expect(deps.persistSession).not.toHaveBeenCalled();
   });
 
-  it('没有可恢复标签时创建并持久化默认会话', async () => {
+  it('creates and persists a default session when no tab can be restored', async () => {
     const deps = createDependencies();
 
     await restoreWorkspaceWithDependencies(deps);
@@ -78,7 +78,7 @@ describe('restoreWorkspaceWithDependencies', () => {
     });
   });
 
-  it('选择空工作区后不恢复也不创建默认标签页', async () => {
+  it('neither restores nor creates a default tab after choosing an empty workspace', async () => {
     const deps = createDependencies({ startupMode: 'empty' });
     await restoreWorkspaceWithDependencies(deps);
     expect(deps.restoreSession).not.toHaveBeenCalled();
@@ -86,14 +86,14 @@ describe('restoreWorkspaceWithDependencies', () => {
     expect(deps.persistSession).not.toHaveBeenCalled();
   });
 
-  it('选择默认标签页时跳过已保存会话恢复', async () => {
+  it('skips restoring saved sessions when the default tab page is chosen', async () => {
     const deps = createDependencies({ startupMode: 'default' });
     await restoreWorkspaceWithDependencies(deps);
     expect(deps.restoreSession).not.toHaveBeenCalled();
     expect(deps.createDefaultSession).toHaveBeenCalledOnce();
   });
 
-  it('选择不恢复时把上次的活动会话整理到会话历史', async () => {
+  it('archives the previous active sessions into history when restore is declined', async () => {
     const archiveSession = vi.fn(async () => {});
     const deps = createDependencies({
       startupMode: 'empty',
@@ -109,7 +109,7 @@ describe('restoreWorkspaceWithDependencies', () => {
     expect(deps.createDefaultSession).not.toHaveBeenCalled();
   });
 
-  it('已有标签时不创建默认会话', async () => {
+  it('does not create a default session when tabs already exist', async () => {
     const deps = createDependencies({ hasTabs: vi.fn(() => true) });
 
     await restoreWorkspaceWithDependencies(deps);
@@ -118,7 +118,7 @@ describe('restoreWorkspaceWithDependencies', () => {
     expect(deps.persistSession).not.toHaveBeenCalled();
   });
 
-  it('单个恢复失败不阻断后续会话和默认会话逻辑', async () => {
+  it('continues with later sessions and default-session logic after a single restore failure', async () => {
     const errors: string[] = [];
     const deps = createDependencies({
       listSessions: vi.fn(async () => [

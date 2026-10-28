@@ -24,11 +24,11 @@ describe('terminal store', () => {
     invokeMock.mockClear();
     useTerminalStore.setState(initialTerm, true);
     useWorkspaceStore.setState(initialWs, true);
-    // 模拟启动后存在活跃标签（store 不再内置初始标签）
+    // Simulate an active tab after startup (the store no longer ships an initial tab)
     useWorkspaceStore.getState().addTab({});
   });
 
-  it('getFocusedTerminalId 默认返回活跃窗口第一个终端', () => {
+  it('getFocusedTerminalId returns the first terminal of the active window by default', () => {
     const activeId = useWorkspaceStore.getState().activeId;
     expect(getFocusedTerminalId()).toBe(`${activeId}#0`);
   });
@@ -48,22 +48,22 @@ describe('terminal store', () => {
     expect(useTerminalStore.getState().sessions.p).toBe('new');
   });
 
-  it('runInTerminal 写入聚焦终端的会话并补换行', () => {
+  it('runInTerminal writes to the focused terminal session and appends a newline', () => {
     const termId = getFocusedTerminalId();
     useTerminalStore.getState().setSession(termId, 's1');
     useTerminalStore.getState().runInTerminal('ls -la');
     expect(invokeMock).toHaveBeenCalledWith('pty_write', { id: 's1', data: 'ls -la\n' });
   });
 
-  it('无会话时自动展开终端面板且不写入', () => {
-    invokeMock.mockClear(); // beforeEach 的 addTab 会触发 create_session 记录
+  it('expands the terminal panel automatically and writes nothing when there is no session', () => {
+    invokeMock.mockClear(); // addTab in beforeEach records a create_session call
     useTerminalStore.setState({ visible: false });
     useTerminalStore.getState().runInTerminal('ls');
     expect(useTerminalStore.getState().visible).toBe(true);
     expect(invokeMock).not.toHaveBeenCalled();
   });
 
-  it('PTY 尚未就绪时暂存命令，并在会话建立后冲刷', () => {
+  it('queues commands while the PTY is not ready and flushes them once the session is established', () => {
     const termId = getFocusedTerminalId();
     useTerminalStore.getState().queueCommand(termId, 'echo ready');
     expect(useTerminalStore.getState().pendingCommands[termId]).toEqual(['echo ready']);
@@ -74,7 +74,7 @@ describe('terminal store', () => {
     expect(useTerminalStore.getState().pendingCommands[termId]).toBeUndefined();
   });
 
-  it('getRecentOutput 读取聚焦终端的终端缓冲并去尾部空行', () => {
+  it('getRecentOutput reads the focused terminal buffer and trims trailing blank lines', () => {
     const termId = getFocusedTerminalId();
     const fakeLines = ['$ ls', 'file1  file2', '', ''];
     const fakeTerm = {

@@ -1,5 +1,5 @@
 /**
- * api/fs — 本地文件系统 invoke 封装：命令透传 + 跨边界路径归一化。
+ * api/fs — local filesystem invoke wrappers: command pass-through and cross-boundary path normalization.
  */
 import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
@@ -8,12 +8,12 @@ import {
   fsList, fsDisks, fsHome, fsRename, fsCreateFile, fsCreateDir, fsCopy, fsMove, fsStageDelete, fsRestoreStaged, fsPurgeStaged, fsStat, fileOpenWith,
 } from '@platform/api/fs';
 
-describe('api/fs 封装', () => {
+describe('api/fs wrappers', () => {
   it('preserves empty staging destinations for non-undoable deletions', async () => {
     invokeMock.mockResolvedValueOnce({ completed: [{ from: 'C:\\work\\a.txt', to: '' }], errors: [] });
     await expect(fsStageDelete(['C:/work/a.txt'], false)).resolves.toEqual({ completed: [{ from: 'C:/work/a.txt', to: '' }], errors: [] });
   });
-  it('各命令按约定透传', async () => {
+  it('passes each command through as agreed', async () => {
     invokeMock.mockResolvedValueOnce([{ name: 'a', path: '/a', is_dir: false }]);
     await fsList('/x');
     expect(invokeMock).toHaveBeenLastCalledWith('fs_list', { path: '/x' });
@@ -39,7 +39,7 @@ describe('api/fs 封装', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('file_open_with', { path: '/a.txt' });
   });
 
-  it('出参路径在边界处归一化（原生反斜杠不进业务状态）', async () => {
+  it('normalizes returned paths at the boundary (native backslashes never reach business state)', async () => {
     invokeMock.mockResolvedValueOnce([
       { name: '.android', path: 'C:\\Users\\37863\\.android', is_dir: true },
       { name: 'notes.txt', path: '/home/e2e/notes.txt', is_dir: false },
@@ -65,7 +65,7 @@ describe('api/fs 封装', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('file_open_with', { path: 'C:/Users/37863/old.txt' });
   });
 
-  it('复制 / 移动：入参归一化，返回的完成项也归一化', async () => {
+  it('copy / move: normalizes inputs and completed items in the result', async () => {
     invokeMock.mockResolvedValueOnce({ completed: [{ from: 'C:\\a\\x.txt', to: 'C:\\b\\x.txt' }], errors: ['目标已存在'] });
     const copy = await fsCopy(['C:\\a\\x.txt'], 'C:\\b');
     expect(invokeMock).toHaveBeenLastCalledWith('fs_copy', { paths: ['C:/a/x.txt'], destDir: 'C:/b' });
@@ -77,7 +77,7 @@ describe('api/fs 封装', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('fs_move', { paths: ['/a/x.txt'], destDir: '/b' });
   });
 
-  it('可回退删除：暂存映射归一化，回退与清理按约定透传', async () => {
+  it('undoable delete: normalizes staging mappings and passes rollback and purge through', async () => {
     invokeMock.mockResolvedValueOnce({ completed: [{ from: 'C:\\Users\\37863\\old.txt', to: 'C:\\Users\\37863\\.vrykell\\undo\\u-old.txt' }], errors: ['unavailable'] });
     const staged = await fsStageDelete(['C:\\Users\\37863\\old.txt']);
     expect(invokeMock).toHaveBeenLastCalledWith('fs_stage_delete', { paths: ['C:/Users/37863/old.txt'] });
@@ -94,7 +94,7 @@ describe('api/fs 封装', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('fs_purge_staged', { paths: ['C:/s/old.txt'] });
   });
 
-  it('fsStat 透传并归一化返回路径', async () => {
+  it('fsStat passes through and normalizes the returned path', async () => {
     invokeMock.mockResolvedValueOnce({
       name: 'notes.txt', path: 'C:\\Users\\37863\\notes.txt', is_dir: false, is_symlink: false,
       size: 42, created_ms: 1, modified_ms: 2,

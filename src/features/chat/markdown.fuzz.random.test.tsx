@@ -1,17 +1,17 @@
 /// <reference types="node" />
 /**
- * 随机压测 Markdown 渲染管线 —— 种子化随机生成"markdown 敏感字符"串，
- * 轰炸 remark-gfm + remark-math + rehype-katex + CommandBlock，抓抛出异常的输入。
- * 命中时打印可复现的 JSON 串，加入 markdown.fuzz.test.tsx 的 NASTY 表。
+ * Random fuzzing of the Markdown render pipeline — seeded random generation of "markdown-sensitive character" strings,
+ * hammering remark-gfm + remark-math + rehype-katex + CommandBlock to catch inputs that throw.
+ * On a hit, print a reproducible JSON string and add it to the NASTY table in markdown.fuzz.test.tsx.
  *
- * 运行：FUZZ=1 FUZZ_N=20000 npx vitest run src/chat/markdown.fuzz.random.test.tsx
+ * Run: FUZZ=1 FUZZ_N=20000 npx vitest run src/chat/markdown.fuzz.random.test.tsx
  */
 import { describe, it, expect } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement } from 'react';
 import Markdown from '@features/chat/components/Markdown';
 
-// 确定性 PRNG（mulberry32）—— 同一种子序列完全可复现
+// Deterministic PRNG (mulberry32) — the same seed reproduces the sequence exactly
 function mulberry32(seed: number) {
   let a = seed >>> 0;
   return () => {
@@ -29,15 +29,15 @@ const TOKENS = [
   '\\', '\\\\', '%', '&', ';', '=', '+', '^', '"', "'", ' ',
   '\n', '\n\n', 'a', '1', 'x^2', '\\frac', '{a}', '(bar)', 'language-',
   '\tb', 'E=mc^2', ' ', '‮', '​',
-  '', '', '', '\ud83d', '\ude00', // 控制字符 + 孤立代理对
+  '', '', '', '\ud83d', '\ude00', // Control characters + lone surrogates
 ];
 
 const RUN = process.env.FUZZ === '1';
 const N = Number(process.env.FUZZ_N ?? 20000);
 const SEED = Number(process.env.FUZZ_SE ?? 20260821);
 
-describe.skipIf(!RUN)('Markdown 随机压测', () => {
-  it(`${N} 例随机输入不抛异常（seed=${SEED}）`, () => {
+describe.skipIf(!RUN)('Markdown random fuzz', () => {
+  it(`${N} random inputs do not throw (seed=${SEED})`, () => {
     const rand = mulberry32(SEED);
     const failures: Array<{ i: number; content: string; error: string }> = [];
     for (let i = 0; i < N; i++) {
@@ -52,7 +52,7 @@ describe.skipIf(!RUN)('Markdown 随机压测', () => {
       }
     }
     if (failures.length > 0) {
-      console.error('命中崩溃输入（JSON 可直接复现）:');
+      console.error('Crashing inputs found (the JSON reproduces them directly):');
       for (const f of failures) console.error(JSON.stringify(f, null, 2));
     }
     expect(failures).toEqual([]);

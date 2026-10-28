@@ -1,12 +1,12 @@
 /**
- * tools/index — buildTools 组装与 deny 过滤测试。
+ * tools/index — buildTools assembly and deny filtering tests.
  */
 import { describe, it, expect } from 'vitest';
 import { buildTools, shellFamilyForPane } from '@features/agent/tools/index';
 import { usePermissions } from '@features/agent/stores/permissions';
 
 describe('buildTools', () => {
-  it('默认注册核心工具；deny 级不注册', () => {
+  it('registers core tools by default and skips tools at deny level', () => {
     usePermissions.setState({ levels: { run_command: 'deny', read_file: 'allow', web_search: 'deny' }, mode: 'standard' });
     const tools = buildTools({});
     expect(tools.run_command).toBeUndefined();
@@ -22,18 +22,18 @@ describe('buildTools', () => {
 });
 
 describe('shellFamilyForPane', () => {
-  it('默认「系统」shell 的本地窗格在 Windows 上按 Windows 规则判定', () => {
-    // 窗格没有 shellType（新建时选择的「系统」偏好），Windows 下实际仍是 PowerShell/cmd
+  it('treats a local pane with the default "system" shell as Windows on Windows', () => {
+    // The pane has no shellType (the "system" preference chosen at creation); on Windows it is still PowerShell/cmd
     expect(shellFamilyForPane({ kind: 'local' }, true)).toBe('powershell');
     expect(shellFamilyForPane(undefined, true)).toBe('powershell');
-    // 其它平台仍是 POSIX 规则
+    // Other platforms still follow POSIX rules
     expect(shellFamilyForPane({ kind: 'local' }, false)).toBe('posix');
   });
 
-  it('已显式指定 shell 或远程窗格时按各自规则', () => {
+  it('follows per-shell rules when the shell is explicit or the pane is remote', () => {
     expect(shellFamilyForPane({ kind: 'local', shellType: 'bash' }, true)).toBe('bash');
     expect(shellFamilyForPane({ kind: 'local', shellType: 'cmd' }, false)).toBe('cmd');
-    // SSH 远端是 POSIX shell，不受本机平台影响
+    // The SSH remote is a POSIX shell and is unaffected by the local platform
     expect(shellFamilyForPane({ kind: 'ssh' }, true)).toBe('posix');
   });
 });

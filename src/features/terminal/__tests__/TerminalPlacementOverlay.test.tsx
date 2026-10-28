@@ -11,7 +11,7 @@ const viewport = {
   toJSON: () => ({}),
 } as DOMRect;
 
-// 单终端分裂的四个半屏落点（row first/second = 左/右，col first/second = 上/下）。
+// The four half-screen drop targets for splitting a single terminal (row first/second = left/right, col first/second = top/bottom).
 const left: DropTarget = { leafId: 'a', dir: 'row', position: 'first', rect: { x: 0, y: 0, w: 0.5, h: 1 } };
 const right: DropTarget = { leafId: 'a', dir: 'row', position: 'second', rect: { x: 0.5, y: 0, w: 0.5, h: 1 } };
 const above: DropTarget = { leafId: 'a', dir: 'col', position: 'first', rect: { x: 0, y: 0, w: 1, h: 0.5 } };
@@ -45,7 +45,7 @@ describe('PlacementOverlay', () => {
     render(<PlacementOverlay targets={[left, right, above, below]} onPick={onPick} onCancel={onCancel} />);
     const overlay = screen.getByTestId('placement-overlay');
 
-    // 指针不在任何落点上时没有预览，也没有十字准星式的全屏描边。
+    // With the pointer outside every target there is no preview and no crosshair-style full-screen outline.
     expect(screen.queryAllByTestId(/^placement-zone-/)).toHaveLength(0);
 
     fireEvent.mouseMove(overlay, { clientX: 40, clientY: 400 });
@@ -61,7 +61,7 @@ describe('PlacementOverlay', () => {
     fireEvent.mouseMove(overlay, { clientX: 750, clientY: 790 });
     expect(screen.getByTestId('placement-zone-3')).toBeEmptyDOMElement();
 
-    // 离开覆盖层后预览消失，回到初始的简洁状态。
+    // Leaving the overlay clears the preview and returns to the initial plain state.
     fireEvent.mouseLeave(overlay);
     expect(screen.queryAllByTestId(/^placement-zone-/)).toHaveLength(0);
 
@@ -76,7 +76,7 @@ describe('PlacementOverlay', () => {
     const overlay = screen.getByTestId('placement-overlay');
     expect(overlay).toBeVisible();
 
-    // 覆盖层内的按下是正常选择，不算失焦。
+    // A press inside the overlay is a normal pick, not a focus loss.
     act(() => { overlay.dispatchEvent(new Event('pointerdown', { bubbles: true })); });
     expect(onCancel).not.toHaveBeenCalled();
 
@@ -89,7 +89,7 @@ describe('PlacementOverlay', () => {
     act(() => { window.dispatchEvent(new Event('blur')); });
     expect(onCancel).toHaveBeenCalledTimes(3);
 
-    // 卸载后不再响应焦点变化。
+    // After unmounting it no longer reacts to focus changes.
     unmount();
     act(() => { window.dispatchEvent(new Event('blur')); });
     expect(onCancel).toHaveBeenCalledTimes(3);
@@ -102,7 +102,7 @@ describe('PlacementOverlay', () => {
     expect(onCancel).toHaveBeenCalledTimes(1);
     unmount();
 
-    // StrictMode 重放挂载副作用时，满员提示也只出现一次。
+    // Even when StrictMode replays mount effects, the full-capacity toast appears only once.
     const onEmptyCancel = vi.fn();
     render(
       <StrictMode>

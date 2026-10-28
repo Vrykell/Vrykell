@@ -1,5 +1,5 @@
 /**
- * history — 命令历史热缓存 store（record/search/clear/hydrate）。
+ * history — command history hot-cache store (record/search/clear/hydrate).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -15,11 +15,11 @@ beforeEach(() => {
 });
 
 describe('history store', () => {
-  it('record：去重置顶 + 落库', () => {
+  it('record: deduplicates, moves to the top and persists', () => {
     const s = useHistoryStore.getState();
     s.record('ls', '/a', 0);
     s.record('pwd', '/b', null);
-    s.record('ls', '/a', 1); // 重复命令去重并置顶
+    s.record('ls', '/a', 1); // A repeated command is deduplicated and moved to the top
     const entries = useHistoryStore.getState().entries;
     expect(entries.map((e) => e.command)).toEqual(['ls', 'pwd']);
     expect(entries[0]!.exitCode).toBe(1);
@@ -28,7 +28,7 @@ describe('history store', () => {
     }));
   });
 
-  it('search：前缀匹配、大小写不敏感、limit 截断', () => {
+  it('search: prefix matching, case insensitive, limit truncation', () => {
     const s = useHistoryStore.getState();
     s.record('npm run dev', '/a', 0);
     s.record('npm test', '/b', 0);
@@ -38,7 +38,7 @@ describe('history store', () => {
     expect(useHistoryStore.getState().search('zzz')).toEqual([]);
   });
 
-  it('clear：清空本地与后端', () => {
+  it('clear: clears local state and the backend', () => {
     const s = useHistoryStore.getState();
     s.record('ls', '/a', 0);
     s.clear();
@@ -46,19 +46,19 @@ describe('history store', () => {
     expect(invokeMock).toHaveBeenCalledWith('clear_history');
   });
 
-  it('hydrate：去重回填、会话内新记录优先；失败静默', async () => {
+  it('hydrate: deduplicates on refill, prefers new in-session records and stays silent on failure', async () => {
     const s = useHistoryStore.getState();
     s.record('fresh', '/a', 0);
     invokeMock.mockResolvedValueOnce([
       { command: 'old1', cwd: '/x', timestamp: 1, exit_code: 0 },
-      { command: 'old1', cwd: '/x', timestamp: 2, exit_code: 0 }, // 重复
-      { command: 'fresh', cwd: '/a', timestamp: 3, exit_code: 0 }, // 与本地重复 → 跳过
+      { command: 'old1', cwd: '/x', timestamp: 2, exit_code: 0 }, // duplicate
+      { command: 'fresh', cwd: '/a', timestamp: 3, exit_code: 0 }, // duplicates a local record → skipped
     ]);
     await useHistoryStore.getState().hydrate();
     const entries = useHistoryStore.getState().entries;
     expect(entries.map((e) => e.command)).toEqual(['fresh', 'old1']);
     expect(invokeMock).toHaveBeenCalledWith('search_history', { query: '', maxResults: 200, filterExitCode: null, since: null, cwd: null });
-    // 后端失败静默
+    // Backend failure is silent
     useHistoryStore.setState({ entries: [{ command: 'keep', cwd: '/a', timestamp: 0, exitCode: null }] });
     await useHistoryStore.getState().hydrate();
     expect(useHistoryStore.getState().entries[0]!.command).toBe('keep');

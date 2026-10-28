@@ -1,5 +1,5 @@
 /**
- * provider — 思考强度映射与模型工厂测试。
+ * provider — thinking-effort mapping and model factory tests.
  */
 import { describe, it, expect, vi } from 'vitest';
 const proxy = vi.hoisted(() => vi.fn<typeof fetch>());
@@ -7,19 +7,19 @@ vi.mock('@features/agent/services/llmFetch', () => ({ createProxyFetch: () => pr
 import { deepThinkProviderOptions, createChatModel, baseUrlForProvider, effectiveEndpoint } from '@features/agent/services/provider';
 
 describe('deepThinkProviderOptions', () => {
-  it('openai-compatible → reasoning_effort 按档位', () => {
+  it('openai-compatible → reasoning_effort per level', () => {
     expect(deepThinkProviderOptions('openai-compatible', 'low')).toEqual({ vrykell: { reasoning_effort: 'low' } });
     expect(deepThinkProviderOptions('openai-compatible', 'medium')).toEqual({ vrykell: { reasoning_effort: 'medium' } });
     expect(deepThinkProviderOptions('openai-compatible')).toEqual({ vrykell: { reasoning_effort: 'high' } });
   });
-  it('anthropic → thinking budget 按档位递增', () => {
+  it('anthropic → thinking budget grows with the level', () => {
     const low = deepThinkProviderOptions('anthropic', 'low');
     const high = deepThinkProviderOptions('anthropic', 'high');
     expect((low.anthropic as { thinking: { budgetTokens: number } }).thinking.budgetTokens).toBeLessThan(
       (high.anthropic as { thinking: { budgetTokens: number } }).thinking.budgetTokens,
     );
   });
-  it('anthropic 兼容端点显式关闭 thinking，官方端点才按开关发送', () => {
+  it('disables thinking explicitly on compatible Anthropic endpoints and only sends it when enabled on the official endpoint', () => {
     expect(deepThinkProviderOptions('anthropic', 'high', 'https://api.deepseek.com/anthropic')).toEqual({
       anthropic: { thinking: { type: 'disabled' } },
     });
@@ -31,14 +31,14 @@ describe('deepThinkProviderOptions', () => {
     });
     expect(deepThinkProviderOptions('anthropic', 'high', 'https://api.anthropic.com', false)).toEqual({});
   });
-  it('gemini → thinkingBudget 按档位递增', () => {
+  it('gemini → thinkingBudget grows with the level', () => {
     const low = deepThinkProviderOptions('gemini', 'low');
     const high = deepThinkProviderOptions('gemini', 'high');
     expect((low.google as { thinkingConfig: { thinkingBudget: number } }).thinkingConfig.thinkingBudget).toBeLessThan(
       (high.google as { thinkingConfig: { thinkingBudget: number } }).thinkingConfig.thinkingBudget,
     );
   });
-  it('createChatModel 为每种 provider 返回模型', () => {
+  it('createChatModel returns a model for every provider', () => {
     for (const provider of ['openai-compatible', 'anthropic', 'gemini', 'opencode'] as const) {
       const m = createChatModel({ provider, baseUrl: 'https://x', model: 'm' });
       expect(m).toBeTruthy();

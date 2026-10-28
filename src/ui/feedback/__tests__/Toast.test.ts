@@ -14,10 +14,10 @@ describe('toast store', () => {
     expect(useToastStore.getState().toasts[0]!.message).toBe('测试消息');
     expect(useToastStore.getState().toasts[0]!.type).toBe('info');
 
-    // 3s 后标记退场（仍在列表，播放动画）
+    // After 3s mark it as leaving (still in the list while the animation plays)
     vi.advanceTimersByTime(3000);
     expect(useToastStore.getState().toasts[0]!.leaving).toBe(true);
-    // 动画结束（+200ms）真正移除
+    // Once the animation ends (+200ms) remove it for real
     vi.advanceTimersByTime(200);
     expect(useToastStore.getState().toasts).toHaveLength(0);
   });
@@ -30,25 +30,25 @@ describe('toast store', () => {
     expect(toasts.map((t) => t.type)).toEqual(['success', 'error', 'warning']);
   });
 
-  it('duration=0 不自动消失', () => {
+  it('does not auto-dismiss when duration=0', () => {
     useToastStore.getState().addToast('常驻', 'info', 0);
     vi.advanceTimersByTime(10000);
     expect(useToastStore.getState().toasts).toHaveLength(1);
-    // 手动关闭
+    // Manual close
     useToastStore.getState().removeToast(useToastStore.getState().toasts[0]!.id);
     expect(useToastStore.getState().toasts[0]!.leaving).toBe(true);
     vi.advanceTimersByTime(200);
     expect(useToastStore.getState().toasts).toHaveLength(0);
   });
 
-  it('pause 悬停暂停自动消失，resume 重新计时', () => {
+  it('pause stops auto-dismiss on hover and resume restarts the timer', () => {
     useToastStore.getState().addToast('暂停', 'info');
     const id = useToastStore.getState().toasts[0]!.id;
     useToastStore.getState().pause(id);
     vi.advanceTimersByTime(10000);
-    // 暂停期间不消失
+    // The toast stays while paused
     expect(useToastStore.getState().toasts).toHaveLength(1);
-    // resume 重新计时
+    // resume restarts the timer
     useToastStore.getState().resume(id);
     vi.advanceTimersByTime(3000);
     expect(useToastStore.getState().toasts[0]!.leaving).toBe(true);
