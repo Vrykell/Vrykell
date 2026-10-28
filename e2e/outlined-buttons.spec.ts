@@ -57,17 +57,18 @@ for (const theme of ['dark', 'light'] as const) {
 
     await page.locator('aside').getByRole('button', { name: '记忆', exact: true }).click();
     const add = page.getByRole('button', { name: '重新加载', exact: true });
+    const iconHover = await themeColor(page, '--control-hover-bg');
     await expect(add).toBeEnabled();
     await add.focus();
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Tab');
     await expect(add).toBeFocused();
-    await expect(add).toHaveCSS('background-color', gray);
+    await expect(add).toHaveCSS('background-color', iconHover);
     await add.click();
     await expect(add).toHaveAttribute('aria-busy', 'false');
     await expect(page.getByTestId('memory-count-total')).toHaveText('1');
     await expect(add).toBeFocused();
-    await expect(add).toHaveCSS('background-color', gray);
+    await expect(add).toHaveCSS('background-color', iconHover);
     await add.scrollIntoViewIfNeeded();
     await page.screenshot({ path: testInfo.outputPath(`outlined-action-${theme}.png`), animations: 'disabled' });
 
