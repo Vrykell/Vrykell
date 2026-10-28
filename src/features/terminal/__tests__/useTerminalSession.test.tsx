@@ -83,7 +83,7 @@ vi.mock('@platform/pty', () => ({
   }),
 }));
 
-// jsdom 无 ResizeObserver
+// jsdom has no ResizeObserver
 globalThis.ResizeObserver = class {
   observe() {}
   unobserve() {}
@@ -101,7 +101,7 @@ import { prepareSshHost } from '@features/ssh/services/hostTrust';
 import { startAutomaticForwarding } from '@features/ssh/services/forwarding';
 import { diagnosticSnapshot } from '@platform/diagnostics';
 
-/** 设置一个本地终端 tab，指定打开模式（classic / block） */
+/** Set up a local terminal tab with the given open mode (classic / block). */
 function setTab(openMode: 'classic' | 'block') {
   useWorkspaceStore.setState({
     tabs: [{ id: 't1', title: 't', kind: 'session', layout: leaf({ id: 't1', kind: 'local', openMode }) }],
@@ -351,7 +351,8 @@ describe('useTerminalSession', () => {
   });
 
   it('keeps a working ssh available when the fingerprint preflight cannot run', async () => {
-    // 老服务器可能与预检库协商失败：此时改由 ssh 自己校验，不能因此连不上。
+    // An old server may fail to negotiate with the preflight library: ssh then verifies the host itself,
+    // and the connection must still work.
     vi.mocked(prepareSshHost).mockRejectedValueOnce(new Error('SSH 握手失败：[Session(-5)] Unable to exchange encryption keys'));
     useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', user: 'user' } }) }], activeId: 't1' });
     render(<TestHarness tabId="t1" onReady={() => {}} />);
@@ -370,7 +371,7 @@ describe('useTerminalSession', () => {
     expect(mockedPtySpawn).not.toHaveBeenCalled();
   });
 
-  it('classic 模式：数据直进主 xterm，不建块', async () => {
+  it('classic mode: data goes straight to the main xterm without creating blocks', async () => {
     setTab('classic');
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(ptyOutputHandlers.length).toBe(1));
@@ -504,18 +505,18 @@ describe('useTerminalSession', () => {
     expect(mockedPtySpawn).toHaveBeenCalledTimes(1);
   });
 
-  it('block 模式：初始即 blockList，OSC 133;A 建立 block', async () => {
+  it('block mode: starts in blockList and OSC 133;A creates a block', async () => {
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(ptyOutputHandlers.length).toBe(1));
 
-    // 初始场景已为 blockList（打开模式 block）
+    // The initial scene is already blockList (open mode block)
     expect(useTerminalStore.getState().scenes['t1']).toBe('blockList');
 
     ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;A', payload: '', raw: '\x1b]133;A\x07' }]);
     await waitFor(() => expect(useBlockStore.getState().byTab['t1']?.length).toBe(1));
   });
 
-  it('block 模式：block 结构变化同步到 blockStore', async () => {
+  it('block mode: block structure changes sync to blockStore', async () => {
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(ptyOutputHandlers.length).toBe(1));
 
@@ -523,7 +524,7 @@ describe('useTerminalSession', () => {
     await waitFor(() => expect(useBlockStore.getState().byTab['t1']?.length).toBe(1));
   });
 
-  it('onPtyOutput 在 ptySpawn 之前注册，防止 spawn 瞬间 OSC 标记丢失', async () => {
+  it('onPtyOutput is registered before ptySpawn so OSC markers at spawn time are not lost', async () => {
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(mockedOnPtyOutput).toHaveBeenCalled());
 
@@ -532,16 +533,16 @@ describe('useTerminalSession', () => {
     expect(outputOrder).toBeLessThan(spawnOrder);
   });
 
-  it('提前卸载后迟到的 listener 解析不会写入已销毁终端', async () => {
+  it('a late listener resolution after early unmount does not write to the destroyed terminal', async () => {
     const { unmount } = render(<TestHarness tabId="t1" onReady={() => {}} />);
     unmount();
 
-    // 模拟 listener 承诺在清理之后才解析
+    // Simulate a listener promise resolving only after cleanup
     outputResolvers.forEach((resolve) => resolve(() => {}));
     exitResolvers.forEach((resolve) => resolve(() => {}));
     await new Promise((resolve) => setTimeout(resolve, 0));
 
-    // 触发迟到的输出事件：不应再写入已 dispose 的 term
+    // Fire a late output event: it must not write to the disposed term
     ptyOutputHandlers.forEach((h) => h('sess-x', [{ kind: 'data', text: 'late' }]));
     expect(writeMock).not.toHaveBeenCalled();
   });

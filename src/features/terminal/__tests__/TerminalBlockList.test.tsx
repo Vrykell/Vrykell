@@ -55,14 +55,14 @@ describe('TerminalBlockList', () => {
     expect(screen.getByTestId('command-block-b1')).toHaveStyle({ paddingLeft: '16px' });
   });
 
-  it('命令行无 $ 前缀、无 3px 左边框', () => {
+  it('the command line has no $ prefix and no 3px left border', () => {
     useBlockStore.getState().setBlocks('t1', [block({})]);
     const { container } = render(<TerminalBlockList tabId="t1" />);
     expect(screen.queryByText('$')).toBeNull();
     expect(container.innerHTML).not.toContain('border-left: 3px');
   });
 
-  it('命令没有输出时保持空白，仅保留命令头部和退出码', () => {
+  it('a command without output stays blank and keeps only the command header and exit code', () => {
     useBlockStore.getState().setBlocks('t1', [block({
       outputText: '', outputHtml: '', outputRaw: '\x1b[H\x1b[2J\x1b[K\r\n',
     })]);
@@ -102,22 +102,22 @@ describe('TerminalBlockList', () => {
     expect(screen.queryByLabelText('展开')).not.toBeInTheDocument();
   });
 
-  it('截断提示：linesTruncated > 0 显示已截断', () => {
+  it('truncation hint: linesTruncated > 0 shows the truncated notice', () => {
     useBlockStore.getState().setBlocks('t1', [block({ linesTruncated: 42 })]);
     render(<TerminalBlockList tabId="t1" />);
     expect(screen.getByText(/已截断 42 行/)).toBeTruthy();
   });
 
-  it('pending block 不渲染占位卡片（底部固定输入栏即提示符）', () => {
+  it('a pending block renders no placeholder card (the fixed bottom input bar is the prompt)', () => {
     useBlockStore.getState().setBlocks('t1', [
       block({ id: 'p1', status: 'pending', command: '', outputText: '', cwd: '/Users/w' }),
     ]);
     const { container } = render(<TerminalBlockList tabId="t1" />);
-    // 唯一 pending 块时整个列表不渲染任何内容
+    // With only a pending block the whole list renders nothing
     expect(container.innerHTML).toBe('');
   });
 
-  it('空 done block（无命令无输出，连按回车产生）不渲染空卡片', () => {
+  it('an empty done block (no command, no output, produced by pressing Enter) renders no empty card', () => {
     useBlockStore.getState().setBlocks('t1', [
       block({ id: 'e1', command: '', outputText: '', outputHtml: '', exitCode: null, startedAt: null }),
     ]);
@@ -143,15 +143,15 @@ describe('TerminalBlockList', () => {
       expect(button.querySelector('svg')).toHaveStyle({ width: '16px', height: '16px' });
       expect(button.textContent).toBe('');
     }
-    // jsdom 下 getExecutingTerm 返回 null，只渲染宿主 div
+    // Under jsdom getExecutingTerm returns null, so only the host div is rendered
     await waitFor(() => expect(screen.getByTestId('running-term')).toBeTruthy());
-    // 快照文本不应再出现在 executing 块中（完成前不提取）
+    // The snapshot text must no longer appear in the executing block (it is not extracted before completion)
     expect(screen.queryByText(/fetching/)).toBeNull();
   });
 
-  it('无样式多行 outputHtml（无 <span）按 HTML 渲染，不显示字面 <br>', () => {
-    // 回归：extractSnapshotFromBuffer 对无样式多行输出产出 'file1<br>file2'，
-    // 旧的内容嗅探（includes('<span')）会误判为纯文本 → 渲染出可见 '&lt;br&gt;' 乱码。
+  it('unstyled multiline outputHtml (no <span) renders as HTML without showing a literal <br>', () => {
+    // Regression: extractSnapshotFromBuffer produces 'file1<br>file2' for unstyled multiline output,
+    // and the old content sniffing (includes('<span')) misread it as plain text -> rendering a visible '&lt;br&gt;' literal.
     useBlockStore.getState().setBlocks('t1', [
       block({ outputHtml: 'file1<br>file2', outputText: 'file1\nfile2' }),
     ]);

@@ -1,5 +1,5 @@
 /**
- * webFetch — web_search/web_fetch/web_crawl 工具测试（参数透传 + 格式化 + 失败结构化）。
+ * webFetch - web_search/web_fetch/web_crawl tool tests (argument pass-through + formatting + structured failures).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -23,8 +23,8 @@ const execOf = (t: unknown): Exec => {
   return (args) => e(args, {});
 };
 
-describe('web_search 工具', () => {
-  it('成功：编号结果列表，内容截断 300 字', async () => {
+describe('web_search tool', () => {
+  it('success: numbered result list with content truncated to 300 characters', async () => {
     invokeMock.mockResolvedValue({
       results: [
         { title: 'A', url: 'https://a', content: 'x'.repeat(400) },
@@ -38,7 +38,7 @@ describe('web_search 工具', () => {
     expect(r).toContain('x'.repeat(300));
   });
 
-  it('maxResults 透传；空结果占位；invoke 失败结构化', async () => {
+  it('maxResults pass-through; empty result placeholder; invoke failure is structured', async () => {
     invokeMock.mockResolvedValueOnce({ results: [] });
     const empty = (await execOf(buildWebSearchTool(CTX))({ query: 'q', maxResults: 3 })) as string;
     expect(invokeMock).toHaveBeenLastCalledWith('web_search', { query: 'q', maxResults: 3 });
@@ -48,7 +48,7 @@ describe('web_search 工具', () => {
     expect(fail).toEqual({ ok: false, error: '网络错误' });
   });
 
-  it('门控拒绝时直接返回门控结果', async () => {
+  it('gate denial returns the gate result directly', async () => {
     usePermissions.setState({ levels: { web_search: 'deny' } });
     const r = await execOf(buildWebSearchTool(CTX))({ query: 'q' });
     expect(invokeMock).not.toHaveBeenCalled();
@@ -57,8 +57,8 @@ describe('web_search 工具', () => {
   });
 });
 
-describe('web_fetch 工具', () => {
-  it('完整响应：标题/来源/正文/截断标记/页内链接（上限 10 条）', async () => {
+describe('web_fetch tool', () => {
+  it('full response: title/source/body/truncation marker/in-page links (capped at 10)', async () => {
     const links = Array.from({ length: 15 }, (_, i) => ({ text: `L${i}`, url: `https://l/${i}` }));
     invokeMock.mockResolvedValue({
       title: '文档', url: 'https://doc', text: '正文', truncated: true, links,
@@ -73,7 +73,7 @@ describe('web_fetch 工具', () => {
     expect(r).not.toContain('11.');
   });
 
-  it('最小响应：无标题/链接也正常；invoke 失败结构化', async () => {
+  it('minimal response: works without title/links; invoke failure is structured', async () => {
     invokeMock.mockResolvedValueOnce({ text: '只有正文' });
     const r = (await execOf(buildWebFetchTool(CTX))({ url: 'https://x' })) as string;
     expect(r).toBe('只有正文');
@@ -83,8 +83,8 @@ describe('web_fetch 工具', () => {
   });
 });
 
-describe('web_crawl 工具', () => {
-  it('成功：逐页格式化 + 截断标记；参数透传（缺省 null/true）', async () => {
+describe('web_crawl tool', () => {
+  it('success: per-page formatting + truncation marker; argument pass-through (defaults null/true)', async () => {
     invokeMock.mockResolvedValue({
       pages: [
         { title: '首页', url: 'https://s', text: 'hello' },
@@ -101,7 +101,7 @@ describe('web_crawl 工具', () => {
     expect(r).toContain('[达到页数上限，结果已截断]');
   });
 
-  it('空页占位；自定义参数透传；invoke 失败结构化', async () => {
+  it('empty page placeholder; custom argument pass-through; invoke failure is structured', async () => {
     invokeMock.mockResolvedValueOnce({ pages: [] });
     const empty = (await execOf(buildWebCrawlTool(CTX))({ start_url: 'https://s' })) as string;
     expect(empty).toContain('未爬取到任何页面');

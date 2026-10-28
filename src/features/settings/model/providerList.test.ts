@@ -9,24 +9,24 @@ import {
 } from './providerList';
 
 describe('effectiveBaseUrl', () => {
-  it('空串解析为该 kind 的默认端点', () => {
+  it('an empty string resolves to the default endpoint for that kind', () => {
     expect(effectiveBaseUrl('anthropic', '')).toBe('https://api.anthropic.com/v1');
     expect(effectiveBaseUrl('openai-compatible', '  ')).toBe('https://api.openai.com/v1');
     expect(effectiveBaseUrl('opencode', '')).toBe('https://opencode.ai/zen/go/v1');
   });
 
-  it('默认端点与带尾斜杠的写法归一到同一值', () => {
+  it('the default endpoint and its trailing-slash form normalize to the same value', () => {
     expect(effectiveBaseUrl('anthropic', 'https://api.anthropic.com/v1/')).toBe('https://api.anthropic.com/v1');
     expect(effectiveBaseUrl('openai-compatible', 'https://api.deepseek.com/v1/')).toBe('https://api.deepseek.com/v1');
   });
 
-  it('自定义端点仅去掉尾斜杠', () => {
+  it('custom endpoints only lose the trailing slash', () => {
     expect(effectiveBaseUrl('openai-compatible', 'http://127.0.0.1:11434/v1')).toBe('http://127.0.0.1:11434/v1');
   });
 });
 
 describe('providerName', () => {
-  it('命中预设时用预设名（空串与默认端点一致）', () => {
+  it('a preset match uses the preset name (an empty string matches the default endpoint)', () => {
     expect(providerName('anthropic', '')).toBe('Anthropic');
     expect(providerName('anthropic', 'https://api.anthropic.com/v1')).toBe('Anthropic');
     expect(providerName('openai-compatible', 'https://api.deepseek.com/v1')).toBe('DeepSeek');
@@ -34,11 +34,11 @@ describe('providerName', () => {
     expect(providerName('opencode', 'https://opencode.ai/zen/v1')).toBe('OpenCode Zen');
   });
 
-  it('未命中预设时退回主机名', () => {
+  it('a preset miss falls back to the hostname', () => {
     expect(providerName('openai-compatible', 'http://127.0.0.1:11434/v1')).toBe('127.0.0.1:11434');
   });
 
-  it('无法解析的地址返回空名（界面回退到家族标签）', () => {
+  it('an unparsable address returns an empty name (the UI falls back to the family label)', () => {
     expect(providerName('openai-compatible', 'not a url')).toBe('');
   });
 });
@@ -46,7 +46,7 @@ describe('providerName', () => {
 describe('providerList', () => {
   const row = (id: string, provider: ProviderKind, baseUrl: string) => ({ id, provider, baseUrl });
 
-  it('按 kind+端点分组，保持首次出现顺序，模型归入各自的 provider', () => {
+  it('groups by kind+endpoint in first-appearance order and assigns models to their provider', () => {
     const rows = providerList([
       row('a', 'anthropic', ''),
       row('b', 'openai-compatible', 'https://api.deepseek.com/v1'),
@@ -63,7 +63,7 @@ describe('providerList', () => {
     expect(rows[1].name).toBe('DeepSeek');
   });
 
-  it('不同端点各成一行；空列表返回空数组', () => {
+  it('different endpoints get separate rows; an empty list returns an empty array', () => {
     const rows = providerList([
       row('x', 'openai-compatible', 'http://127.0.0.1:11434/v1'),
       row('y', 'openai-compatible', 'https://api.moonshot.cn/v1'),
@@ -75,14 +75,14 @@ describe('providerList', () => {
 });
 
 describe('providerHasKey / providerId', () => {
-  it('按 provider 身份取密钥标记', () => {
+  it('reads the key flag by provider identity', () => {
     const flags = { providerKeys: ['anthropic|https://api.anthropic.com/v1'] };
     expect(providerHasKey('anthropic|https://api.anthropic.com/v1', flags)).toBe(true);
     expect(providerHasKey('openai-compatible|https://api.openai.com/v1', flags)).toBe(false);
     expect(providerHasKey('gemini|https://generativelanguage.googleapis.com/v1beta', flags)).toBe(false);
   });
 
-  it('id 与端点归一化一致', () => {
+  it('the id follows the same endpoint normalization', () => {
     expect(providerId('anthropic', '')).toBe(providerId('anthropic', 'https://api.anthropic.com/v1/'));
   });
 });

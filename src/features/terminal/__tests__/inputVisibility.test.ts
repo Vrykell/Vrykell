@@ -1,5 +1,5 @@
 /**
- * inputVisibility.test.ts — 输入框可见性状态机测试（对应文档 §7）。
+ * inputVisibility.test.ts - input box visibility state machine tests (documentation section 7).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -18,39 +18,39 @@ function ctx(overrides: Partial<InputVisibilityContext> = {}): InputVisibilityCo
 }
 
 describe('isInputBoxVisible', () => {
-  it('默认可见', () => {
+  it('visible by default', () => {
     expect(isInputBoxVisible(ctx())).toBe(true);
   });
 
-  it('只读模式 → 隐藏', () => {
+  it('read-only mode -> hidden', () => {
     expect(isInputBoxVisible(ctx({ isReadOnly: true }))).toBe(false);
   });
 
-  it('全屏 TUI → 隐藏', () => {
+  it('fullscreen TUI -> hidden', () => {
     expect(isInputBoxVisible(ctx({ isAltScreenActive: true }))).toBe(false);
   });
 
-  it('长运行命令 → 隐藏', () => {
+  it('long-running command -> hidden', () => {
     expect(isInputBoxVisible(ctx({ isLongRunning: true }))).toBe(false);
   });
 
-  it('长运行 + agent 控制 → 可见', () => {
+  it('long-running + agent in control -> visible', () => {
     expect(
       isInputBoxVisible(ctx({ isLongRunning: true, isAgentInControl: true })),
     ).toBe(true);
   });
 
-  it('长运行 + agent tagged → 可见', () => {
+  it('long-running + agent tagged -> visible', () => {
     expect(
       isInputBoxVisible(ctx({ isLongRunning: true, isAgentTaggedIn: true })),
     ).toBe(true);
   });
 
-  it('只读优先级高于其他 → 始终隐藏', () => {
+  it('read-only outranks the others -> always hidden', () => {
     expect(isInputBoxVisible(ctx({ isReadOnly: true, isAgentInControl: true }))).toBe(false);
   });
 
-  it('TUI 优先级高于 agent → 隐藏', () => {
+  it('TUI outranks agent -> hidden', () => {
     expect(
       isInputBoxVisible(
         ctx({ isAltScreenActive: true, isAgentInControl: true }),
@@ -60,13 +60,13 @@ describe('isInputBoxVisible', () => {
 });
 
 describe('getLongRunningHint', () => {
-  it('短命令名完整显示', () => {
+  it('a short command name is shown in full', () => {
     const hint = getLongRunningHint('npm run dev');
     expect(hint).toContain('npm run dev');
     expect(hint).toContain('运行中');
   });
 
-  it('长命令名截断', () => {
+  it('a long command name is truncated', () => {
     const hint = getLongRunningHint('this-is-a-very-long-command-with-60-plus-chars');
     expect(hint).toContain('...');
     expect(hint.length).toBeLessThan(80);
