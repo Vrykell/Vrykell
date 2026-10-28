@@ -3,7 +3,7 @@ import { useInputStore, selectPaneInput } from '@features/terminal/stores/input'
 
 const initial = useInputStore.getState();
 
-describe('input store（每 pane 独立输入态）', () => {
+describe('input store (independent input state per pane)', () => {
   beforeEach(() => useInputStore.setState(initial, true));
 
   it('stages scripts after a preserved command draft without consuming the AI draft', () => {
@@ -20,7 +20,7 @@ describe('input store（每 pane 独立输入态）', () => {
     expect(useInputStore.getState().byPane.a?.focusRequest).toBe(2);
   });
 
-  it('setText / setAiMode 按 pane 隔离', () => {
+  it('isolates setText / setAiMode per pane', () => {
     useInputStore.getState().setText('a', 'ls');
     useInputStore.getState().setAiMode('a', true);
     useInputStore.getState().setText('a', '解释这个项目');
@@ -30,7 +30,7 @@ describe('input store（每 pane 独立输入态）', () => {
     expect(selectPaneInput('b')(useInputStore.getState())).toEqual({ text: 'pwd', aiMode: false });
   });
 
-  it('clearText 清空文本但保留 AI 模式', () => {
+  it('clearText clears the text but keeps AI mode', () => {
     useInputStore.getState().setText('a', 'ls');
     useInputStore.getState().setAiMode('a', true);
     useInputStore.getState().clearText('a');
@@ -38,13 +38,13 @@ describe('input store（每 pane 独立输入态）', () => {
     expect(selectPaneInput('a')(useInputStore.getState())).toMatchObject({ text: '', aiMode: true });
   });
 
-  it('dropPane 删除该 pane 状态', () => {
+  it('dropPane removes the pane state', () => {
     useInputStore.getState().setText('a', 'ls');
     useInputStore.getState().dropPane('a');
     expect(useInputStore.getState().byPane['a']).toBeUndefined();
   });
 
-  it('selectPaneInput 缺失时返回稳定空态（避免无限重渲染）', () => {
+  it('selectPaneInput returns a stable empty state when missing (avoids infinite re-renders)', () => {
     const s1 = selectPaneInput('missing')(useInputStore.getState());
     const s2 = selectPaneInput('missing')(useInputStore.getState());
     expect(s1).toEqual({ text: '', aiMode: false });

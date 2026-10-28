@@ -12,20 +12,20 @@ import { ptySpawn, ptyWrite, ptyResize, ptyClose, ptyCloseAll, onPtyOutput, ptyI
 describe('pty IPC wrapper', () => {
   beforeEach(() => { invokeMock.mockReset(); listenMock.mockReset(); });
 
-  it('pty_spawn 传 camelCase 参数并返回 id', async () => {
+  it('pty_spawn passes camelCase arguments and returns the id', async () => {
     invokeMock.mockResolvedValue('sess-1');
     const id = await ptySpawn(80, 24, '/tmp');
     expect(invokeMock).toHaveBeenCalledWith('pty_spawn', { cols: 80, rows: 24, cwd: '/tmp', shell: null, ssh: null, openMode: null });
     expect(id).toBe('sess-1');
   });
 
-  it('pty_spawn 缺省 cwd 传 null', async () => {
+  it('pty_spawn passes null for a missing cwd', async () => {
     invokeMock.mockResolvedValue('sess-2');
     await ptySpawn(120, 40);
     expect(invokeMock).toHaveBeenCalledWith('pty_spawn', { cols: 120, rows: 40, cwd: null, shell: null, ssh: null, openMode: null });
   });
 
-  it('pty_spawn 透传 shell 与 ssh 目标', async () => {
+  it('pty_spawn forwards the shell and ssh target', async () => {
     invokeMock.mockResolvedValue('sess-3');
     await ptySpawn(80, 24, undefined, {
       shell: 'zsh',
@@ -41,7 +41,7 @@ describe('pty IPC wrapper', () => {
     });
   });
 
-  it('pty_write/resize/close 映射到对应 command', async () => {
+  it('maps pty_write/resize/close to their commands', async () => {
     invokeMock.mockResolvedValue(undefined);
     await ptyWrite('s', 'ls\n');
     await ptyResize('s', 100, 30);
@@ -51,13 +51,13 @@ describe('pty IPC wrapper', () => {
     expect(invokeMock).toHaveBeenNthCalledWith(3, 'pty_close', { id: 's' });
   });
 
-  it('pty_close_all 返回关闭的会话数', async () => {
+  it('pty_close_all returns the number of closed sessions', async () => {
     invokeMock.mockResolvedValue(2);
     await expect(ptyCloseAll()).resolves.toBe(2);
     expect(invokeMock).toHaveBeenCalledWith('pty_close_all');
   });
 
-  it('onPtyOutput 解包 payload', async () => {
+  it('onPtyOutput unwraps the payload', async () => {
     const cb = vi.fn();
     listenMock.mockResolvedValue(() => {});
     await onPtyOutput(cb);

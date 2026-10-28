@@ -3,7 +3,7 @@ import { compactPathSegments } from '@features/files/utils/breadcrumb';
 import { segmentsToPath } from '@platform/path';
 
 describe('compactPathSegments', () => {
-  it('短路径全部保留', () => {
+  it('keeps every segment of a short path', () => {
     const segs = ['Users', 'wuzhe'];
     const { visible, hiddenCount } = compactPathSegments(segs, segmentsToPath);
     expect(visible.map((c) => c.seg)).toEqual(['Users', 'wuzhe']);
@@ -11,17 +11,17 @@ describe('compactPathSegments', () => {
     expect(hiddenCount).toBe(0);
   });
 
-  it('超长路径省略高层级目录', () => {
+  it('omits higher-level directories for a very long path', () => {
     const segs = ['Users', 'wuzhe', 'Documents', 'projects', 'Vrykell', 'src'];
     const { visible, hiddenCount } = compactPathSegments(segs, segmentsToPath, 16);
-    // 只保留最深层级：src、Vrykell（从深往前累计 ≤ 16 字符；projects 放不下）
+    // Keep only the deepest levels: src and Vrykell (accumulating from the deepest stays ≤ 16 characters; projects does not fit)
     expect(visible.map((c) => c.seg)).toEqual(['Vrykell', 'src']);
-    // 每个可见段仍指向完整路径（点击导航正确）
+    // Every visible segment still points at the full path (click navigation stays correct)
     expect(visible[1]!.full).toBe('/Users/wuzhe/Documents/projects/Vrykell/src');
     expect(hiddenCount).toBe(4);
   });
 
-  it('单个长段也保留（无法再省略）', () => {
+  it('keeps a single long segment (nothing left to omit)', () => {
     const segs = ['a-very-long-directory-name-that-exceeds-capacity'];
     const { visible, hiddenCount } = compactPathSegments(segs, segmentsToPath, 5);
     expect(visible).toHaveLength(1);

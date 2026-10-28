@@ -1,5 +1,5 @@
 /**
- * shells — shell 类型标签与可用 shell 列表。
+ * shells — shell type labels and the available shell list.
  */
 import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
@@ -8,7 +8,7 @@ import { shellTypeLabel, fallbackShells, getAvailableShells, listShells } from '
 import { t } from '@i18n';
 
 describe('shells', () => {
-  it('shellTypeLabel 映射与兜底', () => {
+  it('maps shellTypeLabel and falls back', () => {
     expect(shellTypeLabel('zsh')).toBe('Zsh');
     expect(shellTypeLabel('cmd')).toBe('CMD');
     expect(shellTypeLabel('powershell')).toBe('Windows PowerShell');
@@ -16,13 +16,13 @@ describe('shells', () => {
     expect(shellTypeLabel('')).toBe(t('Terminal'));
   });
 
-  it('fallbackShells 返回结构完整的选项', () => {
+  it('fallbackShells returns structurally complete options', () => {
     const shells = fallbackShells();
     expect(shells.length).toBeGreaterThan(0);
     expect(shells.some((s) => s.default)).toBe(true);
   });
 
-  it('getAvailableShells：有结果用结果，空/失败回退', async () => {
+  it('getAvailableShells: uses results when available, falls back on empty or failure', async () => {
     invokeMock.mockResolvedValueOnce([{ id: 'bash', label: 'Bash', default: true }]);
     const r = await getAvailableShells();
     expect(r[0]!.id).toBe('bash');
@@ -36,7 +36,7 @@ describe('shells', () => {
     expect(await listShells()).toEqual([{ id: 'bash', label: 'Bash', default: true }]);
   });
 
-  it('shellTypeLabel：bash / pwsh 映射（两种 PowerShell 必须有不同标签）', () => {
+  it('shellTypeLabel: bash / pwsh mapping (the two PowerShell variants must have different labels)', () => {
     expect(shellTypeLabel('bash')).toBe('Bash');
     expect(shellTypeLabel('pwsh')).toBe('PowerShell 7');
     expect(shellTypeLabel('pwsh')).not.toBe(shellTypeLabel('powershell'));

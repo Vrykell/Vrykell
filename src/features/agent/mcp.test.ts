@@ -1,6 +1,7 @@
 /**
- * mcp 前端工具包装测试：buildMcpTool 描述前缀 + execute 转发 mcp_call_tool
- * （成功透传 / 失败结构化，execute 永不 throw）。不测门控。
+ * mcp frontend tool wrapper tests: buildMcpTool description prefix + execute forwarding
+ * mcp_call_tool (successful pass-through / structured failure, execute never throws). Gating is
+ * not covered here.
  */
 import { describe, it, expect, vi } from 'vitest';
 
@@ -33,7 +34,7 @@ describe('buildMcpTool', () => {
     invokeMock.mockResolvedValue(failure);
     await expect(execOf(buildMcpTool(TOOL, CTX))({ path: '/x' })).resolves.toEqual(failure);
   });
-  it('描述带 MCP 命名空间前缀；execute 转发 mcp_call_tool', async () => {
+  it('description carries the MCP namespace prefix; execute forwards to mcp_call_tool', async () => {
     invokeMock.mockResolvedValue('file content');
     const t = buildMcpTool(TOOL, CTX);
     expect((t as { description?: string }).description).toContain('[MCP · fs]');
@@ -48,7 +49,7 @@ describe('buildMcpTool', () => {
     expect(r).toBe('file content');
   });
 
-  it('invoke 失败 → { ok:false } 不 throw', async () => {
+  it('invoke failure yields { ok:false } without throwing', async () => {
     invokeMock.mockRejectedValue(new Error('MCP 服务器「fs」未连接'));
     const r = await execOf(buildMcpTool(TOOL, CTX))({ path: '/x' });
     expect(r).toEqual({ ok: false, error: 'MCP 服务器「fs」未连接' });

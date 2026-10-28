@@ -14,13 +14,13 @@ describe('CommandBlock', () => {
   beforeEach(() => {
     invokeMock.mockClear();
     useInputStore.setState({ byPane: {} });
-    // 模拟启动后存在活跃标签（store 不再内置初始标签）
+    // Simulate an active tab after startup (the store no longer seeds an initial tab)
     useSessionStore.getState().addTab({});
     const tabId = useSessionStore.getState().activeId;
     useTerminalStore.setState({ sessions: { [`${tabId}#0`]: 's1' }, dims: {}, visible: true });
   });
 
-  it('bash 代码块带运行按钮，点击写入终端', () => {
+  it('bash code block has a run button that writes to the terminal when clicked', () => {
     render(<Markdown content={'```bash\nls -la\n```'} />);
     const action = screen.getByRole('button', { name: '在终端运行' });
     expect(action.querySelector('svg rect')).not.toBeNull();
@@ -53,7 +53,7 @@ describe('CommandBlock', () => {
     expect(useTerminalStore.getState().focusedPaneId).toBe('selected');
   });
 
-  it('python 代码块没有运行按钮', () => {
+  it('python code block has no run button', () => {
     render(<Markdown content={'```python\nprint(1)\n```'} />);
     expect(screen.queryByText('在终端运行')).toBeNull();
   });
@@ -69,7 +69,7 @@ describe('CommandBlock', () => {
     await screen.findByText('已复制');
   });
 
-  it('代码块带复制按钮，点击复制内容并切换为已复制', async () => {
+  it('code block has a copy button that copies the content and switches to copied', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', {
       value: { writeText },

@@ -44,7 +44,7 @@ describe('ssh store', () => {
     });
   });
 
-  it('加载连接并更新状态', async () => {
+  it('loads connections and updates state', async () => {
     vi.mocked(listSshConnections).mockResolvedValue([connection]);
 
     await useSshStore.getState().load();
@@ -56,7 +56,7 @@ describe('ssh store', () => {
     });
   });
 
-  it('加载失败时降级为空列表并结束 loading', async () => {
+  it('falls back to an empty list and ends loading when loading fails', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.mocked(listSshConnections).mockRejectedValue(new Error('backend down'));
 
@@ -79,7 +79,7 @@ describe('ssh store', () => {
     expect(useSshStore.getState().connections.map((c) => c.id)).toEqual(['ssh-2', 'ssh-1']);
   });
 
-  it('save/remove/touch 调用后端后重新加载', async () => {
+  it('save/remove/touch call the backend and reload', async () => {
     vi.mocked(listSshConnections).mockResolvedValue([]);
 
     await useSshStore.getState().save(connection);
@@ -92,7 +92,7 @@ describe('ssh store', () => {
     expect(listSshConnections).toHaveBeenCalledTimes(3);
   });
 
-  it('ensureSshLoaded 仅触发一次加载', async () => {
+  it('ensureSshLoaded triggers loading only once', async () => {
     let resolveLoad: (connections: SshConnection[]) => void = () => {};
     vi.mocked(listSshConnections).mockImplementation(
       () => new Promise((resolve) => {

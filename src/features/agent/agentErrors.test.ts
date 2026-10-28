@@ -1,15 +1,15 @@
 /**
- * agentErrors — AI SDK 错误拆解测试。
+ * agentErrors — AI SDK error decomposition tests.
  */
 import { describe, it, expect } from 'vitest';
 import { describeError } from '@features/agent/model/agentErrors';
 
 describe('describeError', () => {
-  it('普通 Error 取其 message', () => {
+  it('uses the message of a plain Error', () => {
     expect(describeError(new Error('boom'))).toContain('boom');
   });
 
-  it('展开 APICallError：状态码 + 响应体 + cause 链', () => {
+  it('expands APICallError: status code + response body + cause chain', () => {
     const err: Error & { statusCode?: number; responseBody?: string; cause?: unknown } = Object.assign(
       new Error('Failed after 3 attempts'),
       {
@@ -24,7 +24,7 @@ describe('describeError', () => {
     expect(s).toContain('上游错误');
   });
 
-  it('去重：cause 与上层同消息只出现一次', () => {
+  it('deduplicates: a cause with the same message appears only once', () => {
     const err: Error & { cause?: unknown } = Object.assign(new Error('same'), {
       cause: new Error('same'),
     });
@@ -32,7 +32,7 @@ describe('describeError', () => {
     expect(s.split('same').length - 1).toBe(1);
   });
 
-  it('非 Error 值转字符串；未知返回兜底', () => {
+  it('converts non-Error values to strings; falls back for unknown values', () => {
     expect(describeError('plain')).toContain('plain');
     expect(describeError(undefined)).toBe('未知错误');
   });

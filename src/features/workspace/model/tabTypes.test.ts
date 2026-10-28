@@ -18,12 +18,12 @@ const sshs: SshConnection[] = [
   { id: 'ssh-2', name: '测试机', host: 'staging.example.com', user: 'root', port: 2222, authMethod: 'key' },
 ];
 
-describe('tabTypes 新建标签页候选', () => {
+describe('tabTypes new tab candidates', () => {
   beforeEach(() => {
     localStorage.clear();
   });
 
-  it('buildNewTabOptions 合并 shell 与 ssh 候选', () => {
+  it('buildNewTabOptions merges shell and ssh candidates', () => {
     const opts = buildNewTabOptions(shells, sshs, {});
     expect(opts).toHaveLength(4);
     expect(opts.map((o) => o.key)).toEqual([
@@ -31,7 +31,7 @@ describe('tabTypes 新建标签页候选', () => {
     ]);
   });
 
-  it('按最近打开时间倒序，未打开的按插入顺序稳定排后', () => {
+  it('sorts by most recent open time descending and keeps unopened entries in stable insertion order after them', () => {
     const recent = { 'shell:bash': 200, 'ssh:ssh-2': 300 };
     const opts = buildNewTabOptions(shells, sshs, recent);
     expect(opts.map((o) => o.key)).toEqual([
@@ -39,7 +39,7 @@ describe('tabTypes 新建标签页候选', () => {
     ]);
   });
 
-  it('touchRecentOpen 持久化并可读回', () => {
+  it('touchRecentOpen persists and reads back', () => {
     touchRecentOpen('shell:zsh', 123);
     expect(loadRecentOpen()['shell:zsh']).toBe(123);
     saveRecentOpen({});

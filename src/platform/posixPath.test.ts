@@ -1,32 +1,33 @@
 /**
- * posixPath — 远端（POSIX）路径语义：宿主平台无关，绝对/相对判断与拼接都收口在平台层。
+ * posixPath — remote (POSIX) path semantics: independent of the host platform, with absolute
+ * path checks and joining confined to the platform layer.
  */
 import { describe, expect, it } from 'vitest';
 import { baseNamePosix, fileNamePosix, isPosixAbsolute, joinPosix, normalizePosix, parentPosix } from '@platform/posixPath';
 
-describe('posixPath 平台层', () => {
-  it('绝对路径判断按 POSIX 规则，与宿主平台无关', () => {
+describe('posixPath platform layer', () => {
+  it('detects absolute paths by POSIX rules regardless of the host platform', () => {
     expect(isPosixAbsolute('/home/user')).toBe(true);
     expect(isPosixAbsolute('/')).toBe(true);
     expect(isPosixAbsolute('home/user')).toBe(false);
     expect(isPosixAbsolute('C:/Users')).toBe(false);
   });
 
-  it('拼接不会产生双斜杠或反斜杠', () => {
+  it('joining never produces double slashes or backslashes', () => {
     expect(joinPosix('/home/user', 'docs')).toBe('/home/user/docs');
     expect(joinPosix('/home/user/', 'docs')).toBe('/home/user/docs');
     expect(joinPosix('/', 'etc')).toBe('/etc');
     expect(joinPosix('', 'etc')).toBe('/etc');
   });
 
-  it('规范化折叠重复分隔符、处理 .. 与尾部斜杠', () => {
+  it('normalization collapses repeated separators, resolves .. and handles trailing slashes', () => {
     expect(normalizePosix('/home//user/')).toBe('/home/user');
     expect(normalizePosix('/home/user/../docs')).toBe('/home/docs');
     expect(normalizePosix('/..')).toBe('/');
     expect(normalizePosix('')).toBe('/');
   });
 
-  it('父目录与文件名在根目录处返回 null', () => {
+  it('parent directory and file name return null at the root', () => {
     expect(parentPosix('/home/user/a.txt')).toBe('/home/user');
     expect(parentPosix('/home')).toBe('/');
     expect(parentPosix('/')).toBeNull();

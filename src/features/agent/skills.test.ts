@@ -1,5 +1,5 @@
 /**
- * skills 前端封装测试：可用技能过滤、清单格式化、invoke 透传。
+ * skills frontend wrapper tests: available skill filtering, manifest formatting and invoke pass-through.
  */
 import { describe, it, expect, vi } from 'vitest';
 
@@ -17,11 +17,11 @@ const m2: SkillMeta = { name: '代码审查', description: '审查', dir: '/s/b'
 const m3: SkillMeta = { name: '停用', description: 'x', dir: '/s/c', files: [], hasScripts: false, allowedTools: '', source: '内置', trusted: true, enabled: false, modified: false };
 
 describe('availableSkillMetas / buildSkillsContext', () => {
-  it('只保留已启用且已信任的技能', () => {
+  it('keeps only enabled and trusted skills', () => {
     expect(availableSkillMetas([m1, m2, m3]).map((m) => m.name)).toEqual(['写单测']);
   });
 
-  it('清单仅含名称与描述，提示 use_skill', () => {
+  it('lists only names and descriptions and hints at use_skill', () => {
     const ctx = buildSkillsContext([m1, m2]);
     expect(ctx).toContain('use_skill');
     expect(ctx).toContain('- 写单测: 写测试');
@@ -29,8 +29,8 @@ describe('availableSkillMetas / buildSkillsContext', () => {
   });
 });
 
-describe('invoke 封装', () => {
-  it('各命令按约定透传参数', async () => {
+describe('invoke wrappers', () => {
+  it('forwards arguments for each command as agreed', async () => {
     invokeMock.mockResolvedValueOnce([m1]);
     await listSkills();
     expect(invokeMock).toHaveBeenLastCalledWith('list_skills');

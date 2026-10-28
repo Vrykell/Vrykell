@@ -99,7 +99,7 @@ describe('sshApi', () => {
     expect(invokeMock).toHaveBeenCalledWith('ssh_trust_host_key', { host: 'server', port: 2222, expectedFingerprint: 'SHA256:confirmed' });
   });
 
-  it('validateSshConnection 校验名称/主机/端口', () => {
+  it('validateSshConnection validates name/host/port', () => {
     expect(validateSshConnection({ name: '', host: 'h' })).toBe('请输入连接名。');
     expect(validateSshConnection({ name: 'n', host: '' })).toBe('请输入主机 IP 或域名。');
     expect(validateSshConnection({ name: 'n', host: 'h', port: 0 })).toContain('端口');
@@ -108,7 +108,7 @@ describe('sshApi', () => {
     expect(validateSshConnection({ name: 'n', host: 'h' })).toBeNull();
   });
 
-  it('CRUD 命令映射正确', async () => {
+  it('maps CRUD commands correctly', async () => {
     invokeMock.mockResolvedValue([]);
     await listSshConnections();
     expect(invokeMock).toHaveBeenCalledWith('ssh_connections_list');
@@ -126,7 +126,7 @@ describe('sshApi', () => {
     expect(invokeMock).toHaveBeenCalledWith('ssh_connection_touch', { id: 's1' });
   });
 
-  it('sshTest / sshFsList 映射参数', async () => {
+  it('sshTest / sshFsList map their arguments', async () => {
     invokeMock.mockResolvedValue(undefined);
     await sshTest({ host: 'h', port: 2222, user: 'root', password: 'pw' });
     expect(invokeMock).toHaveBeenCalledWith('ssh_test', {
@@ -147,7 +147,7 @@ describe('sshApi', () => {
     expect(invokeMock).toHaveBeenCalledWith('ssh_download', { id: 's1', path: '/home/app.log' });
   });
 
-  it('newSshId 生成唯一 id', () => {
+  it('newSshId generates unique ids', () => {
     expect(newSshId()).not.toBe(newSshId());
   });
 });

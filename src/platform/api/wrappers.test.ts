@@ -1,5 +1,5 @@
 /**
- * api — session/search/group/workspace/downloads invoke 封装透传测试。
+ * api — pass-through tests for the session/search/group/workspace/downloads invoke wrappers.
  */
 import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
@@ -10,8 +10,8 @@ import { groupsList, groupCreate, groupRename, groupSetCollapsed, groupDelete } 
 import { addWorkspace, removeWorkspace, listWorkspaces } from '@platform/api/workspace';
 import { searchFiles } from '@platform/api/search';
 
-describe('api 封装', () => {
-  it('session 命令透传', async () => {
+describe('api wrappers', () => {
+  it('forwards session commands', async () => {
     await createSession('s1', 't', 1, '/cwd', 'local', '{}');
     expect(invokeMock).toHaveBeenLastCalledWith('create_session', { id: 's1', title: 't', timestamp: 1, cwd: '/cwd', kind: 'local', payload: '{}' });
     await archiveSession('s1', 2);
@@ -29,7 +29,7 @@ describe('api 封装', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('delete_session', { id: 's1' });
   });
 
-  it('group 命令透传', async () => {
+  it('forwards group commands', async () => {
     invokeMock.mockResolvedValueOnce([]);
     await groupsList();
     expect(invokeMock).toHaveBeenLastCalledWith('groups_list');
@@ -43,7 +43,7 @@ describe('api 封装', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('group_delete', { id: 'g1' });
   });
 
-  it('workspace 命令透传', async () => {
+  it('forwards workspace commands', async () => {
     await addWorkspace('/a', 'a', 1);
     expect(invokeMock).toHaveBeenLastCalledWith('add_workspace', { path: '/a', name: 'a', timestamp: 1 });
     await removeWorkspace(5);
@@ -53,7 +53,7 @@ describe('api 封装', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('list_workspaces');
   });
 
-  it('search 命令透传', async () => {
+  it('forwards search commands', async () => {
     invokeMock.mockResolvedValueOnce([]);
     await searchFiles('x');
     expect(invokeMock).toHaveBeenCalled();
