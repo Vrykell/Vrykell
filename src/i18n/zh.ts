@@ -1373,7 +1373,7 @@ const zh: Record<string, string> = {
   'dock.open': '打开',
   'dock.close': '关闭',
 
-  // ── 面板 ──
+  // ── Panels ──
   'panel.newTab': '新建标签',
   'panel.emptyDir': '空目录',
   'panel.goUp': '返回',
@@ -1382,16 +1382,16 @@ const zh: Record<string, string> = {
   'panel.tabGroup.count': '{{n}} 个标签',
   'panel.sessionGroup.count': '{{n}} 个会话',
 
-  // ── 状态栏 ──
+  // ── Status bar ──
   'statusBar.shellLocal': '本地 shell',
   'statusBar.tabs.count': '{{n}} 标签',
   'statusBar.version': 'v2',
 
-  // ── 输入栏 ──
+  // ── Composer ──
   'input.command.placeholder': '输入命令…',
   'input.ai.placeholder': '自然语言描述你想做什么…',
 
-  // ── 终端空状态 ──
+  // ── Terminal empty state ──
   'empty.title1': '在底部输入栏输入命令',
   'empty.title2': 'Enter 执行 · Shift+Enter 换行 · 点击 $ 切换 AI 模式',
 
@@ -1399,7 +1399,7 @@ const zh: Record<string, string> = {
   'toast.tabRestored': '已恢复关闭的标签',
   'toast.renamed': '已重命名为 "{{title}}"',
 
-  // ── 设置 ──
+  // ── Settings ──
   'settings.title': '设置（⌘,）',
   'settings.apiKeyLabel': 'Anthropic API Key',
   'settings.modelLabel': '模型 ID',
@@ -1407,16 +1407,16 @@ const zh: Record<string, string> = {
   'model.scope.global': '全局默认',
   'settings.save': '保存',
 
-  // ── API Key 提示 ──
+  // ── API key prompts ──
   'apiKey.missing': '未配置 API Key，AI 功能不可用',
   'apiKey.placeholder': '输入 Anthropic API Key（sk-ant-...）',
   'apiKey.save': '保存',
 
-  // ── 命令面板 ──
+  // ── Command palette ──
   'palette.search': '搜索命令…',
   'palette.noMatch': '无匹配命令',
 
-  // ── 终端剪贴板 ──
+  // ── Terminal clipboard ──
   'terminal.menu.copy': '复制',
   'terminal.menu.paste': '粘贴',
   'terminal.clipboard.copyEmpty': '没有选中内容',
@@ -1430,7 +1430,7 @@ const zh: Record<string, string> = {
   'SSH connection failed: {{error}}': 'SSH 连接失败：{{error}}',
   'Could not start the shell: {{error}}': '无法启动 Shell：{{error}}',
 
-  // ── SSH 连接页 ──
+  // ── SSH connection page ──
   'ssh.state.connecting': '正在连接',
   'ssh.state.authenticating': '等待认证',
   'ssh.state.connected': 'SSH 交互会话',
@@ -1479,7 +1479,7 @@ const zh: Record<string, string> = {
   'Could not save the SSH connection: {{error}}': '无法保存 SSH 连接：{{error}}',
   'Could not delete the SSH connection: {{error}}': '无法删除 SSH 连接：{{error}}',
 
-  // ── 设置：字号与终端渲染 ──
+  // ── Settings: typography and terminal rendering ──
   'Terminal font family': '终端字体',
   'System monospace': '系统等宽字体',
   'Interface font family': '页面字体',
@@ -1503,18 +1503,18 @@ const zh: Record<string, string> = {
   'settings.font.rendererWebgl': 'WebGL（默认）',
   'settings.font.rendererDom': 'DOM（边缘更干净）',
 
-  // ── TUI 模式 ──
+  // ── TUI mode ──
   'tui.banner': 'TUI 模式 — 键盘直通终端',
   'tui.exit': '退出',
 
-  // ── 查找 ──
+  // ── Find ──
   'find.placeholder': '搜索终端输出…',
   'find.close': '关闭',
 
-  // ── 历史面板 ──
+  // ── History panel ──
   'history.search': '搜索命令历史…',
 
-  // ── 文件管理 ──
+  // ── File management ──
   'files.collapseAll': '收起全部文件夹',
   'files.syncToCwd': '切换到当前终端文件目录',
   'Switch terminal to this directory': '终端切换到当前目录',
@@ -1583,7 +1583,7 @@ const zh: Record<string, string> = {
   '{{path}} · {{total}} total · {{percent}}% used': '{{path}} · 共 {{total}} · 已用 {{percent}}%',
   '{{free}} free': '{{free}} 可用',
 
-  // ── 打开方式设置 ──
+  // ── Open-mode settings ──
   'settings.openMode.title': '各 Shell 打开模式',
   'settings.openMode.description': '经典模式输出直进终端；块模式生成命令块。',
   'settings.openMode.classic': '经典模式',
