@@ -1,36 +1,36 @@
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, emitPtyOutput, ptyWrites, ptySignals, expectAnyTermContains } from './tauri-mock';
 
-test.describe('命令块（OSC 133）', () => {
-  test('终端运行命令后 block UI 可见', async ({ page }) => {
+test.describe('Command blocks (OSC 133)', () => {
+  test('the block UI is visible after running a command in the terminal', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
-    // 初始 prompt 触发 blockList 场景
+    // The initial prompt enters the blockList scene
     const input = page.getByPlaceholder(/输入命令/);
     await expect(input).toBeVisible({ timeout: 5000 });
 
     await input.fill('echo e2e-block-test');
     await input.press('Enter');
 
-    // block 中应显示命令文本（无 $ 前缀、加粗）和输出文本
+    // The block shows the command text (bold, without a $ prefix) and the output text
     await expect(page.getByText('echo e2e-block-test').first()).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('e2e-block-test').first()).toBeVisible({ timeout: 5000 });
-    // 上下文行：退出码 0
+    // Context row: exit code 0
     await expect(page.getByTestId('exit-code').first()).toHaveText('0', { timeout: 5000 });
   });
 
-  test('无 OSC 133 时：块模式暂存输出；经典打开模式直出 xterm', async ({ page }) => {
-    // 关闭 shell integration：默认打开模式是块模式，输出暂存进 pending 块（不可见）
+  test('without OSC 133: block mode stages output while classic open mode writes straight to xterm', async ({ page }) => {
+    // Disable shell integration: the default open mode is block mode, so output is staged in a pending block (invisible)
     await setupTauriMock(page, { integration: false });
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
     await emitPtyOutput(page, 'echo classic-mode\r\nclassic-mode-output\r\n');
     await page.waitForTimeout(600);
-    // 无 OSC 133 标记 → 无退出码上下文，输出不渲染
+    // No OSC 133 markers -> no exit-code context and no rendered output
     await expect(page.getByTestId('exit-code')).toHaveCount(0);
     await expect(page.getByText('classic-mode-output')).toHaveCount(0);
 
-    // 打开方式设经典模式（zsh）→ 新页面经典终端直出
+    // Set the open mode to classic (zsh) -> a new page renders the classic terminal directly
     await page.addInitScript(() => {
       localStorage.setItem('vrykell-agent-settings', JSON.stringify({
         state: { global: { openModeByShell: { zsh: 'classic', bash: 'classic' } }, overrides: {} },
@@ -38,15 +38,15 @@ test.describe('命令块（OSC 133）', () => {
       }));
     });
     await page.reload();
-    // classic 场景：无底部输入栏，xterm 可见
+    // Classic scene: no bottom command bar and a visible xterm
     await expect(page.locator('.xterm').first()).toBeVisible({ timeout: 5000 });
     await expect(page.getByPlaceholder(/输入命令/)).toHaveCount(0);
     await emitPtyOutput(page, 'echo classic-mode\r\nclassic-mode-output\r\n');
-    // WebGL renderer：终端输出画进 canvas 不进 DOM，断言改读 xterm buffer
+    // The WebGL renderer paints terminal output into a canvas rather than the DOM, so assert against the xterm buffer
     await expectAnyTermContains(page, 'classic-mode-output', 5000);
   });
 
-  test('进出 altScreen 显示 TUI banner', async ({ page }) => {
+  test('entering and leaving altScreen shows the TUI banner', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     const input = page.getByPlaceholder(/输入命令/);
@@ -58,7 +58,7 @@ test.describe('命令块（OSC 133）', () => {
       const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
       return Object.values(useTerminalStore.getState().startupStates).includes('ready');
     });
-    // 通过 PTY 输出直接注入 altScreen 序列
+    // Inject the altScreen sequence directly through PTY output
     await emitPtyOutput(
       page,
       '\x1b]133;A\x07' +
@@ -71,17 +71,17 @@ test.describe('命令块（OSC 133）', () => {
     await expect(page.getByText('TUI')).toBeVisible({ timeout: 5000 });
     const banner = page.getByTestId('tui-banner');
     await expect(banner.locator('[data-tip="终止命令"]')).toBeVisible();
-    // 真实 alt-buffer 应用不提供「退出全屏」（输出只写主 xterm，强制回 blockList 会画面失联）；
-    // esc 仅手动全屏（块卡片进入全屏交互）才有 —— 见 running-term.spec.ts
+    // Real alt-buffer apps offer no exit full screen action (output only goes to the main xterm and forcing blockList would disconnect the view);
+    // only manual full screen from a block card provides one - see running-term.spec.ts
     await expect(banner.locator('[data-tip="退出全屏"]')).toHaveCount(0);
 
-    // 真实 alt buffer 应用的内容必须进入主 xterm buffer（WebGL 下 canvas 渲染，读 buffer 断言）
-    // —— 回归：manualTui 误判曾把 vim 画面盖住，用户看到冻结的块内容。
+    // Content from a real alt-buffer app must reach the main xterm buffer (rendered on canvas under WebGL, so assert on the buffer).
+    // Regression: a manualTui misclassification covered the vim screen, leaving users with frozen block content.
     await expectAnyTermContains(page, 'VIM BUFFER', 5000);
 
-    // 键盘必须可达 TUI：altScreen 场景焦点路由到主 xterm，onData → PTY
-    // （回归：Esc 曾被全局快捷键劫持、焦点落在不可见块终端，"无法输入"）
-    // 注意放在按钮点击之前 —— 点击横幅按钮会把焦点从 xterm 抢走
+    // Keyboard input must reach the TUI: in the altScreen scene focus routes to the main xterm and onData -> PTY
+    // (regression: Esc was captured by a global shortcut and focus landed on an invisible block terminal, so typing failed)
+    // Keep this before the button clicks - clicking a banner button steals focus from the xterm
     const writesBefore = (await ptyWrites(page)).length;
     await page.keyboard.press('q');
     await page.keyboard.press('Escape');
@@ -91,8 +91,8 @@ test.describe('命令块（OSC 133）', () => {
       expect(writes.slice(writesBefore).join('')).toContain('q');
     }).toPass({ timeout: 5000 });
 
-    // 升级式结束按钮：首击 SIGTERM → 窗口内再击 SIGKILL
-    // 武装后 data-tip 变为「强制结束前台应用」，用联合选择器保持定位稳定。
+    // Escalating end button: the first click sends SIGTERM and a second click within the window sends SIGKILL.
+    // Once armed the data-tip switches to the force-end label, so a combined selector keeps the locator stable.
     const endButton = '[data-tip="结束前台应用"], [data-tip="强制结束前台应用"]';
     const bannerEnd = banner.locator(endButton);
     await expect(bannerEnd).toBeVisible();
@@ -108,21 +108,21 @@ test.describe('命令块（OSC 133）', () => {
       ]);
     }).toPass({ timeout: 5000 });
 
-    // 退出 altScreen
+    // Leave altScreen
     await emitPtyOutput(page, '\x1b[?1049l\x1b]133;D;0\x07\x1b]133;A\x07');
 
     await expect(page.getByText('TUI')).not.toBeVisible({ timeout: 5000 });
-    // 恢复 block 列表后输入栏应重新出现
+    // The input bar reappears once the block list is back
     await expect(input).toBeVisible({ timeout: 5000 });
     await page.mouse.move(0, 0);
-    // 全屏 TUI 画面不进块历史（alt 内容只在主 xterm 实时呈现），
-    // 历史只留 teardown 后的 shell 噪音 —— 全屏应用不应污染命令历史
+    // Full-screen TUI frames stay out of block history (alt content only appears live in the main xterm),
+    // so history keeps only the shell noise after teardown - full-screen apps must not pollute command history
     await page.locator('[data-testid^="command-block-"]').last().hover();
     await expect(page.getByTestId('exit-code')).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('VIM BUFFER')).toHaveCount(0);
   });
 
-  test('与其它 DEC 私有模式合写的 alt 序列仍按全屏 TUI 处理', async ({ page }) => {
+  test('an alt sequence combined with other DEC private modes still counts as a full-screen TUI', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     const input = page.getByPlaceholder(/输入命令/);
@@ -153,12 +153,12 @@ test.describe('命令块（OSC 133）', () => {
     await expect(page.getByText('HTOP FULLSCREEN')).toHaveCount(0);
   });
 
-  test('altScreen 中滚轮降级为方向键发给 PTY', async ({ page }) => {
+  test('wheel scrolling in altScreen degrades to arrow keys sent to the PTY', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
-    // 进入 altScreen（应用未开鼠标上报：滚轮应降级为方向键）
+    // Enter altScreen (the app has not enabled mouse reporting, so the wheel must degrade to arrow keys)
     await emitPtyOutput(
       page,
       '\x1b]133;A\x07' +
@@ -170,8 +170,8 @@ test.describe('命令块（OSC 133）', () => {
     await expect(page.getByText('TUI')).toBeVisible({ timeout: 5000 });
     await expectAnyTermContains(page, 'TUI APP', 5000);
 
-    // 在可见主 xterm 的中央滚轮（DOM 里还有隐藏的块内 xterm，需 :visible 过滤；
-    // 顶部 29px 是 TUI banner 条，滚轮落在上面不会进 xterm，避开）
+    // Scroll in the middle of the visible main xterm (hidden block xterms are also in the DOM, so filter with :visible;
+    // the top 29px is the TUI banner, where the wheel never reaches the xterm, so avoid it)
     const box = await page.locator('.xterm:visible').boundingBox();
     expect(box).not.toBeNull();
     await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
@@ -191,46 +191,46 @@ test.describe('命令块（OSC 133）', () => {
     }).toPass({ timeout: 5000 });
   });
 
-  test('全局搜索 Cmd+F 打开居中弹窗并聚焦', async ({ page }) => {
+  test('global search opens a centered dialog on Cmd+F and focuses it', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
-    // TopDock 搜索触发器可见（不再是常驻输入框）
+    // The TopDock search trigger is visible instead of a permanent input
     const trigger = page.getByTestId('global-search-trigger');
     await expect(trigger).toBeVisible({ timeout: 3000 });
-    // Cmd+F 打开居中搜索窗并聚焦搜索栏
+    // Cmd+F opens the centered search window and focuses the search field
     await page.keyboard.press('Meta+f');
     const searchInput = page.getByPlaceholder(/搜索文件/);
     await expect(searchInput).toBeVisible({ timeout: 3000 });
     await expect(searchInput).toBeFocused();
-    // Escape 关闭弹窗
+    // Escape closes the dialog
     await page.keyboard.press('Escape');
     await expect(searchInput).not.toBeVisible();
   });
 
-  test('全局搜索筛选面板点击不崩溃', async ({ page }) => {
+  test('clicking the global search filter panel does not crash', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
     await page.keyboard.press('Meta+f');
     const searchInput = page.getByPlaceholder(/搜索文件/);
     await expect(searchInput).toBeVisible({ timeout: 3000 });
-    // 点击筛选按钮 → 打开筛选面板（此前这里条件 hook 导致崩溃）
+    // Click the filter button -> the filter panel opens (a conditional hook here used to crash)
     await page.getByTestId('search-filter-button').click();
     await expect(page.getByText('搜索范围')).toBeVisible({ timeout: 3000 });
-    // 切换一个源后不崩溃，搜索框仍可交互
+    // Toggling a source does not crash and the search field stays interactive
     await page.getByRole('menuitemcheckbox', { name: /历史命令/ }).click();
     await expect(searchInput).toBeVisible();
   });
 
-  test('底部命令输入栏可见', async ({ page }) => {
+  test('the bottom command input bar is visible', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     const cmdInput = page.getByPlaceholder(/输入命令/);
     await expect(cmdInput).toBeVisible({ timeout: 5000 });
   });
 
-  test('Cmd+P 打开命令面板', async ({ page }) => {
+  test('Cmd+P opens the command palette', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
@@ -240,22 +240,22 @@ test.describe('命令块（OSC 133）', () => {
     await expect(page.getByPlaceholder('搜索命令…')).not.toBeVisible();
   });
 
-  test('Cmd+W 打开命令面板不冲突（p 和 w 区分）', async ({ page }) => {
+  test('Cmd+W does not clash with the command palette (p and w are distinct)', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
-    // Cmd+P 打开面板
+    // Cmd+P opens the palette
     await page.keyboard.press('Meta+p');
     await expect(page.getByPlaceholder('搜索命令…')).toBeVisible({ timeout: 3000 });
     await page.keyboard.press('Escape');
-    // Cmd+W 不应打开面板
+    // Cmd+W must not open the palette
     await page.keyboard.press('Meta+w');
     await expect(page.getByPlaceholder('搜索命令…')).not.toBeVisible();
   });
 
   // Regression: estimating snapshot row height from font size made it several pixels
   // shorter than the measured canvas cell. Full-row TUI backgrounds then overlapped.
-  test('完成块快照的行高等于画布实测单元格高度', async ({ page }) => {
+  test('completed block snapshot line height equals the measured canvas cell height', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     const input = page.getByPlaceholder(/输入命令/);

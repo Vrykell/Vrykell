@@ -44,12 +44,12 @@ const D = (ec: number) => `\x1b]133;D;${ec}\x07`;
 const E = (cmd: string) => `\x1b]133;E;${btoa(cmd)}\x07`;
 const OSC7 = (p: string) => `\x1b]7;file://host${p}\x07`;
 
-// xterm write 是异步队列；finishBlock 用空写回调排空后才提取快照。
-// 轮询等待谓词成立（并发全量跑时固定延时不可靠）。
+// xterm writes queue asynchronously; finishBlock drains them with an empty write callback before taking the snapshot.
+// Poll until the predicate holds (fixed delays are unreliable in a full parallel run).
 async function waitFor(cond: () => boolean, timeoutMs = 2000): Promise<void> {
   const start = Date.now();
   while (!cond()) {
-    if (Date.now() - start > timeoutMs) throw new Error('waitFor 超时');
+    if (Date.now() - start > timeoutMs) throw new Error('waitFor timed out');
     await new Promise((r) => setTimeout(r, 5));
   }
 }
@@ -414,7 +414,7 @@ describe('SessionController', () => {
     ctrl.dispose();
   });
 
-  it('初始场景为 classic，数据进主 xterm', () => {
+  it('starts in the classic scene and writes data to the main xterm', () => {
     const { st, ctrl, feed } = wire();
     expect(ctrl.scene).toBe('classic');
     feed('no integration here\r\n');
@@ -422,25 +422,25 @@ describe('SessionController', () => {
     expect(ctrl.blocks.length).toBe(0);
   });
 
-  it('prompt-end 标记 133;B 保留在管线内，不写入主 xterm', () => {
+  it('keeps the prompt-end marker 133;B in the pipeline without writing it to the main xterm', () => {
     const { st, ctrl, feed } = wire();
     feed('\x1b]133;B\x07');
     expect(st.written).toBe('');
     expect(ctrl.blocks.length).toBe(0);
   });
 
-  it('首个 OSC 133;A 切到 blockList，prompt 段不进任何 grid', () => {
+  it('the first OSC 133;A switches to blockList and the prompt segment enters no grid', () => {
     const { st, ctrl, feed } = wire();
     feed(`${A}~/work$ `);
     expect(ctrl.scene).toBe('blockList');
     expect(st.scenes).toEqual(['blockList']);
     expect(ctrl.blocks.length).toBe(1);
     expect(ctrl.blocks[0]!.status).toBe('pending');
-    // prompt 文本不进主 xterm
+    // Prompt text never reaches the main xterm
     expect(st.written).toBe('');
   });
 
-  it('完整命令周期：A→E→C→输出→D', async () => {
+  it('full command cycle: A -> E -> C -> output -> D', async () => {
     const { st, ctrl, feed } = wire();
     feed(`${A}~/work$ ${E('ls')}${C}file1\r\nfile2\r\n${D(0)}${A}`);
     await waitFor(() => st.completed.length === 1);
@@ -451,14 +451,14 @@ describe('SessionController', () => {
     expect(done.exitCode).toBe(0);
     expect(done.outputText).toBe('file1\nfile2');
     expect(done.outputHtml).toContain('file1');
-    // D 后的 A 创建了新 pending block
+    // The A after D creates a new pending block
     expect(ctrl.blocks.length).toBe(2);
     expect(ctrl.blocks[1]!.status).toBe('pending');
   });
 
-  it('命令与输出在同一 chunk 也不串格（乱码回归）', async () => {
+  it('command and output in the same chunk do not bleed across cells (garbled-text regression)', async () => {
     const { ctrl, feed } = wire();
-    // C 和输出同 chunk：旧架构因异步 parser 会把输出路由进 header
+    // C and output share a chunk: the old architecture routed output into the header because of the asynchronous parser
     feed(`${A}p$ ${E('echo hi')}${C}hi\r\n${D(0)}`);
     await waitFor(() => ctrl.blocks[0]?.outputText === 'hi');
     const b = ctrl.blocks[0]!;
@@ -483,22 +483,22 @@ describe('SessionController', () => {
     expect(ctrl.blocks[0]!.outputHtml).not.toContain('PS&gt;');
   });
 
-  it('无 D 直接 A → 上个 block 标记 interrupted', () => {
+  it('A without D marks the previous block as interrupted', () => {
     const { ctrl, feed } = wire();
     feed(`${A}p$ ${E('sleep 99')}${C}`);
-    feed(A); // Ctrl+C 后新 prompt，无 D
+    feed(A); // New prompt after Ctrl+C, without D
     expect(ctrl.blocks[0]!.status).toBe('interrupted');
     expect(ctrl.blocks[1]!.status).toBe('pending');
   });
 
-  it('typeahead 回显丢弃，后台输出保留', async () => {
+  it('drops typeahead echoes while keeping background output', async () => {
     const { ctrl, feed } = wire();
-    // typeahead：A 后用户提前敲了 ls，回显与命令一致
+    // Typeahead: the user typed ls ahead of time after A, so the echo matches the command
     feed(`${A}p$ ls`);
     feed(`${E('ls')}${C}out\r\n${D(0)}`);
     await waitFor(() => ctrl.blocks[0]?.outputText === 'out');
     expect(ctrl.blocks[0]!.outputText).toBe('out');
-    // 后台输出：A 后 job 通知（无回显匹配）
+    // Background output: a job notification after A with no matching echo
     feed(`p$ [1]  done  sleep 1\r\n`);
     feed(`${E('pwd')}${C}/tmp\r\n${D(0)}`);
     await waitFor(() => ctrl.blocks[1]?.outputText?.includes('/tmp'));
@@ -506,7 +506,7 @@ describe('SessionController', () => {
     expect(ctrl.blocks[1]!.outputText).toContain('/tmp');
   });
 
-  it('OSC 7 更新 cwd 并回调', () => {
+  it('OSC 7 updates the cwd and notifies the sink', () => {
     const { st, ctrl, feed } = wire();
     feed(`${A}${OSC7('/Users/w/work')}`);
     expect(st.cwds).toEqual(['/Users/w/work']);
@@ -520,22 +520,22 @@ describe('SessionController', () => {
     expect(ctrl.blocks[0]!.cwd).toBe('C:/Users/My Project');
   });
 
-  it('OSC 7 在 133;A 之前到达（真实 RC 顺序）：cwd 播种到新 pending block', () => {
+  it('OSC 7 arriving before 133;A (the real RC order) seeds the cwd of the new pending block', () => {
     const { st, ctrl, feed } = wire();
     feed(`${OSC7('/Users/w/work')}${A}~/work$ `);
     expect(st.cwds).toEqual(['/Users/w/work']);
     expect(ctrl.blocks[0]!.cwd).toBe('/Users/w/work');
   });
 
-  it('命令完成后的 OSC 7 不改写旧 block 的 cwd，只播种下一个 block', async () => {
+  it('OSC 7 after command completion does not rewrite the old block cwd and only seeds the next block', async () => {
     const { st, ctrl, feed } = wire();
     feed(`${OSC7('/home/a')}${A}a$ ${E('cd /home/b')}${C}${OSC7('/home/b')}${D(0)}${A}b$ `);
     await waitFor(() => st.completed.length === 1);
-    expect(ctrl.blocks[0]!.cwd).toBe('/home/a');   // 命令执行时的 cwd
-    expect(ctrl.blocks[1]!.cwd).toBe('/home/b');   // 新 pending（当前位置行）
+    expect(ctrl.blocks[0]!.cwd).toBe('/home/a');   // cwd while the command ran
+    expect(ctrl.blocks[1]!.cwd).toBe('/home/b');   // New pending block (current location row)
   });
 
-  it('clear() 清空后，后续事件不回填旧 block', async () => {
+  it('after clear(), later events do not backfill old blocks', async () => {
     const { st, ctrl, feed } = wire();
     feed(`${A}p$ ${E('ls')}${C}x\r\n${D(0)}${A}p$ `);
     await waitFor(() => st.completed.length === 1);
@@ -544,18 +544,18 @@ describe('SessionController', () => {
     expect(ctrl.blocks.length).toBe(0);
     feed(`${A}p$ ${E('pwd')}${C}y\r\n${D(0)}${A}p$ `);
     await waitFor(() => st.completed.length === 2);
-    // 只有新命令周期产生的 block
+    // Only blocks from the new command cycle exist
     expect(ctrl.blocks.length).toBe(2);
     expect(ctrl.blocks[0]!.command).toBe('pwd');
   });
 
-  it('OSC 133;G 设置 git 分支', () => {
+  it('OSC 133;G sets the git branch', () => {
     const { ctrl, feed } = wire();
     feed(`${A}\x1b]133;G;${btoa('master')}\x07`);
     expect(ctrl.blocks[0]!.gitBranch).toBe('master');
   });
 
-  it('altScreen：数据转主 xterm（含 alt raw 与 OSC raw），退出恢复', async () => {
+  it('altScreen: data goes to the main xterm (including alt raw and OSC raw) and exiting restores the blocks', async () => {
     const { st, ctrl, feed } = wire();
     feed(`${A}p$ ${E('vim')}${C}`);
     feed('\x1b[?1049h');
@@ -565,24 +565,24 @@ describe('SessionController', () => {
     expect(st.written).toContain('VIM CONTENT');
     feed('\x1b[?1049l');
     expect(ctrl.scene).toBe('blockList');
-    // alt 期间内容不进 block 输出
+    // Content from the alt screen never enters block output
     feed(`done\r\n${D(0)}`);
     await waitFor(() => ctrl.blocks[0]?.outputText === 'done');
     expect(ctrl.blocks[0]!.outputText).toBe('done');
   });
 
-  it('TUI 退出 alt：全屏画面不进块历史（只留 teardown 后的 shell 噪音）', async () => {
+  it('leaving the TUI alt screen keeps full-screen frames out of block history (only shell noise after teardown remains)', async () => {
     const { ctrl, feed } = wire();
     feed(`${A}p$ ${E('vi')}${C}`);
     feed('\x1b[?1049h');
-    feed('VI FULLSCREEN'); // alt 期间只进主 xterm
-    feed('\x1b[?1049l');   // 全屏画面不回填进块
+    feed('VI FULLSCREEN'); // During the alt screen it only reaches the main xterm
+    feed('\x1b[?1049l');   // The full-screen frame is not backfilled into the block
     feed(`zsh: terminated  vi\r\n${D(143)}`);
     await waitFor(() => !!ctrl.blocks[0]?.outputText.includes('zsh: terminated'));
     expect(ctrl.blocks[0]!.outputText).not.toContain('VI FULLSCREEN');
   });
 
-  it('合并其它 DEC 私有模式的 alt 序列同样不进块历史', async () => {
+  it('an alt sequence combined with other DEC private modes also stays out of block history', async () => {
     const { st, ctrl, feed } = wire();
     feed(`${A}p$ ${E('htop')}${C}`);
     feed('\x1b[?1049;2004h');
@@ -598,33 +598,33 @@ describe('SessionController', () => {
     expect(ctrl.blocks[0]!.outputText).not.toContain('HTOP FULLSCREEN');
   });
 
-  it('classic 模式下 OSC raw 转发主 xterm（OSC 8/52 不失效）', () => {
+  it('classic mode forwards raw OSC to the main xterm (OSC 8/52 keep working)', () => {
     const { st, feed } = wire();
     feed('\x1b]8;;https://a.com\x07link\x1b]8;;\x07');
     expect(st.written).toContain('\x1b]8;;https://a.com\x07');
     expect(st.written).toContain('link');
   });
 
-  it('长运行标记：executing 超 2 秒', () => {
+  it('long-running flag: executing for more than 2 seconds', () => {
     vi.useFakeTimers();
     try {
       const { ctrl, feed } = wire();
       feed(`${A}p$ ${E('npm i')}${C}`);
       vi.advanceTimersByTime(2100);
-      feed('x'); // 任意输出触发检查
+      feed('x'); // Any output triggers the check
       expect(ctrl.blocks[0]!.wasLongRunning).toBe(true);
     } finally {
       vi.useRealTimers();
     }
   });
 
-  it('dispose 在 finishBlock 排空期间不应再触发 sink 回调', async () => {
+  it('dispose must not trigger sink callbacks while finishBlock drains', async () => {
     const { st, ctrl, feed } = wire();
-    feed(`${A}p$ ${E('ls')}${C}out\r\n${D(0)}`); // 不 trailing A
+    feed(`${A}p$ ${E('ls')}${C}out\r\n${D(0)}`); // No trailing A
     const blocksBefore = st.blocksChanged;
     ctrl.dispose();
-    // 等 finishBlock 的异步 callback 执行窗口过去；若 dispose 未抑制回调，
-    // completed / blocksChanged 会变化，waitFor 将超时。
+    // Let finishBlock's asynchronous callback window pass; if dispose failed to suppress the callback,
+    // completed / blocksChanged would change and waitFor would time out.
     let stableTicks = 0;
     let lastBlocks = blocksBefore;
     await waitFor(() => {
@@ -637,7 +637,7 @@ describe('SessionController', () => {
     expect(st.blocksChanged).toBe(blocksBefore);
   });
 
-  it('单次大写入溢出应统计 linesTruncated', async () => {
+  it('a single oversized write reports linesTruncated', async () => {
     const { st, ctrl, feed } = wire();
     const output = Array.from({ length: 6000 }, (_, i) => `line${i}`).join('\r\n') + '\r\n';
     feed(`${A}p$ ${E('cat')}${C}${output}${D(0)}`);
@@ -661,7 +661,7 @@ describe('SessionController', () => {
     expect(ctrl.blocks[0]!.outputText).toContain(lines[99]);
   });
 
-  it('finishBlock 触发 enforceBlockCap，旧 block 输出被丢弃', async () => {
+  it('finishBlock triggers enforceBlockCap and drops old block output', async () => {
     const { st, ctrl, feed } = wire();
     for (let i = 0; i < 201; i++) {
       feed(`${A}p$ ${E(`cmd${i}`)}${C}x\r\n${D(0)}`);

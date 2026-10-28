@@ -18,13 +18,13 @@ describe('workspace store', () => {
   beforeEach(() => {
     useUiStore.setState({ settingsOpen: false });
     useWorkspaceStore.setState(initial, true);
-    // 模拟 App 启动：无恢复会话时创建默认终端（store 本身不再内置初始标签）
+    // Simulate app startup: create the default terminal when no session is restored (the store no longer ships an initial tab)
     useWorkspaceStore.getState().addTab({});
     invokeMock.mockReset();
     invokeMock.mockImplementation(() => Promise.reject(new Error('no backend')));
   });
 
-  it('初始无标签，由启动逻辑创建默认终端', () => {
+  it('starts with no tabs; startup logic creates the default terminal', () => {
     useWorkspaceStore.setState(initial, true);
     const empty = useWorkspaceStore.getState();
     expect(empty.tabs).toHaveLength(0);
@@ -34,7 +34,7 @@ describe('workspace store', () => {
     expect(s.activeId).toBe(s.tabs[0]!.id);
   });
 
-  it('addTab 新建并激活', () => {
+  it('addTab creates and activates a tab', () => {
     useWorkspaceStore.getState().addTab();
     const s = useWorkspaceStore.getState();
     expect(s.tabs).toHaveLength(2);
@@ -66,7 +66,7 @@ describe('workspace store', () => {
     expect(useWorkspaceStore.getState().tabs).toHaveLength(1);
   });
 
-  it('closeTab 关闭活跃标签后激活相邻标签', () => {
+  it('closeTab activates the neighbouring tab after closing the active one', () => {
     const s0 = useWorkspaceStore.getState();
     s0.addTab();
     s0.addTab();
@@ -109,7 +109,7 @@ describe('workspace store', () => {
     useWorkspaceNavigation.getState().selectArea('terminal');
   });
 
-  it('closeTab 同时清理每终端输入草稿', () => {
+  it('closeTab also clears per-terminal input drafts', () => {
     const ws = useWorkspaceStore.getState();
     const tab = ws.tabs.find(isSessionTab)!;
     const paneId = firstLeaf(tab.layout).id;
@@ -131,14 +131,14 @@ describe('workspace store', () => {
     expect(useUiStore.getState().settingsOpen).toBe(true);
   });
 
-  it('addTab 支持指定 shell 类型', () => {
+  it('addTab accepts a shell type', () => {
     useWorkspaceStore.getState().addTab({ shellType: 'zsh' });
     const t = useWorkspaceStore.getState().tabs[1]!;
     expect(t.kind).toBe('session');
     expect(firstTerminalOf(t)!.shellType).toBe('zsh');
   });
 
-  it('addTab 支持 ssh 连接元数据', () => {
+  it('addTab accepts SSH connection metadata', () => {
     useWorkspaceStore.getState().addTab({
       kind: 'ssh',
       ssh: { name: '生产服务器', host: 'prod.example.com', user: 'root', port: 22 },
@@ -153,14 +153,14 @@ describe('workspace store', () => {
     expect(term.ssh?.port).toBe(22);
   });
 
-  it('openHistoryTab 新建历史标签页且不重复创建', () => {
+  it('openHistoryTab creates a history tab and never duplicates it', () => {
     const ws = useWorkspaceStore.getState();
     ws.openHistoryTab();
     let s = useWorkspaceStore.getState();
     expect(s.tabs).toHaveLength(2);
     expect(s.tabs[1]!.kind).toBe('history');
     expect(s.activeId).toBe(s.tabs[1]!.id);
-    // 再次打开复用已有历史标签页
+    // Opening it again reuses the existing history tab
     s.openHistoryTab();
     s = useWorkspaceStore.getState();
     expect(s.tabs).toHaveLength(2);
@@ -233,14 +233,14 @@ describe('workspace store', () => {
     expect(useWorkspaceStore.getState().activeId).toBe(settings);
   });
 
-  it('addTab 返回新标签 id，默认标题为终端类型名', () => {
+  it('addTab returns the new tab id and defaults the title to the terminal type name', () => {
     const id = useWorkspaceStore.getState().addTab({ shellType: 'bash' });
     const s = useWorkspaceStore.getState();
     expect(id).toBe(s.tabs[1]!.id);
     expect(s.tabs[1]!.title).toBe('Bash');
   });
 
-  it('titleFromCommand 用首条命令命名且不重复覆盖', () => {
+  it('titleFromCommand names the tab from the first command and never overwrites it', () => {
     const id = useWorkspaceStore.getState().addTab();
     useWorkspaceStore.getState().titleFromCommand(id, 'npm run dev');
     expect(useWorkspaceStore.getState().tabs.find((t) => t.id === id)!.title).toBe('npm run dev');
@@ -248,7 +248,7 @@ describe('workspace store', () => {
     expect(useWorkspaceStore.getState().tabs.find((t) => t.id === id)!.title).toBe('npm run dev');
   });
 
-  it('titleFromMessage 只覆盖默认标题', () => {
+  it('titleFromMessage only overrides the default title', () => {
     const id = useWorkspaceStore.getState().tabs[0]!.id;
     useWorkspaceStore.getState().titleFromMessage(id, '帮我写一个快速排序');
     expect(useWorkspaceStore.getState().tabs[0]!.title).toBe('帮我写一个快速排序');
@@ -256,7 +256,7 @@ describe('workspace store', () => {
     expect(useWorkspaceStore.getState().tabs[0]!.title).toBe('帮我写一个快速排序');
   });
 
-  it('setTerminalCwd / dropTerminalCwd 管理终端的 cwd', () => {
+  it('setTerminalCwd / dropTerminalCwd manage the terminal cwd', () => {
     const tabId = useWorkspaceStore.getState().tabs[0]!.id;
     const paneId = `${tabId}#0`;
     useWorkspaceStore.getState().setTerminalCwd(paneId, '/a');
@@ -267,7 +267,7 @@ describe('workspace store', () => {
     expect(useWorkspaceStore.getState().terminalCwds[paneId]).toBeUndefined();
   });
 
-  it('getFocusedCwd 读聚焦终端的 cwd（回退到 spec.cwd）', () => {
+  it('getFocusedCwd reads the focused terminal cwd (falling back to spec.cwd)', () => {
     const tabId = useWorkspaceStore.getState().tabs[0]!.id;
     useWorkspaceStore.getState().setTerminalCwd(`${tabId}#0`, '/main');
     useTerminalStore.setState({ focusedPaneId: `${tabId}#0`, sessions: { [`${tabId}#0`]: 's1' } });
@@ -291,7 +291,7 @@ describe('workspace store', () => {
   });
 });
 
-describe('workspace store 扩展', () => {
+describe('workspace store extensions', () => {
   beforeEach(() => {
     useWorkspaceStore.setState(initial, true);
     useWorkspaceStore.getState().addTab({});
@@ -309,7 +309,7 @@ describe('workspace store 扩展', () => {
     expect(useUiStore.getState().settingsOpen).toBe(true);
   });
 
-  it('activate 切换活跃并把聚焦回落到该窗口第一个终端', () => {
+  it('activate switches the active tab and moves focus to its first terminal', () => {
     const ws = useWorkspaceStore.getState();
     const a = ws.addTab({ title: 'a' });
     ws.activate(a);
@@ -317,7 +317,7 @@ describe('workspace store 扩展', () => {
     expect(useTerminalStore.getState().focusedPaneId).toBe(`${a}#0`);
   });
 
-  it('closeTab 非活跃标签：activeId 不变；聚焦属于被关标签时回落', () => {
+  it('closeTab on an inactive tab keeps activeId and moves focus away from the closed tab', () => {
     const ws = useWorkspaceStore.getState();
     const initialTab = ws.tabs[0]!.id;
     const b = ws.addTab({ title: 'b' });
@@ -331,27 +331,27 @@ describe('workspace store 扩展', () => {
     expect(s.lastClosed?.id).toBe(initialTab);
   });
 
-  it('undoCloseTab：恢复会话标签 / 历史标签重建 / 无可撤销 no-op', async () => {
+  it('undoCloseTab: restores session tabs, rebuilds history tabs and is a no-op when nothing can be undone', async () => {
     invokeMock.mockImplementation(async command => ['get_session_blocks', 'list_chat_messages'].includes(command) ? [] : undefined);
     const ws = useWorkspaceStore.getState();
     const only = ws.tabs[0]!.id;
     ws.closeTab(only);
     expect(useWorkspaceStore.getState().tabs.some((t) => t.id === only)).toBe(false);
     ws.undoCloseTab();
-    // restore 是异步的（undoCloseTab 不 await），等微任务+定时器排空
+    // Restoring is asynchronous (undoCloseTab does not await), so let microtasks and timers drain
     await new Promise((r) => setTimeout(r, 20));
     // Missing legacy payloads use the default layout after the restore is persisted.
     const s = useWorkspaceStore.getState();
     expect(s.tabs.some((t) => t.id === only)).toBe(true);
     expect(s.lastClosed).toBeNull();
-    // 历史标签是系统页：关闭后不进入可恢复历史
+    // History tabs are system pages, so closing one does not enter the restorable history
     ws.openHistoryTab();
     const histId = useWorkspaceStore.getState().tabs.find((t) => t.kind === 'history')!.id;
     ws.closeTab(histId);
     expect(useWorkspaceStore.getState().lastClosed).toBeNull();
     ws.undoCloseTab();
     expect(useWorkspaceStore.getState().tabs.some((t) => t.kind === 'history')).toBe(false);
-    // 无可撤销
+    // Nothing to undo
     useWorkspaceStore.setState({ lastClosed: null });
     const before = useWorkspaceStore.getState().tabs.length;
     ws.undoCloseTab();
@@ -368,7 +368,7 @@ describe('workspace store 扩展', () => {
     expect(useWorkspaceStore.getState().tabs.some(tab => tab.id === id)).toBe(false);
   });
 
-  it('titleFromMessage：截断 14 字；已定名/视图标签不覆盖', () => {
+  it('titleFromMessage: truncates to 14 characters and skips named or view tabs', () => {
     const ws = useWorkspaceStore.getState();
     const a = ws.addTab();
     ws.titleFromMessage(a, 'x'.repeat(20));
@@ -381,7 +381,7 @@ describe('workspace store 扩展', () => {
     expect(useWorkspaceStore.getState().tabs.find((t) => t.id === histId)!.title).toBe('会话历史');
   });
 
-  it('titleFromCommand：空命令 no-op；截断 24 字', () => {
+  it('titleFromCommand: ignores an empty command and truncates to 24 characters', () => {
     const ws = useWorkspaceStore.getState();
     const a = ws.addTab();
     ws.titleFromCommand(a, '   ');
@@ -390,7 +390,7 @@ describe('workspace store 扩展', () => {
     expect(useWorkspaceStore.getState().tabs.find((t) => t.id === a)!.title).toBe('y'.repeat(24) + '…');
   });
 
-  it('autoTitle：覆盖自动标题；不覆盖手动命名；空标题 no-op', () => {
+  it('autoTitle: overrides automatic titles but not manual ones and ignores an empty title', () => {
     const ws = useWorkspaceStore.getState();
     const a = ws.addTab();
     ws.autoTitle(a, '智能标题');
@@ -408,7 +408,7 @@ describe('workspace store 扩展', () => {
     expect(useWorkspaceStore.getState().tabs.find((t) => t.id === histId)!.title).toBe('会话历史');
   });
 
-  it('renameTab：空标题回退默认；置为手动来源', () => {
+  it('renameTab: an empty title falls back to the default and sets the manual source', () => {
     const ws = useWorkspaceStore.getState();
     const a = ws.addTab({ title: 'a' });
     ws.autoTitle(a, '自动');
@@ -432,11 +432,11 @@ describe('workspace store 扩展', () => {
     expect(serializeSession(hist)).toBeNull();
     expect(nextTerminalId(a, isSessionTab(tab) ? tab.layout : leaf({ id: `${a}#0`, kind: 'local' }))).toBe(`${a}#1`);
     expect(nextTerminalId('fresh', leaf({ id: 'fresh#0', kind: 'local' }))).toBe('fresh#1');
-    // 布局里没有 #N 结尾的终端 id 时从 0 开始
+    // Without terminal ids ending in #N in the layout, numbering starts at 0
     expect(nextTerminalId('x', leaf({ id: 'plain', kind: 'local' }))).toBe('x#0');
   });
 
-  it('setWindowLayout 更新并持久化（去抖）', () => {
+  it('setWindowLayout updates and persists the layout (debounced)', () => {
     const ws = useWorkspaceStore.getState();
     const a = ws.addTab({ title: 'a' });
     const layout = leaf({ id: `${a}#1`, kind: 'local', shellType: 'bash' });
@@ -445,7 +445,7 @@ describe('workspace store 扩展', () => {
     expect(isSessionTab(ta) ? ta.layout : null).toBe(layout);
   });
 
-  it('splitFocusedDirect：分裂聚焦终端并聚焦新 pane；超 4 个提示', () => {
+  it('splitFocusedDirect: splits the focused terminal and focuses the new pane, reporting above 4', () => {
     const ws = useWorkspaceStore.getState();
     const a = ws.addTab({ title: 'a' });
     ws.activate(a);
@@ -454,7 +454,7 @@ describe('workspace store 扩展', () => {
     let tab = useWorkspaceStore.getState().tabs.find((t) => t.id === a)!;
     expect(terminalsOf(tab)).toHaveLength(2);
     expect(useTerminalStore.getState().focusedPaneId).toBe(`${a}#1`);
-    // 分裂到 4 个后不再分裂
+    // No further splits are allowed after reaching 4 panes
     ws.splitFocusedDirect('row');
     ws.splitFocusedDirect('row');
     tab = useWorkspaceStore.getState().tabs.find((t) => t.id === a)!;
@@ -463,7 +463,7 @@ describe('workspace store 扩展', () => {
     expect(terminalsOf(useWorkspaceStore.getState().tabs.find((t) => t.id === a)!)).toHaveLength(4);
   });
 
-  it('closeTerminal：移除终端并聚焦剩余；最后一个终端关闭窗口；未知终端 no-op', () => {
+  it('closeTerminal: removes a terminal and focuses the rest, closes the tab when the last terminal closes and ignores unknown terminals', () => {
     const ws = useWorkspaceStore.getState();
     const a = ws.addTab({ title: 'a' });
     ws.activate(a);
@@ -479,7 +479,7 @@ describe('workspace store 扩展', () => {
     expect(useWorkspaceStore.getState().tabs.some((t) => t.id === a)).toBe(false);
   });
 
-  it('closeFocusedTerminal 关闭聚焦终端', () => {
+  it('closeFocusedTerminal closes the focused terminal', () => {
     const ws = useWorkspaceStore.getState();
     const a = ws.addTab({ title: 'a' });
     ws.activate(a);
@@ -490,7 +490,7 @@ describe('workspace store 扩展', () => {
     expect(terminalsOf(useWorkspaceStore.getState().tabs.find((t) => t.id === a)!)).toHaveLength(before - 1);
   });
 
-  it('getFocusedCwd：回退 spec.cwd；非 session 活跃标签返回 undefined', () => {
+  it('getFocusedCwd: falls back to spec.cwd and returns undefined for a non-session active tab', () => {
     const ws = useWorkspaceStore.getState();
     const a = ws.addTab({ title: 'a', cwd: '/spec' });
     ws.activate(a);
@@ -504,13 +504,13 @@ describe('workspace store 扩展', () => {
     expect(getFocusedCwd()).toBeUndefined();
   });
 
-  it('dropTerminalCwd：不存在的 key 安全', () => {
+  it('dropTerminalCwd: an unknown key is safe', () => {
     const ws = useWorkspaceStore.getState();
     ws.dropTerminalCwd('nope');
     expect(useWorkspaceStore.getState().terminalCwds).toEqual({});
   });
 
-  it('loadGroups：只加载未归档且有会话的分组；失败保持', async () => {
+  it('loadGroups: loads only unarchived groups with sessions and keeps the current groups on failure', async () => {
     invokeMock.mockResolvedValueOnce([
       { id: 'g1', title: '一', collapsed: false, archived: false, session_count: 2 },
       { id: 'g2', title: '二', collapsed: true, archived: true, session_count: 2 },

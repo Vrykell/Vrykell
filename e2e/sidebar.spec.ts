@@ -4,40 +4,40 @@ import { setupTauriMock, fsOps, revealedPaths, openedPaths, ensureTabsOpen } fro
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
-  // 打开文件面板
+  // Open the files panel
   await page.locator('[data-dock-btn="files"]').click();
   await expect(page.getByText('Documents')).toBeVisible({ timeout: 3000 });
 });
 
-test.describe('文件面板', () => {
-  test('单击文件仅选中且面板保持打开', async ({ page }) => {
+test.describe('File panel', () => {
+  test('a single click selects a file and keeps the panel open', async ({ page }) => {
     const file = page.getByTestId('local-file-tree').locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]');
-    // 单击 = 选中（不打开），文件面板保持打开
+    // A click selects without opening, and the files panel stays open
     await file.click();
     await expect(file).toHaveAttribute('data-selected', 'true');
     await expect(page.getByText('Documents')).toBeVisible();
   });
 
-  test('单击选中目录，双击进入；展开由箭头按钮控制', async ({ page }) => {
+  test('a click selects a folder, a double click enters it, and the arrow button controls expansion', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     const documents = tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]');
-    // 单击 = 选中，不展开
+    // A click selects without expanding
     await documents.click();
     await expect(documents).toHaveAttribute('data-selected', 'true');
     await expect(tree.getByText('Documents')).toHaveCount(1);
-    // 展开交给箭头按钮（mock 对每个路径返回相同子项，展开后 Documents 出现两个）
+    // The arrow button expands it (the mock returns the same children for every path, so Documents appears twice after expanding)
     await documents.locator('[data-testid="file-row-expander"]').click();
     await expect(tree.getByText('Documents')).toHaveCount(2);
-    // 双击 = 进入文件夹，回退按钮变为可用
+    // A double click enters the folder and enables the back button
     await documents.first().dblclick();
     await expect(page.getByTestId('local-back-btn')).toBeEnabled();
   });
 
-  test('上下键切换选中行，Enter 进入目录', async ({ page }) => {
+  test('arrow keys move the selection and Enter enters the folder', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     const documents = tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]');
     const downloads = tree.locator('[data-testid="file-row"][data-path="/home/e2e/Downloads"]');
-    // 点击行让文件列表获得焦点并选中 Documents
+    // Clicking a row focuses the file list and selects Documents
     await documents.click();
     await expect(documents).toHaveAttribute('data-selected', 'true');
     await page.keyboard.press('ArrowDown');
@@ -45,18 +45,18 @@ test.describe('文件面板', () => {
     await expect(documents).not.toHaveAttribute('data-selected', 'true');
     await page.keyboard.press('ArrowUp');
     await expect(documents).toHaveAttribute('data-selected', 'true');
-    // Enter = 进入选中目录，回退按钮变为可用
+    // Enter enters the selected folder and enables the back button
     await page.keyboard.press('Enter');
     await expect(page.getByTestId('local-back-btn')).toBeEnabled();
   });
 
-  test('面包屑可编辑：点击路径全选，回车跳转，Esc 或失焦取消', async ({ page }) => {
+  test('editable breadcrumb: clicking selects the path, Enter navigates, and Escape or blur cancels', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     const bar = page.getByTestId('crumb-bar');
     const input = page.getByTestId('path-input');
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
 
-    // 点击当前路径进入编辑态：显示完整路径并且文本全选
+    // Clicking the current path enters edit mode with the full path shown and selected
     await bar.locator('[data-tip="单击编辑路径，回车跳转"]').click();
     await expect(input).toBeVisible();
     await expect(input).toHaveValue('/home/e2e/project');
@@ -65,14 +65,14 @@ test.describe('文件面板', () => {
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
     await expect(input).toHaveCount(0);
 
-    // Esc 取消编辑，路径不变
+    // Escape cancels editing and keeps the path
     await bar.locator('[data-tip="单击编辑路径，回车跳转"]').click();
     await expect(input).toHaveValue('/home/e2e/Documents');
     await input.press('Escape');
     await expect(input).toHaveCount(0);
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
 
-    // 失焦取消编辑，路径不变
+    // Blur cancels editing and keeps the path
     await bar.locator('[data-tip="单击编辑路径，回车跳转"]').click();
     await input.fill('/home/e2e/Downloads');
     await tree.getByText('notes.txt').click();
@@ -99,7 +99,7 @@ test.describe('文件面板', () => {
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
   });
 
-  test('右键属性显示文件基本信息', async ({ page }) => {
+  test('the context menu properties dialog shows basic file information', async ({ page }) => {
     await page.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]').click({ button: 'right' });
     await page.getByRole('button', { name: '属性', exact: true }).click();
 
@@ -122,23 +122,23 @@ test.describe('文件面板', () => {
     await expect(dialog).toHaveCount(0);
   });
 
-  test('更多菜单：只提供本地可用操作，可从当前文件夹新建标签页', async ({ page }) => {
+  test('more menu: offers only locally available actions and can open a new tab from the current folder', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
 
-    // 本地没有上传能力，更多菜单不出现上传项
+    // Local panels cannot upload, so the more menu has no upload entry
     await page.getByTestId('local-more-btn').click();
     await expect(page.getByRole('button', { name: '上传文件' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: '下载管理' })).toBeVisible();
-    // 没有进行过文件操作时不出现回退项
+    // No undo entries appear before any file operation
     await expect(page.getByRole('button', { name: /^回退/ })).toHaveCount(0);
 
-    // 从当前文件夹新建标签页（标题取目录名）
+    // Open a new tab from the current folder (the title comes from the directory name)
     await page.getByRole('button', { name: '从当前文件夹新建标签页' }).click();
     await ensureTabsOpen(page);
     await expect(page.locator('[data-testid^="tab-row-"]', { hasText: 'project' })).toHaveCount(1);
 
-    // 切回文件面板；盘符视图没有「当前文件夹」，菜单里不出现不可用的新建标签页
+    // Switch back to the files panel; the drive view has no current folder, so the menu hides the unavailable new-tab action
     if (!await tree.isVisible()) await page.locator('[data-dock-btn="files"]').click();
     await expect(tree).toBeVisible();
     await page.getByText('此电脑').click();
@@ -148,12 +148,12 @@ test.describe('文件面板', () => {
     await expect(page.getByRole('button', { name: '下载管理' })).toBeVisible();
   });
 
-  test('下载管理往返后文件树停留在原目录（会话内记忆），而不是回到终端 cwd', async ({ page }) => {
+  test('the file tree stays in the original directory (remembered within the session) after a downloads round trip instead of returning to the terminal cwd', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     await tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]').dblclick();
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
 
-    // 打开下载管理再返回：文件树组件重新挂载，恢复记忆的目录
+    // Open downloads and go back: the file tree remounts and restores the remembered directory
     await page.getByTestId('local-more-btn').click();
     await page.getByRole('button', { name: '下载管理' }).click();
     await expect(page.getByTestId('downloads-back')).toBeVisible();
@@ -161,21 +161,21 @@ test.describe('文件面板', () => {
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
   });
 
-  test('更多菜单：切换到当前终端文件目录把面板重新定位回终端 cwd', async ({ page }) => {
+  test('more menu: switching to the terminal directory moves the panel back to the terminal cwd', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
 
-    // 进入子目录：面板与终端解耦（不再自动跟随）
+    // Enter a subdirectory: the panel decouples from the terminal and no longer follows it automatically
     await tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]').dblclick();
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
 
-    // 更多 → 同步到终端目录：面板回到终端的 cwd
+    // More -> sync to the terminal directory: the panel returns to the terminal cwd
     await page.getByTestId('local-more-btn').click();
     await page.getByRole('button', { name: /^切换到当前终端文件目录/ }).click();
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
   });
 
-  test('Ctrl 加选多行并在右键菜单批量操作', async ({ page }) => {
+  test('Ctrl extends the selection to several rows and the context menu acts on all of them', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     const notes = tree.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]');
     const documents = tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]');
@@ -186,18 +186,18 @@ test.describe('文件面板', () => {
     await expect(documents).toHaveAttribute('data-selected', 'true');
     await expect(notes).toHaveAttribute('data-selected', 'true');
 
-    // 右键命中选中集：菜单作用于整组，并隐藏只对单行有意义的操作
+    // Right-clicking inside the selection targets the whole group and hides single-row actions
     await notes.click({ button: 'right' });
     await expect(page.getByRole('button', { name: '复制 2 项' })).toBeVisible();
     await expect(page.getByRole('button', { name: '删除 2 项' })).toBeVisible();
     await expect(page.getByRole('button', { name: '重命名' })).toHaveCount(0);
   });
 
-  test('粘贴目标：右键文件夹进该文件夹，右键文件进其同级目录，Ctrl+V 进当前目录', async ({ page }) => {
+  test('paste target: right-clicking a folder pastes into it, right-clicking a file pastes beside it, and Ctrl+V pastes into the current directory', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     const notes = tree.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]');
 
-    // 复制 → 右键文件夹：粘贴进该文件夹
+    // Copy -> right-click a folder: paste into that folder
     await notes.click({ button: 'right' });
     await page.getByRole('button', { name: '复制', exact: true }).click();
     await tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]').click({ button: 'right' });
@@ -205,13 +205,13 @@ test.describe('文件面板', () => {
     await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'copy'))
       .toContainEqual({ op: 'copy', path: '/home/e2e/notes.txt', destDir: '/home/e2e/Documents' });
 
-    // 右键文件：粘贴到该文件的同级目录（不是当前目录）
+    // Right-click a file: paste into that file's directory (not the current one)
     await notes.click({ button: 'right' });
     await page.getByRole('button', { name: '粘贴', exact: true }).click();
     await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'copy'))
       .toContainEqual({ op: 'copy', path: '/home/e2e/notes.txt', destDir: '/home/e2e' });
 
-    // 空白处右键：粘贴到当前目录
+    // Right-click blank space: paste into the current directory
     // The right-side feedback occupies the bottom of this panel until it disappears.
     await page.mouse.move(0, 0);
     await expect(page.getByRole('status').filter({ hasText: /已复制/ })).toHaveCount(0);
@@ -220,19 +220,19 @@ test.describe('文件面板', () => {
     await expect(page.getByRole('button', { name: '粘贴', exact: true })).toBeVisible();
     await page.keyboard.press('Escape');
 
-    // Ctrl+V：粘贴到当前目录
+    // Ctrl+V: paste into the current directory
     await notes.click();
     await page.keyboard.press('ControlOrMeta+v');
     await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'copy'))
       .toContainEqual({ op: 'copy', path: '/home/e2e/notes.txt', destDir: '/home/e2e/project' });
   });
 
-  test('删除后可连续回退：历史栈支持多次回退', async ({ page }) => {
+  test('consecutive deletes can be undone: the history stack supports multiple undo steps', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     const notes = tree.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]');
     const documents = tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]');
 
-    // 连续删除两次：历史栈保留两步
+    // Delete twice in a row: the history stack keeps both steps
     await notes.click({ button: 'right' });
     await page.getByRole('button', { name: '删除', exact: true }).click();
     await page.locator('[data-testid="confirm-ok"]').click();
@@ -244,7 +244,7 @@ test.describe('文件面板', () => {
     await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'delete'))
       .toContainEqual({ op: 'delete', path: '/home/e2e/Documents' });
 
-    // 更多菜单显示剩余步数，连续回退两次把两步都还原
+    // The more menu shows the remaining steps; undoing twice restores both
     await page.getByTestId('local-more-btn').click();
     await page.getByRole('button', { name: /^回退删除/ }).click();
     await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'restore'))
@@ -253,12 +253,12 @@ test.describe('文件面板', () => {
     await page.getByRole('button', { name: /^回退删除/ }).click();
     await expect.poll(async () => (await fsOps(page)).filter((op) => op.op === 'restore'))
       .toContainEqual({ op: 'restore', path: '/home/e2e/notes.txt' });
-    // 栈清空后不再显示回退项
+    // No undo entries remain once the stack is empty
     await page.getByTestId('local-more-btn').click();
     await expect(page.getByRole('button', { name: /^回退/ })).toHaveCount(0);
   });
 
-  test('拖拽文件到文件夹：悬停高亮并移动', async ({ page }) => {
+  test('dragging a file onto a folder highlights it and moves the file', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     const notes = tree.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]');
     const documents = tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]');
@@ -268,7 +268,7 @@ test.describe('文件面板', () => {
     await page.mouse.move(from!.x + 40, from!.y + from!.height / 2);
     await page.mouse.down();
     await page.mouse.move(to!.x + 40, to!.y + to!.height / 2, { steps: 8 });
-    // 拖拽预览显示被拖文件的图标（不再显示文字说明）
+    // The drag preview shows the dragged file's icon instead of a text label
     await expect(page.getByTestId('file-drag-preview')).toBeVisible();
     await page.mouse.up();
 
@@ -276,29 +276,29 @@ test.describe('文件面板', () => {
       .toContainEqual({ op: 'move', path: '/home/e2e/notes.txt', destDir: '/home/e2e/Documents' });
   });
 
-  test('此电脑视图：磁盘以小卡片展示（含容量），点击进入', async ({ page }) => {
-    // 点击面包屑「此电脑」进入磁盘视图
+  test('this PC view: drives appear as small cards with capacity, and clicking one enters it', async ({ page }) => {
+    // Click the This PC breadcrumb to enter the drive view
     await page.getByText('此电脑').click();
     await expect(page.locator('[data-testid="disk-card-e2e-root"]')).toBeVisible({ timeout: 3000 });
     await expect(page.locator('[data-testid="disk-card-Backup"]')).toBeVisible();
-    // 卡片展示容量信息（250 GB 可用）
+    // The card shows capacity information (250 GB free)
     await expect(page.getByText('250 GB 可用')).toBeVisible();
-    // 点击磁盘卡片进入该磁盘根目录（文件列表出现）
+    // Clicking a drive card enters that drive's root (the file list appears)
     await page.locator('[data-testid="disk-card-e2e-root"]').click();
     await expect(page.getByText('Documents')).toBeVisible({ timeout: 3000 });
     await expect(page.locator('[data-testid="disk-card-e2e-root"]')).toHaveCount(0);
   });
 
-  test('关闭面板再重新打开', async ({ page }) => {
-    // 关闭面板——再点一次 dock 按钮
+  test('closing and reopening the panel', async ({ page }) => {
+    // Close the panel by clicking the dock button again
     await page.locator('[data-dock-btn="files"]').click();
     await expect(page.getByText('Documents')).toBeHidden();
-    // 重新打开
+    // Reopen it
     await page.locator('[data-dock-btn="files"]').click();
     await expect(page.getByText('Documents')).toBeVisible({ timeout: 3000 });
   });
 
-  test('拖拽到最小宽度立即折叠；松手前可反悔拖回', async ({ page }) => {
+  test('dragging to the minimum width collapses immediately and dragging back before release cancels it', async ({ page }) => {
     await expect(page.getByText('Documents')).toBeVisible();
     // Drag the left edge right to reduce the auxiliary panel width.
     const handle = page.locator('[data-testid="resize-handle-files"]');
@@ -308,7 +308,7 @@ test.describe('文件面板', () => {
     const cx = (box?.x ?? 0) + (box?.width ?? 0) / 2;
     await page.mouse.move(cx, cy);
     await page.mouse.down();
-    // 第 5 步（80px）到下限 → 立即折叠（内容隐藏但保持挂载，状态不丢），之后保持收起
+    // The 5th step (80px) reaches the lower limit -> collapse immediately (content hides but stays mounted, so state is kept), then stay collapsed
     for (let i = 0; i < 8; i++) {
       await page.mouse.move(cx + (i + 1) * 16, cy);
       await page.waitForTimeout(12);
@@ -322,11 +322,11 @@ test.describe('文件面板', () => {
       await page.waitForTimeout(12);
     }
     await expect(page.getByText('Documents')).toBeVisible({ timeout: 3000 });
-    // 松手定局：保持展开
+    // Release confirms it: the panel stays expanded
     await page.mouse.up();
     await expect(page.getByText('Documents')).toBeVisible();
-    // 再拖到折叠并直接松手 → 折叠保持；点 Dock 按钮恢复
-    // （宽度已变，手柄位置随之移动，需重新定位）
+    // Drag to collapse again and release right away -> it stays collapsed; the dock button restores it
+    // (the width changed, so the handle moved and has to be located again)
     const box2 = await handle.boundingBox();
     const cx2 = (box2?.x ?? 0) + (box2?.width ?? 0) / 2;
     await page.mouse.move(cx2, cy);
@@ -341,13 +341,13 @@ test.describe('文件面板', () => {
     await expect(page.getByText('Documents')).toBeVisible({ timeout: 3000 });
   });
 
-  test('拖动折叠后反向拖回：面板内部状态不丢失（未重新加载）', async ({ page }) => {
-    // 进入目录（改变面板内部路径状态）：双击目录
+  test('dragging back after a collapse keeps the panel state without reloading it', async ({ page }) => {
+    // Enter a directory to change the panel's internal path state: double-click it
     const tree = page.getByTestId('local-file-tree');
     const documents = tree.locator('[data-testid="file-row"][data-path="/home/e2e/Documents"]');
     await documents.dblclick();
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
-    // 拖到折叠（不松手）
+    // Drag to collapse without releasing
     const handle = page.locator('[data-testid="resize-handle-files"]');
     const box = await handle.boundingBox();
     expect(box).not.toBeNull();
@@ -360,7 +360,7 @@ test.describe('文件面板', () => {
       await page.waitForTimeout(12);
     }
     await expect(page.getByTestId('local-back-btn')).toBeHidden();
-    // 反向拖回并松手 → 面板恢复，且仍停留在之前进入的目录（状态未丢、未 reload）
+    // Drag back and release -> the panel returns and still shows the directory it entered (no state loss, no reload)
     for (let i = 0; i < 8; i++) {
       await page.mouse.move(cx + (8 - i) * 16, cy);
       await page.waitForTimeout(12);
@@ -370,7 +370,7 @@ test.describe('文件面板', () => {
     await expect(page.getByTestId('local-back-btn')).toBeVisible({ timeout: 3000 });
   });
 
-  test('删除文件需二次确认，确认后调用后端删除（回收站）', async ({ page }) => {
+  test('deleting a file asks for confirmation and then calls the backend delete (trash)', async ({ page }) => {
     await page.getByText('notes.txt').click({ button: 'right' });
     await page.getByRole('button', { name: '删除' }).click();
     await expect(page.locator('[data-testid="confirm-dialog"]')).toBeVisible();
@@ -380,10 +380,10 @@ test.describe('文件面板', () => {
     expect(ops).toContainEqual({ op: 'delete', path: '/home/e2e/notes.txt' });
   });
 
-  test('重命名为侧栏内联编辑，回车后确认', async ({ page }) => {
+  test('renaming uses inline sidebar editing and confirms on Enter', async ({ page }) => {
     await page.getByText('notes.txt').click({ button: 'right' });
     await page.getByRole('button', { name: '重命名' }).click();
-    // 内联输入框出现，而非弹窗
+    // An inline input appears instead of a dialog
     const input = page.locator('[data-testid="rename-input"]');
     await expect(input).toBeVisible();
     await expect(page.locator('[data-testid="prompt-input"]')).toHaveCount(0);
@@ -396,7 +396,7 @@ test.describe('文件面板', () => {
     expect(ops).toContainEqual({ op: 'rename', path: '/home/e2e/notes.txt', newName: 'renamed.txt' });
   });
 
-  test('空白处右键菜单与 ⋯ 菜单列出同一套操作', async ({ page }) => {
+  test('the blank-area context menu and the ⋯ menu list the same actions', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     const menu = page.getByRole('menu', { name: '操作菜单' });
     const menuItems = () => menu.evaluate((el) => [...el.querySelectorAll('button')]
@@ -410,7 +410,7 @@ test.describe('文件面板', () => {
     const box = (await tree.boundingBox())!;
     await page.mouse.click(box.x + 40, box.y + box.height - 12, { button: 'right' });
     await expect(menu).toBeVisible();
-    // 空白处不再缺项：⋯ 菜单有的这里都有（剪贴板为空时不多出「粘贴」）
+    // Nothing is missing from the blank-area menu: it has every ⋯ entry and no extra Paste entry while the clipboard is empty
     expect(await menuItems()).toEqual(fromMore);
     await expect(menu.getByRole('button', { name: '下载管理', exact: true })).toBeVisible();
     await expect(menu.getByRole('button', { name: '收起全部文件夹', exact: true })).toBeVisible();
@@ -444,29 +444,29 @@ test.describe('文件面板', () => {
     await expect(externalRow).toHaveCount(0);
   });
 
-  test('右键新建按落点决定目录，建好立即重命名，重名自动加序号且回退用真实路径', async ({ page }) => {
+  test('the context menu creates items in the directory under the click point, renames them immediately, auto-numbers duplicates and undoes with the real path', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
-    /** 面板空白处右键（用元素范围定位，避免落到行上） */
+    /** Right-click the blank area (locate by the element bounds so the click does not land on a row) */
     const rightClickBlank = async () => {
       const box = (await tree.boundingBox())!;
       await page.mouse.click(box.x + 40, box.y + box.height - 12, { button: 'right' });
     };
-    // 空白处右键 → 新建文件夹落在当前目录
+    // Right-click blank space -> the new folder lands in the current directory
     await rightClickBlank();
     await page.getByRole('button', { name: '新建文件夹', exact: true }).click();
     const input = page.locator('[data-testid="rename-input"]');
     await expect(input).toHaveValue('NewFolder');
     expect(await fsOps(page)).toContainEqual({ op: 'create-dir', path: '/home/e2e/project/NewFolder' });
-    await input.press('Enter');   // 名称未变：不产生重命名请求
+    await input.press('Enter');   // Unchanged name: no rename request
     expect(await fsOps(page)).not.toContainEqual(expect.objectContaining({ op: 'rename' }));
 
-    // 右键文件行 → 新建文件落在该文件的同级目录
+    // Right-click a file row -> the new file lands beside that file
     await page.getByText('notes.txt').click({ button: 'right' });
     await page.getByRole('button', { name: '新建文件', exact: true }).click();
     await expect(input).toHaveValue('Untitled');
     expect(await fsOps(page)).toContainEqual({ op: 'create-file', path: '/home/e2e/Untitled' });
 
-    // 改成已存在的名字：后端避让为 notes (1).txt（序号在扩展名前），回退记录必须用真实路径
+    // Rename to an existing name: the backend avoids it as notes (1).txt (the number goes before the extension), and the undo record must use the real path
     await input.fill('notes.txt');
     await input.press('Enter');
     await page.locator('[data-testid="confirm-ok"]').click();
@@ -478,10 +478,10 @@ test.describe('文件面板', () => {
     expect(await fsOps(page)).toContainEqual({ op: 'rename', path: '/home/e2e/notes (1).txt', newName: 'Untitled' });
   });
 
-  test('新建与复制粘贴都能回退（回退新建 / 回退粘贴）', async ({ page }) => {
+  test('new files and pastes can both be undone (undo create / undo paste)', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     const box = (await tree.boundingBox())!;
-    // 新建文件 → 更多菜单出现「回退新建」
+    // Create a file -> the more menu shows Undo create
     await page.mouse.click(box.x + 40, box.y + box.height - 12, { button: 'right' });
     await page.getByRole('button', { name: '新建文件', exact: true }).click();
     await page.locator('[data-testid="rename-input"]').press('Escape');
@@ -490,7 +490,7 @@ test.describe('文件面板', () => {
     await expect(page.getByText('已回退新建')).toBeVisible();
     expect(await fsOps(page)).toContainEqual({ op: 'delete', path: '/home/e2e/project/Untitled' });
 
-    // 复制同名文件到当前目录 → 回退粘贴移除复制出来的那一份
+    // Copy a file into its own directory -> undo paste removes the copied entry
     await page.getByText('notes.txt').first().click({ button: 'right' });
     await page.getByRole('button', { name: '复制', exact: true }).click();
     await page.mouse.click(box.x + 40, box.y + box.height - 12, { button: 'right' });
@@ -502,7 +502,7 @@ test.describe('文件面板', () => {
     expect(await fsOps(page)).toContainEqual({ op: 'delete', path: '/home/e2e/project/notes (1).txt' });
   });
 
-  test('右键文件夹新建文件：落在文件夹内、立即重命名，提交后子列表可见', async ({ page }) => {
+  test('creating a file from a folder context menu: it lands inside the folder, is renamed immediately and appears in the child list after submitting', async ({ page }) => {
     await page.getByText('Documents').first().click({ button: 'right' });
     await page.getByRole('button', { name: '新建文件', exact: true }).click();
     const input = page.locator('[data-testid="rename-input"]');
@@ -514,43 +514,43 @@ test.describe('文件面板', () => {
     await page.locator('[data-testid="confirm-ok"]').click();
     await expect(page.getByText('已重命名')).toBeVisible();
     expect(await fsOps(page)).toContainEqual({ op: 'rename', path: '/home/e2e/Documents/Untitled', newName: 'plan.md' });
-    // 目标文件夹已自动展开，新条目出现在它的子列表里（mock 会把新建条目同时列在多处，取第一个）
+    // The target folder expands automatically and the new entry appears in its child list (the mock lists new entries in several places, so take the first)
     await expect(page.locator('[data-testid="file-row"][data-path="/home/e2e/Documents/Untitled"]').first()).toBeVisible();
   });
 
-  test('新建同名项时后端避让加序号，仍会立即进入重命名', async ({ page }) => {
+  test('the backend avoids duplicate names with a number and the item still enters rename immediately', async ({ page }) => {
     const input = page.locator('[data-testid="rename-input"]');
 
-    // 第一次新建默认名，Esc 取消重命名（条目保留在目录里）
+    // Create the default name first and press Escape to cancel renaming (the entry stays in the directory)
     await page.getByTestId('local-more-btn').click();
     await page.getByRole('button', { name: '新建文件', exact: true }).click();
     await expect(input).toHaveValue('Untitled');
     await input.press('Escape');
 
-    // 第二次新建同名 → 后端避让为 Untitled (1)，仍要立刻进入重命名
+    // Create the same name again -> the backend avoids it as Untitled (1) and renaming still starts immediately
     await page.getByTestId('local-more-btn').click();
     await page.getByRole('button', { name: '新建文件', exact: true }).click();
     await expect(input).toBeVisible();
     await expect(input).toHaveValue('Untitled (1)');
   });
 
-  test('右键行与更多菜单都能在系统文件管理器中定位', async ({ page }) => {
+  test('both the row context menu and the more menu can reveal items in the system file manager', async ({ page }) => {
     const tree = page.getByTestId('local-file-tree');
     const notes = tree.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]');
 
-    // 行右键：定位该条目
+    // Row context menu: reveal that entry
     await notes.click({ button: 'right' });
     await page.getByRole('button', { name: '在文件管理器中显示' }).click();
     await expect.poll(() => revealedPaths(page)).toContain('/home/e2e/notes.txt');
 
-    // ⋯ 菜单：定位当前文件夹
+    // ⋯ menu: reveal the current folder
     const currentDir = await tree.getAttribute('data-path');
     await page.getByTestId('local-more-btn').click();
     await page.getByRole('button', { name: '在文件管理器中显示当前文件夹' }).click();
     await expect.poll(() => revealedPaths(page)).toContain(currentDir);
   });
 
-  test('更多菜单可直接在当前文件夹新建文件/文件夹', async ({ page }) => {
+  test('the more menu can create files and folders directly in the current folder', async ({ page }) => {
     const input = page.locator('[data-testid="rename-input"]');
 
     await page.getByTestId('local-more-btn').click();
@@ -566,7 +566,7 @@ test.describe('文件面板', () => {
     await input.press('Escape');
   });
 
-  test('复制同名文件到当前目录：自动加序号并在提示中说明', async ({ page }) => {
+  test('copying a file into its own directory auto-numbers it and says so in the notification', async ({ page }) => {
     await page.getByText('notes.txt').first().click({ button: 'right' });
     await page.getByRole('button', { name: '复制', exact: true }).click();
     const tree = page.getByTestId('local-file-tree');
@@ -577,7 +577,7 @@ test.describe('文件面板', () => {
     expect(await fsOps(page)).toContainEqual({ op: 'copy', path: '/home/e2e/notes.txt', destDir: '/home/e2e/project' });
   });
 
-  test('本地面板的菜单不含远程专有项', async ({ page }) => {
+  test('the local panel menu has no remote-only entries', async ({ page }) => {
     await page.getByText('Documents').first().click({ button: 'right' });
     await expect(page.getByRole('button', { name: '在新标签页中打开' })).toBeVisible();
     await expect(page.getByRole('button', { name: /下载.*到本地/ })).toHaveCount(0);
