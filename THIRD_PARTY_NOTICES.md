@@ -15,6 +15,8 @@ The complete generated inventory, original notices, license texts and exact-vers
 
 The inventory covers modules found in the frontend output, not every optional package installed by the package manager. Unused asset collections and optional runtimes must be reviewed before they are imported or redistributed. Do not assume that a package's code license also covers its artwork or brand marks.
 
+Documentation screenshots use contributor-supplied wallpaper artwork for demonstration. The original wallpaper files are not bundled with the application; rights to the artwork are separate from the project license.
+
 Platform libraries added by a particular installer are outside this source-level inventory. Before distributing that installer, include its additional native library notices and fulfill any applicable source-availability or relinking requirements.
 
 Regeneration and distribution procedures: [English](docs/en/licensing.md) · [中文](docs/zh/licensing.md).

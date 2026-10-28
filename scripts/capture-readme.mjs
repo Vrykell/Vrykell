@@ -1,19 +1,24 @@
 import { chromium, expect } from '@playwright/test';
-import { mkdir, rename, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { setupTauriMock, emitAcpSession, acpUpdate, waitForWorkbench } from '../e2e/tauri-mock.ts';
 
 const origin = process.env.README_ORIGIN ?? 'http://127.0.0.1:1432';
 const directory = new URL('../docs/images/', import.meta.url);
+const extraOnly = process.env.README_CAPTURE_EXTRA_ONLY === '1';
+const captures = [];
 await mkdir(directory, { recursive: true });
 const browser = await chromium.launch({ headless: true, ignoreDefaultArgs: ['--hide-scrollbars'] });
 
 async function capture(page, target) {
-  const path = fileURLToPath(target);
+  captures.push({ path: fileURLToPath(target), bytes: await page.screenshot({ animations: 'disabled', omitBackground: true }) });
+}
+
+async function saveCapture({ path, bytes }) {
   const temporary = `${path}.new-${randomUUID()}`;
   try {
-    await writeFile(temporary, await page.screenshot({ animations: 'disabled', omitBackground: true }));
+    await writeFile(temporary, bytes);
     for (let attempt = 0; ; attempt++) {
       try { await rename(temporary, path); break; }
       catch (error) {
@@ -55,11 +60,105 @@ async function chooseScheme(page, locale, mode, id) {
   await expect(page.locator('html')).toHaveAttribute('data-theme-preset', id);
 }
 
+async function showWallpaper(page, file) {
+  const body = await readFile(file);
+  const path = '/readme-wallpaper-settings.jpg';
+  await page.unroute('**/readme-wallpaper-*.jpg');
+  await page.route('**/readme-wallpaper-*.jpg', route => route.fulfill({
+    status: 200, contentType: file.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg',
+    headers: { 'cache-control': 'no-store' }, body,
+  }));
+  const loaded = page.waitForResponse(response => response.url().endsWith(path) && response.ok());
+  await page.evaluate(async path => {
+    const { useTerminalThemeStore } = await import('/src/features/settings/model/terminalTheme.ts');
+    await useTerminalThemeStore.getState().update({ backgroundImage: path, opacity: 0.9 });
+  }, path);
+  await loaded;
+  await expect(page.locator('.application-window')).toHaveAttribute('data-wallpaper', 'true');
+}
+
+async function clearWallpaper(page) {
+  await page.evaluate(async () => {
+    const { useTerminalThemeStore } = await import('/src/features/settings/model/terminalTheme.ts');
+    await useTerminalThemeStore.getState().update({ backgroundImage: null, opacity: 1 });
+  });
+  await page.unroute('**/readme-wallpaper-*.jpg');
+}
+
+async function captureSingleWorkspaces(page, locale) {
+  const shot = async name => {
+    await page.evaluate(() => document.fonts.ready);
+    await page.mouse.move(1595, 895);
+    await page.waitForTimeout(400);
+    await capture(page, new URL(`${name}-${locale}.png`, directory));
+    console.log(`${name}-${locale}.png`);
+  };
+  await page.getByTestId('workspace-area-terminal').click();
+  await expect(page.locator('.terminal-pane:visible').first()).toContainText('npm run build');
+  await page.evaluate(text => { window.__AI_REPLY__ = text; }, locale === 'zh' ? '构建和测试已完成，8 项检查通过。' : 'The build and tests finished successfully; all 8 checks passed.');
+  await page.locator('[data-dock-btn="chat"]').click();
+  const sidebarComposer = page.locator('[data-chat-composer]:visible');
+  await sidebarComposer.fill(locale === 'zh' ? '这一轮构建通过了吗？' : 'Did this build pass?');
+  await sidebarComposer.press('Enter');
+  await expect(page.getByText(locale === 'zh' ? '构建和测试已完成，8 项检查通过。' : 'The build and tests finished successfully; all 8 checks passed.', { exact: true })).toBeVisible();
+  await shot('single-terminal');
+  await page.locator('[data-dock-btn="chat"]').click();
+
+  await page.getByTestId('workspace-area-code').click();
+  const releaseTab = page.getByTestId('workspace-instance-bar').locator('.folder-tab').filter({ hasText: 'release.ts' }).first();
+  await expect(releaseTab).toBeVisible(); await releaseTab.click();
+  await expect(page.locator('.monaco-editor:visible .view-lines')).toContainText('checks.every(Boolean)');
+  await shot('single-editor');
+
+  await page.getByTestId('workspace-area-ai').click();
+  await page.getByTestId('ai-new-conversation').click();
+  const reply = locale === 'zh' ? '构建已通过。合并前建议检查：\n\n- 版本号和更新日志\n- 各平台安装包\n- 发布流水线与签名'
+    : 'The build passed. Before merging, check:\n\n- The version and changelog\n- Installers for each platform\n- Release workflows and signing';
+  await page.evaluate(text => { window.__AI_REPLY__ = text; }, reply);
+  const composer = page.locator('[data-chat-composer]:visible');
+  await composer.fill(locale === 'zh' ? '合并发布分支之前还需要检查什么？' : 'What should I check before merging the release branch?');
+  await composer.press('Enter'); await expect(page.getByText(locale === 'zh' ? '各平台安装包' : 'Installers for each platform', { exact: true })).toBeVisible();
+  await shot('single-ai');
+
+  await page.getByTestId('workspace-area-ssh').click();
+  await expect(page.getByTestId('ssh-dashboard')).toBeVisible();
+  await page.waitForFunction(async () => (await import('/src/features/ssh/stores/store.ts')).useSshStore.getState().loaded);
+  await page.evaluate(async locale => {
+    const { useSshStore } = await import('/src/features/ssh/stores/store.ts');
+    const first = useSshStore.getState().connections[0];
+    useSshStore.setState({ connections: [{ ...first, name: locale === 'zh' ? '生产服务器' : 'production' },
+      { ...first, id: 'demo-stage', name: 'staging', host: '192.0.2.20', user: 'deploy' },
+      { ...first, id: 'demo-lab', name: 'lab', host: '192.0.2.30', user: 'ops' }] });
+  }, locale);
+  const hosts = page.getByTestId('ssh-dashboard');
+  await hosts.getByRole('button', { name: locale === 'zh' ? '卡片视图' : 'Card view', exact: true }).click();
+  await expect(hosts.locator('.ssh-dashboard-card')).toHaveCount(3);
+  await shot('single-hosts');
+
+  await page.keyboard.press('Control+,');
+  await page.locator('.settings-navigation').getByRole('button', { name: locale === 'zh' ? '主题' : 'Theme', exact: true }).click();
+  await expect(page.locator('.theme-preset-preview')).toHaveCount(5);
+  if (process.env.README_WALLPAPER) {
+    await showWallpaper(page, process.env.README_WALLPAPER);
+    await shot('theme-settings');
+    await clearWallpaper(page);
+  } else {
+    try { await access(fileURLToPath(new URL(`theme-settings-${locale}.png`, directory))); }
+    catch { await shot('theme-settings'); }
+  }
+}
+
 async function scene(locale, remote = false) {
   const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 2 });
   const page = await context.newPage();
   page.setDefaultTimeout(25000);
-  await setupTauriMock(page, { terminalDirectories: true, launchDirectory: '/work/atlas', sshHost: 'known' });
+  await setupTauriMock(page, {
+    terminalDirectories: true, launchDirectory: '/work/atlas', sshHost: 'known',
+    aiModels: [{ id: 'm-local', name: locale === 'zh' ? '本地模型' : 'Local model', provider: 'openai-compatible',
+      baseUrl: 'http://127.0.0.1:11434/v1', model: 'qwen2.5',
+      capabilities: { vision: false, reasoning: false, tools: true, search: false } }],
+    aiActive: 'm-local',
+  });
   await page.addInitScript(({ locale, code }) => {
     localStorage.setItem('vrykell-theme-mode', 'dark');
     localStorage.setItem('vrykell-language', JSON.stringify({ state: { preference: locale }, version: 0 }));
@@ -173,9 +272,8 @@ async function scene(locale, remote = false) {
   await page.mouse.move(1595, 895);
   await page.waitForTimeout(400);
   const path = new URL(`${remote ? 'scenario-remote' : 'hero-workspace'}-${locale}.png`, directory);
-  await capture(page, path);
-  console.log(path.href);
-  if (!remote) {
+  if (!extraOnly) { await capture(page, path); console.log(path.href); }
+  if (!remote && !extraOnly) {
     for (const variant of [
       { name: 'theme-light', mode: 'light', id: 'catppuccin-latte' },
       { name: 'theme-nord', mode: 'dark', id: 'nord-dark' },
@@ -202,11 +300,13 @@ async function scene(locale, remote = false) {
     await expect(page.locator('.monaco-editor:visible .view-lines')).toContainText('checks.every(Boolean)');
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(400);
-    await capture(page, new URL(`scenario-build-${locale}.png`, directory));
+    if (!extraOnly) await capture(page, new URL(`scenario-build-${locale}.png`, directory));
+    await captureSingleWorkspaces(page, locale);
   }
   await context.close();
 }
 
 try {
-  for (const locale of ['zh', 'en']) { await scene(locale); await scene(locale, true); }
+  for (const locale of ['zh', 'en']) { await scene(locale); if (!extraOnly) await scene(locale, true); }
 } finally { await browser.close(); }
+for (const item of captures) await saveCapture(item);

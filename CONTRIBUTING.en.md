@@ -44,7 +44,7 @@ Open a PR from **your branch to `Vrykell/Vrykell:dev`**. The default branch is `
 
 ## Setup and conventions
 
-Use Node.js 22.12+, stable Rust and your platform's desktop build prerequisites; see the [README](README.en.md#get-started). `npm run tauri dev` starts the desktop application; `npm run dev` starts the frontend only.
+Use Node.js 22.12+, stable Rust and your platform's desktop build prerequisites; see the [README](README.md#get-started). `npm run tauri dev` starts the desktop application; `npm run dev` starts the frontend only.
 
 Read [AGENTS.md](AGENTS.md), the [development rules](docs/en/development-rules.md) and [project conventions](.agents/skills/vrykell-conventions/SKILL.md) before changing code. Also read the [security model](docs/en/security-model.md) for IPC, file access, rendering and external integrations.
 
@@ -81,6 +81,8 @@ Browser tests use one worker per shard. State which checks were not run and why;
 Run `npm run dev -- --port 1432 --host 127.0.0.1` in one terminal and `node --experimental-strip-types scripts/capture-readme.mjs` in another. Install the capture browser with `npx playwright install chromium` before the first run. The script renders the real frontend with sample data, without connecting to a live model or server.
 
 Keep the 3200×1800 PNG output at 2× pixel density and a 16:9 aspect ratio. The capture clips a 16 px corner radius into transparent PNG corners, so rounded images also render on repository pages that remove inline styles. Wait for fonts and the editor to finish loading. Do not upscale old screenshots or stretch images. Preserve original-image links in the README and check desktop and narrow rendering after updates.
+
+To refresh the wallpaper example, set `README_WALLPAPER` to a local image path. Without it, the existing settings image remains in place. Use material you have the right to display publicly and retain required attribution.
 
 ## Commits
 

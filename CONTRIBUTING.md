@@ -44,7 +44,7 @@ git push -u origin feat/short-description
 
 ## 环境与项目约定
 
-需要 Node.js 22.12+、Rust 稳定工具链和对应平台的桌面构建依赖，见 [README](README.md#开始使用)。`npm run tauri dev` 启动桌面应用，`npm run dev` 只启动前端。
+需要 Node.js 22.12+、Rust 稳定工具链和对应平台的桌面构建依赖，见 [README](README.zh-CN.md#开始使用)。`npm run tauri dev` 启动桌面应用，`npm run dev` 只启动前端。
 
 开始改动前阅读 [AGENTS.md](AGENTS.md)、[开发规则](docs/zh/development-rules.md)和[项目约定](.agents/skills/vrykell-conventions/SKILL.md)。涉及 IPC、文件访问、渲染或外部集成时，还需阅读[安全模型](docs/zh/security-model.md)。
 
@@ -81,6 +81,8 @@ npm run check:architecture
 在一个终端运行 `npm run dev -- --port 1432 --host 127.0.0.1`，在另一个终端运行 `node --experimental-strip-types scripts/capture-readme.mjs`。首次使用前运行 `npx playwright install chromium` 安装截图浏览器。脚本使用真实前端与示例数据生成中英文场景图，不连接实际模型或服务器。
 
 保留 2 倍像素密度生成的 3200×1800 PNG 和 16:9 比例；截取时以 16 px 圆角裁切并保留透明角落，避免仓库页面移除内联样式后圆角失效。等待字体与编辑器加载完成。不要放大旧截图或拉伸图片；README 中保留原图链接，更新后检查桌面和窄屏渲染。
+
+刷新壁纸示例时，将 `README_WALLPAPER` 设置为本机图片路径；不设置时保留已有的设置页图片。只使用有权用于公开展示的素材，并保留必要署名。
 
 ## 提交信息
 

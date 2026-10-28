@@ -4,11 +4,11 @@
 
 # Vrykell
 
-### 写代码、跑命令、连服务器，让 Agent 就在工作现场。
+### Terminal and AI, side by side.
 
-围绕终端构建的桌面工作区。把编辑器、SSH、AI 对话和 Agent 自由组合在同一组标签与分屏中。
+A desktop workspace built around the terminal. Combine editors, SSH sessions, AI conversations and agents in the same tabs and split panes.
 
-[开始使用](#开始使用) · [使用场景](#把工作区摆成你的工作方式) · [参与贡献](CONTRIBUTING.md) · [English](README.en.md)
+[Get started](#get-started) · [Workflows](#arrange-the-workspace-around-your-work) · [Contribute](CONTRIBUTING.en.md) · [简体中文](README.zh-CN.md)
 
 <p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="Apache-2.0" /></a>
@@ -18,72 +18,104 @@
 
 </div>
 
-<a href="docs/images/hero-workspace-zh.png"><img src="docs/images/hero-workspace-zh.png" width="1600" alt="代码、构建终端与 Agent 工作区" /></a>
+<a href="docs/images/hero-workspace-en.png"><img src="docs/images/hero-workspace-en.png" width="1600" alt="Code, a build terminal and an agent in Vrykell" /></a>
 
-## 把工作区摆成你的工作方式
+## Arrange the workspace around your work
 
-开发时需要的往往不止一个终端。你还要看代码、对照日志、检查远程环境，再把上下文交给 AI。Vrykell 让这些内容留在同一个工作区：每个标签可以组合不同类型的资源，最多容纳四个窗格；切换、移动和调整布局时，正在运行的终端与会话保持各自的状态。
+Development usually takes more than a terminal. There is code to read, output to compare, a remote environment to inspect and context to share with an agent. Vrykell keeps those resources in one workspace: each tab can combine different resource types in up to four panes. Running terminals and conversations retain their own state as you switch, move and resize the layout.
 
-### 左边改代码，右边看构建
+### Edit on the left. Build on the right.
 
-打开项目文件，在旁边保留构建或测试终端。修改代码、运行命令、查看结果，沿着同一条工作流往前走。需要排查时，再加入一个 Agent 窗格，协助阅读相关文件和命令输出。
+Open a project file beside a build or test terminal. Change code, run a command and inspect the result without leaving the task. Add an agent pane when you need help reading relevant files and command output.
 
-编辑器支持语法高亮、查找替换、编码选择、只读状态和保存冲突提示，也能查看 Markdown 与 Git 差异。终端输出按命令组织，目录、分支、耗时和退出状态随块保留；构建失败后，可以直接引用那一块继续提问。
+The editor provides syntax highlighting, find and replace, encoding selection, read-only states and save-conflict feedback, alongside Markdown preview and Git comparisons. Command blocks retain the directory, branch, duration and exit status. Reference a failed block directly in the next conversation.
 
-<a href="docs/images/scenario-build-zh.png"><img src="docs/images/scenario-build-zh.png" width="1600" alt="并排编辑代码与运行构建" /></a>
+<a href="docs/images/scenario-build-en.png"><img src="docs/images/scenario-build-en.png" width="1600" alt="Editing code beside a build terminal" /></a>
 
-### 左边 SSH，右边 AI
+### SSH on the left. AI on the right.
 
-连接服务器，检查服务状态、磁盘空间或部署日志，在旁边讨论下一步。把实际的终端输出作为上下文，让 AI 帮你梳理排查顺序、检查配置或准备回滚方案。工具执行和文件写入遵循权限策略，操作记录可以展开检查。
+Connect to a server, inspect service status, disk space or deployment logs, and discuss the next step beside the session. Share actual terminal output to help the agent organize an investigation, inspect configuration or prepare a rollback plan. Tool execution and writes follow your permission policy, with inspectable operation records.
 
-主机管理覆盖密码与密钥认证、主机密钥确认和端口转发。直接连接支持 SFTP 浏览、上传、下载和远程编辑。交互终端支持跳板机；经跳板机的文件浏览与资源监控仍有限制。
+Host management covers password and key authentication, host-key confirmation and port forwarding. Direct connections support SFTP browsing, uploads, downloads and remote editing. Jump hosts work for interactive terminals; file browsing and resource monitoring through them remain limited.
 
-<a href="docs/images/scenario-remote-zh.png"><img src="docs/images/scenario-remote-zh.png" width="1600" alt="远程服务检查与 AI 部署讨论" /></a>
+<a href="docs/images/scenario-remote-en.png"><img src="docs/images/scenario-remote-en.png" width="1600" alt="A remote service check beside an AI deployment discussion" /></a>
 
-### 给 Agent 一张完整的工作台
+### Give your agent a complete workbench
 
-既可以在应用内发起 AI 对话，也可以通过 ACP 接入外部 Agent。让一个窗格保留执行终端，另一个窗格承载规划、工具调用和回复；需要时打开文件或差异页面，边检查边推进任务。
+Start a built-in AI conversation or connect an external agent through ACP. Keep an execution terminal in one pane and planning, tool calls and replies in another. Open a file or diff when you need to inspect a change before continuing.
 
-内联 AI、侧边对话与独立会话适合不同的工作节奏。工具调用、审批、重试和会话状态有自己的界面。技能、MCP 和本地记忆扩展上下文与工具能力；具体能力取决于你配置的模型服务或 Agent。
+Inline AI, side conversations and independent sessions support different ways of working. Tool calls, approvals, retries and session state have dedicated interfaces. Skills, MCP and local memory extend context and tools. Specific capabilities depend on the model service or agent you configure.
 
-### 日常工作也能少绕几步
+### Make everyday tasks easier to follow
 
-| 你正在做什么 | 可以怎样安排 |
+| Your task | A workspace arrangement |
 | --- | --- |
-| 调试接口 | 一个终端启动服务，另一个终端发请求，旁边打开处理函数或日志。 |
-| 排查构建失败 | 保留失败命令块，让 AI 分析对应输出，再打开文件核对修复。 |
-| 维护多个项目 | 按项目组织标签分组，用颜色区分；暂时不用的组可以收起。 |
-| 检查远程变更 | SSH 终端旁边放远程文件或 AI 对话，核对目标后再执行操作。 |
-| 审查 Agent 的工作 | 对照工具记录、文件内容与 Git 差异，确认变更后再继续。 |
-| 重复工作流程 | 从命令历史搜索、收藏、分组或重新运行命令。 |
+| Debug an API | Run the service in one terminal, send requests in another, and keep the handler or logs nearby. |
+| Investigate a failed build | Keep the failed command block, ask AI about its output, and open the affected file to check the fix. |
+| Work across projects | Organize tabs into named, colored groups and collapse groups you are not using. |
+| Check a remote change | Place remote files or AI beside SSH, then confirm the target before acting. |
+| Review an agent's work | Compare tool records, file contents and Git diffs before continuing. |
+| Repeat a workflow | Search, favorite, group and rerun commands from history. |
 
-## 换一种配色，保持自己的节奏
+## Dedicated workspaces for focused tasks
 
-内置十套深浅配色，原有配色仍是默认。页面、编辑器和终端一起切换；深浅选择分别记忆，也可以跟随系统。再搭配独立的字体、字号和壁纸设置，把同一张工作台调成自己喜欢的样子。
+The unified workspace brings different resources together. When you want to focus on one kind of work, switch to its dedicated workspace. Tabs, history and live content keep their own places, ready to be combined again when the task calls for it.
 
-<a href="docs/images/theme-light-zh.png"><img src="docs/images/theme-light-zh.png" width="1600" alt="浅色配色下的代码、终端与 Agent 工作台" /></a>
+### Terminal: make commands and results easier to revisit
 
-<a href="docs/images/theme-nord-zh.png"><img src="docs/images/theme-nord-zh.png" width="1600" alt="冷色配色与分组分屏工作台" /></a>
+Keep local shells and SSH sessions in their own tabs. Command blocks bring the command, working directory, output and status together. Search, favorite and rerun history, or complete a command from earlier entries. Open the AI sidebar to discuss a result; switch to the classic terminal view for full-screen tools and traditional interactive sessions.
 
-## 能力一览
+<a href="docs/images/single-terminal-en.png"><img src="docs/images/single-terminal-en.png" width="1600" alt="Terminal sessions and command blocks" /></a>
 
-| 领域 | 已有能力 |
+### Editor: keep files, previews and diffs close
+
+Open local or remote files with syntax highlighting, find and replace, and Markdown preview. Organize files in tabs and inspect Git status and comparisons. Read-only states and save conflicts are presented before you overwrite unconfirmed changes.
+
+<a href="docs/images/single-editor-en.png"><img src="docs/images/single-editor-en.png" width="1600" alt="Project file editing workspace" /></a>
+
+### Hosts: from connecting to daily maintenance
+
+Manage connections in a list or as cards and find a target by name, group or tag. A saved host can open a terminal, browse remote files, manage transfers or configure forwarding. Direct connections can also show resource status on demand.
+
+<a href="docs/images/single-hosts-en.png"><img src="docs/images/single-hosts-en.png" width="1600" alt="Host cards and connection management" /></a>
+
+### AI: discuss and share context before acting
+
+Ask a question in a plain conversation or attach text, files and images; image input requires a capable model. When a task needs execution, select its terminal environment and review tool calls and permission requests. Built-in conversations and external agents can be kept separately for each task.
+
+<a href="docs/images/single-ai-en.png"><img src="docs/images/single-ai-en.png" width="1600" alt="A dedicated AI conversation workspace" /></a>
+
+## A workbench in your own colors
+
+Choose from ten built-in dark and light schemes, including the original defaults. The interface, editor and terminal change together. Dark and light choices are remembered separately and can follow your system appearance. Independent fonts, sizes and wallpaper settings help make the workspace your own.
+
+<a href="docs/images/theme-settings-en.png"><img src="docs/images/theme-settings-en.png" width="1600" alt="Theme settings and color scheme previews" /></a>
+
+<a href="docs/images/theme-light-en.png"><img src="docs/images/theme-light-en.png" width="1600" alt="A light code, terminal and agent workbench" /></a>
+
+<a href="docs/images/theme-nord-en.png"><img src="docs/images/theme-nord-en.png" width="1600" alt="A cool color scheme with grouped split workspaces" /></a>
+
+Choose a local wallpaper and adjust application opacity to bring a background into the terminal or settings. Fonts, schemes and wallpaper are stored independently, so the workspace can retain your own style.
+
+## Capabilities
+
+| Area | Available features |
 | --- | --- |
-| 终端 | 本地 Shell、SSH、命令块、经典终端视图、TUI 与备用屏幕、中文输入、复制与搜索。 |
-| 工作区 | 混合资源标签、最多四窗格、拖放与排序、命名分组、组颜色、收起分组、聚焦与调整分屏。 |
-| AI 与 Agent | 多模型配置、自带密钥、流式对话、命令输出引用、工具权限、ACP、技能、MCP、本地记忆。 |
-| 代码与文件 | 本地与远程文件浏览、上传下载、内置编辑器、Markdown 预览、Git 状态与差异比较。 |
-| 远程连接 | 主机配置、密码与密钥认证、主机密钥校验、端口转发、直接连接下的资源监控。 |
-| 历史与检索 | 命令历史、会话历史、收藏与分组、搜索筛选、工作区布局恢复。 |
-| 显示与输入 | 十套内置深浅配色，支持跟随系统；应用/终端/编辑器字体设置、内置字体、快捷键、中文与英文界面。 |
+| Terminal | Local shells, SSH, command blocks, classic terminal view, TUI and alternate screens, IME, copy and search. |
+| Workspace | Mixed resource tabs, up to four panes, drag ordering, named groups, group colors, collapsing, pane focus and resizing. |
+| AI and agents | Multiple models, bring your own key, streaming, command-output references, tool permissions, ACP, skills, MCP and local memory. |
+| Code and files | Local and remote browsing, transfer, built-in editor, Markdown preview, Git status and comparisons. |
+| Remote connections | Host profiles, password and key authentication, host-key verification, port forwarding and resource monitoring over direct connections. |
+| History and search | Command and session history, favorites, grouping, filters and workspace layout restoration. |
+| Appearance and input | Ten built-in dark/light color schemes with system appearance support; application/terminal/editor typography, bundled fonts, shortcuts and Chinese/English interfaces. |
 
-截图来自应用界面，使用示例项目与模拟会话数据；点击可查看原始分辨率。
+Screenshots use the application UI with a sample project and simulated session data. Click an image for its original resolution.
 
-## 开始使用
+## Get started
 
-当前版本为 **0.1.0**，仍处于早期开发。可以从源码运行；`main` 的成功流水线也会提供各平台安装包，获取方式见[构建说明](docs/zh/ci.md)。目前不承诺稳定版本发布频率。
+Version **0.1.0** is in early development. Run from source, or obtain installers from a successful `main` workflow as described in the [build guide](docs/en/ci.md). There is no fixed stable-release schedule yet.
 
-准备 Node.js **22.12+**、Rust 稳定工具链，以及对应平台的[桌面构建依赖](https://v2.tauri.app/start/prerequisites/)。
+Install Node.js **22.12+**, a stable Rust toolchain and your platform's [desktop build prerequisites](https://v2.tauri.app/start/prerequisites/).
 
 ```bash
 git clone https://github.com/Vrykell/Vrykell.git
@@ -92,35 +124,35 @@ npm ci
 npm run tauri dev
 ```
 
-只开发前端时使用 `npm run dev`，默认端口为 `1420`。需要安装包时运行 `npm run tauri -- build`。
+For frontend-only development, use `npm run dev` on port `1420`. To build an installer, run `npm run tauri -- build`.
 
 <details>
-<summary>平台准备</summary>
+<summary>Platform preparation</summary>
 
-- **Windows**：需要 C++ 构建工具、系统 WebView2 运行时，以及原生上下文菜单构建所需的桌面 SDK。
-- **macOS**：需要命令行开发工具、Perl 和 Make。SSH 相关原生库由依赖工具链从源码构建，无需单独安装系统加密库。
-- **Linux**：安装桌面 WebView、图形界面及应用指示器等系统开发依赖，具体见上方构建依赖链接。
+- **Windows**: C++ build tools, the system WebView2 runtime and the desktop SDK needed by the native context menu.
+- **macOS**: command-line development tools, Perl and Make. Native SSH dependencies build from source without a separately installed system cryptography library.
+- **Linux**: desktop WebView, GUI and application-indicator development dependencies; see the prerequisites above.
 
 </details>
 
-### 连接模型或 Agent
+### Connect a model or agent
 
-在设置中添加模型服务的地址、密钥和模型，再选择当前配置。内置对话支持原生 Messages 接口、原生生成接口和 OpenAI 兼容接口，也可连接提供兼容接口的本地模型服务。请求直接发送至你配置的服务，应用不提供模型中转。
+Add a model service URL, key and model in settings, then select the active configuration. Built-in conversations support native Messages and generation interfaces and OpenAI-compatible endpoints, including compatible local model services. Requests go directly to the service you configure; the application does not provide a model relay.
 
-外部 Agent 在 ACP 设置中配置启动命令与工作目录。检查工具权限，再开始会话。使用远程目标时，请同时核对执行终端和工作目录，确认实际执行环境。
+Configure an external agent's startup command and working directory in ACP settings. Review tool permissions before starting. With remote targets, also check the selected execution terminal and directory so the execution environment is clear.
 
-### 当前边界
+### Current boundaries
 
-- 会话和组合布局可以进入历史；未保存的编辑器草稿、文件浏览状态不能作为可靠的跨重启保存方式。
-- 模型服务、外部 Agent 和远程主机需要自行配置；费用与能力取决于所选服务。
-- 跳板机目前主要用于交互终端，文件浏览与监控尚未覆盖同等连接路径。
-- 分发签名与公证尚未配置，详见[持续集成说明](docs/zh/ci.md)。
+- Sessions and composition layouts can enter history. Unsaved editor drafts and file browsing state are not a reliable way to preserve work across restarts.
+- Model services, external agents and remote hosts require your configuration. Their costs and capabilities depend on the services you choose.
+- Jump-host support focuses on interactive terminals; browsing and monitoring do not cover the same connection paths yet.
+- Distribution signing and notarization are not configured. See [CI and packages](docs/en/ci.md).
 
-## 欢迎一起建设
+## Build it with us
 
-欢迎提交问题、使用场景、文档改进、翻译、测试与代码。第一次贡献可以从复现一个问题、补充缺失说明或增加一条回归用例开始。较大的功能建议先开 Issue，明确场景、边界和预期行为。
+Issues, use cases, documentation, translations, tests and code contributions are welcome. A first contribution can be a reproducible bug report, a missing explanation or a regression test. Open an issue before a substantial feature to agree on its use case, boundaries and behavior.
 
-**贡献 PR 以 `dev` 为目标分支。** `main` 用于维护者集成和版本构建。分支命名、开发环境、检查要求和提交流程见[贡献指南](CONTRIBUTING.md)。
+**Contribution PRs target `dev`.** Maintainers use `main` for integration and version builds. Read the [contributing guide](CONTRIBUTING.en.md) for branch naming, setup, checks and review.
 
 ```bash
 npx tsc --noEmit
@@ -128,14 +160,14 @@ npm run test
 npm run check:architecture
 ```
 
-交互改动还需对应端到端测试，后端改动需运行原生测试。提交信息使用英文和约定前缀；仓库提供提交、PR 和 Issue 模板。
+Interactive changes also need matching browser regressions, and backend changes need native tests. Commit messages use English and the agreed prefixes. Commit, PR and issue templates are included.
 
-## 深入了解
+## Read more
 
-[功能与回归清单](docs/zh/feature-spec.md) · [架构](docs/zh/architecture.md) · [工作区组合](docs/zh/workspace-compositions.md) · [开发规则](docs/zh/development-rules.md) · [安全模型](docs/zh/security-model.md) · [CI 与安装包](docs/zh/ci.md) · [已知陷阱](docs/zh/pitfalls.md)
+[Features and regression checklist](docs/en/feature-spec.md) · [Architecture](docs/en/architecture.md) · [Workspace compositions](docs/en/workspace-compositions.md) · [Development rules](docs/en/development-rules.md) · [Security model](docs/en/security-model.md) · [CI and packages](docs/en/ci.md) · [Known pitfalls](docs/en/pitfalls.md)
 
-## 许可
+## License
 
-原创代码与文档采用 [Apache License 2.0](LICENSE)，另有声明的文件除外。Copyright 2026 Vrykell contributors。
+Original code and documentation use the [Apache License, Version 2.0](LICENSE), except where otherwise stated. Copyright 2026 Vrykell contributors.
 
-第三方软件、字体和图标保留各自的许可与署名，详见 [NOTICE](NOTICE)、[第三方声明](THIRD_PARTY_NOTICES.md) 和[许可说明](docs/zh/licensing.md)。提交用于纳入本项目的贡献，除非明确另有说明，按项目许可提供。
+Third-party software, fonts and icons retain their own terms and attribution. See [NOTICE](NOTICE), [third-party notices](THIRD_PARTY_NOTICES.md) and the [licensing guide](docs/en/licensing.md). Unless explicitly stated otherwise, contributions submitted for inclusion are offered under the project license.
