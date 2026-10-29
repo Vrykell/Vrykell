@@ -185,7 +185,7 @@ async function captureSingleWorkspaces(page, locale) {
 
   await page.keyboard.press('Control+,');
   await page.locator('.settings-navigation').getByRole('button', { name: locale === 'zh' ? '主题' : 'Theme', exact: true }).click();
-  await expect(page.locator('.theme-preset-preview')).toHaveCount(5);
+  await expect(page.locator('.theme-preset-preview')).toHaveCount(6);
   if (process.env.README_WALLPAPER) {
     await showWallpaper(page, process.env.README_WALLPAPER);
     await shot('theme-settings');
@@ -354,7 +354,154 @@ async function scene(locale, remote = false) {
   await context.close();
 }
 
+async function captureCoreWorkflows(locale) {
+  const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 2 });
+  const page = await context.newPage();
+  page.setDefaultTimeout(25000);
+  await setupTauriMock(page, { launchDirectory: '/work/atlas', terminalDirectories: true });
+  const original = `interface HistoryEntry {
+  command: string;
+  directory: string;
+  exitCode: number | null;
+}
+
+export function recentCommands(
+  entries: HistoryEntry[],
+  directory: string,
+) {
+  return entries
+    .filter(entry => entry.exitCode === 0)
+    .map(entry => entry.command);
+}
+`;
+  const modified = `interface HistoryEntry {
+  command: string;
+  directory: string;
+  exitCode: number | null;
+}
+
+export function recentCommands(
+  entries: HistoryEntry[],
+  directory: string,
+) {
+  const commands = entries
+    .filter(entry => entry.directory === directory)
+    .map(entry => entry.command);
+
+  return [...new Set(commands)];
+}
+`;
+  const shared = `
+export function recentDirectories(entries: HistoryEntry[]) {
+  return [...new Set(entries.map(entry => entry.directory))];
+}
+
+export function rememberCommand(
+  entries: HistoryEntry[],
+  next: HistoryEntry,
+) {
+  const previous = entries.filter(entry =>
+    entry.command !== next.command ||
+    entry.directory !== next.directory,
+  );
+
+  return [next, ...previous].slice(0, 200);
+}
+`;
+  await page.addInitScript(({ locale }) => {
+    localStorage.setItem('vrykell-language', JSON.stringify({ state: { preference: locale }, version: 0 }));
+    localStorage.setItem('vrykell-theme-mode', 'dark');
+    localStorage.setItem('mock-git-snapshot', JSON.stringify({ root: '/work/atlas', branch: 'feature/history', remotes: ['origin'],
+      upstream: 'origin/feature/history', ahead: 2, behind: 0, entries: [
+        { path: 'src/session.ts', indexStatus: ' ', worktreeStatus: 'M', previousPath: null },
+        { path: 'src/session.test.ts', indexStatus: 'M', worktreeStatus: ' ', previousPath: null },
+        { path: 'src/completion.ts', indexStatus: ' ', worktreeStatus: 'M', previousPath: null },
+        { path: 'README.md', indexStatus: ' ', worktreeStatus: 'M', previousPath: null },
+        { path: 'tests/fixtures/history.json', indexStatus: '?', worktreeStatus: '?', previousPath: null },
+      ] }));
+  }, { locale });
+  await page.goto(origin); await waitForWorkbench(page);
+  await page.evaluate(async ({ original, modified }) => {
+    document.documentElement.style.clipPath = 'inset(0 round 16px)';
+    const { useTypographyStore } = await import('/src/config/typography.ts');
+    useTypographyStore.getState().update({ terminalFontSize: 17, editorFontSize: 15, commandHighlighting: true });
+    const invoke = window.__TAURI_INTERNALS__.invoke;
+    window.__TAURI_INTERNALS__.invoke = (command, args, ...rest) => command === 'git_diff'
+      ? Promise.resolve({ original, modified, kind: 'text' }) : invoke(command, args, ...rest);
+  }, { original: original + shared, modified: modified + shared });
+  const shot = async name => {
+    await page.evaluate(() => document.fonts.ready);
+    await page.mouse.move(1595, 895); await page.waitForTimeout(400);
+    await capture(page, new URL(`${name}-${locale}.png`, directory));
+    console.log(`${name}-${locale}.png`);
+  };
+  if (selectedShots.includes('feature-git')) {
+    await page.getByRole('button', { name: locale === 'zh' ? '版本控制' : 'Source control', exact: true }).click();
+    const panel = page.getByTestId('git-panel');
+    await expect(panel.getByTestId('git-unstaged-src/session.ts')).toBeVisible();
+    await panel.getByTestId('git-unstaged-src/session.ts').click();
+    await expect(page.getByTestId('git-diff-review').locator('.monaco-diff-editor')).toBeVisible();
+    await page.getByTestId('workspace-instance-bar').getByRole('combobox', { name: locale === 'zh' ? '差异布局' : 'Comparison layout' }).click();
+    await page.getByRole('option', { name: locale === 'zh' ? '左右对比' : 'Side by side', exact: true }).click();
+    await panel.getByRole('textbox', { name: locale === 'zh' ? '提交信息' : 'Commit message', exact: true }).fill('fix: keep command history scoped to its directory');
+    await expect(page.getByTestId('git-diff-review').locator('.modified .view-lines:not(.line-delete)')).toContainText('new Set(commands)');
+    await shot('feature-git');
+    await page.keyboard.press('Control+w');
+    await page.getByRole('button', { name: locale === 'zh' ? '版本控制' : 'Source control', exact: true }).click();
+  }
+  if (selectedShots.includes('feature-completion')) {
+    await page.getByTestId('workspace-area-terminal').click();
+    await page.evaluate(async () => {
+      const { useWorkspaceStore } = await import('/src/features/workspace/stores/workspace.ts');
+      if (!useWorkspaceStore.getState().tabs.some(tab => tab.kind === 'session')) useWorkspaceStore.getState().addTab({ shellType: 'zsh', cwd: '/work/atlas' });
+    });
+    await expect(page.locator('[data-terminal-input]:visible')).toBeVisible();
+    await page.evaluate(async () => {
+      const { useWorkspaceStore } = await import('/src/features/workspace/stores/workspace.ts');
+      const { useBlockStore } = await import('/src/features/terminal/stores/blocks.ts');
+      const { useTerminalStore } = await import('/src/features/terminal/stores/terminal.ts');
+      const { useHistoryStore } = await import('/src/features/terminal/stores/history.ts');
+      const tab = useWorkspaceStore.getState().tabs.find(tab => tab.kind === 'session');
+      const paneId = tab.layout.terminal.id;
+      const now = Date.now();
+      const samples = [
+        ['git status --short', ' M src/session.ts\n M src/completion.ts\nM  src/session.test.ts\n?? tests/fixtures/history.json', 0],
+        ['npm run test -- src/session.test.ts', ' RUN  tests\n\n ✓ src/session.test.ts (8 tests)\n   ✓ keeps commands from the current directory\n   ✓ keeps interrupted commands in history\n   ✓ removes duplicate suggestions\n\n Test Files  1 passed (1)\n      Tests  8 passed (8)\n   Duration  428ms', 0],
+        ['npm run build', 'tsc && vite build\n\n✓ 248 modules transformed.\ndist/index.html          0.64 kB\ndist/assets/app.js     184.32 kB\n\n✓ built in 1.42s', 0],
+      ];
+      useBlockStore.getState().setBlocks(paneId, samples.map(([command, outputText, exitCode], index) => ({
+        id: `core-example-${index}`, command, cwd: '/work/atlas', gitBranch: 'feature/history', status: 'done', exitCode,
+        startedAt: now - (samples.length - index) * 5000, endedAt: now - (samples.length - index) * 5000 + 428,
+        outputText, outputRaw: outputText.replaceAll('\n', '\r\n'), outputHtml: outputText.replaceAll('\n', '<br>'), linesTruncated: 0,
+      })));
+      useTerminalStore.setState(state => ({ scenes: { ...state.scenes, [paneId]: 'blockList' } }));
+      useHistoryStore.setState({ entries: ['npm run test -- src/session.test.ts', 'npm run test -- --watch', 'npm run test -- --coverage']
+        .map(command => ({ command, cwd: '/work/atlas', timestamp: now, exitCode: 0 })) });
+    });
+    if (selectedShots.includes('feature-completion')) {
+      const input = page.locator('[data-terminal-input]:visible');
+      await input.fill('npm run t');
+      await expect(page.locator('.command-completion-suffix:visible')).toContainText('est -- src/session.test.ts');
+      await page.getByRole('button', { name: locale === 'zh' ? '补全快捷键' : 'Completion shortcuts', exact: true }).click();
+      await shot('feature-completion');
+      await page.keyboard.press('Escape');
+    }
+  }
+  if (selectedShots.includes('theme-deep-black')) {
+    await chooseScheme(page, locale, 'dark', 'deep-black');
+    await page.keyboard.press('Control+,');
+    await page.locator('.settings-navigation').getByRole('button', { name: locale === 'zh' ? '主题' : 'Theme', exact: true }).click();
+    await page.getByRole('radio', { name: 'Deep Black', exact: true }).click();
+    await expect(page.getByRole('radio', { name: 'Deep Black', exact: true })).toBeChecked();
+    await shot('theme-deep-black');
+  }
+  await context.close();
+}
+
 try {
-  for (const locale of ['zh', 'en']) { await scene(locale); if (!extraOnly) await scene(locale, true); }
+  for (const locale of ['zh', 'en']) {
+    if (selectedShots?.length && selectedShots.every(name => ['feature-git', 'feature-completion', 'theme-deep-black'].includes(name))) await captureCoreWorkflows(locale);
+    else { await scene(locale); if (!extraOnly) await scene(locale, true); }
+  }
 } finally { await browser.close(); }
 for (const item of captures) await saveCapture(item);
