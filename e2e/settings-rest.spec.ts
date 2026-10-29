@@ -63,12 +63,31 @@ test.describe('Theme file settings page', () => {
 });
 
 test.describe('Opening mode settings page', () => {
-  test('Each shell defaults to block mode; switching to classic mode persists', async ({ page }) => {
+  test('Each shell defaults to block mode; switching to classic mode persists', async ({ page }, testInfo) => {
     await gotoSetting(page, 'Zsh');
-    await page.getByRole('combobox', { name: '打开方式', exact: true }).click();
-    await page.getByRole('option', { name: '经典模式', exact: true }).click();
+    const modes = page.getByRole('radiogroup', { name: '打开方式', exact: true });
+    await expect(modes.getByRole('radio', { name: '块模式', exact: true })).toBeChecked();
+    await modes.getByRole('radio', { name: '经典模式', exact: true }).click();
     const saved = await page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
     expect(saved).toContain('"zsh":"classic"');
+    await modes.getByRole('radio', { name: '经典模式', exact: true }).press('ArrowRight');
+    await expect(modes.getByRole('radio', { name: '块模式', exact: true })).toBeChecked();
+    await gotoSetting(page, 'Bash');
+    await gotoSetting(page, 'Zsh');
+    await expect(modes.getByRole('radio', { name: '块模式', exact: true })).toBeChecked();
+    for (const theme of ['深色', '浅色']) {
+      await gotoSetting(page, '主题'); await selectThemeMode(page, theme);
+      await gotoSetting(page, 'Zsh');
+      for (const width of [760, 1240]) {
+        await page.setViewportSize({ width, height: 800 });
+        await expect(modes.getByRole('radio')).toHaveCount(2);
+        expect(await modes.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+        await modes.screenshot({ path: testInfo.outputPath(`opening-mode-${theme}-${width}.png`) });
+      }
+    }
+    await gotoSetting(page, 'CMD');
+    await expect(modes.getByRole('radio')).toHaveCount(1);
+    await expect(modes.getByRole('radio', { name: '经典模式', exact: true })).toBeChecked();
   });
 
   test('SSH opening mode is configured through the saved host quick menu', async ({ page }) => {

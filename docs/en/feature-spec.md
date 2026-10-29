@@ -4,6 +4,8 @@
 
 Appearance and toolbar regression checklist:
 
+- Shell opening modes use the shared segmented control for classic and block mode. Click and arrow-key choices persist per profile; profiles without block integration offer only classic mode. Verify dark/light themes, narrow layouts and selection persistence.
+
 - Tool permission rows use the shared segmented control for allow, ask and deny, preserving saved levels and existing authorization rules. Wide settings show two items per row; narrow settings use one column. Verify keyboard switching, search focus, navigation persistence and narrow layouts.
 
 - Model lists sort names within each group and show only supported capabilities as colored icon pills: green vision, violet reasoning, orange tools and blue search, each with a faint matching background. Per-model settings place four selectable capability pills below the other options and persist explicit choices; the bottom-left Reset action restores detected capabilities without changing other options. Changing the provider or model ID detects them again. Verify filtering, reset, reload, dark/light colors and narrow layouts.

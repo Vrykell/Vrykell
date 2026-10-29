@@ -4,7 +4,7 @@ import { pickPath } from '@platform/api/fs';
 import { EMPTY_SHELL_PROFILE, useShellProfiles } from '@config/shellProfiles';
 import { useTerminalDefaults } from '@config/terminalDefaults';
 import { useAgentSettings } from '@features/agent';
-import Select from '@ui/fields/Select';
+import SegmentedControl from '@ui/fields/SegmentedControl';
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import { Field, SettingsGroup, Toggle } from '../components/ui';
 import AutoSaveInput from '../components/AutoSaveInput';
@@ -15,6 +15,7 @@ export default function ShellProfilePage({ shell }: { shell: ShellType }) {
   const update = useShellProfiles(state => state.update);
   const defaultShell = useTerminalDefaults(state => state.shell);
   const mode = useAgentSettings(state => state.global.openModeByShell[shell]);
+  const modeOptions = [{ value: 'classic', label: t('settings.openMode.classic') }, { value: 'block', label: t('settings.openMode.block') }] as const;
   const { save } = useSettingsSave();
   const set = (patch: Partial<typeof profile>) => save(() => update(shell, patch));
   return <div className="shell-profile-page">
@@ -27,9 +28,11 @@ export default function ShellProfilePage({ shell }: { shell: ShellType }) {
         <div className="shell-profile-directory"><AutoSaveInput style={{ flex: 1, minWidth: 0 }} aria-label={t('Starting directory')} value={profile.cwd} placeholder={t('Inherit current directory')} onCommit={value => update(shell, { cwd: value })} />
         <OutlineButton onClick={() => save(async () => { const [path] = await pickPath('directory'); if (path) update(shell, { cwd: path }); })}>{t('Browse…')}</OutlineButton></div>
       </Field>
-      <Field title={t('Opening mode')}><Select aria-label={t('Opening mode')} value={shell === 'cmd' ? 'classic' : mode}
-        options={[{ value: 'classic', label: t('settings.openMode.classic') }, ...(shell === 'cmd' ? [] : [{ value: 'block', label: t('settings.openMode.block') }])]}
-        onChange={value => save(() => { const store = useAgentSettings.getState(); store.update({ openModeByShell: { ...store.global.openModeByShell, [shell]: value as 'classic' | 'block' } }); })} /></Field>
+      <Field title={t('Opening mode')}>
+        <SegmentedControl label={t('Opening mode')} value={shell === 'cmd' ? 'classic' : mode}
+          options={shell === 'cmd' ? modeOptions.slice(0, 1) : modeOptions}
+          onChange={value => { void save(() => { const store = useAgentSettings.getState(); store.update({ openModeByShell: { ...store.global.openModeByShell, [shell]: value } }); }); }} />
+      </Field>
     </SettingsGroup>
     <SettingsGroup title={t('Menu and defaults')}>
       <Field title={t('Default profile')}><Toggle label={t('Default profile')} on={defaultShell === shell} onChange={enabled => save(() => useTerminalDefaults.getState().setShell(enabled ? shell : 'system'))} /></Field>
