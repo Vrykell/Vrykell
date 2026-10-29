@@ -162,6 +162,12 @@ npm run check:architecture
 
 Interactive changes also need matching browser regressions, and backend changes need native tests. Commit messages use English and the agreed prefixes. Commit, PR and issue templates are included.
 
+## Community
+
+Join the community group to share ideas, ask questions and follow the project. Group number: **1130135497**.
+
+<a href="docs/images/community-group.jpg"><img src="docs/images/community-group.jpg" width="260" alt="Community group QR code" /></a>
+
 ## Read more
 
 [Features and regression checklist](docs/en/feature-spec.md) · [Architecture](docs/en/architecture.md) · [Workspace compositions](docs/en/workspace-compositions.md) · [Development rules](docs/en/development-rules.md) · [Security model](docs/en/security-model.md) · [CI and packages](docs/en/ci.md) · [Known pitfalls](docs/en/pitfalls.md)

@@ -162,6 +162,12 @@ npm run check:architecture
 
 交互改动还需对应端到端测试，后端改动需运行原生测试。提交信息使用英文和约定前缀；仓库提供提交、PR 和 Issue 模板。
 
+## 交流社区
+
+欢迎加入交流群，分享想法、交流问题并关注项目进展。群号：**1130135497**。
+
+<a href="docs/images/community-group.jpg"><img src="docs/images/community-group.jpg" width="260" alt="交流群二维码" /></a>
+
 ## 深入了解
 
 [功能与回归清单](docs/zh/feature-spec.md) · [架构](docs/zh/architecture.md) · [工作区组合](docs/zh/workspace-compositions.md) · [开发规则](docs/zh/development-rules.md) · [安全模型](docs/zh/security-model.md) · [CI 与安装包](docs/zh/ci.md) · [已知陷阱](docs/zh/pitfalls.md)
