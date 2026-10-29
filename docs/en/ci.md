@@ -1,20 +1,22 @@
 # Continuous integration and packages
 
 The workflow in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) runs on
-pushes and pull requests to `dev` and `main`. It can also be started manually.
+pushes to `main` and pull requests targeting `dev` or `main`. Changes limited to
+documentation or `.github/` files do not trigger it. It can also be started manually.
 
 - The frontend job checks types, unit tests, architecture boundaries and the production build.
-- Four isolated browser jobs share the full interaction suite, each using one worker. Failure diagnostics are saved for seven days.
-- The backend matrix runs locked tests on all three desktop platforms, including the native context menu and the generated third-party inventory check on the Windows runner.
-- After every check passes, a push or manual run on `main` builds desktop installers. Other branches and pull requests do not build packages.
+- Automatic runs only perform the frontend checks on a Linux runner.
+- Manual `full` runs add four browser test shards and backend tests on all three desktop platforms, including the native context menu and generated third-party inventory checks on Windows. Failure diagnostics are kept for three days.
+- Manual `package` runs on `main` perform the frontend checks and build one selected installer target. They do not run the full browser or backend matrices; run `full` on the same commit separately when that coverage is required.
 
-`dev` is the integration branch. Merge it into `main` to produce version builds.
-The repository default branch is `main`.
+`dev` is the integration branch and `main` is the default branch. Merge into `main`,
+then use Actions → CI → Run workflow to select `full` or `package`. For a package,
+select `main` and the desired target; repeat only for additional platforms needed.
 
-The package matrix produces a 64-bit installer for Windows, 64-bit `.deb` and
+The available targets produce a 64-bit installer for Windows, 64-bit `.deb` and
 `.AppImage` packages for Linux, and separate ARM64 and Intel `.dmg` packages for
 macOS. Open the successful workflow run and download its `vrykell-<target>-<commit>`
-artifacts within 14 days. Each artifact is tied to the exact tested commit. The
+artifacts within three days. Each artifact is tied to the exact built commit. The
 version comes from the checked-in manifests; keep `package.json`, its lockfile,
 `src-tauri/Cargo.toml`, its lockfile and `src-tauri/tauri.conf.json` in sync when
 bumping it.

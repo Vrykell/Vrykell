@@ -1,18 +1,20 @@
 # 持续集成与安装包
 
-[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) 会在向 `dev` 和 `main`
-推送代码或提交拉取请求时运行，也支持手动启动。
+[`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) 会在向 `main` 推送代码，
+或向 `dev`、`main` 提交拉取请求时运行，也支持手动启动。仅修改文档或 `.github/`
+文件不会触发自动运行。
 
 - 前端任务检查类型、单元测试、架构边界和生产构建。
-- 四个独立的浏览器任务分片运行完整交互测试，每个任务使用单个工作进程，失败诊断保留七天。
-- 后端矩阵在三个桌面平台运行锁定依赖的测试，其中 Windows 任务还会检查原生上下文菜单和生成的第三方声明清单。
-- 所有检查通过后，`main` 上的推送或手动运行会构建桌面安装包。其他分支和拉取请求不构建安装包。
+- 自动运行只在 Linux 上执行前端检查。
+- 手动选择 `full` 会增加四个浏览器测试分片和三个桌面平台的后端测试，Windows 还会检查原生上下文菜单与生成的第三方声明清单。失败诊断保留三天。
+- 在 `main` 手动选择 `package` 会执行前端检查，并只构建所选平台的安装包；它不会运行完整浏览器和后端矩阵。如需这些覆盖，请对同一提交另行运行 `full`。
 
-`dev` 是集成分支，将其合并到 `main` 后产生版本构建。仓库默认分支为 `main`。
+`dev` 是集成分支，仓库默认分支为 `main`。合并到 `main` 后，在 Actions → CI →
+Run workflow 中选择 `full` 或 `package`；打包时选择 `main` 和所需目标，其他平台按需分别运行。
 
-构建矩阵生成 Windows 64 位安装程序、Linux 64 位 `.deb` 和 `.AppImage` 包，
+可选目标包括 Windows 64 位安装程序、Linux 64 位 `.deb` 和 `.AppImage` 包，
 以及 macOS ARM64 和 Intel 两种 `.dmg` 包。在成功运行的流水线页面中下载
-`vrykell-<target>-<commit>` 产物，保留期限为 14 天。每份产物对应通过检查的精确
+`vrykell-<target>-<commit>` 产物，保留期限为三天。每份产物对应构建使用的精确
 提交。版本号取自仓库清单；升级时请同步 `package.json`、对应锁文件、
 `src-tauri/Cargo.toml`、对应锁文件和 `src-tauri/tauri.conf.json`。
 

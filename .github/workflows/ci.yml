@@ -3,9 +3,24 @@ name: CI
 on:
   push:
     branches: [main]
+    paths-ignore: ['docs/**', 'README*.md', 'CONTRIBUTING*.md', '.github/**']
   pull_request:
     branches: [dev, main]
+    paths-ignore: ['docs/**', 'README*.md', 'CONTRIBUTING*.md', '.github/**']
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Choose basic checks, full tests, or one installer'
+        type: choice
+        required: true
+        default: basic
+        options: [basic, full, package]
+      target:
+        description: 'Installer target (used only in package mode)'
+        type: choice
+        required: true
+        default: x86_64-pc-windows-msvc
+        options: [x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu, aarch64-apple-darwin, x86_64-apple-darwin]
 
 permissions:
   contents: read
@@ -32,6 +47,7 @@ jobs:
       - run: npm run build
 
   e2e:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'full'
     name: Browser interaction tests (${{ matrix.shard }}/4)
     strategy:
       fail-fast: false
@@ -55,10 +71,11 @@ jobs:
         with:
           name: browser-test-results-${{ matrix.shard }}
           path: test-results/
-          retention-days: 7
+          retention-days: 3
           if-no-files-found: ignore
 
   backend:
+    if: github.event_name == 'workflow_dispatch' && inputs.mode == 'full'
     name: Backend tests (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -101,32 +118,13 @@ jobs:
 
   packages:
     name: Package (${{ matrix.target }})
-    needs: [frontend, e2e, backend]
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    needs: [frontend]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch' && inputs.mode == 'package'
     strategy:
       fail-fast: false
-      max-parallel: 2
       matrix:
-        include:
-          - os: windows-2022
-            target: x86_64-pc-windows-msvc
-            bundles: nsis
-            files: src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            bundles: deb,appimage
-            files: |
-              src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb
-              src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage
-          - os: macos-15
-            target: aarch64-apple-darwin
-            bundles: dmg
-            files: src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
-          - os: macos-15
-            target: x86_64-apple-darwin
-            bundles: dmg
-            files: src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg
-    runs-on: ${{ matrix.os }}
+        target: ['${{ inputs.target }}']
+    runs-on: ${{ fromJSON('{"x86_64-pc-windows-msvc":"windows-2022","x86_64-unknown-linux-gnu":"ubuntu-22.04","aarch64-apple-darwin":"macos-15","x86_64-apple-darwin":"macos-15"}')[matrix.target] }}
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -148,12 +146,14 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev patchelf libssl-dev libfuse2
       - run: npm ci
       - name: Build installers from main
-        run: npm run tauri -- build --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} -- --locked
+        run: npm run tauri -- build --ci --target ${{ matrix.target }} --bundles ${{ fromJSON('{"x86_64-pc-windows-msvc":"nsis","x86_64-unknown-linux-gnu":"deb,appimage","aarch64-apple-darwin":"dmg","x86_64-apple-darwin":"dmg"}')[matrix.target] }} -- --locked
       - name: Save installers
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: vrykell-${{ matrix.target }}-${{ github.sha }}
-          path: ${{ matrix.files }}
+          path: |
+            ${{ fromJSON('{"x86_64-pc-windows-msvc":"src-tauri/target/x86_64-pc-windows-msvc/release/bundle/nsis/*.exe","x86_64-unknown-linux-gnu":"src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/deb/*.deb","aarch64-apple-darwin":"src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg","x86_64-apple-darwin":"src-tauri/target/x86_64-apple-darwin/release/bundle/dmg/*.dmg"}')[matrix.target] }}
+            ${{ matrix.target == 'x86_64-unknown-linux-gnu' && 'src-tauri/target/x86_64-unknown-linux-gnu/release/bundle/appimage/*.AppImage' || '' }}
           if-no-files-found: error
           compression-level: 0
-          retention-days: 14
+          retention-days: 3
