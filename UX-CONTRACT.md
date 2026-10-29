@@ -57,6 +57,8 @@ Desktop terminal, remote-host, file and conversation workflows use the existing 
 
 ## Navigation and Feedback
 
+Workspace navigation restores the last selected tab in each area, including utility pages. Common-workspace resource activation retains the reading tab remembered by the native workspace. A closed remembered tab falls back to an available instance through the existing container selection rules.
+
 Main and split AI conversation content has no separate heading or toolbar. Conversation actions stay in the shared tab toolbar when the sidebar opens, closes or changes its selection.
 
 The leading slot in terminal, code, AI and common strips opens all workspace tabs. Resource switching and splitting do not occupy additional right-toolbar slots. Split tab is a context submenu of creatable types, retaining full profile, host and agent pickers and creation after placement. Removed project-selection and open-in-terminal toolbar actions remain in domain context menus. The common toolbar offers side docking for the focused AI owner; insufficient space preserves its main placement. Sent attachment cards follow their question, close previews on outside press or Escape and restore chip focus on Escape. Pure chat sends images to image-capable models and explicitly rejects unsupported image input. Find/replace keeps the close control in the upper row.

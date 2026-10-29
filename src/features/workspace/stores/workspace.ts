@@ -555,8 +555,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const tab = get().tabs.find((t) => t.id === id);
     if (tab) {
       const area = workspaceAreaForKind(tab.kind);
-      if (useWorkspaceNavigation.getState().area !== 'unified') useWorkspaceNavigation.getState().selectArea(area);
-      useWorkspaceNavigation.getState().rememberTab(area, id);
+      if (useWorkspaceNavigation.getState().area !== 'unified') {
+        useWorkspaceNavigation.getState().selectArea(area);
+        useWorkspaceNavigation.getState().rememberTab(area, id);
+      }
     }
     const terminal = useTerminalStore.getState();
     const pane = tab && isSessionTab(tab) ? layoutLeaves(tab.layout).find(item => terminal.manualFullscreen[item.id]) ?? firstLeaf(tab.layout) : null;
@@ -818,8 +820,11 @@ useWorkspaceStore.subscribe((state, previous) => {
   const tab = state.tabs.find(item => item.id === state.activeId);
   if (!tab) return;
   const area = workspaceAreaForKind(tab.kind);
-  if (useWorkspaceNavigation.getState().area !== 'unified') useWorkspaceNavigation.getState().selectArea(area);
-  useWorkspaceNavigation.getState().rememberTab(area, tab.id);
+  // Mixed panes activate native owners without replacing the native workspace's reading tab.
+  if (useWorkspaceNavigation.getState().area !== 'unified') {
+    useWorkspaceNavigation.getState().selectArea(area);
+    useWorkspaceNavigation.getState().rememberTab(area, tab.id);
+  }
   const terminal = useTerminalStore.getState();
   const pane = isSessionTab(tab) ? layoutLeaves(tab.layout).find(item => terminal.manualFullscreen[item.id]) ?? firstLeaf(tab.layout) : null;
   terminal.setFocusedPane(pane?.id ?? tab.id);
