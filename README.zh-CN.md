@@ -6,13 +6,12 @@
 
 ### 终端与 AI，并肩工作。
 
-一个带命令补全、文件浏览、编辑器和 Git 工具的桌面终端。支持本地 Shell 和 SSH，也能在旁边打开 AI 对话或 Agent。
+一个带命令补全、文件管理、编辑器和 Git 的桌面终端。支持本地与 SSH 会话，也能在旁边打开 AI 对话或 Agent。
 
-[下载](https://github.com/Vrykell/Vrykell/releases) · [使用场景](#使用场景) · [命令补全](#命令补全) · [Git](#git) · [参与贡献](CONTRIBUTING.md) · [English](README.md)
+[下载 Beta](#下载) · [主要功能](#主要功能) · [使用场景](#使用场景) · [从源码运行](#从源码运行) · [参与贡献](CONTRIBUTING.md) · [English](README.md)
 
 <p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="Apache-2.0" /></a>
-  <a href="https://github.com/Vrykell/Vrykell/actions/workflows/ci.yml"><img src="https://img.shields.io/badge/CI-checks-64748b?style=flat-square" alt="CI checks" /></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-3b82f6?style=flat-square" alt="Windows, macOS, Linux" />
 </p>
 
@@ -20,123 +19,124 @@
 
 <a href="docs/images/hero-workspace-zh.png"><img src="docs/images/hero-workspace-zh.png" width="1600" alt="代码、构建终端与 Agent 工作区" /></a>
 
-## 使用场景
+## 下载
 
-每个标签最多放四个窗格，可以混排终端、文件、AI 对话和外部 Agent。拖动窗格调整位置，按项目给标签分组、命名和设置颜色。切换标签时，终端和对话继续运行。
+当前版本为 **0.1.0 Beta 1**，提供 Windows、macOS 和 Linux 安装包。这是早期预览版，日常使用前可先查看[当前边界](#当前边界)。截图和功能介绍跟随开发分支，可能领先于已发布的安装包。
 
-### 左边改代码，右边看构建
-
-打开源文件，在旁边保留构建或测试终端。改完代码就运行命令，对照结果检查。需要时再加一个 Agent 窗格，读取相关文件和命令输出。
-
-编辑器支持语法高亮、查找替换、编码选择、Markdown 预览和 Git 差异。命令块保留工作目录、分支、耗时和退出状态；构建失败后，可以把对应命令块附到对话中。
-
-<a href="docs/images/scenario-build-zh.png"><img src="docs/images/scenario-build-zh.png" width="1600" alt="并排编辑代码与运行构建" /></a>
-
-### 左边 SSH，右边 AI
-
-连接服务器，检查服务状态或部署日志。在旁边打开 AI 对话，附上需要分析的输出。交给 Agent 执行前先选好目标终端，工具调用和审批请求会显示在对话中。
-
-主机管理覆盖密码与密钥认证、主机密钥确认和端口转发。直接连接支持 SFTP 浏览、上传、下载和远程编辑。交互终端支持跳板机；经跳板机的文件浏览与资源监控仍有限制。
-
-<a href="docs/images/scenario-remote-zh.png"><img src="docs/images/scenario-remote-zh.png" width="1600" alt="远程服务检查与 AI 部署讨论" /></a>
-
-### 在终端旁边运行 Agent
-
-可以使用内置 AI 对话，也可以通过 ACP 接入外部 Agent。执行终端保持可见，文件和差异随时打开检查。对话可以放在窗格或侧栏中。
-
-内置对话支持附件、工具权限、技能、MCP 和本地记忆。外部 Agent 通过 ACP 提供自己的模型和工具，具体能力取决于所配置的服务或 Agent。
-
-### 其他布局
-
-| 你正在做什么 | 可以怎样安排 |
+| 平台 | 安装包 |
 | --- | --- |
-| 调试接口 | 一个终端启动服务，另一个终端发请求，旁边打开处理函数或日志。 |
-| 排查构建失败 | 保留失败命令块，让 AI 分析对应输出，再打开文件核对修复。 |
-| 维护多个项目 | 按项目组织标签分组，用颜色区分；暂时不用的组可以收起。 |
-| 检查远程变更 | SSH 终端旁边放远程文件或 AI 对话，核对目标后再执行操作。 |
-| 审查 Agent 的工作 | 对照工具记录、文件内容与 Git 差异，确认变更后再继续。 |
-| 重复工作流程 | 从命令历史搜索、收藏、分组或重新运行命令。 |
+| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_x64-setup.exe) |
+| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_aarch64.dmg) |
+| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_x64.dmg) |
+| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_amd64.AppImage) |
 
-## 终端、文件与连接
+[全部版本与发布说明](https://github.com/Vrykell/Vrykell/releases) · [构建说明](docs/zh/ci.md)
 
-终端、项目文件、已保存主机和 AI 对话都有独立工作区。可以单独使用，也可以把它们的标签组合到分屏中。
+## 主要功能
 
-### 终端
+- **[终端与命令补全](#终端与命令补全)**：命令块、经典模式、历史建议、Shell 与路径补全。
+- **[文件与编辑器](#文件与编辑器)**：本地与 SFTP 文件浏览、传输、编辑器标签及 Markdown 预览。
+- **[Git](#git)**：差异、暂存、提交、分支与远程操作。
+- **[SSH](#ssh)**：主机管理、认证、端口转发与资源状态。
+- **[AI 与 Agent](#ai-与-agent)**：自带模型、引用输出或图片、接入外部 Agent。
+- **[工作区布局](#使用场景)**：每个标签最多四个混合窗格，支持标签分组和对话侧栏。
 
-经典模式保留连续终端输出，块模式将每条命令和输出放在一起。全屏程序使用交互终端画面。本地和 SSH 会话各有标签、目录和命令历史。
+### 终端与命令补全
 
-历史命令可以搜索、收藏、分组和重新运行。命令块会记录工作目录、分支、耗时和退出状态，方便回看结果。
+经典模式保留连续终端画面；块模式把命令与输出、工作目录、分支、耗时和退出状态放在一起。全屏程序使用交互终端画面。历史命令可以搜索、收藏、分组和重新运行。
 
-#### 命令补全
+输入时显示历史建议。本地匹配与路径补全不需要模型密钥；可选的 AI 补全会在没有本地建议时调用所配置的模型。Tab 补全结合内置建议、所支持的 Shell 补全和当前本地或 SSH 目录中的路径，支持引号和带空格的名称。
 
-- 输入时显示历史命令建议。本地匹配和文件路径补全不需要模型密钥；可选的 AI 补全会在没有本地建议时调用你配置的模型。
-- Tab 补全结合内置建议、所支持的 Shell 补全和文件路径。路径补全跟随当前本地或 SSH 目录，支持引号和带空格的路径。
-- 用 `Tab`、`Shift+Tab` 切换候选，按 `Esc` 恢复原始输入；接受建议的快捷键可以自定义。
+用 `Tab`、`Shift+Tab` 切换候选，按 `Esc` 恢复原始输入；接受建议的快捷键可以自定义。
 
-<a href="docs/images/single-terminal-zh.png"><img src="docs/images/single-terminal-zh.png" width="1600" alt="终端会话和命令块" /></a>
+<a href="docs/images/feature-completion-zh.png"><img src="docs/images/feature-completion-zh.png" width="1600" alt="命令块、历史补全与可配置的接受快捷键" /></a>
+
+<details>
+<summary>终端工作区与 AI 侧栏</summary>
+
+<a href="docs/images/single-terminal-zh.png"><img src="docs/images/single-terminal-zh.png" width="1600" alt="终端工作区与展开的 AI 侧栏" /></a>
+
+</details>
 
 ### 文件与编辑器
 
-浏览本地目录或 SFTP 远程文件，支持新建文件和目录、重命名、复制、移动、删除及多选操作。上传下载有独立传输列表，文件可以用内置编辑器或指定的外部程序打开。
+浏览本地目录或 SFTP 远程文件，支持新建、重命名、复制、移动、删除和多选。上传下载有独立传输列表，文件可以用内置编辑器或指定的外部程序打开。
 
-编辑器支持语法高亮、查找替换、Markdown 预览、字符编码和 Vim 按键，多个文件以标签组织。只读状态、未保存修改和保存冲突会在覆盖前提示。
+编辑器支持语法高亮、查找替换、Markdown 预览、字符编码和 Vim 按键。多个文件以标签组织，只读状态、未保存修改和保存冲突会在覆盖前提示。选择内置编辑器时，不支持的文件类型交给系统默认应用打开；远程文件会先下载副本，副本修改不会自动同步回去。
 
-<a href="docs/images/single-editor-zh.png"><img src="docs/images/single-editor-zh.png" width="1600" alt="项目文件编辑工作区" /></a>
+<details>
+<summary>项目文件与编辑器</summary>
+
+<a href="docs/images/single-editor-zh.png"><img src="docs/images/single-editor-zh.png" width="1600" alt="项目文件与内置编辑器" /></a>
+
+</details>
 
 ### Git
 
 源码管理面板跟随当前终端或文件，也支持已保存的 SSH 连接。使用前需要在本机或远程主机安装 Git。
 
-- 按冲突、已暂存、未暂存和未跟踪分组查看文件，支持列表和树状视图。可以打开差异、暂存、取消暂存，以及确认后丢弃修改。
-- 检查暂存内容，填写提交信息并提交；也可以让 AI 起草提交信息，再自行检查。
-- 支持 fetch、pull、push，创建、切换、重命名和删除分支，合并、变基和标签操作。可用操作取决于仓库当前状态。
+- 按冲突、已暂存、未暂存和未跟踪查看文件，支持列表和树状视图。可以打开差异、暂存、取消暂存，以及确认后丢弃修改。
+- 填写提交信息并提交；也可以让 AI 起草提交信息，再自行检查。
+- 支持 fetch、pull、push，以及创建、切换、重命名和删除分支、合并、变基和标签管理。
 - 浏览关联工作树，切换面板查看的仓库。
 
-一次常见的检查流程是：**查看差异 → 暂存需要的文件 → 核对提交信息 → 提交 → 推送**。其他 Git 操作也可以直接在终端运行。
+一次常见的检查流程是：**查看差异 → 暂存需要的文件 → 核对提交信息 → 提交 → 推送**。其他操作仍可直接在终端运行。
 
-### SSH 主机
+<a href="docs/images/feature-git-zh.png"><img src="docs/images/feature-git-zh.png" width="1600" alt="文件左右差异与源码管理面板" /></a>
 
-用列表或卡片管理连接，按名称、分组和标签找到目标。保存主机配置后，可以连接终端、浏览远程文件、管理传输任务或设置端口转发；直接连接还支持按需查看资源状态。
+### SSH
 
-<a href="docs/images/single-hosts-zh.png"><img src="docs/images/single-hosts-zh.png" width="1600" alt="主机卡片与连接管理" /></a>
+用列表或卡片管理主机，按名称、分组和标签找到目标。连接支持密码与密钥认证、主机密钥确认和端口转发。直接连接还支持 SFTP 浏览、远程编辑、传输及按需查看资源状态。
 
-### AI 对话
+<a href="docs/images/single-hosts-zh.png"><img src="docs/images/single-hosts-zh.png" width="1600" alt="主机资源状态与展开的侧栏" /></a>
 
-纯对话可以直接提问，也可以附上文本、文件或图片；图片需要所选模型支持图像输入。需要执行任务时，选择明确的终端环境，查看工具调用和权限确认。内置对话与外部 Agent 可以按任务分别保留。
+### AI 与 Agent
 
-<a href="docs/images/single-ai-zh.png"><img src="docs/images/single-ai-zh.png" width="1600" alt="独立的 AI 对话工作区" /></a>
+可以直接聊天，也可以附上文本、文件、图片或命令输出。图片输入需要模型支持。执行任务时，先选择目标终端，再在对话中检查工具调用和权限请求。
+
+内置对话支持流式输出、多模型配置、技能、MCP 和本地记忆。外部 Agent 通过 ACP 接入，提供自己的模型和工具。两者都可以放在窗格或侧栏中，按任务分别保留对话。
+
+<a href="docs/images/single-ai-zh.png"><img src="docs/images/single-ai-zh.png" width="1600" alt="带附件、工具记录与展开侧栏的 AI 对话" /></a>
+
+## 使用场景
+
+每个标签最多放四个窗格，可以混排终端、文件、AI 对话和外部 Agent。拖动窗格调整位置，给标签分组、命名和设置颜色，暂时不用的组可以收起。切换标签时，会话和对话继续运行。
+
+### 左边改代码，右边看构建
+
+打开源文件，在旁边保留测试或构建终端。改完代码就运行命令，对照结果检查。需要分析失败输出时，把对应命令块附到对话中。
+
+<a href="docs/images/scenario-build-zh.png"><img src="docs/images/scenario-build-zh.png" width="1600" alt="并排编辑代码与运行构建" /></a>
+
+### 左边 SSH，右边 AI
+
+连接服务器，检查服务状态或部署日志。在旁边保留 AI 对话，讨论输出；交给 Agent 执行前先核对目标终端与目录。
+
+<a href="docs/images/scenario-remote-zh.png"><img src="docs/images/scenario-remote-zh.png" width="1600" alt="远程服务检查与 AI 部署讨论" /></a>
+
+审查 Agent 的变更时，可以把执行终端留在对话旁边，再打开文件或 Git 差异核对。维护多个项目时，按项目分组收纳会话。
 
 ## 主题与字体
 
-内置十套深浅配色，页面、编辑器和终端一起切换。深浅选择分别保存，也可以跟随系统。页面、编辑器、终端和对话可独立设置字体与字号，内置字体无需另行安装。
+内置十一套配色，包含六套深色、五套浅色，以及中性的 Deep Black。原有深浅配色完整保留。深浅选择分别保存，也可以跟随系统。
 
-<a href="docs/images/theme-settings-zh.png"><img src="docs/images/theme-settings-zh.png" width="1600" alt="主题设置与配色预览" /></a>
+页面、编辑器、终端和对话可分别设置字体与字号，内置字体无需另行安装。也可以选择本地壁纸，调整应用不透明度。
 
-<a href="docs/images/theme-light-zh.png"><img src="docs/images/theme-light-zh.png" width="1600" alt="浅色配色下的代码、终端与 Agent 工作台" /></a>
+<a href="docs/images/theme-settings-zh.png"><img src="docs/images/theme-settings-zh.png" width="1600" alt="配色卡片与壁纸设置" /></a>
 
-<a href="docs/images/theme-nord-zh.png"><img src="docs/images/theme-nord-zh.png" width="1600" alt="冷色配色与分组分屏工作台" /></a>
+<a href="docs/images/theme-light-zh.png"><img src="docs/images/theme-light-zh.png" width="49%" alt="浅色代码、终端与 Agent 工作台" /></a>
+<a href="docs/images/theme-nord-zh.png"><img src="docs/images/theme-nord-zh.png" width="49%" alt="冷色配色与分组工作区" /></a>
 
-也可以选择本地壁纸，调整应用不透明度。
+<details>
+<summary>Deep Black</summary>
 
-## 能力一览
+<a href="docs/images/theme-deep-black-zh.png"><img src="docs/images/theme-deep-black-zh.png" width="1600" alt="Deep Black 与其他配色预览" /></a>
 
-| 领域 | 已有能力 |
-| --- | --- |
-| 终端 | 本地 Shell、SSH、命令块、经典终端视图、TUI 与备用屏幕、中文输入、复制与搜索。 |
-| 补全 | 历史命令建议、Shell 与路径补全、候选切换、自定义接受快捷键、可选 AI 补全。 |
-| 工作区 | 混合资源标签、最多四窗格、拖放与排序、命名分组、组颜色、收起分组、聚焦与调整分屏。 |
-| AI 与 Agent | 多模型配置、自带密钥、流式对话、命令输出引用、工具权限、ACP、技能、MCP、本地记忆。 |
-| 文件与编辑器 | 本地与 SFTP 浏览、多选、文件操作、上传下载、编辑器标签、字符编码、Vim 按键、Markdown 预览。 |
-| Git | 差异、暂存、提交、可选 AI 提交信息、fetch/pull/push、分支、合并与变基、标签、关联工作树浏览。 |
-| 远程连接 | 主机配置、密码与密钥认证、主机密钥校验、端口转发、直接连接下的资源监控。 |
-| 历史与检索 | 命令历史、会话历史、收藏与分组、搜索筛选、工作区布局恢复。 |
-| 显示与输入 | 十套内置深浅配色，支持跟随系统；应用/终端/编辑器字体设置、内置字体、快捷键、中文与英文界面。 |
+</details>
 
 截图来自应用界面，使用示例项目与模拟会话数据；点击可查看原始分辨率。
 
-## 开始使用
-
-在 [Releases](https://github.com/Vrykell/Vrykell/releases) 下载 Windows、macOS 和 Linux 安装包，当前发布版本为 **0.1.0 Beta 1**。这是早期预览版，日常使用前可先查看[当前边界](#当前边界)。也可以从源码运行或自行构建，见[构建说明](docs/zh/ci.md)。
+## 从源码运行
 
 准备 Node.js **22.12+**、Rust 稳定工具链，以及对应平台的[桌面构建依赖](https://v2.tauri.app/start/prerequisites/)。
 
