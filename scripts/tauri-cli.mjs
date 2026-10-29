@@ -20,7 +20,13 @@ if (isBuild && !hasSccache) {
 }
 
 const env = { ...process.env };
-if (isBuild) env.CARGO_INCREMENTAL = '1';
+// The compilation cache rejects incremental builds, so the two settings are mutually exclusive:
+// keep incremental compilation only when the cache is not in use, and clear any inherited value
+// otherwise, because the cache refuses to wrap the compiler while it is enabled.
+if (isBuild) {
+  if (hasSccache) delete env.CARGO_INCREMENTAL;
+  else env.CARGO_INCREMENTAL = '1';
+}
 if (hasSccache) env.RUSTC_WRAPPER = 'sccache';
 // The AppImage step runs linuxdeploy, which ships an older binutils. Its `strip` cannot parse
 // the RELR sections that newer toolchains emit, so every strip call fails and the bundle aborts.
