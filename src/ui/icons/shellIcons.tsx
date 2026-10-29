@@ -26,19 +26,22 @@ function profileIcon(mark: string, Mark: ComponentType<SVGProps<SVGSVGElement>>,
 export const TerminalIcon = profileIcon('terminal', TerminalPrompt);
 export const PowerShellIcon = forwardRef<SVGSVGElement, AppIconProps>(function PowerShellIcon({ size = iconSizes.row, style, className }, ref) {
   return <svg ref={ref} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" data-shell-mark="powershell" className={className}
-    style={{ color: 'var(--chart-blue)', flexShrink: 0, ...style }}>
+    style={{ color: 'var(--shell-powershell-accent)', flexShrink: 0, ...style }}>
     <path d="M6 3.5h15a1.5 1.5 0 0 1 1.45 1.9l-4 14a1.5 1.5 0 0 1-1.45 1.1H2a1.5 1.5 0 0 1-1.45-1.9l4-14A1.5 1.5 0 0 1 6 3.5Z" fill="currentColor" />
-    <path d="m8 7 4 4-6 5m6.5 0H17" fill="none" stroke="var(--primary-button-text)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="m8 7 4 4-6 5m5 0h4" fill="none" stroke="var(--shell-mark-ink)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
   </svg>;
 });
 export const ZshIcon = forwardRef<SVGSVGElement, AppIconProps>(function ZshIcon({ size = iconSizes.row, style, className }, ref) {
   return <svg ref={ref} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" data-shell-mark="zsh" className={className}
     style={{ color: 'var(--shell-zsh-accent)', flexShrink: 0, ...style }}>
     <rect x="1" y="2" width="22" height="20" rx="4" fill="currentColor" />
-    <path d="M7 7h10L7 17h10" fill="none" stroke="var(--primary-button-text)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M7 7h10L7 17h10" fill="none" stroke="var(--shell-mark-ink)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
   </svg>;
 });
-export const BashIcon = profileIcon('bash', BashMark, 'var(--group-green)');
+const BashOutline = forwardRef<SVGSVGElement, SVGProps<SVGSVGElement>>(function BashOutline(props, ref) {
+  return <BashMark {...props} ref={ref} stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />;
+});
+export const BashIcon = profileIcon('bash', BashOutline, 'var(--shell-bash-accent)', '-1 -1 130 130');
 export const CmdIcon = profileIcon('cmd', WindowsMark);
 export const SshIcon = profileIcon('linux', LinuxMark);
 const AppleIcon = profileIcon('macos', AppleMark);

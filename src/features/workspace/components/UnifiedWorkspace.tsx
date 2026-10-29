@@ -94,13 +94,17 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
     state.chooseMerge();
   };
   const beginPlacement = (addition: Addition) => { setPlacement(addition); };
-  const pickerOrigin = () => ({ split: menu?.split ?? false, anchor: menu ? { x: menu.anchor.x, y: menu.anchor.y, aboveY: menu.anchor.y - 4, align: menu.anchor.align } : undefined });
+  const pickerOrigin = (origin?: MenuAnchor) => {
+    const preferred = origin ?? menu?.anchor;
+    return { split: menu?.split ?? false,
+      anchor: preferred ? { x: preferred.x, y: preferred.y, aboveY: preferred.y - 4, align: preferred.align } : undefined };
+  };
   const creation: ContextMenuItem[] = [
-    { label: t('New terminal'), onClick: () => setTerminalPicker({ source: 'shell', ...pickerOrigin() }) },
-    { label: t('Connect a server'), onClick: () => setTerminalPicker({ source: 'ssh', ...pickerOrigin() }) },
+    { label: t('New terminal'), onClick: origin => setTerminalPicker({ source: 'shell', ...pickerOrigin(origin) }) },
+    { label: t('Connect a server'), onClick: origin => setTerminalPicker({ source: 'ssh', ...pickerOrigin(origin) }) },
     ...(['conversation', 'document'] as const).map(kind => ({ label: t(kind === 'conversation' ? 'New conversation' : 'New file'), onClick: () => menu?.split ? setPlacement({ kind: 'new', resource: kind }) : newItem(kind) })),
     ...(menu?.split ? [{ label: t('Open file'), onClick: () => { void pickWorkspaceFile().then(file => { if (file) setPlacement({ kind: 'file', file }); }); } }] : []),
-    { label: t('ACP agents'), onClick: () => setLauncher(pickerOrigin()) },
+    { label: t('ACP agents'), onClick: origin => setLauncher(pickerOrigin(origin)) },
   ];
   const focusedResource = resources.find(resource => resource.id === focused?.resourceId);
   return <section className="unified-workspace" data-testid="unified-workspace" style={{ display: active ? 'flex' : 'none' }} inert={!visible}>
@@ -122,7 +126,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
         <IconButton compact aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}><FolderOpen size={16} /></IconButton>
         <IconButton ref={newButton} compact aria-label={t('New workspace tab')} data-tip={t('New workspace tab')} onClick={event => anchor(event.currentTarget, false)}><Plus size={16} /></IconButton>
       </>} /></WorkspaceHeader>
-    {state.startActive && <UnifiedStartPage resources={resources} icon={resourceIcon} onSelect={focusUnifiedResource}
+    {state.startActive && <UnifiedStartPage resources={resources} icon={resource => <WorkspaceResourceIcon resource={resource} size={28} defaultShellType={defaultShellType} />} onSelect={focusUnifiedResource}
       onNew={kind => kind === 'terminal' ? setTerminalPicker({ source: 'shell', split: false }) : newItem(kind)} onOpen={() => void openWorkspaceFile()}
       onConnect={() => setTerminalPicker({ source: 'ssh', split: false })} onAgent={() => setLauncher({ split: false })} onHistory={history} />}
     <WorkspacePaneCanvas containerId={state.activeTabId} layout={state.layout} focused={state.focused} resources={resources} visible={visible && !state.startActive} toolbarTarget={resourceToolbar}

@@ -1,5 +1,22 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, ptyWrites } from './tauri-mock';
+import { setupTauriMock, ptyWrites, openedPaths } from './tauri-mock';
+
+test('unsupported remote files open as downloaded copies in the system application', async ({ page }) => {
+  await setupTauriMock(page, { sshHost: 'known' });
+  await page.addInitScript(() => {
+    (window as unknown as { __SSH_EXTRA_ENTRIES__: unknown[] }).__SSH_EXTRA_ENTRIES__ = [
+      { name: 'report.pdf', path: '/home/root/report.pdf', is_dir: false },
+    ];
+  });
+  await page.goto('/'); await page.locator('[data-dock-btn="ssh"]').click();
+  await page.getByTestId('ssh-row-ssh-1').dblclick();
+  await page.getByRole('button', { name: '断开连接', exact: true }).waitFor();
+  await page.locator('[data-dock-btn="files"]').click();
+  await page.getByTestId('remote-file-report.pdf').dblclick();
+  await expect.poll(() => openedPaths(page)).toEqual(['/tmp/report.pdf']);
+  await expect(page.getByText('已打开下载的副本，修改不会同步到远程文件。')).toBeVisible();
+  await expect(page.getByTestId('file-editor')).toHaveCount(0);
+});
 
 test('remote file double click opens and saves in the embedded editor', async ({ page }) => {
   await setupTauriMock(page, { sshHost: 'known' });

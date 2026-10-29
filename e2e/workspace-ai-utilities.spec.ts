@@ -25,6 +25,13 @@ test('AI utility pages become singleton tabs while docked conversations keep the
   await page.getByTestId('ai-relocate').click();
   const side = page.getByTestId('ai-surface-side');
   await side.getByRole('button', { name: '会话设置', exact: true }).click();
+  const menu = page.getByRole('region', { name: '会话设置' });
+  const links = menu.locator('.chat-setting-links');
+  const buttons = links.getByRole('button');
+  await expect(buttons).toHaveCount(3);
+  const positions = await buttons.evaluateAll(items => items.map(item => ({ top: item.getBoundingClientRect().top, shared: item.classList.contains('outline-button') })));
+  expect(positions.every(item => item.shared && Math.abs(item.top - positions[0]!.top) < 1)).toBe(true);
+  await expect(buttons.last()).toHaveText('关闭'); await expect(buttons.last()).toHaveAttribute('data-tone', 'danger');
   await page.getByRole('region', { name: '会话设置' }).getByTestId('chat-usage-entry').click();
   // Utility pages are singleton tabs; the side conversation remains independently placed.
   await expect(page.locator('[data-testid="usage-page"]:visible')).toBeVisible();

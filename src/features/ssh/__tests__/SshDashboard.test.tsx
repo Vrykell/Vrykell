@@ -64,11 +64,16 @@ it('combines favorites, folder and colored tag filters and clears each independe
   expect(screen.queryByTestId('ssh-row-ssh-2')).toBeNull();
   expect(screen.getByTestId('ssh-host-favorites').querySelector('svg')).toHaveStyle({ color: 'var(--favorite-color)' });
   fireEvent.click(screen.getByTestId('ssh-host-favorites'));
-  fireEvent.click(screen.getByRole('button', { name: 'Osaka1' }));
+  fireEvent.click(screen.getByTestId('ssh-host-group-filter'));
+  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Osaka' }));
   expect(screen.queryByTestId('ssh-row-ssh-1')).toBeNull();
-  fireEvent.click(screen.getByRole('button', { name: 'Osaka1' }));
+  expect(screen.getByRole('menuitemcheckbox', { name: 'Osaka' })).toHaveAttribute('aria-checked', 'true');
+  expect(screen.getByRole('menuitemcheckbox', { name: 'Osaka' }).querySelector('input')).toBeNull();
+  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Osaka' }));
   fireEvent.click(screen.getByTestId('ssh-host-tag-filter'));
   fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'api' }));
+  expect(screen.getByRole('menuitemcheckbox', { name: 'api' })).toHaveAttribute('aria-checked', 'true');
+  expect(screen.getByRole('menuitemcheckbox', { name: 'api' }).querySelector('input')).toBeNull();
   expect(screen.queryByTestId('ssh-row-ssh-2')).toBeNull();
   expect(screen.getByTestId('ssh-row-ssh-1').querySelector('.sidebar-row-title svg')).toHaveStyle({ color: 'var(--favorite-color)' });
 });

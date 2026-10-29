@@ -2,6 +2,7 @@ import { useFileUndoSettings } from '@config/fileUndo';
 import { useFileDirectoryShortcuts } from '../hooks/useFileDirectoryShortcuts';
 import { TextInput } from '@ui/fields/TextInput';
 import InlineRenameInput from '@ui/fields/InlineRenameInput';
+import { compactSidebarRowContent } from '@ui/layout/sidebarRow';
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ChevronRight, Search, MoreHorizontal, iconSizes } from '@ui/icons';
@@ -749,9 +750,10 @@ function FileRow({
       data-selected={selected ? 'true' : undefined}
       data-drop-dir={renaming ? undefined : dropDir}
       style={{
+        ...compactSidebarRowContent,
         display: 'flex', alignItems: 'center', gap: 4,
-        padding: `${renaming ? 2 : 5}px 10px ${renaming ? 2 : 5}px ${4 + depth * 14}px`,
-        fontSize: 'var(--fs-label)', lineHeight: '20px', minHeight: 32,
+        padding: `2px 10px 2px ${4 + depth * 14}px`, margin: '0 6px', borderRadius: 'var(--radius-inner)',
+        fontSize: 'var(--fs-label)', lineHeight: '20px',
         cursor: renaming ? 'text' : 'pointer',
         background: dropTarget ? 'var(--accent-bg)' : restingBackground,
         opacity: cut ? 0.55 : 1,

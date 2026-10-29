@@ -17,6 +17,7 @@ import { useHarnessWorkspace } from '../stores/harnessWorkspace';
 import { useHarnessStore } from '../stores/harness';
 import { availableSideConversationIds, closeAiWorkspaceSession, createSideAgent, createSideConversation } from '../services/aiWorkspace';
 import ConversationHeading from './ConversationHeading';
+import ConversationSettingsActions from './ConversationSettingsActions';
 
 export default function AiSidebar({ active, onSettingsTarget, settingsSuspended = false }: {
   active: boolean; onSettingsTarget?: (target: HTMLDivElement | null) => void; settingsSuspended?: boolean;
@@ -64,9 +65,8 @@ export default function AiSidebar({ active, onSettingsTarget, settingsSuspended 
           const bounds = event.currentTarget.getBoundingClientRect(); setLauncher({ anchor: { x: bounds.right, y: bounds.bottom + 4, aboveY: bounds.top, align: 'end' } });
         }}><span className="ui-select-value">{connection?.harness ?? t('Choose agent')}</span></SelectTrigger></div>
         <div ref={onSettingsTarget} />
-        <div className="chat-setting-links">
-          <button type="button" data-subtle disabled={!sideSelected} onClick={() => { setMenu(null); closeAiWorkspaceSession(sideSelected); }}>{t('Close this conversation')}</button>
-        </div>
+        <ConversationSettingsActions conversationId={conversation?.id} onCloseMenu={() => setMenu(null)}
+          closeDisabled={!sideSelected} onCloseConversation={() => closeAiWorkspaceSession(sideSelected)} />
       </section>
     </SettingsPopover>}
     <AcpLauncher open={!!launcher} anchor={launcher?.anchor} onClose={() => setLauncher(null)} onPick={(name, cwd) => {

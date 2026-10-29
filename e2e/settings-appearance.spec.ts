@@ -63,6 +63,25 @@ test('follow system tracks the operating system appearance', async ({ page }) =>
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 });
 
+test('near-black colors persist and original dark remains available', async ({ page }, info) => {
+  await setupTauriMock(page); await page.goto('/'); await gotoSetting(page, '主题');
+  await page.getByRole('radio', { name: 'Deep Black', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme-preset', 'deep-black');
+  await expect.poll(() => themeConfig(page)).toMatchObject({ darkPreset: 'deep-black' });
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim())).toBe('#1C1C1C');
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--xterm-bg').trim())).toBe('#111111');
+  for (const width of [760, 1240]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect(page.getByRole('radio', { name: '默认深色', exact: true })).toBeVisible();
+    expect(await page.locator('.settings-content').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+    await page.screenshot({ path: info.outputPath(`deep-black-${width}.png`), animations: 'disabled' });
+  }
+  await page.reload(); await gotoSetting(page, '主题');
+  await expect(page.getByRole('radio', { name: 'Deep Black', exact: true })).toBeChecked();
+  await page.getByRole('radio', { name: '默认深色', exact: true }).click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme-preset', 'default-dark');
+});
+
 test('built-in schemes update live colors, survive reload, follow the system and restore original defaults', async ({ page }, info) => {
   test.setTimeout(60_000);
   await setupTauriMock(page);

@@ -20,7 +20,7 @@ export default function GitChangeRow({ entry, scope, active, busy, compare, open
     ...(scope === 'conflicts' ? [{ label: t('Mark as resolved'), icon: <Check size={14} />, disabled: busy, onClick: stage }] : []),
   ];
   return <>
-    <SidebarItem variant="resource" compact title={entry.path.split('/').pop() || entry.path}
+    <SidebarItem variant="resource" compact dense title={entry.path.split('/').pop() || entry.path}
       subtitle={depth === undefined && entry.path.includes('/') ? entry.path.slice(0, entry.path.lastIndexOf('/')) : undefined}
       tree={depth === undefined ? undefined : { depth }}
       icon={<Icon size={iconSizes.compact} />} tooltip={entry.previousPath ? `${entry.previousPath} → ${entry.path}` : entry.path}

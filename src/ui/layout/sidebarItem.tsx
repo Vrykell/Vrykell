@@ -1,6 +1,6 @@
 import { Fragment, useId, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type PointerEvent, type ReactNode } from 'react';
 import { useListReorder } from '@ui/layout/listReorder';
-import { sidebarRowSpacing, sidebarRowContent, sidebarRowIcon, sidebarRowTitle } from '@ui/layout/sidebarRow';
+import { compactSidebarRowContent, sidebarRowSpacing, sidebarRowContent, sidebarRowIcon, sidebarRowTitle } from '@ui/layout/sidebarRow';
 import { IconButton } from '@ui/actions/IconButton';
 import { ChevronRight, iconSizes } from '@ui/icons';
 
@@ -54,6 +54,7 @@ export default function SidebarItem({
   dataAttributes,
   style,
   compact = false,
+  dense = false,
   variant = 'default',
 }: {
   icon?: ReactNode;
@@ -90,6 +91,8 @@ export default function SidebarItem({
   style?: CSSProperties;
   /** Compact rows reduce padding; history metadata moves into the row description. */
   compact?: boolean;
+  /** Match command-row height while retaining tree indentation and inline actions. */
+  dense?: boolean;
   /** History records use neutral titles and can show metadata as a compact description. */
   variant?: 'default' | 'history' | 'command' | 'resource';
 }) {
@@ -147,8 +150,9 @@ export default function SidebarItem({
       <div className="sidebar-row-content" style={{
         ...sidebarRowContent,
         ...(historyCompact ? { minHeight: 34, padding: '5px 10px', alignItems: 'flex-start' } : compact ? { minHeight: 32, padding: '5px 10px' } : {}),
-        ...(command ? { position: 'relative', minHeight: 28, padding: '2px 10px', gap: 6 } : {}),
+        ...(command ? { ...compactSidebarRowContent, position: 'relative', gap: 6 } : {}),
         ...(tree ? { minHeight: 32, padding: `5px 10px 5px ${4 + tree.depth * 14}px`, gap: 4 } : {}),
+        ...(dense ? { minHeight: compactSidebarRowContent.minHeight, paddingTop: 0, paddingBottom: 0 } : {}),
         background: variant === 'history' ? undefined : command && focused && !active ? 'var(--hover)' : background,
         color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
       }}>

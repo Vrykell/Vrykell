@@ -133,10 +133,12 @@ for (const layout of ['cards', 'table']) test(`hosts change fixed groups through
   await page.getByRole('button', { name: '编辑连接', exact: true }).click();
   await page.getByRole('combobox', { name: '已有分组' }).click(); await page.getByRole('option', { name: 'Beta', exact: true }).click();
   await page.getByTestId('ssh-save-btn').click();
-  const group = page.getByRole('group', { name: '主机分组', exact: true }).getByRole('button').filter({ hasText: 'Beta' });
+  await page.getByTestId('ssh-host-group-filter').click();
+  const group = page.getByRole('menuitemcheckbox', { name: 'Beta', exact: true });
   await expect(group).toBeVisible(); await group.click();
+  await expect(group).toHaveAttribute('aria-checked', 'true');
+  await expect(group).not.toHaveAttribute('data-reorder-item'); await page.keyboard.press('Escape');
   await expect(row).toBeVisible();
-  await expect(group).not.toHaveAttribute('data-reorder-item');
   await expect(page.getByRole('dialog', { name: '主机详情' })).toHaveCount(0);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('vrykell-host-library')!).state.hosts['ssh-1'].group)).toBe('Beta');
   await page.screenshot({ path: info.outputPath(`host-groups-${layout}.png`), animations: 'disabled' });

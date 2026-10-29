@@ -10,16 +10,30 @@ it('preserves every original token and falls back for unknown or mismatched pres
     expect(getPresetPalette(mode, 'missing')).toBe(themes[mode]);
     expect(getPresetPalette(mode, mode === 'dark' ? 'alucard' : 'dracula')).toBe(themes[mode]);
   }
-  expect(new Set(themePresets.map(preset => preset.id)).size).toBe(10);
+  expect(new Set(themePresets.map(preset => preset.id)).size).toBe(11);
   expect(resolveThemePreset('dark', 'alucard').id).toBe('default-dark');
+});
+
+it('offers a near-black palette with darker surfaces and readable secondary text', () => {
+  const palette = getPresetPalette('dark', 'deep-black');
+  expect(palette.canvas).toBe('#1C1C1C');
+  expect(palette.xtermBg).toBe('#111111');
+  const brightness = (hex: string) => [1, 3, 5].reduce((sum, index) => sum + parseInt(hex.slice(index, index + 2), 16), 0);
+  for (const role of ['canvas', 'sidebarBg', 'cardBg', 'fieldBg', 'codeBg', 'xtermBg'] as const) {
+    expect(brightness(palette[role])).toBeLessThan(brightness(themes.dark[role]));
+    const channels = [1, 3, 5].map(index => parseInt(palette[role].slice(index, index + 2), 16));
+    expect(new Set(channels).size).toBe(1);
+  }
+  expect(contrast(palette.textMuted, palette.fieldBg)).toBeGreaterThanOrEqual(4.5);
+  expect(contrast(palette.textSecondary, palette.cardBg)).toBeGreaterThanOrEqual(7);
 });
 
 it('maps each scheme across application, editor and terminal with readable controls', () => {
   for (const preset of themePresets.filter(item => item.seed)) {
     const palette = getPresetPalette(preset.mode, preset.id);
-    expect(palette.xtermBg).toBe(preset.seed!.background);
-    expect(palette.canvas).toBe(palette.xtermBg);
-    expect(palette.codeBg).toBe(palette.xtermBg);
+    expect(palette.xtermBg).toBe(preset.seed!.terminalBackground ?? preset.seed!.background);
+    expect(palette.canvas).toBe(preset.seed!.background);
+    expect(palette.codeBg).toBe(palette.canvas);
     expect(contrast(palette.textPrimary, palette.canvas)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(palette.accentText, palette.primaryAction)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(palette.primaryActionText, palette.primaryAction)).toBeGreaterThanOrEqual(4.5);

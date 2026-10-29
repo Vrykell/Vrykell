@@ -172,7 +172,7 @@ it('filters singleton pages without hiding other rows', () => {
   expect(screen.queryByTestId('tab-row-ai-history')).toBeNull();
   expect(screen.getByTestId('tab-row-history')).toBeVisible();
   act(() => useSessionStore.getState().activate('local'));
-  expect(icon.style.color).toBe('var(--group-green)');
+  expect(icon.style.color).toBe('var(--shell-bash-accent)');
   fireEvent.click(screen.getByTestId('tab-search-toggle'));
   fireEvent.change(screen.getByTestId('tab-search'), { target: { value: 'History' } });
   // The system history page matches by title like any other row; AI pages never appear here.

@@ -54,7 +54,7 @@ export default function GitStatusButton({ paneId, branch }: { paneId: string; br
     <TextButton className="terminal-chip terminal-branch" data-testid={`git-status-${paneId}`} aria-label={t('Git status: {{branch}}', { branch: displayedBranch })}
       data-tip={t('Git status: {{branch}}', { branch: displayedBranch })} aria-haspopup="menu" aria-expanded={!!menu} disabled={!target}
       onClick={event => { const trigger = event.currentTarget; const rect = trigger.getBoundingClientRect(); setMenu({ x: rect.left, y: rect.top, trigger, above: trigger }); }}>
-      <GitBranch size={12} /><span>{displayedBranch}</span>
+      <GitBranch size={14} /><span>{displayedBranch}</span>
     </TextButton>
     {menu && <ContextMenu anchor={menu} label={t('Repository actions')} onClose={() => setMenu(null)}
       description={repository.error ? t('Could not load repository') : snapshot ? `${snapshot.branch}${snapshot.upstream ? ` · ${snapshot.upstream}` : ''}${snapshot.behind ? ` ↓${snapshot.behind}` : ''}${snapshot.ahead ? ` ↑${snapshot.ahead}` : ''}` : repository.loading ? t('Finding repository…') : t('The current directory is not in a repository.')}

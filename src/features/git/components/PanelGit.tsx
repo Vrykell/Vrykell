@@ -100,7 +100,7 @@ export default function PanelGit() {
     {repository.error && <ErrorBox title={t('Could not load repository')} details={repository.error}
       actions={<TextButton onClick={refresh}>{t('Retry')}</TextButton>} />}
     {context.target && !snapshot && !repository.error && <div className="git-empty" role="status">{repository.loading ? t('Finding repository…') : t('The current directory is not in a repository.')}</div>}
-    {snapshot && <>
+    {snapshot && <div className="git-content scroll-region" data-testid="git-content">
       <div className="git-repository" data-tip={`${snapshot.root}\n${snapshot.branch}`}>
         <GitBranch size={iconSizes.compact} /><span>{snapshot.branch}</span><span className="git-count">{snapshot.entries.length}</span>
       </div>
@@ -113,7 +113,7 @@ export default function PanelGit() {
         useGitContextStore.getState().select({ target: { ...target, cwd }, paneId: context.paneId }); setWorktrees(false);
       }} /></> : <>
       {target && <GitCommit key={targetKey} target={target} snapshot={snapshot} refresh={refresh} />}
-      <div className="git-files scroll-region" aria-busy={repository.loading}>
+      <div className="git-files" aria-busy={repository.loading}>
         {GROUPS.filter(scope => groups[scope].length).map(scope => <section key={scope} aria-label={groupLabel(scope)}>
           <div className="git-group-heading"><button data-subtle className="git-group" aria-expanded={!folded.includes(scope)}
             onClick={() => setFolded(values => values.includes(scope) ? values.filter(value => value !== scope) : [...values, scope])}>
@@ -125,7 +125,7 @@ export default function PanelGit() {
         {snapshot.entries.length > 0 && GROUPS.every(scope => !groups[scope].length) && <div className="git-empty">{t('No matching changed files')}</div>}
       </div>
       </>}
-    </>}
+    </div>}
     {progressAction && target && snapshot && <GitReferenceDialog target={target} snapshot={snapshot} action={progressAction} refresh={refresh} onClose={() => setProgressAction(null)} />}
     <ConfirmDialog open={!!discarding} title={t('Discard changes')} danger confirmLabel={t('Discard')} cancelLabel={t('Cancel')}
       message={discarding ? t(discarding.target.connectionId

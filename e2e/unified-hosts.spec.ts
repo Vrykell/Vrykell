@@ -37,15 +37,15 @@ for (const theme of ['dark', 'light']) test(`unified hosts follow the list and c
   expect(newButton.y).toBe(newMenu.y); expect(newButton.height).toBe(newMenu.height); expect(Math.abs(newButton.x + newButton.width - newMenu.x)).toBeLessThan(1);
   await expect(root.getByTestId('ssh-host-favorites')).toHaveCSS('border-radius', '999px');
   await page.setViewportSize({ width: 1240, height: 600 });
-  const browser = root.getByTestId('ssh-host-browser'); const filters = root.locator('.ssh-host-filter-toolbar'); const folders = root.locator('.ssh-host-group-filters');
-  const filterBefore = (await filters.boundingBox())!; const folderBefore = (await folders.boundingBox())!; const headerBefore = (await root.locator('header').boundingBox())!;
+  const browser = root.getByTestId('ssh-host-browser'); const filters = root.locator('.ssh-host-filter-toolbar');
+  const filterBefore = (await filters.boundingBox())!; const headerBefore = (await root.locator('header').boundingBox())!;
   await browser.evaluate(element => { element.scrollTop = 120; });
   const scroll = await browser.evaluate(element => element.scrollTop); expect(scroll).toBeGreaterThan(0);
-  expect((await filters.boundingBox())!.y).toBeCloseTo(filterBefore.y - scroll, 0); expect((await folders.boundingBox())!.y).toBeCloseTo(folderBefore.y - scroll, 0);
+  expect((await filters.boundingBox())!.y).toBeCloseTo(filterBefore.y - scroll, 0);
   expect((await root.locator('header').boundingBox())!.y).toBe(headerBefore.y);
   await browser.evaluate(element => { element.scrollTop = 0; }); await page.setViewportSize({ width: 1240, height: 800 });
-  const folder = root.locator('.ssh-host-group-filters > button').first();
-  expect((await folder.boundingBox())!.height).toBeCloseTo(32, 0);
+  const folder = root.getByTestId('ssh-host-group-filter');
+  expect((await folder.boundingBox())!.height).toBeCloseTo(28, 0);
   await expect(row.locator('.sidebar-row-title > svg')).toHaveCSS('color', starColor);
   await row.click(); await expect(row).toHaveAttribute('data-active', 'true');
   for (const layout of ['table', 'cards']) {
@@ -69,12 +69,20 @@ for (const theme of ['dark', 'light']) test(`unified hosts follow the list and c
       await page.screenshot({ path: info.outputPath(`prototype-${theme}-${layout}-${width}.png`), animations: 'disabled' });
     }
   }
+  const resultY = (await root.locator('.ssh-dashboard-grid').boundingBox())!.y;
   await page.getByTestId('ssh-host-tag-filter').click();
   const menu = page.getByRole('menu', { name: '主机标签', exact: true });
-  const menuBounds = (await menu.boundingBox())!; const groupsBounds = (await root.locator('.ssh-host-group-filters').boundingBox())!;
-  expect(groupsBounds.y).toBeGreaterThanOrEqual(menuBounds.y + menuBounds.height);
+  await expect(menu).toBeVisible();
+  expect((await root.locator('.ssh-dashboard-grid').boundingBox())!.y).toBe(resultY);
+  await expect(menu).toHaveCSS('position', 'fixed');
   await page.getByRole('menuitemcheckbox', { name: 'production', exact: true }).click(); await page.keyboard.press('Escape');
   await expect(root.locator('[data-testid^="ssh-row-"]')).toHaveCount(4);
+  await folder.click();
+  const group = page.getByRole('menuitemcheckbox', { name: 'Tokyo', exact: true });
+  expect((await root.locator('.ssh-dashboard-grid').boundingBox())!.y).toBe(resultY);
+  await group.click(); await expect(group).toHaveAttribute('aria-checked', 'true');
+  await expect(group.locator('input')).toHaveCount(0);
+  await group.click(); await page.keyboard.press('Escape');
   await page.getByTestId('ssh-search').fill('not-a-host');
   const empty = page.getByText('无匹配连接', { exact: true }); await expect(empty).toBeVisible();
   const resultBounds = (await root.locator('.ssh-dashboard-grid').boundingBox())!; const emptyBounds = (await empty.boundingBox())!;

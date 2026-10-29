@@ -76,7 +76,7 @@ export default function FontSettings() {
     </SettingsGroup>
     <SettingsGroup title={t('Preview')}>
       <div className="settings-record">
-        <div className="settings-terminal-preview" data-selectable aria-label={t('Terminal font preview')}>
+        <div className="settings-font-preview settings-terminal-preview" data-selectable aria-label={t('Terminal font preview')}>
           <div>~/project $ ls</div>
           <div>{t('Directories')}  AaBb 0123  ─│┌┐   </div>
         </div>

@@ -2,6 +2,7 @@ import type { CSSProperties } from 'react';
 import { iconSizes } from '@ui/icons';
 
 export const sidebarRowSpacing: CSSProperties = { padding: '2px 6px', cursor: 'pointer' };
+export const compactSidebarRowContent: CSSProperties = { minHeight: 28, padding: '2px 10px' };
 export const sidebarRowContent: CSSProperties = {
   display: 'flex', alignItems: 'center', gap: 8,
   padding: '8px 10px', minHeight: 40, borderRadius: 'var(--radius-inner)',

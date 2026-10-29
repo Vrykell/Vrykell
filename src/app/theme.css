@@ -72,6 +72,9 @@
   --primary-button-bg: var(--primary-action);
   --primary-button-text: var(--primary-action-text);
   --primary-button-hover-bg: var(--primary-action-hover);
+  --shell-powershell-accent: #52ACFF;
+  --shell-bash-accent: #30D158;
+  --shell-mark-ink: #FFFFFF;
   --resource-accent: color-mix(in srgb, var(--group-blue) 80%, var(--primary-action));
   --chart-blue: var(--cmd-argument);
   --chart-violet: var(--cmd-pipe);
@@ -658,9 +661,9 @@ button.window-control-button {
 .chat-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding: 4px; }
 .chat-setting-row > span { flex-shrink: 0; color: var(--text-muted); font-size: var(--fs-caption); }
 .chat-setting-row > .ui-select { flex: 0 1 65%; min-width: 0; font-size: var(--fs-caption); }
-.chat-setting-links { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 4px 2px; margin-top: 4px; border-top: 1px solid var(--border); }
-.chat-setting-links > button { padding: 4px; border: 0; background: transparent; border-radius: var(--radius-inner); color: var(--text-secondary); font-size: var(--fs-caption); }
-.chat-setting-links > button:hover { background: var(--control-hover-bg); }
+.chat-setting-links { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; padding: 8px 4px 2px; margin-top: 4px; border-top: 1px solid var(--border); }
+.chat-setting-links > button.outline-button { flex-shrink: 0; white-space: nowrap; }
+.chat-setting-links > button.chat-close-conversation { margin-left: auto; }
 .chat-approval-option-copy { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; font-size: var(--fs-caption); }
 .chat-approval-option-copy > small { color: var(--text-muted); font-size: var(--fs-micro); }
 .inline-rename-fit { display: inline-flex; flex: 0 1 176px; width: 176px; min-width: 0; max-width: 100%; margin-right: 8px; }
@@ -738,6 +741,8 @@ button.window-control-button {
 .harness-plan-mark[data-state="active"] { background: var(--accent); }
 .harness-plan-mark[data-state="done"] { background: var(--text-muted); }
 button.primary-button, button.user-primary-action.text-control { background: var(--primary-button-bg); color: var(--primary-button-text); border-color: transparent; }
+button.outline-button[data-tone="danger"] { background: var(--danger-action); color: var(--danger-action-text); border-color: transparent; }
+button.outline-button[data-tone="danger"]:enabled:is(:hover, :focus-visible) { background: color-mix(in srgb, var(--danger-action) 86%, var(--danger-action-text)); }
 button.primary-button:is(:hover, :focus):not(:disabled), button.user-primary-action.text-control:is(:hover, :focus):not(:disabled) { --primary-button-bg: var(--primary-button-hover-bg); background: var(--primary-button-bg); }
 @container (max-width: 300px) {
   .chat-setting-row { align-items: flex-start; flex-direction: column; gap: 4px; }
@@ -1105,13 +1110,15 @@ button.md-code-block-action.text-control { min-height: 22px; gap: 4px; padding: 
   font-size: var(--chat-font-size);
 }
 .ai-chat-panel .md pre code { font-size: 0.9em; }
-.settings-chat-preview {
+.settings-font-preview, .settings-chat-preview {
   margin-top: 12px;
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-inner);
   background: var(--surface);
   color: var(--text-primary);
+}
+.settings-chat-preview {
   font-size: var(--chat-font-size);
   line-height: 1.6;
 }
@@ -1491,7 +1498,7 @@ button.outline-button.model-capability-toggle[aria-pressed="true"] { background:
 
 .ssh-recovery-action { height: var(--control-size); padding: 0 12px; color: var(--text-primary); }
 
-.settings-terminal-preview { margin-top: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--surface); color: var(--text-primary); font-family: var(--terminal-font-family); font-size: var(--terminal-font-size); font-weight: var(--terminal-font-weight); line-height: var(--terminal-row-height); white-space: pre-wrap; overflow-wrap: anywhere; }
+.settings-terminal-preview { font-family: var(--terminal-font-family); font-size: var(--terminal-font-size); font-weight: var(--terminal-font-weight); line-height: var(--terminal-row-height); white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .command-block-output [style*="font-weight:bold"], .command-block-output [style*="font-weight: bold"] { font-weight: var(--terminal-bold-weight) !important; }
 
@@ -1526,6 +1533,7 @@ textarea.config-text-input[data-font="ui"] { font-family: var(--font-ui) !import
 .ai-launch-copy { min-width: 0; }
 .ai-launch-copy strong, .ai-launch-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-launch-copy strong { font-size: var(--fs-label); font-weight: var(--fw-semibold); }
+.ai-launch-resource .ai-launch-copy strong { font-weight: var(--fw-regular); }
 .ai-launch-native strong { font-size: var(--fs-subtitle); }
 .ai-launch-copy small { margin-top: 5px; color: var(--text-muted); font-size: var(--fs-caption); }
 .ai-launch-option > svg:last-of-type { color: var(--text-muted); }

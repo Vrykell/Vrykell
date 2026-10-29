@@ -19,6 +19,7 @@ import { getPaneTerminal } from '@features/terminal/services/terminalClipboard';
 import { useToastStore } from '@ui/feedback/Toast';
 import { t } from '@i18n';
 import ErrorBox from '@ui/feedback/ErrorBox';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import { requestSshAuthentication, useSshAuthenticationRevision } from '../hooks/useSessionAuthentication';
 
 /**
@@ -112,14 +113,14 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
             details={error}
             style={{ margin: 16, overflowWrap: 'anywhere' }}
             actions={<>
-              {failure.kind === 'authentication' && <button style={{ minHeight: 36 }} onClick={() => requestSshAuthentication({ connectionId: conn.id, host: conn.host, port: conn.port, user: conn.user, identityFile: conn.identityFile })}>{t('Authenticate services')}</button>}
-              <button style={{ minHeight: 36 }} onClick={() => {
+              {failure.kind === 'authentication' && <OutlineButton style={{ minHeight: 36 }} onClick={() => requestSshAuthentication({ connectionId: conn.id, host: conn.host, port: conn.port, user: conn.user, identityFile: conn.identityFile })}>{t('Authenticate services')}</OutlineButton>}
+              <OutlineButton style={{ minHeight: 36 }} onClick={() => {
                 const dock = useDockStore.getState();
                 const side = dock.leftPanels.includes('files') ? 'left' : 'right';
                 dock.togglePanel(side, 'files');
                 if (paneId) termInstances.get(paneId)?.focus();
-              }}>{t('Continue using terminal')}</button>
-              <button style={{ minHeight: 36 }} onClick={retry}>{t('Retry file service')}</button>
+              }}>{t('Continue using terminal')}</OutlineButton>
+              <OutlineButton style={{ minHeight: 36 }} onClick={retry}>{t('Retry file service')}</OutlineButton>
             </>}
           >
             {failure.message}

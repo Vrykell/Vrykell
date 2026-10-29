@@ -5,6 +5,15 @@ import ContextMenu from '@ui/menus/ContextMenu';
 import Select from '@ui/fields/Select';
 
 describe('independent action menus', () => {
+  it('captures the selected row position before closing its menu', () => {
+    const action = vi.fn(); const close = vi.fn();
+    render(<ContextMenu anchor={{ x: 400, y: 100 }} items={[{ label: 'Choose profile', onClick: action }]} onClose={close} />);
+    const row = screen.getByRole('button', { name: 'Choose profile' });
+    vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({ left: 420, bottom: 236 } as DOMRect);
+    fireEvent.click(row);
+    expect(action).toHaveBeenCalledWith({ x: 420, y: 240 });
+    expect(close).toHaveBeenCalledOnce();
+  });
   it('keeps a controlled select action inside its owning menu during pointer presses', () => {
     const action = vi.fn();
     function Example() {

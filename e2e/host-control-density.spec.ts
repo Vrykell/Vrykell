@@ -15,14 +15,25 @@ for (const theme of ['dark', 'light']) test(`host controls retain compact protot
   await page.getByTestId('workspace-sidebar-toggle').click();
   await expect(page.locator('.workspace-titlebar [data-connection-panel]')).toHaveCount(0);
   const root = page.getByTestId('ssh-dashboard');
-  const folder = root.locator('.ssh-host-group-filters > button').first();
+  const folder = root.getByTestId('ssh-host-group-filter');
+  await expect(folder).toHaveCSS('border-top-width', '0px');
+  await expect(folder).toHaveCSS('background-color', await root.evaluate(element => {
+    const probe = document.createElement('span');
+    probe.style.background = 'var(--card-bg)'; element.appendChild(probe);
+    const color = getComputedStyle(probe).backgroundColor; probe.remove(); return color;
+  }));
   const scale = await page.evaluate(() => window.devicePixelRatio);
-  expect((await folder.boundingBox())!.height * scale).toBeCloseTo(40, 0);
+  expect((await folder.boundingBox())!.height * scale).toBeCloseTo(35, 0);
   expect((await root.getByTestId('ssh-new-btn').boundingBox())!.height * scale).toBeCloseTo(35, 0);
   expect((await root.getByTestId('ssh-host-favorites').boundingBox())!.height * scale).toBeCloseTo(35, 0);
   expect((await root.getByRole('switch', { name: '资源占用' }).boundingBox())!.height * scale).toBeCloseTo(22.5, 0);
   const row = root.getByTestId('ssh-row-ssh-1').locator('.sidebar-row-content');
   await expect(row).toHaveCSS('border-bottom-width', '0px');
   expect((await row.boundingBox())!.height * scale).toBeCloseTo(50, 0);
+  await folder.click();
+  const option = page.getByRole('menuitemcheckbox', { name: 'topview', exact: true });
+  await option.click();
+  await expect(option).toHaveAttribute('aria-checked', 'true');
+  await expect(option.locator('input')).toHaveCount(0);
   await page.screenshot({ path: info.outputPath(`host-density-${theme}-125.png`), animations: 'disabled' });
 });

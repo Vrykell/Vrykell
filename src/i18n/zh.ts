@@ -1,5 +1,7 @@
 ﻿/** Simplified Chinese messages for shared UI and feature namespaces. */
 const zh: Record<string, string> = {
+  'Opened a downloaded copy. Changes are not synced to the remote file.': '已打开下载的副本，修改不会同步到远程文件。',
+  'Could not download the file': '无法下载文件',
   'Default dark': '默认深色',
   'Always dark': '始终深色',
   'Always light': '始终浅色',

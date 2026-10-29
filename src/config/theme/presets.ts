@@ -3,6 +3,9 @@ import type { ThemeMode, ThemePalette } from './tokens';
 type Colors = readonly [string, string, string, string, string, string, string, string];
 interface Seed {
   background: string;
+  terminalBackground?: string;
+  selectionOpacity?: number;
+  selectionColor?: string;
   foreground: string;
   colors: Colors;
   orange: string;
@@ -14,7 +17,7 @@ export interface ThemePreset {
   seed?: Seed;
 }
 
-/** Published palette values only; application roles are mapped independently below. */
+/** Palette seeds define the colors; application roles are mapped independently below. */
 export const themePresets: readonly ThemePreset[] = [
   { id: 'default-dark', name: 'Default dark', mode: 'dark' },
   { id: 'dracula', name: 'Dracula', mode: 'dark', seed: {
@@ -32,6 +35,10 @@ export const themePresets: readonly ThemePreset[] = [
   { id: 'catppuccin-mocha', name: 'Catppuccin Mocha', mode: 'dark', seed: {
     background: '#1E1E2E', foreground: '#CDD6F4', orange: '#FAB387',
     colors: ['#45475A', '#F38BA8', '#A6E3A1', '#F9E2AF', '#89B4FA', '#CBA6F7', '#94E2D5', '#BAC2DE'],
+  } },
+  { id: 'deep-black', name: 'Deep Black', mode: 'dark', seed: {
+    background: '#1C1C1C', terminalBackground: '#111111', selectionColor: '#0076FF', selectionOpacity: 0.65, foreground: '#E2E2E2', orange: '#F3AA70',
+    colors: ['#353535', '#F47C7C', '#59D69A', '#E9C46A', '#168BFF', '#C3A6FF', '#64D8DF', '#E2E2E2'],
   } },
   { id: 'default-light', name: 'Default light', mode: 'light' },
   { id: 'alucard', name: 'Alucard', mode: 'light', seed: {
@@ -85,6 +92,7 @@ function fitContrast(color: string, background: string, ink: string, minimum = 4
 export function presetPalette(base: ThemePalette, preset: ThemePreset): ThemePalette {
   if (!preset.seed) return base;
   const { background: bg, foreground, colors: c, orange } = preset.seed;
+  const terminalBg = preset.seed.terminalBackground ?? bg;
   const light = preset.mode === 'light';
   const fg = light ? fitContrast(foreground, bg, '#111827', 7) : foreground;
   // Bright palettes need stronger layer separation and ink, rather than inverted dark ratios.
@@ -94,11 +102,11 @@ export function presetPalette(base: ThemePalette, preset: ThemePreset): ThemePal
   const border = blend(bg, fg, light ? 0.32 : 0.19);
   const readable = (color: string) => fitContrast(color, light ? hover : raised, fg);
   const muted = light ? readable(blend(bg, fg, 0.76)) : blend(bg, fg, 0.76);
-  const terminal = light ? c.map(color => fitContrast(color, bg, fg)) : c;
+  const terminal = light ? c.map(color => fitContrast(color, terminalBg, fg)) : c;
   const [red, green, yellow, blue, violet, cyan] = [c[1], c[2], c[3], c[4], c[5], c[6]].map(readable);
   const onAccent = contrast(bg, blue) > contrast(fg, blue) ? bg : fg;
   const onDanger = contrast(bg, red) > contrast(fg, red) ? bg : fg;
-  const selection = alpha(blue, 0.25);
+  const selection = alpha(preset.seed.selectionColor ?? blue, preset.seed.selectionOpacity ?? 0.25);
   const dim = (color: string) => alpha(color, 0.12);
   return {
     ...base,
@@ -129,7 +137,7 @@ export function presetPalette(base: ThemePalette, preset: ThemePreset): ThemePal
     accentBg: dim(blue), accentBgStrong: alpha(blue, 0.2), successBg: dim(green), errorBg: dim(red), errorBadgeBg: dim(red),
     tuiBanner: raised, codeBg: bg, commandBlockBg: bg, aiBlockBg: bg, failedBlockBg: dim(red),
     scrollbarThumb: alpha(fg, 0.18), scrollbarThumbHover: alpha(fg, 0.28), apiKeyBg: raised, apiKeyBorder: border,
-    xtermBg: bg, xtermForeground: fg, xtermCursor: fg, textCaret: blue, xtermSelection: selection,
+    xtermBg: terminalBg, xtermForeground: fg, xtermCursor: fg, textCaret: blue, xtermSelection: selection,
     xtermBlack: light ? fg : c[0], xtermRed: terminal[1], xtermGreen: terminal[2], xtermYellow: terminal[3],
     xtermBlue: terminal[4], xtermMagenta: terminal[5], xtermCyan: terminal[6], xtermWhite: terminal[7],
     xtermBrightBlack: muted, xtermBrightRed: terminal[1], xtermBrightGreen: terminal[2], xtermBrightYellow: terminal[3],

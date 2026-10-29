@@ -13,19 +13,19 @@ it.each([undefined, '', 'unrecognized'])('uses the generic terminal identity as 
 
 it('keeps the blue shell panel independent from hidden copies and the generic terminal fallback', () => {
   const { container } = render(<><div hidden><TerminalProfileIcon shellType="powershell" /></div><TerminalProfileIcon shellType="pwsh" /><TerminalProfileIcon /></>);
-  expect(container.querySelector('[data-shell-mark="powershell"]')).toHaveStyle({ color: 'var(--chart-blue)' });
+  expect(container.querySelector('[data-shell-mark="powershell"]')).toHaveStyle({ color: 'var(--shell-powershell-accent)' });
   for (const icon of container.querySelectorAll('[data-shell-mark="powershell"]')) {
     expect(icon.querySelector('path')).toHaveAttribute('fill', 'currentColor');
     expect(icon.querySelector('[id]')).toBeNull();
     expect(icon.innerHTML).not.toContain('url(');
   }
-  expect(container.querySelector('[data-shell-mark="terminal"]')).not.toHaveStyle({ color: 'var(--chart-blue)' });
+  expect(container.querySelector('[data-shell-mark="terminal"]')).not.toHaveStyle({ color: 'var(--shell-powershell-accent)' });
 });
 
 it('uses orange and green for the two command shell identities', () => {
   const { container } = render(<><TerminalProfileIcon shellType="zsh" /><TerminalProfileIcon shellType="bash" /></>);
   expect(container.querySelector('[data-shell-mark="zsh"]')).toHaveStyle({ color: 'var(--shell-zsh-accent)' });
-  expect(container.querySelector('[data-shell-mark="bash"]')).toHaveStyle({ color: 'var(--group-green)' });
+  expect(container.querySelector('[data-shell-mark="bash"]')).toHaveStyle({ color: 'var(--shell-bash-accent)' });
 });
 
 it.each(['zsh', 'bash', 'cmd', 'powershell', 'fish', 'git-bash', 'python', 'node'])('renders the %s identity at the requested size', shell => {

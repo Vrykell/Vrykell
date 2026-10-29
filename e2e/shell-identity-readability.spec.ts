@@ -1,5 +1,27 @@
 import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
+import { gotoSetting, selectThemeMode } from './settings';
+
+test('shell identity colors stay fixed across built-in schemes', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/'); await gotoSetting(page, '主题');
+  const marks = page.locator('.settings-navigation');
+  const colors = async () => marks.locator('[data-shell-mark]').evaluateAll(elements => elements.map(element => ({
+    mark: element.getAttribute('data-shell-mark'),
+    fills: [...element.querySelectorAll('[fill]')].map(path => getComputedStyle(path).fill),
+    strokes: [...element.querySelectorAll('[stroke]')].map(path => getComputedStyle(path).stroke),
+  })));
+  const original = await colors();
+  await expect(marks.locator('[data-shell-mark="powershell"]').first()).toHaveCSS('color', 'rgb(82, 172, 255)');
+  for (const mode of ['深色', '浅色']) {
+    await selectThemeMode(page, mode);
+    const schemes = page.getByRole('radiogroup', { name: `${mode}配色` }).getByRole('radio');
+    for (let index = 0; index < await schemes.count(); index++) {
+      await schemes.nth(index).click();
+      expect(await colors()).toEqual(original);
+    }
+  }
+});
 
 for (const theme of ['dark', 'light'] as const) for (const density of [1, 1.25, 2]) {
   test(`colored shell identities at ${density}x in ${theme}`, async ({ browser }, info) => {

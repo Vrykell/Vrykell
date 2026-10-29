@@ -6,6 +6,7 @@ import KeyHint from '@ui/feedback/KeyHint';
 import Select from '@ui/fields/Select';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import { IconButton } from '@ui/actions/IconButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import type { MenuAnchor } from '@ui/menus/ContextMenu';
 import SettingsPopover from '@ui/menus/SettingsPopover';
 import { ArrowDown, ArrowUp, Plus, SlidersHorizontal, Sparkles, Square } from '@ui/icons';
@@ -23,7 +24,7 @@ import TerminalReferences from './TerminalReferences';
 import AiBlock from './AiBlock';
 import { toExchanges } from '../model/exchanges';
 import { useChatComposer } from '../hooks/useChatComposer';
-import { environmentForPane, showExecutionTerminal } from '../services/conversationContext';
+import { environmentForPane } from '../services/conversationContext';
 import { createExecutionTerminal } from '@features/workspace/services/executionTerminal';
 import type { AttachmentMeta } from '@features/agent/model/attachments';
 import { useTranscriptFollow } from '../hooks/useTranscriptFollow';
@@ -33,6 +34,7 @@ import { useExecutionTerminalOptions } from '../hooks/useExecutionTerminalOption
 import ConversationHeading from './ConversationHeading';
 import { SidebarSettingsContext } from './SidebarSettingsContext';
 import QueuedMessages from './QueuedMessages';
+import ConversationSettingsActions from './ConversationSettingsActions';
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
 
@@ -123,11 +125,7 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
           action={{ label: t('New tab'), onSelect: bounds => { setNewTabAnchor(bounds ? { x: bounds.left, y: bounds.bottom + 4, aboveY: bounds.top } : undefined); setNewTabOpen(true); } }}
           onChange={paneId => useChatStore.getState().setEnvironment(activeId, paneId ? environmentForPane(paneId) : null)} />
       </div>
-      <div className="chat-setting-links">
-        {environment && !!sessions[environment.paneId] && <button type="button" data-subtle onClick={() => { setSettingsMenu(null); showExecutionTerminal(environment.paneId); }}>{t('View terminal')}</button>}
-        <button type="button" data-subtle data-testid="chat-usage-entry" onClick={() => { setSettingsMenu(null); useSessionStore.getState().openUsageTab(); }}>{t('Usage statistics')}</button>
-        <button type="button" data-subtle onClick={() => { setSettingsMenu(null); useSessionStore.getState().openSettings(); }}>{t('Open settings')}</button>
-      </div>
+      {!inSidebar && <ConversationSettingsActions conversationId={activeId} onCloseMenu={() => setSettingsMenu(null)} />}
     </section>;
   return <div ref={panelRef} className="ai-chat-panel">
     {!inSidebar && (workspace ? toolbarTarget && createPortal(actions, toolbarTarget) : <ConversationHeading title={conversation?.title ?? t('AI chat')}
@@ -136,14 +134,14 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
     {inSidebar ? sidebarSettings?.target && createPortal(settingsContents, sidebarSettings.target)
       : settingsMenu && <SettingsPopover anchor={settingsMenu} label={t('Conversation settings')} onClose={() => setSettingsMenu(null)} suspended={newTabOpen}>{settingsContents}</SettingsPopover>}
     {environment && !sessions[environment.paneId] && <div className="chat-environment-note">{t('Terminal disconnected. Select a terminal to continue execution.')}</div>}
-    {loadError && <ErrorBox compact actions={<button onClick={() => {
+    {loadError && <ErrorBox compact actions={<OutlineButton onClick={() => {
       if (!useChatStore.getState().conversationsLoaded) void useChatStore.getState().loadConversations();
       else if (activeId) {
         useChatStore.setState({ conversationError: null });
         void useChatStore.getState().ensureConversationMessages(activeId).then(() => setScopeLoadError('')).catch(reason => setScopeLoadError(String(reason)));
       }
-    }}>{t('Retry')}</button>}>{t('Could not load conversations')}: {loadError}</ErrorBox>}
-    {persistenceError && <ErrorBox compact actions={<button onClick={() => void useChatStore.getState().retryPersistence().catch(() => {})}>{t('Retry saving')}</button>}>
+    }}>{t('Retry')}</OutlineButton>}>{t('Could not load conversations')}: {loadError}</ErrorBox>}
+    {persistenceError && <ErrorBox compact actions={<OutlineButton onClick={() => void useChatStore.getState().retryPersistence().catch(() => {})}>{t('Retry saving')}</OutlineButton>}>
       {t('Conversation changes have not been saved')}
     </ErrorBox>}
     {/* Streaming content must never yank the view away from what is being read: any upward

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { TextArea, TextInput } from '@ui/fields/TextInput';
 import { Checkbox } from '@ui/fields/Checkbox';
 import { TextButton } from '@ui/actions/TextButton';
+import { IconButton } from '@ui/actions/IconButton';
 import Select from '@ui/fields/Select';
 import SegmentedControl from '@ui/fields/SegmentedControl';
 import TagInput from '@ui/fields/TagInput';
@@ -195,12 +196,12 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
     {!page && <TextButton className="ssh-primary-action user-primary-action" onClick={() => void doSave()} disabled={busy} data-testid={onConnect ? 'ssh-connect-btn' : 'ssh-save-btn'}>{t(saving ? 'Saving…' : onConnect ? 'Connect' : 'Save')}</TextButton>}
   </footer>;
   const content = <>
-    <div ref={dialog} className={page ? 'ssh-host-editor' : 'workspace-floating workspace-floating-dialog ssh-form-dialog'} data-testid={page ? 'ssh-host-editor' : undefined} role={page ? 'region' : 'dialog'} aria-modal={page ? undefined : true} aria-label={t('SSH connection')} tabIndex={-1} onClick={event => event.stopPropagation()} onKeyDown={event => {
+    <div ref={dialog} className={page ? 'ssh-host-editor' : `workspace-floating workspace-floating-dialog ssh-form-dialog${onConnect ? ' ssh-host-editor ssh-quick-connect' : ''}`} data-testid={page ? 'ssh-host-editor' : undefined} role={page ? 'region' : 'dialog'} aria-modal={page ? undefined : true} aria-label={t('SSH connection')} tabIndex={-1} onClick={event => event.stopPropagation()} onKeyDown={event => {
       if (page && (event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); if (!busy) void doSave(); }
     }}>
       <header className="ssh-form-header">{page ? <>
         <IconBtn title={t('Back to hosts')} disabled={busy} onClick={onClose}><ArrowLeft size={18} /></IconBtn><span className="ssh-editor-breadcrumb">{group || t('All hosts')}<span>/</span><strong>{name || t(initial ? 'Edit SSH connection' : 'New host')}</strong></span>
-        <button type="button" data-subtle className="ssh-editor-favorite" disabled={busy} aria-label={t(starred ? 'Unstar host' : 'Star host')} aria-pressed={starred} onClick={() => setStarred(value => !value)}>{starred ? <StarFilled size={18} color="var(--favorite-color)" /> : <Star size={18} />}</button>
+        <IconButton data-subtle className="ssh-editor-favorite" disabled={busy} aria-label={t(starred ? 'Unstar host' : 'Star host')} aria-pressed={starred} onClick={() => setStarred(value => !value)}>{starred ? <StarFilled size={18} color="var(--favorite-color)" /> : <Star size={18} />}</IconButton>
         <TextButton disabled={busy} onClick={onClose}>{t('Cancel')}</TextButton><TextButton className="user-primary-action" disabled={busy} onClick={() => void doSave()} data-testid="ssh-save-btn">{t(saving ? 'Saving…' : 'Save')}</TextButton>
       </> : <><h2>{t(onConnect ? 'Quick SSH connection' : initial ? 'Edit SSH connection' : 'New SSH connection')}</h2><KeyHint shortcut={isMacOS ? 'Meta+Enter' : 'Control+Enter'} /></>}</header>
       <div className="ssh-form-layout">
@@ -271,7 +272,7 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
             <TextArea variant="field" id="ssh-host-ai-notes" value={aiNotes} rows={4} onChange={event => setAiNotes(event.target.value)} data-testid="ssh-form-ai-notes" /><small>{new TextEncoder().encode(aiNotes).length.toLocaleString()} / 16,384 {t('bytes')}</small>
           </section>
           <details className="ssh-editor-advanced" open={page ? undefined : true}>
-            {page && <summary><ChevronRight size={14} />{t('Advanced connection options')}</summary>}
+            <summary hidden={!page}><ChevronRight size={14} />{t('Advanced connection options')}</summary>
           <FormSection id="ssh-section-forwarding" role={page || onConnect ? undefined : 'tabpanel'} aria-label={t('Port forwarding')} hidden={!page && !onConnect && section !== 'forwarding'}>
             <SshForwardingEditor key={version} value={forwards} onChange={setForwards} />
           </FormSection>

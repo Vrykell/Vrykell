@@ -24,6 +24,13 @@ test('interface, terminal and editor fonts load locally and keep mixed text alig
   await expect(page.getByLabel('终端字体预览')).toHaveCSS('font-family', /"Maple Mono NF CN"/);
   const terminalBackground = await page.getByLabel('终端字体预览').evaluate(element => getComputedStyle(element).backgroundColor);
   await expect(page.getByLabel('AI Chat 字号预览')).toHaveCSS('background-color', terminalBackground);
+  for (const label of ['编辑器字体预览', '终端字体预览', 'AI Chat 字号预览']) {
+    const preview = page.getByLabel(label);
+    await expect(preview).toHaveCSS('background-color', terminalBackground);
+    await expect(preview).toHaveCSS('border-top-width', '1px');
+    await expect(preview).toHaveCSS('border-top-style', 'solid');
+    await expect(preview).toHaveCSS('border-top-color', await page.getByLabel('终端字体预览').evaluate(element => getComputedStyle(element).borderTopColor));
+  }
   const widths = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d')!;

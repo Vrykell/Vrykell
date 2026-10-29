@@ -41,7 +41,7 @@ export default function UnifiedStartPage({ resources, icon, onSelect, onNew, onO
       <section className="ai-launch-agents" aria-label={t('Open workspace resources')}>
         <div className="ai-launch-section-heading"><h3>{t('Open workspace resources')}<span>{resources.length}</span></h3><OutlineButton onClick={onHistory}><History size={16} />{t('All history')}</OutlineButton></div>
         <div className="workspace-sidebar-search ai-launch-search"><Search size={16} /><TextInput value={query} onChange={event => setQuery(event.target.value)} aria-label={t('Search workspace resources')} placeholder={t('Search workspace resources')} />{query && <IconButton compact aria-label={t('Clear search')} onClick={() => setQuery('')}><X size={14} /></IconButton>}</div>
-        <div className="ai-launch-grid">{filtered.map(resource => <button type="button" key={resource.id} className="ai-launch-option" aria-label={resource.title} onClick={() => onSelect(resource.id)}>{icon(resource)}<span className="ai-launch-copy"><strong>{resource.title}</strong></span><ArrowRight size={16} /></button>)}</div>
+        <div className="ai-launch-grid">{filtered.map(resource => <button type="button" key={resource.id} className="ai-launch-option ai-launch-resource" aria-label={resource.title} onClick={() => onSelect(resource.id)}>{icon(resource)}<span className="ai-launch-copy"><strong>{resource.title}</strong></span><ArrowRight size={16} /></button>)}</div>
         {!filtered.length && <div className="search-empty-state">{t(resources.length ? 'No matching resources' : 'Create a tab or open a file to get started.')}</div>}
       </section>
     </div>

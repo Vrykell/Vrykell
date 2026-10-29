@@ -49,6 +49,7 @@
 }
 .ssh-form-dialog.ssh-auth-dialog { width: min(440px, calc(100vw - 32px)); min-height: 0; }
 .ssh-host-editor { container: host-editor / inline-size; display: flex; flex: 1; flex-direction: column; min-height: 0; min-width: 0; background: var(--canvas); color: var(--text-primary); }
+.ssh-quick-connect { flex: 0 1 auto; width: min(640px, calc(100vw - 32px)); max-height: min(620px, calc(100dvh - 32px)); }
 .ssh-host-editor > .ssh-form-header { flex-shrink: 0; gap: 10px; padding: 12px 24px; }
 .ssh-editor-breadcrumb { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; color: var(--text-muted); font-size: var(--fs-label); }
 .ssh-editor-breadcrumb strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); }
@@ -68,6 +69,7 @@
 .ssh-form-dialog .ssh-form-section + .ssh-form-section:not([hidden]) { margin-top: 16px; }
 .ssh-host-editor textarea, .ssh-form-dialog textarea { resize: none; }
 .ssh-host-editor .ssh-form-footer { padding: 12px 0 0; border: 0; }
+.ssh-quick-connect > .ssh-form-footer { padding: 12px 16px; border-top: 1px solid var(--border); }
 .ssh-host-editor .ssh-inline-error { padding: 0; margin-bottom: 12px; max-height: none; }
 .ssh-host-editor .ssh-form-section-fields > p { padding: 10px 16px; }
 .ssh-editor-section-hint { margin: -16px 0 24px; color: var(--text-muted); font-size: var(--fs-caption); line-height: 1.5; }
@@ -81,6 +83,7 @@ button.ssh-editor-favorite { display: inline-flex; align-items: center; justify-
 button.ssh-editor-favorite:enabled:is(:hover, :focus-visible, :active) { background: transparent; }
 button.ssh-editor-favorite:focus-visible { outline: 1px solid var(--border-strong); outline-offset: 2px; }
 .ssh-editor-advanced > summary { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; color: var(--text-muted); font-size: var(--fs-label); cursor: pointer; list-style: none; }
+.ssh-editor-advanced > summary[hidden] { display: none; }
 .ssh-editor-advanced > summary::-webkit-details-marker { display: none; }
 .ssh-editor-advanced > summary > svg { transition: transform var(--dur) var(--ease); }
 .ssh-editor-advanced[open] > summary > svg { transform: rotate(90deg); }
@@ -107,6 +110,7 @@ button.ssh-editor-favorite:focus-visible { outline: 1px solid var(--border-stron
 .ssh-host-editor .ssh-environment-rows > div + div { border-top: 1px solid var(--border); }
 .ssh-host-editor .ssh-environment-rows input:first-child { flex: .6; }
 .ssh-host-editor :is(.ssh-form-section-fields, .ssh-forwarding-editor) > .ssh-editor-link { justify-content: flex-start; padding: 10px 16px; border-radius: 0; }
+.ssh-host-editor .ssh-forwarding-editor > .ssh-editor-link { border-radius: var(--radius-inner); }
 .ssh-proxy-dialog { display: flex; flex-direction: column; width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: hidden; background: var(--menu-bg); }
 .ssh-proxy-dialog > header { padding: 16px 20px; }
 .ssh-proxy-dialog h2 { margin: 0; font-size: var(--fs-subtitle); }

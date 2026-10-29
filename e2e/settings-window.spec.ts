@@ -78,7 +78,7 @@ test('language and appearance choices apply immediately and persist', async ({ p
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await page.locator('.settings-navigation').getByRole('button', { name: 'Theme', exact: true }).click();
   const modes = page.getByRole('radiogroup', { name: 'Theme mode', exact: true });
-  await expect(page.locator('.theme-preset-preview')).toHaveCount(5);
+  await expect(page.locator('.theme-preset-preview')).toHaveCount(6);
   const selectedPreview = page.locator('.theme-preset-choice[aria-checked="true"] .theme-preset-preview');
   await expect(selectedPreview).toHaveCSS('outline-width', '2px');
   await modes.getByRole('radio', { name: 'Always light', exact: true }).click();

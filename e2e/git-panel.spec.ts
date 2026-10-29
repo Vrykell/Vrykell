@@ -394,6 +394,13 @@ test('shows rounded groups, a collapsible file tree and selectable worktrees', a
   await expect(staged.getByTestId('git-staged-src/main.ts')).toHaveCount(0);
   await staged.getByText('src', { exact: true }).click();
   await expect(staged.getByTestId('git-staged-src/main.ts')).toBeVisible();
+  const fileRow = staged.getByTestId('git-staged-src/main.ts');
+  const folderRow = staged.locator('.resource-row').filter({ hasText: 'src' }).first();
+  expect((await fileRow.locator('.sidebar-row-content').boundingBox())!.height).toBeCloseTo(28, 0);
+  expect((await folderRow.locator('.sidebar-row-content').boundingBox())!.height).toBeCloseTo(28, 0);
+  await fileRow.click();
+  await expect(fileRow).toHaveAttribute('data-active', 'true');
+  await expect(fileRow.locator('.sidebar-row-content')).toHaveCSS('border-radius', '8px');
   for (const width of [1240, 760]) {
     await page.setViewportSize({ width, height: 800 });
     await panel.locator('.git-group-heading').nth(1).hover();
@@ -408,6 +415,23 @@ test('shows rounded groups, a collapsible file tree and selectable worktrees', a
   await trees.getByText('feature/review', { exact: true }).click();
   await expect(panel.getByText('/home/e2e/feature', { exact: true })).toBeVisible();
   await expect(panel.locator('.git-files').getByText('工作区没有变更', { exact: true })).toBeVisible();
+});
+
+test('scrolls repository details, commit controls and changes together', async ({ page }) => {
+  const panel = page.getByTestId('git-panel');
+  await page.evaluate(() => localStorage.setItem('mock-git-snapshot', JSON.stringify({
+    root: '/home/e2e/project', branch: 'main', remotes: ['origin'], upstream: 'origin/main',
+    entries: Array.from({ length: 50 }, (_, index) => ({ path: `src/file-${index}.ts`, previousPath: null, indexStatus: ' ', worktreeStatus: 'M' })),
+  })));
+  await panel.getByRole('button', { name: '刷新变更' }).click();
+  await expect(panel.getByTestId('git-unstaged-src/file-49.ts')).toBeAttached();
+  const scroll = panel.getByTestId('git-content');
+  const top = (await scroll.boundingBox())!.y;
+  await scroll.evaluate(element => { element.scrollTop = element.scrollHeight; });
+  await expect.poll(() => scroll.evaluate(element => element.scrollTop)).toBeGreaterThan(100);
+  expect((await panel.locator('.git-repository').boundingBox())!.y).toBeLessThan(top);
+  expect((await panel.getByTestId('git-commit-area').boundingBox())!.y + (await panel.getByTestId('git-commit-area').boundingBox())!.height).toBeLessThan(top);
+  await expect(panel.getByRole('button', { name: '刷新变更' })).toBeVisible();
 });
 
 test('uses reload feedback and dismisses operation errors from the heading', async ({ page }) => {

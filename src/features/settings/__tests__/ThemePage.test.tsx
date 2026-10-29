@@ -25,7 +25,7 @@ afterEach(() => vi.restoreAllMocks());
 it('uses the shared sliding mode control and previews only the applied palette', () => {
   render(<ThemePage />);
   expect(screen.getByRole('radio', { name: '跟随系统' })).toHaveAttribute('aria-checked', 'true');
-  expect(screen.getAllByRole('radio')).toHaveLength(8);
+  expect(screen.getAllByRole('radio')).toHaveLength(9);
   expect(screen.getByRole('radio', { name: '默认深色' })).toHaveAttribute('aria-checked', 'true');
   expect(screen.queryByRole('radio', { name: '默认浅色' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('radio', { name: '始终浅色' }));

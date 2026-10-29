@@ -72,8 +72,10 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
   const [menu, setMenu] = useState<{ id: string; anchor: MenuAnchor } | null>(null);
   const [tools, setTools] = useState<HTMLElement | null>(null);
   const [tagsOpen, setTagsOpen] = useState(false);
+  const [groupsOpen, setGroupsOpen] = useState(false);
   const [metricsOpen, setMetricsOpen] = useState(false);
   const tagTrigger = useRef<HTMLButtonElement>(null);
+  const groupTrigger = useRef<HTMLButtonElement>(null);
   const metricTrigger = useRef<HTMLButtonElement>(null);
   const search = useRef<HTMLDivElement>(null);
   const collecting = useMemo(() => connections.filter(connection => !metadata[connection.id]?.resourceDisabled), [connections, metadata]);
@@ -148,7 +150,8 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
     <div className="ssh-host-filter-toolbar">
       <div className="ssh-host-filter-actions">
         <TextButton className="ssh-host-filter" aria-pressed={starredOnly} data-testid="ssh-host-favorites" onClick={() => setStarredOnly(value => !value)}>{starredOnly ? <StarFilled size={16} color="var(--favorite-color)" /> : <Star size={16} />}{t('Favorites')}</TextButton>
-        <TextButton ref={tagTrigger} className="ssh-host-filter" aria-expanded={tagsOpen} disabled={!knownTags.length} data-tip={!knownTags.length ? t('Add tags when editing a host.') : undefined} data-testid="ssh-host-tag-filter" onClick={() => setTagsOpen(value => !value)}><Tag size={16} />{t('Tags')}{tagFilter.length > 0 && <span>{tagFilter.length}</span>}<ChevronDown size={12} /></TextButton>
+        <TextButton ref={tagTrigger} className="ssh-host-filter" aria-expanded={tagsOpen} disabled={!knownTags.length} data-tip={!knownTags.length ? t('Add tags when editing a host.') : undefined} data-testid="ssh-host-tag-filter" onClick={() => { setGroupsOpen(false); setTagsOpen(value => !value); }}><Tag size={16} />{t('Tags')}{tagFilter.length > 0 && <span>{tagFilter.length}</span>}<ChevronDown size={12} /></TextButton>
+        <TextButton ref={groupTrigger} className="ssh-host-filter" aria-expanded={groupsOpen} disabled={!groups.some(group => !!group.name)} data-testid="ssh-host-group-filter" onClick={() => { setTagsOpen(false); setGroupsOpen(value => !value); }}><Folder size={16} />{t('Group')}{groupFilter !== null && <span>1</span>}<ChevronDown size={12} /></TextButton>
       </div>
       <div className="ssh-host-view-actions">
         <Select aria-label={t('Host list order')} value={sort} options={[{ value: 'manual', label: t('Manual order') }, { value: 'recent', label: t('Last connected') }, { value: 'name', label: t('Name') }, ...(resources ? (['cpu', 'memory', 'disk'] as const).map(value => ({ value, label: t(METRIC_LABELS[value]) })) : [])]} onChange={value => setSort(value as Sort)} style={{ width: 118 }} />
@@ -160,8 +163,8 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
         </span>}
       </div>
     </div>
-    {tagsOpen && <div className="ssh-host-tag-options"><CheckboxMenu title={t('Host tags')} triggerRef={tagTrigger} style={{ position: 'relative', width: 280, maxWidth: '100%', maxHeight: 200, overflowY: 'auto', zIndex: 'auto' }} options={knownTags.map(tag => ({ id: tag, label: tag, checked: tagFilter.includes(tag), icon: <HostTagDot tag={tag} /> }))} onToggle={tag => setTagFilter(current => current.includes(tag) ? current.filter(value => value !== tag) : [...current, tag])} onClose={() => setTagsOpen(false)} /></div>}
-    {groups.some(group => !!group.name) && <div className="ssh-host-group-filters" role="group" aria-label={t('Host groups')}>{groups.map(group => <TextButton key={group.name} aria-pressed={groupFilter === group.name} onClick={() => setGroupFilter(current => current === group.name ? null : group.name)}><Folder size={16} color="var(--primary-action)" />{group.name || t('Ungrouped')}<span>{group.hosts.length}</span></TextButton>)}</div>}
+    {tagsOpen && <CheckboxMenu anchored checkmark title={t('Host tags')} triggerRef={tagTrigger} style={{ width: 280 }} options={knownTags.map(tag => ({ id: tag, label: tag, checked: tagFilter.includes(tag), icon: <HostTagDot tag={tag} /> }))} onToggle={tag => setTagFilter(current => current.includes(tag) ? current.filter(value => value !== tag) : [...current, tag])} onClose={() => setTagsOpen(false)} />}
+    {groupsOpen && <CheckboxMenu anchored checkmark title={t('Host groups')} triggerRef={groupTrigger} style={{ width: 280 }} options={groups.map(group => ({ id: group.name, label: group.name || t('Ungrouped'), checked: groupFilter === group.name, icon: <Folder size={16} />, count: group.hosts.length }))} onToggle={group => setGroupFilter(current => current === group ? null : group)} onClose={() => setGroupsOpen(false)} />}
     {resources && HOST_METRICS.every(id => !metrics[id]) && <div className="ssh-dashboard-paused" role="status">{t('Metrics collection is paused. Turn on one or more metrics to collect host status.')}</div>}
     {layout === 'table' && <div className="ssh-host-columns"><span /><span>{t('Name')}</span>{resources ? <><span>{t('Status')}</span>{(['cpu', 'memory', 'disk'] as const).filter(metric => metrics[metric]).map(metric => <span key={metric}>{t(METRIC_LABELS[metric])}</span>)}</> : <><span>{t('Address')}</span><span>{t('Tags')}</span><span>{t('Last connected')}</span></>}<span /></div>}
     <div className={layout === 'table' ? 'scroll-region ssh-host-list' : 'scroll-region ssh-dashboard-grid'} data-reorder-list={layout === 'table' ? 'ssh-hosts' : undefined}>

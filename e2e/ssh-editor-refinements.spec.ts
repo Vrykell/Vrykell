@@ -28,6 +28,26 @@ for (const theme of ['dark', 'light']) test(`compact shared fields, authenticati
   await editor.getByRole('button', { name: '移除变量', exact: true }).click(); await expect(editor.getByTestId('ssh-env-add')).toHaveCSS('border-top-width', '0px');
   await editor.getByTestId('ssh-env-add').click(); await editor.getByTestId('ssh-form-ai-notes').scrollIntoViewIfNeeded();
   const summary = editor.locator('.ssh-editor-advanced > summary'); await expect(summary).toHaveCSS('list-style-type', 'none'); await expect(summary.locator('svg')).toBeVisible();
+  if (await summary.locator('..').evaluate(element => !element.hasAttribute('open'))) await summary.click();
+  const addForward = editor.getByTestId('ssh-forward-add');
+  await expect(addForward).toHaveCSS('border-radius', '8px');
   await page.screenshot({ path: info.outputPath(`editor-bottom-${theme}.png`), animations: 'disabled' });
   await editor.getByTestId('ssh-form-name').scrollIntoViewIfNeeded(); await page.screenshot({ path: info.outputPath(`editor-top-${theme}.png`), animations: 'disabled' });
+});
+
+test('quick connection reuses the connection form cards without a native disclosure marker', async ({ page }, info) => {
+  await setupTauriMock(page, {}); await page.goto('/'); await page.getByTestId('workspace-area-ssh').click();
+  await page.getByTestId('ssh-host-actions').click(); await page.getByRole('button', { name: '快速连接', exact: true }).click();
+  const form = page.getByRole('dialog', { name: 'SSH 连接' });
+  await expect(form.locator('.ssh-editor-advanced > summary')).toBeHidden();
+  await expect(form.locator('#ssh-section-connection .ssh-form-section-fields')).toHaveCSS('border-radius', '8px');
+  await expect(form.getByTestId('ssh-forward-add')).toHaveCSS('border-radius', '8px');
+  for (const width of [1240, 640]) {
+    await page.setViewportSize({ width, height: 800 });
+    await expect(form.getByTestId('ssh-form-host')).toBeVisible();
+    const bounds = (await form.boundingBox())!;
+    expect(bounds.width).toBeLessThanOrEqual(Math.min(640, width - 32));
+    expect(Math.abs(bounds.x + bounds.width / 2 - width / 2)).toBeLessThan(2);
+    await page.screenshot({ path: info.outputPath(`quick-connection-${width}.png`), animations: 'disabled' });
+  }
 });

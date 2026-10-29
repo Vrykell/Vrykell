@@ -4,6 +4,7 @@ import PasteConfirmHost from '@features/terminal/components/PasteConfirmHost';
 import NewTabModal from '@features/workspace/components/NewTabModal';
 import ToastContainer from '@ui/feedback/Toast';
 import TooltipLayer from '@ui/feedback/TooltipLayer';
+import FileOpenError from '@features/files/components/FileOpenError';
 import { useUiStore } from '@features/workspace';
 import type { TerminalSpec } from '@features/workspace/model/windowLayout';
 
@@ -28,6 +29,7 @@ export default function ApplicationOverlays({ onPickSplit }: ApplicationOverlays
       <NewTabModal open={splitPickerOpen} source={splitPickerSource} onClose={closeSplitPicker} onPick={onPickSplit} />
       <PasteConfirmHost />
       <ToastContainer />
+      <FileOpenError />
       <TooltipLayer />
     </>
   );

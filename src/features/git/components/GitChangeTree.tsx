@@ -8,7 +8,7 @@ export default function GitChangeTree({ entries, renderEntry }: { entries: GitEn
   const [folded, setFolded] = useState<string[]>([]);
   const toggle = (path: string) => setFolded(values => values.includes(path) ? values.filter(value => value !== path) : [...values, path]);
   const render = (node: ChangeTreeNode, depth: number): ReactNode => node.entry ? renderEntry(node.entry, depth) : <div key={node.path}>
-    <SidebarItem variant="resource" compact active={false} title={node.name} tooltip={node.path}
+    <SidebarItem variant="resource" compact dense active={false} title={node.name} tooltip={node.path}
       tree={{ depth, expanded: !folded.includes(node.path), onToggle: () => toggle(node.path) }} icon={<Folder size={18} />}
       dataAttributes={{ 'aria-expanded': String(!folded.includes(node.path)) }} tabIndex={0}
       onClick={() => toggle(node.path)}

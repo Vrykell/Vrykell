@@ -1227,6 +1227,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               entries: [
                 { name: 'Documents', path: `${base}/Documents`, is_dir: true },
                 { name: 'app.log', path: `${base}/app.log`, is_dir: false },
+                ...((window as unknown as { __SSH_EXTRA_ENTRIES__?: { name: string; path: string; is_dir: boolean }[] }).__SSH_EXTRA_ENTRIES__ ?? []),
                 ...createdEntries,
               ],
             };

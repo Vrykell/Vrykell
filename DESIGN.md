@@ -46,6 +46,8 @@ Each common-workspace tab contains its complete pane layout. Switching tabs pres
 
 Shell profile identities are owned by `src/ui/icons/shellIcons.tsx`. Both supported command-shell variants use the same blue panel mark. Generic terminal actions use a neutral prompt mark. The blue panel uses theme tokens without document-global gradient identifiers, so hidden copies cannot affect visible icons.
 
+Shell identity accents remain fixed across color schemes: shared stylesheet tokens own the blue panel, green outline and white interior strokes. Theme-dependent text, chart and group colors must not recolor these marks. Typography previews share a bordered surface for editor, terminal and chat samples.
+
 Conversation settings use a persistent non-modal popover, not an action menu. Selecting an option or opening its profile picker does not dismiss the parent; Escape first closes the child. Resource icons reuse profile identities. Compositions use the first pane's content icon with a small circular count badge at the top right, not a separate split icon. Workspace-local splits share the composition canvas without changing navigation domains.
 
 The reference is a compact desktop terminal workbench, not an administrative website or an integrated development environment. Output and editable text carry the screen; navigation and tools stay quiet. The signature is uninterrupted terminal state beside dense, single-line host information.
@@ -56,11 +58,17 @@ Runtime tokens remain canonical. `src/config/theme/tokens.ts` maps semantic pale
 
 ## Colors
 
-Both original palettes in `tokens.ts` remain unchanged defaults. Published palette values in `presets.ts` feed an independent semantic adapter and the same `paletteToCssVars` path; the interface, editor, terminals and native frame share that result. Theme file selections are independent for dark and light, with a small startup cache; explicit custom variables remain the final layer. Names identify palette sources without implying an official application port. Original notices ship with the application.
+Both original palettes in `tokens.ts` remain default choices. Palette values in `presets.ts` feed an independent semantic adapter and the same `paletteToCssVars` path; the interface, editor, terminals and native frame share that result. Theme file selections are independent for dark and light, with a small startup cache; explicit custom variables remain the final layer. Names identify palette sources without implying an official application port. Original notices ship with the application.
+
+The additional near-black palette uses a neutral `#1C1C1C` interface canvas and a separate `#111111` terminal background. Structural shades keep equal red, green and blue channels; colored accents retain their semantic roles. Its seed owns both backgrounds through the same semantic adapter.
 
 At the user's explicit request, appearance mode uses the shared sliding `SegmentedControl` instead of the usual settings dropdown. Only the applied mode's color-scheme group is displayed, including when following the system. Rich color-scheme choices use a responsive radio grid: each card previews actual terminal colors, includes a visible checked mark and inset name, and supports roving focus, arrow keys and Home/End. Card previews scope runtime variables to the sample only; labels and focus retain the active application theme. The preview is a selection aid, not a second token system.
 
 Primary actions, selected sidebar navigation icons and range progress use `--primary-action`. Selected top toolbar icons retain the neutral foreground. `--primary-button-bg` and `--primary-button-text` own solid-button contrast. Favorites use `--favorite-color` in both themes and never inherit a muted category color. Host card selection uses the neutral hover surface without a blue border. Status, shell identities, categorical tags and diagnostic colors retain independent semantic tokens.
+
+Host group and tag filters use matching dropdown chips and shared multi-select menus with right-aligned check marks. Creation pickers opened from a context action capture that row's coordinates before the parent closes, rather than relying on the restored document focus. Quick connection remains a bounded centered dialog using the same form cards as host editing.
+
+Local and remote file rows and source-control change rows share the command list's 28 px compact height and inset rounded selection, while preserving tree indentation, multi-selection and row actions.
 
 | Document role | Runtime owner | Consumers |
 |---|---|---|

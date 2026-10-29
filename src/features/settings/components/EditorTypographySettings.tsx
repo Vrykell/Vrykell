@@ -30,7 +30,7 @@ export default function EditorTypographySettings() {
       <Select aria-label={t('Editor line spacing')} value={editorLineHeight} options={lineHeights} onChange={editorLineHeight => { void save(() => update({ editorLineHeight })); }} style={{ width: 110 }} />
     </Field>
     <div className="settings-record">
-      <div data-selectable aria-label={t('Editor font preview')} style={{ fontFamily: 'var(--editor-font-family)', fontSize: 'var(--editor-font-size)', fontWeight: 'var(--editor-font-weight)', lineHeight: 'var(--editor-line-height)', whiteSpace: 'pre-wrap' }}>{'1  const value = 42;\n2  AaBb 0123'}</div>
+      <div className="settings-font-preview" data-selectable aria-label={t('Editor font preview')} style={{ fontFamily: 'var(--editor-font-family)', fontSize: 'var(--editor-font-size)', fontWeight: 'var(--editor-font-weight)', lineHeight: 'var(--editor-line-height)', whiteSpace: 'pre-wrap' }}>{'1  const value = 42;\n2  AaBb 0123'}</div>
       <OutlineButton style={{ marginTop: 12 }} onClick={() => { void save(() => update({ editorFontSize: 13, editorFontPreset: 'system', editorFontWeight: 400, editorLineHeight: 1.5 })); }}>{t('Restore editor typography')}</OutlineButton>
     </div>
   </SettingsGroup>;

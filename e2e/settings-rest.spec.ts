@@ -29,7 +29,7 @@ test.describe('Theme settings page', () => {
     await page.emulateMedia({ colorScheme: 'dark' });
     await gotoSetting(page, '主题');
     await selectThemeMode(page, '跟随系统');
-    await expect(page.getByRole('radiogroup', { name: '深色配色' }).getByRole('radio')).toHaveCount(5);
+    await expect(page.getByRole('radiogroup', { name: '深色配色' }).getByRole('radio')).toHaveCount(6);
     await expect(page.getByRole('radiogroup', { name: '浅色配色' })).toHaveCount(0);
     await page.emulateMedia({ colorScheme: 'light' });
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');

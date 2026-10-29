@@ -11,7 +11,7 @@ export interface MenuAnchor { x: number; y: number; trigger?: HTMLElement; above
 export interface ContextMenuItem {
   label: string;
   tip?: string;
-  onClick?: () => void;
+  onClick?: (anchor?: MenuAnchor) => void;
   danger?: boolean;
   group?: MenuGroup;
   order?: number;
@@ -114,6 +114,13 @@ export function ContextMenuItems({ items, onClose, itemRole, onOpen, onHover, op
       shortcut={item.shortcut} checked={item.checked} submenu={!!item.submenu} expanded={openLabel === item.label} controls={submenuId}
       onPointerEnter={event => onHover?.(item, event.currentTarget)}
       onKeyDown={event => { if (event.key === 'ArrowRight' && item.submenu) { event.preventDefault(); event.stopPropagation(); onOpen?.(item, event.currentTarget); } }}
-      onClick={event => { if (item.submenu) onOpen?.(item, event.currentTarget); else { item.onClick?.(); onClose(); } }} />
+      onClick={event => {
+        if (item.submenu) onOpen?.(item, event.currentTarget);
+        else {
+          const bounds = event.currentTarget.getBoundingClientRect();
+          item.onClick?.({ x: bounds.left, y: bounds.bottom + 4 });
+          onClose();
+        }
+      }} />
   </Fragment>)}</>;
 }

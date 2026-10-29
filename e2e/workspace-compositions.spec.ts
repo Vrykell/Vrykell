@@ -3,6 +3,31 @@ import { setupTauriMock } from './tauri-mock';
 import { pickPlacementZone } from './placement';
 import { chooseSplitType, openWorkspaceResource } from './workbench';
 
+for (const width of [640, 1240]) test(`context creation pickers stay beside the selected action at ${width}px`, async ({ page }) => {
+  await setupTauriMock(page, {}); await page.goto('/');
+  await page.getByTestId('workspace-area-unified').click();
+  await openWorkspaceResource(page);
+  await page.setViewportSize({ width, height: 800 });
+  const strip = page.getByTestId('workspace-instance-bar').getByRole('tablist');
+  for (const surface of [strip, strip.locator('.folder-tab').first()]) {
+    for (const [label, dialog] of [['新终端', '新建标签页'], ['连接服务器', '连接服务器'], ['ACP 智能体', 'ACP']]) {
+      await surface.click({ button: 'right', position: { x: 20, y: 12 } });
+      const action = page.getByRole('menu').getByText(label, { exact: true });
+      const origin = (await action.boundingBox())!;
+      await action.click();
+      const picker = page.getByRole('dialog', { name: dialog, exact: true });
+      await expect(picker).toBeVisible();
+      const bounds = (await picker.boundingBox())!;
+      expect(bounds.x).toBeGreaterThanOrEqual(8);
+      expect(Math.abs(bounds.x - origin.x)).toBeLessThanOrEqual(310);
+      expect(bounds.y + bounds.height).toBeLessThanOrEqual(792);
+      expect(bounds.y < origin.y ? origin.y - bounds.y - bounds.height : bounds.y - origin.y - origin.height).toBeLessThanOrEqual(12);
+      await page.keyboard.press('Escape');
+      await expect(picker).toHaveCount(0);
+    }
+  }
+});
+
 for (const theme of ['dark', 'light']) test(`common start scopes creation correctly in ${theme} and retains its workspace`, async ({ page }, info) => {
   await setupTauriMock(page, {});
   await page.addInitScript(theme => { localStorage.setItem('vrykell-theme-mode', theme); localStorage.setItem('vrykell-startup-mode', 'empty'); }, theme);
