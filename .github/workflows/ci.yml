@@ -3,10 +3,10 @@ name: CI
 on:
   push:
     branches: [main]
-    paths-ignore: ['docs/**', 'README*.md', 'CONTRIBUTING*.md', '.github/**']
+    paths-ignore: ['docs/**', 'README*.md', 'CONTRIBUTING*.md', '.github/**', 'scripts/capture-readme.mjs']
   pull_request:
     branches: [dev, main]
-    paths-ignore: ['docs/**', 'README*.md', 'CONTRIBUTING*.md', '.github/**']
+    paths-ignore: ['docs/**', 'README*.md', 'CONTRIBUTING*.md', '.github/**', 'scripts/capture-readme.mjs']
   workflow_dispatch:
     inputs:
       mode:

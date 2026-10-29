@@ -2,7 +2,7 @@
 
 The workflow in [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) runs on
 pushes to `main` and pull requests targeting `dev` or `main`. Changes limited to
-documentation or `.github/` files do not trigger it. It can also be started manually.
+documentation, `.github/` files or the README screenshot script do not trigger it. It can also be started manually.
 
 - The frontend job checks types, unit tests, architecture boundaries and the production build.
 - Automatic runs only perform the frontend checks on a Linux runner.

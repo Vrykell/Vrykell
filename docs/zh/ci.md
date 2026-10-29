@@ -2,7 +2,7 @@
 
 [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml) 会在向 `main` 推送代码，
 或向 `dev`、`main` 提交拉取请求时运行，也支持手动启动。仅修改文档或 `.github/`
-文件不会触发自动运行。
+文件或 README 截图脚本不会触发自动运行。
 
 - 前端任务检查类型、单元测试、架构边界和生产构建。
 - 自动运行只在 Linux 上执行前端检查。
