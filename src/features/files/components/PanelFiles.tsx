@@ -185,7 +185,7 @@ function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
       <span style={{
         width: 34, height: 34, borderRadius: 8, flexShrink: 0,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--hover)', color: 'var(--accent)',
+        background: 'var(--hover)', color: 'var(--primary-action)',
       }}>
         <HardDrive size={iconSizes.row} />
       </span>
