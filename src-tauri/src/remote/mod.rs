@@ -1,5 +1,6 @@
 //! remote — remote connections (SSH).
 pub mod ssh;
+pub(crate) mod file_channel;
 pub mod ssh_config;
 pub mod session_auth;
 pub mod network;

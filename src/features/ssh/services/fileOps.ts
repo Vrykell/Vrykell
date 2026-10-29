@@ -24,6 +24,8 @@ export function createSshFileOps(connectionId: string): FileOps {
   };
 
   return {
+    refreshIntervalMs: 5000,
+    backgroundRefresh: 'one-directory',
     search: (root, query, signal, onProgress) => sshSearchFiles(connectionId, root, query, signal, onProgress),
     stat: (path) => sshStat(connectionId, path),
     list: (dir) => sshFsList(connectionId, dir ?? undefined)

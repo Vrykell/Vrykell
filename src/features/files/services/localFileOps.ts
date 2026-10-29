@@ -9,6 +9,7 @@ import type { FileOps } from '@features/files/model/fileOps';
 /** Local disk implementation: path semantics come from @platform/path; all operations go through backend file commands. */
 export function createLocalFileOps(): FileOps {
   return {
+    refreshIntervalMs: 2000,
     stat: (path) => fsStat(path),
     list: (dir) => fsList(dir).then((entries) => ({ base: null, entries })),
     parentOf,

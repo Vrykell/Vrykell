@@ -66,6 +66,11 @@ impl AuthCache {
         self.entries.get(&conn.id).map(|entry| Arc::clone(&entry.credential))
     }
 
+    pub fn revision_for(&mut self, conn: &SshConnection) -> u64 {
+        self.get(conn);
+        self.entries.get(&conn.id).map_or(0, |entry| entry.revision)
+    }
+
     pub fn reject(&mut self, id: &str, credential: &Arc<Credential>) {
         if self.entries.get(id).is_some_and(|entry| Arc::ptr_eq(&entry.credential, credential)) {
             self.entries.remove(id);
@@ -135,6 +140,21 @@ mod tests {
         let current = cache.get(&connection).unwrap();
         cache.reject("one", &current);
         assert!(cache.get(&connection).is_none());
+    }
+
+    #[test]
+    fn channel_bindings_follow_credential_replacement_and_forgetting() {
+        let mut cache = AuthCache::default();
+        let connection = conn("channel-binding");
+        assert_eq!(cache.revision_for(&connection), 0);
+        let first = cache.begin(&connection.id);
+        cache.store(&connection, first, credential());
+        assert_eq!(cache.revision_for(&connection), first);
+        let second = cache.begin(&connection.id);
+        cache.store(&connection, second, credential());
+        assert_ne!(cache.revision_for(&connection), first);
+        cache.clear(&connection.id);
+        assert_eq!(cache.revision_for(&connection), 0);
     }
 
     #[test]

@@ -33,6 +33,10 @@ export type FileOpsTarget = { kind: 'local' } | { kind: 'ssh'; connectionId: str
 
 /** File operation interface: collision avoidance and undoable deletion are guaranteed by the implementations and backend. */
 export interface FileOps {
+  /** Delay between visible-tree checks; targets can account for channel latency. */
+  refreshIntervalMs?: number;
+  /** Slow channels check one visible directory per idle pass. */
+  backgroundRefresh?: 'one-directory';
   /** Optional optimized traversal on the target's file channel. */
   search?(root: string, query: string, signal: AbortSignal,
     onProgress?: (result: { entries: FsEntry[]; truncated: boolean; skipped: number }) => void): Promise<{ entries: FsEntry[]; truncated: boolean; skipped: number }>;

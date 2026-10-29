@@ -101,7 +101,6 @@ export default function FilePanel({
     loadingHint,
     error,
     refresh,
-    load,
     navigate,
     goBack,
     goForward,
@@ -159,7 +158,7 @@ export default function FilePanel({
     if (enabled) refresh();
   }, [reloadRevision, enabled, refresh]);
 
-  const rows = flattenVisible(entries, expandedSet, childCache);
+  const rows = useMemo(() => flattenVisible(entries, expandedSet, childCache), [entries, expandedSet, childCache]);
   const [pathDraft, setPathDraft] = useState<string | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [propertiesTarget, setPropertiesTarget] = useState<FsEntry | null>(null);
@@ -212,7 +211,7 @@ export default function FilePanel({
       } else if (result === 'Cancelled' && config.drag.downloadBeforeNativeDrag) {
         void discardNativeDragCopies(payload.paths);
       }
-      load(path);
+      refresh();
     },
   });
   const dragTarget = useFileDragStore((state) => state.target);
@@ -508,16 +507,17 @@ export default function FilePanel({
         data-path={path ?? ''}
         style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}
       >
+        {error && <>
+          {renderError
+            ? renderError(error, refresh)
+            : <ErrorBox style={{ margin: 12 }} actions={<button onClick={refresh} style={{ minHeight: 32 }}>{t('Retry')}</button>}>{error}</ErrorBox>}
+          {!settled && path !== null && <button style={{ margin: 12 }} onClick={() => { void navigate(null); }}>{t('Return to home directory')}</button>}
+        </>}
         {loadingHint ? (
           <div role="status" style={{ padding: 16, color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>
             {config.variant === 'ssh' ? t('files.loading.ssh') : path === null ? t('files.loading.disks') : t('files.loading.directory')}
           </div>
-        ) : error ? <>
-          {renderError
-            ? renderError(error, refresh)
-            : <ErrorBox style={{ margin: 12 }} actions={<button onClick={refresh} style={{ minHeight: 32 }}>{t('Retry')}</button>}>{error}</ErrorBox>}
-          {path !== null && <button style={{ margin: 12 }} onClick={() => { void navigate(null); }}>{t('Return to home directory')}</button>}
-        </> : path === null && renderNullPathView ? (
+        ) : error && !settled ? null : path === null && renderNullPathView ? (
           renderNullPathView({ disks, settled, navigate })
         ) : (
           <>

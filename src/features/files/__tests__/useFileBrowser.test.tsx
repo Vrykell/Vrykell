@@ -202,7 +202,7 @@ describe('useFileBrowser (local target)', () => {
     expect(result.current.path).toBe('C:/work/d5');
   });
 
-  it('lazy-loads and caches children when expanding a directory and does not request again on re-expand', async () => {
+  it('lazy-loads children and revalidates the cache when expanding again', async () => {
     fsMocks.fsList.mockImplementation((dir?: string | null) => Promise.resolve(
       dir === 'C:/work/src' ? [entry('main.ts', 'C:/work/src/main.ts')] : [entry('src', 'C:/work/src', true)],
     ));
@@ -215,8 +215,10 @@ describe('useFileBrowser (local target)', () => {
     const calls = fsMocks.fsList.mock.calls.length;
 
     act(() => result.current.toggleExpand(folder));
-    act(() => result.current.toggleExpand(folder));
-    expect(fsMocks.fsList.mock.calls.length).toBe(calls);
+    fsMocks.fsList.mockResolvedValue([entry('new.ts', 'C:/work/src/new.ts')]);
+    await act(async () => { result.current.toggleExpand(folder); });
+    expect(fsMocks.fsList.mock.calls.length).toBe(calls + 1);
+    expect(result.current.childCache[folder.path]?.[0]?.name).toBe('new.ts');
   });
 
   it('calls copy or move according to paste mode and records the backend target for undo, including collision avoidance', async () => {

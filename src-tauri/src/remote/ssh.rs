@@ -368,7 +368,7 @@ fn connect(conn: &SshConnection) -> Result<Session, String> {
 }
 
 /// Record connection stages without storing credentials, key paths or command output.
-fn connection_stage<T>(conn: &SshConnection, stage: &str, action: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
+pub(super) fn connection_stage<T>(conn: &SshConnection, stage: &str, action: impl FnOnce() -> Result<T, String>) -> Result<T, String> {
     let started = std::time::Instant::now();
     let result = action();
     let _ = crate::diagnostics::record("ssh-backend-stage", serde_json::json!({
@@ -552,16 +552,14 @@ fn ssh_test_sync(conn: &SshConnection) -> Result<String, String> {
 }
 
 fn ssh_list_sync(conn: &SshConnection, path: Option<String>) -> Result<SshListResponse, String> {
-    let sess = connect(conn)?;
-    let sftp = connection_stage(conn, "sftp-open", || sess.sftp().map_err(|error| format!("SFTP_UNAVAILABLE: {error}")))?;
-
     let dir = path.unwrap_or_default();
+    super::file_channel::run(conn, true, |_, sftp| {
     // Empty path → remote home (the SFTP current directory is the login home); other paths are
     // normalized with realpath
     let base = sftp
         .realpath(Path::new(if dir.is_empty() { "." } else { &dir }))
         .map(|p| p.to_string_lossy().to_string())
-        .unwrap_or_else(|_| if dir.is_empty() { "/".to_string() } else { dir });
+        .unwrap_or_else(|_| if dir.is_empty() { "/".to_string() } else { dir.clone() });
 
     let entries = sftp
         .readdir(Path::new(&base))
@@ -583,6 +581,7 @@ fn ssh_list_sync(conn: &SshConnection, path: Option<String>) -> Result<SshListRe
     }
     result.sort_by(|a, b| b.is_dir.cmp(&a.is_dir).then_with(|| a.name.cmp(&b.name)));
     Ok(SshListResponse { entries: result, base })
+    })
 }
 
 // ── Connection CRUD (backend SQLite) ──
@@ -599,6 +598,7 @@ pub fn ssh_connection_save(state: State<'_, HistoryState>, conn: SshConnection) 
     db.save_ssh_connection(&conn)?;
     super::forwarding::invalidate_connection(&conn);
     AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.clear(&conn.id);
+    super::file_channel::invalidate(&conn.id);
     Ok(())
 }
 
@@ -608,6 +608,7 @@ pub fn ssh_connection_delete(state: State<'_, HistoryState>, id: String) -> Resu
     db.delete_ssh_connection(&id)?;
     super::forwarding::stop_connection(&id);
     AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.clear(&id);
+    super::file_channel::invalidate(&id);
     Ok(())
 }
 
@@ -631,6 +632,7 @@ pub async fn ssh_authenticate_session(
             return Err("No private key is configured for this connection".into());
         }
         let revision = AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.begin(&id);
+        super::file_channel::invalidate(&id);
         (conn, revision)
     };
     let credential = std::sync::Arc::new(Credential { method, secret });
@@ -651,6 +653,7 @@ pub async fn ssh_authenticate_session(
 #[tauri::command]
 pub fn ssh_forget_session_auth(id: String) -> Result<(), String> {
     AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.clear(&id);
+    super::file_channel::invalidate(&id);
     Ok(())
 }
 
@@ -802,8 +805,7 @@ fn ssh_stat_from(path: String, name: String, meta: &ssh2::FileStat, is_symlink: 
 }
 
 fn ssh_stat_sync(conn: &SshConnection, path: &str) -> Result<SshStat, String> {
-    let sess = connect(conn)?;
-    let sftp = sess.sftp().map_err(|e| format!("SFTP_UNAVAILABLE: {e}"))?;
+    super::file_channel::run(conn, true, |_, sftp| {
     // stat follows symlinks (target metadata); lstat only flags the link itself.
     let meta = sftp
         .stat(Path::new(path))
@@ -814,6 +816,7 @@ fn ssh_stat_sync(conn: &SshConnection, path: &str) -> Result<SshStat, String> {
         .unwrap_or(false);
     let name = crate::platform::path::file_name(path).unwrap_or_else(|| path.to_string());
     Ok(ssh_stat_from(path.to_string(), name, &meta, is_symlink))
+    })
 }
 
 /// Read metadata for one remote path (path bar quick open and properties dialog).
@@ -951,8 +954,7 @@ pub(super) fn unique_remote_path(sftp: &Sftp, dir: &str, name: &str) -> String {
 /// returning the final path.
 fn ssh_rename_sync(conn: &SshConnection, path: &str, new_name: &str) -> Result<String, String> {
     validate_remote_name(new_name)?;
-    let sess = connect(conn)?;
-    let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
+    super::file_channel::run(conn, false, |_, sftp| {
     let parent = crate::platform::path::parent(path).ok_or("无法定位父目录")?;
     let candidate = crate::platform::path::join(&parent, new_name);
     let dst = if candidate != path && sftp.stat(Path::new(&candidate)).is_ok() {
@@ -963,14 +965,14 @@ fn ssh_rename_sync(conn: &SshConnection, path: &str, new_name: &str) -> Result<S
     sftp.rename(Path::new(path), Path::new(&dst), None)
         .map_err(|e| format!("重命名失败：{e}"))?;
     Ok(dst)
+    })
 }
 
 /// Move a remote file/directory to a destination directory (SFTP rename works across
 /// directories; same-place moves are rejected and name collisions get a sequence number).
 fn ssh_move_sync(conn: &SshConnection, path: &str, dest_dir: &str) -> Result<String, String> {
     let name = crate::platform::path::file_name(path).ok_or("无法定位文件名")?;
-    let sess = connect(conn)?;
-    let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
+    super::file_channel::run(conn, false, |_, sftp| {
     let candidate = crate::platform::path::join(dest_dir, &name);
     if candidate == path {
         return Err("已在目标目录中".into());
@@ -983,14 +985,14 @@ fn ssh_move_sync(conn: &SshConnection, path: &str, dest_dir: &str) -> Result<Str
     sftp.rename(Path::new(path), Path::new(&dst), None)
         .map_err(|e| format!("移动失败：{e}"))?;
     Ok(dst)
+    })
 }
 
 /// Create a remote file (empty) or directory; append a sequence number on collision, returning
 /// the final path.
 fn ssh_create_sync(conn: &SshConnection, dir: &str, name: &str, is_dir: bool) -> Result<String, String> {
     validate_remote_name(name)?;
-    let sess = connect(conn)?;
-    let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
+    super::file_channel::run(conn, false, |_, sftp| {
     if sftp.stat(Path::new(dir)).is_err() {
         return Err(format!("目标目录不可用：{dir}"));
     }
@@ -1008,6 +1010,7 @@ fn ssh_create_sync(conn: &SshConnection, dir: &str, name: &str, is_dir: bool) ->
         sftp.create(Path::new(&path)).map_err(|e| format!("新建文件失败：{e}"))?;
     }
     Ok(path)
+    })
 }
 
 // ── Remote panel: copy / undoable delete (remote staging) ──
@@ -1088,8 +1091,7 @@ fn remote_copy_one(sess: &Session, from: &str, to: &str) -> Result<(), String> {
 /// Copy remote files/directories to a destination directory (each item is pre-checked: same
 /// place, its own subtree and target name collisions are rejected).
 fn ssh_copy_sync(conn: &SshConnection, paths: Vec<String>, dest_dir: String) -> Result<FileOpOutcome, String> {
-    let sess = connect(conn)?;
-    let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
+    super::file_channel::run(conn, false, |sess, sftp| {
     // Absolute/relative checks must follow remote (POSIX) rules: Path::is_absolute("/home") is
     // false on a Windows host
     if !crate::platform::path::is_absolute(&dest_dir) {
@@ -1101,7 +1103,7 @@ fn ssh_copy_sync(conn: &SshConnection, paths: Vec<String>, dest_dir: String) -> 
 
     let mut completed = Vec::new();
     let mut errors = Vec::new();
-    for path in paths {
+    for path in paths.iter().cloned() {
         let Some(name) = crate::platform::path::file_name(&path) else {
             errors.push(format!("无法定位 {path} 的文件名"));
             continue;
@@ -1125,12 +1127,12 @@ fn ssh_copy_sync(conn: &SshConnection, paths: Vec<String>, dest_dir: String) -> 
         }
     }
     Ok(FileOpOutcome { completed, errors })
+    })
 }
 
 /// Undoable delete: move remote entries into the remote staging directory.
 fn ssh_stage_delete_sync(conn: &SshConnection, paths: Vec<String>) -> Result<FileOpOutcome, String> {
-    let sess = connect(conn)?;
-    let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
+    super::file_channel::run(conn, false, |_, sftp| {
     let dir = ssh_undo_dir(&sftp)?;
     ensure_remote_dir(&sftp, &dir)?;
     sftp.setstat(Path::new(&dir), ssh2::FileStat { size: None, uid: None, gid: None, perm: Some(0o700), atime: None, mtime: None })
@@ -1138,7 +1140,7 @@ fn ssh_stage_delete_sync(conn: &SshConnection, paths: Vec<String>) -> Result<Fil
 
     let mut completed = Vec::new();
     let mut errors = Vec::new();
-    for path in paths {
+    for path in paths.iter().cloned() {
         let Some(name) = crate::platform::path::file_name(&path) else {
             errors.push(format!("无法定位 {path} 的文件名"));
             continue;
@@ -1150,16 +1152,16 @@ fn ssh_stage_delete_sync(conn: &SshConnection, paths: Vec<String>) -> Result<Fil
         }
     }
     Ok(FileOpOutcome { completed, errors })
+    })
 }
 
 /// Undo delete: move staged items back to their original location (an item fails when the
 /// original path already has an entry with that name).
 fn ssh_restore_staged_sync(conn: &SshConnection, items: Vec<FileOpPair>) -> Result<FileOpOutcome, String> {
-    let sess = connect(conn)?;
-    let sftp = sess.sftp().map_err(|e| format!("打开 SFTP 失败：{e}"))?;
+    super::file_channel::run(conn, false, |_, sftp| {
     let mut completed = Vec::new();
     let mut errors = Vec::new();
-    for item in items {
+    for item in items.iter().cloned() {
         if sftp.stat(Path::new(&item.from)).is_ok() {
             errors.push(format!("恢复失败：{} 已存在同名项", item.from));
             continue;
@@ -1170,15 +1172,17 @@ fn ssh_restore_staged_sync(conn: &SshConnection, items: Vec<FileOpPair>) -> Resu
         }
     }
     Ok(FileOpOutcome { completed, errors })
+    })
 }
 
 /// Permanently delete staged items (when the undo window ends).
 fn ssh_purge_staged_sync(conn: &SshConnection, paths: Vec<String>) {
-    let Ok(sess) = connect(conn) else { return };
-    let Ok(sftp) = sess.sftp() else { return };
-    for path in paths {
+    let _ = super::file_channel::run(conn, false, |_, sftp| {
+    for path in &paths {
         let _ = remove_remote_recursive(&sftp, &path);
     }
+    Ok(())
+    });
 }
 
 #[tauri::command]
@@ -1210,10 +1214,9 @@ pub async fn ssh_stage_delete(
     };
     tauri::async_runtime::spawn_blocking(move || {
         if undo_enabled != Some(false) { return ssh_stage_delete_sync(&conn, paths); }
-        let sess = connect(&conn)?;
-        let sftp = sess.sftp().map_err(|e| e.to_string())?;
+        super::file_channel::run(&conn, false, |_, sftp| {
         let mut outcome = FileOpOutcome { completed: Vec::new(), errors: Vec::new() };
-        for path in paths {
+        for path in paths.iter().cloned() {
             if path.trim_matches('/').is_empty() || path.split('/').any(|p| p == ".." || p == ".") {
                 outcome.errors.push("Unsafe deletion path".into()); continue;
             }
@@ -1223,6 +1226,7 @@ pub async fn ssh_stage_delete(
             }
         }
         Ok(outcome)
+        })
     })
         .await
         .map_err(|e| e.to_string())?

@@ -111,7 +111,9 @@ pub fn ssh_proxy_save(mut profile: ProxyProfile) -> Result<(), String> {
         if config.profiles.len() >= 128 { return Err("Too many proxy profiles".into()); }
         config.profiles.push(profile);
     }
-    write_config(&config)
+    write_config(&config)?;
+    crate::remote::file_channel::invalidate_all();
+    Ok(())
 }
 
 #[tauri::command]
@@ -123,6 +125,7 @@ pub fn ssh_proxy_delete(id: String) -> Result<(), String> {
     if config.default_id.as_deref() == Some(&id) { config.default_id = None; }
     write_config(&config)?;
     crate::secret::delete_secret(&format!("ssh-proxy:{id}"));
+    crate::remote::file_channel::invalidate_all();
     Ok(())
 }
 
@@ -132,7 +135,9 @@ pub fn ssh_proxy_set_default(id: Option<String>) -> Result<(), String> {
     let mut config = read_config()?;
     if id.as_ref().is_some_and(|id| !config.profiles.iter().any(|profile| &profile.id == id)) { return Err("Proxy profile was not found".into()); }
     config.default_id = id;
-    write_config(&config)
+    write_config(&config)?;
+    crate::remote::file_channel::invalidate_all();
+    Ok(())
 }
 
 fn selected_profile(id: Option<&str>) -> Result<Option<ProxyProfile>, String> {

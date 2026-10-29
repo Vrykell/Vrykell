@@ -194,6 +194,18 @@ test.describe('File panel', () => {
   });
 
   test('paste target: right-clicking a folder pastes into it, right-clicking a file pastes beside it, and Ctrl+V pastes into the current directory', async ({ page }) => {
+    await page.evaluate(() => {
+      const ipc = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__;
+      const original = ipc.invoke;
+      ipc.invoke = async (command, args) => {
+        const result = await original(command, args);
+        // Expanded destinations must list their own children rather than repeat the root fixture.
+        if (command === 'fs_list' && args?.path === '/home/e2e/Documents') {
+          return (result as Array<{ path: string }>).filter(entry => entry.path.slice(0, entry.path.lastIndexOf('/')) === args.path);
+        }
+        return result;
+      };
+    });
     const tree = page.getByTestId('local-file-tree');
     const notes = tree.locator('[data-testid="file-row"][data-path="/home/e2e/notes.txt"]');
 
