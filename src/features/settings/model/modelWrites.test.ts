@@ -8,7 +8,7 @@ vi.mock('@features/agent', () => ({
   setActiveModel: vi.fn(),
 }));
 
-import { updateModel, updateModelCapability } from './modelWrites';
+import { updateModel, updateModelCapability, resetModelCapabilities } from './modelWrites';
 
 beforeEach(() => {
   state.models = [{ id: 'one', name: 'One', provider: 'openai-compatible', baseUrl: '', model: 'sample',
@@ -26,4 +26,16 @@ it('uses detected defaults for older profiles and detects again after an identif
   expect(state.models[0]!.capabilities).toMatchObject({ vision: true, tools: true });
   await updateModel('one', { model: 'embedding' });
   expect(state.models[0]!.capabilities).toMatchObject({ vision: false, tools: false });
+});
+
+it('resets queued capability edits without changing other model fields or profiles', async () => {
+  const original = { ...state.models[0]! };
+  const other = { ...original, id: 'two', name: 'Other', capabilities: { vision: true, reasoning: true, tools: false, search: true } };
+  state.models.push(other);
+  await Promise.all([
+    updateModelCapability('one', 'vision', true),
+    updateModelCapability('one', 'tools', false),
+    resetModelCapabilities('one'),
+  ]);
+  expect(state.models).toEqual([original, other]);
 });

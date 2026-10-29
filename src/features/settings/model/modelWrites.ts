@@ -37,6 +37,12 @@ export function updateModelCapability(id: string, capability: ModelCapability, s
   }));
 }
 
+export function resetModelCapabilities(id: string) {
+  return commitModels(current => current.map(model => model.id !== id ? model : {
+    ...model, capabilities: detectCapabilities(model.provider, model.model),
+  }));
+}
+
 export function selectModel(id: string) {
   const write = modelWrites.then(() => setActiveModel(id));
   modelWrites = write.catch(() => {});

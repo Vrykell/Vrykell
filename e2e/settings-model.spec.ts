@@ -6,7 +6,7 @@
  */
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, aiKeyCalls, aiModelCalls, clipboardText } from './tauri-mock';
-import { openSettings, fieldOf } from './settings';
+import { openSettings, fieldOf, gotoSetting, selectThemeMode } from './settings';
 
 const LOCAL_ID = 'openai-compatible|http://127.0.0.1:11434/v1';
 const ANTHROPIC_ID = 'anthropic|https://api.anthropic.com/v1';
@@ -18,6 +18,26 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Model configuration page', () => {
+  test('supported capability badges use distinct theme colors', async ({ page }, testInfo) => {
+    for (const theme of ['深色', '浅色']) {
+      await gotoSetting(page, '主题');
+      await selectThemeMode(page, theme);
+      await gotoSetting(page, '模型配置');
+      const badges = page.getByTestId('model-row').first().locator('.model-cap-chip');
+      await expect(badges).toHaveCount(4);
+      const colors = await badges.evaluateAll(elements => elements.map(element => {
+        const style = getComputedStyle(element);
+        return { foreground: style.color, background: style.backgroundColor, radius: style.borderRadius };
+      }));
+      expect(new Set(colors.map(color => color.foreground)).size).toBe(4);
+      for (const color of colors) {
+        expect(color.background).not.toBe('rgba(0, 0, 0, 0)');
+        expect(color.radius).toBe('999px');
+      }
+      await page.getByTestId('model-row').first().screenshot({ path: testInfo.outputPath(`capability-colors-${theme}.png`) });
+    }
+  });
+
   test('saves manually declared capabilities and updates the model badges', async ({ page }, testInfo) => {
     await page.getByTestId('provider-switch').click();
     await page.getByTestId(`provider-option-${LOCAL_ID}`).click();
@@ -48,7 +68,24 @@ test.describe('Model configuration page', () => {
       await refreshAiConfig();
     });
     await expect(row.getByTestId('model-cap-vision')).toHaveAttribute('data-supported', 'true');
-    await expect(row.getByTestId('model-cap-reasoning')).toHaveAttribute('data-supported', 'true');
+    await row.getByTestId('model-settings').click();
+    const reset = dialog.getByRole('button', { name: '重置', exact: true });
+    const doneBox = (await dialog.getByTestId('model-settings-done').boundingBox())!;
+    const resetBox = (await reset.boundingBox())!;
+    expect(resetBox.x).toBeLessThan(doneBox.x);
+    expect(Math.abs(resetBox.y + resetBox.height / 2 - doneBox.y - doneBox.height / 2)).toBeLessThanOrEqual(1);
+    await reset.click();
+    await expect(vision).toHaveAttribute('aria-pressed', 'false');
+    await expect(reasoning).toHaveAttribute('aria-pressed', 'false');
+    await expect(dialog.getByRole('button', { name: '工具', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await dialog.getByTestId('model-settings-done').click();
+    await page.evaluate(async () => {
+      const { refreshAiConfig } = await import('/src/features/agent/stores/aiConfig.ts') as typeof import('../src/features/agent/stores/aiConfig');
+      await refreshAiConfig();
+    });
+    await expect(row.getByTestId('model-cap-vision')).toHaveCount(0);
+    await expect(row.getByTestId('model-cap-reasoning')).toHaveCount(0);
+    await expect(row.getByTestId('model-cap-tools')).toBeVisible();
   });
 
   test('provider button: default selection, centered overlay switching, add action and three ⋯ menu entries', async ({ page }) => {
@@ -163,7 +200,7 @@ test.describe('Model configuration page', () => {
     await expect(localRow.locator('.model-cap-chip')).toHaveCount(1);
     await expect(localRow.getByTestId('model-cap-tools')).toHaveAttribute('data-supported', 'true');
     await expect(localRow.getByTestId('model-cap-vision')).toHaveCount(0);
-    await expect(localRow.getByTestId('model-cap-tools')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(localRow.getByTestId('model-cap-tools')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     const capabilities = (await localRow.locator('.model-cap-chip').last().boundingBox())!;
     const settings = (await localRow.getByTestId('model-settings').boundingBox())!;
     const remove = (await localRow.getByTestId('model-remove').boundingBox())!;

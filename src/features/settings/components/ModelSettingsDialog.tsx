@@ -8,13 +8,14 @@
  */
 import { t } from '@i18n';
 import Select from '@ui/fields/Select';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
 import { ModelCapabilityToggle } from '@features/agent/components/ModelCapabilityToggle';
 import type { ModelProfile } from '@features/agent';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
 import { baseUrlForProvider } from '@features/agent/services/provider';
 import { PROVIDERS } from '@config/providers';
-import { updateModel, updateModelCapability } from '@features/settings/model/modelWrites';
+import { updateModel, updateModelCapability, resetModelCapabilities } from '@features/settings/model/modelWrites';
 import { ModelTextInput } from './ui';
 import { useSettingsSave } from './SettingsSaveProvider';
 import AutoSaveInput from './AutoSaveInput';
@@ -54,19 +55,23 @@ export default function ModelSettingsDialog({ open, model, focusModelId = false,
         </span>
       }
       footer={
-        <button
-          type="button"
-          className="primary-button"
-          onClick={onClose}
-          data-testid="model-settings-done"
-          style={{
-            padding: '5px 16px', fontSize: 'calc(12px * var(--ui-font-scale))', border: 'none',
-            borderRadius: 'var(--radius-inner)', background: 'var(--primary-button-bg)',
-            color: 'var(--primary-button-text)', cursor: 'pointer',
-          }}
-        >
-          {t('Done')}
-        </button>
+        <>
+          <OutlineButton data-testid="model-capabilities-reset" style={{ marginRight: 'auto' }}
+            onClick={() => { void save(() => resetModelCapabilities(model.id)); }}>{t('Reset')}</OutlineButton>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={onClose}
+            data-testid="model-settings-done"
+            style={{
+              padding: '5px 16px', fontSize: 'calc(12px * var(--ui-font-scale))', border: 'none',
+              borderRadius: 'var(--radius-inner)', background: 'var(--primary-button-bg)',
+              color: 'var(--primary-button-text)', cursor: 'pointer',
+            }}
+          >
+            {t('Done')}
+          </button>
+        </>
       }
     >
       <ModelTextInput value={model.name} placeholder={t('Model name')}

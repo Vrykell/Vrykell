@@ -2402,6 +2402,7 @@ const zh: Record<string, string> = {
   'Character encoding': '字符集',
   '{{capability}} supported': '支持{{capability}}',
   'Model capabilities': '模型能力',
+  'Reset': '重置',
   'Reopen with encoding': '使用字符集重新打开',
   'Save with encoding': '使用字符集保存',
   'Markdown preview': 'Markdown 预览',

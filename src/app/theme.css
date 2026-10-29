@@ -1451,7 +1451,10 @@ button.provider-option-add:hover { color: var(--text-primary); }
 .acp-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; background: transparent; transition: background var(--dur-fast) var(--ease); }
 .acp-row:hover { background: var(--hover); }
 /* Capability marks share the same supported state in model lists and pickers. */
-.model-cap-chip { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; flex-shrink: 0; border-radius: 6px; color: var(--text-muted); background: transparent; }
+.model-cap-chip { --model-capability-color: var(--group-blue); display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 20px; flex-shrink: 0; border-radius: 999px; color: var(--model-capability-color); background: color-mix(in srgb, var(--model-capability-color) 12%, transparent); }
+.model-cap-chip[data-capability="vision"] { --model-capability-color: var(--group-green); }
+.model-cap-chip[data-capability="reasoning"] { --model-capability-color: var(--group-violet); }
+.model-cap-chip[data-capability="tools"] { --model-capability-color: var(--group-orange); }
 .model-capability-settings { display: flex; flex-wrap: wrap; gap: 6px; min-width: 0; }
 button.model-capability-toggle { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 999px; flex-shrink: 0; font-size: calc(11px * var(--ui-font-scale)); }
 button.outline-button.model-capability-toggle[aria-pressed="true"] { background: var(--primary-button-bg); border-color: var(--primary-button-bg); color: var(--primary-button-text); }
