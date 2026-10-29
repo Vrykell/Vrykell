@@ -7,6 +7,7 @@ import { setupTauriMock, emitAcpSession, acpUpdate, waitForWorkbench } from '../
 const origin = process.env.README_ORIGIN ?? 'http://127.0.0.1:1432';
 const directory = new URL('../docs/images/', import.meta.url);
 const extraOnly = process.env.README_CAPTURE_EXTRA_ONLY === '1';
+const selectedShots = process.env.README_CAPTURE_ONLY?.split(',').map(name => name.trim()).filter(Boolean);
 const captures = [];
 await mkdir(directory, { recursive: true });
 const browser = await chromium.launch({ headless: true, ignoreDefaultArgs: ['--hide-scrollbars'] });
@@ -87,6 +88,7 @@ async function clearWallpaper(page) {
 
 async function captureSingleWorkspaces(page, locale) {
   const shot = async name => {
+    if (selectedShots && !selectedShots.includes(name)) return;
     await page.evaluate(() => document.fonts.ready);
     await page.mouse.move(1595, 895);
     await page.waitForTimeout(400);
@@ -112,28 +114,74 @@ async function captureSingleWorkspaces(page, locale) {
 
   await page.getByTestId('workspace-area-ai').click();
   await page.getByTestId('ai-new-conversation').click();
-  const reply = locale === 'zh' ? '构建已通过。合并前建议检查：\n\n- 版本号和更新日志\n- 各平台安装包\n- 发布流水线与签名'
-    : 'The build passed. Before merging, check:\n\n- The version and changelog\n- Installers for each platform\n- Release workflows and signing';
+  const reply = locale === 'zh' ? '可以按下面的顺序验证发布，并保留上一版本以便回滚。\n\n### 1. 检查构建与测试\n\n```bash\nnpm ci\nnpm run test\nnpm run build\n```\n\n### 2. 核对发布内容\n\n- 确认版本号与更新日志一致。\n- 检查各平台安装包和许可证。\n- 在预发布环境验证健康检查。\n\n如果部署后健康检查失败，先恢复上一版本，再查看服务日志。'
+    : 'Use this sequence to verify the release, and keep the previous build ready for rollback.\n\n### 1. Check the build and tests\n\n```bash\nnpm ci\nnpm run test\nnpm run build\n```\n\n### 2. Review the release\n\n- Check the version and changelog agree.\n- Verify installers and bundled licenses.\n- Run health checks in staging.\n\nIf a health check fails after deployment, restore the previous build and inspect the service logs.';
   await page.evaluate(text => { window.__AI_REPLY__ = text; }, reply);
   const composer = page.locator('[data-chat-composer]:visible');
-  await composer.fill(locale === 'zh' ? '合并发布分支之前还需要检查什么？' : 'What should I check before merging the release branch?');
-  await composer.press('Enter'); await expect(page.getByText(locale === 'zh' ? '各平台安装包' : 'Installers for each platform', { exact: true })).toBeVisible();
+  await composer.fill(locale === 'zh' ? '准备发布前，请帮我整理构建验证和回滚步骤。' : 'Help me plan build verification and a rollback before release.');
+  await composer.press('Enter'); await expect(page.getByText(locale === 'zh' ? '检查构建与测试' : 'Check the build and tests', { exact: false })).toBeVisible();
+  await page.evaluate(() => { window.__FS_EXTRA_ENTRIES__ = [
+    { name: 'src', path: '/work/atlas/src', is_dir: true },
+    { name: 'tests', path: '/work/atlas/tests', is_dir: true },
+    { name: 'release.ts', path: '/work/atlas/release.ts', is_dir: false },
+    { name: 'deploy.yml', path: '/work/atlas/deploy.yml', is_dir: false },
+    { name: 'CHANGELOG.md', path: '/work/atlas/CHANGELOG.md', is_dir: false },
+    { name: 'package.json', path: '/work/atlas/package.json', is_dir: false },
+  ]; });
+  await page.locator('[data-dock-btn="files"]').click();
+  await expect(page.locator('.workspace-side-panel[data-side="right"][data-visible="true"]')).toBeVisible();
   await shot('single-ai');
+  await page.locator('[data-dock-btn="files"]').click();
 
   await page.getByTestId('workspace-area-ssh').click();
   await expect(page.getByTestId('ssh-dashboard')).toBeVisible();
   await page.waitForFunction(async () => (await import('/src/features/ssh/stores/store.ts')).useSshStore.getState().loaded);
   await page.evaluate(async locale => {
     const { useSshStore } = await import('/src/features/ssh/stores/store.ts');
+    const { useHostLibrary } = await import('/src/features/ssh/stores/hostLibrary.ts');
     const first = useSshStore.getState().connections[0];
     useSshStore.setState({ connections: [{ ...first, name: locale === 'zh' ? '生产服务器' : 'production' },
       { ...first, id: 'demo-stage', name: 'staging', host: '192.0.2.20', user: 'deploy' },
-      { ...first, id: 'demo-lab', name: 'lab', host: '192.0.2.30', user: 'ops' }] });
+      { ...first, id: 'demo-lab', name: 'lab', host: '192.0.2.30', user: 'ops' },
+      { ...first, id: 'demo-worker', name: 'worker', host: '192.0.2.40', user: 'deploy' },
+      { ...first, id: 'demo-database', name: 'database', host: '192.0.2.50', user: 'admin' },
+      { ...first, id: 'demo-edge', name: 'edge', host: '192.0.2.60', user: 'ops' }] });
+    for (const [id, group, tags, starred] of [[first.id, 'Production', ['api', 'primary'], true],
+      ['demo-stage', 'Staging', ['testing'], false], ['demo-lab', 'Lab', ['tools'], false],
+      ['demo-worker', 'Production', ['jobs'], false], ['demo-database', 'Production', ['database'], false],
+      ['demo-edge', 'Production', ['gateway'], false]]) useHostLibrary.getState().update(id, { group, tags, starred });
+    const samples = {
+      [first.id]: [0.88, 0.74, 0.38, '0.12 0.08 0.05'], 'demo-stage': [0.94, 0.68, 0.24, '0.08 0.06 0.04'],
+      'demo-lab': [0.76, 0.55, 0.51, '0.37 0.28 0.19'], 'demo-worker': [0.63, 0.41, 0.62, '0.82 0.71 0.64'],
+      'demo-database': [0.82, 0.31, 0.57, '0.46 0.35 0.29'], 'demo-edge': [0.93, 0.79, 0.22, '0.09 0.07 0.05'],
+    };
+    const invoke = window.__TAURI_INTERNALS__.invoke;
+    window.__TAURI_INTERNALS__.invoke = async (command, args, ...rest) => {
+      const result = await invoke(command, args, ...rest);
+      const sample = command === 'ssh_system_status' ? samples[args.id] : undefined;
+      return sample ? { ...result, cpuIdle: Math.round(result.cpuTotal * sample[0]),
+        memoryAvailable: Math.round(result.memoryTotal * sample[1]), diskUsed: Math.round(result.diskTotal * sample[2]), load: sample[3] } : result;
+    };
   }, locale);
   const hosts = page.getByTestId('ssh-dashboard');
   await hosts.getByRole('button', { name: locale === 'zh' ? '卡片视图' : 'Card view', exact: true }).click();
-  await expect(hosts.locator('.ssh-dashboard-card')).toHaveCount(3);
+  await expect(hosts.locator('.ssh-dashboard-card')).toHaveCount(6);
+  await hosts.getByRole('switch', { name: locale === 'zh' ? '资源占用' : 'Resource usage', exact: true }).click();
+  await expect(hosts.locator('.ssh-dashboard-card').first()).toContainText('26%');
+  await page.locator('[data-dock-btn="chat"]').click();
+  const hostSidebar = page.getByTestId('ai-sidebar-content');
+  await expect(hostSidebar).toBeVisible();
+  await hostSidebar.getByRole('button', { name: locale === 'zh' ? '新对话' : 'New conversation', exact: true }).click();
+  await page.evaluate(text => { window.__AI_REPLY__ = text; }, locale === 'zh'
+    ? '生产主机在线。发布前建议检查服务健康、磁盘空间和最近备份，确认回滚包可用。'
+    : 'The production host is online. Before deploying, check service health, disk space and recent backups, and keep a rollback build ready.');
+  const hostComposer = hostSidebar.locator('[data-chat-composer]');
+  await hostComposer.fill(locale === 'zh' ? '部署前应该检查哪些项目？' : 'What should I check before deployment?');
+  await hostComposer.press('Enter');
+  await expect(hostSidebar).toContainText(locale === 'zh' ? '生产主机在线' : 'The production host is online');
+  await expect(hosts.locator('.ssh-dashboard-card').first()).toContainText('12%', { timeout: 20000 });
   await shot('single-hosts');
+  await page.locator('[data-dock-btn="chat"]').click();
 
   await page.keyboard.press('Control+,');
   await page.locator('.settings-navigation').getByRole('button', { name: locale === 'zh' ? '主题' : 'Theme', exact: true }).click();
