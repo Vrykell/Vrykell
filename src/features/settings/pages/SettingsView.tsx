@@ -8,6 +8,7 @@ import SkillsSettings from '@features/settings/pages/SkillsSettings';
 import { MemorySettings } from '@features/settings/pages/MemorySettings';
 import HarnessPage from '@features/settings/pages/harnessPage';
 import Select from '@ui/fields/Select';
+import SegmentedControl from '@ui/fields/SegmentedControl';
 import { useToastStore } from '@ui/feedback/Toast';
 import {
   usePermissions, clearSessionGrants, TOOL_NAMES,
@@ -163,16 +164,16 @@ function SettingsContent() {
               title={t("Tool permissions")}
               description={t("Choose which tools may run. Dangerous commands always require approval.")}
             >
-              <div className="settings-option-list">
+              <div className="settings-permission-list">
                 {TOOL_NAMES.map((name) => {
                   const lv: ToolLevel = permLevels[name] ?? 'ask';
                   return (
-                    <div key={name} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div key={name} className="settings-permission-row">
                       <span style={{ flex: 1, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-primary)' }}>
                         {t(PERM_TOOL_LABEL[name])}
                       </span>
-                      <Select
-                        aria-label={t('Permissions for {{tool}}', { tool: t(PERM_TOOL_LABEL[name]) })}
+                      <SegmentedControl
+                        label={t('Permissions for {{tool}}', { tool: t(PERM_TOOL_LABEL[name]) })}
                         options={(
                           [
                             ['allow', t("Allow")],

@@ -12,7 +12,7 @@ import { IconButton } from '@ui/actions/IconButton';
 import ReloadButton from '@ui/actions/ReloadButton';
 import { TextInput } from '@ui/fields/TextInput';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
-import { ChevronDown, Filter, Minus, Plus, Search, Settings, X, iconSizes } from '@ui/icons';
+import { ChevronDown, Filter, Plus, Search, Settings, Trash2, X, iconSizes } from '@ui/icons';
 import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
 import { modelHue, modelMark } from '@features/agent/components/modelIcon';
 import { ModelCapabilityBadge } from '@features/agent/components/ModelCapabilityBadge';
@@ -54,7 +54,7 @@ function ModelRow({ model, active, onRemove }: {
   const [editing, setEditing] = useState(false);
   const Mark = modelMark(model.provider, model.model, model.baseUrl);
   return (
-    <div data-testid="model-row" data-active={active || undefined} style={{ padding: '6px 10px' }}>
+    <div className="settings-model-row" data-testid="model-row" data-active={active || undefined} style={{ padding: '6px 10px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
         <span style={{
           width: 28, height: 28, flexShrink: 0, display: 'inline-flex', alignItems: 'center',
@@ -70,7 +70,7 @@ function ModelRow({ model, active, onRemove }: {
             {model.name || model.model || t('Unnamed model')}
           </span>
         </span>
-        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+        <div className="settings-row-actions">
           <CapabilityChips profile={model} />
           <IconButton data-testid="model-settings" aria-expanded={editing}
             aria-label={t('Model settings')} data-tip={t('Model settings')} onClick={() => setEditing(true)}>
@@ -78,7 +78,7 @@ function ModelRow({ model, active, onRemove }: {
           </IconButton>
           <IconButton tone="danger" data-testid="model-remove"
             aria-label={t('Delete model')} data-tip={t('Delete model')} onClick={onRemove}>
-            <Minus size={iconSizes.control} />
+            <Trash2 size={iconSizes.control} />
           </IconButton>
         </div>
       </div>

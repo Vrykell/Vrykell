@@ -34,8 +34,11 @@ export function Field({ title, description, children, layout = 'row' }: {
   useEffect(() => {
     if (target !== title) return;
     ref.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
-    const controls = [...(ref.current?.querySelectorAll<HTMLElement>('input, textarea, button, [tabindex="0"]') ?? [])];
-    (controls.find(element => control && element.getAttribute('aria-label') === control) ?? controls[0])?.focus({ preventScroll: true });
+    const controls = [...(ref.current?.querySelectorAll<HTMLElement>('input, textarea, button, [tabindex="0"], [role="radiogroup"]') ?? [])];
+    const requested = controls.find(element => control && element.getAttribute('aria-label') === control) ?? controls[0];
+    const focusTarget = requested?.matches('[role="radiogroup"]')
+      ? requested.querySelector<HTMLElement>('[aria-checked="true"]') : requested;
+    focusTarget?.focus({ preventScroll: true });
   }, [target, title, control, request]);
   return (
     <div ref={ref} className="settings-field" data-setting-title={title} data-layout={layout}>

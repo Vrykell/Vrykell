@@ -16,7 +16,7 @@ import { OutlineButton } from '@ui/actions/OutlineButton';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
-import { Minus, Plus, RefreshCw, Settings } from '@ui/icons';
+import { Plus, RefreshCw, Settings, Trash2 } from '@ui/icons';
 import HarnessBadge from '@features/agent/components/HarnessBadge';
 import HarnessDialog from '@features/settings/components/HarnessDialog';
 import { invoke } from '@platform/diagnostics';
@@ -163,6 +163,7 @@ export default function HarnessPage() {
                   {harness.command} {harness.args.join(' ')}
                 </span>
               </span>
+              <div className="settings-row-actions">
               <button data-subtle data-testid={`harness-connect-${index}`} disabled={!harness.enabled || busy}
                 onClick={() => {
                   // Settings render as a workspace screen over the tabs: leaving it open would hide
@@ -188,8 +189,9 @@ export default function HarnessPage() {
               <IconButton tone="danger" data-testid={`harness-remove-${index}`}
                 disabled={busy}
                 aria-label={t('Remove')} data-tip={t('Remove')} onClick={() => setConfirmRemove(index)}>
-                <Minus size={16} />
+                <Trash2 size={16} />
               </IconButton>
+              </div>
             </div>
             {probeErrors[harness.name] && <ErrorBox title={t('Connection failed')} details={probeErrors[harness.name]}
               actions={<OutlineButton onClick={() => void test(harness.name)}>{t('Retry')}</OutlineButton>} />}

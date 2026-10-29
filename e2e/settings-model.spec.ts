@@ -19,6 +19,11 @@ test.beforeEach(async ({ page }) => {
 
 test.describe('Model configuration page', () => {
   test('supported capability badges use distinct theme colors', async ({ page }, testInfo) => {
+    await page.evaluate(async () => {
+      const { setAiModels, useAiConfigStore } = await import('/src/features/agent/stores/aiConfig.ts') as typeof import('../src/features/agent/stores/aiConfig');
+      const { models, activeModel } = useAiConfigStore.getState();
+      await setAiModels([...models, { ...models[0]!, id: 'main-extra', name: 'Second model' }], activeModel);
+    });
     for (const theme of ['深色', '浅色']) {
       await gotoSetting(page, '主题');
       await selectThemeMode(page, theme);
@@ -34,7 +39,7 @@ test.describe('Model configuration page', () => {
         expect(color.background).not.toBe('rgba(0, 0, 0, 0)');
         expect(color.radius).toBe('999px');
       }
-      await page.getByTestId('model-row').first().screenshot({ path: testInfo.outputPath(`capability-colors-${theme}.png`) });
+      await page.locator('.settings-model-group').first().screenshot({ path: testInfo.outputPath(`capability-colors-${theme}.png`) });
     }
   });
 
@@ -54,10 +59,17 @@ test.describe('Model configuration page', () => {
     await expect(reasoning).toHaveCSS('background-color', await vision.evaluate(element => getComputedStyle(element).backgroundColor));
     const thinking = await dialog.getByText('深度思考', { exact: true }).boundingBox();
     expect((await vision.boundingBox())!.y).toBeGreaterThan(thinking!.y + thinking!.height);
+    const thinkingSwitch = dialog.locator('.model-thinking-settings').getByRole('switch');
+    await expect(thinkingSwitch).toHaveAttribute('aria-checked', 'false');
+    await thinkingSwitch.click();
+    await expect(thinkingSwitch).toHaveAttribute('aria-checked', 'true');
     for (const width of [760, 1240]) {
       await page.setViewportSize({ width, height: 800 });
       await expect(dialog.locator('.model-capability-toggle')).toHaveCount(4);
       expect(await dialog.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+      const providerBox = (await dialog.getByRole('combobox', { name: '本地模型 提供方', exact: true }).boundingBox())!;
+      const thinkingBox = (await dialog.locator('.model-thinking-settings').boundingBox())!;
+      expect(Math.abs(providerBox.y + providerBox.height / 2 - thinkingBox.y - thinkingBox.height / 2)).toBeLessThanOrEqual(1);
       await dialog.screenshot({ path: testInfo.outputPath(`model-capabilities-${width}.png`) });
     }
     await dialog.getByTestId('model-settings-done').click();
@@ -70,10 +82,13 @@ test.describe('Model configuration page', () => {
     await expect(row.getByTestId('model-cap-vision')).toHaveAttribute('data-supported', 'true');
     await row.getByTestId('model-settings').click();
     const reset = dialog.getByRole('button', { name: '重置', exact: true });
-    const doneBox = (await dialog.getByTestId('model-settings-done').boundingBox())!;
-    const resetBox = (await reset.boundingBox())!;
-    expect(resetBox.x).toBeLessThan(doneBox.x);
-    expect(Math.abs(resetBox.y + resetBox.height / 2 - doneBox.y - doneBox.height / 2)).toBeLessThanOrEqual(1);
+    const footer = await dialog.evaluate(element => {
+      const done = element.querySelector('[data-testid="model-settings-done"]')!.getBoundingClientRect();
+      const reset = element.querySelector('[data-testid="model-capabilities-reset"]')!.getBoundingClientRect();
+      return { doneX: done.x, resetX: reset.x, difference: Math.abs(reset.y + reset.height / 2 - done.y - done.height / 2) };
+    });
+    expect(footer.resetX).toBeLessThan(footer.doneX);
+    expect(footer.difference).toBeLessThanOrEqual(1);
     await reset.click();
     await expect(vision).toHaveAttribute('aria-pressed', 'false');
     await expect(reasoning).toHaveAttribute('aria-pressed', 'false');

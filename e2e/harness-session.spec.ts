@@ -28,13 +28,23 @@ function permissionRequest(toolCallId: string, title: string) {
 }
 
 test.describe('harness session', () => {
-  test('shows the failure text and asks for a login only on an authentication error', async ({ page }) => {
+  test('shows the failure text and asks for a login only on an authentication error', async ({ page }, testInfo) => {
     await setupTauriMock(page, {});
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
 
     await page.keyboard.press('Control+,');
     await page.getByText('ACP', { exact: true }).first().click();
+    for (const width of [760, 1240]) {
+      await page.setViewportSize({ width, height: 800 });
+      const actions = page.getByTestId('harness-row-0').locator('.settings-row-actions');
+      const boxes = await actions.getByRole('button').evaluateAll(elements => elements.map(element => {
+        const box = element.getBoundingClientRect(); return { left: box.left, right: box.right };
+      }));
+      expect(boxes).toHaveLength(4);
+      for (let index = 1; index < boxes.length; index++) expect(boxes[index]!.left - boxes[index - 1]!.right).toBeLessThanOrEqual(3);
+      await page.getByTestId('harness-row-0').screenshot({ path: testInfo.outputPath(`server-actions-${width}.png`) });
+    }
     await page.getByTestId('harness-connect-0').click();
     await expect(page.getByTestId('harness-send')).toBeVisible({ timeout: 10000 });
 

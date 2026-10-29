@@ -115,20 +115,36 @@ test.describe('Web search page', () => {
 });
 
 test.describe('Model permissions page', () => {
-  test('Tool permission levels switch and persist', async ({ page }) => {
+  test('Tool permission levels switch and persist', async ({ page }, testInfo) => {
     await gotoSetting(page, '工具权限');
     // Run terminal commands → deny
     const runRow = rowOf(page, '执行终端命令');
-    await runRow.getByRole('combobox', { name: '执行终端命令 权限' }).click();
-    await page.getByRole('option', { name: '禁止', exact: true }).click();
+    const runPermissions = runRow.getByRole('radiogroup', { name: '执行终端命令 权限' });
+    await runPermissions.getByRole('radio', { name: '禁止', exact: true }).click();
+    await expect(runPermissions.getByRole('radio', { name: '禁止', exact: true })).toBeChecked();
     let saved = await page.evaluate(() => localStorage.getItem('vrykell-permissions') ?? '');
     expect(saved).toContain('"run_command":"deny"');
     // Web search → ask every time
     const webRow = rowOf(page, '联网搜索');
-    await webRow.getByRole('combobox', { name: '联网搜索 权限' }).click();
-    await page.getByRole('option', { name: '每次询问', exact: true }).click();
+    const webPermissions = webRow.getByRole('radiogroup', { name: '联网搜索 权限' });
+    await webPermissions.getByRole('radio', { name: '允许', exact: true }).focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(webPermissions.getByRole('radio', { name: '每次询问', exact: true })).toBeChecked();
     saved = await page.evaluate(() => localStorage.getItem('vrykell-permissions') ?? '');
     expect(saved).toContain('"web_search":"ask"');
+    await gotoSetting(page, '模型配置');
+    await gotoSetting(page, '工具权限');
+    await expect(runPermissions.getByRole('radio', { name: '禁止', exact: true })).toBeChecked();
+    for (const width of [760, 1240]) {
+      await page.setViewportSize({ width, height: 800 });
+      await expect(runPermissions.getByRole('radio')).toHaveCount(3);
+      expect(await runRow.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+      const first = (await runRow.boundingBox())!;
+      const second = (await rowOf(page, '读取文件').boundingBox())!;
+      if (width === 1240) expect(Math.abs(first.y - second.y)).toBeLessThanOrEqual(1);
+      else expect(second.y).toBeGreaterThan(first.y);
+      await page.locator('.settings-permission-list').screenshot({ path: testInfo.outputPath(`tool-permissions-${width}.png`) });
+    }
   });
 
   test('Clear session grants button reports success', async ({ page }) => {

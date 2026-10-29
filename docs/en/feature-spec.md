@@ -4,6 +4,8 @@
 
 Appearance and toolbar regression checklist:
 
+- Tool permission rows use the shared segmented control for allow, ask and deny, preserving saved levels and existing authorization rules. Wide settings show two items per row; narrow settings use one column. Verify keyboard switching, search focus, navigation persistence and narrow layouts.
+
 - Model lists sort names within each group and show only supported capabilities as colored icon pills: green vision, violet reasoning, orange tools and blue search, each with a faint matching background. Per-model settings place four selectable capability pills below the other options and persist explicit choices; the bottom-left Reset action restores detected capabilities without changing other options. Changing the provider or model ID detects them again. Verify filtering, reset, reload, dark/light colors and narrow layouts.
 - Shared sliding controls use distinct track/thumb/text colors, 14 px label insets and compact height. Thumb placement tracks both axes after wrapping and font loading. Verify both themes, larger fonts, keyboard selection and host authentication/view controls.
 - All four workspace strips use the same 32 px action targets and 18 px icons as the terminal. The leading resource menu uses a downward chevron with a 4 px first-tab gap. Verify projected tools, dropdown hit bounds and tab corners.

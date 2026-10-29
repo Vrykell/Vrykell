@@ -2,10 +2,21 @@ import { act, cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, expect, it } from 'vitest';
 import { Field, SettingsGroup } from '../components/ui';
 import { useSettingsNavigationStore } from '../stores/navigation';
+import SegmentedControl from '@ui/fields/SegmentedControl';
 
 afterEach(() => {
   cleanup();
   useSettingsNavigationStore.getState().setSelected('ai-model');
+});
+
+it('focuses the selected permission when search targets a segmented control', () => {
+  const options = [{ value: 'allow', label: 'Allow' }, { value: 'ask', label: 'Ask' }];
+  render(<Field title="Permissions" layout="stacked">
+    <SegmentedControl label="First tool" value="allow" options={options} onChange={() => {}} />
+    <SegmentedControl label="Second tool" value="ask" options={options} onChange={() => {}} />
+  </Field>);
+  act(() => useSettingsNavigationStore.getState().openField('ai-perms', 'Permissions', 'Second tool'));
+  expect(within(screen.getByRole('radiogroup', { name: 'Second tool' })).getByRole('radio', { name: 'Ask' })).toHaveFocus();
 });
 
 it('names each group and keeps related controls and descriptions together', () => {

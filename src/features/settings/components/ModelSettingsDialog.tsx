@@ -78,12 +78,16 @@ export default function ModelSettingsDialog({ open, model, focusModelId = false,
         onCommit={value => updateModel(model.id, { name: value })} />
       <ModelTextInput value={model.group ?? ''} placeholder={t('Group')}
         onCommit={value => updateModel(model.id, { group: value.trim() || undefined })} />
-      <Select
-        aria-label={t('{{name}} provider', { name })}
-        options={PROVIDER_KINDS.map(kind => ({ value: kind, label: providerLabel(kind) }))}
-        value={model.provider}
-        onChange={value => updateModel(model.id, { provider: value, baseUrl: baseUrlForProvider(model.baseUrl, value) })}
-      />
+      <div className="model-provider-thinking-row">
+        <Select
+          aria-label={t('{{name}} provider', { name })}
+          options={PROVIDER_KINDS.map(kind => ({ value: kind, label: providerLabel(kind) }))}
+          value={model.provider}
+          onChange={value => updateModel(model.id, { provider: value, baseUrl: baseUrlForProvider(model.baseUrl, value) })}
+          style={{ flex: '1 1 120px', minWidth: 0 }}
+        />
+        <ModelThinkingSettings modelId={model.id} name={name} />
+      </div>
       <div style={{ display: 'flex', gap: 8 }}>
         <ModelTextInput value={model.baseUrl} placeholder={t('Endpoint (base URL)')}
           onCommit={value => updateModel(model.id, { baseUrl: value })} style={{ flex: 1 }} />
@@ -92,7 +96,6 @@ export default function ModelSettingsDialog({ open, model, focusModelId = false,
           onCommit={value => updateModel(model.id, { model: value, capabilities: detectCapabilities(model.provider, value) })}
           style={{ flex: 1 }} />
       </div>
-      <ModelThinkingSettings modelId={model.id} name={name} />
       <div className="model-capability-settings" role="group" aria-label={t('Model capabilities')}>
         {CAPABILITIES.map(capability => <ModelCapabilityToggle key={capability} capability={capability}
           selected={capabilities[capability]}
