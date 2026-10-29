@@ -133,6 +133,21 @@ test('returns from a comparison to its editor and explains binary files', async 
   await expect(page.getByTestId('file-editor')).toBeVisible();
   const image = page.getByTestId('git-unstaged-image.png'); await image.hover(); await image.getByRole('button', { name: '打开工作文件' }).click();
   await expect(page.getByTestId('file-editor').getByText('此文件是二进制或非 UTF-8 文本，请使用其他编辑器打开。')).toBeVisible();
+  for (const width of [1240, 760]) {
+    await page.setViewportSize({ width, height: 800 });
+    const editor = page.getByTestId('file-editor');
+    const reopen = editor.getByRole('button', { name: '使用字符集重新打开' });
+    const editorBox = (await editor.boundingBox())!;
+    const buttonBox = (await reopen.boundingBox())!;
+    expect(Math.abs(editorBox.y + editorBox.height - buttonBox.y - buttonBox.height)).toBeLessThanOrEqual(1);
+    await reopen.click();
+    const menu = page.getByRole('menu', { name: '字符集', exact: true });
+    await expect(menu).toBeVisible();
+    expect((await menu.boundingBox())!.y + (await menu.boundingBox())!.height).toBeLessThanOrEqual(buttonBox.y + 1);
+    await menu.getByRole('menuitem', { name: '使用字符集重新打开' }).hover();
+    await expect(page.getByRole('menu', { name: '使用字符集重新打开' }).getByRole('menuitemradio', { name: 'UTF-8', exact: true })).toBeVisible();
+    await page.keyboard.press('Escape'); await page.keyboard.press('Escape');
+  }
 });
 
 test('reorders connected file tabs and keeps compact actions above the text', async ({ page }, info) => {
