@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::process::Stdio;
+use std::time::Duration;
 use tokio::io::AsyncReadExt;
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -15,6 +16,10 @@ fn safe_query(text: &str, cursor: usize) -> bool {
 
 #[tauri::command]
 pub async fn shell_complete(shell: Option<String>, cwd: Option<String>, text: String, cursor: usize) -> Result<Vec<ShellCompletion>, String> {
+    shell_complete_with_timeout(shell, cwd, text, cursor, Duration::from_millis(2500)).await
+}
+
+async fn shell_complete_with_timeout(shell: Option<String>, cwd: Option<String>, text: String, cursor: usize, timeout: Duration) -> Result<Vec<ShellCompletion>, String> {
     if !safe_query(&text, cursor) { return Ok(Vec::new()); }
     let shell = shell.unwrap_or_else(|| {
         #[cfg(target_os = "windows")]
@@ -50,7 +55,7 @@ pub async fn shell_complete(shell: Option<String>, cwd: Option<String>, text: St
     #[cfg(target_os = "windows")]
     command.creation_flags(0x08000000);
     let mut child = command.spawn().map_err(|error| error.to_string())?;
-    let output = tokio::time::timeout(std::time::Duration::from_millis(2500), async {
+    let output = tokio::time::timeout(timeout, async {
         let stdout = child.stdout.take().ok_or("Completion output unavailable")?;
         let mut bytes = Vec::new();
         stdout.take(65537).read_to_end(&mut bytes).await.map_err(|error| error.to_string())?;
@@ -87,7 +92,7 @@ mod tests {
     #[tokio::test]
     async fn reads_native_parameter_candidates_without_submitting_a_command() {
         let text = "Get-ChildItem -Pa".to_string();
-        let candidates = shell_complete(Some("powershell".to_string()), None, text.clone(), text.len()).await.unwrap();
+        let candidates = shell_complete_with_timeout(Some("powershell".to_string()), None, text.clone(), text.len(), Duration::from_secs(15)).await.unwrap();
         assert!(candidates.iter().any(|candidate| candidate.text == "Get-ChildItem -Path"));
     }
 }

@@ -24,6 +24,11 @@ test.beforeEach(async ({ page }) => {
     ]));
   });
   await page.goto('/');
+  await page.waitForFunction(async () => {
+    const path = '/src/features/terminal/stores/terminal.ts';
+    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    return Object.values(useTerminalStore.getState().startupStates).includes('ready');
+  });
   await page.getByRole('button', { name: '历史命令', exact: true }).click();
   await expect(page.getByTestId('command-history-build')).toBeVisible();
 });

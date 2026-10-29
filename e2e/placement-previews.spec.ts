@@ -46,7 +46,9 @@ for (const theme of ['dark', 'light'] as const) for (const material of [true, fa
   expect(await split.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(panelColor);
   expect(await split.evaluate(element => getComputedStyle(element).backdropFilter)).toBe(panelBlur);
   await page.screenshot({ path: test.info().outputPath(`split-preview-${theme}.png`) });
-  await page.setViewportSize({ width: 720, height: 500 }); await hoverPlacementZone(page, focusedPane(page), 'right');
+  await page.setViewportSize({ width: 720, height: 500 });
+  await expect(page.getByTestId('workspace-sidebar')).toBeHidden();
+  await hoverPlacementZone(page, focusedPane(page), 'right');
   await expect(split.getByText('点击此处分裂终端')).toBeInViewport();
   await page.screenshot({ path: test.info().outputPath(`split-preview-${theme}-narrow.png`) });
   await page.keyboard.press('Escape'); await expect(split).toHaveCount(0);
