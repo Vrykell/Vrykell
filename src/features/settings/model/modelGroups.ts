@@ -41,7 +41,8 @@ export function groupModelsByVendor(models: ModelProfile[]): ModelGroup[] {
     group.models.push(model);
     groups.set(vendor, group);
   }
-  return [...groups.values()];
+  return [...groups.values()].map(group => ({ ...group, models: group.models.sort((a, b) =>
+    (a.name || a.model).localeCompare(b.name || b.model, 'en', { sensitivity: 'base', numeric: true })) }));
 }
 
 /** Search matches the display name and the API model id; the capability filter keeps one kind. */

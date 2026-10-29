@@ -18,6 +18,29 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Model configuration page', () => {
+  test('saves manually declared capabilities and updates the model badges', async ({ page }) => {
+    await page.getByTestId('provider-switch').click();
+    await page.getByTestId(`provider-option-${LOCAL_ID}`).click();
+    const row = page.getByTestId('model-row').first();
+    await row.getByTestId('model-settings').click();
+    const dialog = page.getByTestId('model-settings-dialog');
+    const vision = dialog.getByRole('switch', { name: '视觉', exact: true });
+    const reasoning = dialog.getByRole('switch', { name: '推理', exact: true });
+    await expect(vision).toHaveAttribute('aria-checked', 'false');
+    await vision.click(); await reasoning.click();
+    await expect(vision).toHaveAttribute('aria-checked', 'true');
+    await expect(reasoning).toHaveAttribute('aria-checked', 'true');
+    await dialog.getByTestId('model-settings-done').click();
+    await expect(row.getByTestId('model-cap-vision')).toHaveAttribute('data-supported', 'true');
+    await expect(row.getByTestId('model-cap-reasoning')).toHaveAttribute('data-supported', 'true');
+    await page.evaluate(async () => {
+      const { refreshAiConfig } = await import('/src/features/agent/stores/aiConfig.ts') as typeof import('../src/features/agent/stores/aiConfig');
+      await refreshAiConfig();
+    });
+    await expect(row.getByTestId('model-cap-vision')).toHaveAttribute('data-supported', 'true');
+    await expect(row.getByTestId('model-cap-reasoning')).toHaveAttribute('data-supported', 'true');
+  });
+
   test('provider button: default selection, centered overlay switching, add action and three ⋯ menu entries', async ({ page }) => {
     const switcher = page.getByTestId('provider-switch');
     await expect(switcher.locator('.provider-switch-name')).toHaveText('Anthropic');
@@ -126,6 +149,15 @@ test.describe('Model configuration page', () => {
     await page.getByTestId(`provider-option-${LOCAL_ID}`).click();
     await expect(names).toHaveCount(1);
     await expect(names.first()).toHaveText('本地模型');
+    const localRow = page.getByTestId('model-row').first();
+    await expect(localRow.locator('.model-cap-chip')).toHaveCount(4);
+    await expect(localRow.getByTestId('model-cap-tools')).toHaveAttribute('data-supported', 'true');
+    await expect(localRow.getByTestId('model-cap-vision')).toHaveAttribute('aria-label', '不支持视觉');
+    const capabilities = (await localRow.locator('.model-cap-chip').last().boundingBox())!;
+    const settings = (await localRow.getByTestId('model-settings').boundingBox())!;
+    const remove = (await localRow.getByTestId('model-remove').boundingBox())!;
+    expect(settings.x - (capabilities.x + capabilities.width)).toBeLessThanOrEqual(3);
+    expect(remove.x - (settings.x + settings.width)).toBeLessThanOrEqual(3);
     await expect(page.getByTestId('model-row').first().getByText('当前', { exact: true })).toHaveCount(0);
     // Back to the Anthropic row: it has neither Set as current nor a Current badge
     await page.getByTestId('provider-switch').click();

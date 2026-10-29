@@ -8,19 +8,20 @@
  */
 import { t } from '@i18n';
 import Select from '@ui/fields/Select';
-import { detectCapabilities } from '@features/agent/model/capabilities';
+import { capabilityLabel, detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
 import type { ModelProfile } from '@features/agent';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
 import { baseUrlForProvider } from '@features/agent/services/provider';
 import { PROVIDERS } from '@config/providers';
-import { updateModel } from '@features/settings/model/modelWrites';
-import { ModelTextInput } from './ui';
+import { updateModel, updateModelCapability } from '@features/settings/model/modelWrites';
+import { ModelTextInput, Toggle } from './ui';
 import AutoSaveInput from './AutoSaveInput';
 import ModelThinkingSettings from './ModelThinkingSettings';
 import SettingsDialog from './SettingsDialog';
 
 /** API families a model row can use, in the order the select offers them. */
 const PROVIDER_KINDS = PROVIDERS.map((provider) => provider.kind);
+const CAPABILITIES: ModelCapability[] = ['vision', 'reasoning', 'tools', 'search'];
 
 export default function ModelSettingsDialog({ open, model, focusModelId = false, onClose }: {
   open: boolean;
@@ -31,6 +32,7 @@ export default function ModelSettingsDialog({ open, model, focusModelId = false,
 }) {
   const Mark = modelMark(model.provider, model.model, model.baseUrl);
   const name = model.name || model.model || t('Unnamed model');
+  const capabilities = model.capabilities ?? detectCapabilities(model.provider, model.model);
 
   return (
     <SettingsDialog
@@ -82,6 +84,17 @@ export default function ModelSettingsDialog({ open, model, focusModelId = false,
           onCommit={value => updateModel(model.id, { model: value, capabilities: detectCapabilities(model.provider, value) })}
           style={{ flex: 1 }} />
       </div>
+      <fieldset className="model-capability-settings">
+        <legend>{t('Model capabilities')}</legend>
+        <p>{t('Capabilities are detected again when the provider or model ID changes.')}</p>
+        <div className="model-capability-settings-grid">
+          {CAPABILITIES.map(capability => <div key={capability} className="model-capability-setting">
+            <span>{capabilityLabel(capability)}</span>
+            <Toggle label={capabilityLabel(capability)} on={capabilities[capability]}
+              onChange={supported => updateModelCapability(model.id, capability, supported)} />
+          </div>)}
+        </div>
+      </fieldset>
       <ModelThinkingSettings modelId={model.id} name={name} />
     </SettingsDialog>
   );

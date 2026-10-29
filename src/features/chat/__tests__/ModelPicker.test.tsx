@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useAgentSettings, useAiConfigStore } from '@features/agent';
 import ModelPicker from '../components/ModelPicker';
@@ -11,6 +11,20 @@ afterEach(() => {
 });
 
 describe('model picker controls', () => {
+  it('shows all capabilities with accessible support states', () => {
+    useAiConfigStore.setState({ activeModel: 'sample', models: [{
+      id: 'sample', name: 'Sample', model: 'sample', provider: 'openai-compatible', baseUrl: '',
+      capabilities: { reasoning: false, vision: true, tools: true, search: false },
+    }] });
+    render(<ModelPicker open onClose={vi.fn()} />);
+    const row = screen.getByTestId('model-pick-sample');
+    expect(within(row).getAllByRole('img')).toHaveLength(4);
+    expect(within(row).getByTestId('model-cap-vision')).toHaveAttribute('aria-label', '支持视觉');
+    expect(within(row).getByTestId('model-cap-reasoning')).toHaveAttribute('aria-label', '不支持推理');
+    expect(within(row).getByTestId('model-cap-tools')).toHaveAttribute('data-supported', 'true');
+    expect(within(row).getByTestId('model-cap-search')).toHaveAttribute('data-supported', 'false');
+  });
+
   it('uses the themed selector without selecting the model or closing the dialog', () => {
     useAiConfigStore.setState({ activeModel: 'other', models: [{
       id: 'reasoning', name: '推理模型', model: 'reasoning', provider: 'anthropic', baseUrl: '',

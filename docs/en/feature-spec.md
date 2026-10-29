@@ -4,6 +4,7 @@
 
 Appearance and toolbar regression checklist:
 
+- Model lists sort names within each group. Four capability icons show supported and unsupported states consistently; per-model settings persist explicit capability choices, and changing the provider or model ID detects them again. Verify filtering, reload and narrow layouts.
 - Shared sliding controls use distinct track/thumb/text colors, 14 px label insets and compact height. Thumb placement tracks both axes after wrapping and font loading. Verify both themes, larger fonts, keyboard selection and host authentication/view controls.
 - All four workspace strips use the same 32 px action targets and 18 px icons as the terminal. The leading resource menu uses a downward chevron with a 4 px first-tab gap. Verify projected tools, dropdown hit bounds and tab corners.
 - Host-card connection addresses use the page font, retaining literal `@` and single-line truncation. Browser coverage compares card-title/address typography.

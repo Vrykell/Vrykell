@@ -22,6 +22,8 @@ test('interface, terminal and editor fonts load locally and keep mixed text alig
   await expect(family).toHaveText('Maple Mono NF CN');
   await expect(family).toHaveCSS('font-family', /"Noto Sans SC"/);
   await expect(page.getByLabel('终端字体预览')).toHaveCSS('font-family', /"Maple Mono NF CN"/);
+  const terminalBackground = await page.getByLabel('终端字体预览').evaluate(element => getComputedStyle(element).backgroundColor);
+  await expect(page.getByLabel('AI Chat 字号预览')).toHaveCSS('background-color', terminalBackground);
   const widths = await page.evaluate(() => {
     const canvas = document.createElement('canvas');
     const context = canvas.getContext('2d')!;

@@ -17,14 +17,17 @@ test('directory chips center their icon and label at narrow widths and larger UI
         const box = element.getBoundingClientRect();
         const icon = element.querySelector('svg')!.getBoundingClientRect();
         const label = element.querySelector('span')!.getBoundingClientRect();
+        const style = getComputedStyle(element);
         return { iconY: icon.y + icon.height / 2, labelY: label.y + label.height / 2, centerY: box.y + box.height / 2,
           groupX: (icon.left + label.right) / 2, centerX: box.x + box.width / 2, iconWidth: icon.width,
+          extraWidth: box.width - (label.right - icon.left) - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight),
           overflow: element.scrollHeight - element.clientHeight };
       });
       expect(Math.abs(geometry.iconY - geometry.centerY)).toBeLessThanOrEqual(1);
       expect(Math.abs(geometry.labelY - geometry.centerY)).toBeLessThanOrEqual(1);
       expect(Math.abs(geometry.groupX - geometry.centerX)).toBeLessThanOrEqual(1);
       expect(geometry.iconWidth).toBe(16);
+      expect(Math.abs(geometry.extraWidth)).toBeLessThanOrEqual(1);
       expect(geometry.overflow).toBeLessThanOrEqual(1);
       await page.screenshot({ path: testInfo.outputPath(`directory-chip-${fontSize}-${width}.png`) });
     }

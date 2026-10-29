@@ -9,7 +9,7 @@ import { TextInput } from '@ui/fields/TextInput';
  */
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { iconSizes, BrainCircuit, Eye, Globe, Search, SlidersHorizontal, Wrench, X  } from '@ui/icons';
+import { iconSizes, Search, SlidersHorizontal, X } from '@ui/icons';
 import { t } from '@i18n';
 import { useAiConfigStore, setActiveModel, type ModelProfile, useAgentSettings } from '@features/agent';
 import {
@@ -17,6 +17,7 @@ import {
   type ModelCapability,
 } from '@features/agent/model/capabilities';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
+import { MODEL_CAPABILITY_ICONS, ModelCapabilityBadge } from '@features/agent/components/ModelCapabilityBadge';
 import { useToastStore } from '@ui/feedback/Toast';
 import Select from '@ui/fields/Select';
 
@@ -32,22 +33,6 @@ const pillOn: React.CSSProperties = {
   ...pill,
   background: 'var(--primary-button-bg)', borderColor: 'var(--primary-button-bg)', color: 'var(--primary-button-text)',
 };
-
-function CapBadge({ on, label }: { on: boolean; label: string }) {
-  return (
-    <span
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 'calc(10px * var(--ui-font-scale))', lineHeight: '14px', padding: '1px 6px', borderRadius: 4, flexShrink: 0,
-        color: on ? 'var(--text-secondary)' : 'var(--text-muted)',
-        background: on ? 'var(--hover)' : 'transparent',
-        border: on ? 'none' : '1px solid var(--border)',
-      }}
-    >
-      {label}
-    </span>
-  );
-}
 
 /** Per-model quick setting: thinking effort (the AI panel already owns the agent switch). */
 function ItemControls({ profile }: { profile: ModelProfile }) {
@@ -176,8 +161,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
         {/* Capability filters */}
         <div style={{ display: 'flex', gap: 6, padding: '0 16px 10px', flexWrap: 'wrap' }}>
           {CAP_ORDER.map((cap) => {
-            const TagIcon =
-              cap === 'vision' ? Eye : cap === 'reasoning' ? BrainCircuit : cap === 'tools' ? Wrench : Globe;
+            const TagIcon = MODEL_CAPABILITY_ICONS[cap];
             return (
               <OutlineButton
                 key={cap}
@@ -244,7 +228,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
                       {providerLabel(m.provider)}
                     </span>
                     {CAP_ORDER.map((cap) => (
-                      <CapBadge key={cap} on={caps[cap]} label={capabilityLabel(cap)} />
+                      <ModelCapabilityBadge key={cap} supported={caps[cap]} capability={cap} />
                     ))}
                   </div>
                 </div>

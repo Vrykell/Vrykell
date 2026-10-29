@@ -5,7 +5,7 @@
  * every write is queued and merged with the latest persisted list instead of a stale snapshot.
  */
 import { setAiModels, setActiveModel, useAiConfigStore, type ModelProfile } from '@features/agent';
-import { detectCapabilities } from '@features/agent/model/capabilities';
+import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
 
 let modelWrites = Promise.resolve();
 
@@ -28,6 +28,12 @@ export function updateModel(id: string, patch: Partial<ModelProfile>) {
       next.capabilities = detectCapabilities(next.provider, next.model);
     }
     return next;
+  }));
+}
+
+export function updateModelCapability(id: string, capability: ModelCapability, supported: boolean) {
+  return commitModels(current => current.map(model => model.id !== id ? model : {
+    ...model, capabilities: { ...(model.capabilities ?? detectCapabilities(model.provider, model.model)), [capability]: supported },
   }));
 }
 

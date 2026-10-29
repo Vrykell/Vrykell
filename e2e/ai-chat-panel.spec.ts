@@ -152,6 +152,10 @@ test.describe('AI chat panel', () => {
     await expect(page.getByTestId('model-pick-m-main')).toBeVisible();
     await expect(page.getByTestId('model-pick-m-local')).toBeVisible();
     await expect(page.getByText('推理', { exact: true }).first()).toBeVisible();
+    const localRow = page.getByTestId('model-pick-m-local');
+    await expect(localRow.locator('.model-cap-chip')).toHaveCount(4);
+    await expect(localRow.getByTestId('model-cap-tools')).toHaveAttribute('data-supported', 'true');
+    await expect(localRow.getByTestId('model-cap-vision')).toHaveAttribute('aria-label', '不支持视觉');
 
     // Capability filter: clicking "Reasoning" leaves only the main model
     await page.getByRole('button', { name: /推理/ }).click();

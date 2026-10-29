@@ -7,6 +7,13 @@ const model = (id: string, name: string, modelId: string): ModelProfile => ({
 });
 
 describe('model list grouping', () => {
+  it('sorts each group by display name without changing the saved order', () => {
+    const models = [model('z', 'zeta', 'gpt-z'), model('b', 'Beta 10', 'gpt-b'), model('a', 'beta 2', 'gpt-a')];
+    const groups = groupModelsByVendor(models);
+    expect(groups[0]!.models.map(item => item.id)).toEqual(['a', 'b', 'z']);
+    expect(models.map(item => item.id)).toEqual(['z', 'b', 'a']);
+  });
+
   it('groups by vendor, keeping the first appearance order', () => {
     const models = [
       model('1', 'A', 'deepseek-chat'),

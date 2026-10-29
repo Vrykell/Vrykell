@@ -12,9 +12,10 @@ import { IconButton } from '@ui/actions/IconButton';
 import ReloadButton from '@ui/actions/ReloadButton';
 import { TextInput } from '@ui/fields/TextInput';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
-import { ChevronDown, Eye, Filter, Globe, Lightbulb, Minus, Plus, Search, Settings, Wrench, X, iconSizes, type AppIcon } from '@ui/icons';
+import { ChevronDown, Filter, Minus, Plus, Search, Settings, X, iconSizes } from '@ui/icons';
 import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
 import { modelHue, modelMark } from '@features/agent/components/modelIcon';
+import { ModelCapabilityBadge } from '@features/agent/components/ModelCapabilityBadge';
 import { providerFetchModels, useAiConfigStore, type ModelProfile } from '@features/agent';
 import { commitModels } from '@features/settings/model/modelWrites';
 import { filterModels, groupModelsByVendor } from '@features/settings/model/modelGroups';
@@ -29,31 +30,18 @@ type Toast = (msg: string, type: 'info' | 'success' | 'error') => void;
 /** The filter chips, in the order they appear. */
 const FILTERS: (ModelCapability | 'all')[] = ['all', 'vision', 'reasoning', 'tools', 'search'];
 
-/** Capability marks: metadata, so they stay quiet and answer the pointer instead of shouting. */
-const CAPABILITIES: [ModelCapability, string, AppIcon][] = [
-  ['vision', t('Vision'), Eye],
-  ['reasoning', t('Reasoning'), Lightbulb],
-  ['tools', t('Tools'), Wrench],
-  ['search', t('Search'), Globe],
+const CAPABILITIES: [ModelCapability, string][] = [
+  ['vision', t('Vision')],
+  ['reasoning', t('Reasoning')],
+  ['tools', t('Tools')],
+  ['search', t('Search')],
 ];
 
 function CapabilityChips({ profile }: { profile: ModelProfile }) {
   const caps = profile.capabilities ?? detectCapabilities(profile.provider, profile.model);
-  const present = CAPABILITIES.filter(([cap]) => caps[cap]);
-  if (present.length === 0) return null;
   return (
     <div style={{ display: 'flex', gap: 2, flexShrink: 0, color: 'var(--text-muted)' }}>
-      {present.map(([cap, label, Icon]) => (
-        <span
-          key={cap}
-          data-testid={`model-cap-${cap}`}
-          data-tip={label}
-          aria-label={label}
-          className="model-cap-chip"
-        >
-          <Icon size={14} aria-hidden="true" />
-        </span>
-      ))}
+      {CAPABILITIES.map(([cap]) => <ModelCapabilityBadge key={cap} capability={cap} supported={caps[cap]} />)}
     </div>
   );
 }
@@ -82,15 +70,17 @@ function ModelRow({ model, active, onRemove }: {
             {model.name || model.model || t('Unnamed model')}
           </span>
         </span>
-        <CapabilityChips profile={model} />
-        <IconButton data-testid="model-settings" aria-expanded={editing}
-          aria-label={t('Model settings')} data-tip={t('Model settings')} onClick={() => setEditing(true)}>
-          <Settings size={iconSizes.control} />
-        </IconButton>
-        <IconButton tone="danger" data-testid="model-remove"
-          aria-label={t('Delete model')} data-tip={t('Delete model')} onClick={onRemove}>
-          <Minus size={iconSizes.control} />
-        </IconButton>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
+          <CapabilityChips profile={model} />
+          <IconButton data-testid="model-settings" aria-expanded={editing}
+            aria-label={t('Model settings')} data-tip={t('Model settings')} onClick={() => setEditing(true)}>
+            <Settings size={iconSizes.control} />
+          </IconButton>
+          <IconButton tone="danger" data-testid="model-remove"
+            aria-label={t('Delete model')} data-tip={t('Delete model')} onClick={onRemove}>
+            <Minus size={iconSizes.control} />
+          </IconButton>
+        </div>
       </div>
       <ModelSettingsDialog open={editing} model={model} onClose={() => setEditing(false)} />
     </div>
