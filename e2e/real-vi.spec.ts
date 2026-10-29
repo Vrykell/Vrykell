@@ -112,6 +112,7 @@ test(`real vi receives normal-mode, insertion and Escape commands from ${integra
       (element as HTMLTextAreaElement).value += 'i';
       element.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: 'i' }));
     });
+    await expect.poll(() => editorInput.includes('i')).toBe(true);
     await page.keyboard.type('delta');
     await page.keyboard.press('Escape');
     await page.keyboard.type(':wq');
