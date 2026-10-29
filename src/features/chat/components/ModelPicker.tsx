@@ -1,4 +1,3 @@
-import { OutlineButton } from '@ui/actions/OutlineButton';
 import { TextInput } from '@ui/fields/TextInput';
 /**
  * Full model picker dialog: search by name or model id, filter by capability (vision, reasoning,
@@ -13,26 +12,16 @@ import { iconSizes, Search, SlidersHorizontal, X } from '@ui/icons';
 import { t } from '@i18n';
 import { useAiConfigStore, setActiveModel, type ModelProfile, useAgentSettings } from '@features/agent';
 import {
-  capabilityLabel, detectCapabilities, hasCapability,
+  detectCapabilities, hasCapability,
   type ModelCapability,
 } from '@features/agent/model/capabilities';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
-import { MODEL_CAPABILITY_ICONS, ModelCapabilityBadge } from '@features/agent/components/ModelCapabilityBadge';
+import { ModelCapabilityBadge } from '@features/agent/components/ModelCapabilityBadge';
+import { ModelCapabilityToggle } from '@features/agent/components/ModelCapabilityToggle';
 import { useToastStore } from '@ui/feedback/Toast';
 import Select from '@ui/fields/Select';
 
 const CAP_ORDER: ModelCapability[] = ['vision', 'reasoning', 'tools', 'search'];
-
-// Styles
-
-const pill: React.CSSProperties = {
-  padding: '3px 10px', fontSize: 'calc(11px * var(--ui-font-scale))',
-  borderRadius: 999, flexShrink: 0,
-};
-const pillOn: React.CSSProperties = {
-  ...pill,
-  background: 'var(--primary-button-bg)', borderColor: 'var(--primary-button-bg)', color: 'var(--primary-button-text)',
-};
 
 /** Per-model quick setting: thinking effort (the AI panel already owns the agent switch). */
 function ItemControls({ profile }: { profile: ModelProfile }) {
@@ -160,23 +149,8 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
 
         {/* Capability filters */}
         <div style={{ display: 'flex', gap: 6, padding: '0 16px 10px', flexWrap: 'wrap' }}>
-          {CAP_ORDER.map((cap) => {
-            const TagIcon = MODEL_CAPABILITY_ICONS[cap];
-            return (
-              <OutlineButton
-                key={cap}
-                aria-pressed={tags.has(cap)}
-                onClick={() => toggleTag(cap)}
-                style={{
-                  ...(tags.has(cap) ? pillOn : pill),
-                  display: 'inline-flex', alignItems: 'center', gap: 5,
-                }}
-              >
-                <TagIcon size={iconSizes.compact} />
-                {capabilityLabel(cap)}
-              </OutlineButton>
-            );
-          })}
+          {CAP_ORDER.map(cap => <ModelCapabilityToggle key={cap} capability={cap}
+            selected={tags.has(cap)} onChange={() => toggleTag(cap)} />)}
         </div>
 
         {/* Model list */}

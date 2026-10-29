@@ -18,18 +18,28 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe('Model configuration page', () => {
-  test('saves manually declared capabilities and updates the model badges', async ({ page }) => {
+  test('saves manually declared capabilities and updates the model badges', async ({ page }, testInfo) => {
     await page.getByTestId('provider-switch').click();
     await page.getByTestId(`provider-option-${LOCAL_ID}`).click();
     const row = page.getByTestId('model-row').first();
     await row.getByTestId('model-settings').click();
     const dialog = page.getByTestId('model-settings-dialog');
-    const vision = dialog.getByRole('switch', { name: '视觉', exact: true });
-    const reasoning = dialog.getByRole('switch', { name: '推理', exact: true });
-    await expect(vision).toHaveAttribute('aria-checked', 'false');
+    await expect(dialog.getByText('模型能力', { exact: true })).toHaveCount(0);
+    const vision = dialog.getByRole('button', { name: '视觉', exact: true });
+    const reasoning = dialog.getByRole('button', { name: '推理', exact: true });
+    await expect(vision).toHaveAttribute('aria-pressed', 'false');
     await vision.click(); await reasoning.click();
-    await expect(vision).toHaveAttribute('aria-checked', 'true');
-    await expect(reasoning).toHaveAttribute('aria-checked', 'true');
+    await expect(vision).toHaveAttribute('aria-pressed', 'true');
+    await expect(reasoning).toHaveAttribute('aria-pressed', 'true');
+    await expect(reasoning).toHaveCSS('background-color', await vision.evaluate(element => getComputedStyle(element).backgroundColor));
+    const thinking = await dialog.getByText('深度思考', { exact: true }).boundingBox();
+    expect((await vision.boundingBox())!.y).toBeGreaterThan(thinking!.y + thinking!.height);
+    for (const width of [760, 1240]) {
+      await page.setViewportSize({ width, height: 800 });
+      await expect(dialog.locator('.model-capability-toggle')).toHaveCount(4);
+      expect(await dialog.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+      await dialog.screenshot({ path: testInfo.outputPath(`model-capabilities-${width}.png`) });
+    }
     await dialog.getByTestId('model-settings-done').click();
     await expect(row.getByTestId('model-cap-vision')).toHaveAttribute('data-supported', 'true');
     await expect(row.getByTestId('model-cap-reasoning')).toHaveAttribute('data-supported', 'true');
@@ -150,9 +160,10 @@ test.describe('Model configuration page', () => {
     await expect(names).toHaveCount(1);
     await expect(names.first()).toHaveText('本地模型');
     const localRow = page.getByTestId('model-row').first();
-    await expect(localRow.locator('.model-cap-chip')).toHaveCount(4);
+    await expect(localRow.locator('.model-cap-chip')).toHaveCount(1);
     await expect(localRow.getByTestId('model-cap-tools')).toHaveAttribute('data-supported', 'true');
-    await expect(localRow.getByTestId('model-cap-vision')).toHaveAttribute('aria-label', '不支持视觉');
+    await expect(localRow.getByTestId('model-cap-vision')).toHaveCount(0);
+    await expect(localRow.getByTestId('model-cap-tools')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     const capabilities = (await localRow.locator('.model-cap-chip').last().boundingBox())!;
     const settings = (await localRow.getByTestId('model-settings').boundingBox())!;
     const remove = (await localRow.getByTestId('model-remove').boundingBox())!;

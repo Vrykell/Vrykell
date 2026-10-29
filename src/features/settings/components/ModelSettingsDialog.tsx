@@ -8,13 +8,15 @@
  */
 import { t } from '@i18n';
 import Select from '@ui/fields/Select';
-import { capabilityLabel, detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
+import { detectCapabilities, type ModelCapability } from '@features/agent/model/capabilities';
+import { ModelCapabilityToggle } from '@features/agent/components/ModelCapabilityToggle';
 import type { ModelProfile } from '@features/agent';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
 import { baseUrlForProvider } from '@features/agent/services/provider';
 import { PROVIDERS } from '@config/providers';
 import { updateModel, updateModelCapability } from '@features/settings/model/modelWrites';
-import { ModelTextInput, Toggle } from './ui';
+import { ModelTextInput } from './ui';
+import { useSettingsSave } from './SettingsSaveProvider';
 import AutoSaveInput from './AutoSaveInput';
 import ModelThinkingSettings from './ModelThinkingSettings';
 import SettingsDialog from './SettingsDialog';
@@ -33,6 +35,7 @@ export default function ModelSettingsDialog({ open, model, focusModelId = false,
   const Mark = modelMark(model.provider, model.model, model.baseUrl);
   const name = model.name || model.model || t('Unnamed model');
   const capabilities = model.capabilities ?? detectCapabilities(model.provider, model.model);
+  const { save } = useSettingsSave();
 
   return (
     <SettingsDialog
@@ -84,18 +87,12 @@ export default function ModelSettingsDialog({ open, model, focusModelId = false,
           onCommit={value => updateModel(model.id, { model: value, capabilities: detectCapabilities(model.provider, value) })}
           style={{ flex: 1 }} />
       </div>
-      <fieldset className="model-capability-settings">
-        <legend>{t('Model capabilities')}</legend>
-        <p>{t('Capabilities are detected again when the provider or model ID changes.')}</p>
-        <div className="model-capability-settings-grid">
-          {CAPABILITIES.map(capability => <div key={capability} className="model-capability-setting">
-            <span>{capabilityLabel(capability)}</span>
-            <Toggle label={capabilityLabel(capability)} on={capabilities[capability]}
-              onChange={supported => updateModelCapability(model.id, capability, supported)} />
-          </div>)}
-        </div>
-      </fieldset>
       <ModelThinkingSettings modelId={model.id} name={name} />
+      <div className="model-capability-settings" role="group" aria-label={t('Model capabilities')}>
+        {CAPABILITIES.map(capability => <ModelCapabilityToggle key={capability} capability={capability}
+          selected={capabilities[capability]}
+          onChange={supported => { void save(() => updateModelCapability(model.id, capability, supported)); }} />)}
+      </div>
     </SettingsDialog>
   );
 }
