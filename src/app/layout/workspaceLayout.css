@@ -39,8 +39,11 @@ button.workspace-sidebar-toggle.icon-button:focus-visible { outline: 1px solid v
 .workspace-panel-host, .workspace-panel-slot[data-panel-slot="right"] { display: contents; }
 .workspace-panel-slot[data-panel-slot="left"] { display: flex; flex: 1; min-height: 0; min-width: 0; }
 .workspace-sidebar-footer { padding: 8px 6px 12px; }
-.application-window[data-platform="macos"] .workspace-sidebar-heading { padding-top: 32px; height: 76px; }
-.application-window:has(.workspace-titlebar[data-fullscreen="true"]) .workspace-sidebar-heading { padding-top: 0; height: 42px; }
+/* macOS paints the traffic lights over the sidebar: the heading keeps the window's first row,
+   so its actions share that row and the label steps aside for the lights. Fullscreen has no
+   lights, so the label returns. */
+.application-window[data-platform="macos"]:has(.workspace-titlebar[data-fullscreen="false"]) .workspace-sidebar-heading > span { display: none; }
+.application-window[data-platform="macos"] .workspace-sidebar-heading > .workspace-sidebar-header-actions { margin-left: auto; }
 .workspace-empty { display: flex; flex: 1; min-height: 0; align-items: center; justify-content: center; flex-direction: column; gap: 14px; padding: 24px; text-align: center; color: var(--text-muted); background: var(--xterm-bg); }
 /* Start pages are system pages: their surface matches the active singleton tab above them. */
 .workspace-start-page { background: var(--canvas); }
