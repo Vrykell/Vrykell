@@ -80,6 +80,7 @@
 .ssh-host-editor .ssh-editor-note textarea { min-height: 100px; }
 .ssh-host-editor .ssh-editor-note textarea[data-testid="ssh-form-ai-notes"] { min-height: 124px; }
 button.ssh-editor-favorite { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 32px; width: 32px; height: 32px; padding: 0; border: 0; border-radius: var(--radius-inner); background: transparent; color: var(--text-muted); cursor: pointer; }
+button.icon-button.ssh-editor-favorite[aria-pressed="true"] { background: transparent; }
 button.ssh-editor-favorite:enabled:is(:hover, :focus-visible, :active) { background: transparent; }
 button.ssh-editor-favorite:focus-visible { outline: 1px solid var(--border-strong); outline-offset: 2px; }
 .ssh-editor-advanced > summary { display: flex; align-items: center; gap: 6px; margin-bottom: 16px; color: var(--text-muted); font-size: var(--fs-label); cursor: pointer; list-style: none; }

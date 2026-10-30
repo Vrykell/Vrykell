@@ -47,13 +47,19 @@ test('completes real local paths with Tab even with predictive suggestions disab
     ];
   });
   const input = page.getByPlaceholder(/输入命令/);
+  const replace = async (value: string) => {
+    await input.fill('');
+    await expect(input).toHaveValue('');
+    await input.pressSequentially(value);
+    await expect(input).toHaveValue(value);
+  };
   await input.fill('cat not'); await input.press('Tab');
   await expect(input).toHaveValue('cat notes-two.txt');
   await input.press('Tab'); await expect(input).toHaveValue('cat notes.txt');
   await input.press('Shift+Tab'); await expect(input).toHaveValue('cat notes-two.txt');
   await input.press('Escape'); await expect(input).toHaveValue('cat not');
-  await input.fill('cd Doc'); await input.press('Tab'); await expect(input).toHaveValue('cd Documents/');
-  await input.fill('cat my'); await input.press('Tab'); await expect(input).toHaveValue('cat my\\ file.txt');
+  await replace('cd Doc'); await input.press('Tab'); await expect(input).toHaveValue('cd Documents/');
+  await replace('cat my'); await input.press('Tab'); await expect(input).toHaveValue('cat my\\ file.txt');
   await expect(input).toBeFocused();
   expect((await ptyWrites(page)).some(write => write.includes('cat notes'))).toBe(false);
 });

@@ -46,7 +46,7 @@ test('local and remote tabs retain profile identities before and after activatio
     await expect(icon).toHaveAttribute('data-shell-mark', mark);
     await expect(icon).toHaveCSS('width', '18px');
     await expect(icon).toHaveCSS('height', '18px');
-    if (mark === 'bash') await expect(icon).toHaveAttribute('style', /color: var\(--group-green\)/);
+    if (mark === 'bash') await expect(icon).toHaveAttribute('style', /color: var\(--shell-bash-accent\)/);
     const color = await icon.evaluate(element => getComputedStyle(element).color);
     await row.click();
     await expect(icon).toHaveCSS('color', color);

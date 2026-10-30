@@ -161,7 +161,7 @@ test('new, close and numeric shortcuts follow the workspace and the focused side
   await page.keyboard.press('Control+2'); await expect(composer).toHaveValue('keep the second draft');
   await page.keyboard.press('Control+w');
   await expect(page.getByTestId('ai-surface-side')).toBeVisible();
-  await expect(composer).toHaveValue('');
+  await expect.poll(async () => composer.inputValue()).toBe('');
   await expect.poll(() => page.evaluate(async () => {
     const path = '/src/features/chat/services/aiWorkspace.ts';
     const { availableSideConversationIds } = await import(path) as typeof import('../src/features/chat/services/aiWorkspace');

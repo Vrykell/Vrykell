@@ -131,7 +131,7 @@ test('returns from a comparison to its editor and explains binary files', async 
   await openWorkspaceActions(page);
   await page.getByRole('menuitem', { name: '返回编辑器', exact: true }).click();
   await expect(page.getByTestId('file-editor')).toBeVisible();
-  const image = page.getByTestId('git-unstaged-image.png'); await image.hover(); await image.getByRole('button', { name: '打开工作文件' }).click();
+  const binary = page.getByTestId('git-unstaged-image.svg'); await binary.hover(); await binary.getByRole('button', { name: '打开工作文件' }).click();
   await expect(page.getByTestId('file-editor').getByText('此文件是二进制或非 UTF-8 文本，请使用其他编辑器打开。')).toBeVisible();
   for (const width of [1240, 760]) {
     await page.setViewportSize({ width, height: 800 });

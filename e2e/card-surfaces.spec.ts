@@ -62,6 +62,12 @@ for (const theme of ['dark', 'light'] as const) test(`cards share clear borderle
   }
   await expectCards(page.locator('.usage-card'), background);
   await page.screenshot({ path: info.outputPath(`usage-${theme}.png`), animations: 'disabled' });
+  await page.evaluate(async () => {
+    const path = '/src/features/workspace/stores/workspace.ts';
+    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+    const usage = useWorkspaceStore.getState().tabs.find(tab => tab.kind === 'usage');
+    if (usage) useWorkspaceStore.getState().closeTab(usage.id);
+  });
 
   await gotoSetting(page, '快捷键说明');
   await expectCards(page.locator('.settings-group-panel'), background);

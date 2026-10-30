@@ -18,8 +18,7 @@ for (const theme of ['dark', 'light']) test(`profiles, history contrast and sing
   await picker.getByTestId('new-tab-option-shell:zsh').hover();
   const footer = picker.getByRole('button', { name: '更多配置文件…' });
   await footer.hover();
-  const hovered = await footer.evaluate(element => getComputedStyle(element).backgroundColor);
-  expect(await picker.getByTestId('new-tab-option-shell:zsh').evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe(hovered);
+  await expect(picker.getByTestId('new-tab-option-shell:zsh')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   const sectionHeading = (await picker.getByRole('heading', { name: '打开位置' }).boundingBox())!;
   await page.mouse.move(sectionHeading.x + 3, sectionHeading.y + 3);
   await expect(picker.getByTestId('new-tab-option-shell:zsh')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
@@ -72,7 +71,9 @@ for (const theme of ['dark', 'light']) test(`host groups, table and native conve
     useSshStore.setState({ connections: [seed, ...hosts] });
   });
   await page.getByTestId('workspace-area-ssh').click();
-  await expect(page.getByRole('group', { name: '主机分组', exact: true })).toContainText('Production');
+  await page.getByTestId('ssh-host-group-filter').click();
+  await expect(page.getByRole('menu', { name: '主机分组' })).toContainText('Production');
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: '卡片视图', exact: true }).click();
   await expect(page.getByTestId('ssh-row-ssh-1')).toContainText('production');
   await page.getByRole('switch', { name: '资源占用', exact: true }).click();
@@ -141,7 +142,7 @@ test('shell icons distinguish the blue profile from the dark start-page fallback
   await page.getByTestId('tab-new-btn').click();
   const powerShell = page.getByTestId('new-tab-option-shell:powershell');
   await expect(powerShell.locator('[data-shell-mark="powershell"]')).toBeVisible();
-  expect(await powerShell.locator('[data-shell-mark="powershell"]').evaluate(element => (element as SVGElement).style.color)).toBe('var(--chart-blue)');
+  expect(await powerShell.locator('[data-shell-mark="powershell"]').evaluate(element => (element as SVGElement).style.color)).toBe('var(--shell-powershell-accent)');
   await expect(page.locator('.new-tab-primary-icon')).toHaveCount(0);
   await page.screenshot({ path: info.outputPath('terminal-identities.png'), animations: 'disabled' });
   await powerShell.click();

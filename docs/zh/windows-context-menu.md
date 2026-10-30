@@ -12,14 +12,14 @@ Windows 构建需要 Visual Studio C++ 工具、CMake，以及包含 MakeAppx �
 
 Windows 打包使用面向当前用户的 NSIS 安装器，并通过卸载前钩子在删除应用文件前注销菜单。钩子检查归属，避免卸载旧安装时移除其他可执行文件管理的菜单。证书信任保留到用户在设置中主动移除；卸载不删除可能被其他应用共享的签名证书。完整安装包仅在明确要求时构建。
 
-身份清单为 `Directory` 和 `Directory\Background` 声明 `windows.comServer` 与 `windows.fileExplorerContextMenus`。**清单的 `<Application>` 指向专用宿主 `windows-context-menu\VrykellShellHost.exe`，且只有该宿主嵌入匹配的 MSIX 身份信息**。主程序的 `application.manifest` 必须不含 `msix` 元素：即使已修改身份包中的可执行文件路径，主程序内残留的匹配身份信息仍可能让其进程关联到 shell 身份包。此前 shell 激活清理曾在资源管理器右键时直接终止关联的应用进程（见 `pitfalls.md` 2.15）。宿主只做一件事：把一次显式激活转发给注册表记录的应用路径。COM DLL 与宿主都部署到外部应用目录下的 `windows-context-menu` 文件夹：稀疏包激活 COM 时使用此外部路径，即使身份包内也有副本。独立的当前用户启动映射提供可执行文件路径，启动过程不经过命令解释器。所有后台管理进程禁用控制台窗口；管理员权限提示是用户主动操作的预期流程。
+身份清单为 `Directory` 和 `Directory\Background` 声明 `windows.comServer` 与 `windows.fileExplorerContextMenus`。**清单的 `<Application>` 指向专用宿主 `windows-context-menu\VrykellShellHost.exe`，且只有该宿主嵌入匹配的 MSIX 身份信息**。主程序的 `application.manifest` 必须不含 `msix` 元素：即使已修改身份包中的可执行文件路径，主程序内残留的匹配身份信息仍可能让其进程关联到 shell 身份包。此前 shell 激活清理曾在资源管理器右键时直接终止关联的应用进程。宿主只做一件事：把一次显式激活转发给注册表记录的应用路径。COM DLL 与宿主都部署到外部应用目录下的 `windows-context-menu` 文件夹：稀疏包激活 COM 时使用此外部路径，即使身份包内也有副本。独立的当前用户启动映射提供可执行文件路径，启动过程不经过命令解释器。所有后台管理进程禁用控制台窗口；管理员权限提示是用户主动操作的预期流程。
 
 ## 验证
 
 管理操作通过当前 Windows 用户的互斥锁串行执行。替换注册前校验外部 DLL 与签名包内容一致，并使用包含内容哈希的文件名部署，避免覆盖仍被加载的版本；启用时同时校验身份宿主、清理本包不再使用的内容寻址 DLL，并在注册仍指向旧包或旧可执行文件时以 `stale` 报告，设置页据此提示重新启用（应用更新后必须重新注册，否则会继续加载旧扩展）。`%LOCALAPPDATA%\com.vrykell.app\context-menu\packages` 中的签名包快照用于在更新失败时恢复本功能管理的旧注册。旧状态查询不会覆盖设置中较新的操作结果。根目录 `.ignore` 将构建缓存和集成生成资源排除在项目搜索之外。
 
 - 原生测试覆盖工厂生命周期、标题、图标接口、文件夹可用性与背景站点不可用的处理。注册后执行 `ContextMenuTests.exe --registered` 可进一步验证系统 COM 激活。
-- 打包脚本在装配清单时断言 `<Application>` 声明的是身份宿主（声明应用自身会让右键杀掉运行中的应用，见 `pitfalls.md` 2.15），`manage.ps1` 也把此类清单判为资源不可用并拒绝启用。
+- 打包脚本在装配清单时断言 `<Application>` 声明的是身份宿主（声明应用自身会让右键杀掉运行中的应用），`manage.ps1` 也把此类清单判为资源不可用并拒绝启用。
 - 主程序构建会拒绝嵌入 shell 包身份。`contextMenuIdentity.test.ts` 检查主程序原生清单不含 MSIX 身份、宿主身份与身份包匹配、原生宿主目标确实包含其身份清单。这些检查只读取文件，不激活系统 COM，也不启动任何一个可执行文件。
 - Rust 测试覆盖无目录参数、非法参数和已存在的绝对目录，以及转发目录队列的入队与排空顺序。
 - `powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-context-menu.ps1` 在独立进程中模拟部署和注册表副作用，验证启用、停用、部署失败回滚、外部 DLL 篡改以及「注册指向旧包时必须提示重新启用」；不导入证书，也不触发 UAC。

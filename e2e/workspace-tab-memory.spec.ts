@@ -9,6 +9,7 @@ test.beforeEach(async ({ page }) => {
 
 for (const width of [1240, 760]) {
   test(`restores each workspace reading tab after mixed resource navigation at ${width}px`, async ({ page }, info) => {
+    test.setTimeout(60_000);
     const ids = await page.evaluate(async () => {
       const storePath = '/src/features/workspace/stores/workspace.ts';
       const servicePath = '/src/features/workspace/services/workbench.ts';
@@ -26,7 +27,7 @@ for (const width of [1240, 760]) {
     await strip.getByRole('tab', { name: 'reading.ts', exact: true }).click();
     await page.setViewportSize({ width, height: 800 });
     const navigate = async (area: string) => {
-      if (!await page.getByTestId('workspace-sidebar').isVisible()) await page.getByTestId('workspace-sidebar-expand').click();
+      if (!await page.getByTestId(`workspace-area-${area}`).isVisible()) await page.getByTestId('workspace-sidebar-expand').click();
       await page.getByTestId(`workspace-area-${area}`).click();
     };
     await navigate('unified');

@@ -45,7 +45,14 @@ test('a held divider drag keeps the local grid live and notifies the remote once
   await expect(handleLocator).toBeVisible();
   const handle = (await handleLocator.boundingBox())!;
   const widthBefore = (await screen.boundingBox())!.width;
-  const resizesBefore = (await ptyResizes(page)).length;
+  await page.waitForTimeout(200);
+  let resizesBefore = (await ptyResizes(page)).length;
+  for (let attempt = 0; attempt < 10; attempt++) {
+    await page.waitForTimeout(50);
+    const next = (await ptyResizes(page)).length;
+    if (next === resizesBefore) break;
+    resizesBefore = next;
+  }
   await page.mouse.move(handle.x + handle.width / 2, handle.y + 140);
   await page.mouse.down();
   for (const delta of [20, 40, 60, 80]) {

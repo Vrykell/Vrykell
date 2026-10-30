@@ -56,7 +56,13 @@ test.describe('Model configuration page', () => {
     await vision.click(); await reasoning.click();
     await expect(vision).toHaveAttribute('aria-pressed', 'true');
     await expect(reasoning).toHaveAttribute('aria-pressed', 'true');
-    await expect(reasoning).toHaveCSS('background-color', await vision.evaluate(element => getComputedStyle(element).backgroundColor));
+    await expect.poll(async () => {
+      const [visionColor, reasoningColor] = await Promise.all([
+        vision.evaluate(element => getComputedStyle(element).backgroundColor),
+        reasoning.evaluate(element => getComputedStyle(element).backgroundColor),
+      ]);
+      return visionColor === reasoningColor;
+    }).toBe(true);
     const thinking = await dialog.getByText('深度思考', { exact: true }).boundingBox();
     expect((await vision.boundingBox())!.y).toBeGreaterThan(thinking!.y + thinking!.height);
     const thinkingSwitch = dialog.locator('.model-thinking-settings').getByRole('switch');

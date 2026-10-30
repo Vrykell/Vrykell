@@ -155,6 +155,5 @@ reproduction, a hand-run probe or a log by hand.**
   things that cannot be done, and the checklist every new IPC command, rendering path or
   third-party integration must answer (read it before ACP work).
 - `docs/zh/architecture.md` - pipeline and module detail.
-- `docs/zh/pitfalls.md` - known traps worth reading before touching the terminal pipeline.
 - `docs/zh/feature-spec.md` - feature specifications and test checklist.
 - Docs are bilingual: Chinese in `docs/zh/`, English in `docs/en/`; keep both in sync when editing.

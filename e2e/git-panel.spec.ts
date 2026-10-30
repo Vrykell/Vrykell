@@ -137,7 +137,7 @@ test('stages and unstages complete files and filters paths', async ({ page }) =>
 
 test('shows binary, conflict, empty and failure states', async ({ page }) => {
   const panel = page.getByTestId('git-panel');
-  await panel.getByTestId('git-unstaged-image.png').click();
+  await panel.getByTestId('git-unstaged-image.svg').click();
   await expect(page.getByText('二进制文件无法显示文本差异。')).toBeVisible();
   await panel.getByTestId('git-conflicts-conflict.ts').click();
   await expect(page.getByText('请在编辑器或终端中解决冲突；这里展示冲突两侧的内容。')).toBeVisible();

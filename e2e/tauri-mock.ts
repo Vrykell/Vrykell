@@ -515,7 +515,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             const missing = JSON.parse(localStorage.getItem('mock-editor-missing') || '[]') as string[];
             if (missing.includes(target.path) && !(key in files)) throw new Error('File not found');
             const text = files[key] ?? 'export const value = "working";\n';
-            return { kind: target.path.endsWith('.png') ? 'binary' : target.path.endsWith('.large') ? 'tooLarge' : 'text', text, revision: `mock:${text}`, encoding: target.encoding || 'utf8' };
+            return { kind: target.path.endsWith('.svg') ? 'binary' : target.path.endsWith('.large') ? 'tooLarge' : 'text', text, revision: `mock:${text}`, encoding: target.encoding || 'utf8' };
           }
           case 'editor_save_file': {
             const target = args.target as { path: string; connectionId?: string };
@@ -535,7 +535,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               root: '/home/e2e/project', branch: 'main', remotes: ['origin'], upstream: 'origin/main', ahead: 1, behind: 2, entries: [
                 { path: 'src/main.ts', previousPath: null, indexStatus: 'M', worktreeStatus: 'M' },
                 { path: 'new file.ts', previousPath: null, indexStatus: '?', worktreeStatus: '?' },
-                { path: 'image.png', previousPath: null, indexStatus: ' ', worktreeStatus: 'M' },
+                { path: 'image.svg', previousPath: null, indexStatus: ' ', worktreeStatus: 'M' },
                 { path: 'conflict.ts', previousPath: null, indexStatus: 'U', worktreeStatus: 'U' },
               ],
             }));
@@ -543,7 +543,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'git_diff':
             return { original: args.scope === 'staged' ? 'export const value = "base";\n' : 'export const value = "staged";\n',
               modified: args.scope === 'staged' ? 'export const value = "staged";\n' : 'export const value = "working";\n',
-              kind: args.path === 'image.png' ? 'binary' : 'text' };
+              kind: args.path === 'image.svg' ? 'binary' : 'text' };
           case 'git_change_file': {
             const repository = await (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args: unknown) => Promise<{ entries: { path: string; indexStatus: string; worktreeStatus: string }[] }> } }).__TAURI_INTERNALS__.invoke('git_snapshot', { target: args.target });
             const entry = repository.entries.find(entry => entry.path === args.path);

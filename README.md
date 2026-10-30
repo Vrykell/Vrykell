@@ -195,7 +195,7 @@ Join the community group to share ideas, ask questions and follow the project. G
 
 ## Read more
 
-[Features and regression checklist](docs/en/feature-spec.md) · [Architecture](docs/en/architecture.md) · [Workspace compositions](docs/en/workspace-compositions.md) · [Development rules](docs/en/development-rules.md) · [Security model](docs/en/security-model.md) · [CI and packages](docs/en/ci.md) · [Known pitfalls](docs/en/pitfalls.md)
+[Features and regression checklist](docs/en/feature-spec.md) · [Architecture](docs/en/architecture.md) · [Workspace compositions](docs/en/workspace-compositions.md) · [Development rules](docs/en/development-rules.md) · [Security model](docs/en/security-model.md) · [CI and packages](docs/en/ci.md)
 
 ## License
 

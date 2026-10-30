@@ -219,7 +219,9 @@ test('session date basis survives title sorting, regrouping and reopening', asyn
   await expect(page.locator('.history-row')).toHaveCount(3);
   await page.getByTestId('workspace-area-terminal').click();
   await page.getByTestId('tab-history-btn').click();
-  await expect(page.getByTestId('unified-history-search')).toHaveValue('Deploy');
+  const search = page.getByTestId('unified-history-search');
+  if (!await search.isVisible()) await page.getByTestId('history-search-toggle').first().click();
+  await expect(search).toHaveValue('Deploy');
   await expect(page.locator('.history-row')).toHaveCount(3);
 });
 
