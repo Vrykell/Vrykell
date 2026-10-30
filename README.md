@@ -4,9 +4,9 @@
 
 # Vrykell
 
-### Terminal and AI, side by side.
+### A terminal workspace built for working with AI.
 
-A desktop terminal with command completion, files, an editor and Git. Work locally or over SSH, with AI conversations and agents beside your sessions.
+Bring local and SSH terminals, file management, code editing, Git, and AI agents together in one desktop workspace.
 
 [Download Beta](#download) · [Features](#features) · [Workflows](#workflows) · [Build from source](#build-from-source) · [Contribute](CONTRIBUTING.en.md) · [简体中文](README.zh-CN.md)
 
