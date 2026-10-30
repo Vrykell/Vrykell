@@ -290,7 +290,7 @@ describe('UsageView', () => {
 
     fireEvent.click(screen.getByTestId('usage-refresh'));
     await waitFor(() => expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('2'));
-    expect(screen.getByTestId('usage-refreshed-at')).toHaveTextContent('刷新于');
+    await waitFor(() => expect(screen.getByTestId('usage-refreshed-at')).toHaveTextContent('刷新于'));
   });
 
   it('filters models across reporting sources from the left chip bar', () => {
