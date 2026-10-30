@@ -523,6 +523,12 @@ Fitting that clears the renderer before resizing causes an additional blank fram
 - The proxy previously rejected connection failures as ordinary strings, so the model transport could not identify transient failures.
 - Connection failures now carry explicit retry metadata before response headers. The model transport retries twice with abortable exponential backoff; authentication and configuration errors remain immediate. Started responses and whole tool turns are never replayed. Cover this with the real model transport and mocked IPC, including abort during backoff and exhaustion followed by manual retry.
 
+### 11.12 An incompatible WebSocket route delays the first ACP reply
+- **Observed on 2026-10-30**: application dispatch took about 17 ms, but a Codex ACP turn took about 101 seconds. Its runtime recorded repeated 15-second WebSocket timeouts, five sampling retries and then `falling back to HTTP`. Subsequent turns on that connection finished in about four seconds. Another new connection repeated the same pattern, including an initial WebSocket prewarm timeout.
+- **Diagnosis**: compare application dispatch, adapter output and runtime transport timestamps before changing rendering or model settings. This evidence locates the delay in the external runtime's WebSocket route; it does not establish which proxy or remote endpoint caused the timeout.
+- **Workaround**: for an affected custom provider, set its `supports_websockets` to `false` in the agent's own session configuration. The adapter supports a `CODEX_CONFIG` environment variable containing a JSON object, for example `{"model_providers":{"<provider-id>":{"supports_websockets":false}}}`. Replace the provider id with the configured one, merge existing overrides and reconnect. Keep this scoped to the affected connection; do not disable transport support for all users. HTTP remains streaming. See the [runtime transport documentation](https://developers.openai.com/siwc/token-sharing-open-source/preview-limitations).
+- The composer must show the existing loading cursor as soon as a prompt is sent. Loading feedback does not fix network latency; verify a new connection separately after applying the transport override. Keep diagnostics limited to timings and protocol metadata, without enabling full request or response logging.
+
 ---
 
 ## 12. Rich Content / LaTeX/Markdown
