@@ -201,7 +201,12 @@ npm run check:architecture
 
 ## 深入了解
 
-[功能与回归清单](docs/zh/feature-spec.md) · [架构](docs/zh/architecture.md) · [工作区组合](docs/zh/workspace-compositions.md) · [开发规则](docs/zh/development-rules.md) · [安全模型](docs/zh/security-model.md) · [CI 与安装包](docs/zh/ci.md)
+- [功能与回归清单](docs/zh/feature-spec.md)
+- [架构](docs/zh/architecture.md)
+- [工作区组合](docs/zh/workspace-compositions.md)
+- [开发规则](docs/zh/development-rules.md)
+- [安全模型](docs/zh/security-model.md)
+- [CI 与安装包](docs/zh/ci.md)
 
 ## 许可
 
