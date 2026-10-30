@@ -1,14 +1,14 @@
 <div align="center">
 
-<img src="public/app-icon.svg" width="80" height="80" alt="Vrykell" />
+<img src="public/app-icon.svg" width="96" height="96" alt="" />
 
 # Vrykell
 
-### 面向 AI 协作的终端工作区。
+**终端、工具与 AI，尽在同一个工作区。**
 
-Vrykell 是一款面向开发者和运维人员的跨平台终端工作空间，将终端、文件管理、代码编辑、Git 和 AI 助手整合在一个桌面应用中，减少开发和远程运维时在多个工具之间切换的成本。
+以终端为中心，为开发和远程运维打造的桌面工作区。
 
-[下载 Beta](#下载) · [主要功能](#主要功能) · [使用场景](#使用场景) · [从源码运行](#从源码运行) · [参与贡献](CONTRIBUTING.md) · [English](README.md)
+**[下载 Beta](#下载)** &nbsp; · &nbsp; [探索功能](#主要功能) &nbsp; · &nbsp; [从源码运行](#从源码运行) &nbsp; · &nbsp; [English](README.md)
 
 <p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="Apache-2.0" /></a>
@@ -18,6 +18,10 @@ Vrykell 是一款面向开发者和运维人员的跨平台终端工作空间，
 </div>
 
 <a href="docs/images/hero-workspace-zh.png"><img src="docs/images/hero-workspace-zh.png" width="1600" alt="代码、构建终端与 Agent 工作区" /></a>
+
+<p align="center"><sub>在同一个工作区里编写代码、运行命令，与 Agent 协作。</sub></p>
+
+---
 
 ## 下载
 
@@ -34,7 +38,7 @@ Vrykell 是一款面向开发者和运维人员的跨平台终端工作空间，
 
 [Beta 3 发布说明](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.0-beta.3) 记录安装包校验和、源码提交与验证边界。安装包仍未签名；如需后续修复请构建当前源码。报告漏洞前请阅读[安全政策](SECURITY.zh-CN.md)。
 
-## 主要功能
+## 从命令到提交，一个工作区
 
 - **[终端与命令补全](#终端与命令补全)**：命令块、经典模式、历史建议、Shell 与路径补全。
 - **[文件与编辑器](#文件与编辑器)**：本地与 SFTP 文件浏览、传输、编辑器标签及 Markdown 预览。
@@ -42,6 +46,8 @@ Vrykell 是一款面向开发者和运维人员的跨平台终端工作空间，
 - **[SSH](#ssh)**：主机管理、认证、端口转发与资源状态。
 - **[AI 与 Agent](#ai-与-agent)**：自带模型、引用输出或图片、接入外部 Agent。
 - **[工作区布局](#使用场景)**：每个标签最多四个混合窗格，支持标签分组和对话侧栏。
+
+## 主要功能
 
 ### 终端与命令补全
 

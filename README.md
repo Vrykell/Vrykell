@@ -1,14 +1,14 @@
 <div align="center">
 
-<img src="public/app-icon.svg" width="80" height="80" alt="Vrykell" />
+<img src="public/app-icon.svg" width="96" height="96" alt="" />
 
 # Vrykell
 
-### A terminal workspace built for working with AI.
+**Your terminal, your tools, your AI — together.**
 
-Vrykell is a cross-platform terminal workspace for developers and operations teams. It brings terminals, file management, code editing, Git, and AI assistants together in one desktop app, reducing the need to switch between tools during development and remote operations.
+A desktop workspace for development and remote operations, built around the terminal.
 
-[Download Beta](#download) · [Features](#features) · [Workflows](#workflows) · [Build from source](#build-from-source) · [Contribute](CONTRIBUTING.en.md) · [简体中文](README.zh-CN.md)
+**[Download Beta](#download)** &nbsp; · &nbsp; [Explore features](#features) &nbsp; · &nbsp; [Build from source](#build-from-source) &nbsp; · &nbsp; [简体中文](README.zh-CN.md)
 
 <p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="Apache-2.0" /></a>
@@ -18,6 +18,10 @@ Vrykell is a cross-platform terminal workspace for developers and operations tea
 </div>
 
 <a href="docs/images/hero-workspace-en.png"><img src="docs/images/hero-workspace-en.png" width="1600" alt="Code, a build terminal and an agent in Vrykell" /></a>
+
+<p align="center"><sub>Code, run commands, and work with an agent in the same workspace.</sub></p>
+
+---
 
 ## Download
 
@@ -34,7 +38,7 @@ Vrykell is a cross-platform terminal workspace for developers and operations tea
 
 The [Beta 3 release notes](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.0-beta.3) record package checksums, the source commit and validation limits. Installers remain unsigned; build the current source when later fixes are required. See the [security policy](SECURITY.md) before reporting a vulnerability.
 
-## Features
+## One workspace, from command to commit
 
 - **[Terminal and completion](#terminal-and-completion)** — command blocks, classic mode, history suggestions, shell and path completion.
 - **[Files and editor](#files-and-editor)** — local and SFTP browsing, transfers, editor tabs and Markdown preview.
@@ -42,6 +46,8 @@ The [Beta 3 release notes](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.
 - **[SSH](#ssh)** — saved hosts, authentication, forwarding and resource status.
 - **[AI and agents](#ai-and-agents)** — bring your own model, attach output or images, and connect external agents.
 - **[Your layout](#workflows)** — up to four mixed panes per tab, named tab groups and a dockable conversation sidebar.
+
+## Features
 
 ### Terminal and completion
 
