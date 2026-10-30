@@ -1,5 +1,6 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import { t } from '@i18n';
 import ToolRunCard from '../components/ToolRunCard';
 import type { ToolRun } from '@features/agent/model/messageParts';
 import { gate, usePermissions, denyAllPending, clearSessionGrants, setToolApprover, setToolAuthorizer } from '@features/agent';
@@ -62,6 +63,24 @@ it('announces a live failure once and keeps refusals and cancellations out of th
   expect(view.container.querySelector('.ai-tool-state')).toHaveTextContent('已取消');
   expect(view.container.querySelector('.ai-tool-verdict')).toBeNull();
   expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
+});
+
+it('shows accumulated external output and the exit code when a failed tool is reviewed', () => {
+  const failed: ToolRun = {
+    toolCallId: 'external-command',
+    toolName: 'execute',
+    input: { title: 'node --version; python --version' },
+    state: 'error',
+    startedAt: 1,
+    output: 'v24.13.0',
+    error: t('Tool failed with exit code {{code}}.', { code: 9009 }),
+  };
+  render(<ToolRunCard framed run={failed} />);
+  fireEvent.click(screen.getByRole('button', { name: /node --version/ }));
+  expect(document.querySelector('#app-notifications [role="alert"]'))
+    .toHaveTextContent(t('Tool failed with exit code {{code}}.', { code: 9009 }));
+  fireEvent.click(screen.getByRole('button', { name: t('Technical details') }));
+  expect(screen.getByText(/v24\.13\.0/)).toBeVisible();
 });
 
 it('shows the command label and exit code before disclosing input and output', () => {

@@ -66,7 +66,7 @@ function expandBody(run: ToolRun): string {
       }
     } catch { /* Unstructured output is displayed verbatim. */ }
   }
-  return run.error ?? run.output ?? '';
+  return run.output || run.error || '';
 }
 
 function CommandOutputBlock({ run, paneId, framed }: { run: ToolRun; paneId?: string; framed: boolean }) {

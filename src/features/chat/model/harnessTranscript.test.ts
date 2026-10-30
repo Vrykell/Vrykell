@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { applyHarnessUpdate, groupHarnessMessages, upsertHarnessTool } from './harnessTranscript';
 import { toExchanges } from './exchanges';
+import { t } from '@i18n';
 import type { ChatMessage } from '@features/chat';
 
 const update = (patch: Record<string, unknown>) => ({ sessionId: 's', update: patch });
@@ -148,5 +149,68 @@ describe('applyHarnessUpdate', () => {
     expect(after).toEqual(messages);
     const plan = applyHarnessUpdate(messages, update({ sessionUpdate: 'plan', entries: [] }));
     expect(plan).toEqual(messages);
+  });
+
+  it('accumulates streamed terminal output and reports the exit code of a failed tool', () => {
+    let messages = applyHarnessUpdate([], update({
+      sessionUpdate: 'tool_call', toolCallId: 'external-exec', title: 'node --version; python --version',
+      kind: 'execute', status: 'in_progress', content: [{ type: 'terminal', terminalId: 'external-exec' }],
+    }));
+    messages = applyHarnessUpdate(messages, update({
+      sessionUpdate: 'tool_call_update', toolCallId: 'external-exec',
+      _meta: { terminal_output_delta: { data: 'v24.13.0\n', terminal_id: 'external-exec' } },
+    }));
+    messages = applyHarnessUpdate(messages, update({
+      sessionUpdate: 'tool_call_update', toolCallId: 'external-exec',
+      _meta: { terminal_output_delta: { data: 'python: not found\n', terminal_id: 'external-exec' } },
+    }));
+    messages = applyHarnessUpdate(messages, update({
+      sessionUpdate: 'tool_call_update', toolCallId: 'external-exec', status: 'failed',
+      _meta: { terminal_exit: { exit_code: 9009, signal: null, terminal_id: 'external-exec' } },
+    }));
+
+    const part = messages[0]!.parts?.[0];
+    expect(part?.kind === 'tool' && part.tool.state).toBe('error');
+    expect(part?.kind === 'tool' && part.tool.output).toBe('v24.13.0\npython: not found\n');
+    expect(part?.kind === 'tool' && part.tool.error).toBe(t('Tool failed with exit code {{code}}.', { code: 9009 }));
+  });
+
+  it('accumulates the alternative terminal output channel', () => {
+    let messages = applyHarnessUpdate([], update({
+      sessionUpdate: 'tool_call', toolCallId: 'whole-output', kind: 'execute', status: 'in_progress',
+    }));
+    messages = applyHarnessUpdate(messages, update({
+      sessionUpdate: 'tool_call_update', toolCallId: 'whole-output', status: 'completed',
+      _meta: { terminal_output: { data: 'whole result', terminal_id: 'whole-output' } },
+    }));
+
+    const part = messages[0]!.parts?.[0];
+    expect(part?.kind === 'tool' && part.tool.output).toBe('whole result');
+  });
+
+  it('reads a failed non-terminal exit code from rawOutput and keeps failure text', () => {
+    let messages = applyHarnessUpdate([], update({
+      sessionUpdate: 'tool_call', toolCallId: 'read-call', kind: 'read', status: 'in_progress',
+    }));
+    messages = applyHarnessUpdate(messages, update({
+      sessionUpdate: 'tool_call_update', toolCallId: 'read-call', status: 'failed',
+      content: [{ type: 'content', content: { type: 'text', text: 'permission denied' } }],
+      rawOutput: { exit_code: 13 },
+    }));
+
+    const part = messages[0]!.parts?.[0];
+    expect(part?.kind === 'tool' && part.tool.error).toBe(`permission denied\n${t('Exit code {{code}}', { code: 13 })}`);
+  });
+
+  it('reports a failure without details when the agent sends neither output nor an exit code', () => {
+    let messages = applyHarnessUpdate([], update({
+      sessionUpdate: 'tool_call', toolCallId: 'silent-failure', kind: 'other', status: 'in_progress',
+    }));
+    messages = applyHarnessUpdate(messages, update({
+      sessionUpdate: 'tool_call_update', toolCallId: 'silent-failure', status: 'failed',
+    }));
+
+    const part = messages[0]!.parts?.[0];
+    expect(part?.kind === 'tool' && part.tool.error).toBe(t('The tool reported a failure.'));
   });
 });

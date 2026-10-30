@@ -7,6 +7,7 @@
  * `tool_call`/`tool_call_update` upsert a tool row, and the tool's human-readable title travels in
  * the row's input so the existing card shows it.
  */
+import { t } from '@i18n';
 import type { ChatMessage } from '@features/chat';
 import type { ToolRun, ToolRunState } from '@features/agent/model/messageParts';
 
@@ -32,7 +33,7 @@ function toolState(status: unknown): ToolRunState {
   }
 }
 
-/** Tool content blocks → the plain text our rows display. */
+/** Tool content blocks → the plain text our rows display. Terminal references carry no text. */
 function contentText(content: unknown): string {
   if (!Array.isArray(content)) return '';
   const pieces: string[] = [];
@@ -41,9 +42,34 @@ function contentText(content: unknown): string {
     const block = entry as { type?: string; content?: unknown; path?: string; newText?: string };
     if (block.type === 'content') pieces.push(textOf(block.content));
     else if (block.type === 'diff') pieces.push(`${block.path ?? ''}\n${block.newText ?? ''}`.trim());
-    else if (block.type === 'terminal') pieces.push(`(terminal ${String((block as { terminalId?: unknown }).terminalId ?? '')})`);
   }
   return pieces.filter(Boolean).join('\n');
+}
+
+/** One `_meta` entry of a tool update, when the agent sent an object there. */
+function metaRecord(update: Record<string, unknown>, key: string): Record<string, unknown> | undefined {
+  const meta = update._meta;
+  if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return undefined;
+  const entry = (meta as Record<string, unknown>)[key];
+  return entry && typeof entry === 'object' && !Array.isArray(entry) ? entry as Record<string, unknown> : undefined;
+}
+
+/** Streamed command text carried by an ACP output channel. */
+function metaText(update: Record<string, unknown>, key: string): string {
+  const value = metaRecord(update, key)?.data;
+  return typeof value === 'string' ? value : '';
+}
+
+/** Exit code of a command that reported it under `terminal_exit` or `rawOutput`. */
+function exitCodeOf(update: Record<string, unknown>): number | undefined {
+  const exit = metaRecord(update, 'terminal_exit');
+  const raw = update.rawOutput && typeof update.rawOutput === 'object' && !Array.isArray(update.rawOutput)
+    ? update.rawOutput as Record<string, unknown>
+    : undefined;
+  for (const value of [exit?.exit_code, exit?.exitCode, raw?.exit_code, raw?.exitCode]) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+  }
+  return undefined;
 }
 
 function lastMessage(messages: ChatMessage[]): ChatMessage | undefined {
@@ -182,8 +208,19 @@ export function applyHarnessUpdate(messages: ChatMessage[], payload: Record<stri
         startedAt: existing?.startedAt ?? Date.now(),
       };
       const body = contentText(update.content);
-      if (body) run.output = body;
-      if (update.status === 'failed') run.error = body || 'the harness reported a failure';
+      // The agent reports command output as `_meta` chunks on ACP v1; accumulate them so the card
+      // can show the streamed result and the failure that ended the command.
+      const streamed = metaText(update, 'terminal_output_delta') || metaText(update, 'terminal_output');
+      let output = body || existing?.output || '';
+      if (streamed) output = `${output}${streamed}`;
+      if (output) run.output = output;
+      if (update.status === 'failed') {
+        const exitCode = exitCodeOf(update);
+        const exit = exitCode === undefined ? '' : t('Exit code {{code}}', { code: exitCode });
+        if (body) run.error = exit ? `${body}\n${exit}` : body;
+        else if (exitCode !== undefined) run.error = t('Tool failed with exit code {{code}}.', { code: exitCode });
+        else run.error = t('The tool reported a failure.');
+      }
       return upsertHarnessTool(messages, run);
     }
     default:

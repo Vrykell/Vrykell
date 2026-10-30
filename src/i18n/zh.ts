@@ -1772,6 +1772,8 @@ const zh: Record<string, string> = {
   "Allow for this conversation": "本对话允许",
   "Deny": "拒绝",
   "Tool execution failed": "工具执行失败",
+  "Tool failed with exit code {{code}}.": "工具执行失败，退出码 {{code}}。",
+  "The tool reported a failure.": "工具报告了失败。",
   "Only the end of the output is shown": "…仅显示尾部",
   "Help me analyze this command result.": "帮我分析这条命令的执行结果。",
   "Ask AI": "询问 AI",
