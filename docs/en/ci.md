@@ -32,6 +32,6 @@ context menu uses the existing development certificate flow; this is separate fr
 distribution signing. Configure distribution credentials before publishing signed
 installers. CI does not need application API keys or other user credentials.
 
-Before making the repository public, enable private vulnerability reporting and protect both branches. Require the `Frontend checks` and `Native dependency advisories` jobs and a reviewed pull request, and disable force pushes and branch deletion. These repository settings are separate from checked-in workflow files. See [the security policy](../../SECURITY.md) for the reporting process.
+Keep private vulnerability reporting enabled and protect both branches. Require the `Frontend checks` and `Native dependency advisories` jobs and a reviewed pull request, and disable force pushes and branch deletion. These repository settings are separate from checked-in workflow files. See [the security policy](../../SECURITY.md) for the reporting process.
 
 Before publishing packages, run `full` on the exact source revision used to build them. Record that revision, target, workflow run, checksum and test coverage in the release notes. Do not describe supplied packages as verified builds when their source revision has not been established. Existing release assets are not rebuilt by a source-only fix.
