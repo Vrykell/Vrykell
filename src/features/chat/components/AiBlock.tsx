@@ -103,7 +103,7 @@ export default function AiBlock({ exchange, conversationId, toolContextId, onAsk
         : part.text ? <div key={index} className="md"><SafeMarkdown content={visibleAssistantText(part.text)} paneId={executionPane} />
           {answer.pending && index === parts.length - 1 && <PendingCursor />}</div> : null)
         : answer.content ? <div className="md"><SafeMarkdown content={visibleAssistantText(answer.content)} paneId={executionPane} />{answer.pending && <PendingCursor />}</div> : null}
-      {answer.pending && (!answer.content || parts?.[parts.length - 1]?.kind === 'tool') && <div className="ai-block-working"><PendingCursor />{t('Working')}</div>}
+      {answer.pending && (!answer.content || parts?.[parts.length - 1]?.kind === 'tool') && <div className="ai-block-working" role="status"><PendingCursor />{t('Working')}</div>}
       {answer.error && <ErrorBox placement="inline" dismissible={false} title={t('The reply could not be completed')} details={answer.errorText}
         actions={question && !sending && (allowExchangeActions || onRetry) ? <button type="button" onClick={onRetry ?? regenerate}>{t('Retry')}</button> : undefined}>
         {answer.errorSummary}

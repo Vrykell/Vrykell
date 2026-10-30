@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
 import FolderTabs from '@ui/layout/FolderTabs';
@@ -29,6 +29,8 @@ import { useAiWorkspaceTabs } from '../hooks/useAiWorkspaceTabs';
 /** One workspace page hosts independent sessions through the shared connected tabs. */
 export default function HarnessWorkspace({ active, headerActive = active }: { active: boolean; headerActive?: boolean }) {
   const surface = useContext(AiSurfaceContext);
+  const [toolbar, setToolbar] = useState<HTMLDivElement | null>(null);
+  const onToolbar = useCallback((element: HTMLDivElement | null) => { setToolbar(element); surface?.toolbar(element); }, [surface?.toolbar]);
   const { nativeTabs, selected } = useAiWorkspace();
   const { connections } = useHarnessWorkspace();
   const nativeSelected = useChatStore(state => state.activeConversationId);
@@ -93,7 +95,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
         ...(selected ? [{ label: t('Dock AI to side'), onClick: relocate }] : []),
       ]} toolbar={<>
         <IconButton compact aria-label={t('AI conversation history')} data-tip={t('AI conversation history')} onClick={() => useSessionStore.getState().openAiHistoryTab()}><History size={16} /></IconButton>
-        <div ref={surface?.toolbar} className="ai-conversation-toolbar" style={{ display: selected.startsWith('chat:') && activePage?.kind === 'harness' ? 'flex' : 'none' }} />
+        <div ref={onToolbar} className="ai-conversation-toolbar" style={{ display: selected && activePage?.kind === 'harness' ? 'flex' : 'none' }} />
         <span className="folder-action-secondary ai-secondary-actions">
         <IconButton compact aria-label={t('Usage statistics')} data-tip={t('Usage statistics')} onClick={() => useSessionStore.getState().openUsageTab()}><DataUsage size={16} /></IconButton>
         {selected && <IconButton compact data-testid="ai-relocate" aria-label={t('Dock AI to side')} data-tip={t('Dock AI to side')} onClick={relocate}><PanelRight size={16} /></IconButton>}
@@ -114,7 +116,8 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
       <NativeConversationSurface />
     </div>}
     {connections.map(item => <ResourceContent key={item.id} id={`acp:${item.id}`} active={visible && activePage?.kind === 'harness' && `acp:${item.id}` === selected}>
-      {state => <HarnessView tabId={item.id} harness={item.harness} cwd={item.cwd} fresh={item.fresh} active={state.visible} resumeSessionId={item.resumeSessionId} />}
+      {state => <HarnessView tabId={item.id} harness={item.harness} cwd={item.cwd} fresh={item.fresh} active={state.visible} resumeSessionId={item.resumeSessionId}
+        toolbarTarget={state.placed ? state.header ?? (state.retainsHeader && state.focused ? toolbar : null) : `acp:${item.id}` === selected ? toolbar : null} />}
     </ResourceContent>)}
     {!activeSystemPage && !selected && <div className="ai-start-page" data-testid="ai-start-page"><AcpLauncher embedded open={visible} onClose={() => {}} onPick={pick} onNewConversation={newConversation} /></div>}
     {closing && createPortal(<ConfirmDialog open title={t('Close ACP sessions?')}

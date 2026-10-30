@@ -661,6 +661,7 @@ button.window-control-button {
 .chat-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; padding: 4px; }
 .chat-setting-row > span { flex-shrink: 0; color: var(--text-muted); font-size: var(--fs-caption); }
 .chat-setting-row > .ui-select { flex: 0 1 65%; min-width: 0; font-size: var(--fs-caption); }
+.harness-session-settings .chat-setting-row > span { flex: 1 1 35%; min-width: 0; overflow-wrap: anywhere; }
 .chat-setting-links { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; padding: 8px 4px 2px; margin-top: 4px; border-top: 1px solid var(--border); }
 .chat-setting-links > button.outline-button { flex-shrink: 0; white-space: nowrap; }
 .chat-setting-links > button.chat-close-conversation { margin-left: auto; }
@@ -720,6 +721,7 @@ button.window-control-button {
 .harness-selector-label { flex-shrink: 0; color: var(--text-muted); white-space: nowrap; }
 .harness-selector-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .harness-selector > svg { flex-shrink: 0; color: var(--text-muted); }
+.harness-footer-choice { height: 30px; max-width: 40%; flex-shrink: 1; }
 .harness-context { color: var(--text-muted); font-size: var(--fs-micro); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .harness-select-menu { display: flex; flex-direction: column; gap: 4px; text-align: left; }
 .harness-select-options { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }

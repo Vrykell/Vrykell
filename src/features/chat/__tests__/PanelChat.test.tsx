@@ -278,7 +278,11 @@ it('pauses the follow on an upward scroll but not when an inner scroller consume
   fireEvent.wheel(inner, { deltaY: -100 });
   expect(jumpButton()).toBeNull();
 
-  // A wheel the transcript itself receives pauses the follow, however small it is.
+  // Small movement pauses automatic scrolling without advertising a jump to the same position.
   fireEvent.wheel(transcript, { deltaY: -18 });
+  expect(jumpButton()).toBeNull();
+  Object.defineProperties(transcript, { scrollHeight: { value: 1000 }, clientHeight: { value: 200 } });
+  transcript.scrollTop = 600;
+  fireEvent.scroll(transcript);
   expect(jumpButton()).not.toBeNull();
 });

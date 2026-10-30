@@ -138,7 +138,9 @@ await expect(page.getByTestId('harness-page')).toContainText('Working on it.');
     }));
     await emitAcpSession(page, acpUpdate(SESSION, { sessionUpdate: 'usage_update', used: 12_000, size: 200_000 }));
     await expect(page.getByTestId('harness-plan')).toContainText('Fix the parser');
+    await page.getByRole('button', { name: '会话设置', exact: true }).click();
     await expect(page.getByTestId('harness-context')).toHaveText('1.2万/20万');
+    await page.keyboard.press('Escape');
 
     // A mode the agent switches on its own also moves the control.
     await emitAcpSession(page, acpUpdate(SESSION, { sessionUpdate: 'current_mode_update', currentModeId: 'default' }));

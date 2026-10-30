@@ -16,10 +16,37 @@ it('cancels a pending return to latest when the reader pauses to inspect content
     body.scrollTop = 800; fireEvent.scroll(body);
     act(() => follow!.pauseFollow());
     body.scrollTop = 300;
+    fireEvent.scroll(body);
     act(() => vi.advanceTimersByTime(200));
     expect(body.scrollTop).toBe(300);
     expect(follow!.following).toBe(false);
   } finally { vi.useRealTimers(); }
+});
+
+it('ignores small wheel movement and immediately hides the button when scrolled back to the bottom', () => {
+  let follow: ReturnType<typeof useTranscriptFollow>;
+  function Transcript({ revision = 0 }: { revision?: number }) {
+    follow = useTranscriptFollow('threshold', revision);
+    return <div data-testid="threshold" ref={follow.scrollRef} onScroll={follow.onScroll} onWheel={follow.onWheel} />;
+  }
+  const view = render(<Transcript />);
+  const body = screen.getByTestId('threshold');
+  let height = 1000;
+  Object.defineProperties(body, { scrollHeight: { get: () => height }, clientHeight: { value: 200 } });
+  body.scrollTop = 800; fireEvent.scroll(body);
+  fireEvent.wheel(body, { deltaY: -18 });
+  body.scrollTop = 782; fireEvent.scroll(body);
+  expect(follow!.following).toBe(true);
+  height = 1010; view.rerender(<Transcript revision={1} />);
+  expect(body.scrollTop).toBe(782);
+  body.scrollTop = 700; fireEvent.scroll(body);
+  expect(follow!.following).toBe(false);
+  body.scrollTop = 810; fireEvent.scroll(body);
+  expect(follow!.following).toBe(true);
+  fireEvent.scroll(body);
+  expect(follow!.following).toBe(true);
+  height = 1100; view.rerender(<Transcript revision={2} />);
+  expect(body.scrollTop).toBe(1100);
 });
 
 it('follows incremental output while retaining a paused reading position across hidden pages', () => {

@@ -9,12 +9,14 @@
 import { useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
-import { ArrowDown, ArrowUp, Plus, Square, iconSizes } from '@ui/icons';
+import { ArrowDown, ArrowUp, Plus, SlidersHorizontal, Square, iconSizes } from '@ui/icons';
 import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';
 import { IconButton } from '@ui/actions/IconButton';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import { TextArea } from '@ui/fields/TextInput';
 import Select from '@ui/fields/Select';
+import SettingsPopover from '@ui/menus/SettingsPopover';
+import type { MenuAnchor } from '@ui/menus/ContextMenu';
 import KeyHint from '@ui/feedback/KeyHint';
 import { formatCompact } from '@features/agent/model/usageStats';
 import { useComposerDrafts } from '../stores/composerDrafts';
@@ -40,10 +42,11 @@ import { environmentForPane } from '../services/conversationContext';
 import { SidebarSettingsContext } from './SidebarSettingsContext';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
-/** One control in the composer's status row. */
+/** One session choice in the shared conversation settings. */
 interface SessionSelector {
   key: string;
   model?: boolean;
+  permission?: boolean;
   label: string;
   value: string;
   options: HarnessSelectorOption[];
@@ -62,16 +65,19 @@ function sessionSelectors(session: HarnessSession, tabId: string): SessionSelect
     selectors.push({
       key: `config-${option.id}`,
       model: option.category === 'model' || option.id === 'model',
+      permission: ['mode', 'approval_mode', 'approval_policy', 'permission_mode'].includes(option.id)
+        || option.category === 'mode' && option.id !== 'collaboration_mode',
       label: option.name,
       value: String(option.currentValue),
       options,
       apply: (value) => void store.setConfigOption(tabId, option.id, value),
     });
   }
-  const hasMode = configs.some((option) => option.category === 'mode');
+  const hasMode = selectors.some(selector => selector.permission);
   if (!hasMode && session.modes) {
     selectors.push({
       key: 'mode',
+      permission: true,
       label: t('Mode'),
       value: session.modes.currentModeId,
       options: session.modes.availableModes.map((mode) => ({
@@ -80,7 +86,7 @@ function sessionSelectors(session: HarnessSession, tabId: string): SessionSelect
       apply: (value) => void store.setMode(tabId, value),
     });
   }
-  const hasModel = configs.some((option) => option.category === 'model');
+  const hasModel = selectors.some(selector => selector.model);
   if (!hasModel && session.models) {
     selectors.push({
       key: 'model',
@@ -128,7 +134,7 @@ function contextLabel(context: { used: number; size: number }): string {
 /**
  * A connected session reuses the conversation blocks, composer shell and transcript follow behavior.
  */
-export default function HarnessView({ tabId, harness, cwd, fresh = false, active = true, resumeSessionId }: { tabId: string; harness: string; cwd?: string; fresh?: boolean; active?: boolean; resumeSessionId?: string }) {
+export default function HarnessView({ tabId, harness, cwd, fresh = false, active = true, resumeSessionId, toolbarTarget }: { tabId: string; harness: string; cwd?: string; fresh?: boolean; active?: boolean; resumeSessionId?: string; toolbarTarget?: HTMLElement | null }) {
   const session = useHarnessStore((state) => state.byTab[tabId]);
   const sidebarSettings = useContext(SidebarSettingsContext);
   const inSidebar = sidebarSettings?.resourceId === `acp:${tabId}`;
@@ -138,6 +144,8 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
   const follow = useTranscriptFollow(tabId, session?.messages, active);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const [terminalPicker, setTerminalPicker] = useState<{ anchor?: DropdownAnchor } | null>(null);
+  const [settingsMenu, setSettingsMenu] = useState<MenuAnchor | null>(null);
+  useEffect(() => { setSettingsMenu(null); }, [active, inSidebar, toolbarTarget]);
   useEffect(() => { if (!active) setTerminalPicker(null); }, [active]);
   useEffect(() => {
     if (!inSidebar) return;
@@ -157,6 +165,12 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
 
   const agent = session?.agent?.agentInfo;
   const exchanges = toExchanges(groupHarnessMessages(session?.messages ?? []));
+  if (session?.pending && !exchanges[exchanges.length - 1]?.answer) {
+    const last = exchanges[exchanges.length - 1];
+    const answer = { id: `harness-waiting-${tabId}`, role: 'assistant' as const, content: '', createdAt: last?.createdAt ?? Date.now() };
+    if (last) exchanges[exchanges.length - 1] = { ...last, answer };
+    else exchanges.push({ id: answer.id, createdAt: answer.createdAt, answer });
+  }
   const lastMessage = session?.messages[session.messages.length - 1];
   const replyErrorVisible = lastMessage?.error && lastMessage.errorSummary === session?.error;
   useEffect(() => {
@@ -171,12 +185,24 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
   }, [tabId, session?.sessionId, session?.messages, session?.pending, session?.error, active, exchanges.length]);
   const canSend = Boolean(session) && text.trim().length > 0;
   const selectors = session ? sessionSelectors(session, tabId) : [];
+  const permissionSelector = selectors.find(selector => selector.permission);
+  const modelSelector = selectors.find(selector => selector.model);
   const executionSelector = session?.appToolsConnected && <Select aria-label={t('Application execution terminal')} data-testid="harness-execution-target"
-    triggerClassName={inSidebar ? undefined : 'harness-selector'} style={inSidebar ? undefined : { width: 'auto', maxWidth: 180 }} value={session.executionPaneId ?? ''} options={executionOptions}
+    value={session.executionPaneId ?? ''} options={executionOptions}
     disabled={session.pending || session.opening} onChange={paneId => useHarnessStore.getState().setExecutionPane(tabId, paneId || null)}
     action={{ label: t('New terminal'), onSelect: bounds => setTerminalPicker({ anchor: bounds ? { x: bounds.left, y: bounds.bottom + 4, aboveY: bounds.top } : undefined }) }} />;
   const hints = session?.authRequired ? authHints(session.agent) : [];
   const plan = session?.plan ?? [];
+  const settingsContents = <div className="chat-conversation-settings harness-session-settings">
+    {selectors.filter(selector => selector !== permissionSelector && selector !== modelSelector).map(selector => <div key={selector.key} className="chat-setting-row">
+      <span>{selector.label}</span>
+      <Select aria-label={selector.label} data-testid={`harness-selector-${selector.key}`} value={selector.value}
+        options={selector.options} disabled={session?.pending || session?.opening}
+        data-tip-description={selector.options.find(option => option.value === selector.value)?.description} onChange={selector.apply} />
+    </div>)}
+    {executionSelector && <div className="chat-setting-row"><span>{t('Execution terminal')}</span>{executionSelector}</div>}
+    {session?.context && <div className="chat-setting-row"><span>{t('Context window in use')}</span><span data-testid="harness-context">{contextLabel(session.context)}</span></div>}
+  </div>;
 
   // Slash commands: while the first word is still being typed, the agent's own commands are one
   // press away. Picking one only fills the composer; the command runs when the prompt is sent.
@@ -202,9 +228,15 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
 
   return (
     <div data-testid="harness-page" className="ai-chat-panel harness-chat-panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
-      {inSidebar && sidebarSettings?.target && createPortal(<div className="chat-conversation-settings">
-        {executionSelector && <div className="chat-setting-row"><span>{t('Execution terminal')}</span>{executionSelector}</div>}
-      </div>, sidebarSettings.target)}
+      {!inSidebar && active && toolbarTarget && createPortal(<IconButton compact aria-label={t('Conversation settings')} data-tip={t('Conversation settings')}
+        aria-haspopup="dialog" aria-expanded={!!settingsMenu} onClick={event => {
+          const trigger = event.currentTarget; const bounds = trigger.getBoundingClientRect();
+          setSettingsMenu(current => current ? null : { x: bounds.right - 320, y: bounds.bottom + 4, trigger });
+        }}><SlidersHorizontal size={16} /></IconButton>, toolbarTarget)}
+      {inSidebar ? sidebarSettings?.target && createPortal(settingsContents, sidebarSettings.target)
+        : settingsMenu && <SettingsPopover anchor={settingsMenu} label={t('Conversation settings')} onClose={() => setSettingsMenu(null)} suspended={!!terminalPicker}>
+          {settingsContents}
+        </SettingsPopover>}
       <NewTabModal open={!!terminalPicker} anchor={terminalPicker?.anchor} onClose={() => setTerminalPicker(null)} onPick={spec => {
         const paneId = createExecutionTerminal(spec);
         if (paneId) useHarnessStore.getState().setExecutionPane(tabId, paneId);
@@ -322,22 +354,14 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
             }}>
             <Plus size={iconSizes.compact} />
           </IconButton>
-          {selectors.filter(selector => !selector.model).map((selector) => (
-            <HarnessSelector key={selector.key} testId={`harness-selector-${selector.key}`} label={selector.label} model={selector.model}
-              value={selector.value} options={selector.options} onChange={selector.apply} />
-          ))}
-          {!inSidebar && executionSelector}
-          {session?.context && (session.context.used > 0 || session.context.size > 0) && (
-            <span data-testid="harness-context" className="harness-context" data-tip={t('Context window in use')}>
-              {contextLabel(session.context)}
-            </span>
-          )}
+          {permissionSelector && <HarnessSelector testId={`harness-selector-${permissionSelector.key}`} label={permissionSelector.label} permission
+            value={permissionSelector.value} options={permissionSelector.options} onChange={permissionSelector.apply} />}
           {session?.opening && <span data-testid="harness-opening" style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
             {t('Connecting…')}
           </span>}
           <span className="chat-footer-space" />
-          {selectors.filter(selector => selector.model).map(selector => <HarnessSelector key={selector.key} testId={`harness-selector-${selector.key}`} label={selector.label} model
-            value={selector.value} options={selector.options} onChange={selector.apply} />)}
+          {modelSelector && <HarnessSelector testId={`harness-selector-${modelSelector.key}`} label={modelSelector.label} model
+            value={modelSelector.value} options={modelSelector.options} onChange={modelSelector.apply} />}
           {session?.pending && canSend && <IconButton aria-label={t('Queue message')} data-tip={t('Queue message')} onClick={submit}><ArrowUp size={18} /></IconButton>}
           {session?.pending
             ? <IconButton className="chat-send-button" tone="accent" aria-label={t('Stop the harness turn')}

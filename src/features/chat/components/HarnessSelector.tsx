@@ -8,7 +8,7 @@
  */
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, ChevronDown, iconSizes } from '@ui/icons';
+import { Check, ChevronDown, ShieldCheck, iconSizes } from '@ui/icons';
 import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';
 import { TextInput } from '@ui/fields/TextInput';
 import { t } from '@i18n';
@@ -20,13 +20,14 @@ export interface HarnessSelectorOption {
   description?: string;
 }
 
-export default function HarnessSelector({ label, value, options, onChange, testId, model = false }: {
+export default function HarnessSelector({ label, value, options, onChange, testId, model = false, permission = false }: {
   label: string;
   value: string;
   options: HarnessSelectorOption[];
   onChange: (value: string) => void;
   testId: string;
   model?: boolean;
+  permission?: boolean;
 }) {
   const current = options.find((option) => option.value === value) ?? options[0];
   const [open, setOpen] = useState(false);
@@ -92,7 +93,7 @@ export default function HarnessSelector({ label, value, options, onChange, testI
 
   return (
     <>
-      <button ref={trigger} type="button" data-subtle className="harness-selector" data-testid={testId}
+      <button ref={trigger} type="button" data-subtle className={`harness-selector${model || permission ? ' harness-footer-choice' : ''}`} data-testid={testId}
         aria-label={label} data-tip={`${label}: ${current?.label ?? ''}`} data-tip-description={current?.description}
         aria-haspopup="listbox" aria-expanded={open}
         onClick={event => { navigation.setKeyboardNavigation(event.detail === 0); setOpen(!open); }} onKeyDown={(event) => {
@@ -102,7 +103,8 @@ export default function HarnessSelector({ label, value, options, onChange, testI
             setOpen(true);
           }
         }}>
-        <span className="harness-selector-label">{label}:</span>
+        {permission && <ShieldCheck size={iconSizes.compact} aria-hidden="true" />}
+        {!model && !permission && <span className="harness-selector-label">{label}:</span>}
         <span className="harness-selector-value">{current?.label ?? ''}</span>
         <ChevronDown size={iconSizes.copy} aria-hidden="true" />
       </button>

@@ -27,6 +27,8 @@ async function open(page: Page, theme = 'dark') {
   await page.goto('/');
   await page.getByTestId('workspace-area-ai').click(); await page.getByTestId('harness-add-session').click();
   await page.getByTestId('acp-launcher-Fake ACP').click();
+  await expect(page.getByTestId('harness-composer')).toBeVisible();
+  await page.getByRole('button', { name: '会话设置', exact: true }).click();
 }
 
 for (const theme of ['dark', 'light']) test(`answers application MCP questions in its transcript without silently binding a terminal in ${theme}`, async ({ page }, info) => {
@@ -44,7 +46,9 @@ for (const theme of ['dark', 'light']) test(`answers application MCP questions i
     await page.keyboard.press('Escape');
   }
   await page.getByTestId('harness-composer').fill('Ask me before proceeding'); await page.getByTestId('harness-send').click();
+  await page.getByRole('button', { name: '会话设置', exact: true }).click();
   await expect(target).toBeDisabled();
+  await page.keyboard.press('Escape');
   await call(page, 'unbound', 'run_command', { command: 'echo application-mcp' });
   await expect.poll(async () => (await result(page, 'unbound'))?.isError).toBe(true);
   await call(page, 'question', 'ask_user', { question: 'Which folder should be used?', options: ['Current project', 'Another folder'] });
