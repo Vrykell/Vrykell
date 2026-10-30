@@ -6,7 +6,7 @@
 
 ### A terminal workspace built for working with AI.
 
-Bring local and SSH terminals, file management, code editing, Git, and AI agents together in one desktop workspace.
+Vrykell is a cross-platform terminal workspace for developers and operations teams. It brings terminals, file management, code editing, Git, and AI assistants together in one desktop app, reducing the need to switch between tools during development and remote operations.
 
 [Download Beta](#download) · [Features](#features) · [Workflows](#workflows) · [Build from source](#build-from-source) · [Contribute](CONTRIBUTING.en.md) · [简体中文](README.zh-CN.md)
 
