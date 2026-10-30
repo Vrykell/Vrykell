@@ -1,6 +1,11 @@
 # Vrykell Feature Spec and Test Checklist
 
-> Last updated: 2026-10-28
+> Last updated: 2026-10-30
+
+Security regression checklist:
+
+- Production content policy permits bundled scripts but blocks inline scripts, external requests and development sockets; development exceptions stay in the separate policy. `production-csp.spec.ts` exercises the configured policy in a browser.
+- Untrusted math cannot create external links or images through an inherited trust flag. Archive imports retain parent-path protection and enforce the actual decompressed-byte limit. Cover these boundaries in renderer and native archive tests, and retain narrow/wide formula layout coverage after dependency updates.
 
 Appearance and toolbar regression checklist:
 

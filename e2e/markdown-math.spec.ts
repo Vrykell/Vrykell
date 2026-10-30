@@ -51,7 +51,7 @@ for (const scale of [1, 1.25, 1.5]) {
         for (const formula of await formulas.all()) {
           await formula.scrollIntoViewIfNeeded();
           await formula.evaluate(element => { element.scrollLeft = 0; });
-          await expect(formula.locator('.base').first()).toHaveCSS('display', 'inline-block');
+          await expect(formula.locator('.katex-base').first()).toHaveCSS('display', 'inline-block');
           const bounds = await formula.evaluate(element => {
             const outer = element.getBoundingClientRect();
             const inner = element.querySelector('.katex-display')!.getBoundingClientRect();

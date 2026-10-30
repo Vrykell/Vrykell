@@ -8,6 +8,7 @@ body:
       value: |
         Thank you for helping improve the project. Search existing issues first.
         Remove credentials and private information from all attachments.
+        For suspected vulnerabilities, follow SECURITY.md instead of posting details here.
   - type: input
     id: version
     attributes:

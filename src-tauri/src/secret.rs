@@ -4,8 +4,8 @@
 //!   - Other platforms: `~/.vrykell/secrets.json` (mode 0600), **plaintext** - a known limitation because no
 //!     default keyring is available. Do not sync or share this file on those platforms.
 //!
-//! Windows values use the form `dpapi:<base64>`. Plaintext values written by older versions remain readable
-//! and are sealed automatically on the next write.
+//! Encrypted values use the form `dpapi:<base64>`. Legacy plaintext values on that platform are treated
+//! as missing and must be entered again; reading never migrates or rewrites them.
 
 use base64::Engine as _;
 
@@ -175,7 +175,7 @@ fn unseal(stored: &str) -> Option<String> {
     String::from_utf8(plain).ok()
 }
 
-/// Other platforms: a local file (values are platform-sealed; Unix tightens it to mode 0600).
+/// Local file storage uses platform encryption where available and private file permissions on Unix.
 
 #[cfg(not(target_os = "macos"))]
 /// Serializes the read-modify-write of the whole file: two concurrent saves (settings plus the

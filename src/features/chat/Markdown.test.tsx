@@ -70,6 +70,17 @@ describe('Markdown', () => {
     expect(formula.scrollLeft).toBe(30);
   });
 
+  it('rejects trusted math commands even when renderer options inherit a polluted trust flag', () => {
+    Object.defineProperty(Object.prototype, 'trust', { value: true, configurable: true });
+    try {
+      const { container } = render(<Markdown content={String.raw`$\href{https://example.com/tracking}{link} + \includegraphics{https://example.com/pixel.png}$`} />);
+      expect(container.querySelector('a, img')).not.toBeInTheDocument();
+      expect(openUrlMock).not.toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(Object.prototype, 'trust');
+    }
+  });
+
   it('renders code blocks', () => {
     const { container } = render(<Markdown content={'```python\nprint(1)\n```'} />);
     expect(container.querySelector('pre code')).toBeInTheDocument();

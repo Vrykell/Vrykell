@@ -21,16 +21,18 @@ A desktop terminal with command completion, files, an editor and Git. Work local
 
 ## Download
 
-**0.1.0 Beta 1** is available for Windows, macOS and Linux. This is an early preview; check the [current boundaries](#current-boundaries) before using it for daily work. The screenshots and feature descriptions follow the development branch, which may be ahead of the packaged release.
+**0.1.0 Beta 2** is the latest preview; the Apple silicon package remains on Beta 1. Check the [current boundaries](#current-boundaries) before using it for daily work. The screenshots and feature descriptions follow the development branch, which may be ahead of the packaged release.
 
 | Platform | Package |
 | --- | --- |
-| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_x64-setup.exe) |
-| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_aarch64.dmg) |
-| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_x64.dmg) |
-| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_amd64.AppImage) |
+| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.2/Vrykell_0.1.0_x64-setup.exe) |
+| macOS Apple silicon (Beta 1) | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_aarch64.dmg) |
+| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.2/Vrykell_0.1.0_x64.dmg) |
+| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.2/Vrykell_0.1.0_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.2/Vrykell_0.1.0_amd64.AppImage) |
 
 [All releases and release notes](https://github.com/Vrykell/Vrykell/releases) · [Build instructions](docs/en/ci.md)
+
+The [Beta 2 release notes](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.0-beta.2) record package checksums, source provenance and validation limits. The exact source revisions of its supplied non-Windows packages were not independently verified. Existing installers do not include later fixes from the development branch; build the current source when those fixes are required. See the [security policy](SECURITY.md) before reporting a vulnerability.
 
 ## Features
 

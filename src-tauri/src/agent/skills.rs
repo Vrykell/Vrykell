@@ -963,6 +963,44 @@ mod tests {
     use super::*;
 
     #[test]
+    fn archive_import_extracts_safe_files_and_rejects_parent_paths() {
+        use std::io::Write;
+        let root = std::env::temp_dir().join(format!("skill-archive-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let archive = root.join("skill.zip");
+        let mut writer = zip::ZipWriter::new(std::fs::File::create(&archive).unwrap());
+        let options = zip::write::SimpleFileOptions::default();
+        writer.start_file("sample/SKILL.md", options).unwrap();
+        writer.write_all(b"---\nname: sample\n---\nDescription").unwrap();
+        writer.start_file("../escaped.txt", options).unwrap();
+        writer.write_all(b"must stay inside the destination").unwrap();
+        writer.finish().unwrap();
+        let destination = root.join("extracted");
+        extract_zip(&archive, &destination).unwrap();
+        assert_eq!(std::fs::read_to_string(destination.join("sample/SKILL.md")).unwrap(), "---\nname: sample\n---\nDescription");
+        assert!(!root.join("escaped.txt").exists());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn archive_import_rejects_content_exceeding_the_extraction_limit() {
+        use std::io::Write;
+        let root = std::env::temp_dir().join(format!("skill-archive-limit-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&root).unwrap();
+        let archive = root.join("skill.zip");
+        let mut writer = zip::ZipWriter::new(std::fs::File::create(&archive).unwrap());
+        let options = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        writer.start_file("oversized.txt", options).unwrap();
+        let chunk = [0u8; 1024 * 1024];
+        for _ in 0..=MAX_EXTRACTED_SIZE / chunk.len() as u64 {
+            writer.write_all(&chunk).unwrap();
+        }
+        writer.finish().unwrap();
+        assert!(extract_zip(&archive, &root.join("extracted")).is_err());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn failed_skill_commit_restores_the_previous_installation() {
         let root = std::env::temp_dir().join(format!("skill-commit-{}", uuid::Uuid::new_v4()));
         let installed = root.join("installed");

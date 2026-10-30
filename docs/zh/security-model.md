@@ -20,7 +20,7 @@
 
 > 读者：**在 Vrykell 上加任何新功能前先读这一页**，尤其是接入第三方代码（MCP 服务器、技能、外部 harness）和新增 IPC 命令的时候。
 > 配套文档：`application-tools.md`（会话工具边界）、`architecture.md`（分层）。
-> 最近更新 2026-10-27。
+> 最近更新 2026-10-30。
 
 ## 引用型组合与工具恢复
 
@@ -57,7 +57,7 @@ AI 工具被拒绝后，本轮关闭全部工具，包括继续提问；说明�
 | 路径授权（任意读收口） | ✅ 会把文件内容交给页面的命令（附件导入）只接受**系统级用户动作**产生的路径：Rust 侧授权登记表（`files/grants.rs`，持久化在 `~/.vrykell/approved-paths.json`）；选择器改由我们的 `pick_path` 打开（只有 Rust 亲自打开才知道选择来自用户），窗口拖放由 `WindowEvent::DragDrop` 登记；应用自有目录（附件、技能）无需手势；无人调用的 `read_image_data_url` 已删除 | `files/grants.rs`、`lib.rs` | cargo 单测（授权文件/目录/自有目录/未授权拒绝） |
 | 内容渲染消毒 | ✅ Markdown 不启用 raw HTML、裸 URL 不 linkify、远程图片降级为文本、链接不导航应用窗口（外链交系统浏览器）；终端/命令块与 SSH 画面快照全部过 `sanitizeOutputHtml`（白名单只有 `<span>`+安全 style+`<br>`，且把"本地 DB 被篡改"写进威胁模型） | `Markdown.tsx`、`sanitizeHtml.ts`、`TerminalPanel.tsx` | vitest（Markdown 链接、快照消毒）+ e2e `chat-links` |
 | CSP 与资源范围 | ✅ 生产 CSP：`default-src 'self'`、`script-src 'self'`（Tauri 自注入脚本走 hash）、`style-src 'self' 'unsafe-inline'`（React 内联样式需要）、`object-src 'none'`、`form-action 'none'`、`frame-ancestors 'none'`、img 只允许 self/data/asset、connect 只允许 ipc；dev 例外（HMR 的 ws 与内联脚本）只在 `devCsp` | `src-tauri/tauri.conf.json` | `npm run build` 后确认 `dist/index.html` 无内联脚本；改动 CSP 需重启应用 |
-| 密钥与凭据 | ✅ API key / SSH 密码加密落盘（DPAPI/钥匙串/0600），**模型请求走 Rust 代理，key 从不进渲染进程**；附件读取锁死在附件目录 | `secret.rs`、`files/fs.rs` | 实机检查 `secrets.json`；`config.json` 无 key |
+| 密钥与凭据 | 存储方式因平台而异：macOS 使用系统凭据库，Windows 使用绑定当前用户的加密，Linux 及其他平台使用**明文** `~/.vrykell/secrets.json`，目录权限为 `0700`、文件权限为 `0600`。文件权限不等于加密。**模型请求走 Rust 代理，已保存的密钥不返回渲染进程**；附件读取锁死在附件目录。不要同步或分享明文凭据文件。 | `secret.rs`、`files/fs.rs` | 原生凭据测试；检查存储权限并确认 `config.json` 无 key |
 
 ## 3. 两条「做不到」，必须写清楚
 
@@ -83,6 +83,16 @@ AI 工具被拒绝后，本轮关闭全部工具，包括继续提问；说明�
 | 外部 harness 的启动（`acp_handshake`） | 属**既定类**：它只能启动用户在 `~/.vrykell/harnesses.json` 里**启用**的程序，探测**不跑任何工具**（权限请求一律拒绝），并且不扩大攻击面——同一个 webview 早已能通过 PTY 执行任意命令。设置页的 ACP 分组已写明"添加即授权" |
 | 面板能力化文件系统（路径必须来自用户动作或 shell cwd） | 3–6 周，改产品语义，仍挡不住 PTY → 不做 |
 | agent 移出 webview | 2–4 月 / sidecar 2–4 周，仍挡不住 PTY → 不做 |
+
+## 原生依赖警告（2026-10-30）
+
+锁文件公告审计保留警告，不隐藏这些结果。审计成功只表示该数据库没有归类为漏洞的条目，不表示所有原生依赖仍受维护，也不表示不存在内存安全问题。
+
+- `glib 0.18.5` 仍有未解决的迭代器类型安全警告 [RUSTSEC-2024-0429](https://rustsec.org/advisories/RUSTSEC-2024-0429.html)。Linux 界面工具链依赖 `0.18` 系列，修复从 `0.20` 开始；另外加入一个新版不能修复现有工具链。应跟进上游运行时迁移，并在声称解决前验证受影响的平台。
+- 间接依赖 `serial`、`proc-macro-error`、`unic-*` 系列、`zbus_names`、`zvariant` 和 `zvariant_derive` 有停止维护警告，来自终端、原生界面、渲染或系统集成依赖。所属依赖更新时应检查替代方案，CI 继续显示这些警告。
+- 中央公告 [GHSA-qwgh-2vcv-g2f7](https://github.com/advisories/GHSA-qwgh-2vcv-g2f7) 命中 `block-buffer 0.10.4`，但[上游公告](https://github.com/RustCrypto/utils/security/advisories/GHSA-qwgh-2vcv-g2f7) 的范围是 `>=0.11.0,<0.12.1`。这属于版本元数据冲突，应先复核受影响范围，再决定是否迁移较旧的依赖系列；数据库命中不能描述为已复现利用。
+
+每次发布前重新审计，在发布验证中记录依赖警告、平台测试和精确源码版本。源码修改不会修复已经发布的安装包。
 
 ## 已保存连接的扩展
 

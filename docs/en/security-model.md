@@ -21,7 +21,7 @@ The internal tool adapter uses authenticated, ephemeral loopback framing and a s
 > Readers: **read this page before adding any feature to Vrykell**, especially when integrating
 > third-party code (MCP servers, skills, external harnesses) or adding a new IPC command.
 > Companion documents: `application-tools.md` (session tool boundaries), `architecture.md` (layering).
-> Last updated 2026-10-27.
+> Last updated 2026-10-30.
 
 ## Reference-only compositions and tool recovery
 
@@ -60,7 +60,7 @@ not pretend to protect "the renderer itself" or "the programs the user installs"
 | Path grants (arbitrary reads closed) | ✅ Commands that hand file *contents* to the page (attachment import) only accept a path an **operating-system gesture** produced: a grant registry in Rust (`files/grants.rs`, persisted to `~/.vrykell/approved-paths.json`); pickers run through our `pick_path` (only Rust opening the dialog knows the choice came from the user) and drops are recorded from `WindowEvent::DragDrop`; the app's own directories (attachments, skills) need no gesture; the unused `read_image_data_url` command is gone | `files/grants.rs`, `lib.rs` | cargo tests (granted file, granted directory, app-owned directory, everything else refused) |
 | Rendering hygiene | ✅ Markdown enables no raw HTML, bare URLs are not linkified, remote images degrade to text, links never navigate the app window (they go to the system browser); terminal, command-block and SSH screen snapshots all pass through `sanitizeOutputHtml` (only `<span>` with safe styles plus `<br>`, under a threat model that includes "the local DB was tampered with") | `Markdown.tsx`, `sanitizeHtml.ts`, `TerminalPanel.tsx` | vitest (links, snapshot sanitizing) + e2e `chat-links` |
 | CSP and resource scope | ✅ Production CSP: `default-src 'self'`, `script-src 'self'` (Tauri's own injected scripts are hash-allowed), `style-src 'self' 'unsafe-inline'` (React inline styles need it), `object-src 'none'`, `form-action 'none'`, `frame-ancestors 'none'`, images only self/data/asset, connect only ipc; the development exceptions (HMR websocket, inline scripts) live in `devCsp` only | `src-tauri/tauri.conf.json` | After `npm run build`, `dist/index.html` has no inline script; CSP changes need an app restart |
-| Secrets and credentials | ✅ API keys and SSH passwords are encrypted at rest (DPAPI/keychain/0600), **model requests are proxied in Rust so the key never enters the renderer**, and attachment reads are confined to the attachments directory | `secret.rs`, `files/fs.rs` | Inspect `secrets.json`; `config.json` holds no key |
+| Secrets and credentials | Platform-dependent storage: the system credential store on macOS, per-user encryption on Windows, and **plaintext** `~/.vrykell/secrets.json` on Linux and other platforms, with directory mode `0700` and file mode `0600`. File permissions are not encryption. **Model requests are proxied in Rust so stored keys are not returned to the renderer**; attachment reads are confined to the attachments directory. Do not sync or share the plaintext credential file. | `secret.rs`, `files/fs.rs` | Native credential tests; inspect storage permissions and confirm `config.json` holds no key |
 
 ## 3. Two things that cannot be done, stated plainly
 
@@ -102,6 +102,16 @@ not pretend to protect "the renderer itself" or "the programs the user installs"
 | Starting an external harness (`acp_handshake`) | A **documented class**, not a gap: it only starts a program the user **enabled** in `~/.vrykell/harnesses.json`, a probe **runs no tools** (every permission request is refused), and it does not widen the surface — the same webview can already run anything through the PTY. The ACP settings section states that adding a harness is the authorization |
 | Capability-based file access for the whole panel (paths must come from a user gesture or the shell's cwd) | 3–6 weeks, changes product semantics, still does not stop the PTY → not doing it |
 | Moving the agent out of the webview | 2–4 months (Rust) / 2–4 weeks (sidecar), still does not stop the PTY → not doing it |
+
+## Native dependency warnings (2026-10-30)
+
+The lockfile advisory audit retains warnings instead of suppressing them. A successful audit means no entries classified as vulnerabilities by that database; it does not mean that all native dependencies are maintained or free of memory-safety problems.
+
+- `glib 0.18.5` has the unresolved iterator-soundness warning [RUSTSEC-2024-0429](https://rustsec.org/advisories/RUSTSEC-2024-0429.html). The Linux toolkit dependency graph requires the `0.18` family; the fix starts at `0.20`. Adding a second version does not fix the existing toolkit. Follow the upstream runtime migration and validate the affected platform before claiming this issue resolved.
+- Transitive `serial`, `proc-macro-error`, the `unic-*` family, `zbus_names`, `zvariant` and `zvariant_derive` have maintenance warnings. They come through terminal, native toolkit, rendering or system-integration dependencies. Review replacements when their owning dependency updates; these warnings remain visible in CI.
+- The central advisory entry [GHSA-qwgh-2vcv-g2f7](https://github.com/advisories/GHSA-qwgh-2vcv-g2f7) matches `block-buffer 0.10.4`, while the [upstream advisory](https://github.com/RustCrypto/utils/security/advisories/GHSA-qwgh-2vcv-g2f7) specifies `>=0.11.0,<0.12.1`. Treat this as conflicting version metadata and recheck the affected range before changing the older dependency family. Do not describe a database match as a reproduced exploit.
+
+Repeat the audit before each release. Dependency warnings, platform tests and the exact source revision belong in release validation; source changes do not repair previously published installers.
 
 ## Saved connection extensions
 

@@ -2,11 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
-    paths-ignore: ['docs/**', 'README*.md', 'CONTRIBUTING*.md', '.github/**', 'scripts/capture-readme.mjs']
+    branches: [dev, main]
   pull_request:
     branches: [dev, main]
-    paths-ignore: ['docs/**', 'README*.md', 'CONTRIBUTING*.md', '.github/**', 'scripts/capture-readme.mjs']
   workflow_dispatch:
     inputs:
       mode:
@@ -41,10 +39,26 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - run: npm audit --audit-level=moderate --registry=https://registry.npmjs.org
       - run: npx tsc --noEmit
       - run: npm run test -- --maxWorkers=4 --testTimeout=15000
       - run: npm run check:architecture
       - run: npm run build
+
+  dependency-audit:
+    name: Native dependency advisories
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - uses: Swatinem/rust-cache@e9d7b9f1e587218970671bac74e5511ed9506e6a # v2
+        with:
+          cache-all-crates: true
+          workspaces: src-tauri -> target
+          shared-key: dependency-audit
+      - run: cargo install cargo-audit --version 0.22.2 --locked
+      - run: cargo audit --file src-tauri/Cargo.lock
 
   e2e:
     if: github.event_name == 'workflow_dispatch' && inputs.mode == 'full'

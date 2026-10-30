@@ -21,16 +21,18 @@
 
 ## 下载
 
-当前版本为 **0.1.0 Beta 1**，提供 Windows、macOS 和 Linux 安装包。这是早期预览版，日常使用前可先查看[当前边界](#当前边界)。截图和功能介绍跟随开发分支，可能领先于已发布的安装包。
+最新预览版为 **0.1.0 Beta 2**，Apple silicon 安装包暂时仍为 Beta 1。日常使用前可先查看[当前边界](#当前边界)。截图和功能介绍跟随开发分支，可能领先于已发布的安装包。
 
 | 平台 | 安装包 |
 | --- | --- |
-| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_x64-setup.exe) |
-| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_aarch64.dmg) |
-| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_x64.dmg) |
-| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_amd64.AppImage) |
+| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.2/Vrykell_0.1.0_x64-setup.exe) |
+| macOS Apple silicon（Beta 1） | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.1/Vrykell_0.1.0_aarch64.dmg) |
+| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.2/Vrykell_0.1.0_x64.dmg) |
+| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.2/Vrykell_0.1.0_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.2/Vrykell_0.1.0_amd64.AppImage) |
 
 [全部版本与发布说明](https://github.com/Vrykell/Vrykell/releases) · [构建说明](docs/zh/ci.md)
+
+[Beta 2 发布说明](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.0-beta.2) 记录安装包校验和、源码来源与验证边界；其中提供的非 Windows 安装包，其精确源码版本尚未独立核实。已有安装包不包含开发分支后续的修复，如需这些修复请构建当前源码。报告漏洞前请阅读[安全政策](SECURITY.zh-CN.md)。
 
 ## 主要功能
 

@@ -19,6 +19,9 @@ dist-ssr
 *.pfx
 *.p12
 *.local
+.env
+.env.*
+!.env.example
 
 # Local tool caches and agent state
 /.cache/
