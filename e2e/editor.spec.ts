@@ -88,6 +88,22 @@ test('opens text in the built-in editor, saves it and guards unsaved closes', as
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mock-editor-files')!)['["","/home/e2e/project/src/main.ts"]'])).toContain('unsaved draft');
 });
 
+test('keeps a non-permission save failure editable for a retry', async ({ page }) => {
+  await openWorking(page);
+  const editor = page.getByTestId('file-editor');
+  await replaceText(page, 'retry draft');
+  await page.evaluate(() => localStorage.setItem('mock-editor-save-error', '1'));
+  const save = page.getByTestId('workspace-instance-bar').getByRole('button', { name: '保存文件', exact: true });
+  await page.keyboard.press('Control+s');
+  await expect(page.locator('#app-notifications').getByText('无法读取或保存文件')).toBeVisible();
+  await expect(save).toBeEnabled();
+  await expect(editor.locator('.editor-readonly-label')).toHaveCount(0);
+  await page.evaluate(() => localStorage.removeItem('mock-editor-save-error'));
+  await save.click();
+  await expect(save).toBeDisabled();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('mock-editor-files')!)['["","/home/e2e/project/src/main.ts"]'])).toContain('retry draft');
+});
+
 test('retains drafts on disk conflicts and requires confirmation before reload', async ({ page }) => {
   await openWorking(page); const editor = page.getByTestId('file-editor'); await replaceText(page, 'local draft');
   await page.evaluate(() => localStorage.setItem('mock-editor-files', JSON.stringify({ '["","/home/e2e/project/src/main.ts"]': 'external text' })));

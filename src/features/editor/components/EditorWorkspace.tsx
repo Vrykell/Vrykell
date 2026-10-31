@@ -169,6 +169,12 @@ function DocumentContent({ file, active, focused }: { file: EditorFile; active: 
     {document?.error && <ErrorBox title={t('Could not read or save file')} details={document.error} />}
     {(!document || document.loading) && <div className="code-diff-status" role="status">{t('Loading file…')}</div>}
     {document && !document.loading && document.kind !== 'text' && <div className="code-diff-status">{t(document.kind === 'binary' ? 'This file is binary or is not UTF-8. Open it with another editor.' : 'This file is too large for the embedded editor.')}</div>}
+    {document && !document.loading && document.permissionDenied && !document.revision && (
+      <div className="code-diff-status" role="status">
+        {t('Your current user cannot access or write this file. Open it with elevated permissions to edit.')}
+        <div><ReadOnlyFileAccess file={file} permissionDenied active={active} /></div>
+      </div>
+    )}
     {document && !document.loading && !!document.revision && document.kind === 'text' && <CodeEditor path={file.path} value={document.value} active={focused} readOnly={document.readOnly} wordWrap={preferences.wordWrap} vimMode={preferences.vimMode} onReady={handle => { editor.current = handle; }} onChange={value => useEditorDocuments.getState().edit(file, value)} onSave={save}
       onVimCommand={command => executeEditorVimCommand(file, command)} preview={preview && markdown ? <SafeMarkdown content={document.value} paneId={null} /> : undefined}
       status={<><span className="folder-path editor-status-path" data-testid="editor-file-path" data-tip={file.connectionId ? file.path : normPath(file.path)}><span>{file.connectionId ? file.path : normPath(file.path)}</span></span>{file.draftId && <span>{t('Not saved')}</span>}{document.readOnly && <ReadOnlyFileAccess file={file} permissionDenied={document.permissionDenied} active={active} />}<TextButton aria-label={t('Character encoding')} onClick={event => { const trigger = event.currentTarget; const box = trigger.getBoundingClientRect(); setEncodingMenu({ x: box.left, y: box.top, above: trigger, trigger }); }}>{EDITOR_ENCODINGS[document.encoding ?? 'utf8']}</TextButton></>} />}

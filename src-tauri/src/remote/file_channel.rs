@@ -102,7 +102,7 @@ pub(crate) fn invalidate_all() {
 }
 
 /// Return only successful channels to the pool. Mutations are never replayed automatically.
-pub(super) fn run<T>(conn: &SshConnection, mut read: bool,
+pub(crate) fn run<T>(conn: &SshConnection, mut read: bool,
     mut operation: impl FnMut(&Session, &Sftp) -> Result<T, String>) -> Result<T, String> {
     let started = Instant::now();
     let binding = binding(conn)?;

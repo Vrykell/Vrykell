@@ -18,6 +18,31 @@ test('unsupported remote files open as downloaded copies in the system applicati
   await expect(page.getByTestId('file-editor')).toHaveCount(0);
 });
 
+test('remote read permission failures keep the editor informative instead of blank', async ({ page }) => {
+  await setupTauriMock(page, { sshHost: 'known' });
+  await page.addInitScript(() => {
+    const internals = (window as unknown as {
+      __TAURI_INTERNALS__: { invoke: (cmd: string, args: Record<string, unknown>) => Promise<unknown> };
+    }).__TAURI_INTERNALS__;
+    const invoke = internals.invoke;
+    internals.invoke = async (cmd, args) => cmd === 'editor_read_file'
+      ? { kind: 'text', text: '', revision: '', readOnly: true, permissionDenied: true, encoding: 'utf8' }
+      : invoke(cmd, args);
+  });
+  await page.goto('/');
+  await page.locator('[data-dock-btn="ssh"]').click();
+  await page.getByTestId('ssh-row-ssh-1').dblclick();
+  await page.getByRole('button', { name: '断开连接', exact: true }).waitFor();
+  await page.locator('[data-dock-btn="files"]').click();
+  const row = page.getByTestId('remote-file-app.log');
+  await row.waitFor();
+  await row.dblclick();
+  const editor = page.getByTestId('file-editor');
+  await expect(editor.getByText('当前用户无权读取或写入此文件，请使用提权方式编辑。')).toBeVisible();
+  await expect(editor.getByRole('button', { name: '只读', exact: true })).toBeVisible();
+  await expect(editor.locator('.monaco-editor')).toHaveCount(0);
+});
+
 test('remote file double click opens and saves in the embedded editor', async ({ page }) => {
   await setupTauriMock(page, { sshHost: 'known' });
   await page.goto('/');
@@ -48,6 +73,22 @@ test('remote file double click opens and saves in the embedded editor', async ({
   await expect(page.getByTestId('remote-file-tree')).toHaveAttribute('data-path', '/home/root');
   expect(await ptyWrites(page)).not.toContain("vim '/home/root/app.log'\n");
   await expect(page.getByText('SSH 会话未就绪', { exact: true })).toHaveCount(0);
+});
+
+test('remote file row menu opens with the preferred editor', async ({ page }) => {
+  await setupTauriMock(page, { sshHost: 'known' });
+  await page.goto('/');
+  await page.locator('[data-dock-btn="ssh"]').click();
+  await page.getByTestId('ssh-row-ssh-1').dblclick();
+  await page.getByRole('button', { name: '断开连接', exact: true }).waitFor();
+  await page.locator('[data-dock-btn="files"]').click();
+  const row = page.getByTestId('remote-file-app.log');
+  await row.waitFor();
+  await row.click({ button: 'right' });
+  const open = page.getByRole('button', { name: '使用首选编辑器打开', exact: true });
+  await expect(open).toBeVisible();
+  await open.click();
+  await expect(page.getByTestId('file-editor').locator('.monaco-editor')).toBeVisible();
 });
 
 test('remote path bar respects the terminal editor preference and preserves the directory', async ({ page }) => {

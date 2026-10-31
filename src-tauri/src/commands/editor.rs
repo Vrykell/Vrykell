@@ -4,7 +4,6 @@ use sha2::{Digest, Sha256};
 use std::{
     io::{Read, Write},
     path::Path,
-    time::Duration,
 };
 const LIMIT: usize = 2 * 1024 * 1024;
 
@@ -173,6 +172,39 @@ fn read_limited(reader: impl Read) -> Result<Vec<u8>, String> {
         .map_err(|error| error.to_string())?;
     Ok(bytes)
 }
+/// SFTP status code for a permission failure (SSH_FX_PERMISSION_DENIED).
+const SFTP_PERMISSION_DENIED: i32 = 3;
+/// SFTP status codes that mean the server did not accept the requested replacement.
+const SFTP_OP_UNSUPPORTED: i32 = 8;
+const SFTP_FILE_ALREADY_EXISTS: i32 = 11;
+fn permission_denied_status(code: Option<i32>) -> bool {
+    code == Some(SFTP_PERMISSION_DENIED)
+}
+fn rename_fallback_status(code: Option<i32>) -> bool {
+    matches!(code, Some(SFTP_OP_UNSUPPORTED) | Some(SFTP_FILE_ALREADY_EXISTS))
+}
+/// Distinguishes a real permission failure from a missing file, a dropped connection or
+/// any other transport error, so only the former locks the document read-only.
+fn is_permission_denied(error: &ssh2::Error) -> bool {
+    match error.code() {
+        ssh2::ErrorCode::SFTP(code) => permission_denied_status(Some(code)),
+        _ => false,
+    }
+}
+fn rename_needs_fallback(error: &ssh2::Error) -> bool {
+    match error.code() {
+        ssh2::ErrorCode::SFTP(code) => rename_fallback_status(Some(code)),
+        _ => false,
+    }
+}
+/// The read already succeeded; a transient write probe must not turn the document read-only.
+fn remote_writable(sftp: &ssh2::Sftp, path: &Path) -> bool {
+    match sftp.open_mode(path, ssh2::OpenFlags::WRITE, 0, ssh2::OpenType::File) {
+        Ok(_) => true,
+        Err(error) if is_permission_denied(&error) => false,
+        Err(_) => true,
+    }
+}
 fn check_revision(bytes: &[u8], expected: &str) -> Result<(), String> {
     if bytes.len() > LIMIT || revision(bytes) != expected {
         Err("The file changed on disk. Reload it before saving; your unsaved text is kept.".into())
@@ -185,34 +217,36 @@ fn read_sync(
     connection: Option<SshConnection>,
 ) -> Result<EditorContent, String> {
     validate(&target)?;
-    let (bytes, read_only, permission_denied) = if let Some(connection) = connection {
-        let session =
-            crate::remote::ssh::connect_with_timeout(&connection, Some(Duration::from_secs(5)))?;
-        session.set_timeout(15_000);
-        let sftp = session.sftp().map_err(|error| error.to_string())?;
-        let path = Path::new(&target.path);
-        let file = match sftp.open(path) {
-            Ok(file) => file,
-            Err(error) if error.code() == ssh2::ErrorCode::SFTP(3) => return Ok(denied_content()),
-            Err(error) => return Err(error.to_string()),
-        };
-        let bytes = read_limited(file)?;
-        let read_only = sftp.stat(path).ok().and_then(|stat| stat.perm).is_some_and(|mode| mode & 0o222 == 0);
-        let denied = read_only || sftp.open_mode(path, ssh2::OpenFlags::WRITE, 0, ssh2::OpenType::File).is_err();
-        (bytes, read_only || denied, denied)
-    } else {
-        let file = match std::fs::File::open(&target.path) {
-            Ok(file) => file,
-            Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => return Ok(denied_content()),
-            Err(error) => return Err(error.to_string()),
-        };
-        let read_only = file.metadata().map_err(|error| error.to_string())?.permissions().readonly();
-        let denied = !read_only && std::fs::OpenOptions::new().write(true).open(&target.path).is_err();
-        (read_limited(file)?, read_only || denied, denied || (!cfg!(windows) && read_only))
+    if let Some(connection) = connection {
+        return crate::remote::file_channel::run(&connection, true, |_, sftp| read_remote(&target, sftp));
+    }
+    let file = match std::fs::File::open(&target.path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::PermissionDenied => return Ok(denied_content()),
+        Err(error) => return Err(error.to_string()),
     };
+    let read_only = file.metadata().map_err(|error| error.to_string())?.permissions().readonly();
+    let denied = !read_only && std::fs::OpenOptions::new().write(true).open(&target.path).is_err();
+    let mut result = content(read_limited(file)?, target.encoding)?;
+    result.read_only = read_only || denied;
+    result.permission_denied = denied || (!cfg!(windows) && read_only);
+    Ok(result)
+}
+/// Reads through the shared authenticated file channel; a permission failure keeps the
+/// read-only notice while any other transport failure reaches the caller as an error.
+fn read_remote(target: &EditorFile, sftp: &ssh2::Sftp) -> Result<EditorContent, String> {
+    let path = Path::new(&target.path);
+    let file = match sftp.open(path) {
+        Ok(file) => file,
+        Err(error) if is_permission_denied(&error) => return Ok(denied_content()),
+        Err(error) => return Err(error.to_string()),
+    };
+    let bytes = read_limited(file)?;
+    let read_only = sftp.stat(path).ok().and_then(|stat| stat.perm).is_some_and(|mode| mode & 0o222 == 0);
+    let denied = read_only || !remote_writable(sftp, path);
     let mut result = content(bytes, target.encoding)?;
-    result.read_only = read_only;
-    result.permission_denied = permission_denied;
+    result.read_only = read_only || denied;
+    result.permission_denied = denied;
     Ok(result)
 }
 fn denied_content() -> EditorContent {
@@ -279,61 +313,121 @@ fn save_sync(
     }
     let bytes = encode_text(&text, target.encoding.unwrap_or_default())?;
     if let Some(connection) = connection {
-        let session =
-            crate::remote::ssh::connect_with_timeout(&connection, Some(Duration::from_secs(5)))?;
-        session.set_timeout(15_000);
-        let sftp = session.sftp().map_err(|error| error.to_string())?;
-        let path = sftp
-            .realpath(Path::new(&target.path))
-            .map_err(|error| error.to_string())?;
-        if sftp.stat(&path).ok().and_then(|stat| stat.perm).is_some_and(|mode| mode & 0o222 == 0)
-            || sftp.open_mode(&path, ssh2::OpenFlags::WRITE, 0, ssh2::OpenType::File).is_err() {
+        return crate::remote::file_channel::run(&connection, false, |_, sftp| {
+            save_remote(&target, sftp, &bytes, &expected)
+        });
+    }
+    save_local(Path::new(&target.path), &bytes, &expected)
+}
+/// Replaces the original without leaving it half-written. Servers that ignore the
+/// overwrite flag keep the original in a backup while the new file is installed.
+fn replace_remote(sftp: &ssh2::Sftp, temporary: &Path, path: &Path) -> Result<(), String> {
+    match sftp.rename(
+        temporary,
+        path,
+        Some(ssh2::RenameFlags::OVERWRITE | ssh2::RenameFlags::ATOMIC),
+    ) {
+        Ok(()) => return Ok(()),
+        Err(error) if rename_needs_fallback(&error) => {}
+        Err(error) => return Err(error.to_string()),
+    }
+    let backup = path.with_file_name(format!(".vrykell-editor-{}.bak", uuid::Uuid::new_v4()));
+    sftp.rename(path, &backup, None).map_err(|error| {
+        format!("The remote server could not replace the file and the original could not be backed up: {error}")
+    })?;
+    match sftp.rename(temporary, path, None) {
+        Ok(()) => {
+            if sftp.unlink(&backup).is_err() {
+                let _ = crate::diagnostics::record("editor-remote-backup", serde_json::json!({
+                    "succeeded": false,
+                }));
+            }
+            Ok(())
+        }
+        Err(error) => {
+            if let Err(restore) = sftp.rename(&backup, path, None) {
+                return Err(format!(
+                    "The remote file could not be replaced ({error}); the original is kept at {}. Restore it manually. The restore failed too: {restore}",
+                    backup.display()
+                ));
+            }
+            Err(format!("The remote server could not replace the file: {error}"))
+        }
+    }
+}
+fn save_remote(
+    target: &EditorFile,
+    sftp: &ssh2::Sftp,
+    bytes: &[u8],
+    expected: &str,
+) -> Result<String, String> {
+    let path = sftp
+        .realpath(Path::new(&target.path))
+        .map_err(|error| error.to_string())?;
+    let original = sftp.stat(&path).ok();
+    let mode = original
+        .as_ref()
+        .and_then(|stat| stat.perm)
+        .unwrap_or(0o600)
+        & 0o777;
+    if mode & 0o222 == 0 {
+        return Err("EDITOR_PERMISSION_DENIED: The remote file is read-only or requires elevated permissions.".into());
+    }
+    match sftp.open_mode(&path, ssh2::OpenFlags::WRITE, 0, ssh2::OpenType::File) {
+        Ok(_) => {}
+        Err(error) if is_permission_denied(&error) => {
             return Err("EDITOR_PERMISSION_DENIED: The remote file is read-only or requires elevated permissions.".into());
+        }
+        // A missing file, a dropped connection or a full disk is not a permission problem:
+        // returning the real error keeps the document editable for a retry.
+        Err(error) => return Err(format!("Could not open the remote file for writing: {error}")),
+    }
+    check_revision(
+        &read_limited(sftp.open(&path).map_err(|error| error.to_string())?)?,
+        expected,
+    )?;
+    let temporary = path.with_file_name(format!(".vrykell-editor-{}.tmp", uuid::Uuid::new_v4()));
+    let result = (|| {
+        let mut file = match sftp.open_mode(
+            &temporary,
+            ssh2::OpenFlags::WRITE | ssh2::OpenFlags::CREATE | ssh2::OpenFlags::EXCLUSIVE,
+            mode as i32,
+            ssh2::OpenType::File,
+        ) {
+            Ok(file) => file,
+            Err(error) if is_permission_denied(&error) => {
+                return Err("The remote file is writable, but its directory is not. Saving needs to create a temporary file next to it; use the elevated terminal to edit this file.".into());
+            }
+            Err(error) => return Err(format!("Could not create a temporary file next to the remote file: {error}")),
+        };
+        file.write_all(bytes).map_err(|error| error.to_string())?;
+        // `sftp::File::flush` is a no-op; close flushes buffered writes and reports
+        // delayed server-side errors that must abort the replacement.
+        file.close().map_err(|error| error.to_string())?;
+        // The mode passed to open is subject to the server umask; restore the exact mode
+        // after the content exists. Servers without setstat keep their previous behaviour.
+        if sftp.setstat(
+            &temporary,
+            ssh2::FileStat {
+                size: None, uid: None, gid: None,
+                perm: Some(mode), atime: None, mtime: None,
+            },
+        ).is_err() {
+            let _ = crate::diagnostics::record("editor-remote-mode", serde_json::json!({
+                "connectionId": target.connection_id.clone(), "succeeded": false,
+            }));
         }
         check_revision(
             &read_limited(sftp.open(&path).map_err(|error| error.to_string())?)?,
-            &expected,
+            expected,
         )?;
-        let temporary =
-            path.with_file_name(format!(".vrykell-editor-{}.tmp", uuid::Uuid::new_v4()));
-        let result = (|| {
-            let mode = sftp
-                .stat(&path)
-                .map_err(|error| error.to_string())?
-                .perm
-                .unwrap_or(0o600) as i32
-                & 0o777;
-            let mut file = sftp
-                .open_mode(
-                    &temporary,
-                    ssh2::OpenFlags::WRITE | ssh2::OpenFlags::CREATE | ssh2::OpenFlags::EXCLUSIVE,
-                    mode,
-                    ssh2::OpenType::File,
-                )
-                .map_err(|error| error.to_string())?;
-            file.write_all(&bytes)
-                .and_then(|_| file.flush())
-                .map_err(|error| error.to_string())?;
-            drop(file);
-            check_revision(
-                &read_limited(sftp.open(&path).map_err(|error| error.to_string())?)?,
-                &expected,
-            )?;
-            sftp.rename(
-                &temporary,
-                &path,
-                Some(ssh2::RenameFlags::OVERWRITE | ssh2::RenameFlags::ATOMIC),
-            )
-            .map_err(|error| error.to_string())?;
-            Ok(revision(&bytes))
-        })();
-        if result.is_err() {
-            let _ = sftp.unlink(&temporary);
-        }
-        result
-    } else {
-        save_local(Path::new(&target.path), &bytes, &expected)
+        replace_remote(sftp, &temporary, &path)?;
+        Ok(revision(bytes))
+    })();
+    if result.is_err() {
+        let _ = sftp.unlink(&temporary);
     }
+    result
 }
 #[tauri::command]
 pub async fn editor_read_file(
@@ -396,6 +490,23 @@ pub async fn editor_open_elevated(target: EditorFile) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn only_the_sftp_permission_status_locks_a_document_read_only() {
+        assert!(permission_denied_status(Some(SFTP_PERMISSION_DENIED)));
+        assert!(!permission_denied_status(Some(2)));
+        assert!(!permission_denied_status(Some(4)));
+        assert!(!permission_denied_status(None));
+    }
+
+    #[test]
+    fn only_unavailable_or_non_overwriting_renames_use_the_backup_path() {
+        assert!(rename_fallback_status(Some(SFTP_OP_UNSUPPORTED)));
+        assert!(rename_fallback_status(Some(SFTP_FILE_ALREADY_EXISTS)));
+        assert!(!rename_fallback_status(Some(SFTP_PERMISSION_DENIED)));
+        assert!(!rename_fallback_status(Some(2)));
+        assert!(!rename_fallback_status(None));
+    }
+
     #[test]
     fn new_documents_create_exclusively_and_never_replace_existing_destinations() {
         let path = std::env::temp_dir().join(format!("new-editor-{}.txt", uuid::Uuid::new_v4()));

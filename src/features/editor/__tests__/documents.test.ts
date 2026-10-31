@@ -66,6 +66,16 @@ it('keeps unsaved text when permissions are lost after opening', async () => {
   expect(useEditorDocuments.getState().documents[key]).toMatchObject({ value: 'kept draft', readOnly: true, permissionDenied: true });
 });
 
+it('leaves the document editable after a non-permission save failure', async () => {
+  const store = useEditorDocuments.getState(); await store.load(file); store.edit(file, 'kept draft');
+  vi.mocked(saveEditorFile).mockRejectedValueOnce('Could not open the remote file for writing: File not found');
+  expect(await store.save(file)).toBe(false);
+  const document = useEditorDocuments.getState().documents[key];
+  expect(document).toMatchObject({ value: 'kept draft', error: 'Could not open the remote file for writing: File not found' });
+  expect(document?.readOnly).not.toBe(true);
+  expect(document?.permissionDenied).not.toBe(true);
+});
+
 it('reopens with an explicit encoding and preserves it on subsequent saves', async () => {
   vi.mocked(readEditorFile).mockResolvedValueOnce({ kind: 'text', text: 'decoded', revision: 'bytes-version', encoding: 'gbk' });
   const store = useEditorDocuments.getState();
