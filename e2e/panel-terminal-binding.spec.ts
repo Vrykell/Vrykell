@@ -1,6 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import { setupTauriMock, waitForWorkbench } from './tauri-mock';
 
+// This scenario lifts the shared 30 s default: it opens three panels and switches focus
+// between two terminals, which is slower than a single-surface regression.
+test.setTimeout(120_000);
+
 async function setupTerminals(page: Page) {
   return page.evaluate(async () => {
     const workspacePath = '/src/features/workspace/stores/workspace.ts';
