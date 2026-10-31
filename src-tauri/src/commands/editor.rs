@@ -179,11 +179,13 @@ const SFTP_FILE_ALREADY_EXISTS: i32 = 11;
 /// Some SFTP servers answer the atomic overwrite extension with a generic failure
 /// instead of `SSH_FX_OP_UNSUPPORTED` or `SSH_FX_FILE_ALREADY_EXISTS`.
 const SFTP_GENERIC_FAILURE: i32 = 4;
+/// The server does not implement the atomic overwrite extension.
+const SFTP_OP_UNSUPPORTED: i32 = 8;
 fn permission_denied_status(code: Option<i32>) -> bool {
     code == Some(SFTP_PERMISSION_DENIED)
 }
 fn rename_fallback_status(code: Option<i32>) -> bool {
-    matches!(code, Some(SFTP_FILE_ALREADY_EXISTS | SFTP_GENERIC_FAILURE))
+    matches!(code, Some(SFTP_FILE_ALREADY_EXISTS | SFTP_GENERIC_FAILURE | SFTP_OP_UNSUPPORTED))
 }
 /// Distinguishes a real permission failure from a missing file, a dropped connection or
 /// any other transport error, so only the former locks the document read-only.
@@ -328,14 +330,57 @@ fn save_sync(
     }
     save_local(Path::new(&target.path), &bytes, &expected)
 }
+/// Last-resort fallback for servers that cannot replace a file with any rename
+/// request. The target is truncated in place, so the caller keeps the original bytes
+/// and this function restores them if the write fails.
+fn restore_remote(sftp: &ssh2::Sftp, path: &Path, original: &[u8], mode: Option<u32>) -> Result<(), String> {
+    let mut file = sftp
+        .open_mode(path, ssh2::OpenFlags::WRITE | ssh2::OpenFlags::TRUNCATE, mode.unwrap_or(0o600) as i32, ssh2::OpenType::File)
+        .map_err(|error| error.to_string())?;
+    file.write_all(original).map_err(|error| error.to_string())?;
+    file.close().map_err(|error| error.to_string())?;
+    Ok(())
+}
+fn write_remote_in_place(
+    sftp: &ssh2::Sftp,
+    path: &Path,
+    bytes: &[u8],
+    expected: &str,
+    original: &[u8],
+    mode: Option<u32>,
+) -> Result<(), String> {
+    let current = read_remote_bytes(sftp, path)
+        .map_err(|error| format!("Could not re-read the remote file before the direct overwrite: {error}"))?;
+    check_revision(&current, expected)?;
+    let mut file = sftp
+        .open_mode(path, ssh2::OpenFlags::WRITE | ssh2::OpenFlags::TRUNCATE, mode.unwrap_or(0o600) as i32, ssh2::OpenType::File)
+        .map_err(|error| format!("Could not open the remote file for a direct overwrite: {error}"))?;
+    if let Err(error) = file.write_all(bytes) {
+        drop(file);
+        return match restore_remote(sftp, path, original, mode) {
+            Ok(()) => Err(format!("Could not write the remote file directly: {error} The original content was restored.")),
+            Err(restore) => Err(format!("Could not write the remote file directly: {error} The original content could not be restored: {restore}")),
+        };
+    }
+    if let Err(error) = file.close() {
+        return match restore_remote(sftp, path, original, mode) {
+            Ok(()) => Err(format!("Could not finish the remote file after a direct write: {error} The original content was restored.")),
+            Err(restore) => Err(format!("Could not finish the remote file after a direct write: {error} The original content could not be restored: {restore}")),
+        };
+    }
+    Ok(())
+}
 /// Replaces the original without leaving it half-written. Servers that refuse to
-/// overwrite keep the original in a backup while the new file is installed.
+/// overwrite keep the original in a backup while the new file is installed; servers
+/// that reject rename entirely fall back to a guarded in-place write.
 fn replace_remote(
     sftp: &ssh2::Sftp,
     temporary: &Path,
     path: &Path,
     expected: &str,
+    original: &[u8],
     bytes: &[u8],
+    mode: Option<u32>,
     connection_id: Option<&str>,
 ) -> Result<(), String> {
     match sftp.rename(
@@ -355,9 +400,15 @@ fn replace_remote(
         let path_exists = sftp.stat(path).is_ok();
         if !(backup_exists && !path_exists) {
             if !backup_exists && path_exists {
-                return Err(format!(
-                    "The remote server could not replace the file and the original was not moved: {error}"
-                ));
+                return match write_remote_in_place(sftp, path, bytes, expected, original, mode) {
+                    Ok(()) => {
+                        let _ = sftp.unlink(temporary);
+                        Ok(())
+                    }
+                    Err(direct) => Err(format!(
+                        "The remote server could not replace the file ({error}) and the direct overwrite failed: {direct}"
+                    )),
+                };
             }
             return Err(format!(
                 "The remote server could not confirm the original backup ({error}); verify {} and {} before retrying.",
@@ -404,6 +455,7 @@ fn replace_remote(
             // treat it as success when the installed bytes match the buffer.
             if read_remote_bytes(sftp, path).ok().as_deref() == Some(bytes) {
                 let _ = sftp.unlink(&backup);
+                let _ = sftp.unlink(temporary);
                 return Ok(());
             }
             // Never restore the backup over a path that exists: it may be a
@@ -420,7 +472,15 @@ fn replace_remote(
                     remote_path(&backup)
                 ));
             }
-            Err(format!("The remote server could not replace the file: {error}"))
+            match write_remote_in_place(sftp, path, bytes, expected, original, mode) {
+                Ok(()) => {
+                    let _ = sftp.unlink(temporary);
+                    Ok(())
+                }
+                Err(direct) => Err(format!(
+                    "The remote file could not be replaced ({error}); the original was restored, but the direct overwrite failed: {direct}"
+                )),
+            }
         }
     }
 }
@@ -489,17 +549,17 @@ fn save_remote(
                 }));
             }
         }
-        check_revision(
-            &read_remote_bytes(sftp, &path)
-                .map_err(|error| format!("Could not re-read the remote file before replacing it: {error}"))?,
-            expected,
-        )?;
+        let current = read_remote_bytes(sftp, &path)
+            .map_err(|error| format!("Could not re-read the remote file before replacing it: {error}"))?;
+        check_revision(&current, expected)?;
         replace_remote(
             sftp,
             &temporary,
             &path,
             expected,
+            &current,
             bytes,
+            mode,
             target.connection_id.as_deref(),
         )?;
         Ok(revision(bytes))
@@ -579,11 +639,11 @@ mod tests {
     }
 
     #[test]
-    fn existing_and_generic_rename_failures_use_the_backup_path() {
+    fn existing_generic_and_unsupported_rename_failures_use_the_backup_path() {
         assert!(rename_fallback_status(Some(SFTP_FILE_ALREADY_EXISTS)));
         assert!(rename_fallback_status(Some(SFTP_GENERIC_FAILURE)));
+        assert!(rename_fallback_status(Some(SFTP_OP_UNSUPPORTED)));
         assert!(!rename_fallback_status(Some(SFTP_PERMISSION_DENIED)));
-        assert!(!rename_fallback_status(Some(8)));
         assert!(!rename_fallback_status(Some(2)));
         assert!(!rename_fallback_status(None));
     }
@@ -601,7 +661,7 @@ mod tests {
         assert!(!is_permission_denied(&transport));
         assert!(rename_needs_fallback(&exists));
         assert!(rename_needs_fallback(&generic));
-        assert!(!rename_needs_fallback(&unsupported));
+        assert!(rename_needs_fallback(&unsupported));
         assert!(!rename_needs_fallback(&denied));
         assert!(!rename_needs_fallback(&transport));
     }
