@@ -176,11 +176,14 @@ fn read_limited(reader: impl Read) -> Result<Vec<u8>, String> {
 const SFTP_PERMISSION_DENIED: i32 = 3;
 /// The server refused to replace the destination without an explicit overwrite.
 const SFTP_FILE_ALREADY_EXISTS: i32 = 11;
+/// Some SFTP servers answer the atomic overwrite extension with a generic failure
+/// instead of `SSH_FX_OP_UNSUPPORTED` or `SSH_FX_FILE_ALREADY_EXISTS`.
+const SFTP_GENERIC_FAILURE: i32 = 4;
 fn permission_denied_status(code: Option<i32>) -> bool {
     code == Some(SFTP_PERMISSION_DENIED)
 }
 fn rename_fallback_status(code: Option<i32>) -> bool {
-    code == Some(SFTP_FILE_ALREADY_EXISTS)
+    matches!(code, Some(SFTP_FILE_ALREADY_EXISTS | SFTP_GENERIC_FAILURE))
 }
 /// Distinguishes a real permission failure from a missing file, a dropped connection or
 /// any other transport error, so only the former locks the document read-only.
@@ -342,7 +345,7 @@ fn replace_remote(
     ) {
         Ok(()) => return Ok(()),
         Err(error) if rename_needs_fallback(&error) => {}
-        Err(error) => return Err(error.to_string()),
+        Err(error) => return Err(format!("The remote server refused the atomic replace: {error}")),
     }
     let backup = path.with_file_name(format!(".vrykell-editor-{}.bak", uuid::Uuid::new_v4()));
     if let Err(error) = sftp.rename(path, &backup, Some(ssh2::RenameFlags::empty())) {
@@ -429,7 +432,7 @@ fn save_remote(
 ) -> Result<String, String> {
     let path = sftp
         .realpath(Path::new(&target.path))
-        .map_err(|error| error.to_string())?;
+        .map_err(|error| format!("Could not resolve the remote file path: {error}"))?;
     let original = sftp
         .stat(&path)
         .map_err(|error| format!("Could not read the remote file metadata: {error}"))?;
@@ -446,7 +449,11 @@ fn save_remote(
         // returning the real error keeps the document editable for a retry.
         Err(error) => return Err(format!("Could not open the remote file for writing: {error}")),
     }
-    check_revision(&read_remote_bytes(sftp, &path)?, expected)?;
+    check_revision(
+        &read_remote_bytes(sftp, &path)
+            .map_err(|error| format!("Could not re-read the remote file before saving: {error}"))?,
+        expected,
+    )?;
     let temporary = path.with_file_name(format!(".vrykell-editor-{}.tmp", uuid::Uuid::new_v4()));
     let result = (|| {
         let mut file = match sftp.open_mode(
@@ -461,10 +468,12 @@ fn save_remote(
             }
             Err(error) => return Err(format!("Could not create a temporary file next to the remote file: {error}")),
         };
-        file.write_all(bytes).map_err(|error| error.to_string())?;
+        file.write_all(bytes)
+            .map_err(|error| format!("Could not write the temporary remote file: {error}"))?;
         // `sftp::File::flush` is a no-op; close flushes buffered writes and reports
         // delayed server-side errors that must abort the replacement.
-        file.close().map_err(|error| error.to_string())?;
+        file.close()
+            .map_err(|error| format!("Could not finish writing the temporary remote file: {error}"))?;
         // The mode passed to open is subject to the server umask; restore the exact mode
         // after the content exists. Servers without setstat keep their previous behaviour.
         if let Some(mode) = mode {
@@ -480,7 +489,11 @@ fn save_remote(
                 }));
             }
         }
-        check_revision(&read_remote_bytes(sftp, &path)?, expected)?;
+        check_revision(
+            &read_remote_bytes(sftp, &path)
+                .map_err(|error| format!("Could not re-read the remote file before replacing it: {error}"))?,
+            expected,
+        )?;
         replace_remote(
             sftp,
             &temporary,
@@ -566,8 +579,9 @@ mod tests {
     }
 
     #[test]
-    fn only_non_overwriting_renames_use_the_backup_path() {
+    fn existing_and_generic_rename_failures_use_the_backup_path() {
         assert!(rename_fallback_status(Some(SFTP_FILE_ALREADY_EXISTS)));
+        assert!(rename_fallback_status(Some(SFTP_GENERIC_FAILURE)));
         assert!(!rename_fallback_status(Some(SFTP_PERMISSION_DENIED)));
         assert!(!rename_fallback_status(Some(8)));
         assert!(!rename_fallback_status(Some(2)));
@@ -580,11 +594,13 @@ mod tests {
         let missing = ssh2::Error::new(ssh2::ErrorCode::SFTP(2), "missing");
         let unsupported = ssh2::Error::new(ssh2::ErrorCode::SFTP(8), "unsupported");
         let exists = ssh2::Error::new(ssh2::ErrorCode::SFTP(SFTP_FILE_ALREADY_EXISTS), "exists");
+        let generic = ssh2::Error::new(ssh2::ErrorCode::SFTP(SFTP_GENERIC_FAILURE), "failure");
         let transport = ssh2::Error::new(ssh2::ErrorCode::Session(-1), "transport");
         assert!(is_permission_denied(&denied));
         assert!(!is_permission_denied(&missing));
         assert!(!is_permission_denied(&transport));
         assert!(rename_needs_fallback(&exists));
+        assert!(rename_needs_fallback(&generic));
         assert!(!rename_needs_fallback(&unsupported));
         assert!(!rename_needs_fallback(&denied));
         assert!(!rename_needs_fallback(&transport));
