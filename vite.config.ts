@@ -5,17 +5,16 @@ import { fileURLToPath } from "node:url";
 
 const sourceRoot = fileURLToPath(new URL("./src", import.meta.url));
 
-// @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
-export default defineConfig(async () => ({
+export default defineConfig(() => ({
   // Icons compiles `~icons/<collection>/<name>` imports at build time, so only
   // the shell brand marks we actually use end up in the bundle.
   plugins: [react(), Icons({ compiler: "jsx", jsx: "react" }), {
     name: "embedded-control-messages",
     enforce: "pre",
-    resolveId(source, importer) {
+    resolveId(source: string, importer?: string) {
       if (importer?.replaceAll("\\", "/").includes("/node_modules/monaco-editor/esm/") && /(?:^|\/)nls\.js$/.test(source)) {
         return `${sourceRoot}/ui/editor/code/localize.ts`;
       }
