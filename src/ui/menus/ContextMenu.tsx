@@ -11,7 +11,9 @@ export interface MenuAnchor { x: number; y: number; trigger?: HTMLElement; above
 export interface ContextMenuItem {
   label: string;
   tip?: string;
-  onClick?: (anchor?: MenuAnchor) => void;
+  /** Row bounds for follow-up placement, plus the menu's own anchor when the caller
+   *  needs to distinguish a tab-bar menu from one opened at the pointer. */
+  onClick?: (anchor?: MenuAnchor, menuAnchor?: MenuAnchor) => void;
   danger?: boolean;
   group?: MenuGroup;
   order?: number;
@@ -51,7 +53,7 @@ export default function ContextMenu({ anchor, items, onClose, label = t('Action 
     setPath(previous => [...previous.slice(0, level), { item, trigger, focus }]);
   };
   const rows = (entries: ContextMenuItem[], level: number) => <ContextMenuItems items={entries} onClose={close} itemRole={itemRole}
-    submenuId={`${id}-${level}`} openLabel={path[level]?.item.label}
+    menuAnchor={anchor} submenuId={`${id}-${level}`} openLabel={path[level]?.item.label}
     onHover={(item, trigger) => {
       if (item.submenu && !item.disabled) open(level, item, trigger, false);
       else setPath(previous => previous.length > level ? previous.slice(0, level) : previous);
@@ -102,8 +104,9 @@ function MenuSurface({ anchor, submenuOf, label, focus, children, onClose, onBac
 }
 
 /** All action menus share ordering, group boundaries and row controls. */
-export function ContextMenuItems({ items, onClose, itemRole, onOpen, onHover, openLabel, submenuId }: {
+export function ContextMenuItems({ items, onClose, itemRole, onOpen, onHover, openLabel, submenuId, menuAnchor }: {
   items: ContextMenuItem[]; onClose: () => void; itemRole?: 'menuitem'; openLabel?: string; submenuId?: string;
+  menuAnchor?: MenuAnchor;
   onOpen?: (item: ContextMenuItem, trigger: HTMLButtonElement) => void;
   onHover?: (item: ContextMenuItem, trigger: HTMLButtonElement) => void;
 }) {
@@ -118,7 +121,7 @@ export function ContextMenuItems({ items, onClose, itemRole, onOpen, onHover, op
         if (item.submenu) onOpen?.(item, event.currentTarget);
         else {
           const bounds = event.currentTarget.getBoundingClientRect();
-          item.onClick?.({ x: bounds.left, y: bounds.bottom + 4 });
+          item.onClick?.({ x: bounds.left, y: bounds.bottom + 4 }, menuAnchor);
           onClose();
         }
       }} />
