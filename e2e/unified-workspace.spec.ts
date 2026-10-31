@@ -45,6 +45,58 @@ test('opens a picked file in a separate unified tab and reuses it when reopened'
   await expect(bar.getByRole('tab')).toHaveCount(before + 1);
 });
 
+test('opens a picked file from the unified new-tab menu', async ({ page }) => {
+  await setupTauriMock(page, {}); await page.goto('/');
+  await page.getByTestId('workspace-area-unified').click();
+  const bar = page.getByTestId('workspace-instance-bar');
+  const mixed = page.getByTestId('unified-workspace');
+  await openFirstResource(page);
+  const before = await bar.getByRole('tab').count();
+  await page.evaluate(() => { (window as unknown as { __PICK_PATHS__: string[] }).__PICK_PATHS__ = ['/home/e2e/project/menu-open.txt']; });
+  await bar.getByRole('button', { name: '新建工作区标签', exact: true }).click();
+  const menu = page.getByRole('menu', { name: '新建工作区标签', exact: true });
+  await expect(menu.getByRole('menuitem', { name: '打开文件', exact: true })).toBeVisible();
+  await menu.getByRole('menuitem', { name: '打开文件', exact: true }).click();
+  await expect(bar.getByRole('tab')).toHaveCount(before + 1);
+  await expect(mixed.locator('.monaco-editor')).toBeVisible();
+});
+
+test('opens creation pickers under the tab bar toolbar', async ({ page }) => {
+  await setupTauriMock(page, {}); await page.goto('/');
+  await page.getByTestId('workspace-area-unified').click();
+  const bar = page.getByTestId('workspace-instance-bar');
+  const plus = bar.getByRole('button', { name: '新建工作区标签', exact: true });
+  const plusBounds = (await plus.boundingBox())!;
+  await plus.click();
+  await page.getByRole('menuitem', { name: '连接服务器', exact: true }).click();
+  const picker = page.getByRole('dialog', { name: '连接服务器', exact: true });
+  await expect(picker).toBeVisible();
+  const bounds = (await picker.boundingBox())!;
+  // Flush under the toolbar strip, right-aligned with the trigger that opened the menu,
+  // instead of following the clicked menu row.
+  expect(bounds.y).toBeGreaterThanOrEqual(plusBounds.y + plusBounds.height);
+  expect(bounds.y - (plusBounds.y + plusBounds.height)).toBeLessThan(12);
+  expect(Math.abs(bounds.x + bounds.width - (plusBounds.x + plusBounds.width))).toBeLessThan(3);
+});
+
+test('anchors tab-bar menu pickers below the strip at the pointer', async ({ page }) => {
+  await setupTauriMock(page, {}); await page.goto('/');
+  await page.getByTestId('workspace-area-unified').click();
+  const bar = page.getByTestId('workspace-instance-bar');
+  const tabs = bar.getByRole('tablist', { name: '全部工作区标签' });
+  const tabBounds = (await tabs.boundingBox())!;
+  const plusBounds = (await bar.getByRole('button', { name: '新建工作区标签', exact: true }).boundingBox())!;
+  await tabs.click({ button: 'right', position: { x: tabBounds.width / 2, y: tabBounds.height / 2 } });
+  const menu = page.getByRole('menu', { name: '工作区操作', exact: true });
+  await menu.getByRole('menuitem', { name: '连接服务器', exact: true }).click();
+  const picker = page.getByRole('dialog', { name: '连接服务器', exact: true });
+  await expect(picker).toBeVisible();
+  const bounds = (await picker.boundingBox())!;
+  expect(bounds.y).toBeGreaterThanOrEqual(plusBounds.y + plusBounds.height);
+  expect(bounds.y - (plusBounds.y + plusBounds.height)).toBeLessThan(12);
+  expect(Math.abs(bounds.x - (tabBounds.x + tabBounds.width / 2))).toBeLessThan(3);
+});
+
 test('opens the split-resource menu when splitting a terminal in the unified workspace', async ({ page }) => {
   await setupTauriMock(page, {}); await page.goto('/');
   await expect(page.locator('.terminal-pane').first()).toBeVisible();

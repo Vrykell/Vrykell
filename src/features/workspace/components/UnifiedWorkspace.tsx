@@ -94,17 +94,37 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
     state.chooseMerge();
   };
   const beginPlacement = (addition: Addition) => { setPlacement(addition); };
-  const pickerOrigin = (origin?: MenuAnchor) => {
-    const preferred = origin ?? menu?.anchor;
-    return { split: menu?.split ?? false,
-      anchor: preferred ? { x: preferred.x, y: preferred.y, aboveY: preferred.y - 4, align: preferred.align } : undefined };
+  /** A tab-bar menu opens its picker flush under the strip; a menu opened at the pointer
+   *  keeps the picker at that click position. */
+  const pickerAnchor = (menuAnchor?: MenuAnchor): DropdownAnchor | undefined => {
+    const toolbar = newButton.current?.getBoundingClientRect();
+    if (toolbar && menuAnchor?.trigger?.closest('.folder-header')) {
+      return { x: menuAnchor.x, y: toolbar.bottom + 4, aboveY: toolbar.top, align: menuAnchor.align };
+    }
+    return menuAnchor ? { x: menuAnchor.x, y: menuAnchor.y, aboveY: menuAnchor.y, align: menuAnchor.align } : undefined;
   };
-  const creation: ContextMenuItem[] = [
-    { label: t('New terminal'), onClick: origin => setTerminalPicker({ source: 'shell', ...pickerOrigin(origin) }) },
-    { label: t('Connect a server'), onClick: origin => setTerminalPicker({ source: 'ssh', ...pickerOrigin(origin) }) },
-    ...(['conversation', 'document'] as const).map(kind => ({ label: t(kind === 'conversation' ? 'New conversation' : 'New file'), onClick: () => menu?.split ? setPlacement({ kind: 'new', resource: kind }) : newItem(kind) })),
-    ...(menu?.split ? [{ label: t('Open file'), onClick: () => { void pickWorkspaceFile().then(file => { if (file) setPlacement({ kind: 'file', file }); }); } }] : []),
-    { label: t('ACP agents'), onClick: origin => setLauncher(pickerOrigin(origin)) },
+  const pickerOrigin = (menuAnchor?: MenuAnchor) => ({
+    split: menu?.split ?? false,
+    anchor: pickerAnchor(menuAnchor ?? menu?.anchor),
+  });
+  const creation = (split: boolean): ContextMenuItem[] => [
+    { label: t('New terminal'), onClick: (_row, menuAnchor) => setTerminalPicker({ source: 'shell', ...pickerOrigin(menuAnchor) }) },
+    { label: t('Connect a server'), onClick: (_row, menuAnchor) => setTerminalPicker({ source: 'ssh', ...pickerOrigin(menuAnchor) }) },
+    ...(['conversation', 'document'] as const).map(kind => ({
+      label: t(kind === 'conversation' ? 'New conversation' : 'New file'),
+      onClick: () => split ? setPlacement({ kind: 'new', resource: kind }) : newItem(kind),
+    })),
+    {
+      label: t('Open file'),
+      onClick: () => {
+        if (split) {
+          void pickWorkspaceFile().then(file => { if (file) setPlacement({ kind: 'file', file }); });
+          return;
+        }
+        void openWorkspaceFile();
+      },
+    },
+    { label: t('ACP agents'), onClick: (_row, menuAnchor) => setLauncher(pickerOrigin(menuAnchor)) },
   ];
   const focusedResource = resources.find(resource => resource.id === focused?.resourceId);
   return <section className="unified-workspace" data-testid="unified-workspace" style={{ display: active ? 'flex' : 'none' }} inert={!visible}>
@@ -113,8 +133,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
       items={strip.handles}
       selected={state.activeTabId} onSelect={strip.onSelect} onClose={strip.onClose}
       onMove={strip.onMove} grouping={strip.grouping} onRename={strip.onRename} tabActions={strip.tabActions} menuLabel={t('Workspace actions')} menuItems={[
-        ...(strip.tabActions?.(state.activeTabId) ?? []), ...creation,
-        { label: t('Open file'), onClick: () => void openWorkspaceFile() },
+        ...(strip.tabActions?.(state.activeTabId) ?? []), ...creation(false),
         { label: t('All history'), onClick: history },
       ]} toolbar={<>
         {!state.startActive && resources.find(resource => resource.id === focused?.resourceId)?.kind === 'terminal' && <SshResourcesAction />}
@@ -135,8 +154,8 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
       onMovePane={(paneId, target) => moveWorkspacePane(state.activeTabId, paneId, target)}
       onRemove={removeUnifiedPane} onDetach={detachCompositionPane} />
     {menu && <ContextMenu anchor={menu.anchor} label={t(menu.split ? 'Choose a tab to split' : 'New workspace tab')} itemRole="menuitem" onClose={() => setMenu(null)} items={flattenSingleSubmenu<ContextMenuItem>(menu.split
-      ? [...resources.filter(resource => !placed.has(resource.id)).map(resource => ({ label: resource.title, onClick: () => beginPlacement({ kind: 'existing', id: resource.id }) })), { label: t('New workspace tab'), group: 'edit', submenu: { items: creation } }]
-      : creation)} />}
+      ? [...resources.filter(resource => !placed.has(resource.id)).map(resource => ({ label: resource.title, onClick: () => beginPlacement({ kind: 'existing', id: resource.id }) })), { label: t('New workspace tab'), group: 'edit', submenu: { items: creation(true) } }]
+      : creation(false))} />}
     <AcpLauncher open={!!launcher} anchor={launcher?.anchor} onClose={() => setLauncher(null)} onPick={(name, cwd) => {
       if (launcher?.split) setPlacement({ kind: 'agent', harness: name, cwd });
       else connectUnifiedAgent(name, undefined, cwd);
