@@ -84,6 +84,18 @@ test('keeps terminal splitting native and badges the original terminal icon', as
   const badge = page.getByTestId('workspace-instance-bar').locator('[data-icon-count="2"]');
   await expect(badge.locator('[data-shell-mark]')).toBeVisible();
   await expect(badge.locator('.icon-count-badge-dot')).toHaveText('2');
+  const glyphCenter = await badge.locator('.icon-count-badge-dot').evaluate(element => {
+    const box = element.getBoundingClientRect();
+    const range = document.createRange();
+    range.selectNodeContents(element);
+    const text = range.getBoundingClientRect();
+    return {
+      dx: Math.abs(box.left + box.width / 2 - (text.left + text.width / 2)),
+      dy: Math.abs(box.top + box.height / 2 - (text.top + text.height / 2)),
+    };
+  });
+  expect(glyphCenter.dx).toBeLessThan(1);
+  expect(glyphCenter.dy).toBeLessThan(1);
   expect(await badge.evaluate(element => getComputedStyle(element).overflow)).toBe('visible');
   await page.screenshot({ path: info.outputPath('native-terminal-count-badge.png') });
 });
