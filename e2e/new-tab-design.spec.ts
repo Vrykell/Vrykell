@@ -26,6 +26,12 @@ for (const theme of ['dark', 'light']) test(`new tab picker follows the profile 
   await expect(dialog.getByTestId('new-tab-option-ssh:ssh-1')).toHaveCSS('height', '28px');
   for (const width of [1240, 640]) {
     await page.setViewportSize({ width, height: 800 });
+    // The floating surface repositions after the resize event; wait for that frame instead of
+    // measuring the previous viewport on a loaded CI worker.
+    await expect.poll(async () => {
+      const current = await dialog.boundingBox();
+      return current ? current.x + current.width : Number.POSITIVE_INFINITY;
+    }, { timeout: 10_000 }).toBeLessThanOrEqual(width);
     const bounds = (await dialog.boundingBox())!;
     expect(bounds.x).toBeGreaterThanOrEqual(0);
     expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);

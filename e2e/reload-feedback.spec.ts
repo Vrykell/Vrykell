@@ -33,6 +33,11 @@ test('theme reload spins until loading completes and honors reduced motion', asy
 
 test('terminal context chips retain spacing without separator dots', async ({ page }) => {
   await setupTauriMock(page);
+  // Keep the live git-status refresh on the same branch as the fixture below, otherwise a
+  // late refresh can overwrite the seeded block and make the chip assertion order-dependent.
+  await page.addInitScript(() => localStorage.setItem('mock-git-snapshot', JSON.stringify({
+    root: '/home/e2e/project', branch: 'dev', remotes: [], entries: [],
+  })));
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.evaluate(async () => {
