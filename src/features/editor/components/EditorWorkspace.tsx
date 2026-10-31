@@ -169,10 +169,16 @@ function DocumentContent({ file, active, focused }: { file: EditorFile; active: 
     {document?.error && <ErrorBox title={t('Could not read or save file')} details={document.error} />}
     {(!document || document.loading) && <div className="code-diff-status" role="status">{t('Loading file…')}</div>}
     {document && !document.loading && document.kind !== 'text' && <div className="code-diff-status">{t(document.kind === 'binary' ? 'This file is binary or is not UTF-8. Open it with another editor.' : 'This file is too large for the embedded editor.')}</div>}
-    {document && !document.loading && document.permissionDenied && !document.revision && (
+    {document && !document.loading && document.permissionDenied && !document.revision && !document.error && (
       <div className="code-diff-status" role="status">
         {t('Your current user cannot access or write this file. Open it with elevated permissions to edit.')}
         <div><ReadOnlyFileAccess file={file} permissionDenied active={active} /></div>
+      </div>
+    )}
+    {document && !document.loading && document.error && !document.revision && (
+      <div className="code-diff-status" role="status">
+        {t('Could not read or save file')}
+        <div><OutlineButton onClick={reloadFile}>{t('Reload file')}</OutlineButton></div>
       </div>
     )}
     {document && !document.loading && !!document.revision && document.kind === 'text' && <CodeEditor path={file.path} value={document.value} active={focused} readOnly={document.readOnly} wordWrap={preferences.wordWrap} vimMode={preferences.vimMode} onReady={handle => { editor.current = handle; }} onChange={value => useEditorDocuments.getState().edit(file, value)} onSave={save}

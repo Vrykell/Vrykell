@@ -172,16 +172,15 @@ fn read_limited(reader: impl Read) -> Result<Vec<u8>, String> {
         .map_err(|error| error.to_string())?;
     Ok(bytes)
 }
-/// SFTP status code for a permission failure (SSH_FX_PERMISSION_DENIED).
+/// SFTP status codes used by the editor's error classification.
 const SFTP_PERMISSION_DENIED: i32 = 3;
-/// SFTP status codes that mean the server did not accept the requested replacement.
-const SFTP_OP_UNSUPPORTED: i32 = 8;
+/// The server refused to replace the destination without an explicit overwrite.
 const SFTP_FILE_ALREADY_EXISTS: i32 = 11;
 fn permission_denied_status(code: Option<i32>) -> bool {
     code == Some(SFTP_PERMISSION_DENIED)
 }
 fn rename_fallback_status(code: Option<i32>) -> bool {
-    matches!(code, Some(SFTP_OP_UNSUPPORTED) | Some(SFTP_FILE_ALREADY_EXISTS))
+    code == Some(SFTP_FILE_ALREADY_EXISTS)
 }
 /// Distinguishes a real permission failure from a missing file, a dropped connection or
 /// any other transport error, so only the former locks the document read-only.
@@ -204,6 +203,13 @@ fn remote_writable(sftp: &ssh2::Sftp, path: &Path) -> bool {
         Err(error) if is_permission_denied(&error) => false,
         Err(_) => true,
     }
+}
+/// Remote paths are POSIX even when the desktop displays them through a Windows path.
+fn remote_path(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "/")
+}
+fn read_remote_bytes(sftp: &ssh2::Sftp, path: &Path) -> Result<Vec<u8>, String> {
+    read_limited(sftp.open(path).map_err(|error| error.to_string())?)
 }
 fn check_revision(bytes: &[u8], expected: &str) -> Result<(), String> {
     if bytes.len() > LIMIT || revision(bytes) != expected {
@@ -319,9 +325,16 @@ fn save_sync(
     }
     save_local(Path::new(&target.path), &bytes, &expected)
 }
-/// Replaces the original without leaving it half-written. Servers that ignore the
-/// overwrite flag keep the original in a backup while the new file is installed.
-fn replace_remote(sftp: &ssh2::Sftp, temporary: &Path, path: &Path) -> Result<(), String> {
+/// Replaces the original without leaving it half-written. Servers that refuse to
+/// overwrite keep the original in a backup while the new file is installed.
+fn replace_remote(
+    sftp: &ssh2::Sftp,
+    temporary: &Path,
+    path: &Path,
+    expected: &str,
+    bytes: &[u8],
+    connection_id: Option<&str>,
+) -> Result<(), String> {
     match sftp.rename(
         temporary,
         path,
@@ -332,23 +345,76 @@ fn replace_remote(sftp: &ssh2::Sftp, temporary: &Path, path: &Path) -> Result<()
         Err(error) => return Err(error.to_string()),
     }
     let backup = path.with_file_name(format!(".vrykell-editor-{}.bak", uuid::Uuid::new_v4()));
-    sftp.rename(path, &backup, None).map_err(|error| {
-        format!("The remote server could not replace the file and the original could not be backed up: {error}")
+    if let Err(error) = sftp.rename(path, &backup, Some(ssh2::RenameFlags::empty())) {
+        // A lost status reply can hide a successful move: inspect both paths before
+        // deciding whether the original is still in place.
+        let backup_exists = sftp.stat(&backup).is_ok();
+        let path_exists = sftp.stat(path).is_ok();
+        if !(backup_exists && !path_exists) {
+            if !backup_exists && path_exists {
+                return Err(format!(
+                    "The remote server could not replace the file and the original was not moved: {error}"
+                ));
+            }
+            return Err(format!(
+                "The remote server could not confirm the original backup ({error}); verify {} and {} before retrying.",
+                remote_path(path),
+                remote_path(&backup)
+            ));
+        }
+    }
+    // Re-check the moved original: another writer may have changed it after the
+    // pre-save check. A mismatch restores the backup and keeps the draft.
+    let moved = read_remote_bytes(sftp, &backup).map_err(|error| {
+        format!(
+            "The original was moved to {}, but it could not be read back ({error}); it has not been replaced.",
+            remote_path(&backup)
+        )
     })?;
-    match sftp.rename(temporary, path, None) {
+    if revision(&moved) != expected {
+        if sftp.stat(path).is_ok() {
+            return Err(format!(
+                "The file changed on disk and a new file already exists at {}; the original is kept at {}.",
+                remote_path(path),
+                remote_path(&backup)
+            ));
+        }
+        return match sftp.rename(&backup, path, Some(ssh2::RenameFlags::empty())) {
+            Ok(()) => Err("The file changed on disk. Reload it before saving; your unsaved text is kept.".into()),
+            Err(restore) => Err(format!(
+                "The file changed on disk and the original could not be restored ({restore}); it is kept at {}.",
+                remote_path(&backup)
+            )),
+        };
+    }
+    match sftp.rename(temporary, path, Some(ssh2::RenameFlags::empty())) {
         Ok(()) => {
             if sftp.unlink(&backup).is_err() {
                 let _ = crate::diagnostics::record("editor-remote-backup", serde_json::json!({
-                    "succeeded": false,
+                    "connectionId": connection_id, "succeeded": false,
                 }));
             }
             Ok(())
         }
         Err(error) => {
-            if let Err(restore) = sftp.rename(&backup, path, None) {
+            // The install may have succeeded before the status reply was lost. Only
+            // treat it as success when the installed bytes match the buffer.
+            if read_remote_bytes(sftp, path).ok().as_deref() == Some(bytes) {
+                let _ = sftp.unlink(&backup);
+                return Ok(());
+            }
+            // Never restore the backup over a path that exists: it may be a
+            // concurrent write. Restore only when the destination is absent.
+            if sftp.stat(path).is_ok() {
                 return Err(format!(
-                    "The remote file could not be replaced ({error}); the original is kept at {}. Restore it manually. The restore failed too: {restore}",
-                    backup.display()
+                    "The remote file may have been replaced ({error}); the original is kept at {}. Verify the file before retrying.",
+                    remote_path(&backup)
+                ));
+            }
+            if let Err(restore) = sftp.rename(&backup, path, Some(ssh2::RenameFlags::empty())) {
+                return Err(format!(
+                    "The remote file could not be replaced ({error}); the original is kept at {}. Restore it manually; the restore failed too: {restore}",
+                    remote_path(&backup)
                 ));
             }
             Err(format!("The remote server could not replace the file: {error}"))
@@ -364,13 +430,11 @@ fn save_remote(
     let path = sftp
         .realpath(Path::new(&target.path))
         .map_err(|error| error.to_string())?;
-    let original = sftp.stat(&path).ok();
-    let mode = original
-        .as_ref()
-        .and_then(|stat| stat.perm)
-        .unwrap_or(0o600)
-        & 0o777;
-    if mode & 0o222 == 0 {
+    let original = sftp
+        .stat(&path)
+        .map_err(|error| format!("Could not read the remote file metadata: {error}"))?;
+    let mode = original.perm.map(|perm| perm & 0o777);
+    if mode.is_some_and(|mode| mode & 0o222 == 0) {
         return Err("EDITOR_PERMISSION_DENIED: The remote file is read-only or requires elevated permissions.".into());
     }
     match sftp.open_mode(&path, ssh2::OpenFlags::WRITE, 0, ssh2::OpenType::File) {
@@ -382,21 +446,18 @@ fn save_remote(
         // returning the real error keeps the document editable for a retry.
         Err(error) => return Err(format!("Could not open the remote file for writing: {error}")),
     }
-    check_revision(
-        &read_limited(sftp.open(&path).map_err(|error| error.to_string())?)?,
-        expected,
-    )?;
+    check_revision(&read_remote_bytes(sftp, &path)?, expected)?;
     let temporary = path.with_file_name(format!(".vrykell-editor-{}.tmp", uuid::Uuid::new_v4()));
     let result = (|| {
         let mut file = match sftp.open_mode(
             &temporary,
             ssh2::OpenFlags::WRITE | ssh2::OpenFlags::CREATE | ssh2::OpenFlags::EXCLUSIVE,
-            mode as i32,
+            mode.unwrap_or(0o600) as i32,
             ssh2::OpenType::File,
         ) {
             Ok(file) => file,
             Err(error) if is_permission_denied(&error) => {
-                return Err("The remote file is writable, but its directory is not. Saving needs to create a temporary file next to it; use the elevated terminal to edit this file.".into());
+                return Err("Saving in place is not possible because the remote directory is not writable. Use Save As or the elevated terminal to edit this file.".into());
             }
             Err(error) => return Err(format!("Could not create a temporary file next to the remote file: {error}")),
         };
@@ -406,22 +467,28 @@ fn save_remote(
         file.close().map_err(|error| error.to_string())?;
         // The mode passed to open is subject to the server umask; restore the exact mode
         // after the content exists. Servers without setstat keep their previous behaviour.
-        if sftp.setstat(
-            &temporary,
-            ssh2::FileStat {
-                size: None, uid: None, gid: None,
-                perm: Some(mode), atime: None, mtime: None,
-            },
-        ).is_err() {
-            let _ = crate::diagnostics::record("editor-remote-mode", serde_json::json!({
-                "connectionId": target.connection_id.clone(), "succeeded": false,
-            }));
+        if let Some(mode) = mode {
+            if sftp.setstat(
+                &temporary,
+                ssh2::FileStat {
+                    size: None, uid: None, gid: None,
+                    perm: Some(mode), atime: None, mtime: None,
+                },
+            ).is_err() {
+                let _ = crate::diagnostics::record("editor-remote-mode", serde_json::json!({
+                    "connectionId": target.connection_id.clone(), "succeeded": false,
+                }));
+            }
         }
-        check_revision(
-            &read_limited(sftp.open(&path).map_err(|error| error.to_string())?)?,
+        check_revision(&read_remote_bytes(sftp, &path)?, expected)?;
+        replace_remote(
+            sftp,
+            &temporary,
+            &path,
             expected,
+            bytes,
+            target.connection_id.as_deref(),
         )?;
-        replace_remote(sftp, &temporary, &path)?;
         Ok(revision(bytes))
     })();
     if result.is_err() {
@@ -499,12 +566,28 @@ mod tests {
     }
 
     #[test]
-    fn only_unavailable_or_non_overwriting_renames_use_the_backup_path() {
-        assert!(rename_fallback_status(Some(SFTP_OP_UNSUPPORTED)));
+    fn only_non_overwriting_renames_use_the_backup_path() {
         assert!(rename_fallback_status(Some(SFTP_FILE_ALREADY_EXISTS)));
         assert!(!rename_fallback_status(Some(SFTP_PERMISSION_DENIED)));
+        assert!(!rename_fallback_status(Some(8)));
         assert!(!rename_fallback_status(Some(2)));
         assert!(!rename_fallback_status(None));
+    }
+
+    #[test]
+    fn error_classification_uses_the_sftp_status_code() {
+        let denied = ssh2::Error::new(ssh2::ErrorCode::SFTP(SFTP_PERMISSION_DENIED), "denied");
+        let missing = ssh2::Error::new(ssh2::ErrorCode::SFTP(2), "missing");
+        let unsupported = ssh2::Error::new(ssh2::ErrorCode::SFTP(8), "unsupported");
+        let exists = ssh2::Error::new(ssh2::ErrorCode::SFTP(SFTP_FILE_ALREADY_EXISTS), "exists");
+        let transport = ssh2::Error::new(ssh2::ErrorCode::Session(-1), "transport");
+        assert!(is_permission_denied(&denied));
+        assert!(!is_permission_denied(&missing));
+        assert!(!is_permission_denied(&transport));
+        assert!(rename_needs_fallback(&exists));
+        assert!(!rename_needs_fallback(&unsupported));
+        assert!(!rename_needs_fallback(&denied));
+        assert!(!rename_needs_fallback(&transport));
     }
 
     #[test]
