@@ -25,18 +25,18 @@ A desktop workspace for development and remote operations, built around the term
 
 ## Download
 
-**0.1.0 Beta 3** is the latest preview. Check the [current boundaries](#current-boundaries) before using it for daily work. The screenshots and feature descriptions follow the development branch, which may be ahead of the packaged release.
+**0.1.0 Beta 4** is the latest preview. Check the [current boundaries](#current-boundaries) before using it for daily work. The screenshots and feature descriptions follow the development branch, which may be ahead of the packaged release.
 
 | Platform | Package |
 | --- | --- |
-| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.3/Vrykell_0.1.0_x64-setup.exe) |
-| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.3/Vrykell_0.1.0_aarch64.dmg) |
-| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.3/Vrykell_0.1.0_x64.dmg) |
-| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.3/Vrykell_0.1.0_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.3/Vrykell_0.1.0_amd64.AppImage) |
+| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.4/Vrykell_0.1.0_x64-setup.exe) |
+| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.4/Vrykell_0.1.0_aarch64.dmg) |
+| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.4/Vrykell_0.1.0_x64.dmg) |
+| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.4/Vrykell_0.1.0_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.4/Vrykell_0.1.0_amd64.AppImage) |
 
 [All releases and release notes](https://github.com/Vrykell/Vrykell/releases) · [Build instructions](docs/en/ci.md)
 
-The [Beta 3 release notes](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.0-beta.3) record package checksums, the source commit and validation limits. Installers remain unsigned; build the current source when later fixes are required. See the [security policy](SECURITY.md) before reporting a vulnerability.
+The [Beta 4 release notes](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.0-beta.4) record package checksums, the source commit and validation limits. Installers remain unsigned; build the current source when later fixes are required. See the [security policy](SECURITY.md) before reporting a vulnerability.
 
 ## One workspace, from command to commit
 
