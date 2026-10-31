@@ -79,6 +79,20 @@ describe('fileMenu', () => {
     expect(buildFileMenuItems(['reveal'], ctx())).toHaveLength(0);
   });
 
+  it('offers the preferred editor only when the panel provides a handler', () => {
+    const onOpenEditor = vi.fn();
+    const file = entry('a.txt', '/work/a.txt');
+
+    const row = buildFileMenuItems(['open-editor'], ctx({ entry: file, targets: [file], handlers: handlers({ onOpenEditor }) }));
+    expect(row).toHaveLength(1);
+    expect(row[0]!.label).toBe('使用首选编辑器打开');
+    row[0]!.onClick?.();
+    expect(onOpenEditor).toHaveBeenCalledWith(file);
+
+    // A panel without the handler never renders an inert open action.
+    expect(buildFileMenuItems(['open-editor'], ctx({ entry: file, targets: [file] }))).toHaveLength(0);
+  });
+
   it('offers properties for a single row only, and calls the handler with that entry', () => {
     const onProperties = vi.fn();
     const file = entry('a.txt', '/work/a.txt');

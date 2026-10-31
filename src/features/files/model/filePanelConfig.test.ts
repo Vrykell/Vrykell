@@ -23,6 +23,14 @@ describe('filePanelConfig menus', () => {
     expect(ssh.menus.more).not.toContain('reveal');
   });
 
+  it('offers the preferred editor on file rows of both panels', () => {
+    const local = filePanelConfigFor({ kind: 'local' });
+    const ssh = filePanelConfigFor({ kind: 'ssh', connectionId: 'c1' });
+
+    expect(local.menus.rowFile).toContain('open-editor');
+    expect(ssh.menus.rowFile).toContain('open-editor');
+  });
+
   it('offers properties on single rows of both panels and routes path bar files per target', () => {
     const local = filePanelConfigFor({ kind: 'local' });
     const ssh = filePanelConfigFor({ kind: 'ssh', connectionId: 'c1' });

@@ -83,7 +83,9 @@ function itemFor(key: FileMenuItemKey, ctx: FileMenuContext): ContextMenuItem | 
     case 'open-tab':
       return single ? { label: t('Open in new tab'), onClick: () => handlers.onOpenTab?.(single) } : null;
     case 'open-editor':
-      return single ? { label: t('Open with preferred editor'), onClick: () => handlers.onOpenEditor?.(single) } : null;
+      return single && handlers.onOpenEditor
+        ? { label: t('Open with preferred editor'), onClick: () => handlers.onOpenEditor!(single) }
+        : null;
     case 'open-system':
       return single ? { label: t('Open with the system default application'), onClick: () => handlers.onOpenSystem?.(single) } : null;
     case 'open-with':

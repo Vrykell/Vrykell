@@ -101,7 +101,7 @@ export function filePanelConfigFor(target: FileOpsTarget): FilePanelConfig {
       ids: SSH_IDS,
       menus: {
         rowFolder: ['new-file', 'new-folder', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'download', 'properties', 'delete'],
-        rowFile: ['new-file', 'new-folder', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'download', 'properties', 'delete'],
+        rowFile: ['new-file', 'new-folder', 'open-editor', 'copy', 'cut', 'paste', 'copy-path', 'rename', 'download', 'properties', 'delete'],
         rowMulti: ['copy', 'cut', 'paste', 'download', 'delete'],
         // Blank space and the ⋯ menu expose the same actions (remote adds upload); only the destination is fixed to the current directory
         blank: ['paste', 'new-file', 'new-folder', 'upload-file', 'upload-dir', 'sync-terminal', 'sync-cwd', 'downloads-view', 'uploads-view', 'collapse-all', 'refresh'],

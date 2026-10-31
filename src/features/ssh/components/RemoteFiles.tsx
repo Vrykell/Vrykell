@@ -128,6 +128,7 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
         );
       }}
       handlers={{
+        onOpenEditor: (entry) => remoteEdit(entry),
         onDownload: (targets) => {
           void (async () => {
             if (!ops.download || targets.length === 0) return;

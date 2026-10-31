@@ -13,6 +13,7 @@ vi.mock('@features/files/model/fileOps', () => ({ fileOpsFor: () => ({ upload: m
 vi.mock('@features/files/components/FilePanel', () => ({
   default: (props: ComponentProps<typeof FilePanel>) => <>
     <button onClick={() => props.openEntry?.({ name: 'config.txt', path: '/home/test/config.txt', is_dir: false })}>Open remote file</button>
+    <button onClick={() => props.handlers?.onOpenEditor?.({ name: 'config.txt', path: '/home/test/config.txt', is_dir: false })}>Open remote file from menu</button>
     <button onClick={() => props.onSyncToTerminal?.('/home/test')}>Sync directory</button>
     <button onClick={() => props.onExternalDrop?.(['/local/item.zip'], { rowPath: null, dir: '/home/test' })}>Drop upload</button>
     <button onClick={() => props.handlers?.onUpload?.('file')}>Upload files</button>
@@ -37,6 +38,14 @@ it('opens remote text with the built-in editor when selected', () => {
   useEditorPreferences.setState({ remoteOpenMode: 'editor' });
   const open = vi.spyOn(useSessionStore.getState(), 'openEditorFile').mockReturnValue('editor');
   render(<RemoteFiles conn={conn} />); fireEvent.click(screen.getByRole('button', { name: 'Open remote file' }));
+  expect(open).toHaveBeenCalledWith({ path: '/home/test/config.txt', connectionId: conn.id });
+  expect(mocks.write).not.toHaveBeenCalled();
+});
+
+it('routes the row menu open action through the same preferred editor', () => {
+  useEditorPreferences.setState({ remoteOpenMode: 'editor' });
+  const open = vi.spyOn(useSessionStore.getState(), 'openEditorFile').mockReturnValue('editor');
+  render(<RemoteFiles conn={conn} />); fireEvent.click(screen.getByRole('button', { name: 'Open remote file from menu' }));
   expect(open).toHaveBeenCalledWith({ path: '/home/test/config.txt', connectionId: conn.id });
   expect(mocks.write).not.toHaveBeenCalled();
 });
