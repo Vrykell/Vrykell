@@ -2,7 +2,7 @@ use crate::db::{HistoryState, SshConnection};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    io::{Read, Write},
+    io::{Read, Seek, SeekFrom, Write},
     path::Path,
 };
 const LIMIT: usize = 2 * 1024 * 1024;
@@ -335,6 +335,7 @@ fn save_sync(
 enum DirectWriteFailure {
     Precondition(String),
     Write(String),
+    Verify(String),
 }
 /// Last-resort recovery copy. It is written before a direct overwrite so a failure
 /// never leaves the only copy of the remote file in memory.
@@ -362,9 +363,10 @@ fn restore_remote(sftp: &ssh2::Sftp, path: &Path, original: &[u8], mode: Option<
     file.close().map_err(|error| error.to_string())?;
     Ok(())
 }
-/// Truncates the live target only after a durable backup exists. SFTP has no
-/// compare-and-truncate, so a concurrent writer between the check and the truncate
-/// cannot be serialized by this last-resort path.
+/// Truncates the live target only after a durable backup exists. The content is
+/// checked through the same handle that is truncated, so replacing the path between
+/// the check and the write cannot make this write land in a different file. SFTP has
+/// no compare-and-truncate, so a concurrent in-place writer can still race the check.
 fn write_remote_in_place(
     sftp: &ssh2::Sftp,
     path: &Path,
@@ -372,24 +374,41 @@ fn write_remote_in_place(
     expected: &str,
     mode: Option<u32>,
 ) -> Result<(), DirectWriteFailure> {
-    let current = read_remote_bytes(sftp, path)
-        .map_err(|error| DirectWriteFailure::Precondition(format!("Could not re-read the remote file before the direct overwrite: {error}")))?;
+    let mut file = sftp
+        .open_mode(path, ssh2::OpenFlags::READ | ssh2::OpenFlags::WRITE, mode.unwrap_or(0o600) as i32, ssh2::OpenType::File)
+        .map_err(|error| DirectWriteFailure::Precondition(format!("Could not open the remote file for a direct overwrite: {error}")))?;
+    let mut current = Vec::new();
+    if let Err(error) = Read::by_ref(&mut file).take(LIMIT as u64 + 1).read_to_end(&mut current) {
+        return Err(DirectWriteFailure::Precondition(format!("Could not read the remote file through its open handle: {error}")));
+    }
     if revision(&current) != expected {
         return Err(DirectWriteFailure::Precondition(
             "The file changed on disk. Reload it before saving; your unsaved text is kept.".into(),
         ));
     }
-    let mut file = sftp
-        .open_mode(path, ssh2::OpenFlags::WRITE | ssh2::OpenFlags::TRUNCATE, mode.unwrap_or(0o600) as i32, ssh2::OpenType::File)
-        .map_err(|error| DirectWriteFailure::Precondition(format!("Could not open the remote file for a direct overwrite: {error}")))?;
+    if let Err(error) = file.setstat(ssh2::FileStat {
+        size: Some(0), uid: None, gid: None, perm: None, atime: None, mtime: None,
+    }) {
+        return Err(DirectWriteFailure::Write(format!("Could not truncate the remote file directly: {error}")));
+    }
+    if let Err(error) = file.seek(SeekFrom::Start(0)) {
+        return Err(DirectWriteFailure::Write(format!("Could not seek the remote file after truncating it: {error}")));
+    }
     if let Err(error) = file.write_all(bytes) {
-        drop(file);
         return Err(DirectWriteFailure::Write(format!("Could not write the remote file directly: {error}")));
     }
     if let Err(error) = file.close() {
         return Err(DirectWriteFailure::Write(format!("Could not finish the remote file after a direct write: {error}")));
     }
-    Ok(())
+    match read_remote_bytes(sftp, path) {
+        Ok(installed) if installed == bytes => Ok(()),
+        Ok(_) => Err(DirectWriteFailure::Verify(
+            "The remote file changed while the direct write was finishing; the version being saved is kept in the recovery copy.".into(),
+        )),
+        Err(error) => Err(DirectWriteFailure::Verify(format!(
+            "The direct write finished, but the remote file could not be re-read to verify it: {error}"
+        ))),
+    }
 }
 /// Installs the replacement as a new file when the original is already safely at
 /// the backup path. An exclusive create prevents replacing a concurrent writer.
@@ -441,6 +460,18 @@ fn replace_remote(
         Err(error) if rename_needs_fallback(&error) => {}
         Err(error) => return Err(format!("The remote server could not replace the file through rename: {error}")),
     }
+    // Some servers ignore the requested rename flags but still accept a plain rename.
+    match sftp.rename(temporary, path, Some(ssh2::RenameFlags::empty())) {
+        Ok(()) => return Ok(()),
+        Err(_) => {
+            if read_remote_bytes(sftp, path).ok().as_deref() == Some(bytes) {
+                if sftp.unlink(temporary).is_err() {
+                    record_temp_cleanup_failure(connection_id, temporary);
+                }
+                return Ok(());
+            }
+        }
+    }
     let backup = path.with_file_name(format!(".vrykell-editor-{}.bak", uuid::Uuid::new_v4()));
     let _ = crate::diagnostics::record("editor-remote-backup", serde_json::json!({
         "connectionId": connection_id, "stage": "prepare",
@@ -475,6 +506,10 @@ fn replace_remote(
                     }
                     Err(DirectWriteFailure::Precondition(reason)) => Err(format!(
                         "The remote server could not replace the file ({error}); {reason} The version being saved is kept at {}.",
+                        remote_path(&recovery)
+                    )),
+                    Err(DirectWriteFailure::Verify(reason)) => Err(format!(
+                        "The remote server could not replace the file ({error}); {reason} The previous version is kept at {}.",
                         remote_path(&recovery)
                     )),
                     Err(DirectWriteFailure::Write(direct_error)) => match restore_remote(sftp, path, original, mode) {
@@ -551,6 +586,15 @@ fn replace_remote(
             }
             match write_remote_new_file(sftp, path, bytes, mode) {
                 Ok(()) => {
+                    match read_remote_bytes(sftp, path) {
+                        Ok(installed) if installed == bytes => {}
+                        _ => {
+                            return Err(format!(
+                                "The remote file was created but could not be verified; the original is kept at {}.",
+                                remote_path(&backup)
+                            ));
+                        }
+                    }
                     if sftp.unlink(temporary).is_err() {
                         record_temp_cleanup_failure(connection_id, temporary);
                     }
