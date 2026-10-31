@@ -79,6 +79,30 @@ describe('fileMenu', () => {
     expect(buildFileMenuItems(['reveal'], ctx())).toHaveLength(0);
   });
 
+  it('builds the terminal binding submenu from the panel host data', () => {
+    const onSelect = vi.fn();
+    const items = buildFileMenuItems(['bind-terminal'], ctx({
+      terminalMenu: {
+        value: 'pane-b',
+        options: [
+          { id: 'pane-a', label: 'Build', live: true },
+          { id: 'pane-b', label: 'Server', live: true },
+        ],
+        onSelect,
+      },
+    }));
+
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ label: '绑定终端', group: 'view' });
+    const submenu = items[0]!.submenu?.items ?? [];
+    const server = submenu.find(item => item.label === 'Server');
+    expect(server).toMatchObject({ checked: true });
+    server?.onClick?.();
+    expect(onSelect).toHaveBeenCalledWith('pane-b');
+    submenu.find(item => item.label === '跟随聚焦终端')?.onClick?.();
+    expect(onSelect).toHaveBeenCalledWith(null);
+  });
+
   it('offers the preferred editor only when the panel provides a handler', () => {
     const onOpenEditor = vi.fn();
     const file = entry('a.txt', '/work/a.txt');

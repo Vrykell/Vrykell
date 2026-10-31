@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { t } from '@i18n';
 import type { GitEntry, GitScope, GitTarget } from '@core/git';
 import { useGitPreferences } from '@config/git';
 import { changeGitFile, operateGit } from '@platform/api/git';
-import { useDockStore } from '@features/workspace';
+import { useDockStore, usePanelTerminal } from '@features/workspace';
 import SidebarToolbar from '@ui/layout/SidebarToolbar';
 import ReloadButton from '@ui/actions/ReloadButton';
 import { IconButton } from '@ui/actions/IconButton';
@@ -30,7 +30,12 @@ const GROUPS: GitScope[] = ['conflicts', 'staged', 'unstaged', 'untracked'];
 const groupLabel = (scope: GitScope) => t({ conflicts: 'Merge conflicts', staged: 'Staged changes', unstaged: 'Unstaged changes', untracked: 'Untracked files' }[scope]);
 
 export default function PanelGit() {
-  const context = useGitContext();
+  const terminal = usePanelTerminal('git');
+  const bound = useMemo(() => terminal.isBound && terminal.paneId && terminal.cwd ? {
+    target: { cwd: terminal.cwd, ...(terminal.connectionId ? { connectionId: terminal.connectionId } : {}) },
+    paneId: terminal.paneId,
+  } : null, [terminal.isBound, terminal.paneId, terminal.cwd, terminal.connectionId]);
+  const context = useGitContext(bound);
   const visible = useDockStore(state => [...state.leftPanels, ...state.rightPanels].includes('git') && !state.collapsedPanels.includes('git'));
   const repository = useGitRepository(context.target, visible);
   const [query, setQuery] = useState('');
@@ -90,10 +95,15 @@ export default function PanelGit() {
     busy={!!busy || pending !== null} compare={() => target && useGitReview.getState().open({ target, paneId: context.paneId, path: entry.path, scope })}
     open={() => { if (target) void openGitFile({ target, paneId: context.paneId, path: entry.path, scope }).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}
     stage={() => { if (scope === 'conflicts') { if (target) setResolving({ target, path: entry.path }); } else void change(entry.path, scope); }} discard={() => { if (target) setDiscarding({ target, path: entry.path }); }} />;
-  return <section className="git-panel" data-testid="git-panel" aria-label={t('Source control')}>
+  return <section className="git-panel" data-testid="git-panel" data-bound-pane={terminal.boundPaneId ?? undefined} aria-label={t('Source control')}>
     <SidebarToolbar search={{ value: query, onChange: event => setQuery(event.target.value), 'aria-label': t('Search changed files'), placeholder: t('Search changed files…') }}>
       <ReloadButton compact label={t('Refresh changes')} disabled={!context.target} busy={repository.loading} onReload={refresh} />
-      <GitRepositoryActions target={target} snapshot={snapshot} refresh={refresh} showWorktrees={() => setWorktrees(value => !value)} />
+      <GitRepositoryActions target={target} snapshot={snapshot} refresh={refresh} showWorktrees={() => setWorktrees(value => !value)}
+        terminalMenu={{
+          value: terminal.boundPaneId,
+          options: terminal.options.map(option => ({ id: option.paneId, label: option.label, description: option.description, live: option.live })),
+          onSelect: terminal.bind,
+        }} />
     </SidebarToolbar>
     {context.unavailableConnection && <div className="git-empty">{t('Save this SSH connection before browsing changes.')}</div>}
     {!context.target && !context.unavailableConnection && <div className="git-empty">{t('Open a terminal in a project to browse changes.')}</div>}
@@ -110,6 +120,8 @@ export default function PanelGit() {
         <TextButton disabled={!!busy} onClick={() => setProgressAction(snapshot.operation === 'rebase' ? 'abortRebase' : 'abortMerge')}>{t('Abort operation')}</TextButton>
       </>} />}
       {worktrees && target ? <><TextButton onClick={() => setWorktrees(false)}>{t('Back to changes')}</TextButton><GitWorktrees target={target} revision={worktreeRevision} onSelect={cwd => {
+        // An explicit worktree choice ends a terminal binding; the panel uses that repository.
+        terminal.clear();
         useGitContextStore.getState().select({ target: { ...target, cwd }, paneId: context.paneId }); setWorktrees(false);
       }} /></> : <>
       {target && <GitCommit key={targetKey} target={target} snapshot={snapshot} refresh={refresh} />}

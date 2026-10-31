@@ -56,6 +56,7 @@ export {
   type NewTabOption,
 } from '@features/workspace/model/tabTypes';
 export { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
+export { usePanelTerminal, type PanelTerminalOption, type PanelTerminalState } from '@features/workspace/hooks/usePanelTerminal';
 export { useCanRemoveWorkspacePane } from './hooks/useCanRemoveWorkspacePane';
 export { useScopedPaneActive } from './hooks/useScopedPaneActive';
 export { usePlacedWorkspaceResourceIds } from './hooks/usePlacedWorkspaceResourceIds';

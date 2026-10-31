@@ -15,7 +15,8 @@ import { useWorkspaceDirsStore } from '@features/files/services/workspaceDirs';
 import { useLocalPathStore } from '@features/files/services/localPath';
 import type { FileOpsTarget } from '@features/files/model/fileOps';
 import { useActiveWorkspace } from '@features/workspace/hooks/useActiveWorkspace';
-import { useDockStore, useSessionStore } from '@features/workspace';
+import { useDockStore, usePanelTerminal, useSessionStore, type PanelTerminalState } from '@features/workspace';
+import type { TerminalBindingMenu } from '@ui/menus/terminalBindingMenu';
 import { presentWorkspaceResource } from '@features/workspace/services/unifiedWorkspace';
 import { ptyWrite } from '@platform/pty';
 import { getAvailableShells } from '@platform/shells';
@@ -36,29 +37,37 @@ const LOCAL_TARGET: FileOpsTarget = { kind: 'local' };
  * shown. Both share FilePanel and useFileBrowser and differ only in their FileOps target.
  */
 export default function PanelFiles() {
+  const terminal = usePanelTerminal('files');
   const { focusedSpec, activeTab } = useActiveWorkspace();
-  const connectionId = activeTab?.kind === 'editor' ? activeTab.selected.connectionId : focusedSpec?.ssh?.connectionId;
+  const connectionId = terminal.isBound
+    ? terminal.connectionId
+    : activeTab?.kind === 'editor' ? activeTab.selected.connectionId : focusedSpec?.ssh?.connectionId;
   const sshConnections = useSshStore((s) => s.connections);
   const sshLoaded = useSshStore((s) => s.loaded);
   const filesOpen = useDockStore(s => (s.leftPanels.includes('files') || s.rightPanels.includes('files')) && !s.collapsedPanels.includes('files'));
   useEffect(() => { ensureSshLoaded(); }, []);
+  const terminalMenu: TerminalBindingMenu = {
+    value: terminal.boundPaneId,
+    options: terminal.options.map(option => ({ id: option.paneId, label: option.label, description: option.description, live: option.live })),
+    onSelect: terminal.bind,
+  };
 
   if (sshLoaded && connectionId) {
     const conn = sshConnections.find((c) => c.id === connectionId);
-    if (conn) return <RemoteFiles key={conn.id} conn={conn} enabled={filesOpen} />;
+    if (conn) return <RemoteFiles key={conn.id} conn={conn} enabled={filesOpen} terminal={terminal} terminalMenu={terminalMenu} />;
   }
-  return <LocalFiles enabled={filesOpen} />;
+  return <LocalFiles enabled={filesOpen} terminal={terminal} terminalMenu={terminalMenu} />;
 }
 
 /** Local panel: provides the local-only menu entries, icons and disk view. */
-function LocalFiles({ enabled }: { enabled: boolean }) {
+function LocalFiles({ enabled, terminal, terminalMenu }: { enabled: boolean; terminal: PanelTerminalState; terminalMenu: TerminalBindingMenu }) {
   const [transferPage, setTransferPage] = useState<'upload' | 'download' | null>(null);
   const workspaceDirs = useWorkspaceDirsStore();
   const rememberedPath = useLocalPathStore((state) => state.remembered);
-  // Start with the remembered location, otherwise use the focused terminal directory.
-  // Navigation stays decoupled from the terminal afterwards.
-  const { focusedPaneId: focused, focusedSpec, activeCwd, sessions } = useActiveWorkspace();
-  const shellType = useTerminalStore(state => state.shellTypes?.[focused]) ?? focusedSpec?.shellType;
+  const sessions = useTerminalStore(state => state.sessions);
+  const shellTypes = useTerminalStore(state => state.shellTypes);
+  const paneId = terminal.paneId;
+  const shellType = (paneId ? shellTypes?.[paneId] : undefined) ?? terminal.spec?.shellType;
 
   /** Open a local file with the system default application. */
   const openWithSystemApp = (path: string) => {
@@ -103,13 +112,15 @@ function LocalFiles({ enabled }: { enabled: boolean }) {
     <FilePanel
       target={LOCAL_TARGET}
       enabled={enabled}
-      initialPath={rememberedPath ? rememberedPath.path : activeCwd ?? null}
+      initialPath={rememberedPath ? rememberedPath.path : terminal.cwd ?? null}
       initialResolved={rememberedPath !== null}
       onPathChange={(next) => useLocalPathStore.getState().remember(next)}
-      terminalCwd={activeCwd ?? null}
+      terminalCwd={terminal.cwd ?? null}
+      followCwd={terminal.isBound ? terminal.cwd ?? null : null}
+      terminalMenu={terminalMenu}
       openEntry={(entry) => void openPreferredFile({ path: entry.path }, () => openFileInTerminal(entry))}
       onSyncToTerminal={(dir) => {
-        const sid = sessions[focused];
+        const sid = paneId ? sessions[paneId] : undefined;
         if (!sid) {
           useToastStore.getState().addToast(t('The terminal session is not ready.'), 'info');
           return;

@@ -23,6 +23,17 @@ describe('filePanelConfig menus', () => {
     expect(ssh.menus.more).not.toContain('reveal');
   });
 
+  it('offers terminal binding in both panel-level menus of both panels', () => {
+    const local = filePanelConfigFor({ kind: 'local' });
+    const ssh = filePanelConfigFor({ kind: 'ssh', connectionId: 'c1' });
+
+    for (const config of [local, ssh]) {
+      expect(config.menus.more).toContain('bind-terminal');
+      expect(config.menus.blank).toContain('bind-terminal');
+      expect(config.menus.rowFile).not.toContain('bind-terminal');
+    }
+  });
+
   it('offers the preferred editor on file rows of both panels', () => {
     const local = filePanelConfigFor({ kind: 'local' });
     const ssh = filePanelConfigFor({ kind: 'ssh', connectionId: 'c1' });

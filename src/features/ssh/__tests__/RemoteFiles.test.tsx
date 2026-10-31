@@ -105,7 +105,22 @@ describe('remote file terminal routing', () => {
     await waitFor(() => expect(mocks.write).toHaveBeenCalledWith('ssh-session', expect.stringContaining("'/home/test/config.txt'")));
     expect(mocks.toast).not.toHaveBeenCalled();
     expect(mocks.focus).toHaveBeenCalledWith('tab#0');
-    expect(mocks.debug).toHaveBeenCalledWith('remote-file-terminal-action', { action: 'edit', paneId: 'tab#0', tabId: 'tab', hasSession: true });
+    expect(mocks.debug).toHaveBeenCalledWith('remote-file-terminal-action', { action: 'edit', paneId: 'tab#0', tabId: 'tab', hasSession: true, bound: false });
+  });
+
+  it('writes to the bound pane instead of the focused pane', async () => {
+    useSessionStore.setState({ tabs: [
+      { id: 'tab', kind: 'session', title: 'SSH', layout: sshPane('tab#0') },
+      { id: 'other', kind: 'session', title: 'Other', layout: sshPane('other#0') },
+    ] });
+    useTerminalStore.setState({ focusedPaneId: 'tab#0', sessions: { 'tab#0': 'ssh-session', 'other#0': 'bound-session' } });
+    const terminal = { isBound: true, paneId: 'other#0', cwd: '/home/other' } as import('@features/workspace').PanelTerminalState;
+    render(<RemoteFiles conn={conn} terminal={terminal} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open remote file' }));
+    await waitFor(() => expect(mocks.write).toHaveBeenCalledWith('bound-session', expect.stringContaining("'/home/test/config.txt'")));
+    expect(mocks.debug).toHaveBeenCalledWith('remote-file-terminal-action', {
+      action: 'edit', paneId: 'other#0', tabId: 'tab', hasSession: true, bound: true,
+    });
   });
 
   it('uses the focused matching split pane for file opening and directory sync', async () => {

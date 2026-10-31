@@ -22,6 +22,7 @@ import FileDragPreview from '@features/files/components/FileDragPreview';
 import FilePropertiesDialog from '@features/files/components/FilePropertiesDialog';
 import FileSearchMenu from './FileSearchMenu';
 import ContextMenu from '@ui/menus/ContextMenu';
+import type { TerminalBindingMenu } from '@ui/menus/terminalBindingMenu';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import { useToastStore } from '@ui/feedback/Toast';
@@ -44,6 +45,10 @@ export interface FilePanelProps {
   onSyncToTerminal?: (currentDir: string) => void;
   /** Current terminal directory, used to relocate the file panel. */
   terminalCwd?: string | null;
+  /** Directory of a bound terminal; a change navigates the panel to it. */
+  followCwd?: string | null;
+  /** Terminal binding submenu for this panel. */
+  terminalMenu?: TerminalBindingMenu;
   /** Panel-specific menu callbacks; entries without one are hidden. */
   handlers?: Partial<FileMenuHandlers>;
   /** Row icon (local: by extension or workspace highlight). */
@@ -79,6 +84,8 @@ export default function FilePanel({
   openEntry,
   onSyncToTerminal,
   terminalCwd,
+  followCwd,
+  terminalMenu,
   handlers: extraHandlers,
   renderIcon,
   isHighlighted,
@@ -157,6 +164,15 @@ export default function FilePanel({
     seenReloadRevision.current = reloadRevision;
     if (enabled) refresh();
   }, [reloadRevision, enabled, refresh]);
+
+  // Follow only when the bound terminal reports a new directory. Manual browsing stays
+  // possible until that terminal changes directory again.
+  const followedCwd = useRef<string | null>(null);
+  useEffect(() => {
+    if (!followCwd || followCwd === followedCwd.current) return;
+    followedCwd.current = followCwd;
+    void navigate(followCwd);
+  }, [followCwd, navigate]);
 
   const rows = useMemo(() => flattenVisible(entries, expandedSet, childCache), [entries, expandedSet, childCache]);
   const [pathDraft, setPathDraft] = useState<string | null>(null);
@@ -585,6 +601,7 @@ export default function FilePanel({
             targetDir: resolveTargetDir(ctxMenu.entry, path ?? '', ops.parentOf),
             clipboard,
             inWorkspace: isHighlighted?.(ctxMenu.entry.path) ?? false,
+            terminalMenu,
             handlers,
           })}
           onClose={closeContextMenu}
@@ -608,6 +625,7 @@ export default function FilePanel({
               currentDir: path,
               targetDir: path,
               clipboard,
+              terminalMenu,
               handlers,
             }),
           ]}
@@ -624,6 +642,7 @@ export default function FilePanel({
             currentDir: path,
             targetDir: path,
             clipboard,
+            terminalMenu,
             handlers,
           })}
           onClose={closeBlankMenu}

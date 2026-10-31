@@ -33,6 +33,17 @@ beforeEach(() => {
 });
 async function menu(id: string) { fireEvent.click(within(await screen.findByTestId(`command-history-${id}`)).getByRole('button', { name: t('Command actions') })); }
 
+it('offers terminal binding in the panel actions menu', async () => {
+  render(<PanelCommandHistory />);
+  await screen.findByTestId('command-history-build');
+  fireEvent.click(screen.getByTestId('command-history-more'));
+  const bind = screen.getByRole('menuitem', { name: '绑定终端' });
+  fireEvent.pointerEnter(bind);
+  const submenu = screen.getByRole('menu', { name: '绑定终端' });
+  expect(within(submenu).getByRole('menuitemradio', { name: '跟随聚焦终端' })).toHaveAttribute('aria-checked', 'true');
+  expect(within(submenu).getByRole('button', { name: '没有活跃的终端' })).toBeDisabled();
+});
+
 it('keeps custom group colors directly below its menu actions', async () => {
   saved.groups = [{ id: 'tools', name: 'Tools', commandKeys: [] }];
   render(<PanelCommandHistory />);

@@ -24,6 +24,17 @@ it('does not use a previous local repository for an unsaved remote terminal', ()
   rerender();
   expect(result.current).toMatchObject({ target: null, unavailableConnection: true });
 });
+it('keeps an explicitly bound terminal when focus and the active editor change', () => {
+  const bound = { target: { cwd: '/bound', connectionId: 'remote-bound' }, paneId: 'pane-bound' };
+  const { result, rerender } = renderHook(() => useGitContext(bound));
+  expect(result.current).toMatchObject({ target: bound.target, paneId: 'pane-bound' });
+
+  Object.assign(context, { activeTab: { kind: 'editor', id: 'editor', selected: { path: '/other/src/file.ts', connectionId: 'remote' } }, focusedSpec: null, activeCwd: undefined });
+  rerender();
+  expect(result.current).toMatchObject({ target: bound.target, paneId: 'pane-bound' });
+  expect(useGitContextStore.getState().recent).toBeNull();
+});
+
 it('follows the active editor file and remembers its source page', () => {
   Object.assign(context, { activeTab: { kind: 'editor', id: 'editor', selected: { path: '/other/src/file.ts', connectionId: 'remote' } }, focusedSpec: null, activeCwd: undefined });
   const { result } = renderHook(() => useGitContext());

@@ -5,6 +5,8 @@ import type { FsEntry } from '@platform/api/types';
 import type { SshConnection } from '@features/ssh/services/api';
 import FilePanel from '@features/files/components/FilePanel';
 import DownloadManager from '@features/files/components/DownloadManager';
+import type { PanelTerminalState } from '@features/workspace';
+import type { TerminalBindingMenu } from '@ui/menus/terminalBindingMenu';
 import { fileOpsFor, type FileOpsTarget } from '@features/files/model/fileOps';
 import { loadConfig, remoteOpenCommand } from '@features/files/services/fileOpen';
 import { openPreferredFile } from '@features/files';
@@ -29,14 +31,16 @@ import { requestSshAuthentication, useSshAuthenticationRevision } from '../hooks
  * is operated on, and the panel configuration derives menu and drag semantics. The remote-only
  * parts are upload/download, opening in a remote editor and file-service failure messages.
  */
-export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnection; enabled?: boolean }) {
+export default function RemoteFiles({ conn, enabled = true, terminal, terminalMenu }: {
+  conn: SshConnection; enabled?: boolean; terminal?: PanelTerminalState; terminalMenu?: TerminalBindingMenu;
+}) {
   const authenticationRevision = useSshAuthenticationRevision(conn.id);
   const target = useMemo<FileOpsTarget>(() => ({ kind: 'ssh', connectionId: conn.id }), [conn.id]);
   const ops = useMemo(() => fileOpsFor(target), [target]);
   const storedPath = useRemotePathStore((state) => state.path[conn.id] ?? null);
   const [transferPage, setTransferPage] = useState<'upload' | 'download' | null>(null);
-  const paneId = sshPaneIdFor(conn.id);
-  const terminalCwd = useSessionStore((state) => paneId ? state.terminalCwds[paneId] : undefined);
+  const paneId = terminal?.isBound ? terminal.paneId : sshPaneIdFor(conn.id);
+  const terminalCwd = useSessionStore((state) => terminal?.isBound ? terminal.cwd : paneId ? state.terminalCwds[paneId] : undefined);
 
   const toast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
     useToastStore.getState().addToast(message, type);
@@ -44,18 +48,21 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
 
   /** Resolve the matching pane at action time, including split panes and tab changes. */
   const writeTerminalCommand = (command: string, action: 'edit' | 'sync-directory') => {
-    const currentPaneId = sshPaneIdFor(conn.id);
-    const terminal = useTerminalStore.getState();
-    const sid = currentPaneId ? terminal.sessions[currentPaneId] : undefined;
+    const bound = !!terminal?.isBound;
+    const currentPaneId = bound ? terminal?.paneId : sshPaneIdFor(conn.id);
+    const store = useTerminalStore.getState();
+    const sid = currentPaneId ? store.sessions[currentPaneId] : undefined;
     terminalDebug('remote-file-terminal-action', {
-      action, paneId: currentPaneId, tabId: useSessionStore.getState().activeId, hasSession: Boolean(sid),
+      action, paneId: currentPaneId, tabId: useSessionStore.getState().activeId, hasSession: Boolean(sid), bound,
     });
     if (!sid || !currentPaneId) {
       toast(t('SSH session is not ready'), 'info');
       return;
     }
     void ptyWrite(sid, command).then(() => {
-      if (sshPaneIdFor(conn.id) !== currentPaneId) return;
+      if (bound) {
+        if (action !== 'edit') return;
+      } else if (sshPaneIdFor(conn.id) !== currentPaneId) return;
       useTerminalStore.getState().setFocusedPane(currentPaneId);
       getPaneTerminal(currentPaneId)?.focus();
       if (action === 'edit') presentWorkspaceResource(`terminal:${currentPaneId}`);
@@ -95,8 +102,10 @@ export default function RemoteFiles({ conn, enabled = true }: { conn: SshConnect
       target={target}
       enabled={enabled}
       reloadRevision={authenticationRevision}
-      initialPath={storedPath}
+      initialPath={terminal?.isBound ? terminal.cwd ?? storedPath : storedPath}
       terminalCwd={terminalCwd}
+      followCwd={terminal?.isBound ? terminal.cwd ?? null : null}
+      terminalMenu={terminalMenu}
       onPathChange={(next) => useRemotePathStore.getState().set(conn.id, next)}
       openEntry={remoteEdit}
       onSyncToTerminal={(dir) => {

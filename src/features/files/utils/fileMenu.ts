@@ -3,6 +3,7 @@ import { FILE_DIRECTORY_SHORTCUTS } from '@config/fileShortcuts';
 import type { FsEntry } from '@platform/api/types';
 import { t } from '@i18n';
 import type { ContextMenuItem } from '@ui/menus/ContextMenu';
+import { terminalBindingMenuItem, type TerminalBindingMenu } from '@ui/menus/terminalBindingMenu';
 import type { FileClipboard } from '@features/files/hooks/useFileBrowser';
 import type { FileMenuItemKey } from '@features/files/model/filePanelConfig';
 
@@ -60,6 +61,8 @@ export interface FileMenuContext {
   clipboard: FileClipboard | null;
   /** Whether the row is in the workspace (local highlight only). */
   inWorkspace?: boolean;
+  /** Terminal binding submenu when the host provides it. */
+  terminalMenu?: TerminalBindingMenu;
   handlers: FileMenuHandlers;
 }
 
@@ -128,6 +131,8 @@ function itemFor(key: FileMenuItemKey, ctx: FileMenuContext): ContextMenuItem | 
       return handlers.onUpload ? { label: t('Upload folder'), onClick: () => handlers.onUpload!('dir') } : null;
     case 'new-tab-here':
       return currentDir === null ? null : { label: t('New tab from this folder'), onClick: () => handlers.onNewTabHere?.(currentDir) };
+    case 'bind-terminal':
+      return ctx.terminalMenu ? terminalBindingMenuItem(ctx.terminalMenu) : null;
     case 'sync-cwd':
       return handlers.onSyncToCwd ? { label: t('files.syncToCwd'), shortcut: FILE_DIRECTORY_SHORTCUTS.panel, onClick: handlers.onSyncToCwd } : null;
     case 'sync-terminal':
@@ -155,7 +160,7 @@ export function buildFileMenuItems(keys: FileMenuItemKey[], ctx: FileMenuContext
       const group: MenuGroup = key.startsWith('open-') || key === 'new-tab-here' ? 'primary'
         : clipboard.includes(key) ? 'clipboard'
           : ['new-file', 'new-folder', 'rename', 'upload-file', 'upload-dir', 'download'].includes(key) ? 'edit'
-            : ['reveal', 'sync-terminal', 'sync-cwd', 'downloads-view', 'uploads-view', 'collapse-all', 'refresh'].includes(key) ? 'view' : 'organize';
+            : ['reveal', 'sync-terminal', 'sync-cwd', 'bind-terminal', 'downloads-view', 'uploads-view', 'collapse-all', 'refresh'].includes(key) ? 'view' : 'organize';
       items.push({ ...item, group, order: clipboard.includes(key) ? clipboard.indexOf(key) : 0 });
     }
   }

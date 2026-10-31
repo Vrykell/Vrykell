@@ -12,10 +12,12 @@ import FilterChip from '@ui/menus/FilterChip';
 import { Ellipsis, Filter, Folder, iconSizes, Plus, Sparkles, Terminal } from '@ui/icons';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import ContextMenu, { type MenuAnchor } from '@ui/menus/ContextMenu';
+import { terminalBindingMenuItem } from '@ui/menus/terminalBindingMenu';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import HistoryOptionMenu from '@ui/history/HistoryOptionMenu';
 import { safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import { ListReorderPreview, useListReorder, useListReorderDrag } from '@ui/layout/listReorder';
+import { usePanelTerminal } from '@features/workspace';
 import { useProjectScope } from '../hooks/useProjectScope';
 import { useCommandLibrary } from '../hooks/useCommandLibrary';
 import { readCommandCollapse, writeCommandCollapse } from '../model/collapse';
@@ -67,6 +69,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
   context: ExecutionContext; visible: boolean; onChooseRoot: (event: MouseEvent) => void;
 }) {
   const library = useCommandLibrary(context, visible);
+  const terminal = usePanelTerminal('command-history');
   const { preferences, update } = library;
   const { runIn, doubleClick } = useCommandHistorySettings();
   const [query, setQuery] = useState('');
@@ -262,6 +265,11 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
         { label: t('Same environment only'), active: sameEnvironment, onSelect: () => setSameEnvironment(true) }] },
     ]} onClose={() => setFilterMenu(null)} />}
     {visible && actionsMenu && <ContextMenu anchor={actionsMenu} label={t('Command history actions')} onClose={() => setActionsMenu(null)} items={[
+      terminalBindingMenuItem({
+        value: terminal.boundPaneId,
+        options: terminal.options.map(option => ({ id: option.paneId, label: option.label, description: option.description, live: option.live })),
+        onSelect: terminal.bind,
+      }),
       { label: t('New command group'), onClick: () => createGroup() },
       { label: t('AI auto-group'), disabled: !groupable.length, onClick: openGrouping },
       { label: t('Refresh'), group: 'view', onClick: library.refresh },

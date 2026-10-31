@@ -4,7 +4,7 @@ import type { GitTarget } from '@core/git';
 import { useGitContextStore } from '../stores/context';
 import { parentOf } from '@platform/path';
 
-export function useGitContext() {
+export function useGitContext(bound: { target: GitTarget; paneId: string } | null = null) {
   const { activeTab, activeCwd, focusedSpec, focusedPaneId } = useActiveWorkspace();
   const connectionId = focusedSpec?.kind === 'ssh' ? focusedSpec.ssh?.connectionId : undefined;
   const unavailableConnection = focusedSpec?.kind === 'ssh' && !connectionId;
@@ -12,14 +12,14 @@ export function useGitContext() {
     ? { cwd: activeCwd, ...(connectionId ? { connectionId } : {}) } : null, [activeCwd, !!focusedSpec, unavailableConnection, connectionId]);
   const recent = useGitContextStore(state => state.recent);
   const rememberedKey = useGitContextStore(state => state.sourceKey);
-  const current = activeTab?.kind === 'git-diff' ? activeTab.selection
+  const current = bound ?? (activeTab?.kind === 'git-diff' ? activeTab.selection
     : activeTab?.kind === 'editor' ? { target: { cwd: parentOf(activeTab.selected.path) ?? activeTab.selected.path, connectionId: activeTab.selected.connectionId }, paneId: activeTab.id }
-      : target ? { target, paneId: focusedPaneId } : null;
+      : target ? { target, paneId: focusedPaneId } : null);
   const sourceKey = current ? JSON.stringify([current.paneId, current.target.cwd, current.target.connectionId]) : '';
   useEffect(() => {
-    if (current) useGitContextStore.getState().remember(sourceKey, current);
-  }, [sourceKey]);
-  const resolved = activeTab?.kind === 'session' && !current ? null : current && sourceKey !== rememberedKey ? current : recent;
+    if (!bound && current) useGitContextStore.getState().remember(sourceKey, current);
+  }, [bound, sourceKey]);
+  const resolved = bound ?? (activeTab?.kind === 'session' && !current ? null : current && sourceKey !== rememberedKey ? current : recent);
   return { target: resolved?.target ?? null, paneId: resolved?.paneId ?? focusedPaneId,
     sourceKey: sourceKey || rememberedKey, unavailableConnection: !!unavailableConnection && !resolved };
 }
