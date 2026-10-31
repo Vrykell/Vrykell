@@ -96,20 +96,24 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
   const beginPlacement = (addition: Addition) => { setPlacement(addition); };
   /** A tab-bar menu opens its picker flush under the strip; a menu opened at the pointer
    *  keeps the picker at that click position. */
-  const pickerAnchor = (menuAnchor?: MenuAnchor): DropdownAnchor | undefined => {
+  const pickerAnchor = (rowAnchor?: MenuAnchor, menuAnchor?: MenuAnchor): DropdownAnchor | undefined => {
     const toolbar = newButton.current?.getBoundingClientRect();
-    if (toolbar && menuAnchor?.trigger?.closest('.folder-header')) {
+    const trigger = menuAnchor?.trigger;
+    // A menu on the tab strip's empty area opens under the toolbar; a menu on a tab row
+    // keeps the picker beside the action that was selected.
+    if (toolbar && menuAnchor && trigger && trigger.closest('.folder-header') && !trigger.closest('.folder-tab')) {
       return { x: menuAnchor.x, y: toolbar.bottom + 4, aboveY: toolbar.top, align: menuAnchor.align };
     }
+    if (rowAnchor) return { x: rowAnchor.x, y: rowAnchor.y, aboveY: rowAnchor.y, align: menuAnchor?.align };
     return menuAnchor ? { x: menuAnchor.x, y: menuAnchor.y, aboveY: menuAnchor.y, align: menuAnchor.align } : undefined;
   };
-  const pickerOrigin = (menuAnchor?: MenuAnchor) => ({
+  const pickerOrigin = (rowAnchor?: MenuAnchor, menuAnchor?: MenuAnchor) => ({
     split: menu?.split ?? false,
-    anchor: pickerAnchor(menuAnchor ?? menu?.anchor),
+    anchor: pickerAnchor(rowAnchor, menuAnchor),
   });
   const creation = (split: boolean): ContextMenuItem[] => [
-    { label: t('New terminal'), onClick: (_row, menuAnchor) => setTerminalPicker({ source: 'shell', ...pickerOrigin(menuAnchor) }) },
-    { label: t('Connect a server'), onClick: (_row, menuAnchor) => setTerminalPicker({ source: 'ssh', ...pickerOrigin(menuAnchor) }) },
+    { label: t('New terminal'), onClick: (row, menuAnchor) => setTerminalPicker({ source: 'shell', ...pickerOrigin(row, menuAnchor) }) },
+    { label: t('Connect a server'), onClick: (row, menuAnchor) => setTerminalPicker({ source: 'ssh', ...pickerOrigin(row, menuAnchor) }) },
     ...(['conversation', 'document'] as const).map(kind => ({
       label: t(kind === 'conversation' ? 'New conversation' : 'New file'),
       onClick: () => split ? setPlacement({ kind: 'new', resource: kind }) : newItem(kind),
@@ -124,7 +128,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
         void openWorkspaceFile();
       },
     },
-    { label: t('ACP agents'), onClick: (_row, menuAnchor) => setLauncher(pickerOrigin(menuAnchor)) },
+    { label: t('ACP agents'), onClick: (row, menuAnchor) => setLauncher(pickerOrigin(row, menuAnchor)) },
   ];
   const focusedResource = resources.find(resource => resource.id === focused?.resourceId);
   return <section className="unified-workspace" data-testid="unified-workspace" style={{ display: active ? 'flex' : 'none' }} inert={!visible}>

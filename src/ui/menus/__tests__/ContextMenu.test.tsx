@@ -11,7 +11,7 @@ describe('independent action menus', () => {
     const row = screen.getByRole('button', { name: 'Choose profile' });
     vi.spyOn(row, 'getBoundingClientRect').mockReturnValue({ left: 420, bottom: 236 } as DOMRect);
     fireEvent.click(row);
-    expect(action).toHaveBeenCalledWith({ x: 420, y: 240 });
+    expect(action).toHaveBeenCalledWith({ x: 420, y: 240 }, { x: 400, y: 100 });
     expect(close).toHaveBeenCalledOnce();
   });
   it('keeps a controlled select action inside its owning menu during pointer presses', () => {
