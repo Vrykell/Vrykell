@@ -98,6 +98,7 @@ test('prefixes scope results temporarily and settings search focuses individual 
   await page.getByTestId('global-search-trigger').click();
   const dialog = page.getByRole('dialog', { name: '全局搜索' });
   const input = dialog.getByRole('textbox', { name: '搜索工作区' });
+  await expect(input).toBeFocused();
   await input.fill('@ 终端字号');
   const result = dialog.locator('[data-search-result]').filter({ hasText: '终端字号' }).first();
   await expect(result).toBeVisible();
@@ -106,10 +107,12 @@ test('prefixes scope results temporarily and settings search focuses individual 
   await result.click();
   await expect(page.getByRole('combobox', { name: '终端字号', exact: true })).toBeFocused();
   await page.getByTestId('global-search-trigger').click();
+  await expect(input).toBeFocused();
   await input.fill('@ 补全防抖');
   await dialog.locator('[data-search-result]').filter({ hasText: '补全防抖' }).click();
   await expect(page.locator('.settings-field[data-setting-title="补全防抖"]')).toHaveAttribute('data-setting-title', '补全防抖');
   await page.getByTestId('global-search-trigger').click();
+  await expect(input).toBeFocused();
   await input.fill('>');
   await expect(dialog.locator('[data-search-result]').first()).toBeVisible();
   await dialog.getByRole('button', { name: '清除搜索范围' }).click();

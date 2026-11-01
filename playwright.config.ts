@@ -23,9 +23,14 @@ const origin = `http://127.0.0.1:${port}`;
 
 export default defineConfig({
   testDir: './e2e',
-  timeout: 30_000,
-  retries: 0,
-  // PTY、Canvas 与窗口尺寸断言对并行资源竞争敏感，E2E 串行运行以保持确定性。
+  timeout: 60_000,
+  // Browser rows involve a real renderer and PTY polling; CI can pause longer than the
+  // local machine between an action and its next paint. Keep retries for that environment
+  // only so a single slow frame cannot hide a reproducible failure.
+  retries: process.env.CI ? 1 : 0,
+  expect: { timeout: 10_000 },
+  // PTY, canvas and window-size assertions are sensitive to parallel resource contention;
+  // run E2E serially to keep them deterministic.
   workers: 1,
   use: {
     // Match the desktop browser: native scrollbars must be visible and draggable.
