@@ -449,10 +449,22 @@ fn write_remote_in_place(
     ) {
         Ok(file) => file,
         Err(error) => {
-            let _ = remove_remote(sftp, &recovery);
-            return Err(format!(
-                "Could not open the remote file for a direct replacement: {error}. The original file was not changed."
-            ));
+            // A lost status reply can hide a truncate. Restore the recovery copy
+            // instead of assuming the target is still intact.
+            return match restore_remote(sftp, path, original, mode) {
+                Ok(()) => {
+                    if remove_remote(sftp, &recovery).is_err() {
+                        record_temp_cleanup_failure(connection_id);
+                    }
+                    Err(format!(
+                        "Could not open the remote file for a direct replacement: {error}. The original content was restored."
+                    ))
+                }
+                Err(restore_error) => Err(format!(
+                    "Could not open the remote file for a direct replacement: {error}. The original content could not be restored; it is kept at {}: {restore_error}",
+                    remote_path(&recovery)
+                )),
+            }
         }
     };
     let direct = (move || -> Result<(), String> {
