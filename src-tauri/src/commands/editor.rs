@@ -204,7 +204,7 @@ fn apply_remote_mode(sftp: &ssh2::Sftp, path: &Path, mode: Option<u32>, connecti
         size: None, uid: None, gid: None, perm: Some(mode), atime: None, mtime: None,
     }).is_err() {
         let _ = crate::diagnostics::record("editor-remote-mode", serde_json::json!({
-            "connectionId": connection_id, "path": remote_path(path), "succeeded": false,
+            "connectionId": connection_id, "succeeded": false,
         }));
     }
 }
@@ -351,9 +351,9 @@ fn save_sync(
     }
     save_local(Path::new(&target.path), &bytes, &expected)
 }
-fn record_temp_cleanup_failure(connection_id: Option<&str>, temporary: &Path) {
+fn record_temp_cleanup_failure(connection_id: Option<&str>) {
     let _ = crate::diagnostics::record("editor-remote-temp", serde_json::json!({
-        "connectionId": connection_id, "path": remote_path(temporary), "succeeded": false,
+        "connectionId": connection_id, "succeeded": false,
     }));
 }
 /// Replaces the original through an atomic rename. Servers that reject the rename
@@ -379,7 +379,7 @@ fn replace_remote(
             // success when the target contains exactly the bytes we wrote.
             if read_remote_bytes(sftp, path).ok().as_deref() == Some(bytes) {
                 if remove_remote(sftp, temporary).is_err() {
-                    record_temp_cleanup_failure(connection_id, temporary);
+                    record_temp_cleanup_failure(connection_id);
                 }
                 return Ok(());
             }
@@ -395,7 +395,7 @@ fn replace_remote(
             // The retry may have succeeded before its status reply was lost.
             if read_remote_bytes(sftp, path).ok().as_deref() == Some(bytes) {
                 if remove_remote(sftp, temporary).is_err() {
-                    record_temp_cleanup_failure(connection_id, temporary);
+                    record_temp_cleanup_failure(connection_id);
                 }
                 return Ok(());
             }
@@ -445,7 +445,7 @@ fn save_remote(
         ) {
             Ok(file) => file,
             Err(error) if is_permission_denied(&error) => {
-                return Err("Saving next to the remote file is not possible because the remote directory is not writable. Use Save As or the remote terminal to edit this file.".into());
+                return Err("Saving next to the remote file is not possible because the remote directory is not writable. Use the remote terminal to edit this file.".into());
             }
             Err(error) => return Err(format!("Could not create a temporary file next to the remote file: {error}")),
         };
@@ -472,7 +472,7 @@ fn save_remote(
     })();
     if result.is_err() {
         if remove_remote(sftp, &temporary).is_err() {
-            record_temp_cleanup_failure(target.connection_id.as_deref(), &temporary);
+            record_temp_cleanup_failure(target.connection_id.as_deref());
             if let Err(error) = &mut result {
                 error.push_str(&format!(
                     " A temporary file may remain at {}.",
