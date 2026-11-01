@@ -356,15 +356,151 @@ fn record_temp_cleanup_failure(connection_id: Option<&str>) {
         "connectionId": connection_id, "succeeded": false,
     }));
 }
+/// Creates a hidden recovery copy of the previous content before an in-place write.
+/// The copy is removed after a successful write or restore; it is not a `.bak` file.
+fn create_recovery_copy(
+    sftp: &ssh2::Sftp,
+    recovery: &Path,
+    original: &[u8],
+    mode: Option<u32>,
+    connection_id: Option<&str>,
+) -> Result<(), String> {
+    let result = (|| -> Result<(), String> {
+        let mut file = sftp
+            .open_mode(
+                recovery,
+                ssh2::OpenFlags::WRITE | ssh2::OpenFlags::CREATE | ssh2::OpenFlags::EXCLUSIVE,
+                mode.unwrap_or(0o600) as i32,
+                ssh2::OpenType::File,
+            )
+            .map_err(|error| format!("Could not create a recovery copy next to the remote file: {error}"))?;
+        file.write_all(original)
+            .map_err(|error| format!("Could not write the recovery copy: {error}"))?;
+        file.close()
+            .map_err(|error| format!("Could not finish the recovery copy: {error}"))?;
+        apply_remote_mode(sftp, recovery, mode, connection_id);
+        match read_remote_bytes(sftp, recovery) {
+            Ok(bytes) if bytes == original => Ok(()),
+            Ok(_) => Err("The recovery copy could not be verified.".into()),
+            Err(error) => Err(format!("Could not verify the recovery copy: {error}")),
+        }
+    })();
+    if result.is_err() {
+        let _ = remove_remote(sftp, recovery);
+    }
+    result
+}
+
+fn restore_remote(
+    sftp: &ssh2::Sftp,
+    path: &Path,
+    original: &[u8],
+    mode: Option<u32>,
+) -> Result<(), String> {
+    let mut file = sftp
+        .open_mode(
+            path,
+            ssh2::OpenFlags::WRITE | ssh2::OpenFlags::CREATE | ssh2::OpenFlags::TRUNCATE,
+            mode.unwrap_or(0o600) as i32,
+            ssh2::OpenType::File,
+        )
+        .map_err(|error| error.to_string())?;
+    file.write_all(original).map_err(|error| error.to_string())?;
+    file.close().map_err(|error| error.to_string())?;
+    match read_remote_bytes(sftp, path) {
+        Ok(bytes) if bytes == original => Ok(()),
+        Ok(_) => Err("The restored original could not be verified.".into()),
+        Err(error) => Err(format!("The restored original could not be re-read: {error}")),
+    }
+}
+
+/// Last resort for servers that refuse both rename forms. The previous content is
+/// copied to a hidden temporary recovery file, then the target is truncated and
+/// written directly. A failed write restores the recovery copy; no `.bak` is left.
+fn write_remote_in_place(
+    sftp: &ssh2::Sftp,
+    path: &Path,
+    bytes: &[u8],
+    expected: &str,
+    original: &[u8],
+    mode: Option<u32>,
+    connection_id: Option<&str>,
+) -> Result<(), String> {
+    let recovery = path.with_file_name(format!(".vrykell-editor-{}.tmp", uuid::Uuid::new_v4()));
+    if let Err(error) = create_recovery_copy(sftp, &recovery, original, mode, connection_id) {
+        return Err(format!("The direct replacement was not attempted: {error}"));
+    }
+    let latest = match read_remote_bytes(sftp, path) {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            let _ = remove_remote(sftp, &recovery);
+            return Err(format!("Could not re-read the remote file before the direct replacement: {error}"));
+        }
+    };
+    if let Err(error) = check_revision(&latest, expected) {
+        let _ = remove_remote(sftp, &recovery);
+        return Err(format!("{error} The direct replacement was not attempted."));
+    }
+    let mut file = match sftp.open_mode(
+        path,
+        ssh2::OpenFlags::WRITE | ssh2::OpenFlags::CREATE | ssh2::OpenFlags::TRUNCATE,
+        mode.unwrap_or(0o600) as i32,
+        ssh2::OpenType::File,
+    ) {
+        Ok(file) => file,
+        Err(error) => {
+            let _ = remove_remote(sftp, &recovery);
+            return Err(format!(
+                "Could not open the remote file for a direct replacement: {error}. The original file was not changed."
+            ));
+        }
+    };
+    let direct = (move || -> Result<(), String> {
+        file.write_all(bytes)
+            .map_err(|error| format!("Could not write the remote file directly: {error}"))?;
+        file.close()
+            .map_err(|error| format!("Could not finish the remote file after a direct write: {error}"))?;
+        match read_remote_bytes(sftp, path) {
+            Ok(installed) if installed == bytes => Ok(()),
+            Ok(_) => Err("The direct write finished, but the remote file could not be verified.".into()),
+            Err(error) => Err(format!("The direct write finished, but the remote file could not be re-read: {error}")),
+        }
+    })();
+    match direct {
+        Ok(()) => {
+            if remove_remote(sftp, &recovery).is_err() {
+                record_temp_cleanup_failure(connection_id);
+            }
+            Ok(())
+        }
+        Err(direct_error) => match restore_remote(sftp, path, original, mode) {
+            Ok(()) => {
+                if remove_remote(sftp, &recovery).is_err() {
+                    record_temp_cleanup_failure(connection_id);
+                }
+                Err(format!(
+                    "The direct replacement failed: {direct_error} The original content was restored from the recovery copy."
+                ))
+            }
+            Err(restore_error) => Err(format!(
+                "The direct replacement failed: {direct_error} The original content could not be restored; it is kept at {}: {restore_error}",
+                remote_path(&recovery)
+            )),
+        },
+    }
+}
+
 /// Replaces the original through an atomic rename. Servers that reject the rename
-/// flags get one plain overwriting retry. A failed replacement stops the save and
-/// attempts to remove the temporary file; no backup file is created in the user's
-/// directory.
+/// flags get one plain overwriting retry. If both renames fail, a hidden recovery copy
+/// and a direct write are used as the last resort; no `.bak` file is created.
 fn replace_remote(
     sftp: &ssh2::Sftp,
     temporary: &Path,
     path: &Path,
     bytes: &[u8],
+    expected: &str,
+    original: &[u8],
+    mode: Option<u32>,
     connection_id: Option<&str>,
 ) -> Result<(), String> {
     let first_error = match sftp.rename(
@@ -384,7 +520,7 @@ fn replace_remote(
                 return Ok(());
             }
             return Err(format!(
-                "The remote server could not replace the file: {error}. No backup file was created. Your unsaved text is still in the editor; edit this file in the remote terminal instead."
+                "The remote server could not replace the file: {error}. Your unsaved text is still in the editor; edit this file in the remote terminal instead."
             ));
         }
     };
@@ -399,9 +535,17 @@ fn replace_remote(
                 }
                 return Ok(());
             }
-            Err(format!(
-                "The remote server could not replace the file. The first rename failed with: {first_error}. The overwriting rename retry failed with: {retry}. No backup file was created. Your unsaved text is still in the editor; edit this file in the remote terminal instead."
-            ))
+            match write_remote_in_place(sftp, path, bytes, expected, original, mode, connection_id) {
+                Ok(()) => {
+                    if remove_remote(sftp, temporary).is_err() {
+                        record_temp_cleanup_failure(connection_id);
+                    }
+                    Ok(())
+                }
+                Err(direct) => Err(format!(
+                    "The remote server could not replace the file through rename. The first rename failed with: {first_error}. The overwriting rename retry failed with: {retry}. {direct}"
+                )),
+            }
         }
     }
 }
@@ -466,6 +610,9 @@ fn save_remote(
             &temporary,
             &path,
             bytes,
+            expected,
+            &current,
+            mode,
             target.connection_id.as_deref(),
         )?;
         Ok(revision(bytes))
