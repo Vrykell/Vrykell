@@ -57,6 +57,10 @@ async function setupNativeDropMock(page: Page) {
   });
 }
 
+async function waitForDragListeners(page: Page): Promise<void> {
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __DRAG_LISTENERS__: number }).__DRAG_LISTENERS__)).toBeGreaterThanOrEqual(3);
+}
+
 test('uploads a dragged folder once per drop after returning from the transfer manager', async ({ page }) => {
   await setupNativeDropMock(page);
   await page.goto('/');
@@ -65,11 +69,13 @@ test('uploads a dragged folder once per drop after returning from the transfer m
     const modulePath = '/src/features/workspace/stores/workspace.ts';
     const { useWorkspaceStore } = await import(modulePath) as typeof import('../src/features/workspace/stores/workspace');
     useWorkspaceStore.getState().addTab({ kind: 'ssh', ssh: { connectionId: 'ssh-1', host: 'prod.example.com', user: 'root', name: 'Remote' } });
+    const dockPath = '/src/features/workspace/stores/dock.ts';
+    const { useDockStore } = await import(dockPath) as typeof import('../src/features/workspace/stores/dock');
+    useDockStore.getState().openPanel('files');
   });
-  if (!await page.getByTestId('remote-file-tree').isVisible()) await page.locator('[data-dock-btn="files"]').click();
   const tree = page.getByTestId('remote-file-tree');
   await expect(tree).toHaveAttribute('data-path', '/home/root');
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __DRAG_LISTENERS__: number }).__DRAG_LISTENERS__)).toBeGreaterThanOrEqual(3);
+  await waitForDragListeners(page);
 
   const uploads = () => page.evaluate(() => (window as unknown as {
     __FOLDER_UPLOADS__: { id: string; remoteDir: string; localPath: string }[];
@@ -92,6 +98,7 @@ test('uploads a dragged folder once per drop after returning from the transfer m
   for (const count of [2, 3]) {
     await page.getByTestId('downloads-back').click();
     await expect(tree).toHaveAttribute('data-path', '/home/root');
+    await waitForDragListeners(page);
     const bounds = await tree.boundingBox();
     if (!bounds) throw new Error('Remote file tree is unavailable');
     await dropFolder({ x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height - 12 });
@@ -105,6 +112,7 @@ test('imports one attachment per native drop after repeatedly reopening the pane
   await page.goto('/');
   await page.getByRole('button', { name: '询问 AI', exact: true }).click();
   const composer = page.locator('[data-chat-composer]:visible');
+  await waitForDragListeners(page);
   const drop = async () => {
     const bounds = await composer.boundingBox();
     if (!bounds) throw new Error('Conversation composer is unavailable');

@@ -356,6 +356,25 @@ fn record_temp_cleanup_failure(connection_id: Option<&str>) {
         "connectionId": connection_id, "succeeded": false,
     }));
 }
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DirectTargetState {
+    /// The target still contains the previous content.
+    Original,
+    /// The target already contains the complete new content.
+    Installed,
+    /// The target contains a prefix of the new content, including an empty file.
+    Partial,
+    /// The target was replaced concurrently or could not be read safely.
+    Unknown,
+}
+fn direct_target_state(original: &[u8], bytes: &[u8], current: Option<&[u8]>) -> DirectTargetState {
+    match current {
+        Some(value) if value == bytes => DirectTargetState::Installed,
+        Some(value) if value == original => DirectTargetState::Original,
+        Some(value) if bytes.starts_with(value) => DirectTargetState::Partial,
+        _ => DirectTargetState::Unknown,
+    }
+}
 /// Creates a hidden recovery copy of the previous content before an in-place write.
 /// The copy is removed after a successful write or restore; it is not a `.bak` file.
 fn create_recovery_copy(
@@ -365,19 +384,22 @@ fn create_recovery_copy(
     mode: Option<u32>,
     connection_id: Option<&str>,
 ) -> Result<(), String> {
+    let mut created = false;
     let result = (|| -> Result<(), String> {
         let mut file = sftp
             .open_mode(
                 recovery,
                 ssh2::OpenFlags::WRITE | ssh2::OpenFlags::CREATE | ssh2::OpenFlags::EXCLUSIVE,
-                mode.unwrap_or(0o600) as i32,
+                0o600,
                 ssh2::OpenType::File,
             )
             .map_err(|error| format!("Could not create a recovery copy next to the remote file: {error}"))?;
+        created = true;
         file.write_all(original)
             .map_err(|error| format!("Could not write the recovery copy: {error}"))?;
         file.close()
             .map_err(|error| format!("Could not finish the recovery copy: {error}"))?;
+        // The recovery copy starts private; restore the original mode when setstat is supported.
         apply_remote_mode(sftp, recovery, mode, connection_id);
         match read_remote_bytes(sftp, recovery) {
             Ok(bytes) if bytes == original => Ok(()),
@@ -385,7 +407,7 @@ fn create_recovery_copy(
             Err(error) => Err(format!("Could not verify the recovery copy: {error}")),
         }
     })();
-    if result.is_err() {
+    if result.is_err() && created {
         let _ = remove_remote(sftp, recovery);
     }
     result
@@ -396,6 +418,7 @@ fn restore_remote(
     path: &Path,
     original: &[u8],
     mode: Option<u32>,
+    connection_id: Option<&str>,
 ) -> Result<(), String> {
     let mut file = sftp
         .open_mode(
@@ -407,6 +430,7 @@ fn restore_remote(
         .map_err(|error| error.to_string())?;
     file.write_all(original).map_err(|error| error.to_string())?;
     file.close().map_err(|error| error.to_string())?;
+    apply_remote_mode(sftp, path, mode, connection_id);
     match read_remote_bytes(sftp, path) {
         Ok(bytes) if bytes == original => Ok(()),
         Ok(_) => Err("The restored original could not be verified.".into()),
@@ -414,9 +438,75 @@ fn restore_remote(
     }
 }
 
+/// Inspect the target after a failed direct operation without assuming that an
+/// error response means the target is intact. A missing path is treated as a
+/// partial replacement; transport errors remain unknown.
+fn inspect_direct_target(
+    sftp: &ssh2::Sftp,
+    path: &Path,
+    original: &[u8],
+    bytes: &[u8],
+) -> DirectTargetState {
+    match read_remote_bytes(sftp, path) {
+        Ok(current) => direct_target_state(original, bytes, Some(&current)),
+        Err(_) => match sftp.stat(path) {
+            Err(error) if is_missing(&error) => DirectTargetState::Partial,
+            _ => DirectTargetState::Unknown,
+        },
+    }
+}
+
+/// Resolve a failed direct operation. Only a provably partial target is restored;
+/// an installed target counts as success, an unchanged target is left alone, and
+/// an unknown target keeps the recovery copy for the user.
+fn finish_failed_direct(
+    sftp: &ssh2::Sftp,
+    path: &Path,
+    bytes: &[u8],
+    original: &[u8],
+    mode: Option<u32>,
+    recovery: &Path,
+    connection_id: Option<&str>,
+    direct_error: String,
+) -> Result<(), String> {
+    match inspect_direct_target(sftp, path, original, bytes) {
+        DirectTargetState::Installed => {
+            if remove_remote(sftp, recovery).is_err() {
+                record_temp_cleanup_failure(connection_id);
+            }
+            Ok(())
+        }
+        DirectTargetState::Original => {
+            if remove_remote(sftp, recovery).is_err() {
+                record_temp_cleanup_failure(connection_id);
+            }
+            Err(format!("{direct_error} The remote file still contains the previous content."))
+        }
+        DirectTargetState::Partial => match restore_remote(sftp, path, original, mode, connection_id) {
+            Ok(()) => {
+                if remove_remote(sftp, recovery).is_err() {
+                    record_temp_cleanup_failure(connection_id);
+                }
+                Err(format!(
+                    "{direct_error} The original content was restored from the recovery copy."
+                ))
+            }
+            Err(restore_error) => Err(format!(
+                "{direct_error} The target contains a partial replacement; the original could not be restored and is kept at {}: {restore_error}",
+                remote_path(recovery)
+            )),
+        },
+        DirectTargetState::Unknown => Err(format!(
+            "{direct_error} The target may be incomplete or was replaced concurrently; the previous version is kept at {}.",
+            remote_path(recovery)
+        )),
+    }
+}
+
 /// Last resort for servers that refuse both rename forms. The previous content is
 /// copied to a hidden temporary recovery file, then the target is truncated and
-/// written directly. A failed write restores the recovery copy; no `.bak` is left.
+/// written directly. A provably partial write restores the recovery copy; no `.bak`
+/// is left.
 fn write_remote_in_place(
     sftp: &ssh2::Sftp,
     path: &Path,
@@ -433,13 +523,17 @@ fn write_remote_in_place(
     let latest = match read_remote_bytes(sftp, path) {
         Ok(bytes) => bytes,
         Err(error) => {
-            let _ = remove_remote(sftp, &recovery);
-            return Err(format!("Could not re-read the remote file before the direct replacement: {error}"));
+            return Err(format!(
+                "Could not re-read the remote file before the direct replacement: {error}. The target state is unknown; the previous version is kept at {}.",
+                remote_path(&recovery)
+            ));
         }
     };
     if let Err(error) = check_revision(&latest, expected) {
-        let _ = remove_remote(sftp, &recovery);
-        return Err(format!("{error} The direct replacement was not attempted."));
+        return Err(format!(
+            "{error} The previous version is kept at {}.",
+            remote_path(&recovery)
+        ));
     }
     let mut file = match sftp.open_mode(
         path,
@@ -449,22 +543,16 @@ fn write_remote_in_place(
     ) {
         Ok(file) => file,
         Err(error) => {
-            // A lost status reply can hide a truncate. Restore the recovery copy
-            // instead of assuming the target is still intact.
-            return match restore_remote(sftp, path, original, mode) {
-                Ok(()) => {
-                    if remove_remote(sftp, &recovery).is_err() {
-                        record_temp_cleanup_failure(connection_id);
-                    }
-                    Err(format!(
-                        "Could not open the remote file for a direct replacement: {error}. The original content was restored."
-                    ))
-                }
-                Err(restore_error) => Err(format!(
-                    "Could not open the remote file for a direct replacement: {error}. The original content could not be restored; it is kept at {}: {restore_error}",
-                    remote_path(&recovery)
-                )),
-            }
+            return finish_failed_direct(
+                sftp,
+                path,
+                bytes,
+                original,
+                mode,
+                &recovery,
+                connection_id,
+                format!("Could not open the remote file for a direct replacement: {error}."),
+            );
         }
     };
     let direct = (move || -> Result<(), String> {
@@ -472,6 +560,7 @@ fn write_remote_in_place(
             .map_err(|error| format!("Could not write the remote file directly: {error}"))?;
         file.close()
             .map_err(|error| format!("Could not finish the remote file after a direct write: {error}"))?;
+        apply_remote_mode(sftp, path, mode, connection_id);
         match read_remote_bytes(sftp, path) {
             Ok(installed) if installed == bytes => Ok(()),
             Ok(_) => Err("The direct write finished, but the remote file could not be verified.".into()),
@@ -485,20 +574,16 @@ fn write_remote_in_place(
             }
             Ok(())
         }
-        Err(direct_error) => match restore_remote(sftp, path, original, mode) {
-            Ok(()) => {
-                if remove_remote(sftp, &recovery).is_err() {
-                    record_temp_cleanup_failure(connection_id);
-                }
-                Err(format!(
-                    "The direct replacement failed: {direct_error} The original content was restored from the recovery copy."
-                ))
-            }
-            Err(restore_error) => Err(format!(
-                "The direct replacement failed: {direct_error} The original content could not be restored; it is kept at {}: {restore_error}",
-                remote_path(&recovery)
-            )),
-        },
+        Err(direct_error) => finish_failed_direct(
+            sftp,
+            path,
+            bytes,
+            original,
+            mode,
+            &recovery,
+            connection_id,
+            format!("The direct replacement failed: {direct_error}"),
+        ),
     }
 }
 
@@ -747,6 +832,18 @@ mod tests {
         assert!(is_missing(&missing));
         assert!(!is_missing(&generic));
         assert!(!is_missing(&transport));
+    }
+
+    #[test]
+    fn classifies_direct_target_states_before_restoring() {
+        let original = b"old content";
+        let replacement = b"new content";
+        assert_eq!(direct_target_state(original, replacement, Some(replacement)), DirectTargetState::Installed);
+        assert_eq!(direct_target_state(original, replacement, Some(original)), DirectTargetState::Original);
+        assert_eq!(direct_target_state(original, replacement, Some(b"new")), DirectTargetState::Partial);
+        assert_eq!(direct_target_state(original, replacement, Some(b"")), DirectTargetState::Partial);
+        assert_eq!(direct_target_state(original, replacement, Some(b"another writer")), DirectTargetState::Unknown);
+        assert_eq!(direct_target_state(original, replacement, None), DirectTargetState::Unknown);
     }
 
     #[test]
