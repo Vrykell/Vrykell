@@ -235,9 +235,10 @@ test.describe('Command blocks (OSC 133)', () => {
     await page.goto('/');
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
     await page.keyboard.press('Meta+p');
-    await expect(page.getByPlaceholder('搜索命令…')).toBeVisible({ timeout: 3000 });
-    await page.keyboard.press('Escape');
-    await expect(page.getByPlaceholder('搜索命令…')).not.toBeVisible();
+    const palette = page.getByPlaceholder('搜索命令…');
+    await expect(palette).toBeVisible({ timeout: 3000 });
+    await palette.press('Escape');
+    await expect(palette).not.toBeVisible();
   });
 
   test('Cmd+W does not clash with the command palette (p and w are distinct)', async ({ page }) => {
@@ -246,11 +247,12 @@ test.describe('Command blocks (OSC 133)', () => {
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
     // Cmd+P opens the palette
     await page.keyboard.press('Meta+p');
-    await expect(page.getByPlaceholder('搜索命令…')).toBeVisible({ timeout: 3000 });
-    await page.keyboard.press('Escape');
+    const palette = page.getByPlaceholder('搜索命令…');
+    await expect(palette).toBeVisible({ timeout: 3000 });
+    await palette.press('Escape');
     // Cmd+W must not open the palette
     await page.keyboard.press('Meta+w');
-    await expect(page.getByPlaceholder('搜索命令…')).not.toBeVisible();
+    await expect(palette).not.toBeVisible();
   });
 
   // Regression: estimating snapshot row height from font size made it several pixels
