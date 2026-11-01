@@ -1,13 +1,26 @@
 import { t } from '@i18n';
 import { onForwardedLaunch, takeForwardedLaunchDirectories } from '@platform/contextMenu';
 import { useWorkspaceStore } from '../stores/workspace';
+import { useWorkspaceNavigation } from '../stores/navigation';
+import { useUiStore } from '../stores/ui';
 
 let listening = false;
+
+/** Open one terminal tab and make it the visible tab, including from the unified workspace. */
+function openForwardedDirectory(cwd: string): void {
+  const workspace = useWorkspaceStore.getState();
+  const id = workspace.addTab({ cwd });
+  const navigation = useWorkspaceNavigation.getState();
+  useUiStore.getState().setSettingsOpen(false);
+  navigation.selectArea('terminal');
+  navigation.rememberTab('terminal', id);
+  useWorkspaceStore.getState().activate(id);
+}
 
 /** Open one terminal tab in this window for every directory waiting in the forwarded queue. */
 async function openForwardedDirectories(): Promise<void> {
   for (const cwd of await takeForwardedLaunchDirectories()) {
-    useWorkspaceStore.getState().addTab({ cwd });
+    openForwardedDirectory(cwd);
   }
 }
 
