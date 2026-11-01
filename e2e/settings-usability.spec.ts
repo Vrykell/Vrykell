@@ -100,7 +100,7 @@ test('chat mode dropdown persists per model and replaces the two header toggles'
   await menu.getByRole('option', { name: /^纯聊天/ }).press('Enter');
   await expect(menu).toHaveCount(0);
   await expect(mode).toBeFocused();
-  await page.mouse.move(0, 0);
+  await mode.hover();
   await expect(mode).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   await mode.click();
   await page.mouse.move(0, 0);

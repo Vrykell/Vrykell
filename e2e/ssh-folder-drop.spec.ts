@@ -13,6 +13,7 @@ async function setupNativeDropMock(page: Page) {
       __TAURI_EVENT_PLUGIN_INTERNALS__: { unregisterListener: (event: string, id: number) => void };
       __FOLDER_UPLOADS__: Upload[];
       __ATTACHMENT_IMPORTS__: string[];
+      __DRAG_LISTENERS__: number;
     };
     const api = host.__TAURI_INTERNALS__;
     const originalInvoke = api.invoke;
@@ -21,15 +22,19 @@ async function setupNativeDropMock(page: Page) {
     const listeners = new Map<number, { event: string; handler: number }>();
     host.__FOLDER_UPLOADS__ = [];
     host.__ATTACHMENT_IMPORTS__ = [];
+    host.__DRAG_LISTENERS__ = 0;
     host.__TAURI_EVENT_PLUGIN_INTERNALS__.unregisterListener = (event, id) => {
-      if (event.startsWith('tauri://drag-')) listeners.delete(id);
-      else originalUnregister(event, id);
+      if (event.startsWith('tauri://drag-')) {
+        listeners.delete(id);
+        host.__DRAG_LISTENERS__ = listeners.size;
+      } else originalUnregister(event, id);
     };
     api.invoke = async (command, args) => {
       const event = typeof args?.event === 'string' ? args.event : '';
       if (command === 'plugin:event|listen' && event.startsWith('tauri://drag-')) {
         const handler = Number(args?.handler);
         listeners.set(handler, { event, handler });
+        host.__DRAG_LISTENERS__ = listeners.size;
         await new Promise(resolve => setTimeout(resolve, 0));
         return handler;
       }
@@ -64,6 +69,7 @@ test('uploads a dragged folder once per drop after returning from the transfer m
   if (!await page.getByTestId('remote-file-tree').isVisible()) await page.locator('[data-dock-btn="files"]').click();
   const tree = page.getByTestId('remote-file-tree');
   await expect(tree).toHaveAttribute('data-path', '/home/root');
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __DRAG_LISTENERS__: number }).__DRAG_LISTENERS__)).toBeGreaterThanOrEqual(3);
 
   const uploads = () => page.evaluate(() => (window as unknown as {
     __FOLDER_UPLOADS__: { id: string; remoteDir: string; localPath: string }[];
