@@ -107,7 +107,7 @@ test('browses, fills, favorites, renames and restores hidden project commands ac
   const panel = page.getByTestId('command-history-panel');
   const before = await page.evaluate(() => (window as unknown as { __PTY_WRITES__: string[] }).__PTY_WRITES__?.length ?? 0);
   await page.getByTestId('command-history-build').dblclick();
-  await expect(page.locator('[data-terminal-input]').first()).toHaveValue('npm run build');
+  await expect(page.locator('[data-terminal-input]:visible').first()).toHaveValue('npm run build');
   expect(await page.evaluate(() => (window as unknown as { __PTY_WRITES__: string[] }).__PTY_WRITES__?.length ?? 0)).toBe(before);
   await page.getByTestId('command-history-build').getByRole('button', { name: '命令操作' }).click();
   await page.getByRole('button', { name: '保存到收藏', exact: true }).click();
