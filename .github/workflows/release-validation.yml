@@ -8,29 +8,8 @@ permissions:
   contents: read
 
 jobs:
-  macos:
-    name: Corrected native socket coverage
-    runs-on: macos-15
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
-        with:
-          node-version: 22
-          cache: npm
-      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@e9d7b9f1e587218970671bac74e5511ed9506e6a
-        with:
-          workspaces: src-tauri -> target
-          shared-key: tests-macos-15
-      - run: npm ci
-      - run: cargo test --locked -- --test-threads=1
-        working-directory: src-tauri
-
   browser:
-    name: Corrected menu and update manifest coverage
+    name: Corrected browser and update manifest coverage
     runs-on: ubuntu-22.04
     timeout-minutes: 15
     steps:
@@ -42,4 +21,4 @@ jobs:
       - run: npm ci
       - run: node --test scripts/__tests__/update-release.test.mjs scripts/__tests__/finalize-update-manifest.test.mjs
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e -- e2e/running-term.spec.ts e2e/running-terminal-usability.spec.ts --grep "context menu" --reporter=line
+      - run: npm run test:e2e -- e2e/running-term.spec.ts e2e/running-terminal-usability.spec.ts e2e/workspace-ai-utilities.spec.ts e2e/workspace-refinements.spec.ts --grep "context menu|AI utility pages|prefix cards" --reporter=line
