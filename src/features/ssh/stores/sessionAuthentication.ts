@@ -16,11 +16,11 @@ export function requestSshAuthentication(target: SshAuthenticationTarget) {
   useSessionAuthenticationStore.setState({ request: { ...target, requestId: ++sequence } });
 }
 
-export function finishSshAuthentication(requestId: number) {
+export function finishSshAuthentication(requestId: number, authenticatedId?: string) {
   useSessionAuthenticationStore.setState(state => {
     if (state.request?.requestId !== requestId) return state;
-    const id = state.request.connectionId;
-    return { request: null, revisions: { ...state.revisions, [id]: (state.revisions[id] ?? 0) + 1 }, temporary: { ...state.temporary, [id]: true } };
+    const id = authenticatedId ?? state.request.connectionId;
+    return { request: id === state.request.connectionId ? null : state.request, revisions: { ...state.revisions, [id]: (state.revisions[id] ?? 0) + 1 }, temporary: { ...state.temporary, [id]: true } };
   });
 }
 

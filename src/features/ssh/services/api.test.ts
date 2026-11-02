@@ -17,6 +17,9 @@ import {
   sshHostKeyInfo,
   sshTrustHostKey,
   sshAuthenticateSession,
+  sshAuthenticateInteractive,
+  type SshAuthenticationChallenge,
+  type SshChallengeReply,
   sshNetworkProbe,
   sshSystemStatus,
   sshSearchFiles,
@@ -25,6 +28,29 @@ import { diagnosticSnapshot } from '@platform/diagnostics';
 import { useHostSystems } from '@config/hostSystems';
 
 describe('sshApi', () => {
+  it('binds challenge answers to their round, redacts them and cancels without accepting late events', async () => {
+    let finish!: () => void;
+    invokeMock.mockImplementation(command => command === 'ssh_authenticate_session' ? new Promise<void>(resolve => { finish = resolve; }) : Promise.resolve());
+    const controller = new AbortController();
+    const challenged = vi.fn<(value: SshAuthenticationChallenge, reply: SshChallengeReply) => void>();
+    const pending = sshAuthenticateInteractive({ connectionId: 's1', host: 'server.test', user: 'tester' }, controller.signal, challenged);
+    const args = invokeMock.mock.calls.find(([command]) => command === 'ssh_authenticate_session')![1] as { attemptId: string; onChallenge: { onmessage: (result: SshAuthenticationChallenge) => void } };
+    const event: SshAuthenticationChallenge = { kind: 'prompts', round: 2, target: { connectionId: 's1', host: 'server.test', port: 22, user: 'tester' }, instructions: '', prompts: [{ text: 'Code', echo: false }] };
+    args.onChallenge.onmessage(event);
+    await challenged.mock.calls[0][1](['private-otp-answer']);
+    expect(invokeMock).toHaveBeenCalledWith('ssh_authentication_respond', { attemptId: args.attemptId, round: 2, responses: ['private-otp-answer'] });
+    expect(JSON.stringify(diagnosticSnapshot())).not.toContain('private-otp-answer');
+    controller.abort();
+    expect(invokeMock).toHaveBeenCalledWith('ssh_authentication_cancel', { attemptId: args.attemptId });
+    args.onChallenge.onmessage(event);
+    expect(challenged).toHaveBeenCalledOnce();
+    expect(() => challenged.mock.calls[0][1](['late'])).toThrow();
+    const rejected = expect(pending).rejects.toThrow();
+    finish();
+    await rejected;
+    args.onChallenge.onmessage(event);
+    expect(challenged).toHaveBeenCalledOnce();
+  });
   it('records system identity from an existing authenticated status query', async () => {
     invokeMock.mockResolvedValueOnce({ system: 'Linux' });
     await sshSystemStatus('identity-test', 'host.test', 22);

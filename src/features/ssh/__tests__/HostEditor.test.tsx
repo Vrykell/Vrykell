@@ -61,3 +61,28 @@ it('keeps tag identity stable and groups multi-tag hosts without duplicating unt
   expect(tagColor('production')).toBe(tagColor('production'));
   expect(tagColor('api')).toMatch(/^var\(--group-/);
 });
+
+it('selects a saved jump profile, excludes itself and disables cyclic choices', async () => {
+  const jump: SshConnection = { id: 'jump', name: 'Gateway', host: 'jump.test', user: 'gateway-user', authMethod: 'agent' };
+  const target: SshConnection = { id: 'target', name: 'Internal', host: 'internal.test', user: 'target-user', authMethod: 'key' };
+  const cyclic: SshConnection = { ...jump, id: 'cyclic', name: 'Cyclic', jumpConnectionId: 'target' };
+  useSshStore.setState({ connections: [jump, target, cyclic] });
+  render(<SshFormModal page open initial={target} onClose={vi.fn()} />);
+  fireEvent.click(screen.getByRole('combobox', { name: '已保存的跳板连接' }));
+  expect(screen.queryByRole('option', { name: 'Internal' })).not.toBeInTheDocument();
+  expect(screen.getByRole('option', { name: 'Cyclic' })).toHaveAttribute('aria-disabled', 'true');
+  fireEvent.click(screen.getByRole('option', { name: 'Gateway' }));
+  expect(screen.queryByTestId('ssh-form-jump')).not.toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '认证跳板服务' })).toBeVisible();
+  fireEvent.click(screen.getByTestId('ssh-save-btn'));
+  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 'target', user: 'target-user', jumpConnectionId: 'jump', jumpHost: undefined })));
+});
+
+it('retains a missing jump reference and prevents saving until it is replaced', () => {
+  useSshStore.setState({ connections: [] });
+  render(<SshFormModal page open initial={{ id: 'target', name: 'Internal', host: 'internal.test', user: 'target-user', authMethod: 'key', jumpConnectionId: 'deleted' }} onClose={vi.fn()} />);
+  expect(screen.getByTestId('ssh-form-jump-connection')).toHaveTextContent('已保存的跳板连接不可用');
+  fireEvent.click(screen.getByTestId('ssh-save-btn'));
+  expect(save).not.toHaveBeenCalled();
+  expect(screen.getByTestId('ssh-test-result')).toHaveTextContent('不可用');
+});

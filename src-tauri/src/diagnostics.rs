@@ -230,6 +230,7 @@ fn sanitize(value: Value, key: &str, depth: usize) -> Value {
     if [
         "password",
         "passphrase",
+        "responses",
         "key",
         "apikey",
         "accesstoken",
@@ -601,6 +602,7 @@ mod tests {
 
     #[test]
     fn credential_fields_match_case_and_separator_variants() {
+        assert_eq!(sanitize(json!({ "responses": ["private-otp", "private-password"] }), "", 0)["responses"], "[redacted]");
         let value = sanitize(
             json!({ "api_key": "private-key", "UI-Lease": "private-lease", "environment": "private-env", "safe": "visible" }),
             "",

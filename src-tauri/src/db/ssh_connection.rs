@@ -25,6 +25,12 @@ impl HistoryDb {
 
     /// Load a connection by id, including the password, so the backend can run ssh commands.
     pub fn get_ssh_connection(&self, id: &str) -> Result<SshConnection, String> {
+        let mut conn = self.get_ssh_connection_unresolved(id)?;
+        self.resolve_ssh_route(&mut conn.options, Some(id))?;
+        Ok(conn)
+    }
+
+    pub(crate) fn get_ssh_connection_unresolved(&self, id: &str) -> Result<SshConnection, String> {
         let mut conn = self
             .conn()
             .query_row(
@@ -54,6 +60,7 @@ impl HistoryDb {
     pub fn save_ssh_connection(&self, conn: &SshConnection) -> Result<(), String> {
         validate_ssh_host(&conn.host)?;
         validate_options(&conn.options)?;
+        self.resolve_ssh_route(&mut conn.options.clone(), Some(&conn.id))?;
         let options_json = serde_json::to_string(&conn.options).map_err(|e| e.to_string())?;
         if !conn.password.is_empty() {
             secret::set_secret(&conn.id, &conn.password)?;

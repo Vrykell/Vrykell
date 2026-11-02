@@ -739,3 +739,27 @@ Runtime regression checklist, 2026-10-21:
 - The skill marketplace loads a working preset automatically, honors the system proxy, bounds response sizes and loading duration, and fetches descriptors with bounded concurrency. Switching repository invalidates stale results, and install uses only the loaded source. Third-party skills remain untrusted. A read-only native network probe verifies the real listing endpoint.
 - Destructive buttons use a dedicated vivid semantic red with readable filled-button foregrounds in both themes; diagnostic and terminal text colors remain independent. Server settings use normal-sized shared icon controls. Transfer cards use the shared host identity icon.
 - Tab arbitration prefers built-in suggestions, then bounded shell completion, then paths. The selected provider owns cycling; Escape cancels pending work or restores the base. Late requests cannot overwrite edited input, changed directories or focus. Remote panes do not query a local shell. Constant child scripts receive text as data, never as an executable script, and never write queries to the live terminal.
+
+### Standard jump connections and input recovery
+
+- [x] Saved jump references persist, exclude self-selection and reject cycles, missing profiles, conflicting addresses and chains exceeding eight hops. Existing jump addresses remain supported.
+- [x] Each hop uses separate authentication and strict host trust. File channels bind to every hop and its temporary credential revision; profile changes invalidate cached channels and dependent forwards.
+- [x] Backend handshakes prefer the endpoint's recorded host-key types within the supported algorithm set, including hashed names and explicit ports. Strict key comparison still rejects changed keys; isolated multi-key servers cover direct and routed connections.
+- [x] Service authentication advances through saved hops and the destination, clears entered secrets and refreshes dependent services. Shared hop credentials follow dependent terminal lifetimes.
+- [x] Isolated protocol tests cover two hops, independent password/key authentication, SFTP, resource collection, forwarded channels, rejected credentials, unknown/changed keys, system-client launch and cleanup. Run `uv run --with paramiko python scripts/test-ssh-jumps.py`.
+- [x] Browser coverage saves and reopens jump selections, verifies terminal launch and service access, and checks the authored picker in both themes and narrow/wide layouts.
+- [x] Reset terminal input modes disables residual mouse/focus/application-cursor modes without clearing output, reconnecting or sending a remote command. Native keyboard negotiation stays with the terminal parser; mode-only diagnostics and browser recovery tests cover this path.
+- External approvals and menu-only gateway assets remain terminal flows; no asset API integration is claimed.
+
+### Interactive service authentication
+
+- [x] Middle-hop temporary credentials remain valid when the same endpoint is flattened into another route. Looking up hop credentials does not discard a separately authenticated service transport.
+- [x] Late cancellation after native completion revokes only that attempt's cached revision, retains window ownership checks and does not remove newer authentication. Cancellation is checked before sending credentials and between key candidates.
+- [x] A failed file subsystem or timed-out monitoring channel is distinguished from a dead transport. Healthy authentication remains reusable; subsystem recovery does not replay the failed operation.
+- [x] Host editor Save and Cancel use equal control padding and geometry at normal and enlarged scaling in both themes and narrow/wide layouts.
+- [x] The Windows backend builds its bundled cryptography and checks modern host-key and key-exchange capabilities. Protocol regressions repeat direct and routed handshakes.
+- [x] Shared authentication dialog offers server challenges, multiple rounds and fields, server-controlled echo, empty responses, explicit fingerprint trust, keyboard submission and cancellation. Choosing this method targets the destination route.
+- [x] Authentication attempts are window-scoped, bounded and cancellable; stale rounds, duplicate answers, endpoint changes, timeouts and oversized challenges are rejected. Diagnostic records redact all responses.
+- [x] Files and monitoring reuse the authenticated destination under one operation gate. Responses are never cached for reconnects; independent transfers and forwarding do not clone this transport. Expired connections require fresh authentication without replaying mutations.
+- [x] Failures preserve the originating endpoint and stage through nested service errors, retaining authentication actions and raw diagnostic details.
+- [x] Unit and browser tests cover challenges, input masking, focus, cancellation, redaction, both themes and narrow/wide layouts. Isolated protocol tests cover two MFA hops and the destination, concurrent files and monitoring with exactly one authentication per endpoint, rejected answers, cancellation and strict trust.

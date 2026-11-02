@@ -26,6 +26,9 @@ import { EMPTY_HOST_METADATA, useHostLibrary } from '../stores/hostLibrary';
 import { tagColor } from '../model/hostTags';
 import ProxyManager from './ProxyManager';
 import { getProxies, type ProxyConfiguration } from '../services/proxies';
+import { savedJumpRoute } from '../model/jumpRoute';
+import { prepareSshJumpHosts } from '../services/hostTrust';
+import { requestSshAuthentication } from '../hooks/useSessionAuthentication';
 
 interface Props {
   open: boolean;
@@ -51,6 +54,7 @@ function FormSection({ title, children, ...props }: ComponentProps<'section'>) {
 export default function SshFormModal({ open, initial, onClose, onConnect, onSaved, onSaveAndConnect, page = false }: Props) {
   const save = useSshStore(s => s.save);
   const remove = useSshStore(s => s.remove);
+  const connections = useSshStore(s => s.connections) ?? [];
   const dialog = useRef<HTMLDivElement>(null);
   const savingRef = useRef(false);
   const [section, setSection] = useState<Section>('connection');
@@ -63,6 +67,7 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
   const [password, setPassword] = useState('');
   const [identityFile, setIdentityFile] = useState('');
   const [jumpHost, setJumpHost] = useState('');
+  const [jumpConnectionId, setJumpConnectionId] = useState('');
   const [keepalive, setKeepalive] = useState('30');
   const [shellIntegration, setShellIntegration] = useState(false);
   const [forwards, setForwards] = useState<ForwardTexts>({ local: '', remote: '', dynamic: '' });
@@ -92,6 +97,7 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
     setPort(initial?.port ? String(initial.port) : ''); setUser(initial?.user ?? '');
     setAuthMethod(initial?.authMethod ?? 'password'); setPassword('');
     setIdentityFile(initial?.identityFile ?? ''); setJumpHost(initial?.jumpHost ?? '');
+    setJumpConnectionId(initial?.jumpConnectionId ?? '');
     setKeepalive(String(initial?.serverAliveInterval ?? 30));
     setShellIntegration(initial ? initial.shellIntegration ?? true : false);
     setForwards({ local: (initial?.localForwards ?? []).join('\n'), remote: (initial?.remoteForwards ?? []).join('\n'), dynamic: (initial?.dynamicForwards ?? []).join('\n') });
@@ -118,12 +124,14 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
     forwardingRules: initial?.forwardingRules,
     host: host.trim(), port: port.trim() ? Number(port) : 22, user: user.trim(),
     password: authMethod === 'password' ? password : '', identityFile: authMethod === 'key' ? identityFile.trim() || undefined : undefined,
-    jumpHost: jumpHost.trim() || undefined, serverAliveInterval: keepalive.trim() ? Number(keepalive) : 30, shellIntegration,
+    jumpHost: jumpConnectionId ? undefined : jumpHost.trim() || undefined, jumpConnectionId: jumpConnectionId || undefined, serverAliveInterval: keepalive.trim() ? Number(keepalive) : 30, shellIntegration,
     localForwards: list(forwards.local), remoteForwards: list(forwards.remote), dynamicForwards: list(forwards.dynamic), autoReconnect,
     proxyId: proxyId === 'default' ? undefined : proxyId, environment: Object.fromEntries(environment.filter(row => row.name.trim() || row.value).map(row => [row.name.trim(), row.value])),
     notes, aiNotes, authenticationMode: authMethod,
   });
   const validateEnvironment = () => {
+    try { savedJumpRoute(connections, jumpConnectionId || undefined, initial?.id); }
+    catch (reason) { return String((reason as Error).message); }
     const populated = environment.filter(row => row.name.trim() || row.value);
     if (populated.length > 64 || new Set(populated.map(row => row.name.trim())).size !== populated.length) return t('Environment variable names must be unique; up to 64 variables are supported.');
     return null;
@@ -156,14 +164,12 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
     const draft = target();
     const invalid = validateEnvironment() || validateSshConnection({ ...draft, name: name.trim() || draft.host });
     if (invalid) { setError(invalid); return; }
-    if (draft.jumpHost && draft.jumpHost.toLowerCase() !== 'none') {
-      setTestResult({ ok: false, msg: t('Jump-host authentication must be completed in the terminal. Save and connect to continue.') }); return;
-    }
     if (initial?.hasPassword && authMethod === 'password' && !password) {
       setTestResult({ ok: false, msg: t('Enter the password to test authentication. Saving an empty password keeps the stored password.') }); return;
     }
     setTesting(true); setTestResult(null); setError('');
     try {
+      if (draft.jumpConnectionId) await prepareSshJumpHosts(draft, connections);
       await sshTest(draft);
       setTestResult({ ok: true, msg: t('Authentication succeeded. Terminal, port forwarding and SFTP availability have not been tested.') });
     } catch (reason) {
@@ -256,7 +262,23 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
           <FormSection title={t('Organization and network')} id="ssh-section-organization" hidden={!page && !onConnect && section !== 'advanced'}>
             <label>{t('Host group')}<div className="ssh-editor-pair ssh-editor-group">{addingGroup ? <><TextInput variant="field" autoFocus aria-label={t('Host group')} placeholder={t('New group (optional)')} value={group} onChange={event => setGroup(event.target.value)} data-testid="ssh-form-group" onKeyDown={event => { if (event.key === 'Enter') { event.preventDefault(); setAddingGroup(false); } }} /><TextButton onClick={() => setAddingGroup(false)}>{t('Done')}</TextButton></> : <Select aria-label={t('Existing groups')} value={group} options={[{ value: '', label: t('Ungrouped') }, ...[...new Set([...groups, group].filter(Boolean))].map(value => ({ value, label: value }))]} onChange={setGroup} action={{ label: t('New group…'), onSelect: () => setAddingGroup(true) }} />}</div></label>
             <div className="ssh-editor-field-row"><span>{t('Host tags')}</span><TagInput value={tags} options={knownTags.map(value => ({ value, color: tagColor(value) }))} onChange={setTags} inputTestId="ssh-form-tag" /></div>
-            <label>{t('Jump host (optional)')}<div className="ssh-editor-network"><TextInput variant="field" value={jumpHost} onChange={e => setJumpHost(e.target.value)} data-testid="ssh-form-jump" placeholder="user@host:port" data-tip={t('Separate multiple jump hosts with commas. Use none to disable inherited jump hosts.')} /><small>{t('Route the connection through a jump host (ProxyJump).')}</small></div></label>
+            <label>{t('Saved jump connection')}<div className="ssh-editor-network"><Select aria-label={t('Saved jump connection')} data-testid="ssh-form-jump-connection" disabled={busy} value={jumpConnectionId} onChange={id => { setJumpConnectionId(id); if (id) setJumpHost(''); }} options={[
+              { value: '', label: t('Use jump addresses') },
+              ...connections.filter(connection => connection.id !== initial?.id).map(connection => {
+                let disabled = false;
+                try { savedJumpRoute(connections, connection.id, initial?.id); } catch { disabled = true; }
+                return { value: connection.id, label: connection.name, disabled };
+              }),
+              ...(jumpConnectionId && !connections.some(connection => connection.id === jumpConnectionId) ? [{ value: jumpConnectionId, label: t('Saved jump connection is unavailable.'), disabled: true }] : []),
+            ]} />
+            {jumpConnectionId && <TextButton disabled={busy} className="ssh-editor-link" onClick={() => {
+              try {
+                const route = savedJumpRoute(connections, jumpConnectionId, initial?.id);
+                const hop = route[route.length - 1];
+                if (hop) requestSshAuthentication({ connectionId: hop.id, host: hop.host, port: hop.port, user: hop.user, identityFile: hop.identityFile });
+              } catch (reason) { setError(String((reason as Error).message)); }
+            }}>{t('Authenticate jump services')}</TextButton>}</div></label>
+            {!jumpConnectionId && <label>{t('Jump host (optional)')}<div className="ssh-editor-network"><TextInput variant="field" value={jumpHost} onChange={e => setJumpHost(e.target.value)} data-testid="ssh-form-jump" placeholder="user@host:port" data-tip={t('Separate multiple jump hosts with commas. Use none to disable inherited jump hosts.')} /></div></label>}
             <label>{t('Proxy')}<div className="ssh-editor-pair ssh-editor-proxy"><Select aria-label={t('Proxy')} value={proxyId} options={[{ value: 'default', label: t('Device default') }, { value: 'none', label: t('No proxy') }, ...proxies.profiles.map(profile => ({ value: profile.id, label: profile.name })), ...(!['default', 'none'].includes(proxyId) && !proxies.profiles.some(profile => profile.id === proxyId) ? [{ value: proxyId, label: t('Unavailable proxy') }] : [])]} onChange={setProxyId} /><TextButton className="ssh-editor-link" onClick={() => setProxyManager(true)}>{t('Manage proxies')}</TextButton></div></label>
           </FormSection>
           <FormSection title={t('Environment variables')} hidden={!page && !onConnect && section !== 'advanced'}>

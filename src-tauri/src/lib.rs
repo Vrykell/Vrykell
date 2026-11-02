@@ -199,6 +199,8 @@ pub fn run() {
             remote::forwarding::ssh_forwards_status,
             remote::network::ssh_network_probe,
             remote::ssh::ssh_authenticate_session,
+            remote::interactive_auth::ssh_authentication_respond,
+            remote::interactive_auth::ssh_authentication_cancel,
             remote::ssh::ssh_forget_session_auth,
             remote::ssh::ssh_host_key_info,
             remote::ssh::ssh_trust_host_key,

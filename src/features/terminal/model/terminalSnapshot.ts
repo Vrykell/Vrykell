@@ -12,6 +12,7 @@ import { terminalTypographyChanged, useTypographyStore } from '@config/typograph
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 import { releaseTerminalRenderer } from '@features/terminal/model/xtermRenderer';
 import { applyTerminalCursorPreference } from '@features/terminal/model/terminalCursor';
+import { getTerminalInputOptions } from './terminalInput';
 
 function getFgCss(cell: IBufferCell): string | null {
   if (cell.isFgDefault()) return null;
@@ -248,6 +249,7 @@ export function createBlockTerm(
     rows: Math.max(rows || 24, 1),
     scrollback: 5000,
     ...getTerminalFontOptions(),
+    ...getTerminalInputOptions(),
     cursorBlink: useTypographyStore.getState().terminalCursorBlink,
     // Match the pane: keep a solid cursor when the command input holds focus.
     cursorInactiveStyle: 'block',

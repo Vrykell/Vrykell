@@ -113,6 +113,7 @@ pub fn ssh_proxy_save(mut profile: ProxyProfile) -> Result<(), String> {
     }
     write_config(&config)?;
     crate::remote::file_channel::invalidate_all();
+    crate::remote::session_auth::invalidate_transports();
     Ok(())
 }
 
@@ -126,6 +127,7 @@ pub fn ssh_proxy_delete(id: String) -> Result<(), String> {
     write_config(&config)?;
     crate::secret::delete_secret(&format!("ssh-proxy:{id}"));
     crate::remote::file_channel::invalidate_all();
+    crate::remote::session_auth::invalidate_transports();
     Ok(())
 }
 
@@ -137,6 +139,7 @@ pub fn ssh_proxy_set_default(id: Option<String>) -> Result<(), String> {
     config.default_id = id;
     write_config(&config)?;
     crate::remote::file_channel::invalidate_all();
+    crate::remote::session_auth::invalidate_transports();
     Ok(())
 }
 

@@ -41,6 +41,7 @@ struct RunningForward {
     error: Arc<Mutex<Option<String>>>,
     rule: ForwardingRule,
     target: String,
+    dependencies: Vec<String>,
 }
 
 static RUNNING: LazyLock<Mutex<HashMap<String, RunningForward>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -54,7 +55,7 @@ fn retryable(error: &ssh2::Error) -> bool { error.code() == ErrorCode::Session(-
 fn hostname(host: &str) -> &str { host.trim_start_matches('[').trim_end_matches(']') }
 fn target_signature(connection: &SshConnection) -> String {
     serde_json::json!([connection.host, connection.port, connection.user, connection.auth_method,
-        connection.options.identity_file, connection.options.proxy_id, connection.options.jump_host]).to_string()
+        connection.options.identity_file, connection.options.proxy_id, connection.options.jump_host, connection.options.jump_connection_id]).to_string()
 }
 
 fn open_channel(session: &Session, host: &str, port: u16, stop: &AtomicBool) -> Result<Channel, String> {
@@ -100,7 +101,7 @@ fn socks_destination(stream: &mut TcpStream) -> Result<(String, u16), String> {
     Ok((host, port))
 }
 
-trait ForwardingChannel: Read + Write {
+pub(super) trait ForwardingChannel: Read + Write {
     fn read_eof(&self) -> bool;
     fn write_eof(&mut self) -> std::io::Result<()>;
     fn close_channel(&mut self);
@@ -112,7 +113,7 @@ impl ForwardingChannel for Channel {
     fn close_channel(&mut self) { let _ = self.close(); }
 }
 
-fn bridge(mut stream: TcpStream, mut channel: impl ForwardingChannel, stop: Arc<AtomicBool>) -> Result<(), String> {
+pub(super) fn bridge(mut stream: TcpStream, mut channel: impl ForwardingChannel, stop: Arc<AtomicBool>) -> Result<(), String> {
     stream.set_nonblocking(true).map_err(|error| error.to_string())?;
     let mut to_remote = Vec::new();
     let mut to_local = Vec::new();
@@ -175,9 +176,11 @@ fn reserve(connection: &SshConnection, rule: &ForwardingRule) -> Result<Option<R
         let mut running = RUNNING.lock().map_err(|error| error.to_string())?;
         if running.get(&id).is_some_and(|item| !item.stop.load(Ordering::Relaxed)) { return Ok(None); }
         if running.values().filter(|item| !item.stop.load(Ordering::Relaxed)).count() >= 32 { return Err("Too many running forwards".into()); }
-        running.insert(id.clone(), RunningForward { stop: stop.clone(), ready: ready.clone(), error: error.clone(), rule: rule.clone(), target: target_signature(&connection) });
+        running.insert(id.clone(), RunningForward { stop: stop.clone(), ready: ready.clone(), error: error.clone(), rule: rule.clone(), target: target_signature(&connection),
+            dependencies: connection.options.resolved_jumps.0.iter().map(|hop| hop.id.clone()).filter(|id| !id.is_empty()).collect() });
     }
-    Ok(Some(RunningForward { stop, ready, error, rule: rule.clone(), target: target_signature(connection) }))
+    Ok(Some(RunningForward { stop, ready, error, rule: rule.clone(), target: target_signature(connection),
+        dependencies: connection.options.resolved_jumps.0.iter().map(|hop| hop.id.clone()).filter(|id| !id.is_empty()).collect() }))
 }
 
 fn start(connection: SshConnection, runtime: RunningForward) -> Result<(), String> {
@@ -319,6 +322,14 @@ pub fn stop_connection(connection_id: &str) {
     }
 }
 
+pub(super) fn stop_dependents(connection_id: &str) {
+    if let Ok(mut running) = RUNNING.lock() {
+        running.retain(|_, item| {
+            if item.dependencies.iter().any(|id| id == connection_id) { item.stop.store(true, Ordering::Relaxed); false } else { true }
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -399,7 +410,7 @@ mod tests {
         connection.options.forwarding_rules = Some(vec![rule()]);
         let stop = Arc::new(AtomicBool::new(false));
         let id = key(&connection.id, &rule().id);
-        RUNNING.lock().unwrap().insert(id.clone(), RunningForward { stop: stop.clone(), ready: Arc::new(AtomicBool::new(true)), error: Arc::new(Mutex::new(None)), rule: rule(), target: target_signature(&connection) });
+        RUNNING.lock().unwrap().insert(id.clone(), RunningForward { stop: stop.clone(), ready: Arc::new(AtomicBool::new(true)), error: Arc::new(Mutex::new(None)), rule: rule(), target: target_signature(&connection), dependencies: Vec::new() });
         connection.options.forwarding_rules.as_mut().unwrap()[0].auto_start = true;
         connection.options.forwarding_rules.as_mut().unwrap()[0].name = "Renamed".into();
         invalidate_connection(&connection);
@@ -414,7 +425,7 @@ mod tests {
     fn profile_deletion_stops_its_listener_without_stopping_another_profile() {
         let first = Arc::new(AtomicBool::new(false));
         let second = Arc::new(AtomicBool::new(false));
-        let make = |stop: Arc<AtomicBool>| RunningForward { stop, ready: Arc::new(AtomicBool::new(true)), error: Arc::new(Mutex::new(None)), rule: rule(), target: String::new() };
+        let make = |stop: Arc<AtomicBool>| RunningForward { stop, ready: Arc::new(AtomicBool::new(true)), error: Arc::new(Mutex::new(None)), rule: rule(), target: String::new(), dependencies: Vec::new() };
         {
             let mut running = RUNNING.lock().unwrap();
             running.insert("deleted-profile/rule-1".into(), make(first.clone()));
@@ -424,5 +435,23 @@ mod tests {
         assert!(first.load(Ordering::Relaxed));
         assert!(!second.load(Ordering::Relaxed));
         stop_connection("retained-profile");
+    }
+
+    #[test]
+    fn jump_changes_stop_dependent_forwards_without_stopping_unrelated_routes() {
+        let stopped = Arc::new(AtomicBool::new(false));
+        let unrelated = Arc::new(AtomicBool::new(false));
+        let make = |stop: Arc<AtomicBool>, dependencies: Vec<String>| RunningForward {
+            stop, ready: Arc::new(AtomicBool::new(true)), error: Arc::new(Mutex::new(None)), rule: rule(), target: String::new(), dependencies,
+        };
+        {
+            let mut running = RUNNING.lock().unwrap();
+            running.insert("dependent-profile/rule".into(), make(stopped.clone(), vec!["changed-jump".into()]));
+            running.insert("unrelated-profile/rule".into(), make(unrelated.clone(), vec!["other-jump".into()]));
+        }
+        stop_dependents("changed-jump");
+        assert!(stopped.load(Ordering::Relaxed));
+        assert!(!unrelated.load(Ordering::Relaxed));
+        stop_connection("unrelated-profile");
     }
 }

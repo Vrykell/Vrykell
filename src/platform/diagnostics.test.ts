@@ -57,6 +57,7 @@ describe('diagnostics', () => {
   });
 
   it('redacts credential fields regardless of casing and separators', () => {
+    expect(sanitizeDiagnostic({ responses: ['private-otp', 'private-password'] })).toEqual({ responses: '[redacted]' });
     const detail = sanitizeDiagnostic({ api_key: 'private-key', 'UI-Lease': 'private-lease', environment: 'private-env', safe: 'visible' });
     expect(JSON.stringify(detail)).not.toContain('private-');
     expect(detail).toMatchObject({

@@ -665,8 +665,17 @@ pub async fn pty_spawn(
     let debug_lc_ctype = std::env::var("LC_CTYPE").ok().filter(|value| !value.is_empty()).unwrap_or_else(|| "unset".to_string());
 
     // Creating the session is blocking: run it on a blocking thread, never on the main thread.
-    let (id, master, mut reader, writer, child) =
-        tauri::async_runtime::spawn_blocking(move || spawn_pty(cols, rows, cwd, shell, ssh, open_mode))
+    let startup_app = app.clone();
+    let ((id, master, mut reader, writer, child), ssh_config) =
+        tauri::async_runtime::spawn_blocking(move || {
+            let mut ssh = ssh;
+            let config = if let Some(target) = &mut ssh {
+                startup_app.state::<crate::db::HistoryState>().0.lock().map_err(|error| error.to_string())?
+                    .resolve_ssh_route(&mut target.options, None)?;
+                crate::remote::jump::LaunchConfig::create(&mut target.options)?
+            } else { None };
+            spawn_pty(cols, rows, cwd, shell, ssh, open_mode).map(|session| (session, config))
+        })
             .await
             .map_err(|e| e.to_string())??;
     let input_pending = Arc::new(AtomicBool::new(false));
@@ -709,6 +718,7 @@ pub async fn pty_spawn(
     let tid = id.clone();
     let closed_flag = closed;
     std::thread::spawn(move || {
+        let _ssh_config = ssh_config;
         // The blocking read runs on its own thread; the main loop uses recv_timeout for the idle-timeout flush.
         // Otherwise the last burst of output (such as the cmd/PowerShell prompt) stays in pending
         // until the next input/output flushes it (Windows has no poll, so everything goes through one channel).

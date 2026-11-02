@@ -23,6 +23,48 @@ use zeroize::Zeroizing;
 
 static KH_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
+#[cfg(test)]
+thread_local! { static TEST_KNOWN_HOSTS: std::cell::RefCell<Option<std::path::PathBuf>> = const { std::cell::RefCell::new(None) }; }
+
+pub(crate) fn known_hosts_path() -> Result<std::path::PathBuf, String> {
+    #[cfg(test)]
+    if let Some(path) = TEST_KNOWN_HOSTS.with(|path| path.borrow().clone()) { return Ok(path); }
+    dirs::home_dir().map(|home| home.join(".ssh/known_hosts")).ok_or_else(|| "Home directory is unavailable".into())
+}
+
+/// Prefer recorded key types without changing the supported set or the later key check.
+fn prefer_known_host_key(sess: &Session, host: &str, port: u16, path: &Path) -> Result<Option<String>, String> {
+    if !path.exists() { return Ok(None); }
+    let mut known = sess.known_hosts().map_err(|error| error.to_string())?;
+    known.read_file(path, KnownHostFileKind::OpenSSH).map_err(|error| error.to_string())?;
+    let endpoint = format!("[{host}]:{port}");
+    let mut trusted_types = Vec::new();
+    for entry in known.hosts().map_err(|error| error.to_string())? {
+        if entry.name().is_some_and(|name| name != host && name != endpoint) { continue; }
+        let key = base64::engine::general_purpose::STANDARD.decode(entry.key()).map_err(|error| error.to_string())?;
+        // The library also matches hashed names and explicit ports.
+        if !matches!(known.check_port(host, port, &key), CheckResult::Match) { continue; }
+        let line = known.write_string(&entry, KnownHostFileKind::OpenSSH).map_err(|error| error.to_string())?;
+        if let Some(kind) = line.split_whitespace().nth(1) {
+            if !trusted_types.iter().any(|trusted| trusted == kind) { trusted_types.push(kind.to_owned()); }
+        }
+    }
+    if trusted_types.is_empty() { return Ok(None); }
+    let supported = sess.supported_algs(ssh2::MethodType::HostKey).map_err(|error| error.to_string())?;
+    let (mut preferred, remaining): (Vec<_>, Vec<_>) = supported.into_iter().partition(|algorithm| {
+        let kind = match *algorithm {
+            "rsa-sha2-512" | "rsa-sha2-256" => "ssh-rsa",
+            other => other,
+        };
+        trusted_types.iter().any(|trusted| trusted == kind)
+    });
+    if preferred.is_empty() { return Ok(None); }
+    preferred.extend(remaining);
+    let algorithms = preferred.join(",");
+    sess.method_pref(ssh2::MethodType::HostKey, &algorithms).map_err(|error| error.to_string())?;
+    Ok(Some(algorithms))
+}
+
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SshSystemStatus {
@@ -83,7 +125,7 @@ fn parse_system_status(output: &str, latency_ms: u128) -> SshSystemStatus {
 
 fn ssh_system_status_sync(conn: &SshConnection, metrics: SshStatusMetrics) -> Result<SshSystemStatus, String> {
     if !metrics.any() { return Ok(parse_system_status("", 0)); }
-    let session = connect_with_timeout(conn, Some(Duration::from_secs(5)))?;
+    super::file_channel::run_session(conn, |session| {
     session.set_timeout(5000);
     let latency = if metrics.status {
         let started = std::time::Instant::now();
@@ -114,6 +156,7 @@ fn ssh_system_status_sync(conn: &SshConnection, metrics: SshStatusMetrics) -> Re
     let status = parse_system_status(&output, latency);
     if metrics.status && status.system.is_empty() { return Err("Remote system does not support resource collection".into()); }
     Ok(status)
+    })
 }
 
 /// Read system metadata independently of the interactive terminal.
@@ -346,18 +389,56 @@ fn tcp_handshake(conn: &SshConnection) -> Result<Session, String> {
 }
 
 fn tcp_handshake_with_timeout(conn: &SshConnection, timeout: Option<Duration>) -> Result<Session, String> {
-    let host = conn.host.as_str();
-    let port = conn.port.unwrap_or(22);
-
     crate::terminal::ssh_command::validate_options(&conn.options)?;
-    let tcp = crate::ssh_proxy::connect_target(host, port, conn.options.proxy_id.as_deref(), timeout)?;
-    tcp.set_read_timeout(Some(Duration::from_secs(15))).ok();
-    tcp.set_write_timeout(Some(Duration::from_secs(15))).ok();
+    let mut upstream = None;
+    if conn.options.resolved_jumps.0.is_empty() && (conn.options.jump_connection_id.is_some()
+        || conn.options.jump_host.as_deref().is_some_and(|jump| !jump.eq_ignore_ascii_case("none"))) {
+        return Err("Jump route has not been resolved".into());
+    }
+    for hop in &conn.options.resolved_jumps.0 {
+        let connected = (|| {
+            let sess = connection_stage(hop, "handshake", || handshake_transport(hop, upstream.take(), timeout))?;
+            connection_stage(hop, "host-trust", || verify_host_key(&sess, &hop.host, hop.port.unwrap_or(22)))?;
+            let credential = AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.get(hop);
+            let result = connection_stage(hop, "authentication", || {
+                authenticate(&sess, hop, &hop.user, credential.as_deref())?;
+                if !sess.authenticated() { return Err("SSH_AUTH_FAILED: Additional authentication is required".into()); }
+                Ok(())
+            });
+            if result.is_err() {
+                if let Some(credential) = &credential {
+                    AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.reject(&hop.id, credential);
+                }
+            }
+            result?;
+            if !sess.authenticated() { return Err("SSH_AUTH_FAILED: Additional authentication is required".into()); }
+            Ok::<_, String>(sess)
+        })();
+        upstream = Some(connected.map_err(|error| format!("SSH_JUMP_FAILED:{}: {error}", hop.id))?);
+    }
+    handshake_transport(conn, upstream, timeout)
+}
 
-    let mut sess = Session::new().map_err(|e| format!("初始化 SSH 失败：{e}"))?;
-    sess.set_tcp_stream(tcp);
-    if let Some(timeout) = timeout { sess.set_timeout(timeout.as_millis() as u32); }
-    sess.handshake().map_err(|e| format!("SSH 握手失败：{e}"))?;
+fn handshake_transport(conn: &SshConnection, upstream: Option<Session>, timeout: Option<Duration>) -> Result<Session, String> {
+    let mut sess = Session::new().map_err(|error| error.to_string())?;
+    sess.set_timeout(timeout.unwrap_or(Duration::from_secs(15)).as_millis().min(u32::MAX as u128) as u32);
+    let preferred = {
+        let _guard = KH_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+        prefer_known_host_key(&sess, &conn.host, conn.port.unwrap_or(22), &known_hosts_path()?)?
+    };
+    if let Some(upstream) = upstream {
+        sess.set_tcp_stream(super::jump::tunnel(upstream, &conn.host, conn.port.unwrap_or(22))?);
+    } else {
+        let tcp = crate::ssh_proxy::connect_target(&conn.host, conn.port.unwrap_or(22), conn.options.proxy_id.as_deref(), timeout)?;
+        tcp.set_read_timeout(Some(Duration::from_secs(15))).ok();
+        tcp.set_write_timeout(Some(Duration::from_secs(15))).ok();
+        sess.set_tcp_stream(tcp);
+    }
+    sess.handshake().map_err(|error| format!("SSH handshake failed: {error}"))?;
+    let _ = crate::diagnostics::record("ssh-host-key-negotiation", serde_json::json!({
+        "connectionId": conn.id, "host": conn.host, "port": conn.port.unwrap_or(22),
+        "knownKeyPreferred": preferred.is_some(), "algorithm": sess.methods(ssh2::MethodType::HostKey),
+    }));
     Ok(sess)
 }
 
@@ -378,24 +459,34 @@ pub(super) fn connection_stage<T>(conn: &SshConnection, stage: &str, action: imp
         "durationMs": started.elapsed().as_millis(), "succeeded": result.is_ok(),
         "error": result.as_ref().err(),
     }));
-    result
+    result.map_err(|cause| {
+        if cause.contains("SSH_CONNECTION_FAILED:") { return cause; }
+        format!("SSH_CONNECTION_FAILED:{}", serde_json::json!({
+            "connectionId": conn.id, "host": conn.host, "port": conn.port.unwrap_or(22), "stage": stage, "cause": cause,
+        }))
+    })
 }
 
 pub(crate) fn connect_with_timeout(conn: &SshConnection, timeout: Option<Duration>) -> Result<Session, String> {
-    let credential = AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.get(conn);
+    let (credential, interactive) = {
+        let mut cache = AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?;
+        let interactive = cache.service(conn).is_some();
+        (cache.get(conn), interactive)
+    };
     let result = connect_authenticated(conn, timeout, credential.as_deref());
-    if result.as_ref().err().is_some_and(|error| error.starts_with("SSH_AUTH_FAILED:")) {
+    if result.as_ref().err().is_some_and(|error| !error.starts_with("SSH_JUMP_FAILED:") && error.contains("SSH_AUTH_FAILED:")) {
         if let Some(credential) = &credential {
             AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.reject(&conn.id, credential);
         }
     }
-    result
+    result.map_err(|error| {
+        if interactive && error.contains("SSH_AUTH_FAILED:") {
+            format!("SSH_AUTH_FAILED: This operation needs a separate authenticated connection. Authenticate it independently. {error}")
+        } else { error }
+    })
 }
 
 fn connect_authenticated(conn: &SshConnection, timeout: Option<Duration>, credential: Option<&Credential>) -> Result<Session, String> {
-    if conn.options.jump_host.as_deref().is_some_and(|jump| !jump.eq_ignore_ascii_case("none")) {
-        return Err("跳板机连接请使用交互终端；文件管理暂不支持跳板机".into());
-    }
     let user = conn.user.trim();
     // Reject an empty username outright; never silently default to root (an accidentally blank
     // form would log in as root)
@@ -409,6 +500,76 @@ fn connect_authenticated(conn: &SshConnection, timeout: Option<Duration>, creden
         return Err("SSH_AUTH_FAILED: Additional authentication is required".to_string());
     }
     Ok(sess)
+}
+
+pub(super) fn connect_interactive(conn: &SshConnection, exchange: &super::interactive_auth::Exchange) -> Result<Session, String> {
+    crate::terminal::ssh_command::validate_options(&conn.options)?;
+    let mut upstream = None;
+    for endpoint in conn.options.resolved_jumps.0.iter().chain(std::iter::once(conn)) {
+        exchange.attempt.check()?;
+        let user = endpoint.user.trim();
+        if user.is_empty() { return Err("SSH_AUTH_FAILED: Username must not be empty".into()); }
+        let session = connection_stage(endpoint, "handshake", || handshake_transport(endpoint, upstream.take(), Some(Duration::from_secs(10))))?;
+        connection_stage(endpoint, "host-trust", || {
+            match verify_host_key(&session, &endpoint.host, endpoint.port.unwrap_or(22)) {
+                Err(error) if error.starts_with("HOST_KEY_UNKNOWN:") => {
+                    let fingerprint = fingerprint_of(&session);
+                    let (_, key_type) = session.host_key().ok_or("The server did not provide a host key")?;
+                    exchange.host_key(endpoint, fingerprint.clone(), format!("{key_type:?}").to_lowercase())?;
+                    record_host_key(&session, &endpoint.host, endpoint.port.unwrap_or(22), &fingerprint)
+                }
+                result => result,
+            }
+        })?;
+        connection_stage(endpoint, "authentication", || {
+            let credential = AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.get(endpoint);
+            let _ = authenticate_checked(&session, endpoint, user, credential.as_deref(), || exchange.attempt.check());
+            exchange.attempt.check()?;
+            if session.authenticated() { return Ok(()); }
+            struct Prompter<'a> {
+                conn: &'a SshConnection,
+                exchange: &'a super::interactive_auth::Exchange,
+                error: Option<String>,
+                rounds: u32,
+            }
+            impl ssh2::KeyboardInteractivePrompt for Prompter<'_> {
+                fn prompt(&mut self, _: &str, instructions: &str, prompts: &[ssh2::Prompt<'_>]) -> Vec<String> {
+                    if self.error.is_some() { return Vec::new(); }
+                    self.rounds += 1;
+                    match self.exchange.prompts(self.conn, instructions, prompts) {
+                        Ok(responses) => responses,
+                        Err(error) => { self.error = Some(error); Vec::new() }
+                    }
+                }
+            }
+            let mut prompter = Prompter { conn: endpoint, exchange, error: None, rounds: 0 };
+            // Network waiting stays cancellable, and time spent answering does not consume its timeout.
+            session.set_blocking(false);
+            let mut deadline = std::time::Instant::now() + Duration::from_secs(10);
+            let result = loop {
+                exchange.attempt.check()?;
+                let rounds = prompter.rounds;
+                let result = session.userauth_keyboard_interactive(user, &mut prompter);
+                if prompter.error.is_some() { break result; }
+                if rounds != prompter.rounds { deadline = std::time::Instant::now() + Duration::from_secs(10); }
+                match &result {
+                    Err(error) if error.code() == ssh2::ErrorCode::Session(-37) => {
+                        if std::time::Instant::now() >= deadline { return Err("SSH_AUTH_TIMEOUT: Authentication server did not respond".into()); }
+                        std::thread::sleep(Duration::from_millis(10));
+                    }
+                    _ => break result,
+                }
+            };
+            session.set_blocking(true);
+            if let Some(error) = prompter.error { return Err(error); }
+            exchange.attempt.check()?;
+            result.map_err(|_| "SSH_AUTH_FAILED: The server rejected interactive authentication or does not support it")?;
+            if !session.authenticated() { return Err("SSH_AUTH_FAILED: Additional authentication is required".into()); }
+            Ok(())
+        })?;
+        upstream = Some(session);
+    }
+    upstream.ok_or_else(|| "SSH_AUTH_FAILED: No authentication target is available".into())
 }
 
 /// Host fingerprint (SHA256:base64).
@@ -430,9 +591,7 @@ fn verify_host_key(sess: &Session, host: &str, port: u16) -> Result<(), String> 
     let (key, _key_type) = sess.host_key().ok_or("远端未返回主机密钥".to_string())?;
     let mut kh = sess.known_hosts().map_err(|e| format!("初始化 known_hosts 失败：{e}"))?;
 
-    let kh_path = dirs::home_dir()
-        .map(|h| h.join(".ssh").join("known_hosts"))
-        .unwrap_or_default();
+    let kh_path = known_hosts_path()?;
     if kh_path.exists() {
         kh.read_file(&kh_path, KnownHostFileKind::OpenSSH)
             .map_err(|e| format!("读取 SSH 信任记录失败：{e}"))?;
@@ -455,9 +614,7 @@ fn record_host_key(sess: &Session, host: &str, port: u16, expected_fingerprint: 
     let (key, key_type) = sess.host_key().ok_or("远端未返回主机密钥".to_string())?;
     let mut kh = sess.known_hosts().map_err(|e| format!("初始化 known_hosts 失败：{e}"))?;
 
-    let kh_path = dirs::home_dir()
-        .map(|h| h.join(".ssh").join("known_hosts"))
-        .unwrap_or_default();
+    let kh_path = known_hosts_path()?;
     if kh_path.exists() {
         kh.read_file(&kh_path, KnownHostFileKind::OpenSSH)
             .map_err(|e| format!("读取 SSH 信任记录失败：{e}"))?;
@@ -501,6 +658,11 @@ fn host_key_format(t: HostKeyType) -> KnownHostKeyFormat {
 }
 
 fn authenticate(sess: &Session, conn: &SshConnection, user: &str, credential: Option<&Credential>) -> Result<(), String> {
+    authenticate_checked(sess, conn, user, credential, || Ok(()))
+}
+
+fn authenticate_checked(sess: &Session, conn: &SshConnection, user: &str, credential: Option<&Credential>, check: impl Fn() -> Result<(), String>) -> Result<(), String> {
+    check()?;
     if let Some(credential) = credential {
         return match credential.method {
             AuthMethod::Password => sess.userauth_password(user, &credential.secret)
@@ -510,6 +672,7 @@ fn authenticate(sess: &Session, conn: &SshConnection, user: &str, credential: Op
                 sess.userauth_pubkey_file(user, None, Path::new(identity), Some(&credential.secret))
                     .map_err(|error| format!("SSH_AUTH_FAILED: Private key authentication failed: {error}"))
             }
+            AuthMethod::KeyboardInteractive => Err("SSH_AUTH_FAILED: Interactive authentication requires server challenges".into()),
         };
     }
     if conn.options.authentication_mode.as_deref() == Some("ask") { return Err("SSH_AUTH_FAILED: Enter credentials to connect".into()); }
@@ -532,6 +695,7 @@ fn authenticate(sess: &Session, conn: &SshConnection, user: &str, credential: Op
     if conn.options.authentication_mode.as_deref() == Some("agent") { return Err("SSH_AUTH_FAILED: No accepted agent identities are available".into()); }
     if let Some(home) = dirs::home_dir() {
         for key in ["id_ed25519", "id_rsa", "id_ecdsa", "id_dsa"] {
+            check()?;
             let priv_path = home.join(".ssh").join(key);
             if !priv_path.exists() {
                 continue;
@@ -596,9 +760,11 @@ pub fn ssh_connections_list(state: State<'_, HistoryState>) -> Result<Vec<SshCon
 pub fn ssh_connection_save(state: State<'_, HistoryState>, conn: SshConnection) -> Result<(), String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
     db.save_ssh_connection(&conn)?;
+    super::interactive_auth::cancel_connection(&conn.id);
     super::forwarding::invalidate_connection(&conn);
     AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.clear(&conn.id);
-    super::file_channel::invalidate(&conn.id);
+    super::file_channel::invalidate_all();
+    super::forwarding::stop_dependents(&conn.id);
     Ok(())
 }
 
@@ -606,23 +772,27 @@ pub fn ssh_connection_save(state: State<'_, HistoryState>, conn: SshConnection) 
 pub fn ssh_connection_delete(state: State<'_, HistoryState>, id: String) -> Result<(), String> {
     let db = state.0.lock().map_err(|e| e.to_string())?;
     db.delete_ssh_connection(&id)?;
+    super::interactive_auth::cancel_connection(&id);
     super::forwarding::stop_connection(&id);
     AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.clear(&id);
-    super::file_channel::invalidate(&id);
+    super::file_channel::invalidate_all();
+    super::forwarding::stop_dependents(&id);
     Ok(())
 }
 
 /// Validate a temporary credential against the displayed profile before retaining it in memory.
 #[tauri::command]
 pub async fn ssh_authenticate_session(
-    state: State<'_, HistoryState>, id: String, host: String, port: u16, user: String,
+    webview: tauri::Webview, state: State<'_, HistoryState>, id: String, host: String, port: u16, user: String,
     method: AuthMethod, password: String, passphrase: String,
+    attempt_id: Option<String>, on_challenge: Option<tauri::ipc::JavaScriptChannelId>,
 ) -> Result<(), String> {
     let password = Zeroizing::new(password);
     let passphrase = Zeroizing::new(passphrase);
-    let secret = match method { AuthMethod::Password => password, AuthMethod::KeyPassphrase => passphrase };
-    if secret.is_empty() || secret.len() > 4096 { return Err("Enter a credential between 1 and 4096 bytes".into()); }
-    let (conn, revision) = {
+    let interactive = matches!(method, AuthMethod::KeyboardInteractive);
+    let secret = match method { AuthMethod::Password => password, AuthMethod::KeyPassphrase => passphrase, AuthMethod::KeyboardInteractive => Zeroizing::new(String::new()) };
+    if !interactive && (secret.is_empty() || secret.len() > 4096) { return Err("Enter a credential between 1 and 4096 bytes".into()); }
+    let (conn, revision, exchange) = {
         let db = state.0.lock().map_err(|error| error.to_string())?;
         let conn = db.get_ssh_connection(&id)?;
         if conn.host != host || conn.port.unwrap_or(22) != port || conn.user != user {
@@ -631,10 +801,34 @@ pub async fn ssh_authenticate_session(
         if matches!(method, AuthMethod::KeyPassphrase) && conn.options.identity_file.is_none() {
             return Err("No private key is configured for this connection".into());
         }
+        super::interactive_auth::cancel_connection(&id);
+        let exchange = if interactive {
+            let owner = webview.label().to_owned();
+            let channel: tauri::ipc::Channel<super::interactive_auth::Challenge> = on_challenge.ok_or("Authentication challenge channel is required")?.channel_on(webview);
+            Some(super::interactive_auth::Exchange::new(attempt_id.ok_or("Authentication attempt identifier is required")?, owner, &conn,
+                move |challenge| channel.send(challenge).map_err(|_| "Authentication dialog is no longer available".into()))?)
+        } else { None };
         let revision = AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.begin(&id);
-        super::file_channel::invalidate(&id);
-        (conn, revision)
+        super::file_channel::invalidate_all();
+        (conn, revision, exchange)
     };
+    if let Some(exchange) = exchange {
+        let tested = conn.clone();
+        let (session, exchange) = tauri::async_runtime::spawn_blocking(move || {
+            connect_interactive(&tested, &exchange).map(|session| (session, exchange))
+        }).await.map_err(|error| error.to_string())??;
+        let db = state.0.lock().map_err(|error| error.to_string())?;
+        let current = db.get_ssh_connection(&id)?;
+        if super::session_auth::binding(&current) != super::session_auth::binding(&conn) {
+            return Err("Saved SSH connection changed. Retry authentication.".into());
+        }
+        return exchange.attempt.finish(&id, revision, || {
+            if !AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.store_session(&conn, revision, session) {
+                return Err("SSH authentication was cancelled or the connection changed. Retry authentication.".into());
+            }
+            Ok(())
+        });
+    }
     let credential = std::sync::Arc::new(Credential { method, secret });
     let validated = std::sync::Arc::clone(&credential);
     let tested = conn.clone();
@@ -643,7 +837,9 @@ pub async fn ssh_authenticate_session(
     }).await.map_err(|error| error.to_string())??;
     // Saving, deleting or clearing during validation invalidates the revision under the same lock order.
     let db = state.0.lock().map_err(|error| error.to_string())?;
-    db.get_ssh_connection(&id)?;
+    if super::session_auth::binding(&db.get_ssh_connection(&id)?) != super::session_auth::binding(&conn) {
+        return Err("Saved SSH connection changed. Retry authentication.".into());
+    }
     if !AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.store(&conn, revision, credential) {
         return Err("SSH authentication was cancelled or the connection changed. Retry authentication.".into());
     }
@@ -652,8 +848,10 @@ pub async fn ssh_authenticate_session(
 
 #[tauri::command]
 pub fn ssh_forget_session_auth(id: String) -> Result<(), String> {
+    super::interactive_auth::cancel_connection(&id);
     AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.clear(&id);
-    super::file_channel::invalidate(&id);
+    super::file_channel::invalidate_all();
+    super::forwarding::stop_dependents(&id);
     Ok(())
 }
 
@@ -681,8 +879,8 @@ pub struct SshHostKeyInfo {
 
 /// Query the host fingerprint and its known_hosts status (never writes anything).
 #[tauri::command]
-pub async fn ssh_host_key_info(host: String, port: Option<u16>, options: Option<SshOptions>) -> Result<SshHostKeyInfo, String> {
-    let conn = SshConnection {
+pub async fn ssh_host_key_info(state: State<'_, HistoryState>, host: String, port: Option<u16>, options: Option<SshOptions>) -> Result<SshHostKeyInfo, String> {
+    let mut conn = SshConnection {
         id: String::new(),
         name: String::new(),
         host,
@@ -694,6 +892,7 @@ pub async fn ssh_host_key_info(host: String, port: Option<u16>, options: Option<
         has_password: false,
         options: options.unwrap_or_default(),
     };
+    state.0.lock().map_err(|error| error.to_string())?.resolve_ssh_route(&mut conn.options, None)?;
     tauri::async_runtime::spawn_blocking(move || {
         let sess = tcp_handshake(&conn)?;
         let (_, key_type) = sess.host_key().ok_or("远端未返回主机密钥".to_string())?;
@@ -714,8 +913,8 @@ pub async fn ssh_host_key_info(host: String, port: Option<u16>, options: Option<
 
 /// Record the host key in known_hosts after the user confirms the fingerprint (idempotent).
 #[tauri::command]
-pub async fn ssh_trust_host_key(host: String, port: Option<u16>, expected_fingerprint: String, options: Option<SshOptions>) -> Result<(), String> {
-    let conn = SshConnection {
+pub async fn ssh_trust_host_key(state: State<'_, HistoryState>, host: String, port: Option<u16>, expected_fingerprint: String, options: Option<SshOptions>) -> Result<(), String> {
+    let mut conn = SshConnection {
         id: String::new(),
         name: String::new(),
         host,
@@ -727,6 +926,7 @@ pub async fn ssh_trust_host_key(host: String, port: Option<u16>, expected_finger
         has_password: false,
         options: options.unwrap_or_default(),
     };
+    state.0.lock().map_err(|error| error.to_string())?.resolve_ssh_route(&mut conn.options, None)?;
     tauri::async_runtime::spawn_blocking(move || {
         let sess = tcp_handshake(&conn)?;
         record_host_key(&sess, &conn.host, conn.port.unwrap_or(22), &expected_fingerprint)
@@ -738,13 +938,14 @@ pub async fn ssh_trust_host_key(host: String, port: Option<u16>, expected_finger
 /// Test a connection with explicit parameters, so a form can test before saving.
 #[tauri::command]
 pub async fn ssh_test(
+    state: State<'_, HistoryState>,
     host: String,
     port: Option<u16>,
     user: String,
     password: String,
     options: Option<SshOptions>,
 ) -> Result<String, String> {
-    let conn = SshConnection {
+    let mut conn = SshConnection {
         id: String::new(),
         name: String::new(),
         host,
@@ -756,6 +957,7 @@ pub async fn ssh_test(
         has_password: false,
         options: options.unwrap_or_default(),
     };
+    state.0.lock().map_err(|error| error.to_string())?.resolve_ssh_route(&mut conn.options, None)?;
     tauri::async_runtime::spawn_blocking(move || ssh_test_sync(&conn))
         .await
         .map_err(|e| e.to_string())?
@@ -1339,13 +1541,346 @@ mod tests {
     use super::*;
 
     #[test]
+    #[cfg(windows)]
+    fn desktop_crypto_supports_modern_keys_and_key_exchange() {
+        let session = Session::new().unwrap();
+        assert!(session.supported_algs(ssh2::MethodType::Kex).unwrap().iter().any(|algorithm| algorithm.starts_with("curve25519-sha256")));
+        assert!(session.supported_algs(ssh2::MethodType::HostKey).unwrap().contains(&"ssh-ed25519"));
+    }
+
+    #[test]
+    fn failure_context_preserves_the_original_endpoint_and_stage() {
+        let conn: SshConnection = serde_json::from_value(serde_json::json!({ "id": "stage-test", "name": "server", "host": "gateway.test", "port": 2222, "user": "tester", "authMethod": "ask" })).unwrap();
+        let error = connection_stage::<()>(&conn, "authentication", || Err("SSH_AUTH_FAILED: rejected".into())).unwrap_err();
+        let wrapped = connection_stage::<()>(&conn, "resource-collection", || Err(error.clone())).unwrap_err();
+        assert_eq!(wrapped, error);
+        let detail: serde_json::Value = serde_json::from_str(error.strip_prefix("SSH_CONNECTION_FAILED:").unwrap()).unwrap();
+        assert_eq!(detail["connectionId"], "stage-test");
+        assert_eq!(detail["stage"], "authentication");
+        assert_eq!(detail["host"], "gateway.test");
+        assert_eq!(detail["port"], 2222);
+    }
+
+    #[test]
+    #[ignore = "Run through scripts/test-ssh-jumps.py for isolated protocol servers"]
+    fn interactive_protocol_fixture() -> Result<(), String> {
+        use super::super::interactive_auth::{respond, Challenge, Exchange};
+        let fixture: serde_json::Value = serde_json::from_str(&std::env::var("VRYKELL_SSH_JUMP_FIXTURE").map_err(|error| error.to_string())?).map_err(|error| error.to_string())?;
+        let root = std::path::PathBuf::from(fixture["directory"].as_str().ok_or("Missing fixture directory")?);
+        let ports = fixture["ports"].as_array().ok_or("Missing fixture ports")?;
+        let known_hosts = root.join("interactive-known-hosts");
+        TEST_KNOWN_HOSTS.with(|path| *path.borrow_mut() = Some(known_hosts.clone()));
+        struct TrustScope;
+        impl Drop for TrustScope { fn drop(&mut self) { TEST_KNOWN_HOSTS.with(|path| *path.borrow_mut() = None); } }
+        let _scope = TrustScope;
+        let profile = |name: &str, index: usize| -> SshConnection {
+            serde_json::from_value(serde_json::json!({ "id": format!("mfa-{name}"), "name": name, "host": "127.0.0.1", "port": ports[index],
+                "user": format!("mfa-{name}-user"), "authMethod": "ask", "authenticationMode": "ask", "proxyId": "none" })).unwrap()
+        };
+        let first = profile("first", 0);
+        let second = profile("second", 1);
+        let mut target = profile("target", 2);
+        target.options.jump_connection_id = Some(second.id.clone());
+        target.options.resolved_jumps.0 = vec![first, second];
+        let attempt_id = uuid::Uuid::new_v4().to_string();
+        let reply_id = attempt_id.clone();
+        let rounds = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let observed = rounds.clone();
+        let exchange = Exchange::new(attempt_id, "fixture".into(), &target, move |challenge| {
+            observed.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let value = serde_json::to_value(&challenge).map_err(|error| error.to_string())?;
+            let name = value["target"]["connectionId"].as_str().unwrap().strip_prefix("mfa-").unwrap();
+            match challenge {
+                Challenge::HostKey { round, fingerprint, .. } => respond("fixture", &reply_id, round, vec![fingerprint]),
+                Challenge::Prompts { round, prompts, .. } => {
+                    let answers = if prompts.len() == 2 {
+                        assert!(!prompts[0].echo); assert!(prompts[1].echo);
+                        vec![format!("{name}-test-secret"), format!("mfa-{name}-user")]
+                    } else { vec![format!("{name}-one-time-code")] };
+                    respond("fixture", &reply_id, round, answers)
+                }
+            }
+        })?;
+        let revision = AUTH_CACHE.lock().unwrap().begin(&target.id);
+        println!("Fixture: authenticating two interactive hops and destination");
+        let session = connect_interactive(&target, &exchange)?;
+        assert_eq!(rounds.load(std::sync::atomic::Ordering::Relaxed), 9);
+        assert!(known_hosts.exists());
+        exchange.attempt.finish(&target.id, revision, || {
+            assert!(AUTH_CACHE.lock().unwrap().store_session(&target, revision, session)); Ok(())
+        })?;
+        drop(exchange);
+        println!("Fixture: concurrently reusing the authenticated connection for files and monitoring");
+        std::thread::scope(|scope| {
+            let listing = scope.spawn(|| ssh_list_sync(&target, None));
+            let monitoring = scope.spawn(|| ssh_system_status_sync(&target, SshStatusMetrics::all()));
+            assert_eq!(listing.join().unwrap()?.entries[0].name, "fixture.txt");
+            assert_eq!(monitoring.join().unwrap()?.system, "Fixture Unix");
+            Ok::<_, String>(())
+        })?;
+        assert_eq!(ssh_list_sync(&target, None)?.entries.len(), 1);
+        let independent = connect_with_timeout(&target, Some(Duration::from_secs(5))).err().ok_or("An independent transport unexpectedly replayed interactive credentials")?;
+        assert!(independent.contains("separate authenticated connection"));
+        println!("Fixture: reopening a closed file channel without repeating authentication");
+        let retained = AUTH_CACHE.lock().unwrap().service(&target).unwrap();
+        retained.session(|session| {
+            let mut channel = session.channel_session().map_err(|error| error.to_string())?;
+            channel.exec("fixture-close-sftp").map_err(|error| error.to_string())?;
+            channel.read_to_end(&mut Vec::new()).map_err(|error| error.to_string())?;
+            channel.wait_close().map_err(|error| error.to_string())
+        })?;
+        let closed = ssh_list_sync(&target, None).err().ok_or("Closed file channel unexpectedly succeeded")?;
+        println!("Fixture: closed file channel returned {closed}");
+        assert_eq!(ssh_system_status_sync(&target, SshStatusMetrics::all())?.system, "Fixture Unix");
+        assert_eq!(ssh_list_sync(&target, None)?.entries[0].name, "fixture.txt");
+        println!("Fixture: a timed-out monitoring channel retains the authenticated file connection");
+        retained.session(|session| {
+            let mut channel = session.channel_session().map_err(|error| error.to_string())?;
+            channel.exec("fixture-stall-next-status").map_err(|error| error.to_string())?;
+            channel.read_to_end(&mut Vec::new()).map_err(|error| error.to_string())?;
+            channel.wait_close().map_err(|error| error.to_string())
+        })?;
+        let timeout = ssh_system_status_sync(&target, SshStatusMetrics { cpu: true, ..Default::default() }).err().ok_or("Stalled resource collection unexpectedly succeeded")?;
+        assert!(!timeout.contains("SSH_AUTH_FAILED:"), "{timeout}");
+        assert_eq!(ssh_list_sync(&target, None)?.entries[0].name, "fixture.txt");
+        assert_eq!(ssh_system_status_sync(&target, SshStatusMetrics::all())?.system, "Fixture Unix");
+        println!("Fixture: expired service transport requires fresh authentication without replay");
+        let retained = AUTH_CACHE.lock().unwrap().service(&target).unwrap();
+        let _ = retained.session(|session| {
+            let mut channel = session.channel_session().map_err(|error| error.to_string())?;
+            channel.exec("fixture-disconnect").map_err(|error| error.to_string())?;
+            channel.read_to_end(&mut Vec::new()).map_err(|error| error.to_string())?;
+            Err::<(), String>("Expected the server to disconnect".into())
+        });
+        let expired = ssh_list_sync(&target, None).err().ok_or("Expired service unexpectedly remained available")?;
+        assert!(expired.contains("SSH_AUTH_FAILED:"), "{expired}");
+        AUTH_CACHE.lock().unwrap().clear("mfa-first");
+        assert!(AUTH_CACHE.lock().unwrap().service(&target).is_none());
+        let direct = profile("target", 2);
+        let id = uuid::Uuid::new_v4().to_string();
+        let reply = id.clone();
+        let rejected = Exchange::new(id, "fixture".into(), &direct, move |challenge| match challenge {
+            Challenge::Prompts { round, prompts, .. } => respond("fixture", &reply, round, vec!["rejected-answer".into(); prompts.len()]),
+            _ => Err("Unexpected trust prompt".into()),
+        })?;
+        assert!(connect_interactive(&direct, &rejected).err().unwrap().contains("SSH_AUTH_FAILED:"));
+        drop(rejected);
+        let cancelled = Exchange::new(uuid::Uuid::new_v4().to_string(), "fixture".into(), &direct, |_| {
+            super::super::interactive_auth::cancel_connection("mfa-target"); Ok(())
+        })?;
+        assert!(connect_interactive(&direct, &cancelled).err().unwrap().contains("SSH_AUTH_CANCELLED:"));
+        drop(cancelled);
+        // A known key mismatch must fail before any credentials are requested.
+        let text = std::fs::read_to_string(&known_hosts).map_err(|error| error.to_string())?;
+        let target_line = text.lines().find(|line| line.starts_with(&format!("[127.0.0.1]:{} ", direct.port.unwrap()))).ok_or("Missing trusted target")?;
+        let first_line = text.lines().find(|line| line.starts_with(&format!("[127.0.0.1]:{} ", ports[0]))).ok_or("Missing trusted first hop")?;
+        let target_parts: Vec<_> = target_line.split_whitespace().collect();
+        let first_parts: Vec<_> = first_line.split_whitespace().collect();
+        let changed = text.replace(target_line, &format!("{} {} {}", target_parts[0], first_parts[1], first_parts[2]));
+        std::fs::write(&known_hosts, changed).map_err(|error| error.to_string())?;
+        let mismatch = Exchange::new(uuid::Uuid::new_v4().to_string(), "fixture".into(), &direct, |_| Err("A mismatched key reached authentication".into()))?;
+        let error = connect_interactive(&direct, &mismatch).err().unwrap();
+        assert!(error.contains("host-trust"), "{error}");
+        Ok(())
+    }
+
+    #[test]
+    #[ignore = "Run through scripts/test-ssh-jumps.py for isolated protocol servers"]
+    fn jump_protocol_fixture() -> Result<(), String> {
+        let fixture: serde_json::Value = serde_json::from_str(&std::env::var("VRYKELL_SSH_JUMP_FIXTURE").map_err(|error| error.to_string())?)
+            .map_err(|error| error.to_string())?;
+        let root = std::path::PathBuf::from(fixture["directory"].as_str().ok_or("Missing fixture directory")?);
+        let ports: Vec<u16> = fixture["ports"].as_array().ok_or("Missing fixture ports")?.iter().map(|port| port.as_u64().unwrap() as u16).collect();
+        struct TrustScope;
+        impl Drop for TrustScope { fn drop(&mut self) { TEST_KNOWN_HOSTS.with(|path| *path.borrow_mut() = None); } }
+        let _scope = TrustScope;
+        TEST_KNOWN_HOSTS.with(|path| *path.borrow_mut() = Some(root.join("known_hosts")));
+        let profile = |name: &str, port: u16| -> SshConnection {
+            serde_json::from_value(serde_json::json!({ "id": format!("fixture-{name}"), "name": name, "host": "127.0.0.1", "port": port,
+                "user": format!("{name}-user"), "authMethod": "password", "password": format!("{name}-test-secret"), "proxyId": "none" })).unwrap()
+        };
+        let first = profile("first", ports[0]);
+        let mut second = profile("second", ports[1]);
+        second.auth_method = "key".into();
+        second.password.clear();
+        second.options.identity_file = Some(root.join("client-key").to_string_lossy().into_owned());
+        let mut target = profile("target", ports[2]);
+        target.options.jump_connection_id = Some("fixture-second".into());
+        target.options.resolved_jumps = super::super::jump::ResolvedJumps(vec![first.clone(), second]);
+        println!("Fixture: checking repeated direct handshakes");
+        let mut direct = target.clone();
+        direct.options.jump_connection_id = None;
+        direct.options.resolved_jumps.0.clear();
+        for index in 0..10 {
+            let session = connect_with_timeout(&direct, Some(Duration::from_secs(10))).map_err(|error| format!("Direct handshake {index}: {error}"))?;
+            assert!(matches!(session.host_key().unwrap().1, HostKeyType::Rsa));
+        }
+        println!("Fixture: checking repeated routed handshakes");
+        for index in 0..5 {
+            connect_with_timeout(&target, Some(Duration::from_secs(10))).map_err(|error| format!("Routed handshake {index}: {error}"))?;
+        }
+        println!("Fixture: connecting through two hops");
+        let session = connect_with_timeout(&target, Some(Duration::from_secs(10)))?;
+        println!("Fixture: checking file service");
+        let sftp = session.sftp().map_err(|error| error.to_string())?;
+        assert_eq!(sftp.realpath(Path::new(".")).map_err(|error| error.to_string())?, Path::new("/"));
+        assert!(sftp.readdir(Path::new("/")).map_err(|error| error.to_string())?.iter().any(|(path, _)| path.file_name().unwrap() == "fixture.txt"));
+        drop(sftp);
+        println!("Fixture: checking forwarded channel");
+        let mut echo = session.channel_direct_tcpip("127.0.0.1", ports[3], None).map_err(|error| error.to_string())?;
+        echo.write_all(b"forwarded").map_err(|error| error.to_string())?;
+        let mut response = [0; 9];
+        echo.read_exact(&mut response).map_err(|error| error.to_string())?;
+        assert_eq!(&response, b"forwarded");
+        drop(echo);
+        drop(session);
+        println!("Fixture: checking resource collection");
+        let status = ssh_system_status_sync(&target, SshStatusMetrics::all())?;
+        assert_eq!(status.system, "Fixture Unix");
+        assert_eq!(status.memory_total, Some(1024.0));
+        let service = connect_with_timeout(&target, Some(Duration::from_secs(10)))?;
+        let revision = AUTH_CACHE.lock().unwrap().begin(&target.id);
+        assert!(AUTH_CACHE.lock().unwrap().store_session(&target, revision, service));
+        let independent = connect_with_timeout(&target, Some(Duration::from_secs(10)))?;
+        assert!(independent.authenticated());
+        drop(independent);
+        AUTH_CACHE.lock().unwrap().clear(&target.id);
+        println!("Fixture: using independent temporary credentials through two saved hops");
+        let mut temporary_first = profile("first", ports[0]);
+        temporary_first.options.authentication_mode = Some("ask".into());
+        let first_secret = std::sync::Arc::new(Credential { method: AuthMethod::Password, secret: Zeroizing::new(std::mem::take(&mut temporary_first.password)) });
+        let revision = AUTH_CACHE.lock().unwrap().begin(&temporary_first.id);
+        connect_authenticated(&temporary_first, Some(Duration::from_secs(5)), Some(&first_secret))?;
+        assert!(AUTH_CACHE.lock().unwrap().store(&temporary_first, revision, first_secret));
+        let mut temporary_second = profile("second", ports[1]);
+        temporary_second.options.authentication_mode = Some("ask".into());
+        temporary_second.options.jump_connection_id = Some(temporary_first.id.clone());
+        temporary_second.options.resolved_jumps.0 = vec![temporary_first.clone()];
+        let second_secret = std::sync::Arc::new(Credential { method: AuthMethod::Password, secret: Zeroizing::new(std::mem::take(&mut temporary_second.password)) });
+        let revision = AUTH_CACHE.lock().unwrap().begin(&temporary_second.id);
+        connect_authenticated(&temporary_second, Some(Duration::from_secs(5)), Some(&second_secret))?;
+        assert!(AUTH_CACHE.lock().unwrap().store(&temporary_second, revision, second_secret));
+        temporary_second.options.resolved_jumps.0.clear();
+        let mut temporary_target = target.clone();
+        temporary_target.options.resolved_jumps.0 = vec![temporary_first.clone(), temporary_second.clone()];
+        assert_eq!(ssh_list_sync(&temporary_target, None)?.entries[0].name, "fixture.txt");
+        assert_eq!(ssh_system_status_sync(&temporary_target, SshStatusMetrics::all())?.system, "Fixture Unix");
+        AUTH_CACHE.lock().unwrap().clear(&temporary_first.id);
+        AUTH_CACHE.lock().unwrap().clear(&temporary_second.id);
+        super::super::file_channel::invalidate_all();
+        println!("Fixture: cancellation after handshake prevents sending a saved password");
+        let mut cancelled = direct.clone();
+        cancelled.id = "cancelled-before-auth".into();
+        cancelled.user = "cancelled-target-user".into();
+        let session = tcp_handshake(&cancelled)?;
+        verify_host_key(&session, &cancelled.host, cancelled.port.unwrap_or(22))?;
+        let exchange = super::super::interactive_auth::Exchange::new(uuid::Uuid::new_v4().to_string(), "fixture".into(), &cancelled, |_| Err("Unexpected challenge".into()))?;
+        super::super::interactive_auth::cancel_connection(&cancelled.id);
+        let error = authenticate_checked(&session, &cancelled, &cancelled.user, None, || exchange.attempt.check()).unwrap_err();
+        assert!(error.contains("SSH_AUTH_CANCELLED:"));
+        assert!(!session.authenticated());
+        drop(session);
+        drop(exchange);
+        println!("Fixture: checking authentication and trust failures");
+        let mut wrong = target.clone();
+        wrong.options.resolved_jumps.0[0].password = "incorrect".into();
+        let error = connect_with_timeout(&wrong, Some(Duration::from_secs(5))).err().ok_or("Wrong hop credential was accepted")?;
+        assert!(error.starts_with("SSH_JUMP_FAILED:fixture-first:"), "{error}");
+        assert!(error.contains("SSH_AUTH_FAILED:"), "{error}");
+        TEST_KNOWN_HOSTS.with(|path| *path.borrow_mut() = Some(root.join("untrusted_hosts")));
+        assert!(connect_with_timeout(&target, Some(Duration::from_secs(5))).err().unwrap().contains("HOST_KEY_UNKNOWN:"));
+        let known = std::fs::read_to_string(root.join("known_hosts")).map_err(|error| error.to_string())?;
+        let mut lines = known.lines();
+        let first_address = lines.next().unwrap().split_whitespace().next().unwrap();
+        let other_key = known.lines().last().unwrap().split_once(' ').unwrap().1;
+        let changed = root.join("changed_hosts");
+        std::fs::write(&changed, format!("{first_address} {other_key}\n")).map_err(|error| error.to_string())?;
+        TEST_KNOWN_HOSTS.with(|path| *path.borrow_mut() = Some(changed));
+        assert!(connect_with_timeout(&target, Some(Duration::from_secs(5))).err().unwrap().contains("主机密钥不匹配"));
+        TEST_KNOWN_HOSTS.with(|path| *path.borrow_mut() = Some(root.join("known_hosts")));
+
+        for hop in &mut target.options.resolved_jumps.0 {
+            hop.auth_method = "key".into(); hop.options.authentication_mode = Some("key".into()); hop.password.clear();
+            hop.options.identity_file = Some(root.join("client-key").to_string_lossy().into_owned());
+        }
+        target.options.identity_file = Some(root.join("client-key").to_string_lossy().into_owned());
+        target.options.authentication_mode = Some("key".into());
+        println!("Fixture: checking interactive client configuration");
+        let _config = super::super::jump::LaunchConfig::create(&mut target.options)?;
+        std::fs::OpenOptions::new().append(true).open(target.options.config_file.as_ref().unwrap()).map_err(|error| error.to_string())?
+            .write_all(b"\nHost *\n BatchMode yes\n").map_err(|error| error.to_string())?;
+        let launch = crate::terminal::ssh_command::build_ssh_command(&crate::terminal::ssh_command::SshTarget {
+            host: target.host.clone(), port: target.port, user: Some(target.user.clone()), host_key_type: None, options: target.options,
+        }, Some("fixture-probe"))?;
+        let arguments = launch.get_argv();
+        let output = std::process::Command::new(&arguments[0]).args(&arguments[1..]).stdin(std::process::Stdio::null()).output().map_err(|error| error.to_string())?;
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert!(String::from_utf8_lossy(&output.stdout).contains("destination reached"));
+        Ok(())
+    }
+
+    #[test]
     fn an_explicit_no_jump_profile_uses_the_direct_file_connection_path() {
         let mut conn: SshConnection = serde_json::from_value(serde_json::json!({
             "id": "direct", "name": "direct", "host": "localhost", "jumpHost": "none"
         })).unwrap();
         assert_eq!(connect(&conn).err().as_deref(), Some("用户名不能为空"));
         conn.options.jump_host = Some("bastion".into());
-        assert!(connect(&conn).err().unwrap().contains("跳板机"));
+        assert_eq!(connect(&conn).err().as_deref(), Some("用户名不能为空"));
+    }
+
+    #[test]
+    fn host_key_preferences_follow_only_the_recorded_endpoint() {
+        let session = Session::new().unwrap();
+        let mut known = session.known_hosts().unwrap();
+        known.add("trusted.test", b"rsa-fixture-key", "", KnownHostKeyFormat::SshRsa).unwrap();
+        known.add("other.test", b"other-key", "", KnownHostKeyFormat::Ecdsa256).unwrap();
+        let path = std::env::temp_dir().join(format!("host-key-preference-{}", uuid::Uuid::new_v4()));
+        known.write_file(&path, KnownHostFileKind::OpenSSH).unwrap();
+        let supported = session.supported_algs(ssh2::MethodType::HostKey).unwrap();
+        let algorithms = prefer_known_host_key(&session, "trusted.test", 22, &path).unwrap().unwrap();
+        let preferred: Vec<_> = algorithms.split(',').collect();
+        let rsa: Vec<_> = supported.iter().copied().filter(|algorithm| matches!(*algorithm, "rsa-sha2-512" | "rsa-sha2-256" | "ssh-rsa")).collect();
+        assert!(preferred.starts_with(&rsa));
+        assert!(preferred.iter().all(|algorithm| supported.contains(algorithm)));
+        assert_eq!(preferred.len(), supported.len());
+        assert_eq!(prefer_known_host_key(&session, "unknown.test", 22, &path).unwrap(), None);
+        known.add("trusted.test", b"ecdsa-fixture-key", "", KnownHostKeyFormat::Ecdsa256).unwrap();
+        known.write_file(&path, KnownHostFileKind::OpenSSH).unwrap();
+        let algorithms = prefer_known_host_key(&session, "trusted.test", 22, &path).unwrap().unwrap();
+        let trusted: Vec<_> = supported.iter().copied().filter(|algorithm| rsa.contains(algorithm) || *algorithm == "ecdsa-sha2-nistp256").collect();
+        assert!(algorithms.split(',').collect::<Vec<_>>().starts_with(&trusted));
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn host_key_preferences_match_hashed_names_and_nondefault_ports() {
+        let session = Session::new().unwrap();
+        let path = std::env::temp_dir().join(format!("host-key-preference-{}", uuid::Uuid::new_v4()));
+        let text = "|1|AQIDBAUGBwgJCgsMDQ4PEBESExQ=|C9Z1umYH0Hc57MeO1vlidxT1mhE= ssh-rsa cnNhLWZpeHR1cmUta2V5\n";
+        std::fs::write(&path, text).unwrap();
+        assert!(prefer_known_host_key(&session, "trusted.test", 2222, &path).unwrap().unwrap().starts_with("rsa-sha2-512,rsa-sha2-256,"));
+        assert_eq!(prefer_known_host_key(&session, "trusted.test", 22, &path).unwrap(), None);
+        assert_eq!(prefer_known_host_key(&session, "trusted.test", 2223, &path).unwrap(), None);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), text);
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(prefer_known_host_key(&session, "trusted.test", 2222, &path).unwrap(), None);
+    }
+
+    #[test]
+    #[ignore = "Requires VRYKELL_SSH_TRUST_PROBE_HOST and an existing trusted endpoint"]
+    fn manual_trusted_host_preflight() -> Result<(), String> {
+        let host = std::env::var("VRYKELL_SSH_TRUST_PROBE_HOST").map_err(|error| error.to_string())?;
+        let port: u16 = std::env::var("VRYKELL_SSH_TRUST_PROBE_PORT").unwrap_or_else(|_| "22".into()).parse::<u16>().map_err(|error| error.to_string())?;
+        let conn: SshConnection = serde_json::from_value(serde_json::json!({
+            "id": "trust-probe", "name": "trust-probe", "host": host, "port": port,
+            "user": "", "authMethod": "key", "proxyId": "none",
+        })).map_err(|error| error.to_string())?;
+        let session = tcp_handshake_with_timeout(&conn, Some(Duration::from_secs(6)))?;
+        verify_host_key(&session, &conn.host, port)?;
+        assert!(!session.authenticated());
+        println!("Trusted host preflight passed: algorithm={:?}", session.methods(ssh2::MethodType::HostKey));
+        Ok(())
     }
 
     #[test]

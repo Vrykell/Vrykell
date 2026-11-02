@@ -41,7 +41,7 @@ export function flushDiagnostics(): Promise<void> {
   }
   return writeQueue;
 }
-const privateKeys = new Set(['password', 'passphrase', 'key', 'apikey', 'accesstoken', 'refreshtoken', 'token', 'secret', 'authorization', 'cookie', 'privatekey', 'privatekeycontent', 'env', 'environment', 'lease', 'uilease']);
+const privateKeys = new Set(['password', 'passphrase', 'responses', 'key', 'apikey', 'accesstoken', 'refreshtoken', 'token', 'secret', 'authorization', 'cookie', 'privatekey', 'privatekeycontent', 'env', 'environment', 'lease', 'uilease']);
 const contentKeys = new Set(['data', 'raw', 'output', 'outputclean', 'outputhtml', 'outputraw', 'outputtext', 'outputansi', 'outputplain', 'stdout', 'stderr', 'content', 'text', 'payload', 'prompt', 'command', 'question', 'query', 'messages', 'notes', 'ainotes', 'cursor', 'parts', 'modeloutput', 'attachments', 'database64', 'textcontent']);
 
 /** Match key spellings that differ only by case, underscores or hyphens. */

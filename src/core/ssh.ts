@@ -31,6 +31,7 @@ export interface SshOptions {
   aiNotes?: string;
   identityFile?: string;
   jumpHost?: string;
+  jumpConnectionId?: string;
   serverAliveInterval?: number;
   shellIntegration?: boolean;
   /** `-L` specifications, e.g. `8080:localhost:80`. */
