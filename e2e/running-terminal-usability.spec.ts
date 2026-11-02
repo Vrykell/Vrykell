@@ -58,7 +58,7 @@ test('the running block context menu puts toolbar shortcuts first and triggers t
   await expect(menu).toBeVisible();
 
   // The toolbar actions come first, then copy/paste and the pane actions.
-  const labels = ['重绘终端', '终止命令', '结束前台应用', '进入全屏交互', '复制', '粘贴', '拆分标签页'];
+  const labels = ['重绘终端', '重置终端输入模式', '终止命令', '结束前台应用', '进入全屏交互', '复制', '粘贴', '拆分标签页'];
   for (const [index, label] of labels.entries()) {
     await expect(menu.locator('button').nth(index)).toContainText(label);
   }
