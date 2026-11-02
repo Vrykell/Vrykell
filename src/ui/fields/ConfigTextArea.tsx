@@ -28,7 +28,7 @@ export default function ConfigTextArea({ value, label, font = 'mono', className 
   return <>
     {title && <label htmlFor={inputId} className="config-text-area-label">{title}</label>}
     <div className="config-text-area" style={{ marginTop: style?.marginTop }}>
-      <TextArea {...props} id={inputId} aria-label={inputLabel} value={value} data-font={font} className={`config-text-input ${className}`} style={style} />
+      <TextArea {...props} autoSizeMaxHeight={320} id={inputId} aria-label={inputLabel} value={value} data-font={font} className={`config-text-input ${className}`} style={style} />
       <IconButton compact className="config-text-area-copy" disabled={!text} aria-label={copyLabel} data-tip={copyLabel} onClick={() => void copy()}>
         {copied ? <Check size={iconSizes.copy} /> : <Copy size={iconSizes.copy} />}
       </IconButton>

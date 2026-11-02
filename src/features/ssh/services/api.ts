@@ -58,6 +58,10 @@ export function validateSshConnection(c: Partial<SshConnection>): string | null 
   if (c.host.startsWith('-') || /\s/.test(c.host)) return t('The host cannot contain spaces or start with a dash.');
   if (c.user?.startsWith('-') || /\s/.test(c.user ?? '')) return t('The account cannot contain spaces or start with a dash.');
   if (c.serverAliveInterval !== undefined && (!Number.isInteger(c.serverAliveInterval) || c.serverAliveInterval < 0 || c.serverAliveInterval > 3600)) return t('Keepalive must be an integer from 0 to 3600 seconds.');
+  if (c.jumpConnectionId && (c.jumpConnectionId === c.id || !/^[\w-]{1,128}$/.test(c.jumpConnectionId))) return t('Choose a different saved connection as the jump host.');
+  if (c.jumpConnectionId && c.jumpHost && c.jumpHost.toLowerCase() !== 'none') return t('Choose a saved jump connection or enter jump addresses, not both.');
+  if (c.jumpHost && (c.jumpHost.length > 2048 || c.jumpHost.split(',').length > 8)) return t('Up to 8 jump hosts are supported.');
+  if (c.jumpConnectionId && c.proxyId && c.proxyId !== 'none') return t('Configure the proxy on the first jump connection.');
   if (c.jumpHost && !c.jumpHost.split(',').every(value => /^(?:[\w.-]+@)?(?:\[[0-9a-fA-F:]+\]|[\w.][\w.-]*)(?::[0-9]{1,5})?$/.test(value) && Number(value.match(/:(\d+)$/)?.[1] ?? 22) > 0 && Number(value.match(/:(\d+)$/)?.[1] ?? 22) <= 65535)) return t('Use user@host:port for jump hosts, separated by commas.');
   if (/[\r\n\0]/.test(c.identityFile ?? '')) return t('The private key path cannot contain control characters.');
   if ([c.notes, c.aiNotes].some(value => new TextEncoder().encode(value ?? '').length > 16384)) return t('Host notes must not exceed 16,384 bytes.');
@@ -115,7 +119,7 @@ export function sshTest(target: {
     port: target.port ?? null,
     user: target.user ?? '',
     password: target.password ?? '',
-    options: { identityFile: target.identityFile, jumpHost: target.jumpHost,
+    options: { identityFile: target.identityFile, jumpHost: target.jumpHost, jumpConnectionId: target.jumpConnectionId,
       serverAliveInterval: target.serverAliveInterval, shellIntegration: target.shellIntegration,
       localForwards: target.localForwards, remoteForwards: target.remoteForwards,
       dynamicForwards: target.dynamicForwards, proxyId: target.proxyId, environment: target.environment, authenticationMode: target.authenticationMode },
@@ -136,7 +140,7 @@ export interface SshHostKeyInfo {
 
 export function connectionTarget(conn: SshConnection) {
   return { name: conn.name, host: conn.host, user: conn.user, port: conn.port, connectionId: conn.id,
-    identityFile: conn.identityFile, jumpHost: conn.jumpHost, serverAliveInterval: conn.serverAliveInterval,
+    identityFile: conn.identityFile, jumpHost: conn.jumpHost, jumpConnectionId: conn.jumpConnectionId, serverAliveInterval: conn.serverAliveInterval,
     shellIntegration: conn.shellIntegration, localForwards: conn.localForwards,
     remoteForwards: conn.remoteForwards, dynamicForwards: conn.dynamicForwards,
     autoReconnect: conn.autoReconnect, proxyId: conn.proxyId, environment: conn.environment, notes: conn.notes, aiNotes: conn.aiNotes, authenticationMode: conn.authMethod };
@@ -208,6 +212,36 @@ export async function sshSystemStatus(id: string, host: string, port: number, us
 export function sshAuthenticateSession(target: SshAuthenticationTarget, method: 'password' | 'keyPassphrase', secret: string): Promise<void> {
   return invoke('ssh_authenticate_session', { id: target.connectionId, host: target.host, port: target.port ?? 22,
     user: target.user ?? '', method, password: method === 'password' ? secret : '', passphrase: method === 'keyPassphrase' ? secret : '' });
+}
+
+interface ChallengeTarget { connectionId: string; host: string; port: number; user: string }
+export type SshAuthenticationChallenge =
+  | { kind: 'hostKey'; round: number; target: ChallengeTarget; fingerprint: string; keyType: string }
+  | { kind: 'prompts'; round: number; target: ChallengeTarget; instructions: string; prompts: { text: string; echo: boolean }[] };
+export type SshChallengeReply = (responses: string[]) => Promise<void>;
+
+/** Answers belong to one live handshake; successful services reuse its transport. */
+export async function sshAuthenticateInteractive(target: SshAuthenticationTarget, signal: AbortSignal,
+  onChallenge: (challenge: SshAuthenticationChallenge, reply: SshChallengeReply) => void): Promise<void> {
+  signal.throwIfAborted();
+  const attemptId = crypto.randomUUID();
+  const channel = new Channel<SshAuthenticationChallenge>();
+  channel.onmessage = challenge => {
+    if (!signal.aborted) onChallenge(challenge, responses => {
+      signal.throwIfAborted();
+      return invoke('ssh_authentication_respond', { attemptId, round: challenge.round, responses });
+    });
+  };
+  const cancel = () => { void invoke('ssh_authentication_cancel', { attemptId }).catch(() => {}); };
+  signal.addEventListener('abort', cancel, { once: true });
+  try {
+    await invoke('ssh_authenticate_session', { id: target.connectionId, host: target.host, port: target.port ?? 22,
+      user: target.user ?? '', method: 'keyboardInteractive', password: '', passphrase: '', attemptId, onChallenge: channel });
+    signal.throwIfAborted();
+  } finally {
+    signal.removeEventListener('abort', cancel);
+    channel.onmessage = () => {};
+  }
 }
 
 export function sshForgetSessionAuth(id: string): Promise<void> {

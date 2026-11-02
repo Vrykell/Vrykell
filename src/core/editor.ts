@@ -5,7 +5,8 @@ export interface EditorFile { path: string; connectionId?: string; draftId?: str
 export const editorFileKey = (file: EditorFile) => JSON.stringify(file.draftId ? ['draft', file.draftId] : [file.connectionId ?? '', file.path]);
 export interface EditorContent { kind: 'text' | 'binary' | 'tooLarge'; text: string; revision: string; readOnly?: boolean; permissionDenied?: boolean; encoding?: EditorEncoding }
 
-type CloseGuard = (files: EditorFile[], complete: () => void) => boolean;
+export type EditorCloseTarget = EditorFile[] | 'all';
+type CloseGuard = (files: EditorCloseTarget, complete: () => void) => boolean;
 let closeGuard: CloseGuard | undefined;
 export function registerEditorCloseGuard(guard: CloseGuard) { closeGuard = guard; return () => { if (closeGuard === guard) closeGuard = undefined; }; }
-export function interceptEditorClose(files: EditorFile[], complete: () => void) { return closeGuard?.(files, complete) ?? false; }
+export function interceptEditorClose(files: EditorCloseTarget, complete: () => void) { return closeGuard?.(files, complete) ?? false; }

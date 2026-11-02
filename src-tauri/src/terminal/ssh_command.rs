@@ -13,6 +13,11 @@ pub struct SshOptions {
     pub ai_notes: Option<String>,
     pub identity_file: Option<String>,
     pub jump_host: Option<String>,
+    pub jump_connection_id: Option<String>,
+    #[serde(skip)]
+    pub resolved_jumps: crate::remote::jump::ResolvedJumps,
+    #[serde(skip)]
+    pub config_file: Option<std::path::PathBuf>,
     pub server_alive_interval: Option<u32>,
     pub shell_integration: Option<bool>,
     /// `-L` specifications, e.g. `8080:localhost:80`.
@@ -48,6 +53,17 @@ pub fn validate_ssh_host(host: &str) -> Result<(), String> {
 }
 
 pub fn validate_options(options: &SshOptions) -> Result<(), String> {
+    if let Some(id) = &options.jump_connection_id {
+        if id.is_empty() || id.len() > 128 || !id.bytes().all(|byte| byte.is_ascii_alphanumeric() || b"-_".contains(&byte)) {
+            return Err("Invalid jump connection identifier".into());
+        }
+        if options.jump_host.as_deref().is_some_and(|host| !host.is_empty() && !host.eq_ignore_ascii_case("none")) {
+            return Err("Choose a saved jump connection or enter jump addresses, not both".into());
+        }
+    }
+    if options.jump_host.as_ref().is_some_and(|host| host.len() > 2048 || host.split(',').count() > 8) {
+        return Err("Up to 8 jump hosts are supported".into());
+    }
     if let Some(rules) = &options.forwarding_rules {
         if rules.len() > 64 { return Err("Too many forwarding rules".into()); }
         let mut identifiers = std::collections::HashSet::new();
@@ -154,15 +170,19 @@ pub fn build_ssh_command(target: &SshTarget, remote_command: Option<&str>) -> Re
         return Err("SSH 账户格式不正确".into());
     }
     if target.port == Some(0) { return Err("SSH 端口不能为 0".into()); }
-    let known_hosts = dirs::home_dir().ok_or("无法定位 SSH 信任记录目录")?.join(".ssh").join("known_hosts");
+    let known_hosts = crate::remote::ssh::known_hosts_path()?;
     let mut command = CommandBuilder::new("ssh");
     command.arg("-tt");
+    if let Some(path) = &target.options.config_file { command.arg("-F"); command.arg(path); }
     match target.options.authentication_mode.as_deref() {
         Some("ask") => { command.args(["-o", "PreferredAuthentications=keyboard-interactive,password", "-o", "PubkeyAuthentication=no"]); }
         Some("agent") => { command.args(["-o", "PreferredAuthentications=publickey", "-o", "IdentityFile=none"]); }
         _ => {}
     }
-    if let Some(proxy) = crate::ssh_proxy::command_option(target.options.proxy_id.as_deref(), &target.host)? {
+    if target.options.jump_connection_id.is_some() {
+        if target.options.config_file.is_none() { return Err("Saved jump connection has not been resolved".into()); }
+        if target.options.proxy_id.as_deref().is_some_and(|id| id != "none") { return Err("Configure the proxy on the first jump connection".into()); }
+    } else if let Some(proxy) = crate::ssh_proxy::command_option(target.options.proxy_id.as_deref(), &target.host)? {
         if target.options.jump_host.as_deref().is_some_and(|jump| !jump.eq_ignore_ascii_case("none")) { return Err("A proxy and jump host cannot be combined for this connection".into()); }
         command.arg("-o"); command.arg(proxy);
     }
@@ -176,7 +196,7 @@ pub fn build_ssh_command(target: &SshTarget, remote_command: Option<&str>) -> Re
     // Hop hosts are verified by the client because a direct preflight cannot reach the destination.
     // The same relaxation applies when the preflight itself was unavailable: the client still
     // verifies recorded hosts and only asks about unknown fingerprints.
-    if target.options.jump_host.is_some() || target.options.host_key_policy.as_deref() == Some("ask") {
+    if target.options.jump_host.is_some() || target.options.jump_connection_id.is_some() || target.options.host_key_policy.as_deref() == Some("ask") {
         verified[1] = "StrictHostKeyChecking=ask".into();
     }
     command.args(verified);
@@ -189,7 +209,11 @@ pub fn build_ssh_command(target: &SshTarget, remote_command: Option<&str>) -> Re
         if !path.is_file() { return Err("指定的 SSH 私钥文件不存在".into()); }
         command.arg("-i"); command.arg(path); command.args(["-o", "IdentitiesOnly=yes"]);
     }
-    if let Some(jump) = &target.options.jump_host {
+    if target.options.jump_connection_id.is_some() {
+        let config = target.options.config_file.as_deref().ok_or("Saved jump connection has not been resolved")?;
+        command.arg("-J");
+        command.arg((0..target.options.resolved_jumps.0.len()).map(|index| crate::remote::jump::hop_alias(config, index)).collect::<Vec<_>>().join(","));
+    } else if let Some(jump) = &target.options.jump_host {
         command.args(["-J", if jump.eq_ignore_ascii_case("none") { "none" } else { jump }]);
     }
     for spec in target.options.local_forwards.iter().flatten() {

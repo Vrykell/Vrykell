@@ -79,7 +79,6 @@ export function AiBehaviorPage() {
             style={{
               ...inputStyle,
               minHeight: 130,
-              resize: 'vertical',
               fontFamily: 'var(--font-ui)',
               lineHeight: 1.6,
             }}

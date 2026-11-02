@@ -1,0 +1,8 @@
+.about-product { display: flex; align-items: center; gap: 20px; padding: 8px 4px 28px; min-width: 0; }
+.about-product h2 { margin: 0 0 6px; font-size: calc(28px * var(--ui-font-scale)); line-height: 1.2; font-weight: var(--fw-semibold); letter-spacing: -.5px; color: var(--text-primary); }
+.about-product p { margin: 0; font-size: var(--fs-label); line-height: 1.6; color: var(--text-secondary); }
+.about-version { display: flex; align-items: center; gap: 8px; min-height: 28px; font-family: var(--font-mono); color: var(--text-primary); }
+.about-footer { display: flex; flex-direction: column; gap: 12px; margin-top: 24px; }
+.about-footer nav { display: flex; flex-wrap: wrap; gap: 8px; }
+.about-footer p { margin: 0; font-size: var(--fs-caption); color: var(--text-muted); }
+@media (max-width: 760px) { .about-product { gap: 14px; padding-bottom: 20px; } .about-product > svg { width: 56px; height: 56px; } }

@@ -231,13 +231,13 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
         style={{ ...inputStyle, marginTop: 8 }}
       />
       <ConfigTextArea
-        label={t('Environment variables')}
+        aria-label={t('Environment variables')}
         value={env}
         placeholder={t('Environment variables, one KEY=VALUE per line')}
         onChange={(e) => change({ env: e.target.value })}
         rows={3}
         style={{
-          ...inputStyle, marginTop: 8, minHeight: 52, resize: 'vertical',
+          ...inputStyle, marginTop: 8, minHeight: 52,
           fontFamily: 'var(--font-ui)', lineHeight: 1.5,
         }}
       />

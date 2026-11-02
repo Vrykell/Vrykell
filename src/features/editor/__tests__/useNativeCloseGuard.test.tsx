@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { registerEditorCloseGuard, type EditorFile } from '@core/editor';
+import { registerEditorCloseGuard, type EditorCloseTarget } from '@core/editor';
 import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { useNativeCloseGuard } from '../hooks/useNativeCloseGuard';
 
@@ -28,7 +28,7 @@ it('preserves cancellation and permits the follow-up native close only after app
   const file = { path: '/repo/unsaved.ts' };
   useWorkspaceStore.setState({ tabs: [{ id: 'editor', kind: 'editor', title: 'Editor', files: [file], selected: file }] });
   let approve: (() => void) | undefined;
-  const guard = vi.fn((_files: EditorFile[], complete: () => void) => { approve = complete; return true; });
+  const guard = vi.fn((_files: EditorCloseTarget, complete: () => void) => { approve = complete; return true; });
   release = registerEditorCloseGuard(guard);
   renderHook(useNativeCloseGuard);
   const preventDefault = vi.fn();

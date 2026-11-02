@@ -46,13 +46,13 @@ describe('useRunningCommandActions', () => {
   it('mirrors the running toolbar in order, redraws its own pane and raises the fullscreen surface', () => {
     const { result } = renderHook(() => useRunningCommandActions('pane-1', 'block'));
 
-    expect(result.current.map((item) => item.label)).toEqual(['重绘终端', '终止命令', '结束前台应用', '进入全屏交互']);
+    expect(result.current.map((item) => item.label)).toEqual(['重绘终端', '重置终端输入模式', '终止命令', '结束前台应用', '进入全屏交互']);
     expect(result.current[0]!.shortcut).toMatch(/^(Meta|Control)\+Shift\+R$/);
 
     act(() => result.current[0]!.onClick?.());
     expect(mocks.redrawTerminal).toHaveBeenCalledExactlyOnceWith('pane-1');
 
-    act(() => result.current[3]!.onClick?.());
+    act(() => result.current[4]!.onClick?.());
     expect(useTerminalStore.getState().manualFullscreen['pane-1']).toBe(true);
     expect(useTerminalStore.getState().scenes['pane-1']).toBe('altScreen');
   });
@@ -60,22 +60,22 @@ describe('useRunningCommandActions', () => {
   it('interrupts through the write queue and arms the escalation label', async () => {
     const { result } = renderHook(() => useRunningCommandActions('pane-1', 'block'));
 
-    expect(result.current[1]!.shortcut).toBe('Control+C');
-    act(() => result.current[1]!.onClick?.());
+    expect(result.current[2]!.shortcut).toBe('Control+C');
+    act(() => result.current[2]!.onClick?.());
     expect(mocks.ptyWrite).toHaveBeenCalledWith('session-1', '\x03');
 
-    await act(async () => { result.current[2]!.onClick?.(); });
+    await act(async () => { result.current[3]!.onClick?.(); });
     expect(mocks.killForeground).toHaveBeenCalledWith('session-1');
-    expect(result.current[2]!.label).toBe('强制结束前台应用');
+    expect(result.current[3]!.label).toBe('强制结束前台应用');
   });
 
   it('offers the fullscreen exit on the fullscreen surface and leaves it', () => {
     useTerminalStore.setState({ scenes: { 'pane-1': 'altScreen' }, manualFullscreen: { 'pane-1': true } });
     const { result } = renderHook(() => useRunningCommandActions('pane-1', 'fullscreen'));
 
-    expect(result.current.map((item) => item.label)).toEqual(['重绘终端', '终止命令', '结束前台应用', '退出全屏']);
+    expect(result.current.map((item) => item.label)).toEqual(['重绘终端', '重置终端输入模式', '终止命令', '结束前台应用', '退出全屏']);
 
-    act(() => result.current[3]!.onClick?.());
+    act(() => result.current[4]!.onClick?.());
     expect(useTerminalStore.getState().manualFullscreen['pane-1']).toBeUndefined();
     expect(useTerminalStore.getState().scenes['pane-1']).toBe('blockList');
   });
@@ -84,11 +84,11 @@ describe('useRunningCommandActions', () => {
     useTerminalStore.setState({ scenes: { 'pane-1': 'altScreen' }, manualFullscreen: {} });
     const { result } = renderHook(() => useRunningCommandActions('pane-1', 'altScreen'));
 
-    expect(result.current.map((item) => item.label)).toEqual(['重绘终端', '终止命令', '结束前台应用']);
+    expect(result.current.map((item) => item.label)).toEqual(['重绘终端', '重置终端输入模式', '终止命令', '结束前台应用']);
 
     act(() => result.current[0]!.onClick?.());
     expect(mocks.redrawTerminal).toHaveBeenCalledExactlyOnceWith('pane-1');
-    act(() => result.current[1]!.onClick?.());
+    act(() => result.current[2]!.onClick?.());
     expect(mocks.ptyWrite).toHaveBeenCalledWith('session-1', '\x03');
   });
 });

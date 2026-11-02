@@ -20,10 +20,10 @@ interface Props {
 /** Present workspace search as a compact palette with grouped results. */
 export default function GlobalSearch({ open, onClose }: Props) {
   const {
-    input, inputRef, query, selectedIdx, filterOpen, setFilterOpen, setSelectedIdx,
+    input, inputRef, listRef, query, selectedIdx, selectResult, filterOpen, setFilterOpen,
     state, searchHistory, grouped, sourceCounts, enabledCount, enabledIds, totalSources,
     flatResults, failedSources, hasInput, hasResults, hasHistory,
-    handleInput, handleExecute, handleKey, handleRestore, close,
+    handleInput, handleExecute, handleKey, close,
   } = useGlobalSearch({ open, onClose });
 
   if (!open) return null;
@@ -38,7 +38,7 @@ export default function GlobalSearch({ open, onClose }: Props) {
           <div className="global-search-input-row">
             <div className="global-search-query">
               <Search size={18} />
-              {activeSource && <FilterChip testId="search-scope-chip" icon={<activeSource.icon size={14} />} removeLabel={t('Clear search scope')}
+              {activeSource && <FilterChip testId="search-scope-chip" icon={<activeSource.icon size={18} />} removeLabel={t('Clear search scope')}
                 onRemove={() => { handleInput(query.term); inputRef.current?.focus(); }}>
                 {activeSource.label}
               </FilterChip>}
@@ -60,7 +60,7 @@ export default function GlobalSearch({ open, onClose }: Props) {
           </div>
         </header>
 
-        <div className="global-search-body">
+        <div className="global-search-body" ref={listRef}>
           {!hasInput && hasHistory && (
             <section>
               <div className="global-search-section-heading">
@@ -104,8 +104,8 @@ export default function GlobalSearch({ open, onClose }: Props) {
               {group.results.map(result => {
                 const index = flatResults.indexOf(result);
                 return <SearchResultCard key={result.id} result={result} selected={index === selectedIdx}
-                  query={query.term.trim()} onSelect={() => setSelectedIdx(index)}
-                  onExecute={handleExecute} onRestore={handleRestore} />;
+                  query={query.term.trim()} onSelect={() => selectResult(index)}
+                  onExecute={handleExecute} />;
               })}
             </section>
           ))}

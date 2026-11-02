@@ -1,8 +1,19 @@
-import type { Terminal } from '@xterm/xterm';
+import type { Terminal, ITerminalOptions } from '@xterm/xterm';
+import { isWindows } from '@platform/runtime';
 import { configureLiteralInput } from '@ui/fields/TextInput';
 import { terminalDebug } from '../services/terminalDebug';
 
 const configured = new WeakSet<HTMLTextAreaElement>();
+
+/** Let the native PTY negotiate keyboard encoding through the terminal's own parser. */
+export function getTerminalInputOptions(windows = isWindows): Pick<ITerminalOptions, 'vtExtensions'> {
+  return { vtExtensions: { win32InputMode: windows } };
+}
+
+export function terminalInputModes(term: Terminal) {
+  return { mouse: term.modes?.mouseTrackingMode ?? 'none', focus: term.modes?.sendFocusMode ?? false,
+    applicationCursor: term.modes?.applicationCursorKeysMode ?? false, nativeKeyboard: term.modes?.win32InputMode ?? false };
+}
 
 /** Position preedit before it becomes visible, retaining native candidate placement. */
 export function configureTerminalInput(term: Terminal): void {
@@ -29,7 +40,7 @@ export function configureTerminalInput(term: Terminal): void {
     if (!composing && !nativeDiffPending) compositionCommitted = false;
     terminalDebug('terminal-native-key', { composing: event.isComposing || composing,
       imeKey: event.keyCode === 229, printable: event.key.length === 1,
-      modified: event.ctrlKey || event.altKey || event.metaKey, readonly: input.readOnly });
+      modified: event.ctrlKey || event.altKey || event.metaKey, readonly: input.readOnly, repeat: event.repeat });
     // Some native input methods use ordinary key codes for candidate navigation and
     // confirmation. Keep these keys native until compositionend commits the textarea.
     if (event.target === input && (composing || event.isComposing)) {

@@ -48,7 +48,7 @@ export default function GitCommit({ target, snapshot, refresh }: { target: GitTa
   };
   return <div className="git-commit-area" data-testid="git-commit-area">
     <div className="git-message-field">
-      <TextArea rows={3} aria-label={t('Commit message')} placeholder={t('Message (Ctrl/Cmd+Enter to commit)')} value={message}
+      <TextArea rows={3} autoSizeMaxHeight={180} aria-label={t('Commit message')} placeholder={t('Message (Ctrl/Cmd+Enter to commit)')} value={message}
         onChange={event => useGitOperations.getState().draft(key, event.target.value)}
         onKeyDown={event => { if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !event.nativeEvent.isComposing && canCommit) { event.preventDefault(); event.stopPropagation(); void operate('commit'); } }} />
       <IconButton compact aria-label={t('Generate commit message')} data-tip={t('Summarize staged changes with the configured AI model')}

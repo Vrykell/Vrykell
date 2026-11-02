@@ -35,6 +35,7 @@ import { ContextMenuPage } from './contextMenuPage';
 import EditorOpeningPreferences from '../components/EditorOpeningPreferences';
 import EditorPreferences from '../components/EditorPreferences';
 import { LanguagePage } from './languagePage';
+import { AboutPage } from './aboutPage';
 import ShellProfilePage from './shellProfilePage';
 import { SHELL_TYPES, type ShellType } from '@platform/shells';
 import { TerminalProfileIcon } from '@ui/icons/shellIcons';
@@ -102,6 +103,7 @@ function SettingsContent() {
     }
     switch (selected) {
       case 'application-language': return <LanguagePage />;
+      case 'about': return <AboutPage />;
       case 'file-operations': return <FileOperationsPage />;
       case 'startup': return <StartupPage />;
       case 'logs': return <LogsPage />;
@@ -320,10 +322,10 @@ function SettingsContent() {
               {profileShell && SHELL_TYPES.includes(profileShell) && <TerminalProfileIcon kind="local" shellType={profileShell} size={28} />}
               <h1>{activeLabel}</h1>
             </div>
-            <div className="settings-save-hint">
+            {selected !== 'about' && <div className="settings-save-hint">
               {selected !== 'ai-memory' && <span>{t('Options save immediately; text saves after you stop typing.')}</span>}
               <SaveStatus status={status} onRetry={retry} />
-            </div>
+            </div>}
           </header>
           <div className="settings-page-body">
             {renderPage()}

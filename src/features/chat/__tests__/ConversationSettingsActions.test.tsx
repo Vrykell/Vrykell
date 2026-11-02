@@ -16,7 +16,7 @@ it('uses shared buttons and closes the menu before performing a selected action'
   expect(closeMenu).toHaveBeenCalledOnce();
   expect(mocks.usage).toHaveBeenCalledOnce();
   const close = screen.getByRole('button', { name: '关闭当前对话' });
-  expect(close).toHaveTextContent('关闭'); expect(close).toHaveAttribute('data-tone', 'danger');
+  expect(close).toHaveTextContent('关闭'); expect(close).toHaveClass('primary-button');
   fireEvent.click(close);
   expect(closeConversation).toHaveBeenCalledOnce();
 });

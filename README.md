@@ -4,11 +4,11 @@
 
 # Vrykell
 
-**Your terminal, your tools, your AI — together.**
+**A terminal workbench for development and remote operations.**
 
-A desktop workspace for development and remote operations, built around the terminal.
+Keep command context, manage SSH connections and services, and work with an agent in a terminal you select.
 
-**[Download Beta](#download)** &nbsp; · &nbsp; [Explore features](#features) &nbsp; · &nbsp; [Build from source](#build-from-source) &nbsp; · &nbsp; [简体中文](README.zh-CN.md)
+**[Download Beta](#download)** &nbsp; · &nbsp; [How it works](#working-with-vrykell) &nbsp; · &nbsp; [Build from source](#build-from-source) &nbsp; · &nbsp; [简体中文](README.zh-CN.md)
 
 <p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="Apache-2.0" /></a>
@@ -17,15 +17,104 @@ A desktop workspace for development and remote operations, built around the term
 
 </div>
 
-<a href="docs/images/hero-workspace-en.png"><img src="docs/images/hero-workspace-en.png" width="1600" alt="Code, a build terminal and an agent in Vrykell" /></a>
+<a href="docs/images/hero-workspace-en.png"><img src="docs/images/hero-workspace-en.png" width="1600" alt="Source code, a build terminal and an agent conversation in one workspace" /></a>
 
-<p align="center"><sub>Code, run commands, and work with an agent in the same workspace.</sub></p>
+Vrykell organizes development and remote work around live shell sessions. Each command can retain its directory, output and result; files and diffs follow the environment you are working in; a conversation can explicitly select that environment for execution.
 
----
+The workflow extends from **running a command to understanding its result, changing a file and reviewing the change**. You can carry a failed command's context into a conversation, keep the execution terminal visible as an agent works, then inspect the resulting diff before committing.
+
+## Working with Vrykell
+
+### 1. Inspect commands as individual runs
+
+Block mode keeps a command with its working directory, branch, output, duration and exit status. A failed build remains an identifiable run as you continue working. You can rerun it in its owning terminal, copy its command or output, or stage a snapshot in a conversation for review before sending.
+
+The terminal supports three working states:
+
+| State | Use |
+| --- | --- |
+| Command blocks | Inspect individual runs and refer back to their context and results. |
+| Classic terminal | Work with a continuous terminal screen, including shells without block integration. |
+| Full-screen interaction | Use an interactive editor, pager or monitor, then return to the previous view when it exits. |
+
+History suggestions and local path completion work without a model key. Tab completion combines built-in candidates, supported shell completion and paths in the current local or SSH directory, including quoted paths and names with spaces. Optional AI completion uses your configured model when local suggestions are unavailable. History can be searched, grouped and saved as favorites.
+
+<a href="docs/images/feature-completion-en.png"><img src="docs/images/feature-completion-en.png" width="1600" alt="Command blocks retaining execution context, with history suggestions and completion controls" /></a>
+
+<a href="docs/images/feature-classic-en.png"><img src="docs/images/feature-classic-en.png" width="1600" alt="Classic terminal mode with continuous shell prompts, test output and a build result" /></a>
+
+<p align="center"><sub>Classic mode keeps shell prompts and output on one continuous screen.</sub></p>
+
+### 2. Work through an SSH connection, beyond its prompt
+
+A saved host holds authentication, jump connections, proxy selection, forwarding rules, environment variables and notes. Groups, tags and favorites help organize hosts; importing existing connection configuration reduces repeated setup.
+
+| Capability | Behavior |
+| --- | --- |
+| Routes and trust | Saved jump profiles can form routes of up to eight hops, with separate credentials and host-key verification at each hop. Standard routes support file browsing, resource monitoring and managed forwarding. |
+| Interactive authentication | Service authentication supports password and key passphrases, plus multi-round server challenges such as MFA. Files and monitoring can reuse the authenticated destination transport; challenge answers are never cached for reconnects. |
+| Files and transfers | Browse and manage files over SFTP, with upload and download tasks in a transfer list. |
+| Resource status | Inspect CPU, memory, root-disk usage and network traffic alongside the session. Collection is on demand. |
+| Managed forwarding | Start and stop local, remote and dynamic forwarding rules independently of terminal tabs. Closing a terminal does not itself stop a managed forward. |
+
+Terminal access and service access have distinct requirements. A gateway that exposes only an interactive menu does not automatically provide SFTP, monitoring or forwarding. Transfers and managed forwarding also authenticate separately from the retained interactive service transport. The [connection guide](docs/en/ssh-profiles.md) explains these paths and their lifetimes.
+
+<a href="docs/images/single-hosts-en.png"><img src="docs/images/single-hosts-en.png" width="1600" alt="Saved hosts organized alongside resource status" /></a>
+
+### 3. Give an agent a specific execution environment
+
+Conversations can stand alone or use a selected local or SSH terminal. Attach a command block, text, files or images rather than reconstructing a failure from memory. Image input depends on model support. The application's execution tools follow these rules:
+
+- **Keep execution tied to its target.** A turn captures the selected terminal; changing workspace focus does not redirect it. A disconnected target reports an error. With a remote target, application-provided local file tools are unavailable.
+- **Check completion before continuing.** Command execution waits for supported shell completion signals and reports output and exit status when available. A quiet screen alone is not treated as completion. An unconfirmed command stops queued successors so the terminal can be inspected.
+- **Review tool access.** Tools have allow, ask and deny policies, with session approvals and native confirmation for sensitive operations. Calls, results and approval outcomes stay in the conversation.
+
+Use the built-in agent with your own model endpoint, skills, MCP tools and scoped local memory, or connect an external agent through ACP. External sessions can use application tools through the same implementations and permission path. Tools independently provided by an external agent are managed by that agent. See [application tools](docs/en/application-tools.md) and the [security model](docs/en/security-model.md).
+
+<a href="docs/images/single-ai-en.png"><img src="docs/images/single-ai-en.png" width="1600" alt="A conversation with attachments, an execution target and visible tool records" /></a>
+
+### 4. Turn execution into a reviewed change
+
+Open a source file beside the terminal that runs its tests. The built-in editor supports syntax highlighting, find and replace, Markdown preview, encodings and Vim bindings. Unsaved changes, read-only states and save conflicts are handled explicitly.
+
+Source control follows the current terminal or file, including saved SSH connections, or can stay bound to a terminal while focus changes. Review staged and unstaged diffs separately, inspect conflicts, stage whole files and commit the index while retaining unstaged edits. Fetch, pull and push, branch and tag operations, and linked-worktree browsing are available in the panel. Pulls use fast-forward updates; AI-generated commit messages remain drafts for review.
+
+Each tab can combine up to four terminal, file, comparison or conversation panes. Moving panes and switching views preserve their live owners, so arranging the workspace does not restart terminal processes or duplicate conversations. Named tab groups, pane zoom and a dockable conversation sidebar help keep separate tasks organized.
+
+Remote files opened in the editor are downloaded copies; saving them does not automatically upload changes. Git operations use the Git installation on the relevant local machine or remote host.
+
+<a href="docs/images/feature-git-en.png"><img src="docs/images/feature-git-en.png" width="1600" alt="A file comparison beside repository changes and staging controls" /></a>
+
+<details>
+<summary>Example layout: edit beside a build terminal</summary>
+
+<a href="docs/images/scenario-build-en.png"><img src="docs/images/scenario-build-en.png" width="1600" alt="Source editing beside a build terminal" /></a>
+
+</details>
+
+## Implementation and verification
+
+The terminal's command-level behavior is backed by an explicit lifecycle. A synchronous Rust scanner preserves the order of shell integration markers in PTY output. A controller per session tracks command boundaries and transitions between blocks, classic mode and full-screen interaction. VT/ANSI parsing stays with the terminal engine; completed block output is presented as DOM. See the [architecture](docs/en/architecture.md).
+
+Mixed layouts store references to resources owned by their respective domains. Moving a pane changes placement while the process, document or conversation keeps its identity. History restoration resolves those references through their owners, with errors for missing content. See [workspace compositions](docs/en/workspace-compositions.md).
+
+The repository includes unit, browser and native regression suites. They cover delayed command markers, full-screen transitions, fixed agent targets, unconfirmed execution, permission cancellation and workspace restoration. An isolated SSH protocol check exercises disposable loopback servers for multi-hop authentication, files, resources, forwarding and host-key rejection. The [feature checklist](docs/en/feature-spec.md) links behavior to verification; [CI documentation](docs/en/ci.md) distinguishes automated checks from opt-in platform and package validation.
+
+<details>
+<summary>Appearance: themes, typography and wallpaper</summary>
+
+Eleven built-in color schemes include dark and light choices, saved independently, with an option to follow the system. Set fonts and sizes separately for the interface, editor, terminal and chat. Bundled fonts work without a separate installation; local wallpaper and application opacity are configurable.
+
+<a href="docs/images/theme-light-en.png"><img src="docs/images/theme-light-en.png" width="49%" alt="Light workspace" /></a>
+<a href="docs/images/theme-deep-black-en.png"><img src="docs/images/theme-deep-black-en.png" width="49%" alt="Deep Black appearance settings" /></a>
+
+</details>
+
+Screenshots show the application with a sample project and simulated session data. They follow the development branch and may be ahead of the packaged release.
 
 ## Download
 
-**0.1.0 Beta 5** is the latest preview. Check the [current boundaries](#current-boundaries) before using it for daily work. The screenshots and feature descriptions follow the development branch, which may be ahead of the packaged release.
+Packaged preview: **0.1.0 Beta 5**.
 
 | Platform | Package |
 | --- | --- |
@@ -34,115 +123,18 @@ A desktop workspace for development and remote operations, built around the term
 | macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.5/Vrykell_0.1.0_x64.dmg) |
 | Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.5/Vrykell_0.1.0_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.5/Vrykell_0.1.0_amd64.AppImage) |
 
-[All releases and release notes](https://github.com/Vrykell/Vrykell/releases) · [Build instructions](docs/en/ci.md)
+[All releases](https://github.com/Vrykell/Vrykell/releases) · [Beta 5 release notes](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.0-beta.5)
 
-The [Beta 5 release notes](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.0-beta.5) record package checksums, the source commit and validation limits. Installers remain unsigned; build the current source when later fixes are required. See the [security policy](SECURITY.md) before reporting a vulnerability.
+Release notes record package checksums, the source commit and validation limits. Installers are unsigned, and distribution signing and notarization are not configured. The capability descriptions above follow the development branch; build the current source for changes made after the packaged preview.
 
-## One workspace, from command to commit
+### Current boundaries
 
-- **[Terminal and completion](#terminal-and-completion)** — command blocks, classic mode, history suggestions, shell and path completion.
-- **[Files and editor](#files-and-editor)** — local and SFTP browsing, transfers, editor tabs and Markdown preview.
-- **[Git](#git)** — diffs, staging, commits, branches and remote operations.
-- **[SSH](#ssh)** — saved hosts, authentication, forwarding and resource status.
-- **[AI and agents](#ai-and-agents)** — bring your own model, attach output or images, and connect external agents.
-- **[Your layout](#workflows)** — up to four mixed panes per tab, named tab groups and a dockable conversation sidebar.
+- **Persistence:** session history and composition layouts are supported. Unsaved editor drafts and file browsing state are not reliable cross-restart storage; a restored layout does not resume an old running process.
+- **Remote work:** editor copies do not sync back automatically. Interactive-only gateways may not expose service channels; transfers and managed forwarding have separate authentication requirements.
+- **Models and external agents:** you supply and configure them. Requests go to your configured model service without an application-operated relay. Availability, capabilities and costs depend on that service or agent.
+- **Execution authority:** the terminal runs with your user privileges. Application tool approvals govern operations made through those tools; they do not isolate external agent processes or their independently configured tools. Read the [security model](docs/en/security-model.md) and [security policy](SECURITY.md).
 
-## Features
-
-### Terminal and completion
-
-Keep a continuous screen in classic mode, or use blocks to keep each command with its output, working directory, branch, duration and exit status. Full-screen programs use an interactive terminal screen. Search command history, save favorites and organize commands into groups.
-
-History suggestions appear as you type. Local matching and path completion work without a model key; optional AI completion uses your configured model when local suggestions are unavailable. Tab completion combines built-in suggestions, supported shell completion and paths in the current local or SSH directory, including quoted paths and names with spaces.
-
-Use `Tab` and `Shift+Tab` to cycle candidates and `Esc` to restore the original input. Suggestion acceptance keys are configurable.
-
-<a href="docs/images/feature-completion-en.png"><img src="docs/images/feature-completion-en.png" width="1600" alt="Command blocks, history completion and configurable acceptance shortcuts" /></a>
-
-<details>
-<summary>Terminal workspace with the AI sidebar</summary>
-
-<a href="docs/images/single-terminal-en.png"><img src="docs/images/single-terminal-en.png" width="1600" alt="Terminal workspace and an expanded AI sidebar" /></a>
-
-</details>
-
-### Files and editor
-
-Browse local directories or remote files over SFTP. Create, rename, copy, move and delete files and folders, including multiple selections. Uploads and downloads have a transfer list. Open files in the built-in editor or a configured external application.
-
-The editor has syntax highlighting, find and replace, Markdown preview, character encodings and Vim bindings. Files stay in tabs, with read-only states, unsaved changes and save conflicts shown before an overwrite. With the built-in editor selected, unsupported file types open in the system default application. Remote files open as downloaded copies; changes to those copies do not sync back.
-
-<details>
-<summary>Project files and editor</summary>
-
-<a href="docs/images/single-editor-en.png"><img src="docs/images/single-editor-en.png" width="1600" alt="Project files and the built-in editor" /></a>
-
-</details>
-
-### Git
-
-The source control panel follows the current terminal or file, including saved SSH connections. It uses Git installed on the local machine or remote host.
-
-- Review conflicts, staged, unstaged and untracked files in a list or tree. Open diffs, stage or unstage files, and confirm before discarding changes.
-- Write a commit message and commit; an optional AI action drafts a message for review.
-- Fetch, pull and push. Create, switch, rename or delete branches; merge, rebase and manage tags.
-- Browse linked worktrees and switch the repository shown in the panel.
-
-A typical review is **open the diff → stage the intended files → check the message → commit → push**. The terminal remains available for other commands.
-
-<a href="docs/images/feature-git-en.png"><img src="docs/images/feature-git-en.png" width="1600" alt="Side-by-side file differences and the source control panel" /></a>
-
-### SSH
-
-Manage hosts in a list or as cards, then find a target by name, group or tag. Saved connections support password and key authentication, host-key confirmation and port forwarding. Direct connections also support SFTP browsing, remote editing, transfers and resource status on demand.
-
-<a href="docs/images/single-hosts-en.png"><img src="docs/images/single-hosts-en.png" width="1600" alt="Saved SSH hosts with resource status and an expanded sidebar" /></a>
-
-### AI and agents
-
-Use a plain conversation, or attach text, files, images and command output. Image input requires a capable model. For execution tasks, choose the target terminal and review tool calls and permission requests in the conversation.
-
-Built-in conversations support streaming, multiple model configurations, skills, MCP and local memory. External agents connect through ACP and provide their own models and tools. Either can run in a pane or the sidebar, with separate conversations for separate tasks.
-
-<a href="docs/images/single-ai-en.png"><img src="docs/images/single-ai-en.png" width="1600" alt="AI conversation with attachments, tool records and the expanded sidebar" /></a>
-
-## Workflows
-
-Each tab holds up to four panes: terminals, files, AI conversations or external agents. Drag panes to rearrange them. Name and color tab groups, then collapse the ones you are not using. Sessions and conversations keep running when you switch tabs.
-
-### Edit on the left. Build on the right.
-
-Open a source file beside a test or build terminal. Edit, run the command and compare the result. Attach a failed command block to a conversation when you need help with its output.
-
-<a href="docs/images/scenario-build-en.png"><img src="docs/images/scenario-build-en.png" width="1600" alt="Editing code beside a build terminal" /></a>
-
-### SSH on the left. AI on the right.
-
-Check a service or deployment log over SSH. Keep the output visible while discussing it, and check the selected execution environment before asking an agent to act.
-
-<a href="docs/images/scenario-remote-en.png"><img src="docs/images/scenario-remote-en.png" width="1600" alt="Remote service checks beside an AI deployment discussion" /></a>
-
-To review an agent's changes, keep its execution terminal beside the conversation and open the affected file or Git diff. For multiple projects, use a group for each project rather than mixing their sessions.
-
-## Themes and fonts
-
-Eleven built-in schemes cover six dark and five light choices, including a neutral Deep Black option. The original dark and light palettes remain available. Dark and light selections are saved independently, with an option to follow the system.
-
-Set fonts and sizes separately for the interface, editor, terminal and chat. Bundled fonts work without a separate installation. You can also choose a local wallpaper and adjust application opacity.
-
-<a href="docs/images/theme-settings-en.png"><img src="docs/images/theme-settings-en.png" width="1600" alt="Color scheme cards and wallpaper settings" /></a>
-
-<a href="docs/images/theme-light-en.png"><img src="docs/images/theme-light-en.png" width="49%" alt="Light code, terminal and agent workbench" /></a>
-<a href="docs/images/theme-nord-en.png"><img src="docs/images/theme-nord-en.png" width="49%" alt="Cool color scheme with grouped workspaces" /></a>
-
-<details>
-<summary>Deep Black</summary>
-
-<a href="docs/images/theme-deep-black-en.png"><img src="docs/images/theme-deep-black-en.png" width="1600" alt="Deep Black and other theme previews" /></a>
-
-</details>
-
-Screenshots use the application UI with a sample project and simulated session data. Click an image for its original resolution.
+<a id="get-started"></a>
 
 ## Build from source
 
@@ -160,30 +152,19 @@ For frontend-only development, use `npm run dev` on port `1420`. To build an ins
 <details>
 <summary>Platform preparation</summary>
 
-- **Windows**: C++ build tools, the system WebView2 runtime and the desktop SDK needed by the native context menu.
+- **Windows**: C++ build tools, Perl, the system WebView2 runtime and the desktop SDK needed by the native context menu. Native SSH cryptography builds from source; no separate runtime library is required.
 - **macOS**: command-line development tools, Perl and Make. Native SSH dependencies build from source without a separately installed system cryptography library.
 - **Linux**: desktop WebView, GUI and application-indicator development dependencies; see the prerequisites above.
 
 </details>
 
-### Connect a model or agent
+To use the built-in agent, add a model service URL, key and model in settings, then select the active configuration. Native Messages, generation and compatible chat-completion interfaces are supported, including compatible local model services.
 
-Add a model service URL, key and model in settings, then select the active configuration. Built-in conversations support native Messages and generation interfaces and OpenAI-compatible endpoints, including compatible local model services. Requests go directly to the service you configure; the application does not provide a model relay.
-
-Configure an external agent's startup command and working directory in ACP settings. Review tool permissions before starting. With remote targets, also check the selected execution terminal and directory so the execution environment is clear.
-
-### Current boundaries
-
-- Sessions and composition layouts can enter history. Unsaved editor drafts and file browsing state are not a reliable way to preserve work across restarts.
-- Model services, external agents and remote hosts require your configuration. Their costs and capabilities depend on the services you choose.
-- Jump-host support focuses on interactive terminals; browsing and monitoring do not cover the same connection paths yet.
-- Distribution signing and notarization are not configured. See [CI and packages](docs/en/ci.md).
+For an external agent, configure its startup command and working directory in ACP settings. Select an execution terminal when you want it to use the application's terminal tools.
 
 ## Contributing
 
-Bug reports, documentation, translations, tests and code contributions are welcome. Include reproduction steps and your platform when reporting a bug. For a substantial feature, open an issue to discuss the intended behavior first.
-
-**Contribution PRs target `dev`.** Maintainers use `main` for integration and version builds. Read the [contributing guide](CONTRIBUTING.en.md) for branch naming, setup, checks and review.
+**Contribution PRs target `dev`.** Maintainers use `main` for integration and version builds. Read the [contributing guide](CONTRIBUTING.en.md) for setup, branch naming, checks and review. Bug reports should include reproduction steps and the platform; discuss substantial features in an issue first.
 
 ```bash
 npx tsc --noEmit
@@ -191,21 +172,26 @@ npm run test
 npm run check:architecture
 ```
 
-Interactive changes also need matching browser regressions, and backend changes need native tests. Commit messages use English and the agreed prefixes. Commit, PR and issue templates are included.
+Interactive changes also need matching browser regressions; backend changes need native tests. Commit messages use English and the agreed prefixes.
 
-## Community
+## Community and documentation
 
-Join the community group to share ideas, ask questions and follow the project. Group number: **1130135497**.
+Community group: **1130135497**. Share workflows, ask questions and discuss the project.
+
+<details>
+<summary>Community group QR code</summary>
 
 <a href="docs/images/community-group.jpg"><img src="docs/images/community-group.jpg" width="260" alt="Community group QR code" /></a>
 
-## Read more
+</details>
 
 - [Features and regression checklist](docs/en/feature-spec.md)
 - [Architecture](docs/en/architecture.md)
+- [Connection profiles and forwarding](docs/en/ssh-profiles.md)
+- [Application tools for external agents](docs/en/application-tools.md)
 - [Workspace compositions](docs/en/workspace-compositions.md)
-- [Development rules](docs/en/development-rules.md)
 - [Security model](docs/en/security-model.md)
+- [Development rules](docs/en/development-rules.md)
 - [CI and packages](docs/en/ci.md)
 
 ## License

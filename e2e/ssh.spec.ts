@@ -269,11 +269,12 @@ test.describe('SSH remote connection management sidebar', () => {
     await folder.locator('[data-testid="remote-row-expander"]').click();
     await expect(page.locator('[data-testid="remote-file-app.log"][data-path="/home/root/Documents/app.log"]').first()).toBeVisible();
 
-    // Row menu: downloads are available, local-only entries such as workspace and terminal editor are not
+    // Row menu: downloads are available, local-only entries such as workspace are not;
+    // the editor action belongs to file rows, not folders.
     await folder.click({ button: 'right' });
     await expect(page.getByRole('button', { name: /下载文件夹到本地/ })).toBeVisible();
     await expect(page.getByRole('button', { name: '添加到工作区' })).toHaveCount(0);
-    await expect(page.getByRole('button', { name: '使用终端编辑器打开' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: '使用首选编辑器打开' })).toHaveCount(0);
     await page.keyboard.press('Escape');
 
     // Overflow menu: upload and download management are available, the local-only new tab is not

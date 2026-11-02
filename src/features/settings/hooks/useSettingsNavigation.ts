@@ -1,4 +1,4 @@
-import { BrainCircuit, FileCode, Keyboard, Settings, SquareTerminal, History, FileText, ShieldCheck, Globe, Folder, Plug, Bot, Sun, Palette, TextFont } from '@ui/icons';
+import { BrainCircuit, FileCode, Keyboard, Settings, SquareTerminal, History, FileText, ShieldCheck, Globe, Folder, Plug, Bot, Sun, Palette, TextFont, Info } from '@ui/icons';
 import type { PageId } from '../model/navigation';
 import { isSettingsPageAvailable } from '../model/navigation';
 import { t } from '@i18n';
@@ -28,6 +28,7 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
       { id: 'logs', icon: FileText, label: 'Logs and diagnostics' },
       { id: 'file-operations', icon: Folder, label: 'File operations' },
       { id: 'context-menu', icon: Folder, label: 'Windows context menu' },
+      { id: 'about', icon: Info, label: 'About' },
     ],
   },
   {

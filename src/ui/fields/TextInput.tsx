@@ -1,5 +1,6 @@
-import { forwardRef, type ComponentPropsWithoutRef } from 'react';
+import { forwardRef, useImperativeHandle, useRef, type ComponentPropsWithoutRef } from 'react';
 import { localizeLabel } from '@i18n';
+import { useAutoSizeTextarea } from '../hooks/useAutoSizeTextarea';
 
 /** Preserve literal input across native text services without changing composition events. */
 export const literalInputProps = {
@@ -15,9 +16,12 @@ export const TextInput = forwardRef<HTMLInputElement, ComponentPropsWithoutRef<'
   },
 );
 
-export const TextArea = forwardRef<HTMLTextAreaElement, ComponentPropsWithoutRef<'textarea'> & { variant?: 'plain' | 'field' }>(
-  function TextArea({ variant = 'plain', className, ...props }, ref) {
-    return <textarea {...props} placeholder={localizeLabel(props.placeholder)} aria-label={localizeLabel(props['aria-label'])} {...literalInputProps} ref={ref} className={variant === 'field' ? `text-input-field ${className ?? ''}` : className} />;
+export const TextArea = forwardRef<HTMLTextAreaElement, ComponentPropsWithoutRef<'textarea'> & { variant?: 'plain' | 'field'; autoSizeMaxHeight?: number }>(
+  function TextArea({ variant = 'plain', className, style, autoSizeMaxHeight, ...props }, ref) {
+    const element = useRef<HTMLTextAreaElement>(null);
+    useImperativeHandle(ref, () => element.current!, []);
+    useAutoSizeTextarea(element, String(props.value ?? props.defaultValue ?? ''), autoSizeMaxHeight ?? 120, autoSizeMaxHeight !== undefined);
+    return <textarea {...props} placeholder={localizeLabel(props.placeholder)} aria-label={localizeLabel(props['aria-label'])} {...literalInputProps} ref={element} style={{ ...style, resize: 'none' }} className={variant === 'field' ? `text-input-field ${className ?? ''}` : className} />;
   },
 );
 

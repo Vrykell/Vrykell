@@ -79,6 +79,9 @@ fn binding(conn: &SshConnection) -> Result<[u8; 32], String> {
         .map_err(|error| error.to_string())?);
     digest.update(conn.password.as_bytes());
     digest.update(revision.to_le_bytes());
+    for hop in &conn.options.resolved_jumps.0 {
+        digest.update(binding(hop)?);
+    }
     Ok(digest.finalize().into())
 }
 
@@ -104,6 +107,8 @@ pub(crate) fn invalidate_all() {
 /// Return only successful channels to the pool. Mutations are never replayed automatically.
 pub(crate) fn run<T>(conn: &SshConnection, mut read: bool,
     mut operation: impl FnMut(&Session, &Sftp) -> Result<T, String>) -> Result<T, String> {
+    let retained = super::session_auth::AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.service(conn);
+    if let Some(retained) = retained { return retained.sftp(operation); }
     let started = Instant::now();
     let binding = binding(conn)?;
     loop {
@@ -146,6 +151,13 @@ pub(crate) fn run<T>(conn: &SshConnection, mut read: bool,
     }
 }
 
+pub(crate) fn run_session<T>(conn: &SshConnection, operation: impl FnOnce(&Session) -> Result<T, String>) -> Result<T, String> {
+    let retained = super::session_auth::AUTH_CACHE.lock().map_err(|_| "SSH authentication cache is unavailable")?.service(conn);
+    if let Some(retained) = retained { return retained.session(operation); }
+    let session = super::ssh::connect_with_timeout(conn, Some(Duration::from_secs(5)))?;
+    operation(&session)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -167,6 +179,13 @@ mod tests {
         variants[3].password = "changed-secret".into();
         variants[4].options.proxy_id = Some("another-proxy".into());
         for changed in variants { assert_ne!(binding(&changed).unwrap(), expected); }
+        let mut target = conn.clone();
+        let mut hop = conn.clone();
+        hop.id = "channel-jump-binding-test".into();
+        target.options.resolved_jumps.0.push(hop);
+        let routed = binding(&target).unwrap();
+        target.options.resolved_jumps.0[0].password = "new-hop-secret".into();
+        assert_ne!(binding(&target).unwrap(), routed);
     }
 
     #[test]

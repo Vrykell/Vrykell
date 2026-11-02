@@ -283,8 +283,8 @@ describe('SSH status panel', () => {
     open();
     await screen.findByText('已保存的 SSH 认证信息被拒绝');
     expect(screen.getByText(/认证这两个服务/)).toBeInTheDocument();
-    // The action matches the file panel's rendering of the same error.
-    expect(screen.getByRole('button', { name: '认证服务' })).toHaveStyle({ minHeight: '36px' });
+    fireEvent.click(screen.getByRole('button', { name: '认证服务' }));
+    expect(useSessionAuthenticationStore.getState().request).toMatchObject({ connectionId: target.connectionId, host: target.host, user: target.user });
     expect(screen.getByRole('button', { name: '暂停监控' })).toBeEnabled();
   });
 
@@ -305,14 +305,14 @@ describe('SSH status panel', () => {
     expect(mocks.collect).toHaveBeenCalledTimes(2);
   });
 
-  it('does not collect for inactive, unsaved or jump host connections', async () => {
+  it('collects through saved jump routes while skipping inactive and unsaved connections', async () => {
     const view = render(<SshStatusPanel target={target} state={connected} active={false} />);
     open(); expect(mocks.collect).not.toHaveBeenCalled();
     view.rerender(<SshStatusPanel target={{ ...target, connectionId: undefined }} state={connected} active />);
     expect(screen.getByText('保存此连接后可监控远端资源。')).toBeInTheDocument();
     view.rerender(<SshStatusPanel target={{ ...target, jumpHost: 'bastion' }} state={connected} active />);
-    expect(screen.getByText('跳板机连接暂不支持资源监控。')).toBeInTheDocument();
-    expect(mocks.collect).not.toHaveBeenCalled();
+    await screen.findByText('Linux 6.8');
+    expect(mocks.collect).toHaveBeenCalled();
   });
 
   it('pauses polling and resumes it without overlapping requests', async () => {

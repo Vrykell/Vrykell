@@ -50,8 +50,9 @@ export default function EditorWorkspace({ children }: { children: ReactNode }) {
   useEffect(() => { useSessionStore.getState().configureEditorTabs(); }, [pageCount]);
   useEffect(() => { useEditorDocuments.getState().drop(new Set(JSON.parse(keys) as string[])); }, [keys]);
   useEffect(() => registerEditorCloseGuard((requested, complete) => {
-    if (!requested.some(file => isDocumentDirty(useEditorDocuments.getState().documents[editorFileKey(file)]))) return false;
-    setCloseError(''); setClosing({ files: requested, complete }); return true;
+    const files = requested === 'all' ? Object.values(useEditorDocuments.getState().documents).map(document => document.file) : requested;
+    if (!files.some(file => isDocumentDirty(useEditorDocuments.getState().documents[editorFileKey(file)]))) return false;
+    setCloseError(''); setClosing({ files, complete }); return true;
   }), []);
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => { if (Object.values(useEditorDocuments.getState().documents).some(isDocumentDirty)) { event.preventDefault(); event.returnValue = ''; } };

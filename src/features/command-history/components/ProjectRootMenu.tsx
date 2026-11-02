@@ -23,7 +23,7 @@ export default function ProjectRootMenu({ initial, local, onSave, onClose }: {
     finally { saving.current = false; setBusy(false); }
   };
   return <ToolDialog label={t('Set project root')} onClose={onClose} busy={busy} initialFocus="input">
-    <form className="command-history-tool" onSubmit={event => { event.preventDefault(); void save(); }}>
+    <form noValidate className="command-history-tool" onSubmit={event => { event.preventDefault(); void save(); }}>
       <TextInput variant="field" aria-label={t('Project root')} value={root} disabled={busy} onChange={event => setRoot(event.target.value)} />
       <div className="command-history-actions">
         {local && <TextButton disabled={busy} onClick={() => {

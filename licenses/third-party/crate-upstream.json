@@ -47,6 +47,7 @@
       "objc2-core-video",
       "objc2-foundation",
       "objc2-io-surface",
+      "objc2-osa-kit",
       "objc2-quartz-core",
       "objc2-web-kit"
     ],
@@ -141,6 +142,27 @@
     "revision": "dffa41a8a46d3f5565eefbff2de57d38d399f158",
     "file": "wravery-webview2-rs-dffa41a8.txt",
     "source": "https://github.com/wravery/webview2-rs/blob/dffa41a8a46d3f5565eefbff2de57d38d399f158/LICENSE",
+    "sourcePath": "LICENSE"
+  },
+  {
+    "names": ["alloc-stdlib"],
+    "revision": "0a81fd6928ea3b33c8cd484aa4575d50ffb98012",
+    "file": "dropbox-rust-alloc-no-stdlib-ae42d220.txt",
+    "source": "https://github.com/dropbox/rust-alloc-no-stdlib/blob/0a81fd6928ea3b33c8cd484aa4575d50ffb98012/LICENSE",
+    "sourcePath": "LICENSE"
+  },
+  {
+    "names": ["tauri-plugin"],
+    "revision": "59b63ab500da9859f12d8888c3298bc29bba0b92",
+    "file": "tauri-apps-tauri-6f6ab120.txt",
+    "source": "https://github.com/tauri-apps/tauri/blob/59b63ab500da9859f12d8888c3298bc29bba0b92/LICENSE-APACHE-2.0",
+    "sourcePath": "LICENSE-APACHE-2.0"
+  },
+  {
+    "names": ["webview2-com", "webview2-com-sys"],
+    "revision": "edc2caf886175ccaebe86078c9cfe1ae2a187328",
+    "file": "wravery-webview2-rs-b74dc5e2.txt",
+    "source": "https://github.com/wravery/webview2-rs/blob/edc2caf886175ccaebe86078c9cfe1ae2a187328/LICENSE",
     "sourcePath": "LICENSE"
   }
 ]

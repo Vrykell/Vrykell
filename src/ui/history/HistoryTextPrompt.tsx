@@ -53,7 +53,7 @@ export default function HistoryTextPrompt({ anchor, label, placeholder, value, m
   return createPortal(<div ref={ref} role="dialog" aria-label={label} data-testid={testId} className="workspace-floating history-text-prompt" style={{ ...position, width, maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100vh - 16px)', overflowY: 'auto' }}>
     <div className="history-prompt-label">{label}</div>
     {multiline
-      ? <TextArea autoFocus className="history-prompt-input" rows={3} aria-label={label} placeholder={placeholder}
+      ? <TextArea autoFocus autoSizeMaxHeight={180} className="history-prompt-input" rows={3} aria-label={label} placeholder={placeholder}
         value={text} onChange={event => setText(event.target.value)} onKeyDown={onKeyDown} />
       : <InlineRenameInput autoFocus className="history-prompt-input" aria-label={label} placeholder={placeholder}
         value={text} onChange={event => setText(event.target.value)} onKeyDown={onKeyDown} />}

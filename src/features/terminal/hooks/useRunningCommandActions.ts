@@ -3,6 +3,7 @@ import { t } from '@i18n';
 import { isMacOS } from '@platform/runtime';
 import type { ContextMenuItem } from '@ui/menus/ContextMenu';
 import { redrawTerminal } from '../services/terminalRepaint';
+import { resetTerminalInputModes } from '../services/terminalInputRecovery';
 import { useTuiControls } from './useTuiControls';
 
 /**
@@ -22,6 +23,7 @@ export function useRunningCommandActions(paneId: string, surface: RunningCommand
   return useMemo(() => {
     const items: ContextMenuItem[] = [
       { label: t('Redraw terminal'), shortcut: isMacOS ? 'Meta+Shift+R' : 'Control+Shift+R', onClick: () => redrawTerminal(paneId) },
+      { label: t('Reset terminal input modes'), onClick: () => resetTerminalInputModes(paneId) },
       { label: t('Interrupt command'), shortcut: 'Control+C', onClick: sendCtrlC },
       { label: t(killArmed ? 'Force quit foreground process' : 'Quit foreground process'), onClick: killApp },
     ];

@@ -50,6 +50,9 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [filterOpen, setFilterOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  /** Whether the latest selection came from the keyboard rather than the pointer. */
+  const keyboardSelection = useRef(false);
   const { state, search } = useSearchEngine();
   const searchHistory = useSearchHistoryStore((state) => state);
   const addSearchHistory = useSearchHistoryStore((state) => state.add);
@@ -65,6 +68,8 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
     if (!open) return;
     setInput('');
     setSelectedIdx(0);
+    keyboardSelection.current = false;
+    if (listRef.current) listRef.current.scrollTop = 0;
     setFilterOpen(false);
     setHighlightQuery('');
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -81,7 +86,9 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
       setInput(value);
       if (parseSearchQuery(value).source) setFilterOpen(false);
       search(value);
+      keyboardSelection.current = false;
       setSelectedIdx(0);
+      if (listRef.current) listRef.current.scrollTop = 0;
       setHighlightQuery(parseSearchQuery(value).term.trim());
     },
     [search, setHighlightQuery],
@@ -108,6 +115,24 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
   const enabledCount = enabledIds.size;
   const totalSources = getSources().length;
   const flatResults = useMemo(() => grouped.flatMap((group) => group.results), [grouped]);
+
+  /** Arrow keys move the selection; the body scrolls only when the selected row leaves it. */
+  useEffect(() => {
+    if (!keyboardSelection.current) return;
+    const body = listRef.current;
+    const selected = body?.querySelector<HTMLElement>('[data-search-result][data-selected="true"]');
+    if (!body || !selected) return;
+    const view = body.getBoundingClientRect();
+    const item = selected.getBoundingClientRect();
+    if (item.top < view.top) body.scrollTop -= view.top - item.top;
+    else if (item.bottom > view.bottom) body.scrollTop += item.bottom - view.bottom;
+  }, [selectedIdx]);
+
+  const selectResult = useCallback((index: number) => {
+    keyboardSelection.current = false;
+    setSelectedIdx(index);
+  }, []);
+
   /** Enabled sources that failed this round (errors are collected by the engine). */
   const failedSources = useMemo(
     () => getSources()
@@ -195,9 +220,11 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
         close();
       } else if (event.key === 'ArrowDown') {
         event.preventDefault();
+        keyboardSelection.current = true;
         setSelectedIdx((current) => Math.min(current + 1, flatResults.length - 1));
       } else if (event.key === 'ArrowUp') {
         event.preventDefault();
+        keyboardSelection.current = true;
         setSelectedIdx((current) => Math.max(current - 1, 0));
       } else if (event.key === 'Enter') {
         const selected = flatResults[selectedIdx];
@@ -209,12 +236,6 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
     [close, filterOpen, flatResults, handleExecute, handleInput, query.source, query.term, selectedIdx],
   );
 
-  const handleRestore = useCallback((sessionId: string, sessionTitle: string) => {
-    sessionManager.restore(sessionId, sessionTitle).catch((error) => {
-      notifyRestoreFailure(t('Could not restore the historical session'), error);
-    });
-  }, []);
-
   const hasInput = canSearchQuery(input);
   const hasResults = flatResults.length > 0;
   const hasHistory = searchHistory.items.length > 0;
@@ -222,11 +243,12 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
   return {
     input,
     inputRef,
+    listRef,
     query,
     selectedIdx,
+    selectResult,
     filterOpen,
     setFilterOpen,
-    setSelectedIdx,
     state,
     searchHistory,
     grouped,
@@ -242,7 +264,6 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
     handleInput,
     handleExecute,
     handleKey,
-    handleRestore,
     close,
   };
 }

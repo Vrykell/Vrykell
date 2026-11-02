@@ -12,6 +12,7 @@ import { useToastStore } from '@ui/feedback/Toast';
 import { hideSshStatus, showSshStatus, useSshStatusDismissRequest, useSshStatusOpenRequest } from '@features/workspace/hooks/useAuxiliarySidebar';
 import { sshSystemStatus, type SshSystemStatus } from '../services/api';
 import { isSshAuthenticationFailure } from '../model/fileServiceState';
+import { sshConnectionFailureMessage } from '../model/connectionFailure';
 import SshResourceChart, { RESOURCE_HISTORY_MS, resourceHistoryWindow, type ResourceSample } from './SshResourceChart';
 import SshNetworkProbe from './SshNetworkProbe';
 import SshNetworkRates from './SshNetworkRates';
@@ -112,7 +113,7 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
   const connected = (state.phase === 'connected' || state.phase === 'interactive') && !state.retrying;
   const host = target.host.includes(':') && !target.host.startsWith('[') ? `[${target.host}]` : target.host;
   const address = `${target.user ? `${target.user}@` : ''}${host}:${target.port ?? 22}`;
-  const unsupported = !target.connectionId ? t('Save this connection to monitor remote resources.') : target.jumpHost && target.jumpHost.toLowerCase() !== 'none' ? t('Resource monitoring is unavailable for jump hosts.') : null;
+  const unsupported = !target.connectionId ? t('Save this connection to monitor remote resources.') : null;
 
   // A phase change inside the connected states (connected ↔ interactive) must not throw away the
   // CPU baseline: the next sample would have nothing to subtract and the reading would stay
@@ -301,14 +302,14 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
               void onReconnect().catch(reason => useToastStore.getState().addToast(String(reason), 'error')).finally(() => setReconnecting(false));
             }}>{t('Reconnect SSH session')}</TextButton>
           </section>}
-          <SshNetworkProbe host={target.host} port={target.port ?? 22} jumpHost={target.jumpHost} paused={paused} revision={refresh}>
+          <SshNetworkProbe host={target.host} port={target.port ?? 22} jumpHost={target.jumpHost ?? target.jumpConnectionId} paused={paused} revision={refresh}>
             {sample && <SshNetworkRates samples={trafficHistory} now={chartTime} windowMs={historyWindow} available={sample.networkReceived != null || sample.networkTransmitted != null} />}
           </SshNetworkProbe>
           <section className="ssh-status-resource">
             <div className="ssh-status-section-heading"><h3>{t('Resource usage')}</h3></div>
             {unsupported ? <div className="ssh-status-state"><ErrorBox tone="info">{unsupported}</ErrorBox></div> : <>
               {(error || !sample) && <div className="ssh-status-state">
-                {error && <ErrorBox style={{ overflowWrap: 'anywhere' }} title={t(authenticationFailed ? 'Saved SSH authentication failed' : 'Resource collection failed')} details={error} detailsTitle={t('Technical details')} actions={authenticationFailed && target.connectionId ? <button style={{ minHeight: 36 }} onClick={() => requestSshAuthentication({ ...target, connectionId: target.connectionId! })}>{t('Authenticate services')}</button> : undefined}>{t(authenticationFailed ? 'Authenticate these services with the working server password or private key passphrase. The terminal session stays connected.' : 'The terminal connection is independent of resource monitoring.')}</ErrorBox>}
+                {error && <ErrorBox title={t(authenticationFailed ? 'Saved SSH authentication failed' : 'Resource collection failed')} details={error} detailsTitle={t('Technical details')} actions={authenticationFailed && target.connectionId ? <TextButton className="user-primary-action" onClick={() => requestSshAuthentication({ ...target, connectionId: target.connectionId! })}>{t('Authenticate services')}</TextButton> : undefined}>{sshConnectionFailureMessage(error) ?? t(authenticationFailed ? 'Authenticate these services with the working server password or private key passphrase. The terminal session stays connected.' : 'The terminal connection is independent of resource monitoring.')}</ErrorBox>}
                 {!sample && <p className="ssh-status-caption">{!connected ? t('Resources are collected after connecting.') : busy ? t('Collecting remote resources…') : t('No resource sample yet.')}</p>}
               </div>}
               {sample && <div className="ssh-status-sample" data-stale={stale}>

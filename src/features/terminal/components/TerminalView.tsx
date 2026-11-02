@@ -50,6 +50,7 @@ import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { copyTerminalSelection, getPaneTerminal, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { t } from '@i18n';
 import { focusSessionInput } from '../services/terminalFocus';
+import { resetTerminalInputModes } from '../services/terminalInputRecovery';
 import { TerminalRedrawButton } from './TerminalRedrawButton';
 import SshStatusPanel from '@features/ssh/components/SshStatusPanel';
 import type { SshSessionStatus } from '@core/ssh';
@@ -106,6 +107,7 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
     useUiStore.getState().beginPaneMove(unified ? unifiedState.activeTabId : activeId, paneId);
   };
   const commonActions: ContextMenuItem[] = [
+    ...(!hasRunningCommand ? [{ label: t('Reset terminal input modes'), disabled: !sessions[focusedTermId], onClick: () => resetTerminalInputModes(focusedTermId) }] : []),
     ...(canSplit ? [{ ...workspaceSplitMenu(unified ? 'unified' : 'terminal', kind => requestWorkspaceSplit(`terminal:${focusedTermId}`, undefined, kind)), group: 'view' as const }] : []),
     ...[{
       label: t('Change pane position'), group: 'view' as const, disabled: !multiPane,

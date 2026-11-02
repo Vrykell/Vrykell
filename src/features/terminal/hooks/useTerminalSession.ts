@@ -2,7 +2,7 @@ import { preferredShell } from '@config/terminalDefaults';
 import { useShellProfiles } from '@config/shellProfiles';
 import { getAvailableShells, type ShellType } from '@platform/shells';
 import { createResizeQueue, fitTerminal, repaintTerminal } from '../model/terminalResize';
-import { configureTerminalInput } from '@features/terminal/model/terminalInput';
+import { configureTerminalInput, getTerminalInputOptions, terminalInputModes } from '@features/terminal/model/terminalInput';
 /**
  * Main xterm lifecycle and SessionController wiring. The main terminal receives data only in
  * the classic and alternate-screen scenes; it stays hidden while the block list is visible.
@@ -42,7 +42,8 @@ import type { SshLogEntry } from '@core/ssh';
 import { appendLogEntry, connectionLogLines, isSshClientNotice } from '../model/connectionLog';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { getTerminalFontOptions, measureTerminalDomCellWidth } from '@features/terminal/model/terminalFont';
-import { applyTerminalCursorPreference } from '@features/terminal/model/terminalCursor';
+import { applyTerminalCursorPreference, smoothTerminalCursorRepaints } from '@features/terminal/model/terminalCursor';
+import { configureTerminalPointer } from '@features/terminal/model/terminalPointer';
 import { prepareSshHost } from '@features/ssh/services/hostTrust';
 import { startAutomaticForwarding } from '@features/ssh';
 import { useToastStore } from '@ui/feedback/Toast';
@@ -188,6 +189,7 @@ export function useTerminalSession(
 
     const term = new Terminal({
       ...getTerminalFontOptions(),
+      ...getTerminalInputOptions(),
       cursorBlink: useTypographyStore.getState().terminalCursorBlink,
       // A solid inactive cursor stays visible when the command input takes focus;
       // the default hairline outline reads as a vanished cursor on Retina displays.
@@ -200,7 +202,7 @@ export function useTerminalSession(
     });
     // Keep the typography preference in charge of blinking while still honoring
     // cursor-shape requests from running programs.
-    applyTerminalCursorPreference(term);
+    applyTerminalCursorPreference(term, paneId);
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.loadAddon(new WebLinksAddon());
@@ -210,6 +212,8 @@ export function useTerminalSession(
     // is lost or WebGL is unavailable.
     loadWebglRenderer(term, useTypographyStore.getState().terminalRenderer);
     term.open(el);
+    const disposeCursorRepaints = smoothTerminalCursorRepaints(term, paneId);
+    const disposePointer = configureTerminalPointer(term, paneId);
     configureTerminalInput(term);
     captureTerminalPaste(term, paneId);
     let frameRaf = 0;
@@ -230,7 +234,16 @@ export function useTerminalSession(
         });
       });
     };
-    const frameSub = term.onWriteParsed?.(() => scheduleFrameCapture('write'));
+    let previousInputModes = '';
+    const frameSub = term.onWriteParsed?.(() => {
+      scheduleFrameCapture('write');
+      const modes = terminalInputModes(term);
+      const signature = JSON.stringify(modes);
+      if (signature !== previousInputModes) {
+        previousInputModes = signature;
+        terminalDebug('terminal-input-modes', { paneId, ...modes });
+      }
+    });
     fitTerminal(term, fit);
     registerTerminal(paneId, term);
     useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
@@ -589,7 +602,7 @@ export function useTerminalSession(
     let tabCwd = spec?.cwd;
     const spawnOpts: PtySpawnOptions | undefined = spec?.kind === 'ssh'
       ? { ssh: { host: spec.ssh?.host ?? '', user: spec.ssh?.user, port: spec.ssh?.port,
-        identityFile: spec.ssh?.identityFile, jumpHost: spec.ssh?.jumpHost,
+        identityFile: spec.ssh?.identityFile, jumpHost: spec.ssh?.jumpHost, jumpConnectionId: spec.ssh?.jumpConnectionId,
         serverAliveInterval: spec.ssh?.serverAliveInterval, shellIntegration: spec.ssh?.shellIntegration,
         localForwards: spec.ssh?.localForwards, remoteForwards: spec.ssh?.remoteForwards,
         dynamicForwards: spec.ssh?.dynamicForwards, proxyId: spec.ssh?.proxyId, environment: spec.ssh?.environment, authenticationMode: spec.ssh?.authenticationMode }, openMode }
@@ -611,7 +624,7 @@ export function useTerminalSession(
         const profile = spawnOpts.shell ? useShellProfiles.getState().profiles[spawnOpts.shell as ShellType] : undefined;
         if (spec.useProfileDirectory !== false) tabCwd ??= profile?.cwd || undefined;
       }
-      if (spawnOpts?.ssh && (!spawnOpts.ssh.jumpHost || spawnOpts.ssh.jumpHost.toLowerCase() === 'none')) {
+      if (spawnOpts?.ssh && !spawnOpts.ssh.jumpConnectionId && (!spawnOpts.ssh.jumpHost || spawnOpts.ssh.jumpHost.toLowerCase() === 'none')) {
         try {
           const info = await prepareSshHost(spawnOpts.ssh.host, spawnOpts.ssh.port, startupAbort.signal, spawnOpts.ssh);
           spawnOpts.ssh.hostKeyType = info.keyType;
@@ -746,6 +759,7 @@ export function useTerminalSession(
             scene: inputScene,
             buffer: term.buffer.active.type,
             chars: data.length,
+            ...terminalInputModes(term),
           });
         }
         writeTerminalInput(sessionId, data).then(() => {
@@ -998,6 +1012,8 @@ export function useTerminalSession(
     // Cleanup.
 
     return () => {
+      disposeCursorRepaints();
+      disposePointer();
       unsubscribeTypography();
       unsubscribeActiveTab();
       cancelAnimationFrame(restoreRaf);

@@ -12,9 +12,14 @@ export function useAutoSizeTextarea(
     if (!element || element.clientWidth <= 0) return;
     element.style.overflowY = 'hidden';
     element.style.height = 'auto';
-    const height = element.scrollHeight;
-    element.style.height = `${Math.min(height, maxHeight)}px`;
-    element.style.overflowY = height > maxHeight ? 'auto' : 'hidden';
+    const css = getComputedStyle(element);
+    const pixels = (value: string) => Number.parseFloat(value) || 0;
+    const height = element.scrollHeight + (css.boxSizing === 'border-box'
+      ? pixels(css.borderTopWidth) + pixels(css.borderBottomWidth)
+      : -pixels(css.paddingTop) - pixels(css.paddingBottom));
+    const limit = css.maxHeight.endsWith('px') ? Math.min(maxHeight, pixels(css.maxHeight)) : maxHeight;
+    element.style.height = `${Math.min(height, limit)}px`;
+    element.style.overflowY = height > limit ? 'auto' : 'hidden';
   }, [ref, maxHeight]);
 
   useLayoutEffect(() => {

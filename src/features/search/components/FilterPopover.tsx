@@ -26,6 +26,7 @@ export default function FilterPopover({ open, onClose, counts }: Props) {
   return (
     <CheckboxMenu
       title={t('Search scope')}
+      checkmark
       onClose={onClose}
       onToggle={handleToggle}
       style={{ top: '100%', right: 0, marginTop: 8, width: 216 }}

@@ -65,6 +65,32 @@ describe('workspace search palette', () => {
     expect(close).toHaveBeenCalledOnce();
   });
 
+  it('selects with the keyboard and follows only when the selected result leaves the body', async () => {
+    const { container } = render(<GlobalSearch open onClose={vi.fn()} />);
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'npm' } });
+    await screen.findByText('2 个结果');
+    const body = container.querySelector<HTMLElement>('.global-search-body')!;
+    const cards = Array.from(container.querySelectorAll<HTMLElement>('[data-search-result]'));
+    body.getBoundingClientRect = () => ({ top: 0, bottom: 80 } as DOMRect);
+    cards[0]!.getBoundingClientRect = () => ({ top: 0, bottom: 20 } as DOMRect);
+    cards[1]!.getBoundingClientRect = () => ({ top: 100, bottom: 120 } as DOMRect);
+
+    fireEvent.pointerMove(cards[1]!);
+    expect(cards[1]).toHaveAttribute('data-selected', 'true');
+    expect(body.scrollTop).toBe(0);
+    fireEvent.pointerMove(cards[0]!);
+    expect(cards[0]).toHaveAttribute('data-selected', 'true');
+    expect(body.scrollTop).toBe(0);
+
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'ArrowDown' });
+    expect(cards[1]).toHaveAttribute('data-selected', 'true');
+    expect(body.scrollTop).toBe(40);
+
+    fireEvent.mouseEnter(cards[0]!);
+    expect(cards[1]).toHaveAttribute('data-selected', 'true');
+    expect(body.scrollTop).toBe(40);
+  });
+
   it('keeps successful results and offers retry when a source fails', async () => {
     fileSearch.mockRejectedValue(new Error('Unavailable'));
     render(<GlobalSearch open onClose={vi.fn()} />);
