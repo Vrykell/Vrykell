@@ -1,7 +1,14 @@
 import { beforeEach, expect, it } from 'vitest';
 import { useCommandHistorySettings } from '../commandHistory';
 
-beforeEach(() => { localStorage.clear(); useCommandHistorySettings.setState({ runIn: 'new', doubleClick: 'insert', migrated: false }); });
+beforeEach(() => { localStorage.clear(); useCommandHistorySettings.setState({ runIn: 'current', doubleClick: 'insert', migrated: false }); });
+it('uses the connected terminal by default and preserves an explicit new-terminal choice', async () => {
+  useCommandHistorySettings.getState().migrate();
+  expect(useCommandHistorySettings.getState().runIn).toBe('current');
+  useCommandHistorySettings.getState().update({ runIn: 'new' });
+  await useCommandHistorySettings.persist.rehydrate();
+  expect(useCommandHistorySettings.getState().runIn).toBe('new');
+});
 it('migrates the first legacy target once and preserves application choices across projects', () => {
   const store = useCommandHistorySettings.getState(); store.migrate('current'); store.migrate('new');
   expect(useCommandHistorySettings.getState().runIn).toBe('current');
@@ -16,5 +23,5 @@ it('restores behavior after reload and rejects malformed values', async () => {
   expect(useCommandHistorySettings.getState()).toMatchObject({ runIn: 'current', doubleClick: 'run' });
   localStorage.setItem('vrykell-command-history-settings', JSON.stringify({ state: { runIn: 'bad', doubleClick: false }, version: 0 }));
   await useCommandHistorySettings.persist.rehydrate();
-  expect(useCommandHistorySettings.getState()).toMatchObject({ runIn: 'new', doubleClick: 'insert' });
+  expect(useCommandHistorySettings.getState()).toMatchObject({ runIn: 'current', doubleClick: 'insert' });
 });

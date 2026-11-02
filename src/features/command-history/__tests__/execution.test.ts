@@ -34,6 +34,20 @@ it('runs in the captured terminal even after focus moves', async () => {
   await runHistoryCommand(context, item, 'current');
   expect(ptyWrite).toHaveBeenCalledWith('sid', 'npm run build\n');
 });
+it('reuses the connected SSH terminal without creating a new session', async () => {
+  const remote = { ...context, paneId: 'remote-pane', target: JSON.stringify(['ssh', 'example.test', 22, 'dev']),
+    spec: { id: 'remote-pane', kind: 'ssh' as const, cwd: '/app', ssh: { name: 'Remote', host: 'example.test', user: 'dev', connectionId: 'saved-remote' } } };
+  useSessionStore.setState({ tabs: [{ id: 'tab', kind: 'session', title: 'Remote', layout: { type: 'leaf', terminal: remote.spec } }], terminalCwds: { 'remote-pane': '/app' } });
+  useTerminalStore.setState({ sessions: { 'remote-pane': 'remote-session' }, startupStates: { 'remote-pane': 'ready' }, scenes: { 'remote-pane': 'blockList' } });
+  const addTab = vi.spyOn(useSessionStore.getState(), 'addTab');
+  const remoteItem = { ...item, shell: 'posix' };
+  await runHistoryCommand(remote, remoteItem, 'current');
+  expect(addTab).not.toHaveBeenCalled();
+  expect(ptyWrite).toHaveBeenCalledWith('remote-session', 'npm run build\n');
+  expect(useTerminalStore.getState().sessions['remote-pane']).toBe('remote-session');
+  expect(useSessionStore.getState().tabs).toHaveLength(1);
+  addTab.mockRestore();
+});
 it('requires redacted parameters to be completed', async () => {
   await expect(runHistoryCommand(context, { ...item, command: 'build --token [redacted]' }, 'current')).rejects.toThrow();
   expect(ptyWrite).not.toHaveBeenCalled();
