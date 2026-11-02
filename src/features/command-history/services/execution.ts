@@ -11,6 +11,7 @@ import { useInputStore } from '@features/terminal/stores/input';
 import { setPendingTerminalCommand } from '@features/terminal/hooks/useTerminalSession';
 import { waitForTerminalStartup } from '@features/terminal/services/terminalStartup';
 import { focusSessionInput } from '@features/terminal/services/terminalFocus';
+import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import { agentControl } from '@features/agent/services/agentControl';
 import { normalizeCommandPath, type CommandItem } from '../model/commands';
 
@@ -51,6 +52,7 @@ export function hasCommandDraft(paneId: string): boolean {
 
 export async function runHistoryCommand(context: ExecutionContext, item: CommandItem, location: 'current' | 'new'): Promise<void> {
   if (!item.command.trim() || item.command.includes('[redacted]')) throw new Error(t('Complete the redacted parameters before running this command.'));
+  terminalDebug('history-command-run', { paneId: context.paneId, kind: context.spec.kind, location });
   let paneId = context.paneId;
   if (location === 'new') {
     if (context.spec.kind === 'local' && item.shell !== 'system' && !SHELL_TYPES.includes(item.shell as ShellType)) throw new Error(t('Choose a terminal with the same environment and shell.'));
