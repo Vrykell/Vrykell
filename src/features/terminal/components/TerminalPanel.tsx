@@ -225,7 +225,7 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
       </div>
       {/* Authentication input row: the same 8px inset on both sides as the terminal area, so it stays centered. */}
       {interactive && secret && !disconnected && <div style={{ padding: '0 8px 8px', flexShrink: 0 }}>
-        <form onSubmit={e => {
+        <form noValidate onSubmit={e => {
           e.preventDefault();
           if (inputDisabled || cancellingRef.current || !sessionId) return;
           const value = response;

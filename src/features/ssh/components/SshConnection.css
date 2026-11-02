@@ -119,7 +119,7 @@ button.ssh-editor-favorite:focus-visible { outline: 1px solid var(--border-stron
 .ssh-proxy-dialog > header { padding: 16px 20px; }
 .ssh-proxy-dialog h2 { margin: 0; font-size: var(--fs-subtitle); }
 .ssh-proxy-dialog > .ssh-form-section { padding: 0 20px 20px; overflow: auto; }
-.ssh-host-editor input.text-input-field, .ssh-form-dialog input.text-input-field { min-height: 28px; padding-block: 4px; }
+.ssh-host-editor input.text-input-field, .ssh-form-dialog:not(.ssh-auth-dialog) input.text-input-field { min-height: 28px; padding-block: 4px; }
 .ssh-host-editor .segmented-control, .ssh-form-dialog .segmented-control { width: 100%; min-width: 0; box-sizing: border-box; }
 .ssh-host-editor .segmented-control > button > svg, .ssh-form-dialog .segmented-control > button > svg { flex-shrink: 0; }
 @container host-editor (max-width: 560px) {

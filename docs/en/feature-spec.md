@@ -763,3 +763,12 @@ Runtime regression checklist, 2026-10-21:
 - [x] Files and monitoring reuse the authenticated destination under one operation gate. Responses are never cached for reconnects; independent transfers and forwarding do not clone this transport. Expired connections require fresh authentication without replaying mutations.
 - [x] Failures preserve the originating endpoint and stage through nested service errors, retaining authentication actions and raw diagnostic details.
 - [x] Unit and browser tests cover challenges, input masking, focus, cancellation, redaction, both themes and narrow/wide layouts. Isolated protocol tests cover two MFA hops and the destination, concurrent files and monitoring with exactly one authentication per endpoint, rejected answers, cancellation and strict trust.
+
+### Shared text entry
+
+- [x] File-service failures use shared persistent notifications with compact authentication, retry and terminal actions, expandable diagnostics and dismissal. Underlying page notifications temporarily hide during modal interaction and restore afterward. Service password and challenge fields retain shared field geometry; browser checks cover both themes, narrow/wide layouts, cancellation focus and file recovery.
+
+- [x] Shared multiline controls disable native resizing. Previously resizable commit, configuration, history-note, tool and connection-argument fields grow within a bounded height and retain internal scrolling for long content. Existing composer autosizing is preserved.
+- [x] Autosize respects borders, padding and smaller CSS maximum heights, retains text and focus, and shrinks after content is shortened. Refs, composition events, copy and keyboard submission keep their existing owners.
+- [x] Project-root and terminal authentication forms use application validation without native validation bubbles; empty-root guards and active-terminal routing remain intact.
+- [x] Shared component tests and dark/light, narrow/wide browser checks cover long text, scrolling, shrinking, persistence, and submissions with native validity errors present.

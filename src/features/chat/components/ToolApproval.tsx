@@ -46,7 +46,7 @@ export default function ToolApproval({ run, paneId, conversationId, environment,
       {target?.kind === 'ssh' ? <Server size={13} /> : <TerminalPrompt size={13} />}
       <strong>{target?.label ?? t('No execution terminal selected')}</strong><span>{address}</span>
     </button>
-    {editing ? <TextArea autoFocus className="ai-tool-command-editor" aria-label={t('Command to run')} value={command}
+    {editing ? <TextArea autoFocus autoSizeMaxHeight={200} className="ai-tool-command-editor" aria-label={t('Command to run')} value={command}
       onChange={event => setCommand(event.target.value)} onKeyDown={event => {
         if (event.nativeEvent.isComposing) return;
         if (event.key === 'Escape') { event.stopPropagation(); setCommand(original); setEditing(false); }

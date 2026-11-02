@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import type FilePanel from '@features/files/components/FilePanel';
 
-const mocks = vi.hoisted(() => ({ write: vi.fn(), toast: vi.fn(), focus: vi.fn(), debug: vi.fn(), upload: vi.fn(), download: vi.fn(), open: vi.fn() }));
+const mocks = vi.hoisted(() => ({ write: vi.fn(), toast: vi.fn(), focus: vi.fn(), debug: vi.fn(), upload: vi.fn(), download: vi.fn(), open: vi.fn(), retry: vi.fn(), fileError: '' }));
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: mocks.open }));
 vi.mock('@platform/pty', () => ({ ptyWrite: mocks.write }));
 vi.mock('@ui/feedback/Toast', () => ({ useToastStore: { getState: () => ({ addToast: mocks.toast }) } }));
@@ -12,6 +12,7 @@ vi.mock('@features/terminal/services/terminalClipboard', () => ({ getPaneTermina
 vi.mock('@features/files/model/fileOps', () => ({ fileOpsFor: () => ({ upload: mocks.upload, download: mocks.download }) }));
 vi.mock('@features/files/components/FilePanel', () => ({
   default: (props: ComponentProps<typeof FilePanel>) => <>
+    {mocks.fileError && props.renderError?.(mocks.fileError, mocks.retry)}
     <button onClick={() => props.openEntry?.({ name: 'config.txt', path: '/home/test/config.txt', is_dir: false })}>Open remote file</button>
     <button onClick={() => props.handlers?.onOpenEditor?.({ name: 'config.txt', path: '/home/test/config.txt', is_dir: false })}>Open remote file from menu</button>
     <button onClick={() => props.onSyncToTerminal?.('/home/test')}>Sync directory</button>
@@ -30,6 +31,7 @@ import { useTerminalStore } from '@features/terminal';
 import { leaf } from '@features/workspace/model/windowLayout';
 import { useEditorPreferences } from '@config/editor';
 import { useRemotePathStore } from '@features/ssh/utils/remotePath';
+import { useSessionAuthenticationStore } from '../stores/sessionAuthentication';
 
 const conn = { id: 'ssh-1', name: 'server', host: 'server', user: 'test', authMethod: 'key' as const, password: '' };
 const sshPane = (id: string, connectionId = 'ssh-1') => leaf({ id, kind: 'ssh', ssh: { name: 'server', host: 'server', connectionId } });
@@ -53,6 +55,8 @@ it('routes the row menu open action through the same preferred editor', () => {
 beforeEach(() => {
   useEditorPreferences.setState({ remoteOpenMode: 'terminal' });
   vi.clearAllMocks();
+  mocks.fileError = '';
+  useSessionAuthenticationStore.setState({ request: null });
   mocks.write.mockResolvedValue(undefined);
   mocks.upload.mockResolvedValue(undefined);
   mocks.download.mockResolvedValue('/Downloads/item.zip');
@@ -63,6 +67,22 @@ beforeEach(() => {
 });
 
 describe('remote file terminal routing', () => {
+  it('offers authentication, retry, details and dismissal through the shared notification', () => {
+    mocks.fileError = 'SSH_AUTH_FAILED: Saved password was rejected';
+    const { container } = render(<RemoteFiles conn={conn} />);
+    const notification = screen.getByRole('alert');
+    expect(notification.closest('#app-notifications')).not.toBeNull();
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+    fireEvent.click(within(notification).getByRole('button', { name: '技术详情' }));
+    expect(within(notification).getByText(mocks.fileError)).toBeVisible();
+    fireEvent.click(within(notification).getByRole('button', { name: '认证服务' }));
+    expect(useSessionAuthenticationStore.getState().request).toMatchObject({ connectionId: conn.id, host: conn.host });
+    fireEvent.click(within(notification).getByRole('button', { name: '重试文件服务' }));
+    expect(mocks.retry).toHaveBeenCalledOnce();
+    fireEvent.click(within(notification).getByRole('button', { name: '关闭错误提示' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
   it('opens the upload manager immediately for dropped files', async () => {
     mocks.upload.mockReturnValue(new Promise(() => {}));
     render(<RemoteFiles conn={conn} />);

@@ -237,7 +237,7 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
         onChange={(e) => change({ env: e.target.value })}
         rows={3}
         style={{
-          ...inputStyle, marginTop: 8, minHeight: 52, resize: 'vertical',
+          ...inputStyle, marginTop: 8, minHeight: 52,
           fontFamily: 'var(--font-ui)', lineHeight: 1.5,
         }}
       />

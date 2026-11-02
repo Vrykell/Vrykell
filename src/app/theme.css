@@ -876,7 +876,7 @@ button.history-palette-auto { display: flex; align-items: center; justify-conten
 
 .history-text-prompt { position: fixed; z-index: 9999; display: flex; flex-direction: column; gap: 8px; padding: 10px; }
 .history-prompt-label { color: var(--text-secondary); font-size: calc(12px * var(--ui-font-scale)); }
-.history-prompt-input { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--field-bg); color: var(--text-primary); font: calc(12px * var(--ui-font-scale))/1.5 var(--font-ui); resize: vertical; }
+.history-prompt-input { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--field-bg); color: var(--text-primary); font: calc(12px * var(--ui-font-scale))/1.5 var(--font-ui); }
 .history-prompt-input:focus-visible { outline: none; border-color: var(--border-strong); }
 .history-prompt-actions { display: flex; justify-content: flex-end; gap: 6px; }
 button.history-prompt-action { min-height: 26px; padding: 4px 10px; border: 1px solid transparent; border-radius: 6px; background: var(--action-button-bg); color: var(--text-primary); font-size: calc(12px * var(--ui-font-scale)); cursor: pointer; }
@@ -909,6 +909,7 @@ button.history-prompt-action[data-primary]:enabled:is(:hover, :focus-visible) { 
 .chat-exchange > .ai-block-answer { margin: 0; }
 .notification-region { position: fixed; z-index: 11000; right: 16px; bottom: 16px; display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: min(380px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; pointer-events: none; }
 .notification-region > * { flex-shrink: 0; pointer-events: auto; }
+body:has([role="dialog"][aria-modal="true"]:not([hidden])) .notification-slot[data-notification-modal="false"] { display: none; }
 .notification-toasts { display: contents; }
 .notification-slot { display: contents; }
 .notification-slot > * { flex-shrink: 0; pointer-events: auto; }
@@ -965,7 +966,7 @@ button.ai-tool-target { display: flex; align-items: center; gap: 6px; width: 100
 .ai-tool-target > svg { flex-shrink: 0; }
 .ai-tool-target > span { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-mono); }
 .ai-tool-approval-command, textarea.ai-tool-command-editor { display: block; width: 100%; max-height: 160px; overflow: auto; margin: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--canvas); color: var(--text-primary); font: 500 var(--fs-caption)/1.5 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
-textarea.ai-tool-command-editor { min-height: 68px; resize: vertical; }
+textarea.ai-tool-command-editor { min-height: 68px; }
 .ai-tool-timeout { margin: 6px 0 0; color: var(--text-muted); font-size: var(--fs-micro); }
 .ai-tool-approval-warning { margin-top: 6px; color: var(--approval-status); }
 .ai-tool-approval-actions { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
@@ -1513,7 +1514,7 @@ input.themed-checkbox:disabled { opacity: .55; cursor: default; }
 .config-text-area-label { display: block; margin-bottom: 6px; color: var(--text-secondary); font: var(--fs-caption) var(--font-ui); }
 .config-text-area { position: relative; min-width: 0; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--field-bg); }
 .config-text-area-copy { position: absolute; top: 6px; right: 6px; z-index: 1; }
-textarea.config-text-input { display: block; width: 100% !important; border: none !important; border-radius: 0 !important; margin: 0 !important; padding: 10px 40px 10px 10px !important; background: transparent !important; color: var(--text-primary); font: calc(13px * var(--ui-font-scale))/1.6 var(--font-mono) !important; resize: vertical; min-height: 90px; outline: none; box-shadow: none !important; }
+textarea.config-text-input { display: block; width: 100% !important; border: none !important; border-radius: 0 !important; margin: 0 !important; padding: 10px 40px 10px 10px !important; background: transparent !important; color: var(--text-primary); font: calc(13px * var(--ui-font-scale))/1.6 var(--font-mono) !important; min-height: 90px; outline: none; box-shadow: none !important; }
 .settings-view textarea.config-text-input { font-family: var(--font-ui) !important; }
 textarea.config-text-input[data-font="ui"] { font-family: var(--font-ui) !important; }
 .config-text-area:focus-within { border-color: var(--border-strong); }

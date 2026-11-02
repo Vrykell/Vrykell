@@ -19,8 +19,10 @@ export default function NotificationPortal({ children, followOwner = true }: { c
   const sourceId = useId();
   const [target, setTarget] = useState<HTMLElement | null>(null);
   const [visible, setVisible] = useState(true);
+  const [modalOwner, setModalOwner] = useState(false);
   useLayoutEffect(() => {
     const region = notificationRegion(); setTarget(region);
+    setModalOwner(Boolean(anchor.current?.closest('[role="dialog"][aria-modal="true"]')));
     const ancestors: HTMLElement[] = [];
     for (let element = anchor.current?.parentElement; element; element = element.parentElement) ancestors.push(element);
     const update = () => setVisible(!followOwner || ancestors.every(element => !element.hidden && element.getAttribute('aria-hidden') !== 'true'
@@ -34,6 +36,6 @@ export default function NotificationPortal({ children, followOwner = true }: { c
     };
   }, [followOwner]);
   return <><span ref={anchor} data-notification-source={sourceId} hidden aria-hidden="true" />{target && visible && createPortal(
-    <div className="notification-slot" data-notification-source-id={sourceId}>{children}</div>, target,
+    <div className="notification-slot" data-notification-source-id={sourceId} data-notification-modal={followOwner ? modalOwner : undefined}>{children}</div>, target,
   )}</>;
 }

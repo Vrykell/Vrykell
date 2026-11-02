@@ -25,6 +25,8 @@ import ContextMenu from '@ui/menus/ContextMenu';
 import type { TerminalBindingMenu } from '@ui/menus/terminalBindingMenu';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import ErrorBox from '@ui/feedback/ErrorBox';
+import { OutlineButton } from '@ui/actions/OutlineButton';
+import { TextButton } from '@ui/actions/TextButton';
 import { useToastStore } from '@ui/feedback/Toast';
 import { downloadsDiscard } from '@features/files/services/downloads';
 import { t } from '@i18n';
@@ -526,8 +528,8 @@ export default function FilePanel({
         {error && <>
           {renderError
             ? renderError(error, refresh)
-            : <ErrorBox style={{ margin: 12 }} actions={<button onClick={refresh} style={{ minHeight: 32 }}>{t('Retry')}</button>}>{error}</ErrorBox>}
-          {!settled && path !== null && <button style={{ margin: 12 }} onClick={() => { void navigate(null); }}>{t('Return to home directory')}</button>}
+            : <ErrorBox actions={<OutlineButton onClick={refresh}>{t('Retry')}</OutlineButton>}>{error}</ErrorBox>}
+          {!settled && path !== null && <TextButton style={{ margin: 12 }} onClick={() => { void navigate(null); }}>{t('Return to home directory')}</TextButton>}
         </>}
         {loadingHint ? (
           <div role="status" style={{ padding: 16, color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>

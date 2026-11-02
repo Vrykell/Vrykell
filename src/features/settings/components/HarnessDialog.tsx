@@ -111,6 +111,7 @@ export default function HarnessDialog({ open, entry, onClose, onSave }: {
         />
         <label htmlFor="harness-dialog-args" style={labelStyle}>{t('Arguments')}</label>
         <TextArea
+          autoSizeMaxHeight={180}
           id="harness-dialog-args"
           disabled={saving}
           value={args}

@@ -25,7 +25,7 @@ export default function ToolQuestion({ run, conversationId }: { run: ToolRun; co
   return <div className="ai-tool-approval ai-user-question" role="group" aria-label={t('Answer the question')}>
     <div data-selectable>{pending.question}</div>
     {!!pending.options?.length && <div className="ai-question-options">{pending.options.map(option => <OutlineButton key={option} aria-pressed={false} onClick={() => respond(option)}>{option}</OutlineButton>)}</div>}
-    <TextArea variant="field" style={{ resize: 'vertical', minHeight: 68, maxHeight: 200 }} aria-label={t('Your answer')} placeholder={t('Type your answer…')} value={answer} maxLength={4000} rows={2}
+    <TextArea variant="field" autoSizeMaxHeight={200} style={{ minHeight: 68, maxHeight: 200 }} aria-label={t('Your answer')} placeholder={t('Type your answer…')} value={answer} maxLength={4000} rows={2}
       onChange={event => setAnswer(event.target.value)} onKeyDown={event => {
         if ((event.ctrlKey || event.metaKey) && event.key === 'Enter' && !event.nativeEvent.isComposing) { event.preventDefault(); send(); }
       }} />
