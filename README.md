@@ -41,6 +41,10 @@ History suggestions and local path completion work without a model key. Tab comp
 
 <a href="docs/images/feature-completion-en.png"><img src="docs/images/feature-completion-en.png" width="1600" alt="Command blocks retaining execution context, with history suggestions and completion controls" /></a>
 
+<a href="docs/images/feature-classic-en.png"><img src="docs/images/feature-classic-en.png" width="1600" alt="Classic terminal mode with continuous shell prompts, test output and a build result" /></a>
+
+<p align="center"><sub>Classic mode keeps shell prompts and output on one continuous screen.</sub></p>
+
 ### 2. Work through an SSH connection, beyond its prompt
 
 A saved host holds authentication, jump connections, proxy selection, forwarding rules, environment variables and notes. Groups, tags and favorites help organize hosts; importing existing connection configuration reduces repeated setup.

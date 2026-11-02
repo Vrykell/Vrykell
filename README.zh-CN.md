@@ -41,6 +41,10 @@ Vrykell 围绕真实的 Shell 会话组织开发与远程工作。每条命令�
 
 <a href="docs/images/feature-completion-zh.png"><img src="docs/images/feature-completion-zh.png" width="1600" alt="保留执行上下文的命令块，以及历史建议和补全设置" /></a>
 
+<a href="docs/images/feature-classic-zh.png"><img src="docs/images/feature-classic-zh.png" width="1600" alt="经典终端模式中的连续 Shell 提示符、测试输出与构建结果" /></a>
+
+<p align="center"><sub>经典模式：Shell 提示符与输出保留在连续的终端画面中。</sub></p>
+
 ### 2. 从 SSH 连接延伸到远程操作
 
 保存的主机配置包含认证方式、跳板连接、代理选择、转发规则、环境变量和备注。通过分组、标签和收藏组织主机，也可以导入已有连接配置，减少重复录入。

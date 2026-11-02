@@ -2,7 +2,7 @@ import { chromium, expect } from '@playwright/test';
 import { access, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { setupTauriMock, emitAcpSession, acpUpdate, waitForWorkbench } from '../e2e/tauri-mock.ts';
+import { setupTauriMock, emitAcpSession, acpUpdate, waitForWorkbench, emitPtyOutput, expectAnyTermContains } from '../e2e/tauri-mock.ts';
 
 const origin = process.env.README_ORIGIN ?? 'http://127.0.0.1:1432';
 const directory = new URL('../docs/images/', import.meta.url);
@@ -194,6 +194,77 @@ async function captureSingleWorkspaces(page, locale) {
     try { await access(fileURLToPath(new URL(`theme-settings-${locale}.png`, directory))); }
     catch { await shot('theme-settings'); }
   }
+}
+
+async function captureClassicTerminal(locale) {
+  const context = await browser.newContext({ viewport: { width: 1600, height: 900 }, deviceScaleFactor: 2 });
+  try {
+    const page = await context.newPage();
+    page.setDefaultTimeout(25000);
+    await setupTauriMock(page, {
+      integration: false, terminalDirectories: true, launchDirectory: '/work/atlas',
+      shells: [{ id: 'zsh', label: 'zsh', default: true }],
+    });
+    await page.addInitScript(locale => {
+      localStorage.setItem('vrykell-language', JSON.stringify({ state: { preference: locale }, version: 0 }));
+      localStorage.setItem('vrykell-theme-mode', 'dark');
+      localStorage.setItem('vrykell-agent-settings', JSON.stringify({
+        state: { global: { openModeByShell: { zsh: 'classic' } }, overrides: {} }, version: 8,
+      }));
+    }, locale);
+    await page.goto(origin);
+    await waitForWorkbench(page);
+    await expect(page.locator('.xterm:visible')).toHaveCount(1);
+    await expect(page.locator('[data-terminal-input]:visible')).toHaveCount(0);
+    await page.evaluate(async () => {
+      document.documentElement.style.clipPath = 'inset(0 round 16px)';
+      const { useTypographyStore } = await import('/src/config/typography.ts');
+      const { useWorkspaceStore } = await import('/src/features/workspace/stores/workspace.ts');
+      useTypographyStore.getState().update({ terminalFontSize: 17 });
+      const terminal = useWorkspaceStore.getState().tabs.find(tab => tab.kind === 'session');
+      useWorkspaceStore.getState().renameTab(terminal.id, 'atlas · zsh');
+    });
+    await page.evaluate(() => document.fonts.ready);
+    const prompt = '\u001b[1;32mdev@workstation\u001b[0m \u001b[1;34m/work/atlas\u001b[0m \u001b[35m(feature/history)\u001b[0m $ ';
+    const output = [
+      `${prompt}git status --short`,
+      ' \u001b[31mM\u001b[0m src/session.ts',
+      ' \u001b[31mM\u001b[0m src/completion.ts',
+      '\u001b[32mM\u001b[0m  src/session.test.ts',
+      '',
+      `${prompt}npm run test -- src/session.test.ts`,
+      '',
+      ' \u001b[1;36mRUN\u001b[0m  /work/atlas',
+      '',
+      ' \u001b[32m✓\u001b[0m src/session.test.ts (8 tests) 428ms',
+      '   \u001b[32m✓\u001b[0m keeps commands from the current directory',
+      '   \u001b[32m✓\u001b[0m keeps interrupted commands in history',
+      '   \u001b[32m✓\u001b[0m removes duplicate suggestions',
+      '',
+      ' Test Files  \u001b[1;32m1 passed\u001b[0m (1)',
+      '      Tests  \u001b[1;32m8 passed\u001b[0m (8)',
+      '',
+      `${prompt}npm run build`,
+      '',
+      '\u001b[32m✓\u001b[0m 248 modules transformed.',
+      'dist/index.html          0.64 kB',
+      'dist/assets/app.js     184.32 kB',
+      '\u001b[32m✓ built in 1.42s\u001b[0m',
+      '',
+      prompt,
+    ].join('\r\n');
+    await emitPtyOutput(page, `\u001b[2J\u001b[H${output}`);
+    await expectAnyTermContains(page, 'built in 1.42s');
+    await expect.poll(() => page.evaluate(async () => {
+      const { useTerminalStore } = await import('/src/features/terminal/stores/terminal.ts');
+      return Object.values(useTerminalStore.getState().scenes);
+    })).toEqual(['classic']);
+    await expect(page.locator('.notification-toasts')).toHaveCount(0);
+    await page.mouse.move(1595, 895);
+    await page.waitForTimeout(400);
+    await capture(page, new URL(`feature-classic-${locale}.png`, directory));
+    console.log(`feature-classic-${locale}.png`);
+  } finally { await context.close(); }
 }
 
 async function scene(locale, remote = false) {
@@ -500,7 +571,9 @@ export function rememberCommand(
 
 try {
   for (const locale of ['zh', 'en']) {
-    if (selectedShots?.length && selectedShots.every(name => ['feature-git', 'feature-completion', 'theme-deep-black'].includes(name))) await captureCoreWorkflows(locale);
+    if (!selectedShots || selectedShots.includes('feature-classic')) await captureClassicTerminal(locale);
+    if (selectedShots?.length && selectedShots.every(name => name === 'feature-classic')) continue;
+    if (selectedShots?.length && selectedShots.every(name => ['feature-classic', 'feature-git', 'feature-completion', 'theme-deep-black'].includes(name))) await captureCoreWorkflows(locale);
     else { await scene(locale); if (!extraOnly) await scene(locale, true); }
   }
 } finally { await browser.close(); }
