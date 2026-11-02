@@ -32,7 +32,7 @@ jobs:
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: 22
-      - run: node --test scripts/__tests__/update-release.test.mjs
+      - run: node --test scripts/__tests__/update-release.test.mjs scripts/__tests__/finalize-update-manifest.test.mjs
       - run: node scripts/validate-update-release.mjs
         env:
           RELEASE_TAG: ${{ inputs.tag }}
@@ -124,7 +124,10 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
         run: |
           gh release download "$RELEASE_TAG" --pattern latest.json --output "$RUNNER_TEMP/latest.json"
+          gh api "repos/$GITHUB_REPOSITORY/releases/${{ needs.prepare.outputs.release }}" > "$RUNNER_TEMP/release.json"
+          node scripts/finalize-update-manifest.mjs "$RUNNER_TEMP/latest.json" "$RUNNER_TEMP/release.json"
           node scripts/validate-update-release.mjs "$RUNNER_TEMP/latest.json"
+          gh release upload "$RELEASE_TAG" "$RUNNER_TEMP/latest.json" --clobber
       - if: inputs.publish
         env:
           GH_TOKEN: ${{ github.token }}

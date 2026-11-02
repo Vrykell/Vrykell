@@ -189,9 +189,11 @@ test('the fullscreen terminal context menu offers shortcuts plus copy and paste'
   await fs.locator('.xterm').click({ button: 'right' });
   const menu = page.getByRole('menu', { name: '操作菜单' });
   await expect(menu).toBeVisible();
-  for (const [index, label] of ['重绘终端', '终止命令', '结束前台应用', '退出全屏', '复制', '粘贴'].entries()) {
+  for (const [index, label] of ['重绘终端', '重置终端输入模式', '终止命令', '结束前台应用', '退出全屏'].entries()) {
     await expect(menu.locator('button').nth(index)).toContainText(label);
   }
+  await expect(menu.getByRole('button', { name: '复制' })).toBeVisible();
+  await expect(menu.getByRole('button', { name: '粘贴' })).toBeVisible();
   await expect(menu.getByLabel('Control+C').first()).toBeVisible();
   await expect(menu.getByLabel('Control+V').first()).toBeVisible();
 
@@ -250,7 +252,7 @@ test('the pane context menu of a real alternate-screen TUI offers the banner sho
   await page.locator('.terminal-pane .xterm').first().click({ button: 'right' });
   const menu = page.getByRole('menu', { name: '操作菜单' });
   await expect(menu).toBeVisible();
-  const labels = ['重绘终端', '终止命令', '结束前台应用', '复制', '粘贴', '拆分标签页'];
+  const labels = ['重绘终端', '重置终端输入模式', '终止命令', '结束前台应用', '复制', '粘贴', '拆分标签页'];
   for (const [index, label] of labels.entries()) {
     await expect(menu.locator('button').nth(index)).toContainText(label);
   }

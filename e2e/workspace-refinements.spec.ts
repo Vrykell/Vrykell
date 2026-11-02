@@ -12,7 +12,8 @@ test('prefix cards replace the scope picker and persist on recent searches', asy
   await expect(dialog.getByTestId('search-scope-chip')).toContainText('快捷操作');
   await expect(input).toHaveValue('打开设置');
   await expect(dialog.getByTestId('search-filter-button')).toHaveCount(0);
-  await expect(dialog.locator('[data-search-result] .key-hint [data-key-icon="Meta"]')).toBeVisible();
+  await expect(dialog.locator('[data-search-result]').first()).toContainText('打开设置');
+  await expect(dialog.locator('.global-search-footer').getByRole('img', { name: 'Enter', exact: true })).toBeVisible();
   expect(await dialog.locator('.global-search-header').evaluate(el => getComputedStyle(el).boxShadow)).toBe('none');
   await dialog.screenshot({ path: test.info().outputPath('scope-card.png') });
   await dialog.locator('[data-search-result]').first().click();

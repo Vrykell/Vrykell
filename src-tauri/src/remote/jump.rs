@@ -266,6 +266,9 @@ mod tests {
     fn local_socket_pair_carries_data_and_drop_requests_relay_cancellation() {
         use std::io::Read;
         let (mut client, mut peer) = socket_pair().unwrap();
+        // Accepted sockets can inherit the listener's nonblocking mode.
+        peer.set_nonblocking(false).unwrap();
+        peer.set_read_timeout(Some(Duration::from_secs(2))).unwrap();
         client.write_all(b"encrypted transport").unwrap();
         let mut received = [0; 19];
         peer.read_exact(&mut received).unwrap();
