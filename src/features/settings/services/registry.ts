@@ -46,6 +46,8 @@ function registerField(id: string, page: PageId, label: string, description: str
 
 registerField('local-file-undo', 'file-operations', 'Local file undo', 'File operations');
 registerField('application-language', 'application-language', 'Application language', 'Choose the interface language. Changes apply immediately.', () => useLanguagePreferences.getState().preference);
+registerField('application-version', 'about', 'Version', 'About');
+registerField('application-updates', 'about', 'Stable releases', 'Check for updates');
 registerField('remote-file-undo', 'file-operations', 'Remote file undo', 'File operations');
 registerField('preferred-file-editor', 'editor-local', 'Preferred file editor', 'Opening files', () => useEditorPreferences.getState().localOpenMode);
 registerField('editor-vim-mode', 'editor-preferences', 'Vim mode', 'Use modal keybindings in the built-in editor. This applies to local and remote files.', () => String(useEditorPreferences.getState().vimMode));

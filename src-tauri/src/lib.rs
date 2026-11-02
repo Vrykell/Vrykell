@@ -44,6 +44,8 @@ pub fn run() {
         // PTY sessions before the new page can spawn its own.
         .plugin(terminal::pty::lifecycle_plugin())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_drag::init())

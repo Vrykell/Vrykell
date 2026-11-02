@@ -168,9 +168,11 @@ input, textarea, [contenteditable="true"] { caret-color: var(--text-caret); }
 
 * { box-sizing: border-box; }
 
-/* One themed hover hint for the whole app: the OS tooltip renders in its own style. */
+/* One themed hover hint for the whole app: the OS tooltip renders in its own style.
+   The hint sits above menus, dialogs and their scrims; otherwise the dimming layer that
+   separates a floating surface from the workspace also dims the hint. */
 .app-tooltip {
-  position: fixed; z-index: 9999; pointer-events: none;
+  position: fixed; z-index: 12000; pointer-events: none;
   width: max-content; max-width: min(340px, calc(100vw - 12px)); max-height: calc(100vh - 12px); overflow-y: auto; padding: 3px 8px;
   background: var(--field-bg); color: var(--text-primary);
   border: 1px solid var(--border-strong); border-radius: 6px;
@@ -287,14 +289,10 @@ button.global-search-filter:hover, button.global-search-filter[aria-expanded="tr
 .global-search-source-count { font: var(--fs-micro) var(--font-mono); color: var(--text-muted); }
 .global-search-body { overflow-y: auto; min-height: 0; padding: 8px; background: transparent; flex: 1; max-height: min(350px, 48vh); }
 .global-search-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; color: var(--text-muted); font-size: var(--fs-micro); }
+.global-search-result-group .global-search-section-heading { font-size: var(--fs-label); font-weight: var(--fw-semibold); }
 .global-search-section-heading > span:first-child { display: inline-flex; align-items: center; gap: 6px; }
 .global-search-clear { min-height: 28px; padding: 0 4px; font: inherit; }
 .global-search-result-group + .global-search-result-group { margin-top: 8px; }
-.global-search-dialog .global-search-result, .global-search-dialog .global-search-history,
-.global-search-dialog .global-search-result:hover, .global-search-dialog .global-search-history:hover,
-.global-search-dialog .global-search-result[data-selected="true"] { background: transparent; border: none; border-radius: 0; box-shadow: none; }
-.global-search-result { position: relative; }
-.global-search-result[data-selected="true"]::before { content: ''; position: absolute; left: 0; top: 9px; bottom: 9px; width: 2px; background: var(--accent); border-radius: 1px; }
 .global-search-dialog .global-search-result:hover, .global-search-dialog .global-search-history:hover { color: var(--text-primary); }
 .global-search-dialog .global-search-history:focus-visible { outline: none; background: var(--hover); box-shadow: none; }
 button.global-search-history { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; color: var(--text-secondary); text-align: left; font: var(--fs-caption) var(--font-mono); cursor: pointer; }
@@ -909,9 +907,9 @@ button.history-prompt-action[data-primary]:enabled:is(:hover, :focus-visible) { 
 .chat-exchange > .ai-block-answer { margin: 0; }
 .notification-region { position: fixed; z-index: 11000; right: 16px; bottom: 16px; display: flex; flex-direction: column; align-items: stretch; gap: 8px; width: min(380px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; pointer-events: none; }
 .notification-region > * { flex-shrink: 0; pointer-events: auto; }
-body:has([role="dialog"][aria-modal="true"]:not([hidden])) .notification-slot[data-notification-modal="false"] { display: none; }
 .notification-toasts { display: contents; }
 .notification-slot { display: contents; }
+body:has([role="dialog"][aria-modal="true"]:not([hidden])) .notification-slot[data-notification-modal="false"] { display: none; }
 .notification-slot > * { flex-shrink: 0; pointer-events: auto; }
 .notification-toasts > * { pointer-events: auto; }
 .notification-card { box-sizing: border-box; max-width: 380px; padding: 10px 12px; color: var(--text-primary); font-size: calc(12.5px * var(--ui-font-scale)); line-height: 1.5; animation: toastIn .24s var(--ease); }
@@ -1266,6 +1264,8 @@ button.md-code-block-action.text-control { min-height: 22px; gap: 4px; padding: 
 [data-testid="running-term"] .xterm .xterm-viewport { overflow-y: hidden; }
 [data-testid="running-term"] .xterm .xterm-scrollable-element > .xterm-scrollbar { display: none; }
 
+/* Keep pointer visibility steady during terminal typing bursts. */
+.xterm[data-terminal-typing="true"], .xterm[data-terminal-typing="true"] * { cursor: none !important; }
 /* Input helpers retain their geometry for native composition but never paint text. */
 .xterm .xterm-helper-textarea { opacity: 0 !important; color: transparent !important; -webkit-text-fill-color: transparent !important; background: transparent !important; border: none !important; box-shadow: none !important; }
 .xterm .xterm-helpers .composition-view { background: var(--xterm-bg); color: var(--xterm-foreground); }

@@ -17,6 +17,6 @@ export default function ConversationSettingsActions({ conversationId, onCloseMen
     {environment && connected && <OutlineButton onClick={() => { onCloseMenu(); showExecutionTerminal(environment.paneId); }}>{t('View terminal')}</OutlineButton>}
     <OutlineButton data-testid="chat-usage-entry" onClick={() => { onCloseMenu(); useSessionStore.getState().openUsageTab(); }}>{t('Usage statistics')}</OutlineButton>
     <OutlineButton onClick={() => { onCloseMenu(); useSessionStore.getState().openSettings(); }}>{t('Open settings')}</OutlineButton>
-    {onCloseConversation && <OutlineButton className="chat-close-conversation" tone="danger" aria-label={t('Close this conversation')} disabled={closeDisabled} onClick={() => { onCloseMenu(); onCloseConversation(); }}>{t('Close')}</OutlineButton>}
+    {onCloseConversation && <OutlineButton className="primary-button chat-close-conversation" aria-label={t('Close this conversation')} disabled={closeDisabled} onClick={() => { onCloseMenu(); onCloseConversation(); }}>{t('Close')}</OutlineButton>}
   </div>;
 }

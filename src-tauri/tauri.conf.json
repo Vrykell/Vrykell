@@ -37,6 +37,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "license": "Apache-2.0",
     "licenseFile": "../LICENSE",
     "copyright": "Copyright 2026 Vrykell contributors",
@@ -54,5 +55,12 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRENDUxRTUyQkYyODc4MEMKUldRTWVDaS9VaDVGVGZqRVhhQjdQd2FvZTZaOVhJWnYrcG50TWNZK1VmK0RYeVRDdHd4eWo4em0K",
+      "endpoints": ["https://github.com/Vrykell/Vrykell/releases/latest/download/latest.json"],
+      "windows": { "installMode": "passive" }
+    }
   }
 }

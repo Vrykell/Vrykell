@@ -40,7 +40,7 @@ export function configureTerminalInput(term: Terminal): void {
     if (!composing && !nativeDiffPending) compositionCommitted = false;
     terminalDebug('terminal-native-key', { composing: event.isComposing || composing,
       imeKey: event.keyCode === 229, printable: event.key.length === 1,
-      modified: event.ctrlKey || event.altKey || event.metaKey, readonly: input.readOnly });
+      modified: event.ctrlKey || event.altKey || event.metaKey, readonly: input.readOnly, repeat: event.repeat });
     // Some native input methods use ordinary key codes for candidate navigation and
     // confirmation. Keep these keys native until compositionend commits the textarea.
     if (event.target === input && (composing || event.isComposing)) {

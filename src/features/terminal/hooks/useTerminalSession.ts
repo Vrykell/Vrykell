@@ -42,7 +42,8 @@ import type { SshLogEntry } from '@core/ssh';
 import { appendLogEntry, connectionLogLines, isSshClientNotice } from '../model/connectionLog';
 import type { UnlistenFn } from '@tauri-apps/api/event';
 import { getTerminalFontOptions, measureTerminalDomCellWidth } from '@features/terminal/model/terminalFont';
-import { applyTerminalCursorPreference } from '@features/terminal/model/terminalCursor';
+import { applyTerminalCursorPreference, smoothTerminalCursorRepaints } from '@features/terminal/model/terminalCursor';
+import { configureTerminalPointer } from '@features/terminal/model/terminalPointer';
 import { prepareSshHost } from '@features/ssh/services/hostTrust';
 import { startAutomaticForwarding } from '@features/ssh';
 import { useToastStore } from '@ui/feedback/Toast';
@@ -201,7 +202,7 @@ export function useTerminalSession(
     });
     // Keep the typography preference in charge of blinking while still honoring
     // cursor-shape requests from running programs.
-    applyTerminalCursorPreference(term);
+    applyTerminalCursorPreference(term, paneId);
     const fit = new FitAddon();
     term.loadAddon(fit);
     term.loadAddon(new WebLinksAddon());
@@ -211,6 +212,8 @@ export function useTerminalSession(
     // is lost or WebGL is unavailable.
     loadWebglRenderer(term, useTypographyStore.getState().terminalRenderer);
     term.open(el);
+    const disposeCursorRepaints = smoothTerminalCursorRepaints(term, paneId);
+    const disposePointer = configureTerminalPointer(term, paneId);
     configureTerminalInput(term);
     captureTerminalPaste(term, paneId);
     let frameRaf = 0;
@@ -1009,6 +1012,8 @@ export function useTerminalSession(
     // Cleanup.
 
     return () => {
+      disposeCursorRepaints();
+      disposePointer();
       unsubscribeTypography();
       unsubscribeActiveTab();
       cancelAnimationFrame(restoreRaf);

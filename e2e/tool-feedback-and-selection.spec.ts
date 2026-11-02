@@ -13,6 +13,20 @@ for (const theme of ['dark', 'light']) for (const width of [900, 1440]) {
     const side = page.getByTestId('ai-sidebar-content');
     await expect(side.locator('[data-chat-composer]')).toBeVisible();
     await side.getByRole('button', { name: '会话设置', exact: true }).click();
+    const closeConversation = page.getByRole('button', { name: '关闭当前对话', exact: true });
+    await expect(closeConversation).toHaveClass(/primary-button/);
+    const closeColors = await closeConversation.evaluate(element => {
+      const probe = document.createElement('span');
+      probe.style.background = 'var(--primary-button-bg)';
+      element.append(probe);
+      const primary = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return { primary, applied: getComputedStyle(element).backgroundColor };
+    });
+    expect(closeColors.applied).toBe(closeColors.primary);
+    await closeConversation.hover();
+    await expect(closeConversation).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(closeConversation).not.toHaveAttribute('data-tone', 'danger');
     const agent = page.getByRole('button', { name: '选择智能体', exact: true });
     const recent = page.getByRole('combobox', { name: '侧栏对话' });
     await expect(agent).toHaveClass('ui-select');

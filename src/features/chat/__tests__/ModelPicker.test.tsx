@@ -25,6 +25,13 @@ describe('model picker controls', () => {
     expect(within(row).queryByTestId('model-cap-search')).toBeNull();
   });
 
+  it('renders the top-right close action through the shared icon control', () => {
+    render(<ModelPicker open onClose={vi.fn()} />);
+    const close = screen.getByRole('button', { name: '关闭' });
+    expect(close).toHaveClass('icon-button');
+    expect(close).toHaveAttribute('data-tip', '关闭');
+  });
+
   it('uses the themed selector without selecting the model or closing the dialog', () => {
     useAiConfigStore.setState({ activeModel: 'other', models: [{
       id: 'reasoning', name: '推理模型', model: 'reasoning', provider: 'anthropic', baseUrl: '',

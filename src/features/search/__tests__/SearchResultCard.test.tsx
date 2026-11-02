@@ -12,42 +12,46 @@ function blockResult(overrides: Partial<BlockResultData> = {}): SearchResult {
 }
 
 describe('search result actions', () => {
-  it('uses shared key icons for action shortcuts', () => {
-    render(<SearchResultCard result={{ id: 'action', type: 'action', title: 'Open settings', detail: '⌘,',
-      data: { commandId: 'settings', shortcut: '⌘,' } }} selected={false} query="" onSelect={vi.fn()} onExecute={vi.fn()} />);
-    const hint = screen.getByLabelText('Meta+,');
-    expect(hint.querySelector('[data-key-icon="Meta"]')).not.toBeNull();
-    expect(hint).toHaveTextContent(',');
-    expect(screen.queryByText('⌘,')).not.toBeInTheDocument();
-  });
-
-  it('keeps query highlighting and opens the selected command result', () => {
+  it('keeps query highlighting and executes on click', () => {
     const result = blockResult();
     const execute = vi.fn();
-    render(<SearchResultCard result={result} selected query="Git" onSelect={vi.fn()} onExecute={execute} />);
-    expect(screen.getByText('完成')).toBeVisible();
+    const { container } = render(<SearchResultCard result={result} selected query="Git" onSelect={vi.fn()} onExecute={execute} />);
+
     expect(screen.getAllByText(/git/i).some(el => el.tagName === 'MARK')).toBe(true);
-    fireEvent.click(screen.getByText('完成'));
+    fireEvent.click(container.querySelector('[data-search-result]')!);
     expect(execute).toHaveBeenCalledWith(result);
   });
 
-  it('restores historical sessions from both the row and the restore action', () => {
-    const restore = vi.fn();
-    const execute = vi.fn();
-    render(<SearchResultCard result={blockResult({ sessionStatus: 'historical', tabTitle: '远程' })}
-      selected={false} query="" onSelect={vi.fn()} onExecute={execute} onRestore={restore} />);
-    fireEvent.click(screen.getByText('历史会话'));
-    fireEvent.click(screen.getByLabelText('恢复此会话'));
-    expect(restore.mock.calls).toEqual([['t', '远程'], ['t', '远程']]);
-    expect(execute).not.toHaveBeenCalled();
+  it('renders one secondary line and no leading icon', () => {
+    const result = { ...blockResult(), detail: 'Terminal · 1 min ago' };
+    const { container } = render(
+      <SearchResultCard result={result} selected={false} query="" onSelect={vi.fn()} onExecute={vi.fn()} />,
+    );
+
+    expect(screen.getByText('Git command help')).toBeVisible();
+    expect(screen.queryByText('Terminal · 1 min ago')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-search-result] svg')).toBeNull();
   });
 
-  it('retains failure status and hover selection', () => {
+  it('restores historical results through the normal click path without restore controls', () => {
+    const result = blockResult({ sessionStatus: 'historical', tabTitle: '远程' });
+    const execute = vi.fn();
+    render(<SearchResultCard result={result} selected={false} query="" onSelect={vi.fn()} onExecute={execute} />);
+
+    fireEvent.click(screen.getByText('git --help'));
+    expect(execute).toHaveBeenCalledWith(result);
+    expect(screen.queryByText('历史会话')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('恢复此会话')).not.toBeInTheDocument();
+  });
+
+  it('selects on pointer movement but not on passive mouse entry', () => {
     const select = vi.fn();
-    render(<SearchResultCard result={blockResult({ exitCode: 1, status: 'failed' })}
-      selected={false} query="" onSelect={select} onExecute={vi.fn()} />);
-    fireEvent.mouseEnter(screen.getByText('失败').closest('[data-search-result]')!);
+    render(<SearchResultCard result={blockResult()} selected={false} query="" onSelect={select} onExecute={vi.fn()} />);
+    const row = screen.getByText('git --help').closest('[data-search-result]')!;
+
+    fireEvent.mouseEnter(row);
+    expect(select).not.toHaveBeenCalled();
+    fireEvent.pointerMove(row);
     expect(select).toHaveBeenCalledOnce();
-    expect(screen.getByText('失败')).toBeVisible();
   });
 });

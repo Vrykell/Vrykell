@@ -38,7 +38,8 @@ async function search(page: Page) {
   await expect(results.first()).toBeVisible();
   const selected = dialog.locator('[data-search-result][data-selected="true"]');
   await expect(selected).toHaveCSS('border-left-width', '0px');
-  await expect(selected).toHaveCSS('border-radius', '0px');
+  await expect(selected).toHaveCSS('border-radius', '8px');
+  expect(await selected.evaluate(element => getComputedStyle(element, '::before').content)).toBe('none');
   const firstTitle = await selected.textContent();
   await dialog.getByPlaceholder('搜索文件、命令、设置…').press('ArrowDown');
   expect(await selected.textContent()).not.toBe(firstTitle);
@@ -97,6 +98,20 @@ for (const theme of ['深色', '浅色']) {
     await page.getByTestId('pill-name').first().click();
     const models = page.getByRole('dialog', { name: '选择模型' });
     await assertSurface(models, true);
+    // The close action owns pointer feedback, and its hint stays above the dialog scrim.
+    const closeModels = models.getByRole('button', { name: '关闭' });
+    await closeModels.hover();
+    await expect(closeModels).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    const hint = page.getByTestId('app-tooltip');
+    await expect(hint).toBeVisible();
+    const layers = await hint.evaluate(element => ({
+      hint: Number(getComputedStyle(element).zIndex),
+      scrim: Number(getComputedStyle(document.querySelector('[role="dialog"][aria-modal="true"]')!.parentElement!).zIndex),
+    }));
+    expect(layers.hint).toBeGreaterThan(layers.scrim);
+    // Row feedback keeps the shared hover surface while the scrim is visible.
+    await models.getByTestId('model-pick-m-main').hover();
+    await expect(models.getByTestId('model-pick-m-main')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     await models.getByPlaceholder('搜索模型…').fill('主力');
     await expect(models.getByTestId('model-pick-m-main')).toBeVisible();
     await models.getByTestId('model-pick-m-main').click();

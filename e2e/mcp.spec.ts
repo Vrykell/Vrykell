@@ -43,6 +43,8 @@ test.describe('MCP settings page', () => {
     const nameInputs = page.locator('section').getByPlaceholder('服务器名');
     await expect(nameInputs).toHaveCount(2);
     const draftCard = nameInputs.nth(1).locator('xpath=../..');
+    await expect(draftCard.getByText('环境变量', { exact: true })).toHaveCount(0);
+    await expect(draftCard.getByRole('textbox', { name: '环境变量', exact: true })).toBeVisible();
     await nameInputs.nth(1).fill(' ');
     await expect(page.getByText('请填写服务器名')).toBeVisible();
 

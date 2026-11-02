@@ -9,6 +9,7 @@ import { TextInput } from '@ui/fields/TextInput';
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { iconSizes, Search, SlidersHorizontal, X } from '@ui/icons';
+import { IconButton } from '@ui/actions/IconButton';
 import { t } from '@i18n';
 import { useAiConfigStore, setActiveModel, type ModelProfile, useAgentSettings } from '@features/agent';
 import {
@@ -119,18 +120,9 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
         <div style={{ padding: '14px 16px 10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', flex: 1 }}>{t('Select model')}</span>
-            <button
-              data-subtle
-              data-tip={t('Close')}
-              aria-label={t('Close')}
-              onClick={onClose}
-              style={{
-                border: 'none', background: 'transparent', color: 'var(--text-muted)',
-                cursor: 'pointer', padding: 0, width: 32, height: 32, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              }}
-            >
+            <IconButton aria-label={t('Close')} data-tip={t('Close')} onClick={onClose}>
               <X size={iconSizes.control} />
-            </button>
+            </IconButton>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 8, padding: '6px 10px', background: 'var(--field-bg)' }}>
             <Search size={iconSizes.control} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
@@ -193,18 +185,19 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
                 >
                   <Mark size={iconSizes.row} style={{ color: markHue }} />
                 </span>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-regular)', color: 'var(--text-primary)' }}>{m.name || m.model}</span>
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 3 }}>
-                    <span style={{ fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)', marginRight: 2 }}>
-                      {providerLabel(m.provider)}
-                    </span>
-                    {CAP_ORDER.map((cap) => (
-                      <ModelCapabilityBadge key={cap} supported={caps[cap]} capability={cap} />
-                    ))}
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
+                  <span style={{
+                    minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-regular)', color: 'var(--text-primary)',
+                  }}>{m.name || m.model}</span>
+                  <span style={{ flexShrink: 0, fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
+                    {providerLabel(m.provider)}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>
+                  {CAP_ORDER.map((cap) => (
+                    <ModelCapabilityBadge key={cap} supported={caps[cap]} capability={cap} />
+                  ))}
                 </div>
                 {showThinking && <ItemControls profile={m} />}
               </div>

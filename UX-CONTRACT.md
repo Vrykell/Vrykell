@@ -36,7 +36,7 @@ Desktop terminal, remote-host, file and conversation workflows use the existing 
 | Select/Listbox | `src/ui/fields/Select.tsx` | Development rules | Authored popup | Shared unit and browser keyboard/collision tests |
 | Form | `TextInput`, `TextArea`, `SegmentedControl`, `TagInput` | Development rules | Connection, settings, text editing | Owning unit and browser flow tests |
 | Scrollbar | `src/app/theme.css`, `OverlayScrollbar` | Shared runtime CSS | Terminal geometry exceptions | Browser overflow and scrollbar tests |
-| Toast | `src/ui/feedback/Toast.tsx` | Development rules | Success, info, error | Owning action tests |
+| Toast | `src/ui/feedback/Toast.tsx` | Development rules | Success, info, warning, transient error | Timer, focus and browser lifetime tests |
 | CRUD | Owning domain services and workspace navigation | Feature specification and security model | Host return-to-list; editor stay-on-document | Domain unit and browser flow tests |
 | Error | `ErrorBox`, `ErrorDetails`, `NotificationPortal`; domain `HostResources` owns status data | Current notification request and development rules | Persistent bottom-right errors; inline informational status; full-page global fallback | Shared unit, modal keyboard and retry browser tests |
 | Dialog | `ToolDialog`, `ConfirmDialog`, `useDialogKeyboard` | Development rules | Modal editing/confirmation | Focus, Escape, cancellation tests |
@@ -90,6 +90,10 @@ Terminal and external-session creation reuse `AnchoredDropdown`, including its m
 History uses native keyset pages of 40 metadata records, without loading transcripts. Scrolling or Load more appends a page. Search waits for composition completion, debounces queries and progressively scans sparse matches with frame yields. Group metadata is reused across filters. Counts describe loaded records until the source is exhausted; explicit batch operations gather the full matching scope. Failed appends preserve the retry cursor; stale responses cannot replace newer results. Diagnostics separate lock wait from query time without recording history payloads. The AI start page always exposes history. Native history uses the application mark; external sessions retain their shared agent marks.
 
 Read failures use persistent bottom-right `ErrorBox` notifications with useful guidance, diagnostic details, dismissal and retry. Ordinary transient outcomes use `Toast` in the same shared notification region. Notifications track the visibility and lifetime of their owner, and an active modal includes its own notification controls in keyboard navigation. The global error page remains full-page. Long diagnostics wrap or scroll without squeezing action buttons. All visible copy and accessible labels use the locale catalog.
+
+Transient notifications allow at least 3/4/6/8 seconds for success/info/warning/error, with longer text extending that time up to 12 seconds. Hover, keyboard focus and background windows pause independently; returning resumes the remaining time. Escape or dismissal restores prior focus when it is still connected. Persistent errors never inherit this timer.
+
+The About page follows the settings shell and groups. Product identity precedes a version and stable-update group; project, release and license destinations use ordinary shared buttons. Check, download, verified readiness and explicit install/restart are separate states. Navigation retains download progress, errors retain retry/details, and installation uses the same dirty-document guard as closing the application.
 
 Tool cards retain result statuses without footer errors. Live execution failures and explicit result review use the same bottom-right ErrorBox. Restored history and approval outcomes never automatically replay notifications. Refusal shares the failed badge appearance; a cancelled question remains cancellation rather than failure.
 

@@ -52,6 +52,8 @@ Conversation settings use a persistent non-modal popover, not an action menu. Se
 
 The reference is a compact desktop terminal workbench, not an administrative website or an integrated development environment. Output and editable text carry the screen; navigation and tools stay quiet. The signature is uninterrupted terminal state beside dense, single-line host information.
 
+Classic terminal text entry keeps output painting immediately while smoothing short cursor hides. During a typing burst the mouse pointer stays hidden and passive hover work pauses; a short idle interval or an explicit pointer gesture restores normal interaction. Application mouse reporting and text selection remain independent of this keyboard-focused state.
+
 The audience manages local shells, remote hosts, files and conversations on desktop. English and Chinese interfaces share the same controls and density. There is no inferred market-specific business policy. Current user-provided prototypes govern host density, blue primary actions, yellow favorites and compact menus.
 
 Runtime tokens remain canonical. `src/config/theme/tokens.ts` maps semantic palette properties through `paletteToCssVars`; `src/app/theme.css` defines component aliases and shared geometry. This document records intent rather than generating a second palette. The complete locale-aware font stacks live in `theme.css`; frontmatter records their roles, not replacement font stacks.
@@ -142,6 +144,8 @@ Persistent errors and transient messages use the same notification card, includi
 Agent selection in conversation settings uses the shared dropdown field trigger and existing rich launcher. Refused tool results share the failed badge treatment; cancellation reuses the approval badge palette. Answered questions retain only the selected option or typed answer as inset plain text; no highlighted or inactive options remain. Tool cards never add footer error messages. Live failures and explicit result review use the bottom-right error surface, while restored history stays quiet.
 
 ## Do's and Don'ts
+
+The About page keeps the settings rhythm: a product mark and short description, the standard settings group for version and stable updates, then ordinary shared resource buttons. Update progress survives navigation; installation requires confirmation and preserves the existing unsaved-document decision. Notifications keep their shared card and extend reading time by severity and text length, pausing while hovered, focused or in the background.
 
 Inline rename inputs use the shared field with a fixed 176 px target constrained by available width and an eight-pixel action gap; typing never shifts adjacent controls. Tab-card fields fit their 24 px content row. Sidebar conversation actions stay pinned to the right edge. Selected model names do not gain weight. Editor status stays one 32 px line at all widths, omitting secondary metadata before it can wrap. The filename has no trailing decoration; unsaved drafts have a separate text label. A live modal command has a centered 28 px input in that same row and returns to ordinary metadata when dismissed. Conversation recovery stays in the existing sidebar settings menu, using the shared select.
 
