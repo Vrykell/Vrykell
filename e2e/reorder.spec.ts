@@ -63,6 +63,7 @@ test.describe('sidebar list drag reordering', () => {
       for (const x of [heading.x + 12, Math.min(heading.x + heading.width - 8, viewport.x + viewport.width - 8)]) {
         await page.mouse.move(x, viewport.y + viewport.height / 2, { steps: 5 });
         await expect(loose.locator('[data-reorder-placeholder]')).toHaveCount(1);
+        await expect(loose.locator('[data-reorder-placeholder]')).toHaveCSS('border-width', '0px');
         await expect(list.locator(`[data-group-id="${groupId}"] [data-reorder-placeholder]`)).toHaveCount(0);
       }
       await page.mouse.up();
@@ -71,7 +72,7 @@ test.describe('sidebar list drag reordering', () => {
       await expect(list.locator(`[data-group-id="${groupId}"] [data-tab-row-id="${first}"]`)).toHaveCount(0);
     });
   }
-  test('SSH connections: the source row makes way with a dashed placeholder while dragging, and the order persists after dropping', async ({ page }) => {
+  test('SSH connections: the source row makes way with a borderless placeholder while dragging, and the order persists after dropping', async ({ page }) => {
     await setupTauriMock(page);
     await page.goto('/');
     await page.locator('[data-dock-btn="ssh"]').click();
@@ -89,9 +90,10 @@ test.describe('sidebar list drag reordering', () => {
     const [first, second] = before as [string, string];
 
     await startDragRow(page, `ssh-row-${first}`, `ssh-row-${second}`, 0.85);
-    // While dragging: the source row makes way (hidden) and the drop slot uses a dashed placeholder
+    // While dragging: the source row makes way (hidden) and the drop slot has no edge border
     await expect(page.locator(`[data-testid="ssh-row-${first}"]`)).toHaveAttribute('data-reorder-dragging', 'true');
     await expect(page.locator('[data-reorder-placeholder]')).toHaveCount(1);
+    await expect(page.locator('[data-reorder-placeholder]')).toHaveCSS('border-width', '0px');
     await page.mouse.up();
 
     expect(await sshOrder(page)).toEqual([second, first]);
@@ -116,6 +118,7 @@ test.describe('sidebar list drag reordering', () => {
     await startDragRow(page, `tab-row-${first}`, `tab-row-${last}`, 0.85);
     await expect(page.locator(`[data-testid="tab-row-${first}"]`)).toHaveAttribute('data-reorder-dragging', 'true');
     await expect(page.locator('[data-reorder-placeholder]')).toHaveCount(1);
+    await expect(page.locator('[data-reorder-placeholder]')).toHaveCSS('border-width', '0px');
     await page.mouse.up();
 
     const after = await tabOrder(page);
@@ -157,12 +160,14 @@ test.describe('sidebar list drag reordering', () => {
     };
     await dragUntilGroupPlaceholder(b, a);
     await expect(group.locator('[data-reorder-placeholder]')).toHaveCount(1);
+    await expect(group.locator('[data-reorder-placeholder]')).toHaveCSS('border-width', '0px');
     await page.mouse.up();
     await expect(group.locator(`[data-testid="tab-row-${b}"]`)).toHaveAttribute('data-tab-group', /.+/);
 
     // Reorder within the group: drag a onto b in the group; the slot also appears inside the group
     await dragUntilGroupPlaceholder(a, b);
     await expect(group.locator('[data-reorder-placeholder]')).toHaveCount(1);
+    await expect(group.locator('[data-reorder-placeholder]')).toHaveCSS('border-width', '0px');
     await page.mouse.up();
 
     // The group tab's context menu can move it out explicitly (no need to drag it to the "ungrouped" area)

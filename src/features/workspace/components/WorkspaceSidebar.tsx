@@ -67,14 +67,14 @@ export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number
       </div>
     </div>
     <nav aria-label={t('Workspaces')} className="workspace-area-navigation" data-reorder-list="workspace-areas">
-      {orderedItems.map(({ id, label, Icon }, index) => <Fragment key={id}>
+      {orderedItems.map(({ id, label, Icon }) => <Fragment key={id}>
         <ListReorderPlaceholder listId="workspace-areas" itemId={id} />
         <SidebarItem compact title={label} icon={<Icon size={iconSizes.row} />} active={!settingsOpen && (area === id || id === 'ssh' && area === 'forwarding')}
           testId={`workspace-area-${id}`} dataAttributes={{ role: 'button', 'aria-label': label, 'data-dock-btn': id === 'terminal' ? 'tabs' : id === 'ssh' ? 'ssh' : undefined, 'aria-current': !settingsOpen && (area === id || id === 'ssh' && area === 'forwarding') ? 'page' : undefined }}
           tabIndex={0} reorderItemId={id} reorderListId="workspace-areas" reorderKind="workspace"
           onPointerDown={event => startWorkspaceDrag(event, { id, kind: 'workspace' })}
           onClick={() => open(id)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(id); } }} />
-        {index === orderedItems.length - 1 && <ListReorderPlaceholder listId="workspace-areas" itemId={id} after />}
+        <ListReorderPlaceholder listId="workspace-areas" itemId={id} after />
       </Fragment>)}
     </nav>
     <div className="workspace-sidebar-tools" data-testid="workspace-left-dock">

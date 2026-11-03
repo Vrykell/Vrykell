@@ -662,6 +662,7 @@ The embedded runtime is pinned for older web views. Dependency upgrades must ver
 
 Interface consistency checklist, 2026-10-22:
 
+- Drag insertion slots in navigation, connection lists, tabs and groups keep their existing fill and dimensions without edge borders. Navigation retains its final slot while dragging the last row, including after a saved reorder. Unit and browser checks cover the final slot, reversing direction, both shared placeholder styles, group destinations, cancellation and persisted ordering in dark/light and wide/narrow layouts.
 - Global search stays centered within the complete application width as navigation and native controls change; title text truncates before controls overlap. The collapsed expand control has equal top and left insets, while native window controls keep their reserved space.
 - Selected workspace icons use the blue theme stroke. Titlebar, content and auxiliary panels retain their original distinct surface levels; left navigation keeps the titlebar tint and opaque fallback. Terminal and AI composers use dark RGB 54/54/54. The conversation panel is titled AI assistant. File and comparison tab connectors use masked curves with an overlapping join to avoid edge strokes at fractional density.
 - Both panel and split placement previews share the left navigation material parameters. Native sidebar material is used on supported systems; unsupported compositors keep an opaque themed navigation fallback. The existing switch disables material without introducing opacity adjustment.
