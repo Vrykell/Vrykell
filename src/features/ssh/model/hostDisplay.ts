@@ -1,5 +1,9 @@
 import { resolveLocale, t, useLanguagePreferences } from '@i18n';
 
+export function hostGroupTitle(group: string | null): string {
+  return group === null ? t('Hosts') : group || t('Ungrouped');
+}
+
 export function hostLastConnected(timestamp?: number, now = Date.now()): string {
   if (!timestamp || !Number.isFinite(timestamp)) return '—';
   const locale = resolveLocale(useLanguagePreferences.getState().preference);

@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import PortForwardingPage from '../components/PortForwardingPage';
 import { useSshStore } from '../stores/store';
+import { useHostView } from '../stores/hostView';
 import { connectionRules, withForwardingRules } from '../services/forwarding';
 import type { SshForwardingRule } from '@core/ssh';
 
@@ -11,10 +12,18 @@ const snapshot = useSshStore.getState();
 const rule: SshForwardingRule = { id: 'forward-1', name: 'Database', kind: 'local', bind: '127.0.0.1', port: 15432, host: 'localhost', targetPort: 5432, autoStart: true };
 const connection = { id: 'host-1', name: 'Production', host: 'server', user: 'ops', authMethod: 'key' as const, forwardingRules: [rule] };
 beforeEach(() => {
+  useHostView.setState({ groupFilter: null });
   api.list.mockResolvedValue([]); api.start.mockResolvedValue(undefined); api.stop.mockResolvedValue(undefined);
   useSshStore.setState({ loaded: true, loading: false, connections: [connection], save: vi.fn().mockResolvedValue(undefined) });
 });
-afterEach(() => { cleanup(); vi.clearAllMocks(); useSshStore.setState(snapshot, true); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); useSshStore.setState(snapshot, true); useHostView.setState({ groupFilter: null }); });
+
+it.each([[null, '主机'], ['Tokyo', 'Tokyo'], ['', '未分组']] as const)('matches the host heading in the forwarding breadcrumb for group %s', (groupFilter, label) => {
+  useHostView.setState({ groupFilter });
+  render(<PortForwardingPage active={false} />);
+  expect(screen.getByRole('button', { name: label })).toHaveAttribute('data-tip', label);
+  expect(screen.getByRole('heading', { name: '端口转发', level: 2 })).toHaveAttribute('aria-current', 'page');
+});
 
 it('migrates legacy startup forwards without keeping duplicate client listeners', () => {
   const legacy = { ...connection, forwardingRules: undefined, localForwards: ['8080:localhost:80'], dynamicForwards: ['1080'] };

@@ -18,8 +18,9 @@ import ContextMenu, { type MenuAnchor } from '@ui/menus/ContextMenu';
 import { TerminalProfileIcon } from '@ui/icons/shellIcons';
 import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
 import { EMPTY_HOST_METADATA, useHostLibrary } from '../stores/hostLibrary';
+import { useHostView } from '../stores/hostView';
 import { groupHosts } from '../model/hostTags';
-import { hostLastConnected } from '../model/hostDisplay';
+import { hostGroupTitle, hostLastConnected } from '../model/hostDisplay';
 import { useHostMetadataMenu } from './useHostMetadataMenu';
 import { ensureSshLoaded, useSshStore } from '../stores/store';
 import type { SshConnection } from '../services/api';
@@ -65,7 +66,8 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
   const [query, setQuery] = useState('');
   const [starredOnly, setStarredOnly] = useState(false);
   const [tagFilter, setTagFilter] = useState<string[]>([]);
-  const [groupFilter, setGroupFilter] = useState<string | null>(null);
+  const groupFilter = useHostView(state => state.groupFilter);
+  const toggleGroupFilter = useHostView(state => state.toggleGroupFilter);
   const [groupBy, setGroupBy] = useState('none');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [details, setDetails] = useState<SshConnection | null>(null);
@@ -122,6 +124,7 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
     };
     return sort === 'manual' ? filtered : filtered.sort((first, second) => sort === 'name' ? first.name.localeCompare(second.name) : resources && ['cpu', 'memory', 'disk'].includes(sort) ? metric(second) - metric(first) : (second.lastOpenedAt ?? 0) - (first.lastOpenedAt ?? 0));
   }, [connections, metadata, query, starredOnly, groupFilter, tagFilter, samples, sort, resources]);
+  const pageTitle = hostGroupTitle(groupFilter);
   const grouped = groupHosts(visible, metadata, groupBy);
   const showMenu = (connection: SshConnection, trigger: HTMLElement, x: number, y: number) => { setSelectedId(connection.id); setMenu({ id: connection.id, anchor: { x, y, trigger } }); };
   const address = (connection: SshConnection) => `${connection.user ? `${connection.user}@` : ''}${connection.host}:${connection.port ?? 22}`;
@@ -135,7 +138,7 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
 
   return <div className="ssh-dashboard ssh-host-management" data-testid="ssh-dashboard" data-resources={resources} data-layout={layout} style={{ '--ssh-host-list-columns': columns } as CSSProperties}>
     <header className="ssh-host-page-header ssh-management-header">
-      <div className="ssh-host-page-title"><h2>{t('Hosts')}</h2><span>{t('{{count}} hosts', { count: connections.length })}</span></div>
+      <div className="ssh-host-page-title"><h2 data-tip={pageTitle}>{pageTitle}</h2><span>{t('{{count}} hosts', { count: visible.length })}</span></div>
       <div className="ssh-host-page-actions">
         <div ref={search} className="ssh-host-search"><SidebarToolbar search={{ value: query, onChange: event => setQuery(event.target.value), placeholder: t('Search hosts…'), 'aria-label': t('Search hosts…'), 'data-testid': 'ssh-search' }} /></div>
         <div className="ssh-host-primary-actions">
@@ -163,8 +166,8 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
         </span>}
       </div>
     </div>
-    {tagsOpen && <CheckboxMenu anchored checkmark title={t('Host tags')} triggerRef={tagTrigger} style={{ width: 280 }} options={knownTags.map(tag => ({ id: tag, label: tag, checked: tagFilter.includes(tag), icon: <HostTagDot tag={tag} /> }))} onToggle={tag => setTagFilter(current => current.includes(tag) ? current.filter(value => value !== tag) : [...current, tag])} onClose={() => setTagsOpen(false)} />}
-    {groupsOpen && <CheckboxMenu anchored checkmark title={t('Host groups')} triggerRef={groupTrigger} style={{ width: 280 }} options={groups.map(group => ({ id: group.name, label: group.name || t('Ungrouped'), checked: groupFilter === group.name, icon: <Folder size={16} />, count: group.hosts.length }))} onToggle={group => setGroupFilter(current => current === group ? null : group)} onClose={() => setGroupsOpen(false)} />}
+    {tagsOpen && <CheckboxMenu anchored checkmark title={t('Host tags')} triggerRef={tagTrigger} options={knownTags.map(tag => ({ id: tag, label: tag, checked: tagFilter.includes(tag), icon: <HostTagDot tag={tag} /> }))} onToggle={tag => setTagFilter(current => current.includes(tag) ? current.filter(value => value !== tag) : [...current, tag])} onClose={() => setTagsOpen(false)} />}
+    {groupsOpen && <CheckboxMenu anchored checkmark title={t('Host groups')} triggerRef={groupTrigger} options={groups.map(group => ({ id: group.name, label: group.name || t('Ungrouped'), checked: groupFilter === group.name, icon: <Folder size={16} />, count: group.hosts.length }))} onToggle={toggleGroupFilter} onClose={() => setGroupsOpen(false)} />}
     {resources && HOST_METRICS.every(id => !metrics[id]) && <div className="ssh-dashboard-paused" role="status">{t('Metrics collection is paused. Turn on one or more metrics to collect host status.')}</div>}
     {layout === 'table' && <div className="ssh-host-columns"><span /><span>{t('Name')}</span>{resources ? <><span>{t('Status')}</span>{(['cpu', 'memory', 'disk'] as const).filter(metric => metrics[metric]).map(metric => <span key={metric}>{t(METRIC_LABELS[metric])}</span>)}</> : <><span>{t('Address')}</span><span>{t('Tags')}</span><span>{t('Last connected')}</span></>}<span /></div>}
     <div className={layout === 'table' ? 'scroll-region ssh-host-list' : 'scroll-region ssh-dashboard-grid'} data-reorder-list={layout === 'table' ? 'ssh-hosts' : undefined}>
