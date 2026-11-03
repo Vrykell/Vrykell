@@ -6,9 +6,9 @@
 
 **面向开发与远程运维的终端工作台。**
 
-保留命令执行的上下文，管理 SSH 连接与服务，让 Agent 在指定终端中工作。
+保留命令执行的上下文，管理 SSH 连接与服务，在一个客户端中接入多个 ACP Agent，并明确选择执行目标。
 
-**[下载 Beta](#下载)** &nbsp; · &nbsp; [工作方式](#工作方式) &nbsp; · &nbsp; [从源码运行](#从源码运行) &nbsp; · &nbsp; [English](README.md)
+**[下载](#下载)** &nbsp; · &nbsp; [工作方式](#工作方式) &nbsp; · &nbsp; [从源码运行](#从源码运行) &nbsp; · &nbsp; [English](README.md)
 
 <p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="Apache-2.0" /></a>
@@ -71,6 +71,19 @@ Vrykell 围绕真实的 Shell 会话组织开发与远程工作。每条命令�
 
 内置 Agent 使用你配置的模型服务，支持技能、MCP 工具和按范围管理的本地记忆；也可以通过 ACP 接入外部 Agent。外部会话可使用应用工具，复用同一套实现与权限流程。外部 Agent 自带的独立工具由该 Agent 管理。详见[外部会话的应用工具](docs/zh/application-tools.md)和[安全模型](docs/zh/security-model.md)。
 
+#### 一个客户端，连接 20+ Agent 生态
+
+通过预设或自定义本地命令，接入拥有 20+ Agent 选择的 [ACP 生态](https://github.com/agentclientprotocol/registry)。内置 11 个启动预设，包括 Claude Code、Codex、Gemini CLI、OpenCode、Qwen Code、Cursor、OpenClaw、Kiro CLI、Kimi CLI、Goose 和 Pi；其他兼容 Agent 可自行配置命令、参数、环境变量和项目目录。
+
+| 在同一个客户端中 | 各自保留的状态 |
+| --- | --- |
+| 多个 Agent 配置与对话标签 | 每个对话保留自己的草稿、项目上下文、流式回复和取消状态。 |
+| 主窗格与可停靠的对话侧栏 | 切换 Agent 或移动对话时，保留已连接会话与草稿。 |
+| 模型、模式与会话设置 | 按当前 Agent 实际报告的能力展示控件。 |
+| 终端与文件工具 | 明确选择执行目标，在对话中检查应用工具的审批记录。 |
+
+在**设置 → ACP**中添加预设或自定义命令，完成所选 Agent 的安装与认证，再在新建对话时选择项目目录。可用性、认证方式、模型及可选协议能力取决于各 Agent。预设提供启动配置，更广泛的生态以协议目录为参考。
+
 <a href="docs/images/single-ai-zh.png"><img src="docs/images/single-ai-zh.png" width="1600" alt="包含附件、执行目标和工具记录的对话" /></a>
 
 ### 4. 从执行结果走到变更审查
@@ -114,18 +127,18 @@ Vrykell 围绕真实的 Shell 会话组织开发与远程工作。每条命令�
 
 ## 下载
 
-安装包预览版：**0.1.0 Beta 5**。
+当前稳定版：**0.1.1**。
 
 | 平台 | 安装包 |
 | --- | --- |
-| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.5/Vrykell_0.1.0_x64-setup.exe) |
-| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.5/Vrykell_0.1.0_aarch64.dmg) |
-| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.5/Vrykell_0.1.0_x64.dmg) |
-| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.5/Vrykell_0.1.0_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.5/Vrykell_0.1.0_amd64.AppImage) |
+| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_x64-setup.exe) |
+| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_aarch64.dmg) |
+| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_x64.dmg) |
+| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_amd64.AppImage) |
 
-[全部版本](https://github.com/Vrykell/Vrykell/releases) · [Beta 5 发布说明](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.0-beta.5)
+[全部版本](https://github.com/Vrykell/Vrykell/releases) · [发布说明](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.1)
 
-发布说明记录安装包校验和、源码提交与验证边界。安装包未签名，分发签名与公证尚未配置。上文能力描述跟随开发分支；预览包发布之后的改动需要构建当前源码。
+发布说明记录安装包校验和、精确源码提交与验证覆盖。更新签名用于验证更新载荷，不能替代操作系统的分发签名或公证。上文能力描述跟随开发分支；安装包发布之后的改动需要构建当前源码。
 
 ### 当前边界
 
