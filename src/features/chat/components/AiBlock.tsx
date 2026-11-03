@@ -62,9 +62,14 @@ export default function AiBlock({ exchange, conversationId, toolContextId, onAsk
   const lastPart = parts?.[parts.length - 1];
   const streamTail = parts ? lastPart?.kind === 'text' ? lastPart.text : '' : answer?.content ?? '';
   const showOutputCursor = Boolean(answer?.pending && visibleAssistantText(streamTail).trim());
-  // A stopped (or still tool-running) reply can have no answer text yet: fall back to the
-  // one-line tool log so the copy target is never an empty string.
-  const answerCopyText = answer ? visibleAssistantText(answer.content) || visibleAssistantText(partsToHistoryText(parts)).trim() : '';
+  // ACP streams text as ordered parts; the flat content field can stay empty because the parts
+  // are the source of truth. Copy the visible text first, then fall back to the tool log for a
+  // stopped reply that has not produced any text yet.
+  const partsText = parts?.flatMap(part => part.kind === 'text' && part.text ? [part.text] : []).join('\n\n') ?? '';
+  const answerCopyText = answer
+    ? visibleAssistantText(answer.content).trim() || visibleAssistantText(partsText).trim()
+      || visibleAssistantText(partsToHistoryText(parts)).trim()
+    : '';
   const actions: ContextMenuItem[] = [
     ...(allowExchangeActions && !sending && question && answer ? [{ label: t('Regenerate'), onClick: regenerate }] : []),
     ...(allowExchangeActions && !sending && question ? [

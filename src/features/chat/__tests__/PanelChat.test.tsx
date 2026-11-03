@@ -133,7 +133,7 @@ it('allows discussion without implicitly binding the focused terminal', () => {
   expect(screen.queryByTestId('chat-context-usage')).not.toBeInTheDocument();
   expect(screen.queryByRole('combobox', { name: '选择执行终端' })).not.toBeInTheDocument();
   openSettings();
-  expect(screen.getByRole('combobox', { name: '选择执行终端' })).toHaveTextContent('仅讨论');
+  expect(screen.getByRole('combobox', { name: '选择执行终端' })).toHaveTextContent('不操作终端');
   expect(screen.getByRole('combobox', { name: '选择执行终端' })).toBeInTheDocument();
   expect(screen.queryByTestId('chat-environment-chip')).not.toBeInTheDocument();
   expect(useChatStore.getState().conversations[0]?.environment).toBeNull();
@@ -219,7 +219,7 @@ it('switches and clears the target through conversation settings without losing 
   fireEvent.click(screen.getByRole('option', { name: /Build/ }));
   expect(useChatStore.getState().conversations[0]?.environment?.paneId).toBe(paneId);
   fireEvent.click(select);
-  fireEvent.click(screen.getByRole('option', { name: '仅讨论 · 不操作终端' }));
+  fireEvent.click(screen.getByRole('option', { name: '不操作终端' }));
   expect(useChatStore.getState().conversations[0]?.environment).toBeNull();
   expect(input).toHaveValue('Keep this draft');
 });
@@ -272,7 +272,7 @@ it('keeps a disconnected target visible and never silently chooses another termi
   expect(screen.queryByRole('button', { name: '查看终端' })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('combobox', { name: '选择执行终端' }));
   const picker = screen.getByRole('listbox', { name: '选择执行终端' });
-  expect(within(picker).getByRole('option', { name: '仅讨论 · 不操作终端' })).toBeInTheDocument();
+  expect(within(picker).getByRole('option', { name: '不操作终端' })).toBeInTheDocument();
   expect(within(picker).queryByRole('option', { name: /closed-terminal/ })).not.toBeInTheDocument();
   expect(useChatStore.getState().conversations[0]?.environment?.paneId).toBe('closed-terminal');
 });

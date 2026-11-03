@@ -13,10 +13,15 @@ import {
   acpAnswerPermission, acpCancel, acpClose, acpOpen, acpPrompt, acpSetConfigOption, acpSetMode, acpSetModel,
   onAcpSession, acpAppToolResult,
   type AcpConfigOption, type AcpSessionEvent, type AcpSessionModes, type AcpSessionModels, type AgentDescription,
+  type HarnessOpenResult,
 } from '@platform/api/acp';
 import { useUsageStore } from '@features/agent/stores/usage';
 import { useHarnessSessionRefs } from './harnessSessions';
+import { useHarnessConfigPrefs } from './harnessConfigPrefs';
+import { isModelOption, isPermissionOption, optionValues } from '../model/harnessOptions';
 import { useToastStore } from '@ui/feedback/Toast';
+import type { AttachmentMeta } from '@features/agent/model/attachments';
+import { harnessPromptContent, harnessSupportsImages, type HarnessPromptContent } from '../services/harnessAttachments';
 import { ApplicationToolSession, applicationToolCatalog } from '@features/agent/services/applicationTools';
 import { clearSessionGrants } from '@features/agent/stores/permissions';
 import { executionPaneSpec } from '@features/agent/services/executionTarget';
@@ -40,7 +45,7 @@ export interface HarnessCommand {
 }
 
 export interface HarnessSession {
-  queuedInputs?: Array<{ id: string; text: string }>;
+  queuedInputs?: Array<{ id: string; text: string; attachments?: AttachmentMeta[] }>;
   stopping?: boolean;
   interrupted?: boolean;
   resumeSessionId?: string;
@@ -93,7 +98,7 @@ interface HarnessStore {
   setExecutionPane: (tabId: string, paneId: string | null) => void;
   byTab: Record<string, HarnessSession>;
   open: (tabId: string, harness: string, cwd: string, fresh?: boolean, resumeSessionId?: string) => Promise<void>;
-  prompt: (tabId: string, text: string) => Promise<void>;
+  prompt: (tabId: string, text: string, attachments?: AttachmentMeta[]) => Promise<boolean>;
   cancel: (tabId: string) => Promise<void>;
   close: (tabId: string) => Promise<void>;
   /** Switch the session mode (legacy mode API). */
@@ -124,13 +129,14 @@ let toolScopeSequence = 0;
 let inputSequence = 0;
 const openVersions = new Map<string, number>();
 const turnVersions = new Map<string, number>();
+const inputVersions = new Map<string, number>();
 const cancellationAcks = new Map<string, () => void>();
 function drainHarnessQueue(tabId: string) {
   const session = useHarnessStore.getState().byTab[tabId];
   if (!session || session.pending || session.opening || session.stopping || !session.queuedInputs?.length) return;
   const [next, ...rest] = session.queuedInputs;
   patch(tabId, current => ({ ...current, queuedInputs: rest }));
-  if (next) void useHarnessStore.getState().prompt(tabId, next.text);
+  if (next) void useHarnessStore.getState().prompt(tabId, next.text, next.attachments);
 }
 function stopApplicationTools(tabId: string) { applicationSessions.get(tabId)?.close(); applicationSessions.delete(tabId); }
 
@@ -231,6 +237,57 @@ function hasHarnessReply(messages: ChatMessage[]): boolean {
     && (!!message.content.trim() || !!message.parts?.some(part => part.kind === 'tool' || !!part.text.trim())));
 }
 
+interface RestoredConfig {
+  configOptions: AcpConfigOption[] | null;
+  modes: AcpSessionModes | null;
+  models: AcpSessionModels | null;
+}
+
+/**
+ * Re-apply the choices remembered for this harness to a newly created session. Only values the
+ * agent still offers are sent, and a refused value keeps the agent's default: a stale preference
+ * must never block a session from opening.
+ */
+async function restoreSessionConfig(harness: string, result: HarnessOpenResult): Promise<RestoredConfig | null> {
+  const preference = useHarnessConfigPrefs.getState().prefs[harness];
+  if (!preference) return null;
+  const selectable = (result.configOptions ?? []).filter(option => option.type === 'select');
+  let configOptions = result.configOptions;
+  for (const option of selectable) {
+    const remembered = preference.config[option.id];
+    if (remembered === undefined || remembered === option.currentValue) continue;
+    if (!optionValues(option).includes(String(remembered))) continue;
+    try {
+      const next = await acpSetConfigOption(result.sessionId, option.id, remembered);
+      if (Array.isArray(next)) configOptions = next;
+      else if (configOptions) configOptions = configOptions.map(entry =>
+        entry.id === option.id ? { ...entry, currentValue: remembered } : entry);
+    } catch {
+      // The agent no longer accepts this value: leave its configuration untouched.
+      break;
+    }
+  }
+  let modes = result.modes;
+  const mode = preference.mode;
+  if (!selectable.some(isPermissionOption) && mode && modes && modes.currentModeId !== mode
+      && modes.availableModes.some(entry => entry.id === mode)) {
+    try {
+      await acpSetMode(result.sessionId, mode);
+      modes = { ...modes, currentModeId: mode };
+    } catch { /* Keep the mode the agent chose. */ }
+  }
+  let models = result.models;
+  const model = preference.model;
+  if (!selectable.some(isModelOption) && model && models && models.currentModelId !== model
+      && models.availableModels.some(entry => entry.modelId === model)) {
+    try {
+      await acpSetModel(result.sessionId, model);
+      models = { ...models, currentModelId: model };
+    } catch { /* Keep the model the agent chose. */ }
+  }
+  return { configOptions, modes, models };
+}
+
 export const useHarnessStore = create<HarnessStore>()((set, get) => ({
   byTab: {},
   cancelQueuedInput: (tabId, id) => patch(tabId, current => ({ ...current, queuedInputs: current.queuedInputs?.filter(item => item.id !== id) })),
@@ -253,28 +310,37 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     patch(tabId, (session) => ({ ...session, opening: true, error: null, errorDetails: null, authRequired: false }));
     try {
       await bindHarnessEvents();
-      // Resume the harness's last conversation when we remember one from the same directory; the
-      // agent replays it and the replay travels back with the open result. A stale reference (a
-      // deleted session, another directory) falls back to a new session inside the backend.
+      // Resume the harness's last conversation only when the same directory is requested: an empty
+      // request opens a fresh default folder, and loading a conversation from another folder into it
+      // would blur where the agent is allowed to work.
       const stored = useHarnessSessionRefs.getState().refs[harness];
-      const resume = resumeSessionId ?? (!newSession && stored && (!cwd || stored.cwd === cwd) ? stored.sessionId : undefined);
+      const resume = resumeSessionId ?? (!newSession && stored && !!cwd && stored.cwd === cwd ? stored.sessionId : undefined);
       const result = await acpOpen(harness, cwd, resume, applicationToolCatalog());
-      tabOfSession.set(result.sessionId, tabId);
       const known = get().byTab[tabId];
       if (!known || openVersions.get(tabId) !== version) {
         // The tab was closed while this open was in flight: do not resurrect it, and do not leave a
         // process running with no page behind it. (A React remount keeps the entry, so it lands in
         // the branch below instead.)
         await acpClose(result.sessionId).catch(() => undefined);
-        tabOfSession.delete(result.sessionId);
         return;
       }
+      // A new session adopts the choices remembered for this harness; a loaded one keeps the state
+      // its agent returns. The page stays in its opening state until the choices are settled.
+      const restored = resume ? null : await restoreSessionConfig(harness, result);
+      if (!get().byTab[tabId] || openVersions.get(tabId) !== version) {
+        await acpClose(result.sessionId).catch(() => undefined);
+        openingEvents.delete(result.sessionId);
+        return;
+      }
+      tabOfSession.set(result.sessionId, tabId);
       const replayed = result.replayed ?? [];
       patch(tabId, (current) => replayEvents({
         ...current, opening: false, stopping: false, sessionId: result.sessionId, resumeSessionId: result.resumeSessionId ?? result.sessionId, cwd: result.cwd || cwd,
         messages: replayed.length ? [] : current.messages,
         agent: result.agent, error: null, appToolsConnected: result.appToolsConnected ?? false, toolContextId: `${result.sessionId}:app:${++toolScopeSequence}`,
-        modes: result.modes ?? null, models: result.models ?? null, configOptions: result.configOptions ?? null,
+        modes: restored?.modes ?? result.modes ?? null,
+        models: restored?.models ?? result.models ?? null,
+        configOptions: restored?.configOptions ?? result.configOptions ?? null,
         note: null,
       }, replayed));
       if (get().byTab[tabId]?.messages.some(hasChatContent)) useHarnessSessionRefs.getState().remember(harness, {
@@ -292,25 +358,48 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     }
   },
 
-  prompt: async (tabId, text) => {
+  prompt: async (tabId, text, attachments = []) => {
     let session = get().byTab[tabId];
-    if (!session || !text.trim()) return;
+    if (!session || (!text.trim() && attachments.length === 0)) return false;
+    const inputVersion = inputVersions.get(tabId);
+    const openVersion = openVersions.get(tabId);
+    // Read attachments before the turn starts: a failed read must leave the draft and queue alone,
+    // and text files become text blocks only when the user actually sends them.
+    const content: HarnessPromptContent = attachments.length
+      ? await harnessPromptContent(text, attachments)
+      : { text: text.trim(), images: [], unsupported: [] };
+    session = get().byTab[tabId];
+    if (!session || inputVersions.get(tabId) !== inputVersion || openVersions.get(tabId) !== openVersion) return false;
+    if (content.unsupported.length) {
+      useToastStore.getState().addToast(t('ACP agents cannot read this attachment: {{name}}', { name: content.unsupported.join(', ') }), 'error');
+      return false;
+    }
     if (session.pending || session.stopping || session.opening) {
-      patch(tabId, current => ({ ...current, queuedInputs: [...(current.queuedInputs ?? []), { id: `queued-${Date.now()}-${inputSequence++}`, text: text.trim() }] }));
-      return;
+      patch(tabId, current => ({ ...current, queuedInputs: [...(current.queuedInputs ?? []), {
+        id: `queued-${Date.now()}-${inputSequence++}`, text: text.trim(),
+        ...(attachments.length ? { attachments } : {}),
+      }] }));
+      return true;
     }
     const version = (turnVersions.get(tabId) ?? 0) + 1; turnVersions.set(tabId, version);
     if (!session.sessionId) {
       patch(tabId, current => ({ ...current, pending: true }));
       await get().open(tabId, session.harness, session.cwd, false, session.resumeSessionId);
-      if (turnVersions.get(tabId) !== version) return;
+      if (turnVersions.get(tabId) !== version) return false;
       session = get().byTab[tabId];
-      if (!session?.sessionId) { patch(tabId, current => ({ ...current, pending: false })); return; }
+      if (!session?.sessionId) { patch(tabId, current => ({ ...current, pending: false })); return false; }
+    }
+    // The protocol only allows image content when the agent advertised it during the handshake.
+    if (content.images.length && !harnessSupportsImages(session.agent?.agentCapabilities)) {
+      patch(tabId, current => ({ ...current, pending: false }));
+      useToastStore.getState().addToast(t('This agent does not accept images.'), 'error');
+      return false;
     }
     const sessionId = session.sessionId;
-    terminalDebug('harness-prompt-dispatched', { tabId, sessionId, messageCount: session.messages.length });
+    terminalDebug('harness-prompt-dispatched', { tabId, sessionId, messageCount: session.messages.length, attachmentCount: attachments.length });
     const question: ChatMessage = {
       id: `harness-question-${Date.now()}-${inputSequence++}`, role: 'user', content: text.trim(), createdAt: Date.now(),
+      ...(attachments.length ? { attachments } : {}),
     };
     patch(tabId, (current) => ({ ...current, messages: [...current.messages, question], pending: true, interrupted: false, note: null, error: null, errorDetails: null, authRequired: false }));
     useHarnessSessionRefs.getState().remember(session.harness, { sessionId: session.resumeSessionId ?? sessionId, cwd: session.cwd, at: Date.now() });
@@ -323,17 +412,19 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     }));
     try {
       armFirstResponse(tabId);
-      await acpPrompt(sessionId, text.trim());
+      await acpPrompt(sessionId, content.text, content.images);
     } catch (error) {
-      if (turnVersions.get(tabId) !== version || get().byTab[tabId]?.sessionId !== sessionId) return;
+      if (turnVersions.get(tabId) !== version || get().byTab[tabId]?.sessionId !== sessionId) return true;
       disarmFirstResponse(tabId);
       stopApplicationTools(tabId);
       patch(tabId, current => failHarnessTurn(current, String((error as Error)?.message ?? error)));
       queueMicrotask(() => drainHarnessQueue(tabId));
     }
+    return true;
   },
 
   cancel: async (tabId) => {
+    inputVersions.set(tabId, (inputVersions.get(tabId) ?? 0) + 1);
     disarmFirstResponse(tabId);
     stopApplicationTools(tabId);
     const session = get().byTab[tabId];
@@ -367,6 +458,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     if (!session?.sessionId) return;
     try {
       await acpSetMode(session.sessionId, modeId);
+      useHarnessConfigPrefs.getState().remember(session.harness, { mode: modeId });
       // The agent may also send a current_mode_update; writing the value here keeps the control
       // responsive even for agents that stay quiet.
       patch(tabId, (current) => current.modes
@@ -382,6 +474,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     if (!session?.sessionId) return;
     try {
       await acpSetModel(session.sessionId, modelId);
+      useHarnessConfigPrefs.getState().remember(session.harness, { model: modelId });
       patch(tabId, (current) => current.models
         ? { ...current, models: { ...current.models, currentModelId: modelId } }
         : current);
@@ -395,6 +488,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     if (!session?.sessionId) return;
     try {
       const configOptions = await acpSetConfigOption(session.sessionId, configId, value);
+      useHarnessConfigPrefs.getState().remember(session.harness, { config: { [configId]: value } });
       patch(tabId, (current) => ({
         ...current,
         configOptions: Array.isArray(configOptions) ? configOptions : current.configOptions,
@@ -405,6 +499,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
   },
 
   close: async (tabId) => {
+    inputVersions.set(tabId, (inputVersions.get(tabId) ?? 0) + 1);
     disarmFirstResponse(tabId);
     openVersions.set(tabId, (openVersions.get(tabId) ?? 0) + 1);
     turnVersions.set(tabId, (turnVersions.get(tabId) ?? 0) + 1);

@@ -31,7 +31,9 @@ export function workspaceHistoryMember(resource: WorkspaceResource): WorkspaceHi
     const connection = useHarnessWorkspace.getState().connections.find(connection => connection.id === resource.sessionId);
     if (!connection) return null;
     const session = useHarnessStore.getState().byTab[resource.sessionId];
-    return { ...base, kind: 'agent', reference: connection.harness, local: true, cwd: connection.cwd, remoteId: base.empty ? undefined : session?.resumeSessionId ?? session?.sessionId ?? undefined };
+    // A default session knows its directory only after the backend opened it; saving the resolved
+    // path keeps a restored workspace in the same folder instead of creating another fresh one.
+    return { ...base, kind: 'agent', reference: connection.harness, local: true, cwd: session?.cwd || connection.cwd, remoteId: base.empty ? undefined : session?.resumeSessionId ?? session?.sessionId ?? undefined };
   }
   if (resource.kind === 'document') return { ...base, kind: 'document', reference: resource.file.path,
     connectionId: resource.file.connectionId, draftId: resource.file.draftId, local: !resource.file.connectionId, ssh: !!resource.file.connectionId };

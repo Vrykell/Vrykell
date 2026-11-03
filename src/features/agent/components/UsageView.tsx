@@ -1,7 +1,7 @@
 /**
  * UsageView — the usage statistics workspace page.
  *
- * Follows the reference dashboard's shape: model chips, provider and range filters,
+ * Follows the reference dashboard's shape: the model filter, provider and range filters,
  * the metric cards, the trend chart, then the request log / providers / models tables. Counts are
  * tokens and requests only, never money, and every number comes from the provider's own usage
  * report (see `agentStream`); auxiliary calls are not counted yet.

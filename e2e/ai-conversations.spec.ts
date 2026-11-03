@@ -61,7 +61,7 @@ test('the execution environment stays fixed and a closed terminal stays disconne
   await boot(page);
   await ensureChatSettingsOpen(page);
   await page.getByRole('combobox', { name: '选择执行终端' }).click();
-  await page.getByRole('listbox', { name: '选择执行终端' }).getByRole('option').filter({ hasNotText: '仅讨论' }).first().click();
+  await page.getByRole('listbox', { name: '选择执行终端' }).getByRole('option').filter({ hasNotText: '不操作终端' }).first().click();
   const chip = page.getByTestId('chat-execution-target');
   await expect(chip).toBeVisible();
   const selected = await chip.textContent();
@@ -81,7 +81,7 @@ test('the picker opens the new-tab panel and binds the terminal it creates', asy
   await boot(page);
   await ensureChatSettingsOpen(page);
   const target = page.getByRole('combobox', { name: '选择执行终端' });
-  await expect(target).toContainText('仅讨论');
+  await expect(target).toContainText('不操作终端');
   await ensureTabsOpen(page);
   const tabsBefore = await page.locator('[data-tab-kind="session"]').count();
   await ensureChatSettingsOpen(page);
@@ -91,7 +91,7 @@ test('the picker opens the new-tab panel and binds the terminal it creates', asy
   await page.getByRole('button', { name: /Bash/ }).click();
   await expect(page.locator('[data-tab-kind="session"]')).toHaveCount(tabsBefore + 1);
   await ensureChatSettingsOpen(page);
-  await expect(target).not.toContainText('仅讨论');
+  await expect(target).not.toContainText('不操作终端');
   await expect(page.getByTestId('chat-conversation-context')).toHaveCount(0);
 });
 

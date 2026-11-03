@@ -20,7 +20,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use tauri::Manager;
 use tokio::io::{AsyncBufReadExt, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::sync::{mpsc, oneshot};
@@ -52,10 +53,16 @@ const TURN_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 /// The tail of the agent's stderr kept for the error surface. Harnesses log freely; the last few
 /// KiB are what explains an exit, and a bound keeps a chatty agent from growing the process.
 const STDERR_TAIL_LIMIT: usize = 8 * 1024;
-const MAX_MESSAGE_BYTES: usize = 2 * 1024 * 1024;
+/// Agent output stays small enough to parse in one line; a prompt that carries an image does not.
+const MAX_INBOUND_MESSAGE_BYTES: usize = 2 * 1024 * 1024;
+const MAX_OUTBOUND_MESSAGE_BYTES: usize = 24 * 1024 * 1024;
 const EVENT_QUEUE_CAPACITY: usize = 128;
 const MAX_REPLAY_BYTES: usize = 16 * 1024 * 1024;
 const MAX_REPLAY_EVENTS: usize = 20_000;
+/// A prompt is a short user message; images beyond this are a sign that the caller built it wrong.
+const MAX_PROMPT_IMAGES: usize = 8;
+/// Base64 expansion of the 5 MiB image limit with room for the surrounding JSON.
+const MAX_PROMPT_IMAGE_BYTES: usize = 8 * 1024 * 1024;
 
 enum ClientEvent {
     Update(Value),
@@ -65,10 +72,10 @@ enum ClientEvent {
 async fn read_message(reader: &mut (impl tokio::io::AsyncBufRead + Unpin)) -> Result<Option<Value>, String> {
     loop {
         let mut buffer = Vec::new();
-        let count = (&mut *reader).take(MAX_MESSAGE_BYTES as u64 + 1).read_until(b'\n', &mut buffer)
+        let count = (&mut *reader).take(MAX_INBOUND_MESSAGE_BYTES as u64 + 1).read_until(b'\n', &mut buffer)
             .await.map_err(|_| "the agent connection could not be read")?;
         if count == 0 { return Ok(None); }
-        if count > MAX_MESSAGE_BYTES { return Err("the agent message exceeds its size limit".into()); }
+        if count > MAX_INBOUND_MESSAGE_BYTES { return Err("the agent message exceeds its size limit".into()); }
         if let Ok(message) = serde_json::from_slice(&buffer) { return Ok(Some(message)); }
     }
 }
@@ -491,7 +498,7 @@ impl AcpClient {
     fn send_line(&self, message: Value) -> Result<(), String> {
         if self.closed.load(Ordering::SeqCst) { return Err("the harness connection is closed".to_string()); }
         let line = serde_json::to_string(&message).map_err(|e| e.to_string())?;
-        if line.len() > MAX_MESSAGE_BYTES { return Err("the client message exceeds its size limit".into()); }
+        if line.len() > MAX_OUTBOUND_MESSAGE_BYTES { return Err("the client message exceeds its size limit".into()); }
         self.out.try_send(line).map_err(|_| "the harness write queue is full or closed".to_string())
     }
 
@@ -781,21 +788,78 @@ impl HarnessFile {
     }
 }
 
+/// Root that holds the folders of sessions started without a chosen project.
+const WORKSPACE_DIRECTORY: &str = "acp-workspace";
+
+/// The app-private root for default sessions. It is deliberately neither the application's
+/// working directory nor a terminal directory. This is a starting location, not a filesystem
+/// sandbox: external processes retain their operating-system access.
+fn default_workspace_root<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> Result<PathBuf, String> {
+    let base = app.path().app_local_data_dir()
+        .map_err(|error| format!("the default workspace is unavailable: {error}"))?;
+    Ok(base.join(WORKSPACE_DIRECTORY))
+}
+
+/// A new empty folder per session, so a default session never inherits files from an earlier one.
+fn fresh_workspace(root: &Path) -> Result<PathBuf, String> {
+    std::fs::create_dir_all(root)
+        .map_err(|error| format!("cannot create the default workspace: {error}"))?;
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|elapsed| elapsed.as_millis())
+        .unwrap_or_default();
+    for _ in 0..16 {
+        let directory = root.join(format!("session-{stamp}-{}", uuid::Uuid::new_v4().simple()));
+        match std::fs::create_dir(&directory) {
+            Ok(()) => return Ok(directory),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(format!("cannot create the default workspace: {error}")),
+        }
+    }
+    Err("cannot create a unique folder for this session".into())
+}
+
+/// The directory a session uses: an explicit project folder wins, otherwise a fresh folder under
+/// the default root.
+fn session_directory(root: &Path, cwd: &str) -> Result<String, String> {
+    if cwd.trim().is_empty() {
+        fresh_workspace(root).map(|directory| directory.to_string_lossy().to_string())
+    } else {
+        Ok(cwd.to_string())
+    }
+}
+
+/// The directory the agent process starts in. A configured harness directory wins; otherwise the
+/// session directory keeps the process out of the application's own folder.
+fn process_directory<'a>(harness: &'a HarnessConfig, session_cwd: &'a str) -> &'a Path {
+    if harness.cwd.trim().is_empty() { Path::new(session_cwd) } else { Path::new(harness.cwd.trim()) }
+}
+
 /// Probe a configured harness: start it, negotiate, report what it says it can do, and let the
 /// process go. This is the only ACP command that starts something, and it starts a program the user
 /// put in the config — the same class as the terminal.
 #[tauri::command]
-pub async fn acp_handshake(name: String) -> Result<Value, String> {
+pub async fn acp_handshake<R: tauri::Runtime>(app: tauri::AppHandle<R>, name: String) -> Result<Value, String> {
     let config = HarnessFile::load()?;
     note("acp-handshake", json!({ "name": name, "configured": config.harnesses.len() }));
     let harness = config
         .find_enabled(&name)
         .ok_or_else(|| format!("no enabled harness named {name}"))?
         .clone();
+    // The probe never opens a session, so it only needs the root; it still must not inherit the
+    // application's working directory.
+    let fallback_root = if harness.cwd.trim().is_empty() {
+        let root = default_workspace_root(&app).unwrap_or_else(|_| std::env::temp_dir());
+        let _ = std::fs::create_dir_all(&root);
+        Some(root)
+    } else {
+        None
+    };
+    let process_cwd = if harness.cwd.trim().is_empty() { fallback_root.as_deref() } else { Some(Path::new(harness.cwd.trim())) };
     let client = AcpClient::spawn(
         &harness.command,
         &harness.args,
-        if harness.cwd.trim().is_empty() { None } else { Some(Path::new(&harness.cwd)) },
+        process_cwd,
         &harness.env,
         // A probe never runs a tool: anything the agent asks for is refused, fail closed.
         Arc::new(|_| None),
@@ -835,6 +899,16 @@ fn describe_agent(info: &Value) -> Value {
     })
 }
 
+/// The root new default sessions start in. The launcher shows it before a session is opened, so the
+/// folder an agent will work in is known before anything runs.
+#[tauri::command]
+pub fn acp_workspace_root<R: tauri::Runtime>(app: tauri::AppHandle<R>) -> Result<String, String> {
+    let root = default_workspace_root(&app)?;
+    std::fs::create_dir_all(&root)
+        .map_err(|error| format!("cannot create the default workspace: {error}"))?;
+    Ok(root.to_string_lossy().to_string())
+}
+
 /// Replace the harness list. Validation is deliberately strict: a harness without a name or a
 /// command cannot be started, and it would only confuse the settings list.
 #[tauri::command]
@@ -866,7 +940,7 @@ pub struct AcpRuntime {
     pending: Arc<Mutex<HashMap<String, oneshot::Sender<PermissionOutcome>>>>,
 }
 
-struct RuntimeSession { client: Arc<AcpClient>, agent_session_id: String, app_tools: Option<super::app_mcp::AppMcpServer> }
+struct RuntimeSession { client: Arc<AcpClient>, agent_session_id: String, app_tools: Option<super::app_mcp::AppMcpServer>, images: bool }
 
 /// Key of a pending permission request: the session and the tool call id it belongs to.
 fn pending_key(session: &str, tool_call_id: &str) -> String {
@@ -874,9 +948,9 @@ fn pending_key(session: &str, tool_call_id: &str) -> String {
 }
 
 impl AcpRuntime {
-    fn insert(&self, session: String, agent_session_id: String, client: Arc<AcpClient>, app_tools: Option<super::app_mcp::AppMcpServer>) {
+    fn insert(&self, session: String, agent_session_id: String, client: Arc<AcpClient>, app_tools: Option<super::app_mcp::AppMcpServer>, images: bool) {
         if let Ok(mut map) = self.sessions.lock() {
-            map.insert(session, Arc::new(RuntimeSession { client, agent_session_id, app_tools }));
+            map.insert(session, Arc::new(RuntimeSession { client, agent_session_id, app_tools, images }));
         }
     }
 
@@ -1099,10 +1173,17 @@ pub async fn acp_open<R: tauri::Runtime>(
         Some(receiver)
     });
 
+    let session_cwd = if cwd.trim().is_empty() {
+        // A session without a chosen project gets its own empty folder. Falling back to the
+        // application's directory (or a terminal directory) would let an agent edit unrelated files.
+        session_directory(&default_workspace_root(&app)?, &cwd)?
+    } else {
+        cwd.clone()
+    };
     let client = Arc::new(AcpClient::spawn(
         &harness.command,
         &harness.args,
-        if harness.cwd.trim().is_empty() { None } else { Some(Path::new(&harness.cwd)) },
+        Some(process_directory(&harness, &session_cwd)),
         &harness.env,
         permission,
     )
@@ -1126,22 +1207,16 @@ pub async fn acp_open<R: tauri::Runtime>(
         note("acp-open-failed", json!({ "name": harness.name, "stage": "version" }));
         return Err(error);
     }
-    // The protocol requires an absolute working directory, and an empty one is refused by the agent
-    // ("cwd must be an absolute path"). Fall back to the directory the app itself runs in; a caller
-    // that knows the project directory (the workspace does) should pass it.
-    let session_cwd = if cwd.trim().is_empty() {
-        std::env::current_dir()
-            .map(|dir| dir.to_string_lossy().to_string())
-            .unwrap_or_else(|_| dirs::home_dir().unwrap_or_default().to_string_lossy().to_string())
-    } else {
-        cwd.clone()
-    };
     // Reopen the previous conversation when the page asks for it and the agent can: `session/load`
     // replays the history as notifications, which are drained with the result because the page only
     // learns the session id when this call returns. A failed load falls back to a new session — a
     // stale id (a deleted session, another directory) must not lock the user out.
     let can_load = info
         .pointer("/agentCapabilities/loadSession")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let accepts_images = info
+        .pointer("/agentCapabilities/promptCapabilities/image")
         .and_then(Value::as_bool)
         .unwrap_or(false);
     let resume = resume_session_id.filter(|id| !id.trim().is_empty());
@@ -1226,7 +1301,7 @@ pub async fn acp_open<R: tauri::Runtime>(
     });
 
     let app_tools_connected = app_tools.is_some();
-    state.insert(session_id.clone(), agent_session_id.clone(), client, app_tools);
+    state.insert(session_id.clone(), agent_session_id.clone(), client, app_tools, accepts_images);
     note("acp-open-ok", json!({ "name": harness.name, "sessionId": session_id }));
     // The session's own state travels with the id: the page shows the modes, models and config
     // options the agent published, and needs them before the first turn.
@@ -1278,21 +1353,66 @@ pub async fn acp_set_config_option(
     session.client.set_config_option(&session.agent_session_id, &config_id, value).await
 }
 
+/// One image attached to a prompt. The page reads the stored attachment and sends base64.
+#[derive(Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PromptImage {
+    pub mime_type: String,
+    pub data: String,
+}
+
+/// ACP content blocks for one turn: the text first, then the images in the order the user added them.
+fn prompt_blocks(text: &str, images: &[PromptImage]) -> Result<Vec<Value>, String> {
+    if images.len() > MAX_PROMPT_IMAGES {
+        return Err(format!("a prompt can carry at most {MAX_PROMPT_IMAGES} images"));
+    }
+    let mut blocks = Vec::with_capacity(images.len() + 1);
+    let text = text.trim();
+    if !text.is_empty() {
+        blocks.push(json!({ "type": "text", "text": text }));
+    }
+    for image in images {
+        let mime = image.mime_type.trim();
+        if !mime.starts_with("image/") || mime.len() > 64 {
+            return Err("a prompt image needs an image MIME type".into());
+        }
+        if image.data.is_empty() || image.data.len() > MAX_PROMPT_IMAGE_BYTES {
+            return Err("a prompt image exceeds its size limit".into());
+        }
+        if !image.data.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'+' | b'/' | b'=')) {
+            return Err("a prompt image is not base64".into());
+        }
+        blocks.push(json!({ "type": "image", "mimeType": mime, "data": image.data }));
+    }
+    if blocks.is_empty() {
+        return Err("a prompt needs text or an image".into());
+    }
+    Ok(blocks)
+}
+
 /// Send a prompt. The turn runs in the background; its content and stop reason arrive as events.
 #[tauri::command]
 pub async fn acp_prompt(
     state: tauri::State<'_, AcpRuntime>,
     session_id: String,
     text: String,
+    images: Option<Vec<PromptImage>>,
 ) -> Result<(), String> {
     let client = state.get(&session_id)?;
+    let images = images.unwrap_or_default();
+    // The protocol requires clients to restrict prompt content to the capabilities the agent
+    // advertised during `initialize`; an image block sent without the capability is a protocol error.
+    if !images.is_empty() && !client.images {
+        return Err("this agent does not accept images".into());
+    }
+    let blocks = prompt_blocks(&text, &images)?;
     let generation = client.app_tools.as_ref().map(|tools| tools.begin_turn()).transpose()?;
-    note("acp-prompt", json!({ "sessionId": session_id }));
+    note("acp-prompt", json!({ "sessionId": session_id, "images": images.len() }));
     let session = session_id.clone();
     tokio::spawn(async move {
         let started = std::time::Instant::now();
         let outcome = client.client
-            .prompt_events(&client.agent_session_id, json!([{ "type": "text", "text": text }]))
+            .prompt_events(&client.agent_session_id, Value::Array(blocks))
             .await;
         if let Some(tools) = &client.app_tools { tools.end_turn(generation); }
         let duration_ms = started.elapsed().as_millis().min(u64::MAX as u128) as u64;
@@ -1374,7 +1494,7 @@ mod tests {
 
     #[tokio::test]
     async fn oversized_unterminated_frames_fail_without_growing_the_buffer() {
-        let mut reader = BufReader::new(std::io::Cursor::new(vec![b'x'; MAX_MESSAGE_BYTES + 1]));
+        let mut reader = BufReader::new(std::io::Cursor::new(vec![b'x'; MAX_INBOUND_MESSAGE_BYTES + 1]));
         assert!(read_message(&mut reader).await.unwrap_err().contains("size limit"));
     }
 
@@ -1485,7 +1605,7 @@ mod tests {
             &["--exact".into(), "agent::acp::tests::idle_child_fixture".into(), "--nocapture".into()],
             None, &HashMap::from([("APP_ACP_TEST_CHILD".into(), "1".into())]), Arc::new(|_| None)).unwrap());
         let runtime = AcpRuntime::default();
-        runtime.insert("idle".into(), "agent-id".into(), client.clone(), None);
+        runtime.insert("idle".into(), "agent-id".into(), client.clone(), None, false);
         let pump_client = client.clone();
         let pump = tokio::spawn(async move { pump_client.next_event().await });
         let request_client = client.clone();
@@ -1531,13 +1651,52 @@ mod tests {
         std::fs::remove_file(&path).unwrap();
     }
 
+    #[test]
+    fn a_default_session_gets_a_new_empty_folder_and_an_explicit_folder_is_kept() {
+        let root = std::env::temp_dir().join(format!("acp-workspace-test-{}", uuid::Uuid::new_v4().simple()));
+        let first = fresh_workspace(&root).unwrap();
+        let second = fresh_workspace(&root).unwrap();
+        assert!(first.is_dir());
+        assert!(second.is_dir());
+        assert_ne!(first, second);
+        assert_eq!(std::fs::read_dir(&first).unwrap().count(), 0);
+        let generated = session_directory(&root, "  ").unwrap();
+        assert!(Path::new(&generated).is_dir());
+        assert_eq!(session_directory(&root, "/chosen/project").unwrap(), "/chosen/project");
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn the_agent_process_never_starts_in_the_application_directory() {
+        let harness = HarnessConfig { cwd: String::new(), ..Default::default() };
+        assert_eq!(process_directory(&harness, "/fresh/session"), Path::new("/fresh/session"));
+        let configured = HarnessConfig { cwd: " /configured ".into(), ..Default::default() };
+        assert_eq!(process_directory(&configured, "/fresh/session"), Path::new("/configured"));
+    }
+
+    #[test]
+    fn prompts_send_text_first_and_each_image_as_a_content_block() {
+        let image = PromptImage { mime_type: "image/png".into(), data: "aGVsbG8=".into() };
+        assert_eq!(prompt_blocks(" hello ", std::slice::from_ref(&image)).unwrap(), vec![
+            json!({ "type": "text", "text": "hello" }),
+            json!({ "type": "image", "mimeType": "image/png", "data": "aGVsbG8=" }),
+        ]);
+        assert_eq!(prompt_blocks("", std::slice::from_ref(&image)).unwrap().len(), 1);
+        assert!(prompt_blocks("", &[]).is_err());
+        assert!(prompt_blocks("x", &[PromptImage { mime_type: "text/plain".into(), data: "aGVsbG8=".into() }]).is_err());
+        assert!(prompt_blocks("x", &[PromptImage { mime_type: "image/png".into(), data: "not base64!".into() }]).is_err());
+        assert!(prompt_blocks("x", &[PromptImage { mime_type: "image/png".into(), data: "a".repeat(MAX_PROMPT_IMAGE_BYTES + 1) }]).is_err());
+        let too_many: Vec<PromptImage> = (0..=MAX_PROMPT_IMAGES).map(|_| image.clone()).collect();
+        assert!(prompt_blocks("x", &too_many).is_err());
+    }
+
     #[tokio::test]
     async fn equal_agent_ids_on_different_connections_remain_independent() {
         let runtime = AcpRuntime::default();
         let (first, first_agent) = client_pair(Arc::new(Mutex::new(Vec::new())), Arc::new(|_| None));
         let (second, second_agent) = client_pair(Arc::new(Mutex::new(Vec::new())), Arc::new(|_| None));
-        runtime.insert("local-a".into(), "same-agent-id".into(), Arc::new(first), None);
-        runtime.insert("local-b".into(), "same-agent-id".into(), Arc::new(second), None);
+        runtime.insert("local-a".into(), "same-agent-id".into(), Arc::new(first), None, false);
+        runtime.insert("local-b".into(), "same-agent-id".into(), Arc::new(second), None, false);
         runtime.remove("local-a").unwrap().client.shutdown().await;
         assert!(!runtime.get("local-b").unwrap().client.closed.load(Ordering::SeqCst));
         runtime.remove("local-b").unwrap().client.shutdown().await;

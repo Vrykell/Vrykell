@@ -183,7 +183,7 @@ test('footer matches attachment, approval, model and send order without wrapping
     await ensureChatSettingsOpen(page);
     await page.getByRole('combobox', { name: '选择执行终端' }).scrollIntoViewIfNeeded();
     await page.getByRole('combobox', { name: '选择执行终端' }).click();
-    await page.getByRole('option').filter({ hasNotText: '仅讨论' }).first().click();
+    await page.getByRole('option').filter({ hasNotText: '不操作终端' }).first().click();
     expect(await settings.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
     await settings.screenshot({ path: `.cache/chat-settings-${width}.png` });
     await page.getByRole('button', { name: '会话设置', exact: true }).click();

@@ -15,7 +15,7 @@ beforeEach(() => {
   useHarnessWorkspace.setState({ connections: [], selected: '' });
 });
 
-it('keeps one workspace page and separate internal connections with the focused directory', () => {
+it('keeps one workspace page and separate internal connections without reusing terminal directories', () => {
   const workspace = useSessionStore.getState();
   workspace.openHarnessTab('Agent A');
   workspace.openHarnessTab('Agent B', '/other');
@@ -23,7 +23,7 @@ it('keeps one workspace page and separate internal connections with the focused 
   expect(useSessionStore.getState().tabs.filter(tab => tab.kind === 'harness')).toHaveLength(1);
   const sessions = useHarnessWorkspace.getState();
   expect(sessions.connections.map(item => [item.harness, item.cwd])).toEqual([
-    ['Agent A', '/right/current'], ['Agent B', '/other'],
+    ['Agent A', ''], ['Agent B', '/other'],
   ]);
   expect(sessions.selected).toBe(sessions.connections[0].id);
 });

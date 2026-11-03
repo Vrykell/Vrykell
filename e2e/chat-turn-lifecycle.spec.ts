@@ -71,7 +71,7 @@ for (const theme of ['dark', 'light']) test(`keeps agent sidebar headings and qu
     for (let index = 1; index < bounds.length; index++) expect(bounds[index].top - bounds[index - 1].bottom).toBeGreaterThanOrEqual(7);
     expect(input.y - bounds[2].bottom).toBeGreaterThanOrEqual(11);
     const lead = (await sidebar.locator('.chat-composer-lead').boundingBox())!;
-    const add = (await sidebar.getByTestId('harness-new-session').boundingBox())!;
+    const add = (await sidebar.getByTestId('harness-add-attachment').boundingBox())!;
     expect(Math.abs(lead.x + lead.width / 2 - add.x - add.width / 2)).toBeLessThan(1);
     await page.screenshot({ path: info.outputPath(`sidebar-questions-${theme}-${width}.png`) });
   }

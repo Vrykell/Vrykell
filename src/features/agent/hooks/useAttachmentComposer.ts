@@ -16,6 +16,8 @@ interface AttachmentComposerState {
   attachments: AttachmentMeta[];
   updateAttachments: (update: (current: AttachmentMeta[]) => AttachmentMeta[]) => void;
   scopeKey: string;
+  /** Return a message to refuse an imported file; `null` accepts it. */
+  accept?: (attachment: AttachmentMeta) => string | null;
 }
 
 /** Manage attachments using local state or a session-owned draft. */
@@ -23,6 +25,7 @@ export function useAttachmentComposer(state?: AttachmentComposerState) {
   const [localAttachments, setLocalAttachments] = useState<AttachmentMeta[]>([]);
   const attachments = state?.attachments ?? localAttachments;
   const setAttachments = state?.updateAttachments ?? setLocalAttachments;
+  const accept = state?.accept;
   const [previewId, setPreviewId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -53,13 +56,15 @@ export function useAttachmentComposer(state?: AttachmentComposerState) {
           toastError(t('Image {{name}} exceeds the 5 MB limit.', { name: attachment.name }));
           continue;
         }
+        const rejection = accept?.(attachment);
+        if (rejection) { toastError(rejection); continue; }
         imported.push(attachment);
       } catch (error) {
         toastError(String((error as Error)?.message ?? error));
       }
     }
     addAttachments(imported);
-  }, [addAttachments, toastError]);
+  }, [accept, addAttachments, toastError]);
 
   const pickFiles = useCallback(async () => {
     try {
@@ -86,13 +91,16 @@ export function useAttachmentComposer(state?: AttachmentComposerState) {
           reader.readAsDataURL(file);
         });
         const name = file.name || `pasted-${Date.now()}.png`;
-        saved.push(await saveBlobAsAttachment(name, file.type || 'application/octet-stream', base64));
+        const attachment = await saveBlobAsAttachment(name, file.type || 'application/octet-stream', base64);
+        const rejection = accept?.(attachment);
+        if (rejection) { toastError(rejection); continue; }
+        saved.push(attachment);
       } catch (error) {
         toastError(String((error as Error)?.message ?? error));
       }
     }
     addAttachments(saved);
-  }, [addAttachments, toastError]);
+  }, [accept, addAttachments, toastError]);
 
   useEffect(() => {
     if (!('__TAURI_INTERNALS__' in window)) return;
