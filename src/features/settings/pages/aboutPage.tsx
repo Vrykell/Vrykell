@@ -22,6 +22,10 @@ export function AboutPage() {
     : t('Check your connection and try again. Updates require a published, signed stable release.');
   useEffect(() => { void update.loadVersion(); }, [update.loadVersion]);
   const busy = ['checking', 'downloading', 'installing', 'restarting'].includes(update.phase);
+  const downloading = update.phase === 'downloading';
+  const downloadPercent = downloading && update.total
+    ? Math.min(100, Math.max(0, update.downloaded / update.total * 100))
+    : 0;
   const supported = supportsAppUpdates();
   const status = !supported ? t('Updates are available in the installed desktop application.')
     : update.phase === 'current' ? t('You are using the latest stable version.')
@@ -58,8 +62,14 @@ export function AboutPage() {
       <Field title={t('Version')}><div className="about-version"><span data-selectable data-testid="application-version">{update.currentVersion || t('Loading…')}</span>{update.currentVersion && <CopyButton quiet text={update.currentVersion} label={t('Copy version')} />}</div></Field>
       <Field title={t('Stable releases')} description={<span role="status" aria-live="polite">{status}</span>}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: 220, maxWidth: '100%' }}>
-          <OutlineButton className="primary-button" disabled={busy || !supported} onClick={act}>{label}</OutlineButton>
-          {update.phase === 'downloading' && !!update.total && <ProgressBar value={update.downloaded / update.total * 100} label={t('Update download')} />}
+          <OutlineButton className="primary-button about-update-button" disabled={busy || !supported} onClick={act}
+            data-downloading={downloading || undefined}
+            style={downloading ? { backgroundSize: `${downloadPercent}% 100%` } : undefined}>
+            {label}
+          </OutlineButton>
+          {downloading && !!update.total && <div className="about-update-accessible-progress">
+            <ProgressBar value={downloadPercent} label={t('Update download')} />
+          </div>}
         </div>
       </Field>
       {update.notes && <Field title={t('Release notes')} layout="stacked"><div className="scroll-region" data-selectable style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 180, overflowY: 'auto' }}>{update.notes}</div></Field>}

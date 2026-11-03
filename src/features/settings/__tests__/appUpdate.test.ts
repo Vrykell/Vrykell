@@ -42,12 +42,12 @@ it('rejects prereleases and closes their native resources', async () => {
 it('keeps a completed download unavailable for installation until signature verification succeeds', async () => {
   const update = candidate(); api.check.mockResolvedValue(update);
   let fail!: (reason: Error) => void;
-  update.download.mockImplementation(async onEvent => {
+  update.download.mockImplementationOnce(async onEvent => {
     onEvent?.({ event: 'Started', data: { contentLength: 100 } });
     onEvent?.({ event: 'Progress', data: { chunkLength: 100 } });
     onEvent?.({ event: 'Finished' });
     await new Promise<void>((_resolve, reject) => { fail = reject; });
-  });
+  }).mockRejectedValue(new Error('Signature verification failed'));
   await useAppUpdate.getState().check();
   const download = useAppUpdate.getState().download();
   expect(useAppUpdate.getState()).toMatchObject({ phase: 'downloading', downloaded: 100, total: 100 });
@@ -56,8 +56,23 @@ it('keeps a completed download unavailable for installation until signature veri
   expect(update.download).toHaveBeenCalledOnce();
   expect(update.install).not.toHaveBeenCalled();
   fail(new Error('Signature verification failed')); await download;
+  expect(update.download).toHaveBeenCalledTimes(3);
   expect(useAppUpdate.getState()).toMatchObject({ phase: 'available', error: 'Error: Signature verification failed' });
   expect(api.prepare).not.toHaveBeenCalled();
+});
+
+it('retries a failed download twice with a five minute timeout and resets its progress', async () => {
+  const update = candidate(); api.check.mockResolvedValue(update);
+  update.download.mockRejectedValueOnce(new Error('error decoding response body')).mockImplementationOnce(async onEvent => {
+    onEvent?.({ event: 'Started', data: { contentLength: 100 } });
+    onEvent?.({ event: 'Progress', data: { chunkLength: 100 } });
+  });
+  await useAppUpdate.getState().check();
+  await useAppUpdate.getState().download();
+  expect(update.download).toHaveBeenCalledTimes(2);
+  expect(update.download).toHaveBeenNthCalledWith(1, expect.any(Function), { timeout: 300_000 });
+  expect(update.download).toHaveBeenNthCalledWith(2, expect.any(Function), { timeout: 300_000 });
+  expect(useAppUpdate.getState()).toMatchObject({ phase: 'ready', error: '', downloaded: 0, total: undefined });
 });
 
 it('waits for the shared unsaved-document guard before closing terminals and installing once', async () => {

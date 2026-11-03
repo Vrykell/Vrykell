@@ -44,7 +44,12 @@ async function openAbout(page: Page, theme: 'dark' | 'light' = 'dark', mode: Mod
   await expect(page.getByTestId('application-version')).toHaveText('0.1.0');
 }
 async function state(page: Page) { return page.evaluate(() => (window as unknown as { __UPDATE_FIXTURE__: Fixture }).__UPDATE_FIXTURE__); }
-async function finishDownload(page: Page) { await page.evaluate(() => (window as unknown as { __UPDATE_FIXTURE__: Fixture }).__UPDATE_FIXTURE__.finish?.()); }
+async function finishDownload(page: Page, attempts = 1) {
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    await expect.poll(async () => (await state(page)).downloads).toBe(attempt);
+    await page.evaluate(() => (window as unknown as { __UPDATE_FIXTURE__: Fixture }).__UPDATE_FIXTURE__.finish?.());
+  }
+}
 
 for (const [theme, width] of [['dark', 1240], ['light', 720]] as const) {
   test(`about page checks, downloads and explicitly installs stable updates in ${theme}`, async ({ page }, info) => {
@@ -58,6 +63,9 @@ for (const [theme, width] of [['dark', 1240], ['light', 720]] as const) {
     await expect(page.getByText('<script>fixture</script>', { exact: false })).toBeVisible();
     await page.getByRole('button', { name: '下载更新', exact: true }).click();
     await expect(page.getByRole('progressbar', { name: '更新下载进度' })).toHaveAttribute('aria-valuenow', '25');
+    await expect(page.getByRole('button', { name: '正在下载…', exact: true })).toHaveCSS('opacity', '1');
+    await expect(page.getByRole('button', { name: '正在下载…', exact: true })).toHaveCSS('background-size', '25% 100%');
+    await page.locator('.settings-view').screenshot({ path: info.outputPath(`about-downloading-${theme}.png`), animations: 'disabled' });
     await page.locator('.settings-navigation').getByRole('button', { name: '语言', exact: true }).click();
     await page.locator('.settings-navigation').getByRole('button', { name: '关于', exact: true }).click();
     await expect(page.getByRole('button', { name: '正在下载…', exact: true })).toBeDisabled();
@@ -94,10 +102,10 @@ test('signature failures never offer installation or restart', async ({ page }) 
   const initialCloses = (await state(page)).closes;
   await page.getByRole('button', { name: '检查更新', exact: true }).click();
   await page.getByRole('button', { name: '下载更新', exact: true }).click();
-  await finishDownload(page);
+  await finishDownload(page, 3);
   await expect(page.locator('#app-notifications').getByRole('alert')).toContainText('软件更新失败');
   await expect(page.getByRole('button', { name: '安装并重启', exact: true })).toHaveCount(0);
-  expect(await state(page)).toMatchObject({ installs: 0, restarts: 0, closes: initialCloses });
+  expect(await state(page)).toMatchObject({ downloads: 3, installs: 0, restarts: 0, closes: initialCloses });
 });
 
 test('cancelling the unsaved-document guard keeps drafts and terminal connections', async ({ page }) => {

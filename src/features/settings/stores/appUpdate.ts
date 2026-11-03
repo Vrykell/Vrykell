@@ -23,6 +23,8 @@ interface UpdateState {
 
 let pending: AppUpdate | null = null;
 const busy = (phase: Phase) => ['checking', 'downloading', 'installing', 'restarting'].includes(phase);
+const DOWNLOAD_TIMEOUT_MS = 300_000;
+const DOWNLOAD_RETRIES = 2;
 
 /** Keep the native update resource alive when settings navigation changes. */
 export const useAppUpdate = create<UpdateState>((set, get) => ({
@@ -52,15 +54,26 @@ export const useAppUpdate = create<UpdateState>((set, get) => ({
     const update = pending;
     if (!update || get().phase !== 'available') return;
     set({ phase: 'downloading', error: '', operation: 'download', downloaded: 0, total: undefined });
-    try {
-      await update.download(event => {
-        if (pending !== update || get().phase !== 'downloading') return;
-        if (event.event === 'Started') set({ total: event.data.contentLength });
-        if (event.event === 'Progress') set(state => ({ downloaded: state.downloaded + event.data.chunkLength }));
-      }, { timeout: 120000 });
-      // Completion is published only after the native signature verification succeeds.
-      set({ phase: 'ready' });
-    } catch (error) { set({ phase: 'available', error: String(error) }); }
+    for (let attempt = 0; attempt <= DOWNLOAD_RETRIES; attempt += 1) {
+      // A failed request cannot resume, so each retry restarts the visible progress.
+      if (pending !== update || get().phase !== 'downloading') return;
+      set({ downloaded: 0, total: undefined });
+      try {
+        await update.download(event => {
+          if (pending !== update || get().phase !== 'downloading') return;
+          if (event.event === 'Started') set({ total: event.data.contentLength });
+          if (event.event === 'Progress') set(state => ({ downloaded: state.downloaded + event.data.chunkLength }));
+        }, { timeout: DOWNLOAD_TIMEOUT_MS });
+        // Completion is published only after the native signature verification succeeds.
+        set({ phase: 'ready', downloaded: 0, total: undefined });
+        return;
+      } catch (error) {
+        if (attempt === DOWNLOAD_RETRIES) {
+          set({ phase: 'available', downloaded: 0, total: undefined, error: String(error) });
+          return;
+        }
+      }
+    }
   },
   install: () => {
     const update = pending;
