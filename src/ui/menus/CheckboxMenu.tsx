@@ -41,6 +41,8 @@ export interface CheckboxMenuProps<Id extends string = string> {
 
 export default function CheckboxMenu<Id extends string>({ title, options, onToggle, onClose, style, compact = false, checkmark = false, footer, triggerRef, anchored = false }: CheckboxMenuProps<Id>) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const close = useRef(onClose);
+  close.current = onClose;
   const [position, setPosition] = useState<CSSProperties>({});
   const navigation = useListNavigationMode(true);
 
@@ -62,20 +64,18 @@ export default function CheckboxMenu<Id extends string>({ title, options, onTogg
 
   useEffect(() => {
     const outside = (event: PointerEvent) => {
-      if (!menuRef.current?.contains(event.target as Node) && !triggerRef?.current?.contains(event.target as Node)) onClose();
+      if (!menuRef.current?.contains(event.target as Node) && !triggerRef?.current?.contains(event.target as Node)) close.current();
     };
     const key = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') close.current();
     };
-    // Register one tick late so the click that opened the menu does not close it.
-    const timer = setTimeout(() => document.addEventListener('pointerdown', outside), 0);
+    document.addEventListener('pointerdown', outside, true);
     document.addEventListener('keydown', key);
     return () => {
-      clearTimeout(timer);
-      document.removeEventListener('pointerdown', outside);
+      document.removeEventListener('pointerdown', outside, true);
       document.removeEventListener('keydown', key);
     };
-  }, [onClose, triggerRef]);
+  }, [triggerRef]);
 
   const content = (
     <div
