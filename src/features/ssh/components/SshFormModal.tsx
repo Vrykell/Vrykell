@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { TextArea, TextInput } from '@ui/fields/TextInput';
 import { Checkbox } from '@ui/fields/Checkbox';
 import { TextButton } from '@ui/actions/TextButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import { IconButton } from '@ui/actions/IconButton';
 import Select from '@ui/fields/Select';
 import SegmentedControl from '@ui/fields/SegmentedControl';
@@ -194,10 +195,10 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
   const deleteButton = initial && <TextButton className="ssh-editor-delete" onClick={() => setDeleting(true)} disabled={busy} data-testid="ssh-delete-btn"><Trash2 size={13} />{t('Delete')}</TextButton>;
   const footer = <footer className="ssh-form-footer">
     {!page && deleteButton}
-    {!onConnect && <TextButton onClick={() => void doTest()} disabled={busy} data-testid="ssh-test-btn">{testing ? <Loader2 size={13} className="spin" /> : <Plug size={13} />}{t(testing ? 'Testing…' : 'Test authentication')}</TextButton>}
+    {!onConnect && <OutlineButton onClick={() => void doTest()} disabled={busy} data-testid="ssh-test-btn">{testing ? <Loader2 size={13} className="spin" /> : <Plug size={13} />}{t(testing ? 'Testing…' : 'Test authentication')}</OutlineButton>}
     <span style={{ flex: 1 }} />
     {!page && <TextButton onClick={onClose} disabled={busy}>{t('Cancel')}</TextButton>}
-    {!onConnect && onSaveAndConnect && <TextButton onClick={() => void doSave(true)} disabled={busy} data-testid="ssh-save-connect-btn">{t('Save and connect')}</TextButton>}
+    {!onConnect && onSaveAndConnect && <OutlineButton onClick={() => void doSave(true)} disabled={busy} data-testid="ssh-save-connect-btn">{t('Save and connect')}</OutlineButton>}
     {page && deleteButton}
     {!page && <TextButton className="ssh-primary-action user-primary-action" onClick={() => void doSave()} disabled={busy} data-testid={onConnect ? 'ssh-connect-btn' : 'ssh-save-btn'}>{t(saving ? 'Saving…' : onConnect ? 'Connect' : 'Save')}</TextButton>}
   </footer>;
@@ -249,12 +250,12 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
               <label>{t('Private key file (optional)')}
                 <div className="ssh-form-file-picker">
                   <TextInput variant="field" value={identityFile} onChange={e => setIdentityFile(e.target.value)} data-testid="ssh-form-identity" placeholder={t('Use default keys / SSH Agent when empty')} style={{ flex: '1 1 0', minWidth: 0, width: 0 }} />
-                  <TextButton className="ssh-form-browse" onClick={async () => {
+                  <OutlineButton className="ssh-form-browse" onClick={async () => {
                     try {
                       const path = await chooseFile({ multiple: false, directory: false, title: t('Choose SSH private key') });
                       if (typeof path === 'string') setIdentityFile(path);
                     } catch (reason) { setError(String(reason)); }
-                  }}>{t('Browse…')}</TextButton>
+                  }}>{t('Browse…')}</OutlineButton>
                 </div>
               </label>
             ) : <p>{t(authMethod === 'ask' ? 'Enter credentials interactively when connecting.' : 'Use identities provided by the SSH authentication agent.')}</p>}
@@ -271,19 +272,19 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
               }),
               ...(jumpConnectionId && !connections.some(connection => connection.id === jumpConnectionId) ? [{ value: jumpConnectionId, label: t('Saved jump connection is unavailable.'), disabled: true }] : []),
             ]} />
-            {jumpConnectionId && <TextButton disabled={busy} className="ssh-editor-link" onClick={() => {
+            {jumpConnectionId && <OutlineButton disabled={busy} className="ssh-editor-action" onClick={() => {
               try {
                 const route = savedJumpRoute(connections, jumpConnectionId, initial?.id);
                 const hop = route[route.length - 1];
                 if (hop) requestSshAuthentication({ connectionId: hop.id, host: hop.host, port: hop.port, user: hop.user, identityFile: hop.identityFile });
               } catch (reason) { setError(String((reason as Error).message)); }
-            }}>{t('Authenticate jump services')}</TextButton>}</div></label>
+            }}>{t('Authenticate jump services')}</OutlineButton>}</div></label>
             {!jumpConnectionId && <label>{t('Jump host (optional)')}<div className="ssh-editor-network"><TextInput variant="field" value={jumpHost} onChange={e => setJumpHost(e.target.value)} data-testid="ssh-form-jump" placeholder="user@host:port" data-tip={t('Separate multiple jump hosts with commas. Use none to disable inherited jump hosts.')} /></div></label>}
-            <label>{t('Proxy')}<div className="ssh-editor-pair ssh-editor-proxy"><Select aria-label={t('Proxy')} value={proxyId} options={[{ value: 'default', label: t('Device default') }, { value: 'none', label: t('No proxy') }, ...proxies.profiles.map(profile => ({ value: profile.id, label: profile.name })), ...(!['default', 'none'].includes(proxyId) && !proxies.profiles.some(profile => profile.id === proxyId) ? [{ value: proxyId, label: t('Unavailable proxy') }] : [])]} onChange={setProxyId} /><TextButton className="ssh-editor-link" onClick={() => setProxyManager(true)}>{t('Manage proxies')}</TextButton></div></label>
+            <label>{t('Proxy')}<div className="ssh-editor-pair ssh-editor-proxy"><Select aria-label={t('Proxy')} value={proxyId} options={[{ value: 'default', label: t('Device default') }, { value: 'none', label: t('No proxy') }, ...proxies.profiles.map(profile => ({ value: profile.id, label: profile.name })), ...(!['default', 'none'].includes(proxyId) && !proxies.profiles.some(profile => profile.id === proxyId) ? [{ value: proxyId, label: t('Unavailable proxy') }] : [])]} onChange={setProxyId} /><OutlineButton className="ssh-editor-action" onClick={() => setProxyManager(true)}>{t('Manage proxies')}</OutlineButton></div></label>
           </FormSection>
           <FormSection title={t('Environment variables')} hidden={!page && !onConnect && section !== 'advanced'}>
             <div className="ssh-environment-rows">{environment.map((row, index) => <div key={index} className="ssh-editor-pair"><TextInput variant="field" aria-label={t('Variable name')} placeholder={t('Variable name')} value={row.name} data-testid={`ssh-env-name-${index}`} onChange={event => setEnvironment(current => current.map((value, position) => position === index ? { ...value, name: event.target.value } : value))} /><span>=</span><TextInput variant="field" aria-label={t('Variable value')} placeholder={t('Value')} value={row.value} data-testid={`ssh-env-value-${index}`} onChange={event => setEnvironment(current => current.map((value, position) => position === index ? { ...value, value: event.target.value } : value))} /><IconBtn title={t('Remove variable')} onClick={() => setEnvironment(current => current.filter((_, position) => position !== index))}><X size={16} /></IconBtn></div>)}</div>
-            <TextButton className="ssh-editor-link" disabled={environment.length >= 64} onClick={() => setEnvironment(current => [...current, { name: '', value: '' }])} data-testid="ssh-env-add"><Plus size={14} />{t('Add variable')}</TextButton>
+            <div className="ssh-editor-actions"><OutlineButton className="ssh-editor-action" disabled={environment.length >= 64} onClick={() => setEnvironment(current => [...current, { name: '', value: '' }])} data-testid="ssh-env-add"><Plus size={14} />{t('Add variable')}</OutlineButton></div>
           </FormSection>
           {(page || onConnect || section === 'advanced') && <p className="ssh-editor-section-hint">{t('The server must allow these variables through AcceptEnv. Do not store secrets here.')}</p>}
           <section className="ssh-editor-note" hidden={!page && !onConnect && section !== 'advanced'}>
@@ -300,7 +301,7 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
           </FormSection>
           <FormSection title={t('Connection behavior')} id="ssh-section-advanced" role={page || onConnect ? undefined : 'tabpanel'} aria-label={t('Advanced')} hidden={!page && !onConnect && section !== 'advanced'}>
             <div className="ssh-form-fields">
-              <label>{t('Keepalive interval (seconds)')}<TextInput variant="field" type="number" min={0} max={3600} value={keepalive} onChange={e => setKeepalive(e.target.value)} data-testid="ssh-form-keepalive" /></label>
+              <label>{t('Keepalive interval (seconds)')}<TextInput variant="field" className="ssh-number-input" type="number" min={0} max={3600} value={keepalive} onChange={e => setKeepalive(e.target.value)} data-testid="ssh-form-keepalive" /></label>
             </div>
             <div className="ssh-check-group">
               <label className="ssh-check-row"><Checkbox checked={shellIntegration} onChange={e => setShellIntegration(e.target.checked)} data-testid="ssh-form-integration" /><span>{t('Enable remote Shell integration (command blocks)')}<small>{t('Leave this off for menu-based servers. Enable it for shells that support command blocks.')}</small></span></label>

@@ -98,6 +98,12 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
   };
 
   useEffect(() => { ensureSshLoaded(); }, []);
+  useEffect(() => {
+    if (active) return;
+    setTagsOpen(false);
+    setGroupsOpen(false);
+    setMetricsOpen(false);
+  }, [active]);
   useEffect(() => { safeLocalStorageSet(PREFERENCES_KEY, JSON.stringify({ layout, resources, metrics, sort })); }, [layout, resources, metrics, sort]);
   useEffect(() => {
     if (!active) return;
@@ -158,13 +164,13 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
         <span className="ssh-host-resource-toggle"><Toggle compact on={resources} onChange={toggleResources} label={t('Resource usage')} /><span onClick={() => toggleResources(!resources)}>{t('Resource usage')}</span></span>
         <SegmentedControl variant="buttons" label={t('Host view')} value={layout} onChange={setLayout} options={[{ value: 'table', label: t('List'), ariaLabel: t('Table view'), icon: <Columns2 size={14} /> }, { value: 'cards', label: t('Cards'), ariaLabel: t('Card view'), icon: <Grid size={14} /> }]} />
         {resources && <span className="ssh-dashboard-metric-menu"><IconBtn ref={metricTrigger} title={t('More metrics')} data-testid="ssh-dashboard-metrics" onClick={() => setMetricsOpen(value => !value)}><MoreHorizontal size={16} /></IconBtn>
-          {metricsOpen && <CheckboxMenu anchored title={t('Collect and show')} triggerRef={metricTrigger} checkmark options={HOST_METRICS.map(id => ({ id, label: t(METRIC_LABELS[id]), checked: metrics[id] }))} onToggle={id => setMetrics(current => ({ ...current, [id]: !current[id] }))} onClose={() => setMetricsOpen(false)}
+          {active && metricsOpen && <CheckboxMenu anchored title={t('Collect and show')} triggerRef={metricTrigger} checkmark options={HOST_METRICS.map(id => ({ id, label: t(METRIC_LABELS[id]), checked: metrics[id] }))} onToggle={id => setMetrics(current => ({ ...current, [id]: !current[id] }))} onClose={() => setMetricsOpen(false)}
             footer={<TextButton className="ssh-metrics-refresh" data-testid="ssh-dashboard-refresh" onClick={() => { refresh(); setMetricsOpen(false); }}><RefreshCw size={14} />{t('Refresh')}</TextButton>} />}
         </span>}
       </div>
     </div>
-    {tagsOpen && <CheckboxMenu anchored checkmark title={t('Host tags')} triggerRef={tagTrigger} style={{ width: 280 }} options={knownTags.map(tag => ({ id: tag, label: tag, checked: tagFilter.includes(tag), icon: <HostTagDot tag={tag} /> }))} onToggle={tag => setTagFilter(current => current.includes(tag) ? current.filter(value => value !== tag) : [...current, tag])} onClose={() => setTagsOpen(false)} />}
-    {groupsOpen && <CheckboxMenu anchored checkmark title={t('Host groups')} triggerRef={groupTrigger} style={{ width: 280 }} options={groups.map(group => ({ id: group.name, label: group.name || t('Ungrouped'), checked: groupFilter === group.name, icon: <Folder size={16} />, count: group.hosts.length }))} onToggle={group => setGroupFilter(current => current === group ? null : group)} onClose={() => setGroupsOpen(false)} />}
+    {active && tagsOpen && <CheckboxMenu anchored checkmark title={t('Host tags')} triggerRef={tagTrigger} style={{ width: 280 }} options={knownTags.map(tag => ({ id: tag, label: tag, checked: tagFilter.includes(tag), icon: <HostTagDot tag={tag} /> }))} onToggle={tag => setTagFilter(current => current.includes(tag) ? current.filter(value => value !== tag) : [...current, tag])} onClose={() => setTagsOpen(false)} />}
+    {active && groupsOpen && <CheckboxMenu anchored checkmark title={t('Host groups')} triggerRef={groupTrigger} style={{ width: 280 }} options={groups.map(group => ({ id: group.name, label: group.name || t('Ungrouped'), checked: groupFilter === group.name, icon: <Folder size={16} />, count: group.hosts.length }))} onToggle={group => setGroupFilter(current => current === group ? null : group)} onClose={() => setGroupsOpen(false)} />}
     {resources && HOST_METRICS.every(id => !metrics[id]) && <div className="ssh-dashboard-paused" role="status">{t('Metrics collection is paused. Turn on one or more metrics to collect host status.')}</div>}
     {layout === 'table' && <div className="ssh-host-columns"><span /><span>{t('Name')}</span>{resources ? <><span>{t('Status')}</span>{(['cpu', 'memory', 'disk'] as const).filter(metric => metrics[metric]).map(metric => <span key={metric}>{t(METRIC_LABELS[metric])}</span>)}</> : <><span>{t('Address')}</span><span>{t('Tags')}</span><span>{t('Last connected')}</span></>}<span /></div>}
     <div className={layout === 'table' ? 'scroll-region ssh-host-list' : 'scroll-region ssh-dashboard-grid'} data-reorder-list={layout === 'table' ? 'ssh-hosts' : undefined}>
