@@ -6,9 +6,9 @@
 
 **A terminal workbench for development and remote operations.**
 
-Keep command context, manage SSH connections and services, and work with an agent in a terminal you select.
+Keep command context, manage SSH connections and services, and bring your ACP agents into one client with explicit execution targets.
 
-**[Download Beta](#download)** &nbsp; · &nbsp; [How it works](#working-with-vrykell) &nbsp; · &nbsp; [Build from source](#build-from-source) &nbsp; · &nbsp; [简体中文](README.zh-CN.md)
+**[Download](#download)** &nbsp; · &nbsp; [How it works](#working-with-vrykell) &nbsp; · &nbsp; [Build from source](#build-from-source) &nbsp; · &nbsp; [简体中文](README.zh-CN.md)
 
 <p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="Apache-2.0" /></a>
@@ -71,6 +71,19 @@ Conversations can stand alone or use a selected local or SSH terminal. Attach a 
 
 Use the built-in agent with your own model endpoint, skills, MCP tools and scoped local memory, or connect an external agent through ACP. External sessions can use application tools through the same implementations and permission path. Tools independently provided by an external agent are managed by that agent. See [application tools](docs/en/application-tools.md) and the [security model](docs/en/security-model.md).
 
+#### One client for a 20+ agent ecosystem
+
+Choose from the growing [ACP agent ecosystem](https://github.com/agentclientprotocol/registry), with 20+ agent choices available through presets or custom local commands. Eleven built-in startup presets include Claude Code, Codex, Gemini CLI, OpenCode, Qwen Code, Cursor, OpenClaw, Kiro CLI, Kimi CLI, Goose and Pi. Additional compatible agents can be configured with their command, arguments, environment and project directory.
+
+| In the same client | What stays independent |
+| --- | --- |
+| Multiple agent profiles and conversation tabs | Each conversation retains its draft, project context, streamed reply and cancellation state. |
+| Main panes and a dockable conversation sidebar | Switch agents or move a conversation while keeping its live session and draft. |
+| Models, modes and session settings | Controls follow the capabilities reported by the selected agent. |
+| Terminal and file tools | Select the execution target explicitly and review application-tool approvals in the transcript. |
+
+Add a preset or custom command in **Settings → ACP**, install and authenticate the selected agent, then choose its project directory when opening a conversation. Agent availability, authentication, models and optional protocol capabilities depend on that agent. Presets are startup configurations; the registry is the reference for the wider ecosystem.
+
 <a href="docs/images/single-ai-en.png"><img src="docs/images/single-ai-en.png" width="1600" alt="A conversation with attachments, an execution target and visible tool records" /></a>
 
 ### 4. Turn execution into a reviewed change
@@ -114,18 +127,18 @@ Screenshots show the application with a sample project and simulated session dat
 
 ## Download
 
-Packaged preview: **0.1.0 Beta 5**.
+Current stable release: **0.1.1**.
 
 | Platform | Package |
 | --- | --- |
-| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.5/Vrykell_0.1.0_x64-setup.exe) |
-| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.5/Vrykell_0.1.0_aarch64.dmg) |
-| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.5/Vrykell_0.1.0_x64.dmg) |
-| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.5/Vrykell_0.1.0_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.0-beta.5/Vrykell_0.1.0_amd64.AppImage) |
+| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_x64-setup.exe) |
+| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_aarch64.dmg) |
+| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_x64.dmg) |
+| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_amd64.AppImage) |
 
-[All releases](https://github.com/Vrykell/Vrykell/releases) · [Beta 5 release notes](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.0-beta.5)
+[All releases](https://github.com/Vrykell/Vrykell/releases) · [Release notes](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.1)
 
-Release notes record package checksums, the source commit and validation limits. Installers are unsigned, and distribution signing and notarization are not configured. The capability descriptions above follow the development branch; build the current source for changes made after the packaged preview.
+Release notes record package checksums, the exact source commit and validation coverage. Update signatures verify updater payloads; they do not replace operating-system distribution signing or notarization. The capability descriptions above follow the development branch; build the current source for changes made after the packaged release.
 
 ### Current boundaries
 

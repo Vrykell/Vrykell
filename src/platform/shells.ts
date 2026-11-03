@@ -47,13 +47,13 @@ export function fallbackShells(): ShellOption[] {
   ];
 }
 
-/** Returns the available shells; falls back to the platform guess when invoke fails, so the dialog still opens. */
-export async function getAvailableShells(): Promise<ShellOption[]> {
-  try {
-    const shells = await listShells();
-    if (Array.isArray(shells) && shells.length > 0) return shells;
-    return fallbackShells();
-  } catch {
-    return fallbackShells();
-  }
+let availableShellsRequest: Promise<ShellOption[]> | undefined;
+
+/** Share concurrent discovery while allowing later calls to discover newly installed shells. */
+export function getAvailableShells(): Promise<ShellOption[]> {
+  availableShellsRequest ??= listShells()
+    .then(shells => Array.isArray(shells) && shells.length > 0 ? shells : fallbackShells())
+    .catch(() => fallbackShells())
+    .finally(() => { availableShellsRequest = undefined; });
+  return availableShellsRequest;
 }

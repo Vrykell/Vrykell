@@ -28,6 +28,7 @@ import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
 import { useTerminalStore, getFocusedTerminalId } from '@features/terminal/stores/terminal';
 import type { ShellType } from '@platform/shells';
 import { shellTypeLabel } from '@platform/shells';
+import { diagnostic } from '@platform/diagnostics';
 import {
   leaf, leaves as layoutLeaves, firstLeaf, findLeaf, splitLeaf, replaceLeaf, removeLeaf, countLeaves, mapTerminals,
   type WindowLayout, type TerminalSpec, type SplitDir,
@@ -294,6 +295,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       };
     }
 
+    if (isSessionTab(tab)) diagnostic('terminal-create-request', {
+      tabId: id, paneId: firstLeaf(tab.layout).id, kind: firstLeaf(tab.layout).kind,
+    });
     set((s) => ({ tabs: [...s.tabs, tab], activeId: id }));
     if (isSessionTab(tab)) {
       const ser = serializeSession(tab)!;

@@ -21,6 +21,44 @@ const exchange: ChatExchange = { id: 'question', createdAt: 1,
   answer: { id: 'answer', role: 'assistant', content: 'Check the **configuration**.', createdAt: 2 },
 };
 
+it.each(['block', 'conversation'] as const)('shows only the output cursor when structured text is streaming in %s presentation', presentation => {
+  const { container, rerender } = render(<AiBlock presentation={presentation} exchange={{ ...exchange,
+    answer: { ...exchange.answer!, content: '', pending: true, parts: [{ kind: 'text', text: 'The reply is arriving.' }] },
+  }} />);
+  expect(screen.getByText('The reply is arriving.')).toBeVisible();
+  expect(screen.queryByText('处理中')).toBeNull();
+  expect(container.querySelectorAll('.ai-pending-cursor')).toHaveLength(1);
+  rerender(<AiBlock presentation={presentation} exchange={{ ...exchange,
+    answer: { ...exchange.answer!, content: '', pending: false, parts: [{ kind: 'text', text: 'The reply is arriving.' }] },
+  }} />);
+  expect(container.querySelector('.ai-pending-cursor')).toBeNull();
+});
+
+it.each(['', ' \n ', '<|tool_calls_begin|>'])('keeps one waiting indicator when the stream tail has no visible text (%j)', text => {
+  const { container } = render(<AiBlock presentation="conversation" exchange={{ ...exchange,
+    answer: { ...exchange.answer!, content: '', pending: true, parts: [{ kind: 'text', text }] },
+  }} />);
+  expect(screen.getByRole('status')).toHaveTextContent('处理中');
+  expect(container.querySelectorAll('.ai-pending-cursor')).toHaveLength(1);
+});
+
+it('switches between waiting, text output and a tool continuation without duplicate cursors', () => {
+  const view = (parts?: import('@features/agent/model/messageParts').MessagePart[]) => <AiBlock presentation="conversation" exchange={{ ...exchange,
+    answer: { ...exchange.answer!, content: '', pending: true, parts },
+  }} />;
+  const { container, rerender } = render(view());
+  expect(screen.getByRole('status')).toHaveTextContent('处理中');
+  rerender(view([{ kind: 'text', text: 'Checking the project.' }]));
+  expect(screen.queryByRole('status')).toBeNull();
+  expect(container.querySelectorAll('.ai-pending-cursor')).toHaveLength(1);
+  rerender(view([{ kind: 'text', text: 'Checking the project.' }, commandPart]));
+  expect(screen.getByRole('status')).toHaveTextContent('处理中');
+  expect(container.querySelectorAll('.ai-pending-cursor')).toHaveLength(1);
+  rerender(view([{ kind: 'text', text: 'Checking the project.' }, commandPart, { kind: 'text', text: 'The check succeeded.' }]));
+  expect(screen.queryByRole('status')).toBeNull();
+  expect(container.querySelectorAll('.ai-pending-cursor')).toHaveLength(1);
+});
+
 it('keeps sent attachments beneath the question and dismisses previews on outside press and Escape', () => {
   const view = render(<AiBlock presentation="conversation" exchange={{ ...exchange, question: { ...exchange.question!, attachments: [{ id: 'paste', kind: 'paste', name: 'Pasted sample', mime: 'text/plain', size: 11, textContent: 'sample text' }] } }} />);
   const question = view.container.querySelector('.ai-block-question')!;

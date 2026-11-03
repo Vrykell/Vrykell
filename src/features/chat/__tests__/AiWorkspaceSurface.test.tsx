@@ -1,8 +1,8 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import AiWorkspaceSurface, { AiWorkspaceProvider } from '../components/AiWorkspaceSurface';
-import NativeConversationSurface from '../components/NativeConversationSurface';
+import NativeConversationSurface, { AiSurfaceContext } from '../components/NativeConversationSurface';
 import { useAiWorkspace } from '../stores/aiWorkspace';
 import { useChatStore } from '../stores/chat';
 import { ResourceContentProvider } from '@ui/layout/ResourceContent';
@@ -10,18 +10,32 @@ import { ResourceContentProvider } from '@ui/layout/ResourceContent';
 const lifecycle = vi.hoisted(() => ({ mounts: 0, stops: 0, renders: 0, harnessRenders: 0 }));
 vi.mock('../components/HarnessWorkspace', () => ({ default: () => {
   lifecycle.harnessRenders += 1;
-  return <><span data-testid="connected-session">Connected session</span><NativeConversationSurface /></>;
+  const surface = useContext(AiSurfaceContext);
+  return <><span data-testid="connected-session">Connected session</span><div ref={surface?.toolbar} /><NativeConversationSurface /></>;
 } }));
-vi.mock('../components/PanelChat', () => ({ default: function Conversation({ conversationId, workspace }: { conversationId: string; workspace: boolean }) {
+vi.mock('../components/PanelChat', () => ({ default: function Conversation({ conversationId, workspace, toolbarTarget }: { conversationId: string; workspace: boolean; toolbarTarget?: HTMLElement | null }) {
   lifecycle.renders += 1;
   const [draft, setDraft] = useState('');
   useEffect(() => { lifecycle.mounts += 1; return () => { lifecycle.stops += 1; }; }, []);
-  return <input aria-label="Draft" data-conversation={conversationId} data-workspace={workspace} value={draft} onChange={event => setDraft(event.target.value)} />;
+  return <input aria-label="Draft" data-conversation={conversationId} data-workspace={workspace} data-has-toolbar={!!toolbarTarget} value={draft} onChange={event => setDraft(event.target.value)} />;
 } }));
 const ai = useAiWorkspace.getState();
 const chat = useChatStore.getState();
 beforeEach(() => { useAiWorkspace.setState({ nativeTabs: ['native'], selected: 'chat:native', sideSelected: '' }); useChatStore.setState({ activeConversationId: 'native' }); });
 afterEach(() => { cleanup(); lifecycle.mounts = 0; lifecycle.stops = 0; lifecycle.renders = 0; lifecycle.harnessRenders = 0; useAiWorkspace.setState(ai, true); useChatStore.setState(chat, true); });
+
+it('releases the main toolbar when an external conversation replaces the selected native conversation', () => {
+  render(<AiWorkspaceProvider mainActive headerActive sideActive={false}><AiWorkspaceSurface placement="main" /></AiWorkspaceProvider>);
+  const native = screen.getByRole('textbox', { name: 'Draft' });
+  expect(native).toHaveAttribute('data-has-toolbar', 'true');
+  fireEvent.change(native, { target: { value: 'Retain this draft' } });
+  act(() => useAiWorkspace.setState({ selected: 'acp:external' }));
+  expect(native).toHaveAttribute('data-has-toolbar', 'false');
+  act(() => useAiWorkspace.setState({ selected: 'chat:native' }));
+  expect(native).toHaveAttribute('data-has-toolbar', 'true');
+  expect(screen.getByRole('textbox', { name: 'Draft' })).toBe(native);
+  expect(native).toHaveValue('Retain this draft');
+});
 
 it('keeps each open native conversation mounted independently while the selection changes', () => {
   useAiWorkspace.setState({ nativeTabs: ['native', 'other'], selected: 'chat:native' });

@@ -23,6 +23,7 @@ import { useBlockStore } from '@features/terminal';
 import { useHistoryStore } from '@features/terminal/stores/history';
 import { captureHistoryCommand } from '@features/command-history/services/recording';
 import { isTerminalDebugEnabled, isTerminalInputTraceEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
+import { terminalStartupTrace } from '@features/terminal/services/terminalStartupTrace';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 import { useSessionStore, useUiStore, useWorkspaceNavigation } from '@features/workspace';
 import { leaves as layoutLeaves } from '@features/workspace/model/windowLayout';
@@ -183,6 +184,8 @@ export function useTerminalSession(
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    const traceStartup = terminalStartupTrace(paneId, el);
+    traceStartup('effect-start', { tabId: ownerTab.current, attempt });
     setStatus('connecting');
     setSshAuthenticated(false);
     useTerminalStore.getState().setStartupState(paneId, 'starting');
@@ -200,6 +203,7 @@ export function useTerminalSession(
       allowTransparency: false,
       theme: readXtermTheme(),
     });
+    traceStartup('terminal-created');
     // Keep the typography preference in charge of blinking while still honoring
     // cursor-shape requests from running programs.
     applyTerminalCursorPreference(term, paneId);
@@ -210,8 +214,11 @@ export function useTerminalSession(
     // join without a seam; the DOM renderer lays their CSS line boxes on the font baseline and
     // always leaves a gap. The shared helper steps down to the DOM renderer when the GPU context
     // is lost or WebGL is unavailable.
+    traceStartup('renderer-load-start', { renderer: useTypographyStore.getState().terminalRenderer });
     loadWebglRenderer(term, useTypographyStore.getState().terminalRenderer);
+    traceStartup('renderer-loaded');
     term.open(el);
+    traceStartup('terminal-opened');
     const disposeCursorRepaints = smoothTerminalCursorRepaints(term, paneId);
     const disposePointer = configureTerminalPointer(term, paneId);
     configureTerminalInput(term);
@@ -245,6 +252,7 @@ export function useTerminalSession(
       }
     });
     fitTerminal(term, fit);
+    traceStartup('initial-fit', { cols: term.cols, rows: term.rows, hostWidth: el.clientWidth, hostHeight: el.clientHeight });
     registerTerminal(paneId, term);
     useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
 
@@ -493,12 +501,17 @@ export function useTerminalSession(
     let idleFallbackTimer: ReturnType<typeof setTimeout> | undefined;
     let promptReady = false;
     let startupComplete = false;
+    let firstOutput = true;
+    let readinessWait: 'prompt-marker' | 'plain-shell' | 'idle-fallback' = 'idle-fallback';
+    let readinessDueAt = 0;
     const markInputReady = (integrated: boolean) => {
       if (disposed || stopped || !sessionId) return;
       if (startupComplete) return;
       clearTimeout(startupTimer);
       clearTimeout(idleFallbackTimer);
       startupComplete = true;
+      traceStartup('input-ready', { sessionId, integrated, reason: readinessWait,
+        timerLagMs: Math.round(Math.max(0, performance.now() - readinessDueAt)) });
       setRetry(previous => ({ ...previous, phase: 'idle', seconds: 0 }));
       // Only a shell integration marker proves that SSH authentication completed. Output
       // silence can also be an authentication prompt and must not renew the retry budget.
@@ -507,6 +520,10 @@ export function useTerminalSession(
       terminalDebug('shell-input-ready', { paneId, sessionId, integrated });
     };
     const handleOutput = (events: DispatchEvent[]) => {
+      if (firstOutput && events.length > 0) {
+        firstOutput = false;
+        traceStartup('first-output', { sessionId, eventCount: events.length });
+      }
       if (sessionId && events.some(event => event.kind === 'altExit' || event.kind === 'altEnter'
         || event.kind === 'osc' && ['133;A', '133;C', '133;D'].includes(event.code))) {
         cancelTerminalInput(sessionId);
@@ -524,6 +541,7 @@ export function useTerminalSession(
       }
       // A real prompt marker also renews the budget after an earlier idle-readiness fallback.
       if (events.some(event => event.kind === 'osc' && event.code === '133;B')) {
+        if (!promptReady) traceStartup('prompt-marker', { sessionId, afterInputReady: startupComplete });
         promptReady = true;
         if (spec?.kind === 'ssh') setSshAuthenticated(true);
         if (spec?.kind === 'ssh' && spec.ssh?.connectionId && !automaticForwardingStarted) {
@@ -542,6 +560,10 @@ export function useTerminalSession(
       if (promptReady || plainShellOutput) {
         clearTimeout(startupTimer);
         clearTimeout(idleFallbackTimer);
+        const reason = promptReady ? 'prompt-marker' : 'plain-shell';
+        if (!readinessDueAt || readinessWait !== reason) traceStartup('readiness-wait', { reason, delayMs: 150 });
+        readinessWait = reason;
+        readinessDueAt = performance.now() + 150;
         // Let the line editor finish its initial repaint before injecting a command.
         startupTimer = setTimeout(() => markInputReady(promptReady), 150);
         return;
@@ -550,6 +572,9 @@ export function useTerminalSession(
       // otherwise block the queued command forever. Output that stops for this long
       // means the shell is sitting at its prompt, so type there and record why.
       clearTimeout(idleFallbackTimer);
+      if (!readinessDueAt) traceStartup('readiness-wait', { reason: 'idle-fallback', delayMs: SHELL_IDLE_READY_MS });
+      readinessWait = 'idle-fallback';
+      readinessDueAt = performance.now() + SHELL_IDLE_READY_MS;
       idleFallbackTimer = setTimeout(() => markInputReady(false), SHELL_IDLE_READY_MS);
     };
 
@@ -617,17 +642,11 @@ export function useTerminalSession(
       : spec?.kind === 'local'
         ? { shell: spec.shellType, openMode }
         : undefined;
-    // A split pane may mount before its container is laid out, in which case fit measures 0x0.
-    // Start with fallback dimensions and re-fit to the real size from the ResizeObserver so the
-    // PTY never starts at 0x0 and renders a blank screen.
-    const spawnCols = term.cols > 0 ? term.cols : 80;
-    const spawnRows = term.rows > 0 ? term.rows : 24;
-    if (isTerminalDebugEnabled()) {
-      terminalDebug('pty-spawn-request', { paneId, tabId: ownerTab.current, cols: spawnCols, rows: spawnRows, spawnOpts });
-    }
     const startSession = async () => {
       if (spec?.kind === 'local' && spawnOpts) {
+        traceStartup('shell-detection-start');
         const shells = await getAvailableShells();
+        traceStartup('shell-detection-complete', { shellCount: shells.length, cancelled: disposed || stopped });
         spawnOpts.shell = preferredShell(spec.shellType as ShellType ?? 'system', shells);
         const profile = spawnOpts.shell ? useShellProfiles.getState().profiles[spawnOpts.shell as ShellType] : undefined;
         if (spec.useProfileDirectory !== false) tabCwd ??= profile?.cwd || undefined;
@@ -648,10 +667,18 @@ export function useTerminalSession(
         }
       }
       if (disposed || stopped) throw new Error('Connection cancelled');
+      // Resolve dimensions after asynchronous preparation; detached hosts can report a 2x1 grid.
+      const measurable = el.isConnected && el.clientWidth > 0 && el.clientHeight > 0;
+      if (measurable) fitTerminal(term, fit);
+      const spawnCols = measurable && term.cols > 0 ? term.cols : 80;
+      const spawnRows = measurable && term.rows > 0 ? term.rows : 24;
+      terminalDebug('pty-spawn-request', { paneId, tabId: ownerTab.current, cols: spawnCols, rows: spawnRows, spawnOpts });
+      traceStartup('pty-invoke', { cols: spawnCols, rows: spawnRows, currentCols: term.cols, currentRows: term.rows });
       return ptySpawn(spawnCols, spawnRows, tabCwd, spawnOpts);
     };
     startSession()
       .then((id) => {
+        traceStartup('pty-returned', { sessionId: id, cancelled: disposed || stopped });
         if (disposed || stopped) {
           ptyClose(id).catch(() => {});
           return;
@@ -684,6 +711,7 @@ export function useTerminalSession(
         });
       })
       .catch((e) => {
+        traceStartup('startup-rejected', { cancelled: disposed || stopped, errorType: e instanceof Error ? e.name : typeof e });
         if (!disposed && !stopped) {
           setRetry(previous => ({ ...previous, phase: 'stopped', seconds: 0 }));
           connectionFailed = true;
@@ -1027,7 +1055,9 @@ export function useTerminalSession(
 
     // Cleanup.
 
+    traceStartup('effect-ready');
     return () => {
+      traceStartup('effect-dispose', { startupComplete, hasSession: Boolean(sessionId) });
       disposeCursorRepaints();
       disposePointer();
       unsubscribeTypography();
@@ -1077,6 +1107,7 @@ export function useTerminalSession(
       // context; hand it back so long sessions do not accumulate contexts.
       releaseTerminalRenderer(term);
       term.dispose();
+      traceStartup('effect-disposed');
     };
   }, [paneId, attempt]);
 

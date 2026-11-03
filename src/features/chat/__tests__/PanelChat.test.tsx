@@ -86,6 +86,24 @@ it('does not invent a per-pane heading when an unfocused workspace conversation 
   expect(screen.getByPlaceholderText('自然语言描述你想做什么…')).toBeVisible();
 });
 
+it('removes inactive conversation tools from a shared toolbar without losing its draft', () => {
+  function Surface({ active }: { active: boolean }) {
+    const [toolbar, setToolbar] = useState<HTMLDivElement | null>(null);
+    return <><div data-testid="conversation-toolbar" ref={setToolbar} /><PanelChat workspace active={active} toolbarTarget={toolbar} /></>;
+  }
+  const { rerender } = render(<Surface active />);
+  const toolbar = screen.getByTestId('conversation-toolbar');
+  const composer = screen.getByPlaceholderText('自然语言描述你想做什么…');
+  fireEvent.change(composer, { target: { value: 'Keep the unfinished question' } });
+  expect(within(toolbar).getByRole('button', { name: '会话设置' })).toBeVisible();
+  rerender(<Surface active={false} />);
+  expect(within(toolbar).queryByRole('button', { name: '会话设置' })).toBeNull();
+  rerender(<Surface active />);
+  expect(within(toolbar).getAllByRole('button', { name: '会话设置' })).toHaveLength(1);
+  expect(screen.getByPlaceholderText('自然语言描述你想做什么…')).toBe(composer);
+  expect(composer).toHaveValue('Keep the unfinished question');
+});
+
 beforeEach(() => {
   useSessionStore.setState({ tabs: [{ id: 'chat-tab', title: 'Build', kind: 'session', layout: leaf({ id: paneId, kind: 'local', shellType: 'bash', cwd: '/work' }) }], activeId: 'chat-tab', terminalCwds: {} });
   useTerminalStore.setState({ focusedPaneId: paneId, sessions: { [paneId]: 'pty-chat' } });

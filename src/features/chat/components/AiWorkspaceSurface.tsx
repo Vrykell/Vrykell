@@ -47,7 +47,7 @@ export function AiWorkspaceProvider({ mainActive, headerActive, sideActive, chil
     {createPortal(<StableHarnessWorkspace active={mainActive} headerActive={headerActive} />, host)}
     {side && createPortal(<AiSidebar active={sideActive} onSettingsTarget={setSidebarSettingsTarget} settingsSuspended={settingsSuspended} />, side)}
     {mountedNativeIds.map(id => <ResourceContent key={id} id={`chat:${id}`} defer active={nativeActive && id === nativeSelected} fallbackTarget={id === nativeSelected ? target ?? parking : parking}>
-      {state => <StablePanelChat conversationId={id} active={state.visible} workspace toolbarTarget={state.placed ? state.header ?? (state.retainsHeader && state.focused ? toolbar : null) : id === nativeSelected ? toolbar : null} />}
+      {state => <StablePanelChat conversationId={id} active={state.visible} workspace toolbarTarget={state.placed ? state.header ?? (state.retainsHeader && state.focused ? toolbar : null) : nativeActive && id === nativeSelected ? toolbar : null} />}
     </ResourceContent>)}
   </SurfaceContext.Provider></SidebarSettingsContext.Provider>;
 }
