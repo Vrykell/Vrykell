@@ -25,7 +25,7 @@ for (const theme of ['dark', 'light']) test(`compact shared fields, authenticati
   await expect(editor.getByTestId('ssh-env-name-0')).toHaveAttribute('placeholder', '变量名');
   const variable = editor.getByTestId('ssh-env-name-0'); await variable.scrollIntoViewIfNeeded();
   await expect(variable).toHaveClass(/text-input-field/); await expect(editor.locator('.ssh-environment-rows > div').first()).toHaveCSS('border-top-width', '0px');
-  await editor.getByRole('button', { name: '移除变量', exact: true }).click(); await expect(editor.getByTestId('ssh-env-add')).toHaveCSS('border-top-width', '0px');
+  await editor.getByRole('button', { name: '移除变量', exact: true }).click(); await expect(editor.getByTestId('ssh-env-add').locator('..')).toHaveCSS('border-top-width', '0px');
   await editor.getByTestId('ssh-env-add').click(); await editor.getByTestId('ssh-form-ai-notes').scrollIntoViewIfNeeded();
   const summary = editor.locator('.ssh-editor-advanced > summary'); await expect(summary).toHaveCSS('list-style-type', 'none'); await expect(summary.locator('svg')).toBeVisible();
   if (await summary.locator('..').evaluate(element => !element.hasAttribute('open'))) await summary.click();
