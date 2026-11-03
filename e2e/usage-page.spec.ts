@@ -67,13 +67,25 @@ test.describe('usage statistics page', () => {
     const laneWidth = Number(await page.getByTestId('usage-trend-hover').getAttribute('width'));
     expect(laneWidth).toBeLessThan(80);
 
-    await expect(page.getByTestId('usage-model-all')).toHaveAttribute('aria-pressed', 'true');
-    await expect(page.getByTestId('usage-filter-model')).toHaveCount(0);
-    await page.getByTestId('usage-model-qwen2.5').click();
-    await expect(page.getByTestId('usage-model-qwen2.5')).toHaveAttribute('aria-pressed', 'true');
+    const modelFilter = page.getByTestId('usage-model-filter');
+    await expect(modelFilter).toContainText('全部');
+    await expect(modelFilter.locator('.ui-select-icon svg')).toBeVisible();
+    await modelFilter.click();
+    const modelOption = page.getByRole('option', { name: 'qwen2.5' });
+    await expect(modelOption.locator('svg')).toBeVisible();
+    const iconBox = (await modelOption.locator('svg').boundingBox())!;
+    const labelBox = (await modelOption.locator('.ui-select-option-label').boundingBox())!;
+    expect(iconBox.x).toBeLessThan(labelBox.x);
+    expect(iconBox.width).toBe(16);
+    await modelOption.click();
+    await expect(modelFilter).toContainText('qwen2.5');
+    const filterBox = (await modelFilter.boundingBox())!;
+    expect(filterBox.width).toBeLessThan(190);
+    expect(filterBox.width).toBeLessThanOrEqual(220);
     await expect(page.getByTestId('usage-total-requests')).toHaveText('1');
-    await page.getByTestId('usage-model-all').click();
-    await expect(page.getByTestId('usage-model-all')).toHaveAttribute('aria-pressed', 'true');
+    await modelFilter.click();
+    await page.getByRole('option', { name: '全部' }).click();
+    await expect(modelFilter).toContainText('全部');
 
     // The refresh button re-reads storage and reports the refresh time.
     await expect(page.getByTestId('usage-refreshed-at')).toHaveCount(0);
@@ -102,7 +114,8 @@ test.describe('usage statistics page', () => {
     await page.getByTestId('usage-range').click();
     await page.getByRole('option', { name: '全部时间' }).click();
     await expect(page.getByTestId('usage-total-requests')).toHaveText('1');
-    await page.getByTestId('usage-model-qwen2.5').click();
+    await page.getByTestId('usage-model-filter').click();
+    await page.getByRole('option', { name: 'qwen2.5' }).click();
     await expect(page.getByTestId('usage-total-tokens')).toHaveText('15');
 
     await page.reload();
@@ -155,7 +168,7 @@ test.describe('usage statistics page', () => {
       const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
       useWorkspaceStore.getState().openUsageTab();
     });
-    await page.getByTestId('usage-model-all').click();
+    await expect(page.getByTestId('usage-model-filter')).toContainText('全部');
     await expect(page.getByTestId('usage-metrics')).toBeVisible();
     await expect(page.getByTestId('usage-acp-row')).toHaveCount(0);
     await page.getByTestId('usage-tab-acp').click();

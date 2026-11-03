@@ -890,12 +890,7 @@ button.history-prompt-action[data-primary]:enabled:is(:hover, :focus-visible) { 
 .usage-card { padding: 12px 14px; border: 0; border-radius: var(--radius-inner); background: var(--card-bg); box-shadow: none; min-width: 0; }
 .usage-page { font-family: var(--font-ui); }
 /* Usage filter row: the source segment bar on the left, then the by-value selects. */
-.usage-model-filter { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; min-width: 0; padding: 3px; border-radius: var(--radius-inner); background: var(--hover); overflow-x: auto; }
-.usage-model-chip { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; gap: 6px; height: 26px; max-width: 220px; padding: 0 10px; border: 0; border-radius: var(--radius-inner); background: transparent; color: var(--text-secondary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); white-space: nowrap; cursor: pointer; transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
-.usage-model-chip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
-.usage-model-chip svg { flex-shrink: 0; }
-.usage-model-chip:is(:hover, :focus-visible) { background: var(--button-hover); color: var(--text-primary); }
-.usage-model-chip[aria-pressed="true"] { background: var(--surface); color: var(--text-primary); font-weight: var(--fw-semibold); }
+/* Usage filters use the shared select field; model marks appear in the trigger and list. */
 .command-block.ai-block { min-width: 0; margin: 0; padding-left: 18px; padding-right: 18px; background: color-mix(in srgb, var(--ai-block-bg) calc(var(--ai-block-bg-enabled) * 100%), transparent); }
 .command-block.ai-block::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: color-mix(in srgb, var(--ai-block-rail) calc(var(--ai-block-bg-enabled) * 100%), transparent); pointer-events: none; z-index: 1; }
 .command-block.ai-block[data-divider-before="true"]::before { top: -1px; }
@@ -949,6 +944,9 @@ button.ai-tool-summary:enabled:is(:hover, :focus-visible, :active) { background:
 .ai-tool-summary > svg:last-child { transition: transform var(--dur-fast) var(--ease); }
 .ai-tool-label { flex: 0 1 auto; max-width: 45%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-primary); }
 .ai-tool-description { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-family: var(--font-mono); }
+/* The label and the monospace detail use different fonts; share one baseline so every
+   tool row reads as a single line instead of centring two mismatched line boxes. */
+.ai-tool-label, .ai-tool-description { align-self: baseline; }
 .ai-tool-state { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; max-width: 45%; padding: 1px 6px; border-radius: 4px; color: var(--text-muted); font-size: var(--fs-micro); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ai-tool-state > svg { flex-shrink: 0; }
 .ai-tool-state[data-state="done"] { color: var(--success); background: color-mix(in srgb, var(--success) 12%, transparent); }

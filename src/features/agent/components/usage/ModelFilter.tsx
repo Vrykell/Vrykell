@@ -1,4 +1,6 @@
 import { t } from '@i18n';
+import Select from '@ui/fields/Select';
+import { Grid, iconSizes } from '@ui/icons';
 import { ALL_FILTER } from '../../hooks/useUsageStats';
 import { vendorMark } from './vendorColor';
 
@@ -7,17 +9,14 @@ export default function ModelFilter({ value, options, onChange }: {
   options: string[];
   onChange: (next: string) => void;
 }) {
-  return <div className="usage-model-filter" role="group" aria-label={t('Model')}>
-    <button type="button" data-subtle className="usage-model-chip" data-testid="usage-model-all"
-      aria-pressed={value === ALL_FILTER} onClick={() => onChange(ALL_FILTER)}>{t('All')}</button>
-    {options.map(model => {
+  const items = [
+    { value: ALL_FILTER, label: t('All'), icon: <Grid size={iconSizes.compact} color="var(--text-muted)" /> },
+    ...options.map(model => {
       const mark = vendorMark('', model);
       const Glyph = mark.icon;
-      return <button key={model} type="button" data-subtle className="usage-model-chip"
-        data-testid={`usage-model-${model}`} aria-label={model} aria-pressed={value === model}
-        data-tip={model} onClick={() => onChange(value === model ? ALL_FILTER : model)}>
-        <Glyph size={14} color={mark.color} /><span>{model}</span>
-      </button>;
-    })}
-  </div>;
+      return { value: model, label: model, icon: <Glyph size={iconSizes.compact} color={mark.color} /> };
+    }),
+  ];
+  return <Select aria-label={t('Model')} data-testid="usage-model-filter" value={value} options={items}
+    onChange={onChange} style={{ maxWidth: 220 }} />;
 }

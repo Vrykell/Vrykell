@@ -270,6 +270,17 @@ it('copies the tool log when a stopped reply has no answer text yet', async () =
   await waitFor(() => expect(writeClipboardTextMock).toHaveBeenCalledWith('[执行命令: npm run build → 成功]'));
 });
 
+it('copies ACP text parts when the flat answer content is empty', async () => {
+  writeClipboardTextMock.mockClear();
+  render(<AiBlock conversationId="conversation" presentation="conversation"
+    exchange={{ ...exchange, answer: { ...exchange.answer!, content: '', parts: [
+      { kind: 'text', text: 'First paragraph.' },
+      { kind: 'text', text: 'Second paragraph.' },
+    ] } }} />);
+  fireEvent.click(screen.getByTestId('chat-answer-copy'));
+  await waitFor(() => expect(writeClipboardTextMock).toHaveBeenCalledWith('First paragraph.\n\nSecond paragraph.'));
+});
+
 it('keeps this exchange actionable while a background conversation answers', () => {
   // The single send slot is taken by a scheduled (background) conversation: this exchange is idle.
   useChatStore.setState({ sendingTabs: ['background-conversation'] });
