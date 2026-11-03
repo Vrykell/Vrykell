@@ -127,16 +127,16 @@ Vrykell 围绕真实的 Shell 会话组织开发与远程工作。每条命令�
 
 ## 下载
 
-当前稳定版：**0.1.1**。
+当前稳定版：**0.1.2**。
 
 | 平台 | 安装包 |
 | --- | --- |
-| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_x64-setup.exe) |
-| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_aarch64.dmg) |
-| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_x64.dmg) |
-| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_amd64.AppImage) |
+| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.2/Vrykell_0.1.2_x64-setup.exe) |
+| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.2/Vrykell_0.1.2_aarch64.dmg) |
+| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.2/Vrykell_0.1.2_x64.dmg) |
+| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.2/Vrykell_0.1.2_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.2/Vrykell_0.1.2_amd64.AppImage) |
 
-[全部版本](https://github.com/Vrykell/Vrykell/releases) · [发布说明](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.1)
+[全部版本](https://github.com/Vrykell/Vrykell/releases) · [发布说明](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.2)
 
 发布说明记录安装包校验和、精确源码提交与验证覆盖。更新签名用于验证更新载荷，不能替代操作系统的分发签名或公证。上文能力描述跟随开发分支；安装包发布之后的改动需要构建当前源码。
 
