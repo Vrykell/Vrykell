@@ -18,15 +18,13 @@
 .ssh-form-fields { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 12px; }
 .ssh-form-fields label, .ssh-form-section-fields > label, .ssh-forward-fields label { display: flex; flex-direction: column; gap: 6px; color: var(--text-secondary); font-size: var(--fs-caption); }
 .ssh-form-file-picker { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.ssh-form-file-picker > .ssh-form-browse { flex: 0 0 auto; height: 32px; min-height: 32px; padding: 0 12px; border-radius: var(--radius-inner); white-space: nowrap; }
 .ssh-check-group { padding: 0 12px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--chrome-field); }
 .ssh-check-row { display: flex !important; flex-direction: row !important; align-items: flex-start; gap: 10px !important; padding: 12px 0; color: var(--text-primary) !important; font-size: var(--fs-label) !important; }
 .ssh-check-row + .ssh-check-row { border-top: 1px solid var(--border); }
 .ssh-check-row .themed-checkbox { margin-top: 2px; }
 .ssh-check-row small { display: block; margin-top: 4px; color: var(--text-muted); font-size: var(--fs-caption); line-height: 1.5; }
 .ssh-form-footer { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--border); flex-shrink: 0; flex-wrap: wrap; }
-.ssh-form-footer .text-control { flex: 0 0 auto; height: 34px; min-height: 34px; padding: 0 12px; border-radius: var(--radius-inner); white-space: nowrap; }
-.ssh-form-footer .ssh-primary-action { padding: 0 16px; }
+.ssh-form-header > .text-control, .ssh-form-footer > :is(.text-control, .outline-button), .ssh-form-file-picker > .ssh-form-browse, button.outline-button.ssh-editor-action { flex: 0 0 auto; min-height: var(--control-size-compact); padding: 4px 12px; border-radius: var(--radius-inner); font: var(--fs-caption)/1.5 var(--font-ui); white-space: nowrap; }
 .ssh-inline-error { padding: 0 16px 10px; max-height: 100px; overflow-y: auto; flex-shrink: 0; }
 .ssh-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
 .ssh-section-heading > div { flex: 1; }
@@ -103,9 +101,10 @@ button.ssh-editor-favorite:focus-visible { outline: 1px solid var(--border-stron
 .ssh-editor-network > .ui-select { width: 100%; }
 .ssh-editor-proxy { flex-wrap: wrap; }
 .ssh-editor-proxy > .ui-select { flex-basis: 200px; }
-.ssh-host-editor button.ssh-editor-link { color: var(--accent); }
-.ssh-host-editor .ssh-form-header > button.text-control, .ssh-host-editor .ssh-form-footer > button.text-control:not(.ssh-editor-delete) { padding-inline: 12px; }
-.ssh-host-editor .ssh-form-header > button.text-control:not(.user-primary-action), .ssh-host-editor .ssh-form-footer > button.text-control:not(.ssh-editor-delete) { background: var(--action-button-bg); }
+.ssh-editor-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ssh-host-editor .ssh-form-section-fields > .ssh-editor-actions { padding: 8px 12px; }
+button.ssh-editor-action { align-self: flex-start; }
+.ssh-editor-network > button.ssh-editor-action { margin-top: 8px; }
 .ssh-host-tag-dot { display: inline-block; flex: 0 0 7px; width: 7px; height: 7px; margin-right: 6px; border-radius: 50%; }
 .ssh-environment-rows { display: flex; flex-direction: column; gap: 8px; }
 .ssh-environment-rows:empty { display: none; }
@@ -113,13 +112,16 @@ button.ssh-editor-favorite:focus-visible { outline: 1px solid var(--border-stron
 .ssh-host-editor .ssh-environment-rows > div { padding: 6px 12px; }
 .ssh-host-editor .ssh-environment-rows > div + div { border-top: 1px solid var(--border); }
 .ssh-host-editor .ssh-environment-rows input:first-child { flex: .6; }
-.ssh-host-editor :is(.ssh-form-section-fields, .ssh-forwarding-editor) > .ssh-editor-link { justify-content: flex-start; padding: 10px 16px; border-radius: 0; }
-.ssh-host-editor .ssh-forwarding-editor > .ssh-editor-link { border-radius: var(--radius-inner); }
 .ssh-proxy-dialog { display: flex; flex-direction: column; width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); overflow: hidden; background: var(--menu-bg); }
-.ssh-proxy-dialog > header { padding: 16px 20px; }
+.ssh-proxy-dialog > header { padding: 12px 16px; }
 .ssh-proxy-dialog h2 { margin: 0; font-size: var(--fs-subtitle); }
-.ssh-proxy-dialog > .ssh-form-section { padding: 0 20px 20px; overflow: auto; }
-.ssh-host-editor input.text-input-field, .ssh-form-dialog:not(.ssh-auth-dialog) input.text-input-field { min-height: 28px; padding-block: 4px; }
+.ssh-proxy-dialog > .ssh-form-section { min-height: 0; padding: 12px 16px 16px; overflow: auto; }
+.ssh-proxy-dialog > .ssh-form-footer { padding-inline: 16px; }
+.ssh-proxy-dialog .ssh-form-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ssh-proxy-dialog .ui-select { min-height: var(--control-size-compact); padding-block: 4px; }
+.ssh-host-editor input.text-input-field, .ssh-form-dialog:not(.ssh-auth-dialog) input.text-input-field, .ssh-proxy-dialog input.text-input-field { min-height: var(--control-size-compact); padding-block: 4px; }
+.ssh-number-input { appearance: textfield; }
+.ssh-number-input::-webkit-inner-spin-button, .ssh-number-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .ssh-host-editor .segmented-control, .ssh-form-dialog .segmented-control { width: 100%; min-width: 0; box-sizing: border-box; }
 .ssh-host-editor .segmented-control > button > svg, .ssh-form-dialog .segmented-control > button > svg { flex-shrink: 0; }
 @container host-editor (max-width: 560px) {

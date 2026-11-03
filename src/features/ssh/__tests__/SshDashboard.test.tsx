@@ -80,6 +80,23 @@ it('combines favorites, folder and colored tag filters and clears each independe
   expect(screen.getByTestId('ssh-row-ssh-1').querySelector('.sidebar-row-title svg')).toHaveStyle({ color: 'var(--favorite-color)' });
 });
 
+it.each([
+  ['ssh-host-tag-filter', '主机标签', 'api'],
+  ['ssh-host-group-filter', '主机分组', 'Tokyo'],
+])('dismisses %s when the workspace becomes inactive without clearing its filter', (triggerId, title, option) => {
+  const props = { onManage: vi.fn(), onOpenTerminal: vi.fn() };
+  const view = render(<SshDashboard {...props} active />);
+  fireEvent.click(screen.getByTestId(triggerId));
+  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: option }));
+  expect(screen.getByRole('menu', { name: title })).toBeVisible();
+  view.rerender(<SshDashboard {...props} active={false} />);
+  expect(screen.queryByRole('menu', { name: title })).toBeNull();
+  view.rerender(<SshDashboard {...props} active />);
+  expect(screen.queryByRole('menu', { name: title })).toBeNull();
+  fireEvent.click(screen.getByTestId(triggerId));
+  expect(screen.getByRole('menuitemcheckbox', { name: option })).toHaveAttribute('aria-checked', 'true');
+});
+
 it.each(['卡片视图', '表格视图'])('centers unmatched hosts in %s and searches full connection addresses', layout => {
   render(<SshDashboard onManage={vi.fn()} onOpenTerminal={vi.fn()} />);
   fireEvent.click(screen.getByRole('button', { name: layout }));

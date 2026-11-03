@@ -5,7 +5,7 @@ import { TextInput } from '@ui/fields/TextInput';
 import ConfigTextArea from '@ui/fields/ConfigTextArea';
 import { IconButton } from '@ui/actions/IconButton';
 import { Plus, Trash2 } from '@ui/icons';
-import { TextButton } from '@ui/actions/TextButton';
+import { OutlineButton } from '@ui/actions/OutlineButton';
 import { t } from '@i18n';
 import { formatForwardRules, parseForwardTexts, type ForwardKind, type ForwardRule, type ForwardTexts } from '../model/forwardRules';
 
@@ -53,7 +53,7 @@ export default function SshForwardingEditor({ value, onChange }: Props) {
           </>}
         </div>
       </div>)}
-      <TextButton className="ssh-editor-link" onClick={add} data-testid="ssh-forward-add"><Plus size={14} />{t('Add forwarding rule')}</TextButton>
+      <OutlineButton className="ssh-editor-action" onClick={add} data-testid="ssh-forward-add"><Plus size={14} />{t('Add forwarding rule')}</OutlineButton>
     </> : <div className="ssh-forward-texts">
       {(['local', 'remote', 'dynamic'] as const).map(kind => <ConfigTextArea key={kind} label={t(kind === 'local' ? 'Local forward' : kind === 'remote' ? 'Remote forward' : 'Dynamic forward')}
         aria-label={t(kind === 'local' ? 'Local forward' : kind === 'remote' ? 'Remote forward' : 'Dynamic forward')}
