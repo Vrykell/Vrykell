@@ -128,7 +128,7 @@ export default function PanelChat({ active = true, workspace = false, toolbarTar
       {!inSidebar && <ConversationSettingsActions conversationId={activeId} onCloseMenu={() => setSettingsMenu(null)} />}
     </section>;
   return <div ref={panelRef} className="ai-chat-panel">
-    {!inSidebar && (workspace ? toolbarTarget && createPortal(actions, toolbarTarget) : <ConversationHeading title={conversation?.title ?? t('AI chat')}
+    {!inSidebar && active && (workspace ? toolbarTarget && createPortal(actions, toolbarTarget) : <ConversationHeading title={conversation?.title ?? t('AI chat')}
       onRename={conversation ? title => useChatStore.getState().renameConversation(activeId, title) : undefined}
       onHistory={() => useSessionStore.getState().openAiHistoryTab()} onNew={() => useChatStore.getState().createConversation()} settings={actions} />)}
     {inSidebar ? sidebarSettings?.target && createPortal(settingsContents, sidebarSettings.target)

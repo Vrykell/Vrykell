@@ -58,6 +58,10 @@ export default function AiBlock({ exchange, conversationId, toolContextId, onAsk
     useChatStore.getState().deleteExchange(id, question.id);
   };
   const parts = answer?.parts;
+  // Structured replies can keep their streamed text only in the ordered parts.
+  const lastPart = parts?.[parts.length - 1];
+  const streamTail = parts ? lastPart?.kind === 'text' ? lastPart.text : '' : answer?.content ?? '';
+  const showOutputCursor = Boolean(answer?.pending && visibleAssistantText(streamTail).trim());
   // A stopped (or still tool-running) reply can have no answer text yet: fall back to the
   // one-line tool log so the copy target is never an empty string.
   const answerCopyText = answer ? visibleAssistantText(answer.content) || visibleAssistantText(partsToHistoryText(parts)).trim() : '';
@@ -101,9 +105,9 @@ export default function AiBlock({ exchange, conversationId, toolContextId, onAsk
       {parts ? parts.map((part, index) => part.kind === 'tool'
         ? <ToolRunCard key={part.tool.toolCallId} run={part.tool} paneId={answer.paneId ?? exchange.paneId} framed={plain} conversationId={toolContextId ?? ownerConversation} onAskAboutTool={onAskAboutTool} environment={answer.environment ?? question?.environment ?? undefined} />
         : part.text ? <div key={index} className="md"><SafeMarkdown content={visibleAssistantText(part.text)} paneId={executionPane} />
-          {answer.pending && index === parts.length - 1 && <PendingCursor />}</div> : null)
-        : answer.content ? <div className="md"><SafeMarkdown content={visibleAssistantText(answer.content)} paneId={executionPane} />{answer.pending && <PendingCursor />}</div> : null}
-      {answer.pending && (!answer.content || parts?.[parts.length - 1]?.kind === 'tool') && <div className="ai-block-working" role="status"><PendingCursor />{t('Working')}</div>}
+          {showOutputCursor && index === parts.length - 1 && <PendingCursor />}</div> : null)
+        : answer.content ? <div className="md"><SafeMarkdown content={visibleAssistantText(answer.content)} paneId={executionPane} />{showOutputCursor && <PendingCursor />}</div> : null}
+      {answer.pending && !showOutputCursor && <div className="ai-block-working" role="status"><PendingCursor />{t('Working')}</div>}
       {answer.error && <ErrorBox placement="inline" dismissible={false} title={t('The reply could not be completed')} details={answer.errorText}
         actions={question && !sending && (allowExchangeActions || onRetry) ? <button type="button" onClick={onRetry ?? regenerate}>{t('Retry')}</button> : undefined}>
         {answer.errorSummary}

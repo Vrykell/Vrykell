@@ -5,12 +5,10 @@ import { save } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
 import { diagnosticsLogDirectory, exportDiagnostics, setDiagnosticAutoSave, setDiagnosticInputTrace, useDiagnosticSettings } from '@platform/diagnostics';
 import ErrorBox from '@ui/feedback/ErrorBox';
-import { SettingsGroup, Field } from '../components/ui';
-import { useSettingsSave } from '../components/SettingsSaveProvider';
+import { SettingsGroup, Field, Toggle } from '../components/ui';
 
 export function LogsPage() {
   const { autoSave, inputTrace, saving, error } = useDiagnosticSettings();
-  const { save: saveSetting } = useSettingsSave();
   const [exporting, setExporting] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: 'success' | 'error' } | null>(null);
   const [directory, setDirectory] = useState('');
@@ -25,11 +23,11 @@ export function LogsPage() {
   };
   return <SettingsGroup title={t('Diagnostics')}>
     <Field title={t('Save logs automatically')} description={t('Save diagnostics on this device across restarts.')}>
-      <OutlineButton role="switch" aria-label={t('Save logs automatically')} aria-checked={autoSave} disabled={saving} onClick={() => { void saveSetting(() => setDiagnosticAutoSave(!autoSave)); }}>{saving ? t('Saving…') : autoSave ? t('Enabled') : t('Disabled')}</OutlineButton>
+      <Toggle on={autoSave} label={t('Save logs automatically')} disabled={saving} onChange={setDiagnosticAutoSave} />
       {error && <ErrorBox compact testId="logs-error" style={{ marginTop: 8 }}>{error}</ErrorBox>}
     </Field>
     <Field title={t('Trace terminal input')} description={t('Record every key and cursor repaint in the diagnostics log. Turn this on only while investigating input latency.')}>
-      <OutlineButton role="switch" aria-label={t('Trace terminal input')} aria-checked={inputTrace} onClick={() => setDiagnosticInputTrace(!inputTrace)}>{inputTrace ? t('Enabled') : t('Disabled')}</OutlineButton>
+      <Toggle on={inputTrace} label={t('Trace terminal input')} onChange={setDiagnosticInputTrace} />
     </Field>
     <Field title={t('Export logs')} description={t('Export recent diagnostics. Passwords, keys and terminal or conversation content are excluded.')}>
       <OutlineButton disabled={exporting} onClick={() => { void exportLog(); }}>{exporting ? t('Exporting…') : t('Export detailed log')}</OutlineButton>
