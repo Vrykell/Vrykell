@@ -108,6 +108,7 @@ test('a toolbar drag reserves a stable shared insertion gap before saving', asyn
   await page.mouse.move(source.x + 16, source.y + 16); await page.mouse.down();
   await page.mouse.move(target.x + 4, target.y + 16, { steps: 8 });
   const gap = zone(page).locator('[data-dock-placeholder="0"]'); await expect(gap).toBeVisible();
+  await expect(gap).toHaveCSS('border-width', '0px');
   const bounds = (await gap.boundingBox())!;
   expect(bounds.width).toBe(32); expect(bounds.height).toBe(32);
   for (const delta of [-1, 0, 1]) {
@@ -118,6 +119,54 @@ test('a toolbar drag reserves a stable shared insertion gap before saving', asyn
   await page.mouse.up(); expect((await order(page))[0]).toBe('chat');
   await expect(page.locator('[data-dock-placeholder]')).toHaveCount(0);
 });
+
+for (const theme of ['dark', 'light'] as const) {
+  for (const width of [1240, 720]) {
+    test(`drag insertion slots have no edge borders in ${theme} at ${width}px`, async ({ page }, info) => {
+      await page.addInitScript(mode => localStorage.setItem('vrykell-theme-mode', mode), theme);
+      await page.setViewportSize({ width, height: 800 });
+      await page.reload();
+      await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+
+      const source = (await button(page, 'git').boundingBox())!;
+      const target = (await button(page, 'files').boundingBox())!;
+      await page.mouse.move(source.x + 16, source.y + 16);
+      await page.mouse.down();
+      await page.mouse.move(target.x + 4, target.y + 16, { steps: 8 });
+      const toolbarSlot = zone(page).locator('[data-dock-placeholder="0"]');
+      await expect(toolbarSlot).toBeVisible();
+      await expect(toolbarSlot).toHaveCSS('border-width', '0px');
+      await expect(toolbarSlot).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await page.screenshot({ path: info.outputPath('toolbar-slot.png') });
+      await page.keyboard.press('Escape');
+      await page.mouse.up();
+      await expect(toolbarSlot).toHaveCount(0);
+
+      const expand = page.getByTestId('workspace-sidebar-expand');
+      if (await expand.isVisible()) await expand.click();
+      const row = page.getByTestId('workspace-area-unified');
+      const rowBox = (await row.boundingBox())!;
+      const destination = (await page.getByTestId('workspace-area-ssh').boundingBox())!;
+      await page.mouse.move(rowBox.x + rowBox.width / 2, rowBox.y + rowBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(destination.x + destination.width / 2, destination.y + destination.height + 40, { steps: 8 });
+      const sidebarSlot = page.locator('[data-reorder-placeholder]');
+      await expect(sidebarSlot).toBeVisible();
+      await expect(sidebarSlot).toHaveAttribute('data-reorder-placeholder', 'ssh');
+      await expect(sidebarSlot).toHaveCSS('border-width', '0px');
+      await expect(sidebarSlot).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      expect((await sidebarSlot.boundingBox())!.height).toBe(rowBox.height);
+      await page.screenshot({ path: info.outputPath('sidebar-slot.png') });
+      const firstRow = (await page.getByTestId('workspace-area-terminal').boundingBox())!;
+      await page.mouse.move(firstRow.x + firstRow.width / 2, firstRow.y + 1, { steps: 8 });
+      await expect(sidebarSlot).toHaveAttribute('data-reorder-placeholder', 'terminal');
+      await page.keyboard.press('Escape');
+      await page.mouse.up();
+      await expect(sidebarSlot).toHaveCount(0);
+      await expect(row).toBeVisible();
+    });
+  }
+}
 
 test('crossing sides previews the real panel surface and moving a left panel back keeps it usable', async ({ page }, info) => {
   await page.evaluate(async () => {
@@ -154,6 +203,7 @@ test('workspace navigation rows reorder vertically and retain their order', asyn
   await page.mouse.down();
   await page.mouse.move(target.x + target.width / 2, target.y + 1, { steps: 8 });
   await expect(page.locator('[data-reorder-preview]')).toBeVisible();
+  await expect(page.locator('[data-reorder-placeholder]')).toHaveCSS('border-width', '0px');
   await page.mouse.up();
   const order = () => page.locator('[data-testid^="workspace-area-"]').evaluateAll(rows =>
     rows.map(row => row.getAttribute('data-testid')?.replace('workspace-area-', '')));

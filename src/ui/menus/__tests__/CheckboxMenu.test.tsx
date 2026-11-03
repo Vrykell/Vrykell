@@ -71,4 +71,28 @@ describe('CheckboxMenu', () => {
     expect(onClose).toHaveBeenCalledOnce();
     trigger.remove();
   });
+
+  it('closes on an outside press even when the target stops event propagation', () => {
+    vi.useFakeTimers();
+    const onClose = vi.fn();
+    render(<>
+      <button onPointerDown={event => event.stopPropagation()}>Outside</button>
+      <CheckboxMenu title="Filters" options={options} onToggle={vi.fn()} onClose={onClose} />
+    </>);
+    act(() => { vi.advanceTimersByTime(1); });
+    fireEvent.pointerDown(screen.getByRole('button', { name: 'Outside' }));
+    expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('keeps outside dismissal active when a toggle replaces the close callback', () => {
+    vi.useFakeTimers();
+    const firstClose = vi.fn();
+    const nextClose = vi.fn();
+    const view = render(<CheckboxMenu title="Filters" options={options} onToggle={vi.fn()} onClose={firstClose} />);
+    act(() => { vi.advanceTimersByTime(1); });
+    view.rerender(<CheckboxMenu title="Filters" options={options} onToggle={vi.fn()} onClose={nextClose} />);
+    fireEvent.pointerDown(document.body);
+    expect(firstClose).not.toHaveBeenCalled();
+    expect(nextClose).toHaveBeenCalledOnce();
+  });
 });

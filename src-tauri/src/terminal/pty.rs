@@ -18,6 +18,7 @@ const CLOSE_DEADLINE: std::time::Duration = std::time::Duration::from_millis(200
 const CLOSE_ALL_DEADLINE: std::time::Duration = std::time::Duration::from_millis(500);
 /// Natural exits should already be reaped; this only guards a stale wait.
 const REAP_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(1000);
+static STARTUP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 /// A poisoned lock must never stop process cleanup halfway: the child still has to be
 /// terminated even when another thread panicked while holding the session state.
@@ -643,6 +644,11 @@ pub async fn pty_spawn(
     ssh: Option<SshTarget>,
     open_mode: Option<String>,
 ) -> Result<String, String> {
+    let startup_id = STARTUP_SEQUENCE.fetch_add(1, Ordering::Relaxed) + 1;
+    let startup_started = std::time::Instant::now();
+    let _ = crate::diagnostics::record("pty-spawn-backend-start", serde_json::json!({
+        "startupId": startup_id, "cols": cols, "rows": rows, "ssh": ssh.is_some(),
+    }));
     let debug_shell = shell.clone();
     let debug_ssh = ssh.is_some();
     let debug_open_mode = open_mode.clone();
@@ -668,6 +674,9 @@ pub async fn pty_spawn(
     let startup_app = app.clone();
     let ((id, master, mut reader, writer, child), ssh_config) =
         tauri::async_runtime::spawn_blocking(move || {
+            let _ = crate::diagnostics::record("pty-spawn-blocking-start", serde_json::json!({
+                "startupId": startup_id, "elapsedMs": startup_started.elapsed().as_millis() as u64,
+            }));
             let mut ssh = ssh;
             let config = if let Some(target) = &mut ssh {
                 startup_app.state::<crate::db::HistoryState>().0.lock().map_err(|error| error.to_string())?
@@ -851,6 +860,9 @@ pub async fn pty_spawn(
             }
         }
     });
+    let _ = crate::diagnostics::record("pty-spawn-backend-ready", serde_json::json!({
+        "startupId": startup_id, "sessionId": id, "durationMs": startup_started.elapsed().as_millis() as u64,
+    }));
     Ok(id)
 }
 

@@ -60,6 +60,7 @@ registerField('command-highlighting', 'appearance-typography', 'Command syntax h
 registerField('terminal-cursor-blink', 'appearance-typography', 'Terminal cursor blinking', 'Blink the classic terminal cursor. Turn off to keep it steady while typing.', () => String(useTypographyStore.getState().terminalCursorBlink));
 registerField('composition-cursor-blink', 'appearance-typography', 'Composition cursor blinking', 'Blink the simulated cursor while composing text with an input method.', () => String(useTypographyStore.getState().compositionCursorBlink));
 registerField("logs", "logs", "Save diagnostic logs automatically", "Diagnostic logging and errors");
+registerField('input-trace', 'logs', 'Trace terminal input', 'Diagnostic logging and errors');
 registerField('context-menu', 'context-menu', 'Windows context menu', 'Open in Vrykell', undefined, 'Open in Vrykell');
 registerField("export-logs", "logs", "Export logs", "Diagnostic archive");
 registerField("api-key", "ai-model", "Provider API Key", "Credentials for the current model provider", () => isApiKeyConfigured() ? t('Configured') : t('Not configured'));

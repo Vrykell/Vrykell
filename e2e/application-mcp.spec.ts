@@ -84,8 +84,28 @@ test('uses the explicitly selected terminal and does not bypass shared approval 
   await expect.poll(async () => (await result(page, 'command'))?.isError).toBe(true);
   await call(page, 'retry', 'read_file', { path: '/home/e2e/project/file.txt' });
   await expect.poll(async () => (await result(page, 'retry'))?.isError).toBe(true);
-  expect((await result(page, 'retry'))?.content[0]?.text).toContain('denied');
+  expect((await result(page, 'retry'))?.content[0]?.text).toContain('本轮工具调用已结束');
   await expect(page.getByRole('button', { name: '运行', exact: true })).toHaveCount(0);
+});
+
+test('blocks application tools queued behind a skipped question and permits a new turn', async ({ page }) => {
+  await open(page);
+  await page.getByTestId('harness-composer').fill('Ask before writing');
+  await page.getByTestId('harness-send').click();
+  await call(page, 'skipped', 'ask_user', { question: 'Which folder should be used?', options: ['Current project'] });
+  await expect(page.getByRole('group', { name: '回答问题', exact: true })).toBeVisible();
+  await call(page, 'queued-write', 'write_file', { path: '/home/e2e/project/blocked.txt', content: 'blocked' });
+  await page.getByRole('button', { name: '跳过问题', exact: true }).click();
+  await expect.poll(async () => (await result(page, 'queued-write'))?.isError).toBe(true);
+  expect((await result(page, 'queued-write'))?.content[0]?.text).toContain('本轮工具调用已结束');
+  await expect(page.getByRole('button', { name: '运行', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '停止本轮', exact: true }).click();
+  await page.getByTestId('harness-composer').fill('New question');
+  await page.getByTestId('harness-send').click();
+  await call(page, 'new-question', 'ask_user', { question: 'Which environment?', options: ['Preview'] });
+  await expect(page.getByRole('group', { name: '回答问题', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Preview', exact: true }).click();
+  await expect.poll(async () => (await result(page, 'new-question'))?.isError).toBe(false);
 });
 
 test('returns an approval review question to the same agent composer', async ({ page }) => {

@@ -2,6 +2,7 @@ import { invoke as rawInvoke, type InvokeArgs, type InvokeOptions } from '@tauri
 import { create } from 'zustand';
 import sharedCommands from '@core/sharedCommands.json';
 import { t } from '@i18n';
+import { startPerformanceProbe, type FrameSchedulingDetail } from './diagnosticPerformance';
 export type { InvokeArgs, InvokeOptions } from '@tauri-apps/api/core';
 
 export interface DiagnosticRecord {
@@ -69,7 +70,37 @@ export function sanitizeDiagnostic(value: unknown, key = '', depth = 0): unknown
   return value;
 }
 
-export const useDiagnosticSettings = create<{ autoSave: boolean; saving: boolean; error: string | null }>(() => ({ autoSave: false, saving: false, error: null }));
+const INPUT_TRACE_KEY = 'vrykell-terminal-input-trace';
+
+function storedInputTrace(): boolean {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem(INPUT_TRACE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export const useDiagnosticSettings = create<{ autoSave: boolean; inputTrace: boolean; saving: boolean; error: string | null }>(() => ({
+  autoSave: false,
+  inputTrace: storedInputTrace(),
+  saving: false,
+  error: null,
+}));
+
+/** Per-key terminal tracing is opt-in: it is too frequent for the default log volume. */
+export function isDiagnosticInputTraceEnabled(): boolean {
+  return useDiagnosticSettings.getState().inputTrace;
+}
+
+export function setDiagnosticInputTrace(enabled: boolean): void {
+  useDiagnosticSettings.setState({ inputTrace: enabled });
+  try {
+    localStorage.setItem(INPUT_TRACE_KEY, enabled ? '1' : '0');
+  } catch {
+    // Storage can be unavailable; the in-memory switch still applies to this session.
+  }
+  diagnostic('diagnostics-input-trace', { enabled }, 'info');
+}
 
 export function diagnostic(event: string, detail: unknown = {}, level: DiagnosticRecord['level'] = 'debug'): void {
   try {
@@ -92,22 +123,20 @@ export function diagnosticSnapshot(): DiagnosticRecord[] { return [...records]; 
 
 /** Frame gaps at or above this are a main-thread stall the user feels as lag. */
 export const FRAME_STALL_MS = 250;
-/** Gaps this large are the window not producing frames at all (hidden or occluded). */
+/** Label long gaps separately without assuming the window was suspended. */
 export const FRAME_PAUSE_MS = 5000;
 
 /**
- * Record one animation-frame gap of the application window. The watchdog below reports what the
- * user feels as lag - a frozen main thread freezes every frame - and keeps the two causes apart:
- * a stall while the window is on screen, versus the window being paused (no frames at all) while
- * it was hidden. The probe stays silent below {@link FRAME_STALL_MS} so ordinary frames cost
- * nothing.
+ * Record a frame gap with independent timer progress. Long-task observations and native focus
+ * events supply additional evidence; duration alone does not distinguish blocking from suspension.
  */
-export function reportFrameGap(gapMs: number): void {
+export function reportFrameGap(gapMs: number, scheduling?: FrameSchedulingDetail): void {
   if (gapMs < FRAME_STALL_MS) return;
   diagnostic(gapMs >= FRAME_PAUSE_MS ? 'frame-pause' : 'frame-stall', {
     gapMs: Math.round(gapMs),
     visibility: document.visibilityState,
     hasFocus: document.hasFocus(),
+    ...scheduling,
   });
 }
 
@@ -178,18 +207,8 @@ export function initializeDiagnostics(): void {
   });
   window.addEventListener('focus', () => reportWindowFocus(true));
   window.addEventListener('blur', () => reportWindowFocus(false));
-  // The frame watchdog: a gap between frames is the most direct reading of the lag the user
-  // feels, and it attributes nothing to a subsystem, so it also covers causes the terminal
-  // pipeline does not know about.
-  let lastFrameAt = performance.now();
-  const watchFrame = () => {
-    const now = performance.now();
-    reportFrameGap(now - lastFrameAt);
-    lastFrameAt = now;
-    window.requestAnimationFrame(watchFrame);
-  };
-  window.requestAnimationFrame(watchFrame);
-  window.addEventListener('pagehide', () => { void flushDiagnostics(); });
+  const stopPerformanceProbe = startPerformanceProbe(diagnostic, reportFrameGap, FRAME_STALL_MS);
+  window.addEventListener('pagehide', () => { stopPerformanceProbe(); void flushDiagnostics(); });
   const initialSettingsRevision = autoSaveRevision;
   void rawInvoke<boolean>('diagnostics_auto_save').then(autoSave => {
     if (initialSettingsRevision !== autoSaveRevision) return;

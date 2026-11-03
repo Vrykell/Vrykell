@@ -1,7 +1,7 @@
 /**
  * sessionManager — session lifecycle (create/close/restore/rename/record and others) tests.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
@@ -20,8 +20,46 @@ beforeEach(() => {
   useBlockStore.setState({ byTab: {} });
   useChatStore.setState({ byTab: {} });
 });
+afterEach(() => { vi.useRealTimers(); });
 
 describe('sessionManager lifecycle', () => {
+  it('flushes the last debounced layout before archiving the session', async () => {
+    invokeMock.mockResolvedValue(undefined);
+    const layout = { type: 'leaf' as const, terminal: { id: 'layout-close#0', kind: 'local' as const, cwd: '/latest' } };
+    sessionManager.saveLayout('layout-close', layout);
+    await sessionManager.close('layout-close');
+    expect(invokeMock).toHaveBeenCalledWith('update_session_payload', { id: 'layout-close', payload: JSON.stringify({ layout }) });
+    expect(invokeMock.mock.calls.map(([command]) => command)).toEqual(['update_session_payload', 'archive_session']);
+  });
+
+  it('waits for an in-flight layout write and queues the latest layout before archive', async () => {
+    vi.useFakeTimers();
+    let finish!: () => void;
+    invokeMock.mockResolvedValue(undefined).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    const initial = { type: 'leaf' as const, terminal: { id: 'layout-flight#0', kind: 'local' as const, cwd: '/first' } };
+    const latest = { ...initial, terminal: { ...initial.terminal, cwd: '/latest' } };
+    sessionManager.saveLayout('layout-flight', initial);
+    await vi.advanceTimersByTimeAsync(150);
+    sessionManager.saveLayout('layout-flight', latest);
+    const closing = sessionManager.close('layout-flight');
+    await Promise.resolve();
+    expect(invokeMock.mock.calls.map(([command]) => command)).toEqual(['update_session_payload']);
+    finish(); await closing;
+    expect(invokeMock.mock.calls.map(([command]) => command)).toEqual(['update_session_payload', 'update_session_payload', 'archive_session']);
+    expect(invokeMock.mock.calls[1][1]).toEqual({ id: 'layout-flight', payload: JSON.stringify({ layout: latest }) });
+  });
+
+  it('keeps failed close-time layouts retryable without archiving stale metadata', async () => {
+    invokeMock.mockRejectedValueOnce(new Error('disk unavailable'));
+    const layout = { type: 'leaf' as const, terminal: { id: 'layout-retry#0', kind: 'local' as const } };
+    sessionManager.saveLayout('layout-retry', layout);
+    await expect(sessionManager.close('layout-retry')).rejects.toThrow('disk unavailable');
+    expect(invokeMock.mock.calls.map(([command]) => command)).toEqual(['update_session_payload']);
+    invokeMock.mockResolvedValue(undefined);
+    await sessionManager.close('layout-retry');
+    expect(invokeMock.mock.calls.map(([command]) => command)).toEqual(['update_session_payload', 'update_session_payload', 'archive_session']);
+  });
+
   it('moves pane chat ownership immediately and serializes history writes behind the transfer', async () => {
     let finish!: () => void;
     invokeMock.mockImplementation((command: string) => command === 'move_terminal_panes' ? new Promise<void>(resolve => { finish = resolve; }) : Promise.resolve(undefined));

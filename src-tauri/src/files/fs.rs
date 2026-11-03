@@ -1404,6 +1404,23 @@ mod tests {
     }
 
     #[test]
+    fn collision_rename_and_staging_preserve_the_replacement_file() {
+        let root = temp_workspace("undo-collision");
+        let original = super::fs_create_sync(root.to_string_lossy().into_owned(), "Untitled".into(), false).unwrap();
+        std::fs::write(&original, "owned").unwrap();
+        let renamed = super::fs_rename_sync(original.clone(), "renamed".into()).unwrap();
+        std::fs::write(&original, "replacement").unwrap();
+        let restored = super::fs_rename_sync(renamed, "Untitled".into()).unwrap();
+        assert_ne!(restored, original);
+        assert_eq!(std::fs::read_to_string(&restored).unwrap(), "owned");
+        let staged = super::stage_delete_into(&root.join("staging"), vec![restored]).unwrap();
+        assert!(staged.errors.is_empty());
+        assert_eq!(std::fs::read_to_string(&original).unwrap(), "replacement");
+        assert_eq!(std::fs::read_to_string(&staged.completed[0].to).unwrap(), "owned");
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
     fn stage_delete_reports_successes_even_when_an_item_fails() {
         let root = temp_workspace("partial-delete");
         let first = root.join("first.txt");

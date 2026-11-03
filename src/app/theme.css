@@ -455,19 +455,19 @@ button.state-icon-button[aria-pressed="true"]:hover { background: var(--selectio
 [data-dock-zone][data-dragging="true"], [data-dock-zone][data-dragging="true"] button { cursor: grabbing; }
 .workspace-navigation-placeholder {
   width: 32px; height: 32px; flex-shrink: 0; box-sizing: border-box;
-  border: 1px dashed var(--border-strong); border-radius: 8px; background: var(--hover);
+  border: 0; border-radius: 8px; background: var(--hover);
 }
 .workspace-navigation-drag-preview {
   position: fixed; z-index: 2000; pointer-events: none; transform: translate(-50%, -50%);
   width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
   background: var(--chrome-field); color: var(--text-primary); border-radius: 8px; box-shadow: var(--shadow-md);
 }
-/* Sidebar list reorder: the dragged row leaves its slot for a dashed placeholder. */
+/* Sidebar list reorder: the dragged row leaves its slot for a borderless placeholder. */
 [data-reorder-dragging="true"] { position: absolute; visibility: hidden; pointer-events: none; }
 [data-reorder-dragging="true"], [data-reorder-dragging="true"] * { visibility: hidden !important; pointer-events: none !important; }
 .sidebar-reorder-placeholder {
   height: 44px; flex-shrink: 0; box-sizing: border-box; margin: 0 6px;
-  border: 1px dashed var(--border-strong); border-radius: var(--radius-inner); background: var(--hover);
+  border: 0; border-radius: var(--radius-inner); background: var(--hover);
 }
 .sidebar-reorder-preview {
   position: fixed; z-index: 2000; pointer-events: none; transform: translate(-50%, -50%);

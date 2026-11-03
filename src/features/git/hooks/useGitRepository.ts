@@ -2,6 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import type { GitSnapshot, GitTarget } from '@core/git';
 import { getGitSnapshot } from '@platform/api/git';
 
+/** A focus that follows a recent load reuses its result instead of starting another git process. */
+export const FOCUS_REFRESH_DEBOUNCE_MS = 2000;
+
 export function useGitRepository(target: GitTarget | null, visible: boolean) {
   const cwd = target?.cwd;
   const connectionId = target?.connectionId;
@@ -13,9 +16,11 @@ export function useGitRepository(target: GitTarget | null, visible: boolean) {
     if (!visible || !cwd) return;
     let disposed = false;
     let busy = false;
+    let lastLoadAt = 0;
     const load = async () => {
       if (busy || document.hidden) return;
       busy = true;
+      lastLoadAt = Date.now();
       setState(previous => ({ key, snapshot: previous?.key === key ? previous.snapshot : null, error: previous?.key === key ? previous.error : '', loading: true }));
       try {
         const snapshot = await getGitSnapshot({ cwd, connectionId });
@@ -26,7 +31,10 @@ export function useGitRepository(target: GitTarget | null, visible: boolean) {
     };
     void load();
     const timer = window.setInterval(() => { void load(); }, 5000);
-    const onFocus = () => { void load(); };
+    const onFocus = () => {
+      if (Date.now() - lastLoadAt < FOCUS_REFRESH_DEBOUNCE_MS) return;
+      void load();
+    };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onFocus);
     return () => {

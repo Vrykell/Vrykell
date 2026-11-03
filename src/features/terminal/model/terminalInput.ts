@@ -1,7 +1,7 @@
 import type { Terminal, ITerminalOptions } from '@xterm/xterm';
 import { isWindows } from '@platform/runtime';
 import { configureLiteralInput } from '@ui/fields/TextInput';
-import { terminalDebug } from '../services/terminalDebug';
+import { isTerminalInputTraceEnabled, terminalDebug } from '../services/terminalDebug';
 
 const configured = new WeakSet<HTMLTextAreaElement>();
 
@@ -38,14 +38,18 @@ export function configureTerminalInput(term: Terminal): void {
     keyStart = emitted;
     nativeDiffPending = event.keyCode === 229 || event.isComposing;
     if (!composing && !nativeDiffPending) compositionCommitted = false;
-    terminalDebug('terminal-native-key', { composing: event.isComposing || composing,
-      imeKey: event.keyCode === 229, printable: event.key.length === 1,
-      modified: event.ctrlKey || event.altKey || event.metaKey, readonly: input.readOnly, repeat: event.repeat });
+    if (isTerminalInputTraceEnabled()) {
+      terminalDebug('terminal-native-key', { composing: event.isComposing || composing,
+        imeKey: event.keyCode === 229, printable: event.key.length === 1,
+        modified: event.ctrlKey || event.altKey || event.metaKey, readonly: input.readOnly, repeat: event.repeat });
+    }
     // Some native input methods use ordinary key codes for candidate navigation and
     // confirmation. Keep these keys native until compositionend commits the textarea.
     if (event.target === input && (composing || event.isComposing)) {
       event.stopPropagation();
-      terminalDebug('terminal-composition-key-guard', { imeKey: event.keyCode === 229 });
+      if (isTerminalInputTraceEnabled()) {
+        terminalDebug('terminal-composition-key-guard', { imeKey: event.keyCode === 229 });
+      }
     }
   }, { capture: true });
   term.element?.addEventListener('keypress', event => {
@@ -59,7 +63,9 @@ export function configureTerminalInput(term: Terminal): void {
       && (composing || compositionCommitted || commit.isComposing)) {
       event.stopPropagation();
       if (!composing && !commit.isComposing) compositionCommitted = false;
-      terminalDebug('terminal-composition-input-guard', { composing, chars: commit.data?.length ?? 0 });
+      if (isTerminalInputTraceEnabled()) {
+        terminalDebug('terminal-composition-input-guard', { composing, chars: commit.data?.length ?? 0 });
+      }
     }
   }, { capture: true });
   input.addEventListener('focus', () => {
@@ -87,8 +93,10 @@ export function configureTerminalInput(term: Terminal): void {
     // commit right after compositionend is exactly the one that must not be forwarded twice.
     const composed = compositionCommitted;
     if (commit.inputType === 'insertText') compositionCommitted = false;
-    terminalDebug('terminal-native-input', { inputType: commit.inputType,
-      composing: composing || commit.isComposing, chars: commit.data?.length ?? 0, consumed: emitted !== keyStart });
+    if (isTerminalInputTraceEnabled()) {
+      terminalDebug('terminal-native-input', { inputType: commit.inputType,
+        composing: composing || commit.isComposing, chars: commit.data?.length ?? 0, consumed: emitted !== keyStart });
+    }
     if (commit.inputType !== 'insertText' || !commit.data || composing || composed || commit.isComposing || nativeDiffPending || emitted !== keyStart) return;
     const expected = emitted;
     const version = compositionVersion;

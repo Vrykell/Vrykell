@@ -1,5 +1,9 @@
 # Security model
 
+## Conversation turn and transport limits
+
+Local tools share per-turn serialized execution. A refusal or an unanswered question closes queued and later calls in that turn; each subsequent user message starts a new scope. Native policy, confirmations and execution leases still apply. External protocol frames and replay buffers have explicit size limits and bounded queues; replay is consumed while its response is pending. Turn completion follows already received content, and a failed history load cannot inject its partial transcript into a replacement session. Request identifiers retain their original types. These changes add no commands, capabilities, file grants or network sources; independently configured external tools remain outside this adapter's control.
+
 ## Signed stable updates
 
 The main window alone receives check, download, install and restart capabilities. The platform adapter uses a fixed HTTPS release feed and fixed project links; user inputs cannot supply updater endpoints or public keys. The native updater verifies each downloaded artifact against the embedded public key before installation becomes available. Release notes render as bounded plain text. Prerelease versions are rejected even if the feed returns one. No check, download or installation runs automatically at startup.

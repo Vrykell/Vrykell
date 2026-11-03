@@ -10,6 +10,9 @@ vi.mock('@platform/pty', () => ({
 }));
 
 import { runCommandAndWait } from '@features/agent/tools/runCommand';
+import { ptyWrite } from '@platform/pty';
+import { writeTerminalInput } from '@features/terminal/services/terminalWriteQueue';
+import { setPendingCommandRegistrar } from '@features/terminal/services/pendingCommandRegistry';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
 import { useSessionStore } from '@features/workspace';
@@ -51,6 +54,23 @@ function mkBlock(p: Partial<TermBlock>): TermBlock {
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
 describe('runCommandAndWait', () => {
+  it('does not write a queued command after its turn was cancelled', async () => {
+    const paneId = setupPane();
+    let release!: () => void;
+    vi.mocked(ptyWrite).mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+    const earlier = writeTerminalInput('pty-1', 'earlier input');
+    const controller = new AbortController();
+    const clearPending = vi.fn();
+    setPendingCommandRegistrar(() => clearPending);
+    const pending = runCommandAndWait('echo cancelled', { paneId, signal: controller.signal });
+    controller.abort();
+    release();
+    await earlier;
+    await expect(pending).resolves.toMatchObject({ ok: false, completed: false });
+    expect(vi.mocked(ptyWrite).mock.calls.filter(([, data]) => data.includes('cancelled'))).toEqual([]);
+    expect(clearPending).toHaveBeenCalledOnce();
+  });
+
   it('reschedules completion after a later statement outlives the snapshot grace period', async () => {
     vi.useFakeTimers();
     const paneId = setupPane();
@@ -83,6 +103,7 @@ describe('runCommandAndWait', () => {
   });
   afterEach(() => {
     vi.useRealTimers();
+    setPendingCommandRegistrar(null);
   });
 
   it('block mode: a new block turns done -> returns the exit code and output, and the block receives the agent mark', async () => {

@@ -54,17 +54,21 @@ for (const theme of ['dark', 'light']) test(`keeps agent sidebar headings and qu
   await expect(question).toBeVisible();
   for (const width of [760, 1320]) {
     await page.setViewportSize({ width, height: 850 });
-    const bounds = await question.locator('.ai-question-options button').evaluateAll(buttons => buttons.map(button => {
-      const rect = button.getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right };
-    }));
+    // Measure together so transcript following cannot scroll between related samples.
+    const { bounds, card, input } = await question.evaluate(group => {
+      const bounds = Array.from(group.querySelectorAll('.ai-question-options button')).map(button => {
+        const rect = button.getBoundingClientRect(); return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right };
+      });
+      const card = group.parentElement!.getBoundingClientRect();
+      const input = group.querySelector('textarea, input')!.getBoundingClientRect();
+      return { bounds, card: { x: card.x, width: card.width }, input: { y: input.y } };
+    });
     expect(bounds).toHaveLength(3);
-    const card = (await question.locator('..').boundingBox())!;
     for (const option of bounds) {
       expect(option.left - card.x).toBeGreaterThanOrEqual(10);
       expect(card.x + card.width - option.right).toBeGreaterThanOrEqual(10);
     }
     for (let index = 1; index < bounds.length; index++) expect(bounds[index].top - bounds[index - 1].bottom).toBeGreaterThanOrEqual(7);
-    const input = (await question.getByRole('textbox').boundingBox())!;
     expect(input.y - bounds[2].bottom).toBeGreaterThanOrEqual(11);
     const lead = (await sidebar.locator('.chat-composer-lead').boundingBox())!;
     const add = (await sidebar.getByTestId('harness-new-session').boundingBox())!;

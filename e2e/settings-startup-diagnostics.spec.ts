@@ -2,6 +2,30 @@ import { test, expect } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
+for (const width of [1240, 760]) test(`diagnostics use standard settings switches at ${width}px`, async ({ page }, info) => {
+  await setupTauriMock(page);
+  await page.addInitScript(mode => localStorage.setItem('vrykell-theme-mode', mode), width === 760 ? 'light' : 'dark');
+  await page.setViewportSize({ width, height: 800 });
+  await page.goto('/');
+  await gotoSetting(page, '日志与诊断');
+  const automatic = page.getByRole('switch', { name: '自动保存日志' });
+  const input = page.getByRole('switch', { name: '跟踪终端输入' });
+  await expect(page.locator('.settings-toggle > [role="switch"]')).toHaveCount(2);
+  await expect(automatic).toHaveAttribute('aria-checked', 'false');
+  await automatic.click();
+  await expect(automatic).toHaveAttribute('aria-checked', 'true');
+  await expect(automatic).toBeEnabled();
+  await input.focus();
+  await page.keyboard.press('Space');
+  await expect(input).toHaveAttribute('aria-checked', 'true');
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('vrykell-terminal-input-trace'))).toBe('1');
+  await page.keyboard.press('Enter');
+  await expect(input).toHaveAttribute('aria-checked', 'false');
+  await automatic.click();
+  await expect(automatic).toHaveAttribute('aria-checked', 'false');
+  await page.screenshot({ path: info.outputPath(`diagnostics-switches-${width}.png`) });
+});
+
 test('startup preference is discoverable and persists the restore toggle', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');

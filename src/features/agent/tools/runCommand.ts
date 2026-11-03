@@ -93,14 +93,15 @@ export async function runCommandAndWait(
   agentControl.acquire(paneId);
   diagnostic('agent-command-start', { paneId, completionMode: completion ? 'marker' : 'block' });
   try {
-    await writeTerminalCommand(paneId, sessionId, completion ? completion.wrap(command) : command);
+    await writeTerminalCommand(paneId, sessionId, completion ? completion.wrap(command) : command, undefined, opts?.signal);
     const result = await waitForCompletion(paneId, sessionId, command, t0, opts?.toolCallId, opts?.signal, timeoutMs, completion);
     diagnostic('agent-command-completion', { paneId, completed: result.completed ?? false, ok: result.ok, exitCode: result.exitCode, outputChars: result.output.length });
     return result;
   } catch (e) {
+    if (opts?.signal?.aborted) return { ok: false, completed: false, output: '', error: t('Stopped waiting. The command may still be running in the terminal.') };
     const disconnected = terminalDisconnected(paneId, sessionId);
     if (disconnected) return disconnected;
-    return { ok: false, output: '', error: `写入终端失败: ${e instanceof Error ? e.message : String(e)}` };
+    return { ok: false, completed: false, output: '', error: t('Could not write to the terminal: {{error}}', { error: e instanceof Error ? e.message : String(e) }) };
   } finally {
     completion?.dispose();
     agentControl.release(paneId);

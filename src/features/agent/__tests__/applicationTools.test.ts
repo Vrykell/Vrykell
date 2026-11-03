@@ -19,6 +19,19 @@ it('preserves a cancelled question as cancellation instead of refusal or failure
   expect(states[states.length - 1]?.state).toBe('cancelled');
 });
 
+for (const outcome of [{ ok: true, answered: false }, { ok: false, answered: false, cancelled: true }, { ok: false, answered: false, error: 'Expired' }]) {
+  it(`closes queued and later tool calls after an unanswered question: ${JSON.stringify(outcome)}`, async () => {
+    execute.mockResolvedValueOnce(outcome).mockResolvedValue({ ok: true });
+    const session = new ApplicationToolSession({ tabId: 'owner', paneId: null }, vi.fn());
+    const question = session.call('question', 'ask_user', { path: '/question' });
+    const queued = session.call('queued', 'read_file', { path: '/file' });
+    await question;
+    expect((await queued).isError).toBe(true);
+    expect((await session.call('later', 'read_file', { path: '/later' })).isError).toBe(true);
+    expect(execute).toHaveBeenCalledOnce();
+  });
+}
+
 it('keeps an aborted active call cancelled when execution rejects', async () => {
   execute.mockImplementation((_args, context: ToolContext) => new Promise((_resolve, reject) => {
     context.signal?.addEventListener('abort', () => reject(new Error('Aborted')), { once: true });

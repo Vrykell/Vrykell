@@ -137,9 +137,21 @@ export class SessionController {
   handleEvents(events: DispatchEvent[]): void {
     this.ioLog.consumed(events, this._scene);
     if (!this.blockEnabled) {
-      // Classic mode: traditional terminal, all output goes straight to the main terminal (no blocks, no scene switches, TUIs handled natively)
+      // Classic mode: traditional terminal, all output goes straight to the main terminal (no blocks, no scene switches, TUIs handled natively).
+      // One write per batch keeps the xterm queue from churning once per scan event during a burst.
+      let payload = '';
+      let dataChars = 0;
       for (const ev of events) {
-        this.sinks.writeMain(ev.kind === 'data' ? ev.text : ev.raw);
+        if (ev.kind === 'data') {
+          payload += ev.text;
+          dataChars += ev.text.length;
+        } else {
+          payload += ev.raw;
+        }
+      }
+      if (payload) {
+        if (dataChars > 0) this.ioLog.routed('main', dataChars);
+        this.sinks.writeMain(payload);
       }
       return;
     }

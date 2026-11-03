@@ -51,7 +51,7 @@ function horizontalPreviewLeft(x: number, origin: NonNullable<ListReorderDrag['o
 
 /**
  * Shared transient state for pointer-driven list reordering. The source row
- * leaves its slot, a dashed placeholder marks the expected drop position,
+ * leaves its slot, a borderless placeholder marks the expected drop position,
  * and a small preview follows the pointer.
  */
 export const useListReorder = create<ListReorderState>((set) => ({

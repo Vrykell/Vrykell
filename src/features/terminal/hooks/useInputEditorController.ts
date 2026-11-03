@@ -11,7 +11,7 @@ import { useTerminalInputContext } from './useTerminalInputContext';
 import { useCommandCompletion } from './useCommandCompletion';
 import { usePathCompletion } from './usePathCompletion';
 import { appendTerminalBlankLines, clearPendingTerminalCommand, setPendingTerminalCommand } from './useTerminalSession';
-import { terminalDebug } from '@features/terminal/services/terminalDebug';
+import { isTerminalInputTraceEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
 import { useAutoSizeTextarea } from '@ui/hooks/useAutoSizeTextarea';
 import { acceptsCompletionKey, completionShortcut, useCompletionPreferences } from '@config/completion';
 
@@ -110,12 +110,14 @@ export function useInputEditorController({ paneId, focused, isLongRunning, onEnd
   const handleChange = useCallback((event: ChangeEvent<HTMLTextAreaElement>) => {
     resetHistNav();
     const value = event.target.value;
-    const previous = useInputStore.getState().byPane[paneId]?.text ?? '';
     // Command text never lands in diagnostics: lengths, the delta and the composition flag only.
-    terminalDebug('composer-input-change', {
-      paneId, chars: value.length, delta: value.length - previous.length,
-      composing: Boolean((event.nativeEvent as InputEvent).isComposing),
-    });
+    if (isTerminalInputTraceEnabled()) {
+      const previous = useInputStore.getState().byPane[paneId]?.text ?? '';
+      terminalDebug('composer-input-change', {
+        paneId, chars: value.length, delta: value.length - previous.length,
+        composing: Boolean((event.nativeEvent as InputEvent).isComposing),
+      });
+    }
     setText(value);
   }, [paneId, resetHistNav, setText]);
   const handleKeyDown = useCallback((event: KeyboardEvent<HTMLTextAreaElement>) => {

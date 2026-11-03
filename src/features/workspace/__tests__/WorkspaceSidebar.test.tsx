@@ -4,12 +4,14 @@ import WorkspaceSidebar from '../components/WorkspaceSidebar';
 import { useDockStore } from '../stores/dock';
 import { useWorkspaceNavigation } from '../stores/navigation';
 import { t } from '@i18n';
+import { useListReorder } from '@ui/layout/listReorder';
 
 const navigation = useWorkspaceNavigation.getState();
 const dock = useDockStore.getState();
 const width = window.innerWidth;
 afterEach(() => {
   cleanup();
+  useListReorder.getState().end();
   useWorkspaceNavigation.setState(navigation, true);
   useDockStore.setState(dock, true);
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
@@ -60,6 +62,24 @@ it('reorders workspace rows and renders them in the saved order', () => {
     .map(row => row.getAttribute('data-testid'));
   expect(rows).toEqual(['workspace-area-ssh', 'workspace-area-terminal', 'workspace-area-code', 'workspace-area-ai', 'workspace-area-unified']);
   expect(useWorkspaceNavigation.getState().workspaceOrder).toEqual(['ssh', 'terminal', 'code', 'ai', 'unified']);
+});
+
+it.each(['terminal', 'unified'] as const)('shows the final slot when dragging the last %s row', id => {
+  const order = navigation.workspaceOrder.filter(item => item !== id);
+  useWorkspaceNavigation.setState({ collapsed: false, workspaceOrder: [...order, id] });
+  render(<WorkspaceSidebar />);
+  const lastRemaining = screen.getByTestId(`workspace-area-${order[order.length - 1]!}`);
+  act(() => {
+    useListReorder.getState().start({ listId: 'workspace-areas', id, kind: 'workspace', height: 32 }, { x: 60, y: 250 });
+    useListReorder.getState().hover({ itemId: order[order.length - 1]!, after: true });
+  });
+  const slot = document.querySelector('[data-reorder-placeholder]');
+  expect(slot).not.toBeNull();
+  expect(lastRemaining.nextElementSibling).toBe(slot);
+  expect(slot).toHaveStyle({ height: '32px' });
+  expect(screen.getByTestId(`workspace-area-${id}`)).toHaveAttribute('data-reorder-dragging', 'true');
+  act(() => useListReorder.getState().end());
+  expect(document.querySelector('[data-reorder-placeholder]')).toBeNull();
 });
 
 it('opens the mixed workspace through a full-width sidebar row with keyboard navigation', () => {

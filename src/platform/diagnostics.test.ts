@@ -3,13 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { diagnostic, diagnosticSnapshot, diagnosticsLogDirectory, diagnosticsLogPath, exportDiagnostics, flushDiagnostics, invoke, redactText, reportFrameGap, reportWindowFocus, sanitizeDiagnostic, setDiagnosticAutoSave, useDiagnosticSettings } from './diagnostics';
+import { diagnostic, diagnosticSnapshot, diagnosticsLogDirectory, diagnosticsLogPath, exportDiagnostics, flushDiagnostics, invoke, isDiagnosticInputTraceEnabled, redactText, reportFrameGap, reportWindowFocus, sanitizeDiagnostic, setDiagnosticAutoSave, setDiagnosticInputTrace, useDiagnosticSettings } from './diagnostics';
 
 describe('diagnostics', () => {
   beforeEach(async () => {
     await flushDiagnostics();
     invokeMock.mockReset().mockResolvedValue(undefined);
-    useDiagnosticSettings.setState({ autoSave: false, saving: false, error: null });
+    useDiagnosticSettings.setState({ autoSave: false, inputTrace: false, saving: false, error: null });
   });
   afterEach(async () => { await flushDiagnostics(); vi.useRealTimers(); });
 
@@ -91,6 +91,16 @@ describe('diagnostics', () => {
     expect(useDiagnosticSettings.getState().error).toContain('disk denied');
   });
 
+  it('keeps per-key tracing off until the explicit switch is enabled', () => {
+    expect(isDiagnosticInputTraceEnabled()).toBe(false);
+    setDiagnosticInputTrace(true);
+    expect(isDiagnosticInputTraceEnabled()).toBe(true);
+    expect(localStorage.getItem('vrykell-terminal-input-trace')).toBe('1');
+    setDiagnosticInputTrace(false);
+    expect(isDiagnosticInputTraceEnabled()).toBe(false);
+    expect(localStorage.getItem('vrykell-terminal-input-trace')).toBe('0');
+  });
+
   it('redacts API credentials embedded in error strings', () => {
     expect(redactText('401 Bearer abc sk-api-secret token=private')).toBe('401 Bearer [redacted] [redacted] token=[redacted]');
   });
@@ -138,7 +148,7 @@ describe('diagnostics', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('diagnostics_log_directory');
   });
 
-  it('separates a stalled main thread from a paused window in the frame gaps', () => {
+  it('labels frame gap durations without assuming their cause', () => {
     const before = diagnosticSnapshot().length;
     reportFrameGap(120);
     reportFrameGap(300);

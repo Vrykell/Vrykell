@@ -52,6 +52,26 @@ const TURN_TIMEOUT: Duration = Duration::from_secs(60 * 60);
 /// The tail of the agent's stderr kept for the error surface. Harnesses log freely; the last few
 /// KiB are what explains an exit, and a bound keeps a chatty agent from growing the process.
 const STDERR_TAIL_LIMIT: usize = 8 * 1024;
+const MAX_MESSAGE_BYTES: usize = 2 * 1024 * 1024;
+const EVENT_QUEUE_CAPACITY: usize = 128;
+const MAX_REPLAY_BYTES: usize = 16 * 1024 * 1024;
+const MAX_REPLAY_EVENTS: usize = 20_000;
+
+enum ClientEvent {
+    Update(Value),
+    TurnEnd { kind: String, payload: Value },
+}
+
+async fn read_message(reader: &mut (impl tokio::io::AsyncBufRead + Unpin)) -> Result<Option<Value>, String> {
+    loop {
+        let mut buffer = Vec::new();
+        let count = (&mut *reader).take(MAX_MESSAGE_BYTES as u64 + 1).read_until(b'\n', &mut buffer)
+            .await.map_err(|_| "the agent connection could not be read")?;
+        if count == 0 { return Ok(None); }
+        if count > MAX_MESSAGE_BYTES { return Err("the agent message exceeds its size limit".into()); }
+        if let Ok(message) = serde_json::from_slice(&buffer) { return Ok(Some(message)); }
+    }
+}
 
 /// How long the reader waits for the child to report its status once its output has ended.
 const EXIT_STATUS_GRACE: Duration = Duration::from_millis(500);
@@ -200,12 +220,13 @@ type Pending = Arc<Mutex<HashMap<u64, oneshot::Sender<Result<Value, AgentFailure
 
 pub struct AcpClient {
     /// Lines waiting for the writer task.
-    out: mpsc::UnboundedSender<String>,
+    out: mpsc::Sender<String>,
     next_id: AtomicU64,
     pending: Pending,
     /// Notifications the agent sent (`session/update` and friends), in arrival order. Behind a
     /// mutex so the event pump and a request can run side by side.
-    events: tokio::sync::Mutex<mpsc::UnboundedReceiver<Value>>,
+    events: tokio::sync::Mutex<mpsc::Receiver<ClientEvent>>,
+    event_sender: mpsc::WeakSender<ClientEvent>,
     /// Held so the child is killed when the client is dropped (`kill_on_drop`). Shared with the
     /// reader so it can report the exit status once the agent's output ends.
     child: Arc<Mutex<Option<Child>>>,
@@ -229,8 +250,9 @@ impl AcpClient {
         R: tokio::io::AsyncRead + Unpin + Send + 'static,
         W: AsyncWrite + Unpin + Send + 'static,
     {
-        let (out_tx, mut out_rx) = mpsc::unbounded_channel::<String>();
-        let (event_tx, events) = mpsc::unbounded_channel::<Value>();
+        let (out_tx, mut out_rx) = mpsc::channel::<String>(64);
+        let (event_tx, events) = mpsc::channel::<ClientEvent>(EVENT_QUEUE_CAPACITY);
+        let event_sender = event_tx.downgrade();
         let pending: Pending = Arc::new(Mutex::new(HashMap::new()));
         let closed = Arc::new(AtomicBool::new(false));
         let closing = Arc::new(AtomicBool::new(false));
@@ -262,15 +284,15 @@ impl AcpClient {
         let reader_exit = exit_code.clone();
         let reader_child = child.clone();
         let reader_task = tokio::spawn(async move {
-            let mut lines = BufReader::new(reader).lines();
-            while let Ok(Some(line)) = lines.next_line().await {
-                if line.trim().is_empty() {
-                    continue;
-                }
-                let Ok(message) = serde_json::from_str::<Value>(&line) else {
-                    continue;
+            let mut reader = BufReader::new(reader);
+            let mut read_failure = None;
+            loop {
+                let message = match read_message(&mut reader).await {
+                    Ok(Some(message)) => message,
+                    Ok(None) => break,
+                    Err(error) => { read_failure = Some(error); break; }
                 };
-                let id = message.get("id").and_then(Value::as_u64);
+                let id = message.get("id").filter(|id| id.is_string() || id.is_i64() || id.is_u64() || id.is_null()).cloned();
                 if let Some(method) = message.get("method").and_then(Value::as_str) {
                     match (id, method) {
                         // Agent → client request: answer through the handler, or refuse.
@@ -295,21 +317,20 @@ impl AcpClient {
                             } else {
                                 // Not advertised, or not implemented: say so instead of leaving the
                                 // agent waiting for an answer that never comes.
-                                let _ = event_tx.send(message.clone());
                                 let text = format!("method not supported by this client: {m}");
                                 let payload = json!({
                                     "jsonrpc": "2.0", "id": id,
                                     "error": { "code": -32601, "message": text }
                                 });
-                                let _ = out_tx_for_error(&answer_tx, payload);
+                                if out_tx_for_error(&answer_tx, payload).await.is_err() { break; }
                                 continue;
                             };
                             let payload = json!({ "jsonrpc": "2.0", "id": id, "result": reply });
-                            let _ = out_tx_for_error(&answer_tx, payload);
+                            if out_tx_for_error(&answer_tx, payload).await.is_err() { break; }
                         }
                         // Agent → client notification.
                         (None, _) => {
-                            if event_tx.send(message).is_err() {
+                            if event_tx.send(ClientEvent::Update(message)).await.is_err() {
                                 break;
                             }
                         }
@@ -317,7 +338,7 @@ impl AcpClient {
                     continue;
                 }
                 // Response to one of our requests.
-                if let Some(id) = id {
+                if let Some(id) = id.and_then(|id| id.as_u64()) {
                     let waiter = reader_pending.lock().ok().and_then(|mut map| map.remove(&id));
                     if let Some(waiter) = waiter {
                         let outcome = match message.get("error") {
@@ -331,6 +352,9 @@ impl AcpClient {
             // The agent closed the pipe. Mark the transport unusable before waking the waiters:
             // a prompt sent after this point must fail at once, not wait out its whole budget.
             reader_closed.store(true, Ordering::SeqCst);
+            if let Some(error) = read_failure {
+                if let Ok(mut tail) = reader_stderr.lock() { append_stderr_tail(&mut tail, error.as_bytes()); }
+            }
             capture_exit_status(&reader_child, &reader_exit, EXIT_STATUS_GRACE).await;
             let details = transport_details(&reader_stderr, &reader_exit);
             if let Ok(mut map) = reader_pending.lock() {
@@ -340,7 +364,7 @@ impl AcpClient {
             }
         });
 
-        Self { out: out_tx, next_id: AtomicU64::new(0), pending, events: tokio::sync::Mutex::new(events), mcp_servers: Mutex::new(Vec::new()),
+        Self { out: out_tx, next_id: AtomicU64::new(0), pending, events: tokio::sync::Mutex::new(events), event_sender, mcp_servers: Mutex::new(Vec::new()),
             child, tasks: vec![writer_task.abort_handle(), reader_task.abort_handle()], closed, closing, stderr, exit_code }
     }
 
@@ -467,7 +491,8 @@ impl AcpClient {
     fn send_line(&self, message: Value) -> Result<(), String> {
         if self.closed.load(Ordering::SeqCst) { return Err("the harness connection is closed".to_string()); }
         let line = serde_json::to_string(&message).map_err(|e| e.to_string())?;
-        self.out.send(line).map_err(|_| "the harness connection is closed".to_string())
+        if line.len() > MAX_MESSAGE_BYTES { return Err("the client message exceeds its size limit".into()); }
+        self.out.try_send(line).map_err(|_| "the harness write queue is full or closed".to_string())
     }
 
     /// A request that waits for its own answer. Every caller names its budget: how long an answer
@@ -510,13 +535,13 @@ impl AcpClient {
     }
 
     /// The next notification the agent sent; `None` once the connection is gone.
-    pub async fn next_event(&self) -> Option<Value> {
+    async fn next_event(&self) -> Option<ClientEvent> {
         self.events.lock().await.recv().await
     }
 
     /// Negotiate versions and capabilities. The result carries what the agent can do.
     pub async fn initialize(&self, client_name: &str, client_version: &str) -> Result<Value, String> {
-        self.request(
+        let request = self.request(
             "initialize",
             json!({
                 "protocolVersion": PROTOCOL_VERSION,
@@ -524,8 +549,8 @@ impl AcpClient {
                 "clientInfo": { "name": client_name, "title": "Vrykell", "version": client_version },
             }),
             HANDSHAKE_TIMEOUT,
-        )
-        .await
+        );
+        collect_open_events(self, request).await.map(|(info, _)| info)
     }
 
     /// Create a session in a working directory and answer with the agent's whole session result —
@@ -558,7 +583,7 @@ impl AcpClient {
         let mut events = self.events.lock().await;
         let mut drained = Vec::new();
         while let Ok(message) = events.try_recv() {
-            drained.push(message);
+            if let ClientEvent::Update(message) = message { drained.push(message); }
         }
         drained
     }
@@ -614,6 +639,22 @@ impl AcpClient {
             .to_string())
     }
 
+    async fn prompt_events(&self, session_id: &str, prompt: Value) -> Result<String, AgentFailure> {
+        // Keep the sender alive until completion is queued, including an immediate process exit.
+        let sender = self.event_sender.upgrade();
+        let outcome = self.prompt(session_id, prompt).await;
+        if let Some(sender) = sender {
+            let (kind, payload) = match &outcome {
+                Ok(stop) => ("stop", json!({ "stopReason": stop })),
+                Err(failure) => ("error", json!({ "message": failure.message, "code": failure.code,
+                    "authRequired": failure.is_authentication(), "details": failure.details,
+                    "reason": if failure.transport { json!("transport") } else { Value::Null } })),
+            };
+            let _ = sender.send(ClientEvent::TurnEnd { kind: kind.into(), payload }).await;
+        }
+        outcome
+    }
+
     /// Ask the agent to stop; the turn ends with the `cancelled` stop reason.
     pub fn cancel(&self, session_id: &str) -> Result<(), String> {
         self.notify("session/cancel", json!({ "sessionId": session_id }))
@@ -630,9 +671,9 @@ impl Drop for AcpClient {
 }
 
 /// Small helper so the reader task can send an agent-request answer without owning the sender.
-fn out_tx_for_error(tx: &mpsc::UnboundedSender<String>, payload: Value) -> Result<(), String> {
+async fn out_tx_for_error(tx: &mpsc::Sender<String>, payload: Value) -> Result<(), String> {
     let line = serde_json::to_string(&payload).map_err(|e| e.to_string())?;
-    tx.send(line).map_err(|_| "the harness connection is closed".to_string())
+    tx.send(line).await.map_err(|_| "the harness connection is closed".to_string())
 }
 
 /// Record the child's exit status once its output has ended. A process is normally reaped by the
@@ -948,6 +989,46 @@ fn event_diagnostic(event: &AcpEvent) -> Value {
 /// a stale id (a deleted session, another directory) must not lock the user out. The replay of a
 /// loaded session is drained here, in arrival order, because the page only learns the id when the
 /// command returns.
+async fn collect_open_events(
+    client: &AcpClient,
+    request: impl std::future::Future<Output = Result<Value, String>>,
+) -> Result<(Value, Vec<Value>), String> {
+    tokio::pin!(request);
+    let mut replayed = Vec::new();
+    let mut bytes = 0;
+    loop {
+        tokio::select! {
+            biased;
+            result = &mut request => {
+                let result = result?;
+                for message in client.drain_events().await {
+                    bytes += message.to_string().len();
+                    if bytes > MAX_REPLAY_BYTES || replayed.len() >= MAX_REPLAY_EVENTS { return Err("the agent replay exceeds its size limit".into()); }
+                    replayed.push(message);
+                }
+                return Ok((result, replayed));
+            }
+            message = client.next_event() => match message {
+                Some(ClientEvent::Update(message)) => {
+                    bytes += message.to_string().len();
+                    if bytes > MAX_REPLAY_BYTES || replayed.len() >= MAX_REPLAY_EVENTS { return Err("the agent replay exceeds its size limit".into()); }
+                    replayed.push(message);
+                }
+                Some(ClientEvent::TurnEnd { .. }) => {},
+                None => return request.await.map(|result| (result, replayed)),
+            }
+        }
+    }
+}
+
+fn replay_events(messages: Vec<Value>, session_id: &str) -> Vec<AcpEvent> {
+    messages.into_iter()
+        .filter(|message| message.get("method").and_then(Value::as_str) == Some("session/update")
+            && message.pointer("/params/sessionId").and_then(Value::as_str) == Some(session_id))
+        .map(|payload| AcpEvent { session_id: session_id.into(), kind: "update".into(), payload })
+        .collect()
+}
+
 async fn open_session(
     client: &AcpClient,
     name: &str,
@@ -956,26 +1037,21 @@ async fn open_session(
     can_load: bool,
 ) -> Result<(Value, String, Vec<AcpEvent>), String> {
     if let (Some(id), true) = (resume, can_load) {
-        match client.load_session(id, cwd).await {
-            Ok(loaded) => {
-                let replayed: Vec<AcpEvent> = client
-                    .drain_events()
-                    .await
-                    .into_iter()
-                    .map(|message| AcpEvent { session_id: id.to_string(), kind: "update".to_string(), payload: message })
-                    .collect();
+        match collect_open_events(client, client.load_session(id, cwd)).await {
+            Ok((loaded, messages)) => {
+                let replayed = replay_events(messages, id);
                 note("acp-load-ok", json!({ "name": name, "sessionId": id, "replayed": replayed.len() }));
                 return Ok((loaded, id.to_string(), replayed));
             }
             Err(_) => note("acp-load-failed", json!({ "name": name, "stage": "load" })),
         }
     }
-    let session = client
-        .new_session(cwd)
+    let (session, messages) = collect_open_events(client, client.new_session(cwd))
         .await
         .map_err(|e| format!("harness could not open a session: {e}"))?;
     let id = session.get("sessionId").and_then(Value::as_str).unwrap_or_default().to_string();
-    Ok((session, id, Vec::new()))
+    let replayed = replay_events(messages, &id);
+    Ok((session, id, replayed))
 }
 
 /// Start a harness and open a session in `cwd` (or reopen `resume_session_id`), then pump its
@@ -1092,12 +1168,13 @@ pub async fn acp_open<R: tauri::Runtime>(
     let pump_name = harness.name.clone();
     let mut saw_update = false;
     let pump_session = session_id.clone();
+    let pump_agent_session = agent_session_id.clone();
     let pump_client = Arc::downgrade(&client);
     tokio::spawn(async move {
         loop {
             // Explicit shutdown closes the notification channel even while this task owns a client.
             let Some(pump_client) = pump_client.upgrade() else { break };
-            let Some(message) = pump_client.next_event().await else {
+            let Some(event) = pump_client.next_event().await else {
                 // The channel closes for two reasons only: we shut the session down, or the agent's
                 // output ended. The second one has to reach the page, which would otherwise keep
                 // showing a session that can no longer answer anything.
@@ -1124,6 +1201,14 @@ pub async fn acp_open<R: tauri::Runtime>(
                 }
                 break;
             };
+            let message = match event {
+                ClientEvent::TurnEnd { kind, payload } => {
+                    emit(&pump_app, AcpEvent { session_id: pump_session.clone(), kind, payload });
+                    continue;
+                }
+                ClientEvent::Update(message) => message,
+            };
+            if message.pointer("/params/sessionId").and_then(Value::as_str) != Some(pump_agent_session.as_str()) { continue; }
             // The first notification is the interesting one for diagnosis: an open session that
             // never speaks means the agent found nothing to report, not that the wire is broken.
             if !saw_update {
@@ -1195,8 +1280,7 @@ pub async fn acp_set_config_option(
 
 /// Send a prompt. The turn runs in the background; its content and stop reason arrive as events.
 #[tauri::command]
-pub async fn acp_prompt<R: tauri::Runtime>(
-    app: tauri::AppHandle<R>,
+pub async fn acp_prompt(
     state: tauri::State<'_, AcpRuntime>,
     session_id: String,
     text: String,
@@ -1204,26 +1288,17 @@ pub async fn acp_prompt<R: tauri::Runtime>(
     let client = state.get(&session_id)?;
     let generation = client.app_tools.as_ref().map(|tools| tools.begin_turn()).transpose()?;
     note("acp-prompt", json!({ "sessionId": session_id }));
-    let app = app.clone();
     let session = session_id.clone();
     tokio::spawn(async move {
         let started = std::time::Instant::now();
         let outcome = client.client
-            .prompt(&client.agent_session_id, json!([{ "type": "text", "text": text }]))
+            .prompt_events(&client.agent_session_id, json!([{ "type": "text", "text": text }]))
             .await;
         if let Some(tools) = &client.app_tools { tools.end_turn(generation); }
         let duration_ms = started.elapsed().as_millis().min(u64::MAX as u128) as u64;
         match outcome {
             Ok(stop) => {
                 note("acp-prompt-end", json!({ "sessionId": session, "stopReason": stop.clone(), "durationMs": duration_ms }));
-                emit(
-                    &app,
-                    AcpEvent {
-                        session_id: session,
-                        kind: "stop".to_string(),
-                        payload: json!({ "stopReason": stop }),
-                    },
-                )
             }
             Err(failure) => {
                 // Error text is useful in the log; the prompt itself never is.
@@ -1233,24 +1308,6 @@ pub async fn acp_prompt<R: tauri::Runtime>(
                     "error": failure.message.chars().take(200).collect::<String>(),
                     "durationMs": duration_ms,
                 }));
-                emit(
-                    &app,
-                    AcpEvent {
-                        session_id: session,
-                        kind: "error".to_string(),
-                        payload: {
-                            let auth_required = failure.is_authentication();
-                            let transport = failure.transport;
-                            json!({
-                                "message": failure.message,
-                                "code": failure.code,
-                                "authRequired": auth_required,
-                                "details": failure.details,
-                                "reason": if transport { json!("transport") } else { Value::Null },
-                            })
-                        },
-                    },
-                )
             }
         }
     });
@@ -1292,6 +1349,87 @@ mod tests {
     use super::*;
     use serde_json::json;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[tokio::test]
+    async fn permission_and_unsupported_requests_preserve_all_valid_id_shapes() {
+        let (ours, mut agent) = tokio::io::duplex(8192);
+        let (read, write) = tokio::io::split(ours);
+        let asked = Arc::new(AtomicU64::new(0));
+        let count = asked.clone();
+        let client = AcpClient::over(read, write, Arc::new(move |_| { count.fetch_add(1, Ordering::SeqCst); None }));
+        for id in [json!("permission-1"), json!(-7), Value::Null] {
+            for method in ["session/request_permission", "unsupported"] {
+                let request = json!({"jsonrpc": "2.0", "id": id, "method": method, "params": {}});
+                agent.write_all(format!("{request}\n").as_bytes()).await.unwrap();
+                let response = tokio::time::timeout(Duration::from_secs(2), read_line(&mut agent)).await.unwrap().unwrap();
+                assert_eq!(response["id"], id);
+                if method == "session/request_permission" {
+                    assert_eq!(response["result"]["outcome"]["outcome"], "cancelled");
+                } else { assert_eq!(response["error"]["code"], -32601); }
+            }
+        }
+        assert_eq!(asked.load(Ordering::SeqCst), 3);
+        client.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn oversized_unterminated_frames_fail_without_growing_the_buffer() {
+        let mut reader = BufReader::new(std::io::Cursor::new(vec![b'x'; MAX_MESSAGE_BYTES + 1]));
+        assert!(read_message(&mut reader).await.unwrap_err().contains("size limit"));
+    }
+
+    #[tokio::test]
+    async fn queued_turn_completion_follows_every_chunk_even_when_the_agent_exits() {
+        let (ours, mut agent) = tokio::io::duplex(8192);
+        let (read, write) = tokio::io::split(ours);
+        let client = AcpClient::over(read, write, Arc::new(|_| None));
+        let writer = tokio::spawn(async move {
+            let request = read_line(&mut agent).await.unwrap();
+            for index in 0..EVENT_QUEUE_CAPACITY * 3 {
+                let update = json!({"method": "session/update", "params": {"sessionId": "session", "update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": index.to_string()}}}});
+                agent.write_all(format!("{update}\n").as_bytes()).await.unwrap();
+            }
+            agent.write_all(format!("{}\n", json!({"id": request["id"], "result": {"stopReason": "end_turn"}})).as_bytes()).await.unwrap();
+        });
+        let run = async {
+            let (turn, received) = tokio::join!(client.prompt_events("session", json!([])), async {
+                let mut chunks = 0;
+                while let Some(event) = client.next_event().await {
+                    match event {
+                        ClientEvent::Update(_) => chunks += 1,
+                        ClientEvent::TurnEnd { kind, payload } => {
+                            assert_eq!(kind, "stop"); assert_eq!(payload["stopReason"], "end_turn"); break;
+                        }
+                    }
+                }
+                chunks
+            });
+            assert_eq!(turn.unwrap(), "end_turn");
+            assert_eq!(received, EVENT_QUEUE_CAPACITY * 3);
+        };
+        tokio::time::timeout(Duration::from_secs(5), run).await.unwrap();
+        writer.await.unwrap();
+        client.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn restoring_more_than_one_queue_of_history_does_not_block_the_response() {
+        let (ours, mut agent) = tokio::io::duplex(8192);
+        let (read, write) = tokio::io::split(ours);
+        let client = AcpClient::over(read, write, Arc::new(|_| None));
+        let writer = tokio::spawn(async move {
+            let request = read_line(&mut agent).await.unwrap();
+            for _ in 0..EVENT_QUEUE_CAPACITY * 3 {
+                let update = json!({"method": "session/update", "params": {"sessionId": "saved", "update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "saved answer"}}}});
+                agent.write_all(format!("{update}\n").as_bytes()).await.unwrap();
+            }
+            agent.write_all(format!("{}\n", json!({"id": request["id"], "result": {}})).as_bytes()).await.unwrap();
+        });
+        let (_, id, replayed) = tokio::time::timeout(Duration::from_secs(5), open_session(&client, "fixture", "/project", Some("saved"), true)).await.unwrap().unwrap();
+        assert_eq!(id, "saved"); assert_eq!(replayed.len(), EVENT_QUEUE_CAPACITY * 3);
+        writer.await.unwrap();
+        client.shutdown().await;
+    }
 
     #[test]
     fn event_probe_records_shape_without_protocol_contents() {
@@ -1657,8 +1795,8 @@ mod tests {
         let turn = client.prompt(&session_id, json!([{ "type": "text", "text": "hi" }]));
         let stop = tokio::join!(turn, async {
             // The two chunks arrive while the turn is open.
-            let first = client.next_event().await.expect("chunk");
-            let second = client.next_event().await.expect("chunk");
+            let ClientEvent::Update(first) = client.next_event().await.expect("chunk") else { panic!("expected an update") };
+            let ClientEvent::Update(second) = client.next_event().await.expect("chunk") else { panic!("expected an update") };
             assert_eq!(first.pointer("/params/update/content/text").and_then(Value::as_str), Some("Hello"));
             assert_eq!(second.pointer("/params/update/content/text").and_then(Value::as_str), Some(" world"));
         });
@@ -1810,6 +1948,10 @@ mod tests {
             let mut pipe = theirs;
             while let Some(message) = read_line(&mut pipe).await {
                 let id = message.get("id").cloned();
+                let stale = json!({"method": "session/update", "params": {"sessionId": "stale", "update": {
+                    "sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "partial old history"}
+                }}});
+                pipe.write_all(format!("{stale}\n").as_bytes()).await.unwrap();
                 let reply = match message.get("method").and_then(Value::as_str).unwrap_or("") {
                     "session/load" => json!({
                         "jsonrpc": "2.0", "id": id,

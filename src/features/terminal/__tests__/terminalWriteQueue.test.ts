@@ -29,6 +29,43 @@ function deferredWrites(): PendingWrite[] {
 const callData = () => ptyWriteMock.mock.calls.map((call) => call[1] as string);
 
 describe('terminalWriteQueue', () => {
+  it('removes only the aborted command and preserves unrelated queued input', async () => {
+    const pending = deferredWrites();
+    const earlier = writeTerminalInput('cancel-owner', 'earlier');
+    const controller = new AbortController();
+    const cancelled = expect(writeTerminalInput('cancel-owner', 'cancelled', controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    const human = writeTerminalInput('cancel-owner', 'human');
+    controller.abort();
+    await cancelled;
+    pending[0].settle();
+    await vi.waitFor(() => expect(callData()).toEqual(['earlier', 'human']));
+    pending[1].settle();
+    await Promise.all([earlier, human]);
+  });
+
+  it('drops the unsent tail of an aborted command while allowing later input', async () => {
+    const pending = deferredWrites();
+    const controller = new AbortController();
+    const cancelled = expect(writeTerminalInput('cancel-tail', 'x'.repeat(TERMINAL_INPUT_CHUNK_UNITS + 50), controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    controller.abort();
+    await cancelled;
+    const human = writeTerminalInput('cancel-tail', 'human');
+    pending[0].settle();
+    await vi.waitFor(() => expect(callData()).toEqual(['x'.repeat(TERMINAL_INPUT_CHUNK_UNITS), 'human']));
+    pending[1].settle(); await human;
+  });
+
+  it('keeps later input queued when a cancelled in-flight write reports an error', async () => {
+    const pending = deferredWrites();
+    const controller = new AbortController();
+    const cancelled = expect(writeTerminalInput('cancel-error', 'command', controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    controller.abort(); await cancelled;
+    const human = writeTerminalInput('cancel-error', 'human');
+    pending[0].fail(new Error('late write failure'));
+    await vi.waitFor(() => expect(callData()).toEqual(['command', 'human']));
+    pending[1].settle(); await human;
+  });
+
   beforeEach(() => {
     ptyWriteMock.mockReset();
   });
@@ -82,6 +119,46 @@ describe('terminalWriteQueue', () => {
     await vi.waitFor(() => expect(pending.map((write) => write.data)).toEqual(['a', 'b']));
     pending[1]!.settle();
     await expect(Promise.all([first, second])).resolves.toEqual([undefined, undefined]);
+  });
+
+  it('batches queued keyboard input into one write', async () => {
+    const pending = deferredWrites();
+    const first = writeTerminalInput('batch', 'a');
+    const second = writeTerminalInput('batch', 'b');
+    const third = writeTerminalInput('batch', 'c');
+    expect(pending.map((write) => write.data)).toEqual(['a']);
+
+    pending[0]!.settle();
+    await vi.waitFor(() => expect(pending.map((write) => write.data)).toEqual(['a', 'bc']));
+    pending[1]!.settle();
+    await expect(Promise.all([first, second, third])).resolves.toEqual([undefined, undefined, undefined]);
+  });
+
+  it('keeps abortable input in its own write', async () => {
+    const pending = deferredWrites();
+    const controller = new AbortController();
+    const abortable = writeTerminalInput('batch-signal', 'command', controller.signal);
+    const second = writeTerminalInput('batch-signal', 'b');
+    const third = writeTerminalInput('batch-signal', 'c');
+    expect(pending.map((write) => write.data)).toEqual(['command']);
+
+    pending[0]!.settle();
+    await vi.waitFor(() => expect(pending.map((write) => write.data)).toEqual(['command', 'bc']));
+    pending[1]!.settle();
+    await expect(Promise.all([abortable, second, third])).resolves.toEqual([undefined, undefined, undefined]);
+  });
+
+  it('drops a queued batch when an interrupt arrives', async () => {
+    const pending = deferredWrites();
+    const first = writeTerminalInput('batch-interrupt', 'a');
+    const second = writeTerminalInput('batch-interrupt', 'b');
+    const third = writeTerminalInput('batch-interrupt', 'c');
+    const interrupt = writeTerminalInput('batch-interrupt', '\x03');
+    pending[0]!.settle();
+    // The interrupt drops the queued pair and leads the next write.
+    await vi.waitFor(() => expect(pending.map((write) => write.data)).toEqual(['a', '\x03']));
+    pending[1]!.settle();
+    await expect(Promise.all([first, second, third, interrupt])).resolves.toEqual([undefined, undefined, undefined, undefined]);
   });
 
   it('sends the next chunk only after the previous write resolved', async () => {

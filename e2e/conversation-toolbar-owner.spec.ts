@@ -1,0 +1,34 @@
+import { test, expect } from '@playwright/test';
+import { setupTauriMock } from './tauri-mock';
+
+for (const width of [1240, 760]) test(`only the selected conversation contributes settings at ${width}px`, async ({ page }, info) => {
+  await setupTauriMock(page);
+  await page.addInitScript(mode => localStorage.setItem('vrykell-theme-mode', mode), width === 760 ? 'light' : 'dark');
+  await page.setViewportSize({ width: 1240, height: 800 });
+  await page.goto('/');
+  await page.getByTestId('workspace-area-ai').click();
+  await page.getByTestId('ai-new-conversation').click();
+  const composer = page.locator('[data-chat-composer]');
+  await expect(composer).toBeVisible();
+  await composer.fill('Keep the native draft');
+  const toolbar = page.getByTestId('workspace-instance-bar');
+  await expect(toolbar.getByRole('button', { name: '会话设置', exact: true })).toHaveCount(1);
+  await page.getByTestId('harness-add-session').click();
+  await page.getByTestId('acp-launcher-Fake ACP').click();
+  await expect(page.locator('[data-testid="harness-page"]:visible')).toBeVisible();
+  await page.setViewportSize({ width, height: 800 });
+  const settings = toolbar.getByRole('button', { name: '会话设置', exact: true });
+  await expect(settings).toHaveCount(1);
+  await settings.click();
+  await expect(page.getByTestId('harness-execution-target')).toBeVisible();
+  await expect(page.getByTestId('chat-execution-target')).toHaveCount(0);
+  await page.screenshot({ path: info.outputPath(`conversation-settings-${width}.png`) });
+  await page.keyboard.press('Escape');
+  const tabs = page.getByRole('tablist', { name: 'AI 会话' }).getByRole('tab');
+  await tabs.first().click();
+  await expect(composer).toHaveValue('Keep the native draft');
+  await expect(toolbar.getByRole('button', { name: '会话设置', exact: true })).toHaveCount(1);
+  await toolbar.getByRole('button', { name: '会话设置', exact: true }).click();
+  await expect(page.getByTestId('chat-execution-target')).toBeVisible();
+  await expect(page.getByTestId('harness-execution-target')).toHaveCount(0);
+});

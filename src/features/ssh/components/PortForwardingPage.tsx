@@ -15,6 +15,8 @@ import ErrorBox from '@ui/feedback/ErrorBox';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import { useDialogKeyboard } from '@ui/hooks/useDialogKeyboard';
 import { ensureSshLoaded, useSshStore } from '../stores/store';
+import { useHostView } from '../stores/hostView';
+import { hostGroupTitle } from '../model/hostDisplay';
 import type { SshConnection } from '../services/api';
 import { connectionRules, listForwardingStatus, startForwarding, stopForwarding, withForwardingRules, type ForwardingStatus } from '../services/forwarding';
 import './PortForwardingPage.css';
@@ -23,6 +25,8 @@ const emptyRule = (): SshForwardingRule => ({ id: `forward-${crypto.randomUUID()
 
 export default function PortForwardingPage({ active = true }: { active?: boolean }) {
   const connections = useSshStore(state => state.connections);
+  const groupFilter = useHostView(state => state.groupFilter);
+  const hostsTitle = hostGroupTitle(groupFilter);
   const [statuses, setStatuses] = useState<ForwardingStatus[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
@@ -54,7 +58,7 @@ export default function PortForwardingPage({ active = true }: { active?: boolean
   };
   const count = connections.reduce((count, connection) => count + connectionRules(connection).length, 0);
   return <div className="ssh-forwarding-page" data-testid="port-forwarding-page">
-    <header className="ssh-host-page-header"><nav aria-label={t('Page navigation')} className="ssh-host-page-title ssh-forwarding-breadcrumb"><button type="button" data-subtle onClick={() => useWorkspaceNavigation.getState().selectArea('ssh')}>{t('Hosts')}</button><ChevronRight size={18} aria-hidden="true" /><h2 aria-current="page">{t('Port forwarding')}</h2><span>{t('{{count}} rules', { count })}</span></nav><OutlineButton className="primary-button" disabled={!connections.length} onClick={() => setEditing({ connectionId: connections[0].id, rule: emptyRule(), create: true })}><Plus size={14} />{t('Add forward…')}</OutlineButton></header>
+    <header className="ssh-host-page-header"><nav aria-label={t('Page navigation')} className="ssh-host-page-title ssh-forwarding-breadcrumb"><button type="button" data-subtle data-tip={hostsTitle} onClick={() => useWorkspaceNavigation.getState().selectArea('ssh')}>{hostsTitle}</button><ChevronRight size={18} aria-hidden="true" /><h2 aria-current="page">{t('Port forwarding')}</h2><span>{t('{{count}} rules', { count })}</span></nav><OutlineButton className="primary-button" disabled={!connections.length} onClick={() => setEditing({ connectionId: connections[0].id, rule: emptyRule(), create: true })}><Plus size={14} />{t('Add forward…')}</OutlineButton></header>
     <div className="ssh-forwarding-content scroll-region">
       {error && <ErrorBox title={t('Port forwarding failed')} details={error} onDismiss={() => setError('')} actions={<OutlineButton onClick={() => void refresh()}><RefreshCw size={14} />{t('Retry')}</OutlineButton>}>{t('Check the host credentials, network and listening port.')}</ErrorBox>}
       {!count && <div className="search-empty-state">{t(connections.length ? 'No forwarding rules. Add a rule to map a port.' : 'Create a saved host before adding a forwarding rule.')}</div>}
