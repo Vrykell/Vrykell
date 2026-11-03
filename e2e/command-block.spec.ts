@@ -12,7 +12,7 @@ test.describe('Command block flow', () => {
     await page.getByRole('button', { name: '询问 AI', exact: true }).click();
     await ensureChatSettingsOpen(page);
     await page.getByRole('combobox', { name: '选择执行终端' }).click();
-    await page.getByRole('listbox', { name: '选择执行终端' }).getByRole('option').filter({ hasNotText: '仅讨论' }).first().click();
+    await page.getByRole('listbox', { name: '选择执行终端' }).getByRole('option').filter({ hasNotText: '不操作终端' }).first().click();
     await page.keyboard.press('Escape');
     const input = page.getByTestId('ai-surface-side').getByPlaceholder(/自然语言描述/);
     await input.fill('给我个命令');

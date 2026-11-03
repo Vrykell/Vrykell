@@ -24,6 +24,7 @@ beforeEach(() => {
   invokeMock.mockReset();
   invokeMock.mockImplementation((command: string) => {
     if (command === 'acp_harnesses') return Promise.resolve(CONFIGURED);
+    if (command === 'acp_workspace_root') return Promise.resolve('C:/Users/test/AppData/Local/com.vrykell.app/acp-workspace');
     if (command === 'which_cmd') return Promise.resolve(true);
     return Promise.resolve(undefined);
   });
@@ -88,6 +89,13 @@ describe('AcpLauncher', () => {
     fireEvent.change(screen.getByRole('textbox', { name: '项目路径' }), { target: { value: 'C:/work/chosen' } });
     fireEvent.click(screen.getByTestId('acp-launcher-Claude Code'));
     expect(onPick).toHaveBeenCalledWith('Claude Code', 'C:/work/chosen');
+  });
+
+  it('shows the default workspace used when no project folder is chosen', async () => {
+    render(<AcpLauncher open onClose={() => {}} />);
+    await screen.findByTestId('acp-launcher-Claude Code');
+    await waitFor(() => expect(screen.getByRole('textbox', { name: '项目路径' })).toHaveAttribute(
+      'placeholder', '在 C:/Users/test/AppData/Local/com.vrykell.app/acp-workspace 下新建文件夹'));
   });
 
   it('marks a server whose program is not on PATH as unavailable', async () => {

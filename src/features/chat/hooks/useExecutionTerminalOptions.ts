@@ -24,7 +24,7 @@ export function useExecutionTerminalOptions(environment?: ChatEnvironment | null
         return { value: pane.id, label: name, triggerLabel, description: `${context.label}${hostLabel}${context.cwd ? ` · ${context.cwd}` : ''}`, swatch, disabled: false };
       });
     return [
-      { value: '', label: t('Discussion only'), triggerLabel: t('Discussion'), swatch: 'var(--text-muted)', description: undefined, disabled: false },
+      { value: '', label: t('No terminal operation'), triggerLabel: t('No terminal operation'), swatch: 'var(--text-muted)', description: undefined, disabled: false },
       ...(environment && !available.some(option => option.value === environment.paneId)
         ? [{ value: environment.paneId, label: `${environment.label} · ${t('Disconnected')}`, triggerLabel: `${environment.label} · ${t('Disconnected')}`, description: undefined, swatch: 'var(--accent-warm)', disabled: true }] : []),
       ...available,

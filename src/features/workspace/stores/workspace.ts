@@ -337,14 +337,9 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   openHarnessTab: (name, cwd) => {
     if (useWorkspaceNavigation.getState().area !== 'unified') useWorkspaceNavigation.getState().setAiPlacement('main');
-    // Capture the focused local context before switching to the singleton page.
-    const state = get();
-    const active = state.tabs.find((tab) => tab.id === state.activeId);
-    const sessionLeaves = state.tabs.flatMap(tab => isSessionTab(tab) ? layoutLeaves(tab.layout) : []).filter(pane => pane.kind === 'local');
-    const focused = active && isSessionTab(active) ? findLeaf(active.layout, useTerminalStore.getState().focusedPaneId ?? '') ?? firstLeaf(active.layout) : null;
-    const spec = focused?.kind === 'local' ? focused : sessionLeaves.find(pane => pane.id === state.lastLocalPaneId);
-    const directory = cwd ?? (spec ? state.terminalCwds[spec.id] ?? spec.cwd : undefined);
-    if (name) useAiWorkspace.getState().select(`acp:${useHarnessWorkspace.getState().connect(name, directory)}`);
+    // A new agent never inherits the focused terminal or another previous workspace: the backend
+    // starts an empty default folder unless the user picked a project explicitly.
+    if (name) useAiWorkspace.getState().select(`acp:${useHarnessWorkspace.getState().connect(name, cwd)}`);
     useUiStore.getState().setSettingsOpen(false);
     if (useWorkspaceNavigation.getState().area !== 'unified') useWorkspaceNavigation.getState().selectArea('ai');
     get().addTab({ kind: 'harness' });

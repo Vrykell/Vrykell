@@ -189,11 +189,16 @@ pub fn run_helper() -> Option<i32> {
         let mut stream = TcpStream::connect_timeout(&address, Duration::from_secs(3))?;
         stream.set_read_timeout(Some(Duration::from_secs(5)))?;
         writeln!(stream, "{}", json!({"token": token}))?;
-        let mut reader = std::io::BufReader::new(stream.try_clone()?);
+        let mut auth_reader = std::io::BufReader::new(stream.try_clone()?);
         let mut auth = Vec::new();
-        Read::take(&mut reader, 1024).read_until(b'\n', &mut auth)?;
+        Read::take(&mut auth_reader, 1024).read_until(b'\n', &mut auth)?;
         if serde_json::from_slice::<Value>(&auth)?.get("ok") != Some(&Value::Bool(true)) { return Err("application tool authentication failed".into()); }
         stream.set_read_timeout(None)?;
+        // Create the relay reader only after the handshake timeout is cleared: MCP leaves the
+        // connection idle between requests, and a read timeout here would terminate a healthy
+        // bridge and take every tool away from the agent.
+        let mut reader = std::io::BufReader::new(stream.try_clone()?);
+        reader.get_ref().set_read_timeout(None)?;
         let mut input_stream = stream.try_clone()?;
         std::thread::spawn(move || {
             let input = std::io::stdin(); let mut input = input.lock();
@@ -320,6 +325,13 @@ mod tests {
         let response: Value = serde_json::from_slice(&frame).unwrap();
         assert_eq!(response["id"], 1);
         assert_eq!(response["result"]["protocolVersion"], "2025-06-18");
+        // An MCP connection is idle between tool requests; the bridge must outlive the handshake.
+        tokio::time::sleep(Duration::from_secs(6)).await;
+        input.write_all(b"{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/list\",\"params\":{}}\n").await.unwrap();
+        let frame = tokio::time::timeout(Duration::from_secs(5), read_frame(&mut output, MAX_FRAME)).await.unwrap().unwrap().unwrap();
+        let response: Value = serde_json::from_slice(&frame).unwrap();
+        assert_eq!(response["id"], 2);
+        assert_eq!(response["result"]["tools"].as_array().unwrap().len(), 1);
         drop(server);
         assert!(tokio::time::timeout(Duration::from_secs(5), child.wait()).await.unwrap().unwrap().success());
     }

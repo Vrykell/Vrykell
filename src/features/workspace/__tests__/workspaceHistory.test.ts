@@ -81,6 +81,17 @@ it('stores durable external history identities rather than live process identifi
   expect(record?.members[0]?.empty).toBeUndefined();
 });
 
+it('records the resolved default workspace of an agent session', () => {
+  useHarnessWorkspace.setState({ connections: [{ id: 'agent', harness: 'Agent', cwd: '', fresh: true }] });
+  useHarnessStore.setState({ byTab: { agent: { harness: 'Agent', sessionId: 'live', cwd: '/default/session-1', messages: [{ id: 'q', role: 'user', content: 'Question', createdAt: 1 }] } as import('@features/chat/stores/harness').HarnessSession } });
+  const record = captureWorkspaceHistory({ type: 'split', direction: 'row', ratio: 0.5,
+    first: { type: 'pane', id: 'a', resourceId: 'acp:agent' }, second: { type: 'pane', id: 'b', resourceId: 'file:test' } }, 'a', [
+    { id: 'acp:agent', title: 'Agent', kind: 'agent', sessionId: 'agent' },
+    { id: 'file:test', title: 'test', kind: 'document', file: { path: '/test' } },
+  ]);
+  expect(record?.members[0]?.cwd).toBe('/default/session-1');
+});
+
 it('updates one combination record rather than producing a record per resize or effect replay', async () => {
   const writer = createWorkspaceHistoryWriter(vi.fn());
   await writer(snapshot()); await writer(snapshot());

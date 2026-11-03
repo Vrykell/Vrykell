@@ -31,7 +31,7 @@ test.describe('AI chat panel', () => {
     await expect(composer).not.toBeFocused();
   });
 
-  test('conversation settings start with discussion and the composer keeps attachment controls', async ({ page }) => {
+  test('conversation settings start without a terminal and the composer keeps attachment controls', async ({ page }) => {
     await boot(page, 'OK');
     await page.locator('[data-dock-btn="chat"]').click();
     await ensureChatSettingsOpen(page);
@@ -91,7 +91,7 @@ test.describe('AI chat panel', () => {
     // run_command needs the conversation's terminal, and it waits on the approval card.
     await ensureChatSettingsOpen(page);
     await page.getByRole('combobox', { name: '选择执行终端' }).click();
-    await page.getByRole('option').filter({ hasNotText: '仅讨论' }).first().click();
+    await page.getByRole('option').filter({ hasNotText: '不操作终端' }).first().click();
     await input.fill('跑构建');
     await input.press('Enter');
     await expect(page.getByRole('button', { name: '运行', exact: true })).toBeVisible({ timeout: 10000 });

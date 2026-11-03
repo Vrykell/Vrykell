@@ -128,6 +128,8 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     /** Harness commands the page invoked, in order: one open per tab, never two. */
     const acpCalls: string[] = [];
     let acpSessionCount = 0;
+    /** Mirrors the backend's app-private root for sessions started without a chosen folder. */
+    const acpWorkspace = 'C:/Users/e2e/AppData/Local/com.vrykell.app/acp-workspace';
     let acpServers = JSON.parse(localStorage.getItem('mock-acp-servers') ?? 'null') as Array<Record<string, unknown>> | null;
     acpServers ??= [{ name: 'Fake ACP', command: 'node', args: ['scripts/fake-acp-agent.mjs'], env: {}, cwd: '', enabled: true }];
     /** Native picker invocations the page made, so a spec can assert the mode it asked for. */
@@ -1109,9 +1111,14 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return undefined;
           case 'save_attachment':
             return { name: args.name as string, blob_path: `/home/e2e/.vrykell/attachments/${args.name}`, text: null, size: 123, mime: 'image/png' };
-          case 'import_attachment':
-            return { name: (args.path as string).split('/').pop() ?? 'file', blob_path: args.path as string, text: 'Test attachment content', size: 123, mime: 'text/plain' };
+          case 'import_attachment': {
+            const path = String(args.path ?? '');
+            const name = path.split('/').pop() ?? 'file';
+            const image = /\.(png|jpe?g|gif|webp|bmp)$/i.test(name);
+            return { name, blob_path: path, text: image ? null : 'Test attachment content', size: 123, mime: image ? 'image/png' : 'text/plain' };
+          }
           case 'read_attachment':
+            if ((window as unknown as { __READ_ATTACHMENT_FAIL__?: boolean }).__READ_ATTACHMENT_FAIL__) throw new Error('Attachment read failed');
             return 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aSFAAAAAASUVORK5CYII=';
           case 'fs_home':
             return '/home/e2e';
@@ -1286,6 +1293,8 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'acp_harnesses':
             acpCalls.push('acp_harnesses');
             return acpServers;
+          case 'acp_workspace_root':
+            return acpWorkspace;
           case 'acp_harness_save':
             acpServers = args.harnesses as Array<Record<string, unknown>>;
             localStorage.setItem('mock-acp-servers', JSON.stringify(acpServers));
@@ -1303,11 +1312,11 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               sessionId,
               harness: 'Fake ACP',
               appToolsConnected: Array.isArray(args.appTools) && args.appTools.length > 0,
-              cwd: String(args.cwd ?? ''),
+              cwd: String(args.cwd ?? '') || `${acpWorkspace}/${sessionId}`,
               agent: {
                 protocolVersion: 1,
                 agentInfo: { name: 'fake-acp', title: 'Fake ACP agent', version: '0.1.0' },
-                agentCapabilities: {},
+                agentCapabilities: { promptCapabilities: { image: true, audio: false, embeddedContext: true } },
                 authMethods: [{ id: 'fake-login', name: 'Log in', description: 'Run `fake login` in the terminal' }],
               },
               modes: {
@@ -1339,7 +1348,11 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'acp_set_config_option':
             acpCalls.push(`acp_set_config_option:${String(args.configId ?? '')}=${String(args.value ?? '')}`);
             return null;
-          case 'acp_prompt':
+          case 'acp_prompt': {
+            const images = Array.isArray(args.images) ? args.images.length : 0;
+            acpCalls.push(`acp_prompt:${String(args.sessionId ?? '')}${images ? `:images:${images}` : ''}`);
+            return undefined;
+          }
           case 'acp_cancel':
           case 'acp_close':
             acpCalls.push(`${cmd}:${String(args.sessionId ?? '')}`);

@@ -155,7 +155,7 @@ test('follows streamed replies, pauses for reading and offers a return to the la
   await expect.poll(gap).toBeLessThan(5);
 });
 
-test('opens the focused pane directory instead of the first split pane', async ({ page }) => {
+test('starts a new agent in the default workspace instead of a terminal directory', async ({ page }) => {
   await page.evaluate(async () => {
     const workspacePath = '/src/features/workspace/stores/workspace.ts';
     const terminalPath = '/src/features/terminal/stores/terminal.ts';
@@ -173,7 +173,47 @@ test('opens the focused pane directory instead of the first split pane', async (
     useWorkspaceStore.getState().openHarnessTab('Fake ACP');
   });
   await expect(current(page).getByTestId('harness-directory')).toHaveCount(0);
-  await expect(current(page).locator('[data-tip="D:/project-right"]')).toHaveCount(1);
+  await expect(current(page).locator('[data-tip^="C:/Users/e2e/AppData/Local/com.vrykell.app/acp-workspace/"]')).toHaveCount(1);
+  await expect(current(page).locator('[data-tip="D:/project-right"]')).toHaveCount(0);
+  const connectionCwd = await page.evaluate(async () => {
+    const { useHarnessWorkspace } = await import('/src/features/chat/stores/harnessWorkspace.ts') as typeof import('../src/features/chat/stores/harnessWorkspace');
+    return useHarnessWorkspace.getState().connections[0]?.cwd;
+  });
+  expect(connectionCwd).toBe('');
+});
+
+test('sends an attached image with the prompt', async ({ page }) => {
+  await connect(page);
+  await page.evaluate(() => { (window as unknown as { __PICK_PATHS__: string[] }).__PICK_PATHS__ = ['/home/e2e/shot.png']; });
+  const surface = current(page);
+  await surface.getByTestId('harness-add-attachment').click();
+  const tray = surface.locator('.chat-attachments').first();
+  await expect(tray).toContainText('shot.png');
+  await surface.getByTestId('harness-composer').fill('What is in this image?');
+  await surface.getByTestId('harness-send').click();
+  await expect.poll(async () => (await acpCalls(page)).filter(call => call.startsWith('acp_prompt:'))).toEqual(['acp_prompt:sess_e2e:images:1']);
+  await expect(surface.locator('.chat-question-attachments')).toContainText('shot.png');
+});
+
+test('keeps the draft and attachment after a failed read and allows retry', async ({ page }) => {
+  await connect(page);
+  await page.evaluate(() => { (window as unknown as { __PICK_PATHS__: string[] }).__PICK_PATHS__ = ['/home/e2e/shot.png']; });
+  const surface = current(page);
+  await surface.getByTestId('harness-add-attachment').click();
+  await expect(surface.locator('.chat-attachments').first()).toContainText('shot.png');
+  await surface.getByTestId('harness-composer').fill('Keep this question');
+  await page.evaluate(() => { (window as unknown as { __READ_ATTACHMENT_FAIL__: boolean }).__READ_ATTACHMENT_FAIL__ = true; });
+  await surface.getByTestId('harness-send').click();
+  const notice = page.getByRole('status').filter({ hasText: 'shot.png' });
+  await expect(notice).toBeVisible();
+  await expect(surface.getByTestId('harness-composer')).toHaveValue('Keep this question');
+  await expect(surface.locator('.chat-attachments').first()).toContainText('shot.png');
+  expect((await acpCalls(page)).filter(call => call.startsWith('acp_prompt:'))).toEqual([]);
+  await notice.getByRole('button', { name: '关闭通知' }).click();
+  await page.evaluate(() => { (window as unknown as { __READ_ATTACHMENT_FAIL__: boolean }).__READ_ATTACHMENT_FAIL__ = false; });
+  await surface.getByTestId('harness-send').click();
+  await expect(surface.getByTestId('harness-composer')).toHaveValue('');
+  await expect.poll(async () => (await acpCalls(page)).filter(call => call.startsWith('acp_prompt:')).length).toBe(1);
 });
 
 test('asks another conversation even after a matching command shape was approved', async ({ page }) => {

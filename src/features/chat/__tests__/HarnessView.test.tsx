@@ -62,3 +62,25 @@ it('shows the shared loading animation before any output and removes it when the
   act(() => useHarnessStore.setState(state => ({ byTab: { agent: { ...state.byTab.agent, pending: false } } })));
   expect(screen.queryByRole('status')).toBeNull();
 });
+
+it('keeps the draft when a prompt cannot be accepted', async () => {
+  useHarnessStore.setState({ prompt: vi.fn(async () => false) });
+  useComposerDrafts.getState().setText('agent', 'Keep this question');
+  render(<Surface />);
+  await act(async () => { fireEvent.click(screen.getByTestId('harness-send')); });
+  expect(screen.getByTestId('harness-composer')).toHaveValue('Keep this question');
+});
+
+it('preserves newly typed text while accepting a pending send only once', async () => {
+  let finish!: (accepted: boolean) => void;
+  const prompt = vi.fn(() => new Promise<boolean>(resolve => { finish = resolve; }));
+  useHarnessStore.setState({ prompt });
+  useComposerDrafts.getState().setText('agent', 'Original question');
+  render(<Surface />);
+  fireEvent.click(screen.getByTestId('harness-send'));
+  fireEvent.click(screen.getByTestId('harness-send'));
+  fireEvent.change(screen.getByTestId('harness-composer'), { target: { value: 'Next question' } });
+  await act(async () => { finish(true); });
+  expect(prompt).toHaveBeenCalledTimes(1);
+  expect(screen.getByTestId('harness-composer')).toHaveValue('Next question');
+});

@@ -125,6 +125,19 @@ describe('useAttachmentComposer', () => {
       expect(listeners.size).toBe(0);
     });
 
+    it('refuses an attachment the caller rejects', async () => {
+      const view = renderHook(() => useAttachmentComposer({
+        attachments: [], updateAttachments: vi.fn(), scopeKey: 'rejected', accept: () => 'cannot send this file',
+      }), { wrapper: StrictMode });
+      view.result.current.panelRef.current = panel();
+      await finishSubscriptions();
+
+      drop();
+
+      await waitFor(() => expect(useToastStore.getState().toasts[useToastStore.getState().toasts.length - 1]?.message).toBe('cannot send this file'));
+      expect(view.result.current.attachments).toHaveLength(0);
+    });
+
     it('ignores events after unmount before the native subscription finishes', async () => {
       const view = renderHook(() => useAttachmentComposer());
       view.result.current.panelRef.current = panel();

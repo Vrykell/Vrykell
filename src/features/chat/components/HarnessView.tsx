@@ -6,24 +6,28 @@
  * something (approvals, the process, the protocol) happens in Rust; this page sends the user's
  * intent and renders what comes back.
  */
-import { useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
-import { ArrowDown, ArrowUp, Plus, SlidersHorizontal, Square, iconSizes } from '@ui/icons';
+import { ArrowDown, ArrowUp, Plus, SlidersHorizontal, Sparkles, Square, iconSizes } from '@ui/icons';
 import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';
 import { IconButton } from '@ui/actions/IconButton';
 import ErrorBox from '@ui/feedback/ErrorBox';
+import { useToastStore } from '@ui/feedback/Toast';
 import { TextArea } from '@ui/fields/TextInput';
 import Select from '@ui/fields/Select';
 import SettingsPopover from '@ui/menus/SettingsPopover';
 import type { MenuAnchor } from '@ui/menus/ContextMenu';
 import KeyHint from '@ui/feedback/KeyHint';
 import { formatCompact } from '@features/agent/model/usageStats';
-import { useComposerDrafts } from '../stores/composerDrafts';
+import { useAttachmentComposer } from '@features/agent/hooks/useAttachmentComposer';
+import type { AttachmentMeta } from '@features/agent/model/attachments';
+import { useComposerDrafts, EMPTY_COMPOSER_DRAFT } from '../stores/composerDrafts';
 import { useHarnessWorkspace } from '../stores/harnessWorkspace';
 import { useAiWorkspace } from '../stores/aiWorkspace';
 import { useWorkspaceNavigation } from '@features/workspace';
 import { createSideAgent } from '../services/aiWorkspace';
+import { harnessSupportsImages } from '../services/harnessAttachments';
 import { useTranscriptFollow } from '../hooks/useTranscriptFollow';
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import { toExchanges } from '@features/chat/model/exchanges';
@@ -32,10 +36,12 @@ import { createExecutionTerminal } from '@features/workspace/services/executionT
 import NewTabModal from '@features/workspace/components/NewTabModal';
 import type { DropdownAnchor } from '@ui/menus/AnchoredDropdown';
 import AiBlock from '@features/chat/components/AiBlock';
+import AttachmentChips from './AttachmentChips';
 import ChatComposerShell from './ChatComposerShell';
 import QueuedMessages from './QueuedMessages';
 import HarnessSelector, { type HarnessSelectorOption } from './HarnessSelector';
 import { useHarnessStore, type HarnessSession } from '../stores/harness';
+import { isModelOption, isPermissionOption } from '../model/harnessOptions';
 import type { AcpConfigGroup, AcpConfigValue } from '@platform/api/acp';
 import { useExecutionTerminalOptions } from '../hooks/useExecutionTerminalOptions';
 import { environmentForPane } from '../services/conversationContext';
@@ -64,9 +70,8 @@ function sessionSelectors(session: HarnessSession, tabId: string): SessionSelect
     if (options.length === 0) continue;
     selectors.push({
       key: `config-${option.id}`,
-      model: option.category === 'model' || option.id === 'model',
-      permission: ['mode', 'approval_mode', 'approval_policy', 'permission_mode'].includes(option.id)
-        || option.category === 'mode' && option.id !== 'collaboration_mode',
+      model: isModelOption(option),
+      permission: isPermissionOption(option),
       label: option.name,
       value: String(option.currentValue),
       options,
@@ -139,10 +144,25 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
   const sidebarSettings = useContext(SidebarSettingsContext);
   const inSidebar = sidebarSettings?.resourceId === `acp:${tabId}`;
   const executionOptions = useExecutionTerminalOptions(session?.executionPaneId ? environmentForPane(session.executionPaneId) ?? { paneId: session.executionPaneId, kind: 'local', label: t('Disconnected') } : null);
-  const text = useComposerDrafts(state => state.byTab[tabId]?.text ?? '');
-  const setText = (value: string) => useComposerDrafts.getState().setText(tabId, value);
+  const composerDraft = useComposerDrafts(state => state.byTab[tabId] ?? EMPTY_COMPOSER_DRAFT);
+  const text = composerDraft.text;
+  const setText = useCallback((value: string) => useComposerDrafts.getState().setText(tabId, value), [tabId]);
+  const updateAttachments = useCallback((update: (current: AttachmentMeta[]) => AttachmentMeta[]) => {
+    useComposerDrafts.getState().updateAttachments(tabId, update);
+  }, [tabId]);
+  const imageSupport = harnessSupportsImages(session?.agent?.agentCapabilities);
+  const agentKnown = Boolean(session?.agent);
+  const acceptAttachment = useCallback((attachment: AttachmentMeta) => {
+    if (attachment.textContent !== undefined) return null;
+    if (!attachment.mime.startsWith('image/')) return t('This attachment cannot be sent to an ACP agent.');
+    if (agentKnown && !imageSupport) return t('This agent does not accept images.');
+    return null;
+  }, [agentKnown, imageSupport]);
+  const { attachments, previewId, panelRef, addPastedText, pickFiles, addBlobs, togglePreview, removeAttachment } =
+    useAttachmentComposer({ attachments: composerDraft.attachments, updateAttachments, scopeKey: tabId, accept: acceptAttachment });
   const follow = useTranscriptFollow(tabId, session?.messages, active);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  const submitting = useRef(false);
   const [terminalPicker, setTerminalPicker] = useState<{ anchor?: DropdownAnchor } | null>(null);
   const [settingsMenu, setSettingsMenu] = useState<MenuAnchor | null>(null);
   useEffect(() => { setSettingsMenu(null); }, [active, inSidebar, toolbarTarget]);
@@ -183,7 +203,7 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
       hasError: !!session?.error,
     });
   }, [tabId, session?.sessionId, session?.messages, session?.pending, session?.error, active, exchanges.length]);
-  const canSend = Boolean(session) && text.trim().length > 0;
+  const canSend = Boolean(session) && (text.trim().length > 0 || attachments.length > 0);
   const selectors = session ? sessionSelectors(session, tabId) : [];
   const permissionSelector = selectors.find(selector => selector.permission);
   const modelSelector = selectors.find(selector => selector.model);
@@ -218,16 +238,35 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
     composerRef.current?.focus();
   };
 
-  const submit = () => {
-    if (!canSend) return;
+  const submit = async () => {
+    if (!canSend || submitting.current) return;
     const value = text;
+    const pending = attachments;
+    if (pending.some(attachment => attachment.textContent === undefined && !attachment.mime.startsWith('image/'))) {
+      useToastStore.getState().addToast(t('This attachment cannot be sent to an ACP agent.'), 'error');
+      return;
+    }
+    if (pending.some(attachment => attachment.mime.startsWith('image/')) && !imageSupport) {
+      useToastStore.getState().addToast(t('This agent does not accept images.'), 'error');
+      return;
+    }
     follow.jumpToLatest();
-    setText('');
-    void useHarnessStore.getState().prompt(tabId, value);
+    submitting.current = true;
+    try {
+      const accepted = await useHarnessStore.getState().prompt(tabId, value, pending);
+      if (!accepted) return;
+      const current = useComposerDrafts.getState().byTab[tabId];
+      if (!current) return;
+      if (current?.text === value) setText('');
+      const sentIds = new Set(pending.map(attachment => attachment.id));
+      updateAttachments(current => current.filter(attachment => !sentIds.has(attachment.id)));
+    } finally {
+      submitting.current = false;
+    }
   };
 
   return (
-    <div data-testid="harness-page" className="ai-chat-panel harness-chat-panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+    <div ref={panelRef} data-testid="harness-page" className="ai-chat-panel harness-chat-panel" style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
       {!inSidebar && active && toolbarTarget && createPortal(<IconButton compact aria-label={t('Conversation settings')} data-tip={t('Conversation settings')}
         aria-haspopup="dialog" aria-expanded={!!settingsMenu} onClick={event => {
           const trigger = event.currentTarget; const bounds = trigger.getBoundingClientRect();
@@ -266,7 +305,7 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
         {exchanges.map((exchange, index) => (
           <AiBlock key={exchange.id} exchange={exchange.answer && index === exchanges.length - 1 ? { ...exchange, answer: { ...exchange.answer, pending: session?.pending ?? false } } : exchange}
             onRetry={exchange.question && !session?.pending && !session?.opening && !session?.stopping
-              ? () => { follow.jumpToLatest(); void useHarnessStore.getState().prompt(tabId, exchange.question!.content); } : undefined}
+              ? () => { follow.jumpToLatest(); void useHarnessStore.getState().prompt(tabId, exchange.question!.content, exchange.question!.attachments); } : undefined}
             allowExchangeActions={false} toolContextId={session?.toolContextId ?? tabId} presentation="conversation" onAskAboutTool={question => {
             const drafts = useComposerDrafts.getState(); const previous = drafts.byTab[tabId]?.text;
             drafts.setText(tabId, previous ? `${previous}\n${question}` : question);
@@ -325,7 +364,11 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
           {harness}{agent ? ` · ${agent.title || agent.name || ''}` : ''}
         </span>}
         hints={<><KeyHint shortcut="Enter" />{t('Send')}</>}
-        tray={<><QueuedMessages messages={session?.queuedInputs ?? []} onCancel={id => useHarnessStore.getState().cancelQueuedInput(tabId, id)} />{matches.length > 0 ? (
+        tray={<><QueuedMessages messages={session?.queuedInputs ?? []} onCancel={id => useHarnessStore.getState().cancelQueuedInput(tabId, id)} />
+          {attachments.length > 0 && <div className="chat-context-tray" aria-label={t('Conversation context')}>
+            <AttachmentChips atts={attachments} previewId={previewId} onPreview={togglePreview} onRemove={removeAttachment} />
+          </div>}
+          {matches.length > 0 ? (
           <div {...commandNavigation.props} data-testid="harness-commands" role="listbox" aria-label={t('Slash commands')} className="harness-commands">
             {matches.map((command, index) => (
               <button key={command.name} type="button" data-subtle role="option"
@@ -343,6 +386,16 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
           </div>
         ) : null}</>}
         status={<>
+          <IconButton aria-label={t('Add attachment')} data-tip={t('Add attachment')} data-testid="harness-add-attachment"
+            onClick={() => void pickFiles()}><Plus size={18} /></IconButton>
+          {permissionSelector && <HarnessSelector testId={`harness-selector-${permissionSelector.key}`} label={permissionSelector.label} permission
+            value={permissionSelector.value} options={permissionSelector.options} onChange={permissionSelector.apply} />}
+          {session?.opening && <span data-testid="harness-opening" style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
+            {t('Connecting…')}
+          </span>}
+          <span className="chat-footer-space" />
+          {modelSelector && <HarnessSelector testId={`harness-selector-${modelSelector.key}`} label={modelSelector.label} model
+            value={modelSelector.value} options={modelSelector.options} onChange={modelSelector.apply} />}
           <IconButton aria-label={t('New session')} data-tip={t('New session')} data-testid="harness-new-session"
             disabled={!session?.sessionId || session.pending}
             onClick={() => {
@@ -352,16 +405,8 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
                 useAiWorkspace.getState().select(`acp:${id}`);
               }
             }}>
-            <Plus size={iconSizes.compact} />
+            <Sparkles size={iconSizes.compact} />
           </IconButton>
-          {permissionSelector && <HarnessSelector testId={`harness-selector-${permissionSelector.key}`} label={permissionSelector.label} permission
-            value={permissionSelector.value} options={permissionSelector.options} onChange={permissionSelector.apply} />}
-          {session?.opening && <span data-testid="harness-opening" style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
-            {t('Connecting…')}
-          </span>}
-          <span className="chat-footer-space" />
-          {modelSelector && <HarnessSelector testId={`harness-selector-${modelSelector.key}`} label={modelSelector.label} model
-            value={modelSelector.value} options={modelSelector.options} onChange={modelSelector.apply} />}
           {session?.pending && canSend && <IconButton aria-label={t('Queue message')} data-tip={t('Queue message')} onClick={submit}><ArrowUp size={18} /></IconButton>}
           {session?.pending
             ? <IconButton className="chat-send-button" tone="accent" aria-label={t('Stop the harness turn')}
@@ -400,6 +445,10 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
               event.preventDefault();
               submit();
             }
+          }} onPaste={event => {
+            const files = Array.from(event.clipboardData.files);
+            if (files.length) { event.preventDefault(); void addBlobs(files); return; }
+            if (addPastedText(event.clipboardData.getData('text/plain'))) event.preventDefault();
           }} />
       </ChatComposerShell>
     </div>

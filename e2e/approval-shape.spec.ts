@@ -9,8 +9,8 @@ import { setupTauriMock, mockAnthropic, mockAnthropicToolCall, armToolCall, appr
 async function attachTerminal(page: import('@playwright/test').Page) {
   await ensureChatSettingsOpen(page);
   await page.getByRole('combobox', { name: '选择执行终端' }).click();
-  await page.getByRole('option').filter({ hasNotText: '仅讨论' }).first().click();
-  await expect(page.getByRole('combobox', { name: '选择执行终端' })).not.toHaveText('仅讨论');
+  await page.getByRole('option').filter({ hasNotText: '不操作终端' }).first().click();
+  await expect(page.getByRole('combobox', { name: '选择执行终端' })).not.toHaveText('不操作终端');
 }
 
 test.describe('shape approvals', () => {

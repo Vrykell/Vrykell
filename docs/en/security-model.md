@@ -1,5 +1,9 @@
 # Security model
 
+## External session folders and images
+
+The read-only `acp_workspace_root` command returns the application-owned default workspace path and prepares that directory; it accepts no caller-supplied path. A session without an explicit project starts in its own new folder. This prevents accidental project inheritance, but does not sandbox the external process. Attachments reuse the existing picker/drop grants and application-owned storage. Image prompts require the capability advertised by the agent, bounded image blocks and a separately bounded outbound frame; inbound and replay limits stay unchanged. Closing or cancelling a session invalidates pending attachment reads, and failed reads retain the composer draft. No capability, CSP origin, arbitrary read or authorization grant is added.
+
 ## Conversation turn and transport limits
 
 Local tools share per-turn serialized execution. A refusal or an unanswered question closes queued and later calls in that turn; each subsequent user message starts a new scope. Native policy, confirmations and execution leases still apply. External protocol frames and replay buffers have explicit size limits and bounded queues; replay is consumed while its response is pending. Turn completion follows already received content, and a failed history load cannot inject its partial transcript into a replacement session. Request identifiers retain their original types. These changes add no commands, capabilities, file grants or network sources; independently configured external tools remain outside this adapter's control.

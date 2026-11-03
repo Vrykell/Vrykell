@@ -9,11 +9,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { HARNESS_FIRST_RESPONSE_TIMEOUT_MS, useHarnessStore } from '@features/chat/stores/harness';
 import { t } from '@i18n';
 import { useHarnessSessionRefs } from '@features/chat/stores/harnessSessions';
+import { useHarnessConfigPrefs } from '@features/chat/stores/harnessConfigPrefs';
 import { acpCancel, acpClose, acpOpen, acpPrompt, acpAppToolResult, acpSetConfigOption, acpSetMode, acpSetModel, type HarnessOpenResult } from '@platform/api/acp';
 import { answerUserQuestion, questionKey, useUserQuestions } from '@features/agent/services/userQuestions';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
 vi.mock('@features/terminal/services/terminalDebug', () => ({ terminalDebug: vi.fn() }));
+
+const readAttachmentDataUrl = vi.hoisted(() => vi.fn());
+
+vi.mock('@features/agent/model/attachments', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@features/agent/model/attachments')>(),
+  readAttachmentDataUrl,
+}));
 
 vi.mock('@platform/api/acp', () => ({
   acpAnswerPermission: vi.fn(async () => undefined),
@@ -24,7 +32,7 @@ vi.mock('@platform/api/acp', () => ({
     sessionId: 's1',
     harness: 'Claude Code',
     cwd: '/tmp/project',
-    agent: { agentInfo: { name: 'Fake' } },
+    agent: { agentInfo: { name: 'Fake' }, agentCapabilities: { promptCapabilities: { image: true } } },
     modes: {
       currentModeId: 'default',
       availableModes: [
@@ -67,6 +75,7 @@ beforeEach(async () => {
   vi.mocked(acpOpen).mockClear();
   useHarnessStore.setState({ byTab: {} });
   useHarnessSessionRefs.setState({ refs: {} });
+  useHarnessConfigPrefs.setState({ prefs: {} });
   await useHarnessStore.getState().open(TAB, 'Claude Code', '/tmp/project');
 });
 
@@ -185,11 +194,11 @@ describe('harness session state', () => {
     expect(current().queuedInputs?.map(item => item.text)).toEqual(['Second', 'Third']);
     useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'end_turn' } });
     await vi.waitFor(() => expect(acpPrompt).toHaveBeenCalledTimes(2));
-    expect(acpPrompt).toHaveBeenLastCalledWith(SESSION, 'Second');
+    expect(acpPrompt).toHaveBeenLastCalledWith(SESSION, 'Second', []);
     expect(current().pending).toBe(true);
     useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'end_turn' } });
     await vi.waitFor(() => expect(acpPrompt).toHaveBeenCalledTimes(3));
-    expect(acpPrompt).toHaveBeenLastCalledWith(SESSION, 'Third');
+    expect(acpPrompt).toHaveBeenLastCalledWith(SESSION, 'Third', []);
   });
 
   it('releases an unresponsive cancelled session and resumes without accepting late output', async () => {
@@ -355,6 +364,87 @@ describe('harness session state', () => {
     expect(transcript).toContain('earlier answer');
     expect(current().note).toBeNull();
     expect(useHarnessSessionRefs.getState().refs['Claude Code']?.sessionId).toBe('older');
+  });
+
+  it('sends an attached image with the prompt and keeps it on the question', async () => {
+    readAttachmentDataUrl.mockResolvedValue('data:image/png;base64,AAAA');
+    const image = { id: 'image', kind: 'image' as const, name: 'shot.png', mime: 'image/png', size: 4, blobPath: '/tmp/shot.png' };
+
+    await useHarnessStore.getState().prompt(TAB, 'Look', [image]);
+
+    expect(acpPrompt).toHaveBeenLastCalledWith(SESSION, 'Look', [{ mimeType: 'image/png', data: 'AAAA' }]);
+    expect(current().messages[current().messages.length - 1]).toMatchObject({ role: 'user', content: 'Look', attachments: [image] });
+  });
+
+  it('refuses images when the agent did not advertise image prompts', async () => {
+    vi.mocked(acpPrompt).mockClear();
+    vi.mocked(acpOpen).mockResolvedValueOnce({
+      sessionId: 'no-images', harness: 'Claude Code', cwd: '/tmp/project',
+      agent: { protocolVersion: 1, agentInfo: { name: 'Fake' }, agentCapabilities: {}, authMethods: [] },
+      modes: null, models: null, configOptions: null,
+    });
+    await useHarnessStore.getState().open('plain', 'Claude Code', '/tmp/project');
+    readAttachmentDataUrl.mockResolvedValue('data:image/png;base64,AAAA');
+    await useHarnessStore.getState().prompt('plain', 'Look', [
+      { id: 'image', kind: 'image' as const, name: 'shot.png', mime: 'image/png', size: 4, blobPath: '/tmp/shot.png' },
+    ]);
+
+    expect(acpPrompt).not.toHaveBeenCalled();
+    expect(useHarnessStore.getState().byTab.plain?.messages).toHaveLength(0);
+  });
+
+  it.each(['close', 'cancel'] as const)('does not send an attachment after %s during its read', async action => {
+    vi.mocked(acpPrompt).mockClear();
+    let finish!: (url: string) => void;
+    readAttachmentDataUrl.mockImplementationOnce(() => new Promise<string>(resolve => { finish = resolve; }));
+    const sending = useHarnessStore.getState().prompt(TAB, 'Look', [
+      { id: 'image', kind: 'image', name: 'shot.png', mime: 'image/png', size: 4, blobPath: '/tmp/shot.png' },
+    ]);
+    vi.mocked(acpCancel).mockImplementationOnce(async () => {
+      useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'cancelled' } });
+    });
+    await useHarnessStore.getState()[action](TAB);
+    finish('data:image/png;base64,AAAA');
+    expect(await sending).toBe(false);
+    expect(acpPrompt).not.toHaveBeenCalled();
+  });
+
+  it('queues a delayed attachment behind the turn that started during its read', async () => {
+    vi.mocked(acpPrompt).mockClear();
+    let finish!: (url: string) => void;
+    readAttachmentDataUrl.mockImplementationOnce(() => new Promise<string>(resolve => { finish = resolve; }));
+    const image = { id: 'image', kind: 'image' as const, name: 'shot.png', mime: 'image/png', size: 4, blobPath: '/tmp/shot.png' };
+    const sending = useHarnessStore.getState().prompt(TAB, 'Look', [image]);
+    await useHarnessStore.getState().prompt(TAB, 'First');
+    finish('data:image/png;base64,AAAA');
+    expect(await sending).toBe(true);
+    expect(acpPrompt).toHaveBeenCalledTimes(1);
+    expect(current().queuedInputs).toEqual([expect.objectContaining({ text: 'Look', attachments: [image] })]);
+  });
+
+  it('clears pending when a reopened agent refuses images', async () => {
+    useHarnessStore.setState({ byTab: { [TAB]: { ...current(), sessionId: null } } });
+    vi.mocked(acpOpen).mockResolvedValueOnce({
+      sessionId: 'reopened', harness: 'Claude Code', cwd: '/tmp/project',
+      agent: { protocolVersion: 1, agentInfo: null, agentCapabilities: {}, authMethods: [] },
+      modes: null, models: null, configOptions: null,
+    });
+    readAttachmentDataUrl.mockResolvedValueOnce('data:image/png;base64,AAAA');
+    expect(await useHarnessStore.getState().prompt(TAB, 'Look', [
+      { id: 'image', kind: 'image', name: 'shot.png', mime: 'image/png', size: 4, blobPath: '/tmp/shot.png' },
+    ])).toBe(false);
+    expect(current().pending).toBe(false);
+    expect(current().messages).toHaveLength(0);
+  });
+
+  it('does not resume a remembered session when no project folder is chosen', async () => {
+    useHarnessSessionRefs.setState({
+      refs: { 'Claude Code': { sessionId: 'older', cwd: '/tmp/project', at: 1 } },
+    });
+    useHarnessStore.setState({ byTab: {} });
+    await useHarnessStore.getState().open(TAB, 'Claude Code', '');
+
+    expect(acpOpen).toHaveBeenCalledWith('Claude Code', '', undefined, expect.arrayContaining([expect.objectContaining({ name: 'ask_user' })]));
   });
 
   it('opens a fresh connection without closing the previous conversation', async () => {

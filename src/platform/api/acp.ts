@@ -84,7 +84,7 @@ export interface HarnessOpenResult {
   /** Agent-owned history id; the live session id is local to the client runtime. */
   resumeSessionId?: string;
   harness: string;
-  /** The directory the session was actually opened in (an empty request falls back to the app's). */
+  /** The directory the session was actually opened in (an empty request gets a fresh folder). */
   cwd: string;
   agent: AgentDescription;
   /** Session state the agent published with the session; null when it publishes none. */
@@ -104,22 +104,34 @@ export interface AcpSessionEvent {
 
 export const acpHarnesses = () => invoke<HarnessConfig[]>('acp_harnesses');
 
+/** The root that holds the fresh folder of every session started without a chosen project. */
+export const acpWorkspaceRoot = () => invoke<string>('acp_workspace_root');
+
 /** Replace the configured list (the settings page is the caller). */
 export const acpHarnessSave = (harnesses: HarnessConfig[]) => invoke<void>('acp_harness_save', { harnesses });
 
 /** Start a configured harness, negotiate, and let it go again: the "test connection" action. */
 export const acpHandshake = (name: string) => invoke<AgentDescription>('acp_handshake', { name });
 
-/** Start a harness and open a session in `cwd` (`cwd` empty means the app's own working directory).
- *  Passing `resumeSessionId` reopens that session and replays its conversation instead. */
+/** Start a harness and open a session in `cwd` (an empty `cwd` gets a fresh folder in the app's
+ *  default ACP workspace). Passing `resumeSessionId` reopens that session and replays its
+ *  conversation instead. */
 export const acpOpen = (name: string, cwd: string, resumeSessionId?: string, appTools?: Array<{ name: string; description?: string; inputSchema: Record<string, unknown> }>) =>
   invoke<HarnessOpenResult>('acp_open', { name, cwd, resumeSessionId: resumeSessionId ?? null, appTools: appTools ?? null });
 
 export const acpAppToolResult = (sessionId: string, requestId: string, payload: unknown) =>
   invoke<void>('acp_app_tool_result', { sessionId, requestId, payload });
 
+/** One image included in a prompt; the agent must advertise `promptCapabilities.image`. */
+export interface AcpPromptImage {
+  mimeType: string;
+  /** Base64-encoded image bytes, without the `data:` URL prefix. */
+  data: string;
+}
+
 /** Send a prompt; the turn's content and its stop reason arrive as events. */
-export const acpPrompt = (sessionId: string, text: string) => invoke<void>('acp_prompt', { sessionId, text });
+export const acpPrompt = (sessionId: string, text: string, images: AcpPromptImage[] = []) =>
+  invoke<void>('acp_prompt', { sessionId, text, images: images.length ? images : null });
 
 /** Ask the agent to stop the current turn. */
 export const acpCancel = (sessionId: string) => invoke<void>('acp_cancel', { sessionId });
