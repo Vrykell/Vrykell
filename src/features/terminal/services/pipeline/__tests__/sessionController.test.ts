@@ -422,6 +422,22 @@ describe('SessionController', () => {
     expect(ctrl.blocks.length).toBe(0);
   });
 
+  it('coalesces a classic output batch into one main write', () => {
+    const written: string[] = [];
+    const ctrl = new SessionController('classic-batch', 80, {
+      writeMain: data => { written.push(data); },
+      onBlocksChanged: () => {}, onSceneChanged: () => {}, onCwd: () => {},
+      onBlockStart: () => {}, onBlockComplete: () => {}, onTerminalData: () => {}, onProgramTitle: () => {},
+    }, 24, 'classic', false);
+    ctrl.handleEvents([
+      { kind: 'data', text: 'one' },
+      { kind: 'osc', code: '8', payload: '', raw: '\x1b]8;;x\x07' },
+      { kind: 'data', text: 'two' },
+    ]);
+    expect(written).toEqual(['one\x1b]8;;x\x07two']);
+    ctrl.dispose();
+  });
+
   it('keeps the prompt-end marker 133;B in the pipeline without writing it to the main xterm', () => {
     const { st, ctrl, feed } = wire();
     feed('\x1b]133;B\x07');

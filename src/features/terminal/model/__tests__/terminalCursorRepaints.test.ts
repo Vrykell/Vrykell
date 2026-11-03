@@ -2,7 +2,7 @@ import { Terminal } from '@xterm/xterm';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { smoothTerminalCursorRepaints } from '../terminalCursor';
 
-vi.mock('../../services/terminalDebug', () => ({ terminalDebug: vi.fn() }));
+vi.mock('../../services/terminalDebug', () => ({ terminalDebug: vi.fn(), isTerminalInputTraceEnabled: () => false }));
 
 const cleanups: Array<() => void> = [];
 

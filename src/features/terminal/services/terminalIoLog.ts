@@ -42,6 +42,11 @@ interface IoWindow {
   blockNotReady: number;
   echoArmed: number;
   echoFiltered: number;
+  inputs: number;
+  inputChars: number;
+  inputWrites: number;
+  inputWriteMaxMs: number;
+  inputPaintMaxMs: number;
 }
 
 function emptyWindow(): IoWindow {
@@ -66,6 +71,11 @@ function emptyWindow(): IoWindow {
     blockNotReady: 0,
     echoArmed: 0,
     echoFiltered: 0,
+    inputs: 0,
+    inputChars: 0,
+    inputWrites: 0,
+    inputWriteMaxMs: 0,
+    inputPaintMaxMs: 0,
   };
 }
 
@@ -123,6 +133,29 @@ export class TerminalIoLog {
     if (flags.echoFiltered) window.echoFiltered += 1;
   }
 
+  /** One keyboard payload handed to the ordered input queue. */
+  input(chars: number): void {
+    if (!isTerminalDebugEnabled()) return;
+    const window = this.open();
+    window.inputs += 1;
+    window.inputChars += chars;
+  }
+
+  /** One completed input write and how long the IPC round trip took. */
+  inputWrite(durationMs: number): void {
+    if (!isTerminalDebugEnabled()) return;
+    const window = this.open();
+    window.inputWrites += 1;
+    window.inputWriteMaxMs = Math.max(window.inputWriteMaxMs, Math.round(durationMs));
+  }
+
+  /** One paint after keyboard input and how long the last key waited for it. */
+  inputPaint(durationMs: number): void {
+    if (!isTerminalDebugEnabled()) return;
+    const window = this.open();
+    window.inputPaintMaxMs = Math.max(window.inputPaintMaxMs, Math.round(durationMs));
+  }
+
   /** Write the open window now; a pane that is going away keeps its last counters. */
   flush(): void {
     this.stopTimer();
@@ -150,6 +183,11 @@ export class TerminalIoLog {
       blockNotReady: window.blockNotReady,
       echoArmed: window.echoArmed,
       echoFiltered: window.echoFiltered,
+      inputs: window.inputs,
+      inputChars: window.inputChars,
+      inputWrites: window.inputWrites,
+      inputWriteMaxMs: window.inputWriteMaxMs,
+      inputPaintMaxMs: window.inputPaintMaxMs,
     });
   }
 

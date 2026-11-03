@@ -58,7 +58,7 @@ typechecking, architecture checks, or dev mode as appropriate.
 - **Sidebar rows** - `src/ui/layout/sidebarItem.tsx`. Session tab rows and SSH rows render through
   `SidebarItem`; a new list that looks like them must use it instead of hand-rolling markup.
 - **List reordering** - `src/ui/layout/listReorder.tsx`. The mechanic matches the titlebar buttons:
-  the dragged row leaves its slot, a dashed placeholder marks the drop slot, an icon preview
+  the dragged row leaves its slot, a borderless placeholder marks the drop slot, an icon preview
   follows the pointer, Escape cancels and the post-drag click is suppressed. Lists opt in with
   `data-reorder-list` on the container and `data-reorder-item` (+ `data-reorder-kind`) on rows;
   rows start drags through `useListReorderDrag`, and gaps are rendered with

@@ -16,7 +16,7 @@ import ShellIndicator from '@features/terminal/components/ShellIndicator';
 import { useInputEditorController } from '@features/terminal/hooks/useInputEditorController';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { normalizeWorkingDirectory } from '@features/terminal/services/pipeline/workingDirectory';
-import { terminalDebug } from '@features/terminal/services/terminalDebug';
+import { isTerminalInputTraceEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
 import DirectoryPicker from './DirectoryPicker';
 import CommandSyntax from './CommandSyntax';
 import CompletionControl from './CompletionControl';
@@ -88,17 +88,19 @@ export default function InputEditor({
     if (!element || !overlay) return;
     overlay.scrollTop = element.scrollTop;
     // Geometry and lengths only: the mirror must keep both the text and the box of the real input.
-    terminalDebug('composer-mirror-sync', {
-      paneId,
-      chars: text.length,
-      mirrorChars: overlay.firstElementChild?.textContent?.length ?? -1,
-      inputScroll: element.scrollTop,
-      mirrorScroll: overlay.scrollTop,
-      inputHeight: element.scrollHeight,
-      mirrorHeight: overlay.scrollHeight,
-      inputWidth: element.clientWidth,
-      mirrorWidth: overlay.clientWidth,
-    });
+    if (isTerminalInputTraceEnabled()) {
+      terminalDebug('composer-mirror-sync', {
+        paneId,
+        chars: text.length,
+        mirrorChars: overlay.firstElementChild?.textContent?.length ?? -1,
+        inputScroll: element.scrollTop,
+        mirrorScroll: overlay.scrollTop,
+        inputHeight: element.scrollHeight,
+        mirrorHeight: overlay.scrollHeight,
+        inputWidth: element.clientWidth,
+        mirrorWidth: overlay.clientWidth,
+      });
+    }
   }, [paneId, text, ghost, highlightInput]);
 
   // Focus routing decides whether typing reaches the composer at all; record the destination

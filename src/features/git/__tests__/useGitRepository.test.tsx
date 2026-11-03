@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useGitRepository } from '../hooks/useGitRepository';
+import { FOCUS_REFRESH_DEBOUNCE_MS, useGitRepository } from '../hooks/useGitRepository';
 import { getGitSnapshot } from '@platform/api/git';
 import type { GitSnapshot } from '@core/git';
 
@@ -30,5 +30,20 @@ describe('repository loading', () => {
     await act(async () => result.current.refresh());
     await waitFor(() => expect(result.current.error).toBe(''));
     expect(result.current.snapshot).toBeNull();
+  });
+
+  it('reuses a recent load instead of refreshing on every window focus', async () => {
+    vi.mocked(getGitSnapshot).mockResolvedValue(snapshot('/repo'));
+    renderHook(() => useGitRepository({ cwd: '/repo' }, true));
+    await waitFor(() => expect(getGitSnapshot).toHaveBeenCalledTimes(1));
+    const loadedAt = Date.now();
+    const now = vi.spyOn(Date, 'now');
+    now.mockReturnValue(loadedAt + 500);
+    window.dispatchEvent(new Event('focus'));
+    expect(getGitSnapshot).toHaveBeenCalledTimes(1);
+    now.mockReturnValue(loadedAt + FOCUS_REFRESH_DEBOUNCE_MS + 1);
+    window.dispatchEvent(new Event('focus'));
+    now.mockRestore();
+    await waitFor(() => expect(getGitSnapshot).toHaveBeenCalledTimes(2));
   });
 });

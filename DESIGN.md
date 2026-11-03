@@ -107,6 +107,8 @@ With resource collection enabled, host tables separate identity, status and each
 
 Static content is separated primarily by surface tone. Floating menus and dialogs use the shared floating treatment. Do not add ornamental top rules, individual list-row borders or unrelated shadows to convey hierarchy.
 
+Drag insertion placeholders use the existing rounded hover fill without an edge border. Navigation actions and shared list rows keep their measured slot geometry; connected document tabs retain their transparent gap.
+
 ## Shapes
 
 Shared inner corners are 8 px and block corners are 14 px. Favorites and tag filters are compact capsules; primary split buttons are one continuous shape with a single internal separator. Favorite marks in the editor header have no background.

@@ -7,7 +7,6 @@ import {
 import type { FileListResult, FileOpPair, FileOps, FileOpsTarget } from '@features/files/model/fileOps';
 import { useToastStore } from '@ui/feedback/Toast';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
-import { writeClipboardFiles } from '@platform/clipboard';
 import { t, type I18nKey } from '@i18n';
 import { flattenVisible } from '../utils/fileTree';
 
@@ -181,6 +180,7 @@ export function useFileBrowser({
   const undoEnabled = useFileUndoSettings(state => target.kind === 'ssh' ? state.remote : state.local);
   const [undoStack, setUndoStack] = useState<FileUndo[]>([]);
   const undoStackRef = useRef<FileUndo[]>([]);
+  const undoBusy = useRef(false);
   const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; entry: FsEntry } | null>(null);
   const [renameTarget, setRenameTarget] = useState<FsEntry | null>(null);
   const [confirm, setConfirm] = useState<FileConfirmState | null>(null);
@@ -764,11 +764,6 @@ export function useFileBrowser({
 
   useEffect(() => { if (!undoEnabled) setUndo([]); }, [undoEnabled, setUndo]);
 
-  /** Remove the top step after it is consumed, successful or not. */
-  const popUndo = useCallback(() => {
-    setUndo(undoStackRef.current.slice(1));
-  }, [setUndo]);
-
   /**
    * Undo one file operation (rename, move or delete); repeatable.
    *
@@ -779,11 +774,13 @@ export function useFileBrowser({
   const runUndo = useCallback(async () => {
     if (!(target.kind === 'ssh' ? useFileUndoSettings.getState().remote : useFileUndoSettings.getState().local)) return;
     const current = undoStackRef.current[0];
-    if (!current) return;
+    if (!current || undoBusy.current) return;
+    undoBusy.current = true;
     let done = 0;
     let failed = 0;
     let firstError = '';
     const restoredPaths: string[] = [];
+    const restored: FileOpPair[] = [];
     try {
       if (current.kind === 'delete') {
         const outcome = await ops.restoreStaged(current.pairs);
@@ -791,6 +788,7 @@ export function useFileBrowser({
         failed = outcome.errors.length;
         firstError = outcome.errors[0] ?? '';
         restoredPaths.push(...outcome.completed.map((pair) => pair.from));
+        restored.push(...outcome.completed.map(pair => ({ from: pair.from, to: pair.from })));
       } else if (current.kind === 'remove') {
         // Undoing a new item or paste moves the added entries into the staging area.
         const outcome = await ops.stageDelete(current.pairs.map((pair) => pair.to));
@@ -800,7 +798,9 @@ export function useFileBrowser({
       } else if (current.kind === 'rename') {
         for (const pair of current.pairs) {
           try {
-            restoredPaths.push(await ops.rename(pair.to, pathName(pair.from)));
+            const actual = await ops.rename(pair.to, pathName(pair.from));
+            restoredPaths.push(actual);
+            restored.push({ from: pair.from, to: actual });
             done += 1;
           } catch (error) {
             failed += 1;
@@ -819,8 +819,12 @@ export function useFileBrowser({
           done += outcome.completed.length;
           failed += outcome.errors.length;
           firstError ||= outcome.errors[0] ?? '';
+          for (const pair of outcome.completed) {
+            const original = pairs.find(item => item.to === pair.from);
+            if (original) restored.push({ from: original.from, to: pair.to });
+            restoredPaths.push(pair.to);
+          }
         }
-        restoredPaths.push(...current.pairs.map((pair) => pair.from));
       }
     } catch (error) {
       failed = current.pairs.length;
@@ -828,7 +832,23 @@ export function useFileBrowser({
     }
 
     terminalDebug('files-op', { op: `undo-${current.kind}`, itemCount: current.pairs.length, doneCount: done, errorCount: failed });
-    popUndo();
+    // Consume this record, preserving newer operations and rebasing older dependencies.
+    const stack = undoStackRef.current;
+    const index = stack.indexOf(current);
+    if (index >= 0) {
+      const within = (path: string, base: string) => path === base || path.startsWith(`${base}/`);
+      const failedPaths = current.kind === 'rename' || current.kind === 'move' || current.kind === 'delete'
+        ? current.pairs.filter(pair => !restored.some(item => item.from === pair.from)).map(pair => pair.from) : [];
+      const rebase = (path: string) => {
+        const pair = restored.find(item => within(path, item.from));
+        return pair ? pair.to + path.slice(pair.from.length) : path;
+      };
+      const older = stack.slice(index + 1).filter(entry => !entry.pairs.some(pair =>
+        failedPaths.some(path => within(pair.from, path) || within(pair.to, path) || within(path, pair.to)),
+      )).map(entry => ({ ...entry, pairs: entry.pairs.map(pair => ({ from: rebase(pair.from), to: rebase(pair.to) })) }));
+      setUndo([...stack.slice(0, index), ...older]);
+    }
+    undoBusy.current = false;
 
     const label = t('files.undo.result', { label: t(current.labelKey) });
     if (done > 0) {
@@ -842,8 +862,8 @@ export function useFileBrowser({
       toast(t('files.undo.failed', { reason: firstError || t('files.undo.reasonMissing') }), 'error');
     }
     // Undo also changes expanded directories: refresh the parents and destinations it touched.
-    refreshAffected(current.pairs.flatMap((pair) => [pair.from, pair.to]));
-  }, [ops, popUndo, refreshAffected, replaceSelection, toast, target.kind]);
+    refreshAffected([...current.pairs.flatMap((pair) => [pair.from, pair.to]), ...restoredPaths]);
+  }, [ops, setUndo, refreshAffected, replaceSelection, toast, target.kind]);
 
   // Transfers shared by paste and drag.
 
@@ -896,17 +916,16 @@ export function useFileBrowser({
   const copyEntries = useCallback((list: FsEntry[]) => {
     const paths = list.map((entry) => entry.path);
     setClipboard({ mode: 'copy', paths });
-    // In-panel paste reads the in-memory clipboard; the OS file manager reads the system one.
-    void writeClipboardFiles(paths, 'copy').catch(() => {});
+    void ops.writeClipboard?.(paths, 'copy').catch(() => {});
     toast(list.length > 1 ? t('Copied {{count}} items', { count: list.length }) : t('Copied'));
-  }, [toast]);
+  }, [ops, toast]);
 
   const cutEntries = useCallback((list: FsEntry[]) => {
     const paths = list.map((entry) => entry.path);
     setClipboard({ mode: 'cut', paths });
-    void writeClipboardFiles(paths, 'cut').catch(() => {});
+    void ops.writeClipboard?.(paths, 'cut').catch(() => {});
     toast(list.length > 1 ? t('Cut {{count}} items', { count: list.length }) : t('Cut to clipboard'));
-  }, [toast]);
+  }, [ops, toast]);
 
   /** Paste into a directory; cut pastes as a move (undoable) and copy adds no undo step. */
   const pasteInto = useCallback(async (destDir: string | null) => {

@@ -71,7 +71,7 @@
 38. **复用诊断接口** — 前端使用 `terminalDebug`，Rust 终端层使用 `terminal::debug::write`；新增事件名应稳定且能说明操作阶段，避免逐字符或高频输出日志。
 39. **按现有配置记录日志** — 当前共享测试机已开启详细诊断日志自动保存，排查时先检查已有记录，不要每轮测试重新开启；其他环境按自身设置决定，应用新环境默认关闭自动保存。涉及后台任务或新 IPC 流程时，应确认入口和失败分支都能留下可关联的日志。
 40. **先检查已有日志** — 先检查 `%LOCALAPPDATA%\com.vrykell.app\logs\diagnostics-<YYYYMMDDTHH>.jsonl`；文件名带有 UTC 小时，日志按小时轮转，较早分段留在同目录中（最多保留 24 个、256 MB）。配置保存在 `%APPDATA%\com.vrykell.app\diagnostics.json`，其开启状态属于测试机配置，不要据此推断新用户的默认值。
-41. **日志不阻塞输入输出** — 高频记录经前端批量传送与后端缓冲线程写入，保留详细事件；导出和修改自动保存配置前冲刷待写记录。终端数据通路的读数（读取、输出冲刷、收包、控制器入口、路由去向）按秒窗口聚合成 `pty-io` / `terminal-io` 单条记录，静默按 1 s、2 s、4 s… 记 `read-idle`；新增诊断逻辑不得恢复逐按键或逐块写盘。
+41. **日志不阻塞输入输出** — 高频记录经前端批量传送与后端缓冲线程写入，保留详细事件；导出和修改自动保存配置前冲刷待写记录。终端数据通路的读数（读取、输出冲刷、收包、控制器入口、路由去向）按秒窗口聚合成 `pty-io` / `terminal-io` 单条记录，静默按 1 s、2 s、4 s… 记 `read-idle`；新增诊断逻辑不得恢复逐按键或逐块写盘。逐按键的输入与光标重绘事件默认不记录，仅在设置页开启“跟踪终端输入”后写入；关闭时只保留 `terminal-io` 里的输入计数与最大写入/重绘耗时。
 
 ## 九、窗口与标题栏
 
@@ -79,7 +79,7 @@
 
 ## 十、公共组件与文档
 
-43. **公共组件优先** — 侧栏列表项统一走 `src/ui/layout/sidebarItem.tsx`（会话标签行与 SSH 连接行共用同一外观与交互）；列表拖拽排序统一走 `src/ui/layout/listReorder.tsx` 的「占位空位」交互（拖起的行让出槽位、落点用虚线占位、跟随指针的图标预览、Esc 取消、抑制拖拽后的点击），新列表通过 `data-reorder-list` / `data-reorder-item` / `data-reorder-kind` 接入，不得另造一套观感；错误展示统一走 `src/ui/feedback/ErrorBox.tsx` 与 `ErrorDetails.tsx`（数据加载失败通过 ErrorBox 显示右下角持久通知，保留重试、技术详情、关闭及弹窗键盘访问；临时动作结果使用同一通知区域中的 Toast；全局错误页仍为整页）；设置项选择器统一用 `src/ui/fields/Select.tsx` 下拉框；悬停提示统一走 `data-tip` + `src/ui/feedback/TooltipLayer.tsx`（组件里不写 `title`：系统原生提示无法改样式；纯图标控件同时保留 `aria-label` 作为无障碍名称）；多选列表统一走 `src/ui/menus/CheckboxMenu.tsx`（逐项切换后保持展开，失焦或 Esc 才关闭）。新增同类界面时先抽公共组件再接入。
+43. **公共组件优先** — 侧栏列表项统一走 `src/ui/layout/sidebarItem.tsx`（会话标签行与 SSH 连接行共用同一外观与交互）；列表拖拽排序统一走 `src/ui/layout/listReorder.tsx` 的「占位空位」交互（拖起的行让出槽位、落点用无边框底色占位、跟随指针的图标预览、Esc 取消、抑制拖拽后的点击），新列表通过 `data-reorder-list` / `data-reorder-item` / `data-reorder-kind` 接入，不得另造一套观感；错误展示统一走 `src/ui/feedback/ErrorBox.tsx` 与 `ErrorDetails.tsx`（数据加载失败通过 ErrorBox 显示右下角持久通知，保留重试、技术详情、关闭及弹窗键盘访问；临时动作结果使用同一通知区域中的 Toast；全局错误页仍为整页）；设置项选择器统一用 `src/ui/fields/Select.tsx` 下拉框；悬停提示统一走 `data-tip` + `src/ui/feedback/TooltipLayer.tsx`（组件里不写 `title`：系统原生提示无法改样式；纯图标控件同时保留 `aria-label` 作为无障碍名称）；多选列表统一走 `src/ui/menus/CheckboxMenu.tsx`（逐项切换后保持展开，失焦或 Esc 才关闭）。新增同类界面时先抽公共组件再接入。
 44. **测试钩子稳定** — 重构移动标记时保留既有测试钩子（`data-testid`、`data-tab-row-id`、`data-tab-group`、ARIA 名称等），或在同一提交内更新全部引用它的单测 / e2e。
 45. **文档分层** — 规则正本 = `docs/zh/development-rules.md`（英文镜像 `docs/en/development-rules.md`，两者保持同步）；常驻摘要 = `AGENTS.md`（Codex 等 agent 先读它）；agent 规范入口 = `.agents/skills/vrykell-conventions/SKILL.md`（Command Code 与 Codex 直接读取，`.claude/skills/vrykell-conventions/SKILL.md` 是 Claude Code 的桥接）。规则变化时同步这几处，不再新增副本。
 46. **双语文档** — `docs/` 下的文档保持中英双语：中文放 `docs/zh/`、英文放 `docs/en/`，两侧文件名一一对应。新增文档必须同时提供两种语言；修改任一语言版本时同步更新另一种。原始证据截图不翻译，按所属文档存放。

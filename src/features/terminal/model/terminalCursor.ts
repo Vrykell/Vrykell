@@ -1,5 +1,5 @@
 import type { Terminal } from '@xterm/xterm';
-import { terminalDebug } from '../services/terminalDebug';
+import { isTerminalInputTraceEnabled, terminalDebug } from '../services/terminalDebug';
 
 type CursorShape = 'block' | 'underline' | 'bar';
 
@@ -44,7 +44,9 @@ export function smoothTerminalCursorRepaints(term: Terminal, paneId?: string): (
     if (timer === undefined) return;
     clearTimeout(timer);
     timer = undefined;
-    terminalDebug('terminal-cursor-repaint-release', { paneId, reason, smoothed });
+    if (isTerminalInputTraceEnabled()) {
+      terminalDebug('terminal-cursor-repaint-release', { paneId, reason, smoothed });
+    }
     if (smoothed) {
       smoothed = false;
       // Show sequences already refresh their dirty rows through the parser.
@@ -120,7 +122,9 @@ export function applyTerminalCursorPreference(term: Terminal, paneId?: string): 
     term.parser.registerCsiHandler({ prefix: '?', final }, params => {
       if (params.includes(25)) {
         visibilityChanged = true;
-        terminalDebug('terminal-cursor-visibility-request', { paneId, visible: final === 'h' });
+        if (isTerminalInputTraceEnabled()) {
+          terminalDebug('terminal-cursor-visibility-request', { paneId, visible: final === 'h' });
+        }
       }
       // Observe visibility requests without changing their native parsing or other modes.
       return false;
@@ -129,6 +133,7 @@ export function applyTerminalCursorPreference(term: Terminal, paneId?: string): 
   term.onRender?.(() => {
     if (!visibilityChanged) return;
     visibilityChanged = false;
+    if (!isTerminalInputTraceEnabled()) return;
     const core = (term as unknown as {
       _core?: { coreService?: { isCursorHidden?: boolean } };
     })._core?.coreService;

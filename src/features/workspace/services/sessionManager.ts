@@ -133,6 +133,23 @@ export function ensureContentSession(tabId: string): Promise<void> {
 
 /** Debounce timers for layout persistence (divider drags adjust the ratio at high frequency). */
 const layoutTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const pendingLayouts = new Map<string, WindowLayout>();
+const layoutWrites = new Map<string, { layout: WindowLayout; promise: Promise<void> }>();
+
+function flushLayout(tabId: string): Promise<void> {
+  const timer = layoutTimers.get(tabId);
+  if (timer) clearTimeout(timer);
+  layoutTimers.delete(tabId);
+  const layout = pendingLayouts.get(tabId);
+  const previous = layoutWrites.get(tabId);
+  if (!layout || previous?.layout === layout) return previous?.promise ?? Promise.resolve();
+  const write = (previous?.promise ?? Promise.resolve()).catch(() => {}).then(() =>
+    updateSessionPayload(tabId, JSON.stringify({ layout })),
+  ).then(() => { if (pendingLayouts.get(tabId) === layout) pendingLayouts.delete(tabId); })
+    .finally(() => { if (layoutWrites.get(tabId)?.promise === write) layoutWrites.delete(tabId); });
+  layoutWrites.set(tabId, { layout, promise: write });
+  return write;
+}
 
 /** Persist a window layout into the session payload (debounced). */
 export function saveLayout(tabId: string, layout: WindowLayout): void {
@@ -140,11 +157,11 @@ export function saveLayout(tabId: string, layout: WindowLayout): void {
   if (draft) { pendingSessions.set(tabId, { ...draft, payload: JSON.stringify({ layout }) }); return; }
   const pending = layoutTimers.get(tabId);
   if (pending) clearTimeout(pending);
+  pendingLayouts.set(tabId, layout);
   layoutTimers.set(
     tabId,
     setTimeout(() => {
-      layoutTimers.delete(tabId);
-      updateSessionPayload(tabId, JSON.stringify({ layout })).catch((e) => {
+      void flushLayout(tabId).catch((e) => {
         console.warn('sessionManager.saveLayout failed:', e);
       });
     }, 150),
@@ -165,13 +182,9 @@ export async function setCwd(tabId: string, cwd: string): Promise<void> {
 /** Close a session (called when a tab is closed - marks it historical). */
 export async function close(tabId: string): Promise<void> {
   await paneTransfers.get(tabId);
-  const pending = layoutTimers.get(tabId);
-  if (pending) {
-    clearTimeout(pending);
-    layoutTimers.delete(tabId);
-  }
   if (pendingSessions.has(tabId) && !sessionWrites.has(tabId)) { pendingSessions.delete(tabId); return; }
   await sessionWrites.get(tabId)?.catch(() => {});
+  await flushLayout(tabId);
   try {
     await archiveSession(tabId, Date.now());
   } catch (e) {

@@ -31,52 +31,60 @@ interface SshState {
   reorder: (from: number, to: number) => void;
 }
 
-export const useSshStore = create<SshState>((set, get) => ({
-  connections: [],
-  loaded: false,
-  loading: false,
+export const useSshStore = create<SshState>((set, get) => {
+  let pendingLoad: Promise<void> | undefined;
+  let reloadRequested = false;
+  return {
+    connections: [],
+    loaded: false,
+    loading: false,
 
-  load: async () => {
-    if (get().loading) return;
-    set({ loading: true });
-    try {
-      const connections = applySavedOrder(await listSshConnections());
-      set({ connections, loaded: true });
-    } catch (e) {
-      console.warn('ssh.load failed:', e);
-      set({ connections: [], loaded: true });
-    } finally {
-      set({ loading: false });
-    }
-  },
+    load: () => {
+      reloadRequested = true;
+      if (pendingLoad) return pendingLoad;
+      set({ loading: true });
+      pendingLoad = (async () => {
+        do {
+          reloadRequested = false;
+          try {
+            const connections = applySavedOrder(await listSshConnections());
+            if (!reloadRequested) set({ connections, loaded: true });
+          } catch (e) {
+            console.warn('ssh.load failed:', e);
+            if (!reloadRequested) set({ connections: [], loaded: true });
+          }
+        } while (reloadRequested);
+      })().finally(() => { pendingLoad = undefined; set({ loading: false }); });
+      return pendingLoad;
+    },
 
-  save: async (conn) => {
-    await saveSshConnection(conn);
-    clearSshAuthenticationMetadata(conn.id);
-    await get().load();
-  },
+    save: async (conn) => {
+      await saveSshConnection(conn);
+      clearSshAuthenticationMetadata(conn.id);
+      await get().load();
+    },
 
-  remove: async (id) => {
-    await deleteSshConnection(id);
-    clearSshAuthenticationMetadata(id);
-    await get().load();
-  },
+    remove: async (id) => {
+      await deleteSshConnection(id);
+      clearSshAuthenticationMetadata(id);
+      await get().load();
+    },
 
-  touch: async (id) => {
-    await touchSshConnection(id);
-    await get().load();
-  },
+    touch: async (id) => {
+      await touchSshConnection(id);
+      await get().load();
+    },
 
-  reorder: (from, to) => {
-    const connections = [...get().connections];
-    if (from < 0 || from >= connections.length) return;
-    const [moved] = connections.splice(from, 1);
-    connections.splice(Math.max(0, Math.min(to, connections.length)), 0, moved!);
-    set({ connections });
-    safeLocalStorageSet(ORDER_KEY, JSON.stringify(connections.map(connection => connection.id)));
-  },
-
-}));
+    reorder: (from, to) => {
+      const connections = [...get().connections];
+      if (from < 0 || from >= connections.length) return;
+      const [moved] = connections.splice(from, 1);
+      connections.splice(Math.max(0, Math.min(to, connections.length)), 0, moved!);
+      set({ connections });
+      safeLocalStorageSet(ORDER_KEY, JSON.stringify(connections.map(connection => connection.id)));
+    },
+  };
+});
 
 /** Ensures the store has loaded from the backend (idempotent, fire-and-forget). */
 export function ensureSshLoaded(): void {

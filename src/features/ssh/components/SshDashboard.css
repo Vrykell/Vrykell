@@ -1,8 +1,9 @@
 .ssh-dashboard { container: hosts / inline-size; display: flex; flex: 1; flex-direction: column; min-height: 0; min-width: 0; background: var(--canvas); }
 .ssh-host-page-header { display: flex; flex-shrink: 0; align-items: center; justify-content: space-between; gap: 16px; padding: 24px 24px 16px; }
-.ssh-host-page-title { display: flex; align-items: baseline; gap: 10px; flex-shrink: 0; min-width: 0; }
-.ssh-host-page-title h2 { margin: 0; color: var(--text-primary); font-size: calc(24px * var(--ui-font-scale)); font-weight: var(--fw-semibold); white-space: nowrap; }
-.ssh-host-page-title > span { color: var(--text-muted); font-size: var(--fs-caption); white-space: nowrap; }
+.ssh-host-page-title { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+.ssh-dashboard .ssh-host-page-title { max-width: 40%; }
+.ssh-host-page-title h2 { min-width: 0; margin: 0; overflow: hidden; color: var(--text-primary); font-size: calc(24px * var(--ui-font-scale)); font-weight: var(--fw-semibold); text-overflow: ellipsis; white-space: nowrap; }
+.ssh-host-page-title > span { flex-shrink: 0; color: var(--text-muted); font-size: var(--fs-caption); white-space: nowrap; }
 .ssh-host-page-actions { display: flex; flex: 1; justify-content: flex-end; align-items: center; gap: 8px; min-width: 0; }
 .ssh-host-search { flex: 1; min-width: 100px; max-width: 376px; }
 .ssh-host-search .workspace-sidebar-toolbar { padding: 0; }
@@ -79,6 +80,7 @@ button.ssh-host-connect { flex-shrink: 0; height: 28px; padding: 0 10px; opacity
 .ssh-dashboard-paused { margin: 0 24px 12px; padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--card-bg); color: var(--text-secondary); font-size: var(--fs-caption); }
 @container hosts (max-width: 860px) {
   .ssh-host-page-header { flex-wrap: wrap; align-items: flex-start; gap: 12px; padding: 20px 16px 14px; }
+  .ssh-dashboard .ssh-host-page-title { max-width: 100%; }
   .ssh-host-page-actions { flex-basis: 100%; justify-content: flex-start; }
   .ssh-host-search { max-width: none; }
   .ssh-host-filter-toolbar { padding-inline: 16px; }

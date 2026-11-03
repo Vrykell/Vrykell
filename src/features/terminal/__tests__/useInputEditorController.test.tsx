@@ -73,7 +73,8 @@ describe('useInputEditorController', () => {
     const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
     const execute = result.current.execute;
     await act(async () => { execute(); execute(); execute(); });
-    expect(mocks.ptyWrite.mock.calls.map(call => call[1])).toEqual(['git status\n', '\n', '\n']);
+    // Queued blank submissions may share one write; the shell still receives every newline in order.
+    expect(mocks.ptyWrite.mock.calls.map(call => call[1]).join('')).toBe('git status\n\n\n');
   });
   it('preserves a draft consisting of standalone newline characters', () => {
     useInputStore.setState({ byPane: { 'pane-1': { text: '\n\n', aiMode: false } } });

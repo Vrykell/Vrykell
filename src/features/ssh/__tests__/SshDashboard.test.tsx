@@ -3,12 +3,14 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import SshDashboard from '../components/SshDashboard';
 import { useSshStore } from '../stores/store';
 import { useHostLibrary } from '../stores/hostLibrary';
+import { useHostView } from '../stores/hostView';
 import { useSessionAuthenticationStore } from '../stores/sessionAuthentication';
 
 const status = vi.hoisted(() => vi.fn());
 vi.mock('../services/api', async importOriginal => ({ ...(await importOriginal<typeof import('../services/api')>()), sshSystemStatus: status }));
 const snapshot = useSshStore.getState();
 beforeEach(() => {
+  useHostView.setState({ groupFilter: null });
   localStorage.removeItem('vrykell-host-view-v2');
   status.mockResolvedValue({ system: 'Linux', cpuTotal: 100, cpuIdle: 80, memoryTotal: 100, memoryAvailable: 40, diskTotal: 100, diskUsed: 25 });
   useSshStore.setState({ loaded: true, loading: false, connections: [
@@ -20,7 +22,7 @@ beforeEach(() => {
     'ssh-2': { group: 'Osaka', tags: ['database'], starred: false },
   } });
 });
-afterEach(() => { cleanup(); vi.clearAllMocks(); useSshStore.setState(snapshot, true); useHostLibrary.setState({ hosts: {} }); localStorage.removeItem('vrykell-host-view-v2'); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); useSshStore.setState(snapshot, true); useHostLibrary.setState({ hosts: {} }); useHostView.setState({ groupFilter: null }); localStorage.removeItem('vrykell-host-view-v2'); });
 
 it('starts with one host list and only collects resources when explicitly enabled', async () => {
   render(<SshDashboard onManage={vi.fn()} onOpenTerminal={vi.fn()} />);
@@ -104,6 +106,24 @@ it.each(['卡片视图', '表格视图'])('centers unmatched hosts in %s and sea
   fireEvent.change(screen.getByTestId('ssh-search'), { target: { value: 'no-match' } });
   expect(screen.getByText('无匹配连接')).toHaveClass('search-empty-state');
   expect(screen.queryByTestId('ssh-row-ssh-1')).toBeNull();
+});
+
+it.each(['卡片视图', '表格视图'])('shows the selected group and matching host count in the %s heading', layout => {
+  useHostLibrary.getState().update('ssh-2', { group: '' });
+  render(<SshDashboard onManage={vi.fn()} onOpenTerminal={vi.fn()} />);
+  fireEvent.click(screen.getByRole('button', { name: layout }));
+  expect(screen.getByRole('heading', { name: '主机', level: 2 }).parentElement).toHaveTextContent('2 台主机');
+  fireEvent.click(screen.getByTestId('ssh-host-group-filter'));
+  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Tokyo' }));
+  expect(screen.getByRole('heading', { name: 'Tokyo', level: 2 }).parentElement).toHaveTextContent('1 台主机');
+  fireEvent.change(screen.getByTestId('ssh-search'), { target: { value: 'no-match' } });
+  expect(screen.getByRole('heading', { name: 'Tokyo', level: 2 }).parentElement).toHaveTextContent('0 台主机');
+  fireEvent.change(screen.getByTestId('ssh-search'), { target: { value: '' } });
+  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: '未分组' }));
+  expect(screen.getByRole('heading', { name: '未分组', level: 2 }).parentElement).toHaveTextContent('1 台主机');
+  expect(screen.getByTestId('ssh-row-ssh-2')).toBeVisible();
+  fireEvent.click(screen.getByRole('menuitemcheckbox', { name: '未分组' }));
+  expect(screen.getByRole('heading', { name: '主机', level: 2 }).parentElement).toHaveTextContent('2 台主机');
 });
 
 it('returns to a valid host sort when resource display is disabled', () => {

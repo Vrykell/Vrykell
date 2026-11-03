@@ -17,6 +17,9 @@ interface WriteJob {
   resolve: () => void;
   reject: (error: unknown) => void;
   guard?: TerminalInputGuard;
+  /** An abortable job owns its payload; batching it with later input would hide that ownership. */
+  signal?: AbortSignal;
+  cancelled?: boolean;
 }
 
 export interface TerminalInputGuard { epoch: number; isCurrent: () => boolean }
@@ -49,14 +52,23 @@ const queues = new Map<string, SessionQueue>();
  * session stay in order, and an interrupt drops the part that has not been sent yet. The returned
  * promise settles once this payload is written, or as soon as it was dropped on purpose.
  */
-export function writeTerminalInput(sessionId: string, data: string): Promise<void> {
+export function writeTerminalInput(sessionId: string, data: string, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(new DOMException('The operation was aborted.', 'AbortError'));
   if (!data) return Promise.resolve();
   // An interrupt leads the queue: the text typed after it must not wait for the rest of a paste.
   if (data === INTERRUPT) cancelTerminalInput(sessionId);
   const scope = pasteScopes.get(sessionId);
   const result = new Promise<void>((resolve, reject) => {
-    const job: WriteJob = { data, offset: 0, resolve, reject, guard: scope?.guard };
     const queue = queues.get(sessionId) ?? { jobs: [], draining: false };
+    const abort = () => {
+      job.cancelled = true;
+      const index = queue.jobs.indexOf(job);
+      if (index >= 0) queue.jobs.splice(index, 1);
+      job.reject(new DOMException('The operation was aborted.', 'AbortError'));
+    };
+    const finish = (settle: () => void) => { signal?.removeEventListener('abort', abort); settle(); };
+    const job: WriteJob = { data, offset: 0, resolve: () => finish(resolve), reject: error => finish(() => reject(error)), guard: scope?.guard, signal };
+    signal?.addEventListener('abort', abort, { once: true });
     queues.set(sessionId, queue);
     queue.jobs.push(job);
     if (!queue.draining) void drain(sessionId, queue);
@@ -80,6 +92,27 @@ async function drain(sessionId: string, queue: SessionQueue): Promise<void> {
   queue.draining = true;
   try {
     while (queue.jobs.length > 0) {
+      // Fast typing queues several short jobs behind one another. Sending them as one write
+      // removes the per-key IPC round trip without changing the order the shell sees.
+      const batch = takeBatch(queue);
+      if (batch) {
+        try {
+          await ptyWrite(sessionId, batch.data);
+        } catch (error) {
+          const head = batch.jobs[0]!;
+          if (queue.jobs[0] === head) queue.jobs.shift();
+          head.reject(error);
+          failQueue(queue, error);
+          return;
+        }
+        for (const job of batch.jobs) {
+          // A cancel may have dropped the job while the write was in flight.
+          const index = queue.jobs.indexOf(job);
+          if (index >= 0) queue.jobs.splice(index, 1);
+          job.resolve();
+        }
+        continue;
+      }
       const job = queue.jobs[0]!;
       if (job.guard && !job.guard.isCurrent()) {
         queue.jobs.shift(); job.reject(new TerminalInputTargetChanged()); continue;
@@ -91,6 +124,7 @@ async function drain(sessionId: string, queue: SessionQueue): Promise<void> {
         if (job.guard) await ptyWrite(sessionId, chunk, job.guard.epoch);
         else await ptyWrite(sessionId, chunk);
       } catch (error) {
+        if (job.cancelled) continue;
         // A session that is gone fails every remaining chunk: report once and stop.
         if (queue.jobs[0] === job) queue.jobs.shift();
         job.reject(error);
@@ -110,6 +144,32 @@ async function drain(sessionId: string, queue: SessionQueue): Promise<void> {
     queue.draining = false;
     if (queue.jobs.length === 0 && queues.get(sessionId) === queue) queues.delete(sessionId);
   }
+}
+
+/**
+ * Collect the head and the plain jobs behind it into one payload. Only complete jobs are
+ * batched: a job that needs another chunk keeps the existing single-job path, and guarded
+ * paste jobs, abortable jobs and the interrupt stay alone so their ownership rules hold.
+ */
+function takeBatch(queue: SessionQueue): { jobs: WriteJob[]; data: string } | null {
+  // Batching only applies when another job is already waiting; a single job keeps the
+  // chunked path without copying its payload first.
+  if (queue.jobs.length < 2) return null;
+  const head = queue.jobs[0];
+  if (!head || head.guard || head.signal || head.data === INTERRUPT) return null;
+  // A payload larger than one chunk must keep its chunked, sequential writes.
+  if (head.data.length - head.offset > TERMINAL_INPUT_CHUNK_UNITS) return null;
+  let data = head.data.slice(head.offset);
+  const jobs = [head];
+  for (let index = 1; index < queue.jobs.length; index++) {
+    const next = queue.jobs[index]!;
+    if (next.guard || next.signal || next.data === INTERRUPT) break;
+    const rest = next.data.slice(next.offset);
+    if (data.length + rest.length > TERMINAL_INPUT_CHUNK_UNITS) break;
+    data += rest;
+    jobs.push(next);
+  }
+  return jobs.length > 1 ? { jobs, data } : null;
 }
 
 function failQueue(queue: SessionQueue, error: unknown): void {
