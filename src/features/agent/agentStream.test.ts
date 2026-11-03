@@ -118,7 +118,8 @@ describe('agentStream (mocked IPC boundary)', () => {
   it('hands a denied tool back to the user with a text-only model step', async () => {
     const initial = useAgentSettings.getState().global;
     useAgentSettings.setState({ global: { ...initial, agentMode: true, maxSteps: 4 } });
-    setToolAuthorizer(async () => ({ decision: 'deny', reason: 'policy.denied' }));
+    const authorize = vi.fn(async () => ({ decision: 'deny' as const, reason: 'policy.denied' }));
+    setToolAuthorizer(authorize);
     setupInvoke('');
     const fallback = mockInvoke.getMockImplementation()!;
     const requests: Record<string, unknown>[] = [];
@@ -129,7 +130,10 @@ describe('agentStream (mocked IPC boundary)', () => {
       const send = request.onEvent.onmessage!;
       send({ kind: 'started', status: 200, headers: [['content-type', 'text/event-stream']] });
       const response = requests.length === 1
-        ? 'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"blocked","type":"function","function":{"name":"run_command","arguments":"{\\"command\\":\\"echo check\\"}"}}]}}]}\n\ndata: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\ndata: [DONE]\n\n'
+        ? `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [
+          { index: 0, id: 'blocked', type: 'function', function: { name: 'run_command', arguments: JSON.stringify({ command: 'echo check' }) } },
+          { index: 1, id: 'queued-file', type: 'function', function: { name: 'read_file', arguments: JSON.stringify({ path: '/project/file' }) } },
+        ] } }] })}\n\ndata: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\ndata: [DONE]\n\n`
         : 'data: {"choices":[{"delta":{"content":"Waiting for authorization"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n';
       for (const chunk of toChunks(response, 11)) send({ kind: 'chunk', data: chunk });
       send({ kind: 'done' });
@@ -140,6 +144,7 @@ describe('agentStream (mocked IPC boundary)', () => {
       await agentStream([{ role: 'user', content: 'Inspect the service' }], chunk => { text += chunk; }, { paneId: 'fixed', tabId: 'owner' });
       expect(requests).toHaveLength(2);
       expect(requests[1]!.tool_choice).toBe('none');
+      expect(authorize).toHaveBeenCalledOnce();
       expect(text).toBe('Waiting for authorization');
     } finally {
       useAgentSettings.setState({ global: initial });

@@ -140,6 +140,8 @@ test('follows streamed replies, pauses for reading and offers a return to the la
   }
   const body = current(page).locator('.scroll-region');
   const gap = () => body.evaluate(el => el.scrollHeight - el.clientHeight - el.scrollTop);
+  await expect(current(page).locator('.chat-exchange')).toContainText('another paragraph');
+  await expect.poll(() => body.evaluate(el => el.scrollHeight - el.clientHeight)).toBeGreaterThan(300);
   await expect.poll(gap).toBeLessThan(5);
   await body.evaluate(el => { el.scrollTop -= 300; });
   await expect.poll(gap).toBeGreaterThan(250);
@@ -147,6 +149,7 @@ test('follows streamed replies, pauses for reading and offers a return to the la
   await emitAcpSession(page, acpUpdate('sess_e2e', {
     sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'more paragraphs\n\n'.repeat(30) },
   }));
+  await expect(current(page).locator('.chat-exchange')).toContainText('more paragraphs');
   await expect.poll(() => body.evaluate(el => el.scrollTop)).toBe(before);
   await current(page).getByRole('button', { name: '回到最新回复' }).click();
   await expect.poll(gap).toBeLessThan(5);
