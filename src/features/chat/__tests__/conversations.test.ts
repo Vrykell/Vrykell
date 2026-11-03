@@ -44,6 +44,24 @@ afterEach(() => {
 });
 
 describe('independent conversations', () => {
+  it('does not recreate a conversation when a send arrives during deletion', async () => {
+    const id = useChatStore.getState().createConversation();
+    await useChatStore.getState().send('Saved question', { conversationId: id, streamFn: async () => {} });
+    vi.mocked(api.saveConversation).mockClear();
+    vi.mocked(api.appendConversationMessage).mockClear();
+    let finish!: () => void;
+    vi.mocked(api.deleteConversation).mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    const deleting = useChatStore.getState().deleteConversation(id, { activateNext: false });
+    await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
+    const stream = vi.fn(async () => {});
+    const sending = useChatStore.getState().send('Late question', { conversationId: id, streamFn: stream });
+    finish(); await Promise.all([deleting, sending]);
+    expect(api.saveConversation).not.toHaveBeenCalled();
+    expect(api.appendConversationMessage).not.toHaveBeenCalled();
+    expect(stream).not.toHaveBeenCalled();
+    expect(useChatStore.getState().conversations.some(item => item.id === id)).toBe(false);
+  });
+
   it('restores draft batches once without activating them or overwriting existing work', () => {
     const id = useChatStore.getState().createConversation();
     useChatStore.getState().restoreDraftConversations([{ id, title: 'Replacement' }, { id: 'restored', title: 'Draft' }, { id: 'restored', title: 'Duplicate' }]);

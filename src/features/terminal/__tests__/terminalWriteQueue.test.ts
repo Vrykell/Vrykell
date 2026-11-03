@@ -29,6 +29,43 @@ function deferredWrites(): PendingWrite[] {
 const callData = () => ptyWriteMock.mock.calls.map((call) => call[1] as string);
 
 describe('terminalWriteQueue', () => {
+  it('removes only the aborted command and preserves unrelated queued input', async () => {
+    const pending = deferredWrites();
+    const earlier = writeTerminalInput('cancel-owner', 'earlier');
+    const controller = new AbortController();
+    const cancelled = expect(writeTerminalInput('cancel-owner', 'cancelled', controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    const human = writeTerminalInput('cancel-owner', 'human');
+    controller.abort();
+    await cancelled;
+    pending[0].settle();
+    await vi.waitFor(() => expect(callData()).toEqual(['earlier', 'human']));
+    pending[1].settle();
+    await Promise.all([earlier, human]);
+  });
+
+  it('drops the unsent tail of an aborted command while allowing later input', async () => {
+    const pending = deferredWrites();
+    const controller = new AbortController();
+    const cancelled = expect(writeTerminalInput('cancel-tail', 'x'.repeat(TERMINAL_INPUT_CHUNK_UNITS + 50), controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    controller.abort();
+    await cancelled;
+    const human = writeTerminalInput('cancel-tail', 'human');
+    pending[0].settle();
+    await vi.waitFor(() => expect(callData()).toEqual(['x'.repeat(TERMINAL_INPUT_CHUNK_UNITS), 'human']));
+    pending[1].settle(); await human;
+  });
+
+  it('keeps later input queued when a cancelled in-flight write reports an error', async () => {
+    const pending = deferredWrites();
+    const controller = new AbortController();
+    const cancelled = expect(writeTerminalInput('cancel-error', 'command', controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    controller.abort(); await cancelled;
+    const human = writeTerminalInput('cancel-error', 'human');
+    pending[0].fail(new Error('late write failure'));
+    await vi.waitFor(() => expect(callData()).toEqual(['command', 'human']));
+    pending[1].settle(); await human;
+  });
+
   beforeEach(() => {
     ptyWriteMock.mockReset();
   });

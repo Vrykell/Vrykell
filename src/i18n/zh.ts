@@ -670,6 +670,7 @@ const zh: Record<string, string> = {
   'Command completion could not be confirmed. This is a terminal snapshot; use read_terminal and do not queue more commands until the shell is ready.': '无法确认命令已结束。当前返回的是终端快照，请用 read_terminal 检查，在 shell 就绪前不要继续排队发送命令。',
   'Command timed out after {{seconds}} seconds. It may still be running; use read_terminal before sending another command.': '命令执行超时（{{seconds}} 秒），可能仍在运行；发送下一条命令前请用 read_terminal 检查。',
   'Stopped waiting. The command may still be running in the terminal.': '已停止等待，命令可能仍在终端中运行。',
+  'Could not write to the terminal: {{error}}': '无法写入终端：{{error}}',
   'The command entered an interactive screen. Use read_terminal and terminal_keys to continue.': '命令进入了交互式界面，请使用 read_terminal 和 terminal_keys 继续操作。',
   'Open in Vrykell': '在 Vrykell 中打开',
   'Windows context menu': 'Windows 右键菜单',

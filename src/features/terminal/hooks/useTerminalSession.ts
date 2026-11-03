@@ -446,7 +446,11 @@ export function useTerminalSession(
     }, term.rows, initialScene, blockEnabled, deferBlockUntilPreexec);
     sessionControllers.set(paneId, controller);
     setPendingCommandRegistrar((targetPane, command, payload) => {
-      if (sessionControllers.has(targetPane)) setPendingTerminalCommand(targetPane, command, payload);
+      if (!sessionControllers.has(targetPane) || !setPendingTerminalCommand(targetPane, command, payload)) return;
+      const pending = pendingUiCommands.get(targetPane);
+      return () => {
+        if (pending && pendingUiCommands.get(targetPane) === pending) clearPendingTerminalCommand(targetPane);
+      };
     });
     if (isTerminalDebugEnabled()) {
       terminalDebug('session-controller-register', { paneId, tabId: ownerTab.current, scene: initialScene, blockEnabled, deferBlockUntilPreexec });

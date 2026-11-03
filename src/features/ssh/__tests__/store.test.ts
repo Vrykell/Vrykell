@@ -24,6 +24,32 @@ const connection: SshConnection = {
 };
 
 describe('ssh store', () => {
+  it('does not restore a deleted profile from a listing already in flight', async () => {
+    let finish!: (connections: SshConnection[]) => void;
+    vi.mocked(listSshConnections).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }))
+      .mockResolvedValue([]);
+    const loading = useSshStore.getState().load();
+    const deleting = useSshStore.getState().remove(connection.id);
+    await Promise.resolve();
+    finish([connection]);
+    await Promise.all([loading, deleting]);
+    expect(useSshStore.getState().connections).toEqual([]);
+    expect(listSshConnections).toHaveBeenCalledTimes(2);
+  });
+
+  it('publishes saved changes made while an old listing is in flight', async () => {
+    const updated = { ...connection, host: 'updated.example.com' };
+    let finish!: (connections: SshConnection[]) => void;
+    vi.mocked(listSshConnections).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }))
+      .mockResolvedValue([updated]);
+    const loading = useSshStore.getState().load();
+    const saving = useSshStore.getState().save(updated);
+    await Promise.resolve();
+    finish([connection]);
+    await Promise.all([loading, saving]);
+    expect(useSshStore.getState().connections).toEqual([updated]);
+  });
+
   it('persists manual connection order and reapplies it after loading', async () => {
     const other = { ...connection, id: 'other', name: 'Other' };
     useSshStore.setState({ connections: [connection, other] });

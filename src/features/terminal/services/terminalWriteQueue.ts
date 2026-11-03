@@ -17,6 +17,7 @@ interface WriteJob {
   resolve: () => void;
   reject: (error: unknown) => void;
   guard?: TerminalInputGuard;
+  cancelled?: boolean;
 }
 
 export interface TerminalInputGuard { epoch: number; isCurrent: () => boolean }
@@ -49,14 +50,23 @@ const queues = new Map<string, SessionQueue>();
  * session stay in order, and an interrupt drops the part that has not been sent yet. The returned
  * promise settles once this payload is written, or as soon as it was dropped on purpose.
  */
-export function writeTerminalInput(sessionId: string, data: string): Promise<void> {
+export function writeTerminalInput(sessionId: string, data: string, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) return Promise.reject(new DOMException('The operation was aborted.', 'AbortError'));
   if (!data) return Promise.resolve();
   // An interrupt leads the queue: the text typed after it must not wait for the rest of a paste.
   if (data === INTERRUPT) cancelTerminalInput(sessionId);
   const scope = pasteScopes.get(sessionId);
   const result = new Promise<void>((resolve, reject) => {
-    const job: WriteJob = { data, offset: 0, resolve, reject, guard: scope?.guard };
     const queue = queues.get(sessionId) ?? { jobs: [], draining: false };
+    const abort = () => {
+      job.cancelled = true;
+      const index = queue.jobs.indexOf(job);
+      if (index >= 0) queue.jobs.splice(index, 1);
+      job.reject(new DOMException('The operation was aborted.', 'AbortError'));
+    };
+    const finish = (settle: () => void) => { signal?.removeEventListener('abort', abort); settle(); };
+    const job: WriteJob = { data, offset: 0, resolve: () => finish(resolve), reject: error => finish(() => reject(error)), guard: scope?.guard };
+    signal?.addEventListener('abort', abort, { once: true });
     queues.set(sessionId, queue);
     queue.jobs.push(job);
     if (!queue.draining) void drain(sessionId, queue);
@@ -91,6 +101,7 @@ async function drain(sessionId: string, queue: SessionQueue): Promise<void> {
         if (job.guard) await ptyWrite(sessionId, chunk, job.guard.epoch);
         else await ptyWrite(sessionId, chunk);
       } catch (error) {
+        if (job.cancelled) continue;
         // A session that is gone fails every remaining chunk: report once and stop.
         if (queue.jobs[0] === job) queue.jobs.shift();
         job.reject(error);

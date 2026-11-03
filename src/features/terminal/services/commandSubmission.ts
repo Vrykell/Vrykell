@@ -18,12 +18,12 @@ export function terminalCommandPayload(paneId: string, command: string): string 
 }
 
 /** Explicit command execution shares one serializer and the ordered terminal input queue. */
-export function writeTerminalCommand(paneId: string, sessionId: string, command: string, preparedPayload?: string): Promise<void> {
+export function writeTerminalCommand(paneId: string, sessionId: string, command: string, preparedPayload?: string, signal?: AbortSignal): Promise<void> {
   const payload = preparedPayload ?? terminalCommandPayload(paneId, command);
-  registerPendingCommand(paneId, command, payload);
+  const clearPending = registerPendingCommand(paneId, command, payload);
   terminalDebug('terminal-command-submission', {
     paneId, sessionId, sourceLines: command.split(/\r\n|\r|\n/).length,
     sourceChars: command.length, payloadChars: payload.length, wireLines: payload.split('\n').length - 1,
   });
-  return writeTerminalInput(sessionId, payload);
+  return writeTerminalInput(sessionId, payload, signal).catch(error => { clearPending?.(); throw error; });
 }

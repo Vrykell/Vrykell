@@ -572,6 +572,7 @@ export const useChatStore = create<ChatState>((set, get) => {
   },
   send: async (text, opts) => {
     const tabId = opts?.conversationId ?? opts?.ownerId ?? useWorkspaceStore.getState().activeId;
+    if (pendingConversationDeletes.has(tabId)) return;
     const conversation = get().conversations.find(item => item.id === tabId);
     if (opts?.conversationId && (!conversation || !(tabId in get().byTab))) return;
     const trimmed = text.trim();
@@ -611,7 +612,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     await runAssistant(tabId, assistantMsg.id, controller, opts?.streamFn);
   },
   regenerate: async (tabId, userMsgId) => {
-    if (get().sendingTabs.includes(tabId)) return;
+    if (get().sendingTabs.includes(tabId) || pendingConversationDeletes.has(tabId)) return;
     const msgs = get().byTab[tabId] ?? [];
     const idx = msgs.findIndex((m) => m.id === userMsgId);
     if (idx < 0 || msgs[idx].role !== 'user') return;
@@ -646,7 +647,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     await runAssistant(tabId, assistantMsg.id, controller);
   },
   deleteExchange: (tabId, userMsgId) => {
-    if (get().sendingTabs.includes(tabId)) return;
+    if (get().sendingTabs.includes(tabId) || pendingConversationDeletes.has(tabId)) return;
     const msgs = get().byTab[tabId] ?? [];
     const idx = msgs.findIndex((m) => m.id === userMsgId);
     if (idx < 0 || msgs[idx].role !== 'user') return;
@@ -662,7 +663,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     for (const id of ids) void deleteMessage(tabId, id).catch(() => {});
   },
   editResend: (tabId, userMsgId) => {
-    if (get().sendingTabs.includes(tabId)) return;
+    if (get().sendingTabs.includes(tabId) || pendingConversationDeletes.has(tabId)) return;
     const msgs = get().byTab[tabId] ?? [];
     const idx = msgs.findIndex((m) => m.id === userMsgId);
     if (idx < 0 || msgs[idx].role !== 'user') return;
