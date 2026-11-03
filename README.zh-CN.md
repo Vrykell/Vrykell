@@ -191,6 +191,8 @@ npm run check:architecture
 
 交流群：**1130135497**。欢迎分享工作流程、交流问题和讨论项目。
 
+Discord：[加入 Vrykell 社区](https://discord.gg/ZqKPd5DW)。
+
 <details>
 <summary>交流群二维码</summary>
 

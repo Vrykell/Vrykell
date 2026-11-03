@@ -191,6 +191,8 @@ Interactive changes also need matching browser regressions; backend changes need
 
 Community group: **1130135497**. Share workflows, ask questions and discuss the project.
 
+Discord: [Join the Vrykell community](https://discord.gg/ZqKPd5DW).
+
 <details>
 <summary>Community group QR code</summary>
 
