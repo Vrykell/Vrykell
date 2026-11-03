@@ -6,7 +6,7 @@ import ResizeHandle from '@ui/layout/ResizeHandle';
 import { ListReorderPlaceholder, ListReorderPreview, useListReorderDrag } from '@ui/layout/listReorder';
 import { TerminalPrompt, FileCode, ServerStack, Settings, PanelLeft, History, Grid, iconSizes } from '@ui/icons';
 import AiSessionIcon from '@features/chat/components/AiSessionIcon';
-import { useUiStore } from '@features/workspace';
+import { useDockStore, useNavigationDrag, useUiStore } from '@features/workspace';
 import { useWorkspaceNavigation, WORKSPACE_AREA_LABELS, WORKSPACE_COMPACT_BREAKPOINT, type WorkspaceArea } from '../stores/navigation';
 import { selectWorkspaceArea } from '../services/selectWorkspaceArea';
 import { openUnifiedWorkspace } from '../services/unifiedWorkspace';
@@ -21,6 +21,12 @@ export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number
   const overlay = useWorkspaceNavigation(state => state.sidebarOverlay);
   const sidebarWidth = useWorkspaceNavigation(state => state.sidebarDragWidth ?? state.sidebarWidth);
   const settingsOpen = useUiStore(state => state.settingsOpen);
+  const leftPanelOpen = useDockStore(state => state.leftPanels.length > 0);
+  // The placement preview shows the docked layout, so the settings foot already clears for it.
+  const leftPlacementPreview = useNavigationDrag(state => state.target?.side === 'left' && state.target.openPanel === true);
+  const leftDocked = leftPanelOpen || leftPlacementPreview;
+  const toggleSettings = () => useUiStore.getState().setSettingsOpen(!settingsOpen);
+  const settingsShortcut = `${isMacOS ? 'Meta' : 'Control'}+,`;
   const workspaceOrder = useWorkspaceNavigation(state => state.workspaceOrder);
   const historyLoading = useWorkspaceNavigation(state => state.historyLoading);
   useEffect(() => {
@@ -58,6 +64,9 @@ export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number
     <div className="workspace-sidebar-heading" data-tauri-drag-region>
       <span data-tauri-drag-region>{t('Workspaces')}</span>
       <div className="workspace-sidebar-header-actions">
+        {leftDocked && <IconButton compact data-testid="workspace-settings" aria-label={t('Settings')} data-tip={t('Open settings')}
+          data-dock-btn="settings" data-dock-fixed="true" data-tip-shortcut={settingsShortcut}
+          onClick={toggleSettings}><Settings size={iconSizes.control} /></IconButton>}
         <IconButton compact data-testid="workspace-history" aria-label={t('All history')} data-tip={t('All history')}
           data-busy={historyLoading || undefined} onClick={() => selectWorkspaceArea('history')}>
           <History size={iconSizes.control} className={historyLoading ? 'reload-spin' : undefined} />
@@ -68,7 +77,7 @@ export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number
     </div>
     <nav aria-label={t('Workspaces')} className="workspace-area-navigation" data-reorder-list="workspace-areas">
       {orderedItems.map(({ id, label, Icon }) => <Fragment key={id}>
-        <ListReorderPlaceholder listId="workspace-areas" itemId={id} />
+        <ListReorderPlaceholder listId="workspace-areas" itemId={id} reserveSource />
         <SidebarItem compact title={label} icon={<Icon size={iconSizes.row} />} active={!settingsOpen && (area === id || id === 'ssh' && area === 'forwarding')}
           testId={`workspace-area-${id}`} dataAttributes={{ role: 'button', 'aria-label': label, 'data-dock-btn': id === 'terminal' ? 'tabs' : id === 'ssh' ? 'ssh' : undefined, 'aria-current': !settingsOpen && (area === id || id === 'ssh' && area === 'forwarding') ? 'page' : undefined }}
           tabIndex={0} reorderItemId={id} reorderListId="workspace-areas" reorderKind="workspace"
@@ -80,10 +89,10 @@ export default function WorkspaceSidebar({ maxWidth = 400 }: { maxWidth?: number
     <div className="workspace-sidebar-tools" data-testid="workspace-left-dock">
       <SidePanel side="left" />
     </div>
-    <div className="workspace-sidebar-footer">
-      <SidebarItem compact title={t('Settings')} tooltip={t('Open settings')} icon={<Settings size={iconSizes.row} />} active={settingsOpen} dataAttributes={{ 'data-dock-btn': 'settings', 'data-dock-fixed': 'true', role: 'button', 'aria-label': t('Settings'), 'aria-pressed': String(settingsOpen), 'data-tip-shortcut': `${isMacOS ? 'Meta' : 'Control'}+,` }} testId="workspace-settings" tabIndex={0}
-        onClick={() => useUiStore.getState().setSettingsOpen(!settingsOpen)} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); useUiStore.getState().setSettingsOpen(!settingsOpen); } }} />
-    </div>
+    {!leftDocked && <div className="workspace-sidebar-footer">
+      <SidebarItem compact title={t('Settings')} tooltip={t('Open settings')} icon={<Settings size={iconSizes.row} />} active={settingsOpen} dataAttributes={{ 'data-dock-btn': 'settings', 'data-dock-fixed': 'true', role: 'button', 'aria-label': t('Settings'), 'aria-pressed': String(settingsOpen), 'data-tip-shortcut': settingsShortcut }} testId="workspace-settings" tabIndex={0}
+        onClick={toggleSettings} onKeyDown={event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleSettings(); } }} />
+    </div>}
     <NavigationDragPreview />
       <ListReorderPreview listId="workspace-areas" variant="icon">
         {drag => {
