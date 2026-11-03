@@ -29,6 +29,17 @@ export interface SizedMessage {
   group?: string;
 }
 
+/** Keep each complete call/result exchange atomic, allowing earlier steps to be folded. */
+export function sizeModelMessages(messages: ModelMessage[]): SizedMessage[] {
+  let exchange: string | undefined;
+  return messages.map((msg, index) => {
+    if (msg.role === 'assistant' && Array.isArray(msg.content)
+      && msg.content.some(part => part.type === 'tool-call')) exchange = `exchange:${index}`;
+    else if (msg.role !== 'tool') exchange = undefined;
+    return { msg, tokens: messageTokens(msg), group: exchange };
+  });
+}
+
 export interface PlanContextOptions {
   sized: SizedMessage[];
   strategy: ContextStrategy;
@@ -191,6 +202,14 @@ export async function planContext(opts: PlanContextOptions): Promise<PlanContext
 
   // Accumulate from the newest backwards, keeping the suffix that fits; the latest message is always kept.
   const available = Math.max(1, maxTokens - (opts.reservedTokens ?? 0));
+  let requestIndex = -1;
+  for (let i = sized.length - 1; i >= 0; i--) {
+    if (sized[i]!.msg.role === 'user') { requestIndex = i; break; }
+  }
+  const request = sized[requestIndex];
+  const pinnedTokens = (start: number) => requestIndex >= 0 && requestIndex < start ? request!.tokens : 0;
+  const withRequest = (items: SizedMessage[], start: number) =>
+    (request && requestIndex < start ? [request, ...items] : items).map(item => item.msg);
   let keep = sized.length;
   let used = 0;
   for (let i = sized.length - 1; i >= 0;) {
@@ -198,30 +217,35 @@ export async function planContext(opts: PlanContextOptions): Promise<PlanContext
     const group = sized[i]!.group;
     while (start > 0 && group && sized[start - 1]!.group === group) start--;
     const t = sized.slice(start, i + 1).reduce((sum, item) => sum + item.tokens, 0);
-    if (i < sized.length - 1 && used + t > available) break;
+    if (i < sized.length - 1 && used + t + pinnedTokens(start) > available) break;
     used += t;
     keep = start;
     i = start - 1;
   }
 
   let kept = sized.slice(keep);
-  let dropped = sized.slice(0, keep);
-  const windowMessages = kept.map(item => item.msg);
+  const discarded = () => sized.slice(0, keep).filter((_, index) => index !== requestIndex);
+  let dropped = discarded();
+  const windowMessages = withRequest(kept, keep);
 
   if (strategy === 'window' || dropped.length === 0) {
-    return { messages: kept.map((s) => s.msg) };
+    return { messages: windowMessages };
   }
 
   // compact: fold the dropped messages into a summary.
-  const summaryBudget = Math.max(0, Math.min(summaryTokens, Math.floor(available / 4), available - (sized[sized.length - 1]?.tokens ?? 0)));
-  if (summaryBudget === 0) return { messages: kept.map(s => s.msg) };
-  while (kept.length > 1 && used + summaryBudget > available) {
+  let newestStart = sized.length - 1;
+  const newestGroup = sized[newestStart]?.group;
+  while (newestStart > 0 && newestGroup && sized[newestStart - 1]?.group === newestGroup) newestStart--;
+  const newestTokens = sized.slice(Math.max(0, newestStart)).reduce((sum, item) => sum + item.tokens, 0) + pinnedTokens(newestStart);
+  const summaryBudget = Math.max(0, Math.min(summaryTokens, Math.floor(available / 4), available - newestTokens));
+  if (summaryBudget === 0) return { messages: windowMessages };
+  while (kept.length > 1 && used + pinnedTokens(keep) + summaryBudget > available) {
     const group = kept[0]!.group;
     if (group && group === kept[kept.length - 1]!.group) break;
     do { used -= kept.shift()!.tokens; keep++; }
     while (kept.length > 0 && group && kept[0]!.group === group);
   }
-  dropped = sized.slice(0, keep);
+  dropped = discarded();
   const summary = await buildSummary(dropped, summaryBudget, model, tabId, signal, available, opts.previousSummary);
   if (summary == null) return { messages: windowMessages };
   let low = 0;
@@ -232,7 +256,7 @@ export async function planContext(opts: PlanContextOptions): Promise<PlanContext
     else high = middle - 1;
   }
   const system = (summary ?? '').slice(0, low).replace(/[\ud800-\udbff]$/, '');
-  const result: PlanContextResult = { messages: kept.map((s) => s.msg) };
+  const result: PlanContextResult = { messages: withRequest(kept, keep) };
   if (system) result.system = system;
   return result;
 }

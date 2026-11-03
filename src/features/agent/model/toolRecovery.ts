@@ -7,17 +7,20 @@ export const TOOL_RECOVERY_GUIDANCE = [
   'When completed=false or executionState=busy, inspect the same terminal with read_terminal. Do not resend the command, type another shell command through terminal_keys, or interrupt a process without authorization. executionState=unknown is not proof that the shell is ready.',
 ].join('\n');
 
+export const TOOL_TURN_CLOSED = 'Tool use has ended for this turn. Explain the result and wait for a new user message.';
+
+export function endsToolUse(toolName: string | undefined, output: unknown): boolean {
+  if (typeof output !== 'object' || output === null) return toolName === 'ask_user';
+  return 'denied' in output && output.denied === true
+    || toolName === 'ask_user' && (!('answered' in output) || output.answered !== true);
+}
+
 export function prepareToolRecoveryStep({ steps }: {
   steps: readonly { toolResults: readonly { toolName?: string; output: unknown }[] }[];
 }, availableTools: readonly string[] = []): { toolChoice: 'none' } | { activeTools: string[] } | undefined {
-  const denied = steps.some(step => step.toolResults.some(result => {
-    const output = result.output;
-    return typeof output === 'object' && output !== null && 'denied' in output && output.denied === true;
-  }));
-  if (denied) return { toolChoice: 'none' };
+  if (steps.some(step => step.toolResults.some(result => endsToolUse(result.toolName, result.output)))) return { toolChoice: 'none' };
   const questions = steps.flatMap(step => step.toolResults).filter(result => result.toolName === 'ask_user');
   if (!questions.length) return undefined;
-  if (questions.some(({ output }) => typeof output !== 'object' || output === null || !('answered' in output) || output.answered !== true)) return { toolChoice: 'none' };
   const remaining = availableTools.filter(name => name !== 'ask_user');
   return remaining.length ? { activeTools: remaining } : { toolChoice: 'none' };
 }

@@ -16,7 +16,7 @@ import { t } from '@i18n';
 import type { StreamFn } from '@features/chat';
 import { createChatModel, createNativeWebSearchTool, deepThinkProviderOptions, providerId, supportsThinkingPassback, type ProviderKind } from '@features/agent/services/provider';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
-import { estimateTokens, messageTokens, planContext, IMAGE_TOKEN_ESTIMATE, type SizedMessage } from '@features/agent/model/context';
+import { estimateTokens, messageTokens, sizeModelMessages, planContext, IMAGE_TOKEN_ESTIMATE, type SizedMessage } from '@features/agent/model/context';
 import { attachmentsForModel, supportsVision } from '@features/agent/model/attachments';
 import { buildTools } from '@features/agent/tools';
 import { buildTavilySearchTool } from '@features/agent/tools/webSearch';
@@ -31,8 +31,9 @@ import { levelOf, type ToolContext } from '@features/agent/stores/permissions';
 import { useUsageStore } from '@features/agent/stores/usage';
 import { partsToModelMessages, type ToolRunState } from '@features/agent/model/messageParts';
 import { executionPaneSpec } from './executionTarget';
-import { prepareToolRecoveryStep, TOOL_RECOVERY_GUIDANCE } from '../model/toolRecovery';
+import { prepareToolRecoveryStep, TOOL_RECOVERY_GUIDANCE, TOOL_TURN_CLOSED } from '../model/toolRecovery';
 import { visibleAssistantText } from '@features/chat/model/providerMarkup';
+import { ToolTurn } from './toolTurn';
 
 interface AiConfigInfoRust {
   has_key: boolean;
@@ -103,10 +104,9 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   const sized: SizedMessage[] = [];
   for (const m of messages) {
     if (m.role === 'assistant' && m.parts?.some(part => part.kind === 'tool')) {
-      const group = `history:${sized.length}`;
       for (const msg of partsToModelMessages(m.content, m.parts)) {
         const safe = msg.role === 'assistant' && typeof msg.content === 'string' ? { ...msg, content: visibleAssistantText(msg.content) } : msg;
-        sized.push({ msg: safe, tokens: messageTokens(safe), group });
+        sized.push({ msg: safe, tokens: messageTokens(safe) });
       }
       continue;
     }
@@ -239,6 +239,14 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     }
   }
   const hasTools = Object.keys(tools).length > 0;
+  const toolTurn = new ToolTurn();
+  for (const [name, entry] of Object.entries(tools)) {
+    const execute = entry.execute;
+    if (execute) tools[name] = { ...entry, execute: (input, options) => toolTurn.run(
+      async () => { const output = await execute(input, options); toolTurn.observe(name, output); return output; },
+      () => ({ ok: false, ...(options.abortSignal?.aborted || ctx?.signal?.aborted ? { cancelled: true } : { denied: true }),
+        error: t(TOOL_TURN_CLOSED) }), options.abortSignal ?? ctx?.signal) };
+  }
   let schemaTokens = 0;
   for (const [name, entry] of Object.entries(tools)) {
     const schema = entry.inputSchema;
@@ -247,7 +255,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   }
   const reservedTokens = countTokens(basePrompt) + schemaTokens + 64;
   const plan = await planContext({
-    sized, strategy: settings.contextStrategy, maxTokens: settings.contextMaxTokens,
+    sized: sizeModelMessages(sized.map(item => item.msg)), strategy: settings.contextStrategy, maxTokens: settings.contextMaxTokens,
     summaryTokens: settings.contextSummaryTokens, reservedTokens,
     model, tabId: ctx?.tabId, signal: ctx?.signal,
   });
@@ -278,11 +286,7 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
     tools: hasTools ? tools : undefined,
     prepareStep: hasTools ? async options => {
       if (ctx?.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
-      let group = 'previous';
-      const current = options.messages.map((msg, index) => {
-        if (msg.role === 'user') group = `turn:${index}`;
-        return { msg, group, tokens: messageTokens(msg) };
-      });
+      const current = sizeModelMessages(options.messages);
       const next = await planContext({ sized: current, strategy: settings.contextStrategy,
         maxTokens: settings.contextMaxTokens, summaryTokens: settings.contextSummaryTokens,
         reservedTokens: countTokens([systemPrompt, stepSummary].filter(Boolean).join('\n\n')) + schemaTokens + 64,

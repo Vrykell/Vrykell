@@ -2586,6 +2586,7 @@ const zh: Record<string, string> = {
   'Forget {{count}} workspace combinations? Their sessions and documents are kept.': '移除 {{count}} 条工作区组合历史？其中的会话和文档将保留。',
   'Application execution terminal': '应用工具执行终端',
   'Tool call cancelled.': '工具调用已取消。',
+  'Tool use has ended for this turn. Explain the result and wait for a new user message.': '本轮工具调用已结束。请说明结果并等待新的用户消息。',
   'Application tool failed.': '应用工具调用失败。',
   'The model request failed.': '模型请求失败。',
   'Could not connect to the model service: {{message}}': '无法连接模型服务：{{message}}',
