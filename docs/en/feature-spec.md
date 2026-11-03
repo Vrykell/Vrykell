@@ -676,6 +676,7 @@ Interface consistency checklist, 2026-10-22:
 
 ### File transfer tasks and undo preferences
 
+- [x] File undo tracks actual collision-resolved paths across earlier steps, preserves newer operations added during a pending undo, and ignores duplicate concurrent undo requests. Failed restores invalidate older dependent steps. Remote copy/cut does not publish remote paths to the local file clipboard. Real-file integration and browser tests cover collision preservation and clipboard isolation. Closing a terminal session flushes and waits for its final layout write before archival; failed writes remain retryable.
 - [x] Local and remote file undo have independent, persistent switches under File operations. Defaults preserve existing undo behavior. Turning a switch off clears that panel's undo stack and stops recording new operations; it does not purge existing staged files.
 - [x] With undo disabled, local deletion uses the system trash directly and remote deletion is permanent after confirmation. Neither path creates an application undo directory. Startup cleanup does not create a local undo directory merely to inspect it.
 - [x] Remote panels never sweep the shared staging directory on mount. Enabled remote staging restricts its directory to owner access.

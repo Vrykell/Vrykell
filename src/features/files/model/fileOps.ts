@@ -62,6 +62,8 @@ export interface FileOps {
   stageDelete(paths: string[]): Promise<FileOpOutcome>;
   restoreStaged(pairs: FileOpPair[]): Promise<FileOpOutcome>;
   purgeStaged(paths: string[]): Promise<void>;
+  /** Publish local files to the system clipboard when the target supports it. */
+  writeClipboard?(paths: string[], mode: 'copy' | 'cut'): Promise<void>;
   /** Local panel's start directory (remote resolves it through list). */
   home?(): Promise<string>;
   /** Local only: disk view (shown when path is null). */

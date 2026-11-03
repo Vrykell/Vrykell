@@ -4,12 +4,14 @@ import {
   fsCopy, fsMove, fsStageDelete, fsRestoreStaged, fsPurgeStaged, fsStat,
 } from '@platform/api/fs';
 import { parentOf, pathSegments, segmentsToPath } from '@platform/path';
+import { writeClipboardFiles } from '@platform/clipboard';
 import type { FileOps } from '@features/files/model/fileOps';
 
 /** Local disk implementation: path semantics come from @platform/path; all operations go through backend file commands. */
 export function createLocalFileOps(): FileOps {
   return {
     refreshIntervalMs: 2000,
+    writeClipboard: writeClipboardFiles,
     stat: (path) => fsStat(path),
     list: (dir) => fsList(dir).then((entries) => ({ base: null, entries })),
     parentOf,
