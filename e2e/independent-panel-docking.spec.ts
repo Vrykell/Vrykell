@@ -27,10 +27,32 @@ for (const theme of ['深色', '浅色']) test(`left and right panels retain the
   const left = page.locator('.workspace-side-panel[data-side="left"][data-visible="true"]');
   await expect(left.locator('[data-chat-composer]')).toHaveValue('Preserve across both sides');
   await expect(left.locator('.workspace-panel-heading')).toHaveCount(1);
+  // Settings moves into the heading so the docked panel reaches the sidebar's bottom edge.
+  const sidebar = page.getByTestId('workspace-sidebar');
+  const sidebarBox = (await sidebar.boundingBox())!;
+  await expect(page.locator('.workspace-sidebar-footer')).toHaveCount(0);
+  const headingSettings = page.locator('.workspace-sidebar-heading').getByTestId('workspace-settings');
+  await expect(headingSettings).toBeVisible();
+  expect(await headingSettings.getAttribute('aria-pressed')).toBeNull();
+  await expect(headingSettings).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  const leftBox = (await left.boundingBox())!;
+  expect(leftBox.y + leftBox.height).toBeCloseTo(sidebarBox.y + sidebarBox.height, 0);
   await page.locator('[data-dock-zone="right"] [data-dock-btn="files"]').click();
   const right = page.locator('.workspace-side-panel[data-side="right"][data-visible="true"]');
   await expect(right.getByText('notes.txt')).toBeVisible();
   await expect(left).toBeVisible();
+  // The left placement hint expands over the widened dock region as well.
+  const filesHeading = (await page.getByTestId('panel-drag-handle-files').boundingBox())!;
+  const leftDock = (await page.getByTestId('workspace-left-dock').boundingBox())!;
+  await page.mouse.move(filesHeading.x + 24, filesHeading.y + filesHeading.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(80, leftDock.y + Math.min(180, leftDock.height / 2), { steps: 8 });
+  const preview = page.getByTestId('panel-drop-preview');
+  await expect(preview).toHaveAttribute('data-side', 'left');
+  const previewBox = (await preview.boundingBox())!;
+  expect(previewBox.y + previewBox.height).toBeCloseTo(sidebarBox.y + sidebarBox.height, 0);
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
   await page.screenshot({ path: info.outputPath(`independent-panels-${theme}.png`), animations: 'disabled' });
   await page.getByTestId('workspace-sidebar-toggle').click();
   await expect(left).toBeHidden(); await expect(right).toBeVisible();
@@ -38,6 +60,7 @@ for (const theme of ['深色', '浅色']) test(`left and right panels retain the
   await expect(left).toBeVisible(); await expect(composer).toHaveValue('Preserve across both sides');
   await left.locator('.workspace-panel-close').click();
   await expect(left).toHaveCount(0); await expect(right).toBeVisible();
+  await expect(page.locator('.workspace-sidebar-footer').getByTestId('workspace-settings')).toBeVisible();
   await dragPanel(page, 'chat', 'left'); await page.mouse.up();
   await expect(composer).toHaveValue('Preserve across both sides');
   expect(await composer.evaluate(element => element === (window as unknown as { savedPanelComposer: Element }).savedPanelComposer)).toBe(true);

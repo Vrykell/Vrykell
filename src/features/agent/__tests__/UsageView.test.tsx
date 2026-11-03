@@ -38,7 +38,7 @@ describe('UsageView', () => {
       { name: 'Disabled agent', enabled: false, command: 'agent', args: [], env: {}, cwd: '' },
     ]);
     render(<UsageView />);
-    expect(screen.getByTestId('usage-model-all')).toBeInTheDocument();
+    expect(screen.getByTestId('usage-model-filter')).toBeInTheDocument();
     await waitFor(() => expect(useUsageSources.getState().configured).toContain('Disabled agent'));
     expect(screen.queryByTestId('usage-source-Unused agent')).toBeNull();
     fireEvent.click(screen.getByTestId('usage-tab-acp'));
@@ -293,7 +293,7 @@ describe('UsageView', () => {
     await waitFor(() => expect(screen.getByTestId('usage-refreshed-at')).toHaveTextContent('刷新于'));
   });
 
-  it('filters models across reporting sources from the left chip bar', () => {
+  it('filters models across reporting sources from the model dropdown', () => {
     seedSonnetTurn();
     // A turn reported by a future ACP harness (opencode stands in for it here)
     useUsageStore.getState().recordTurn({
@@ -301,18 +301,20 @@ describe('UsageView', () => {
     });
     render(<UsageView />);
 
-    expect(screen.getByTestId('usage-model-all')).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.queryByTestId('usage-filter-model')).toBeNull();
+    const filter = screen.getByTestId('usage-model-filter');
+    expect(filter).toHaveTextContent('全部');
+    expect(filter).toHaveStyle({ maxWidth: '220px' });
     expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('2');
 
-    fireEvent.click(screen.getByTestId('usage-model-claude-sonnet-4'));
+    fireEvent.click(filter);
+    fireEvent.click(screen.getByRole('option', { name: 'claude-sonnet-4' }));
     expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('2');
     expect(screen.getByTestId('usage-total-tokens')).toHaveTextContent('1610');
 
-    // Clicking again returns to all sources
-    fireEvent.click(screen.getByTestId('usage-model-claude-sonnet-4'));
-    expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('2');
-    expect(screen.getByTestId('usage-model-all')).toHaveAttribute('aria-pressed', 'true');
+    // Selecting "All" returns to every model
+    fireEvent.click(filter);
+    fireEvent.click(screen.getByRole('option', { name: '全部' }));
+    expect(filter).toHaveTextContent('全部');
   });
 
   it('keeps agent session totals in the details tab without replacing model usage', () => {
@@ -332,8 +334,8 @@ describe('UsageView', () => {
     expect(screen.getByTestId('usage-range')).toBeInTheDocument();
     expect(screen.getByTestId('usage-clear')).toBeEnabled();
 
-    // Back to all sources, the token view is restored
-    fireEvent.click(screen.getByTestId('usage-model-all'));
+    // Back to all models, the token view is restored
+    expect(screen.getByTestId('usage-model-filter')).toHaveTextContent('全部');
     expect(screen.getByTestId('usage-metrics')).toBeInTheDocument();
     expect(screen.getByTestId('usage-record-count')).toBeInTheDocument();
   });
@@ -364,12 +366,14 @@ describe('UsageView', () => {
     seedSonnetTurn();
     render(<UsageView />);
 
-    fireEvent.click(screen.getByTestId('usage-model-claude-sonnet-4'));
-    expect(screen.getByTestId('usage-model-claude-sonnet-4')).toHaveAttribute('aria-pressed', 'true');
+    const filter = screen.getByTestId('usage-model-filter');
+    fireEvent.click(filter);
+    fireEvent.click(screen.getByRole('option', { name: 'claude-sonnet-4' }));
+    expect(filter).toHaveTextContent('claude-sonnet-4');
 
     // Clearing removes the server's record, so the selected source no longer exists.
     fireEvent.click(screen.getByTestId('usage-clear'));
-    expect(screen.getByTestId('usage-model-all')).toHaveAttribute('aria-pressed', 'true');
+    expect(filter).toHaveTextContent('全部');
     expect(screen.getByTestId('usage-metrics')).toBeInTheDocument();
   });
 

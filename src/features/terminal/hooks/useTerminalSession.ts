@@ -642,6 +642,14 @@ export function useTerminalSession(
       : spec?.kind === 'local'
         ? { shell: spec.shellType, openMode }
         : undefined;
+    // A split pane may mount before its container is laid out, in which case fit measures 0x0.
+    // Start with fallback dimensions and re-fit to the real size from the ResizeObserver so the
+    // PTY never starts at 0x0 and renders a blank screen.
+    const spawnCols = term.cols > 0 ? term.cols : 80;
+    const spawnRows = term.rows > 0 ? term.rows : 24;
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('pty-spawn-request', { paneId, tabId: ownerTab.current, cols: spawnCols, rows: spawnRows, spawnOpts });
+    }
     const startSession = async () => {
       if (spec?.kind === 'local' && spawnOpts) {
         traceStartup('shell-detection-start');
@@ -667,12 +675,6 @@ export function useTerminalSession(
         }
       }
       if (disposed || stopped) throw new Error('Connection cancelled');
-      // Resolve dimensions after asynchronous preparation; detached hosts can report a 2x1 grid.
-      const measurable = el.isConnected && el.clientWidth > 0 && el.clientHeight > 0;
-      if (measurable) fitTerminal(term, fit);
-      const spawnCols = measurable && term.cols > 0 ? term.cols : 80;
-      const spawnRows = measurable && term.rows > 0 ? term.rows : 24;
-      terminalDebug('pty-spawn-request', { paneId, tabId: ownerTab.current, cols: spawnCols, rows: spawnRows, spawnOpts });
       traceStartup('pty-invoke', { cols: spawnCols, rows: spawnRows, currentCols: term.cols, currentRows: term.rows });
       return ptySpawn(spawnCols, spawnRows, tabCwd, spawnOpts);
     };

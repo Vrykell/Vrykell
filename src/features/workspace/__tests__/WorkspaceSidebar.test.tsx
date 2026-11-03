@@ -2,6 +2,8 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it } from 'vitest';
 import WorkspaceSidebar from '../components/WorkspaceSidebar';
 import { useDockStore } from '../stores/dock';
+import { useNavigationDrag } from '../stores/navigationDrag';
+import { useUiStore } from '../stores/ui';
 import { useWorkspaceNavigation } from '../stores/navigation';
 import { t } from '@i18n';
 import { useListReorder } from '@ui/layout/listReorder';
@@ -12,6 +14,7 @@ const width = window.innerWidth;
 afterEach(() => {
   cleanup();
   useListReorder.getState().end();
+  useNavigationDrag.getState().end();
   useWorkspaceNavigation.setState(navigation, true);
   useDockStore.setState(dock, true);
   Object.defineProperty(window, 'innerWidth', { configurable: true, value: width });
@@ -55,6 +58,39 @@ it('keeps the left dock as a bare panel slot without a toolbar heading or button
   expect(screen.getByTestId('workspace-left-dock').querySelector('[data-dock-btn="files"]')).toBeNull();
 });
 
+it('moves settings into the heading and frees the footer while a left panel is open', () => {
+  act(() => useUiStore.getState().setSettingsOpen(false));
+  act(() => useDockStore.setState({ leftZone: ['files'], leftPanels: ['files'] }));
+  render(<WorkspaceSidebar />);
+  const settings = screen.getByTestId('workspace-settings');
+  expect(settings.closest('.workspace-sidebar-heading')).not.toBeNull();
+  expect(settings).toHaveAttribute('data-tip', '打开设置');
+  expect(settings).toHaveAttribute('data-tip-shortcut', 'Control+,');
+  expect(settings).not.toHaveAttribute('aria-pressed');
+  expect(document.querySelector('.workspace-sidebar-footer')).toBeNull();
+  fireEvent.click(settings);
+  expect(useUiStore.getState().settingsOpen).toBe(true);
+  expect(settings).not.toHaveAttribute('aria-pressed');
+  act(() => useUiStore.getState().setSettingsOpen(false));
+  act(() => useDockStore.setState({ leftPanels: [] }));
+  const footer = document.querySelector('.workspace-sidebar-footer');
+  expect(footer).not.toBeNull();
+  expect(footer!.contains(screen.getByTestId('workspace-settings'))).toBe(true);
+});
+
+it('previews the docked settings layout while a left placement target is active', () => {
+  act(() => useDockStore.setState({ leftZone: ['files'], leftPanels: [] }));
+  render(<WorkspaceSidebar />);
+  expect(document.querySelector('.workspace-sidebar-footer')).not.toBeNull();
+  expect(screen.getByTestId('workspace-settings').closest('.workspace-sidebar-footer')).not.toBeNull();
+  act(() => useNavigationDrag.getState().start('files', { x: 300, y: 200 }));
+  act(() => useNavigationDrag.getState().hover('left', 0, true));
+  expect(screen.getByTestId('workspace-settings').closest('.workspace-sidebar-heading')).not.toBeNull();
+  expect(document.querySelector('.workspace-sidebar-footer')).toBeNull();
+  act(() => useNavigationDrag.getState().hover('right', 0, true));
+  expect(document.querySelector('.workspace-sidebar-footer')).not.toBeNull();
+});
+
 it('reorders workspace rows and renders them in the saved order', () => {
   act(() => useWorkspaceNavigation.getState().moveWorkspaceArea('ssh', 'terminal', false));
   render(<WorkspaceSidebar />);
@@ -80,6 +116,20 @@ it.each(['terminal', 'unified'] as const)('shows the final slot when dragging th
   expect(screen.getByTestId(`workspace-area-${id}`)).toHaveAttribute('data-reorder-dragging', 'true');
   act(() => useListReorder.getState().end());
   expect(document.querySelector('[data-reorder-placeholder]')).toBeNull();
+});
+
+it('reserves the dragged row slot while no destination is resolved', () => {
+  useWorkspaceNavigation.setState({ collapsed: false });
+  render(<WorkspaceSidebar />);
+  act(() => useListReorder.getState().start({ listId: 'workspace-areas', id: 'terminal', kind: 'workspace', height: 32 }, { x: 60, y: 250 }));
+  const row = screen.getByTestId('workspace-area-terminal');
+  const slot = document.querySelector('[data-reorder-placeholder="terminal"]');
+  expect(slot).not.toBeNull();
+  expect(row.previousElementSibling).toBe(slot);
+  act(() => useListReorder.getState().hover({ itemId: 'unified', after: true }));
+  expect(document.querySelector('[data-reorder-placeholder="terminal"]')).toBeNull();
+  expect(document.querySelector('[data-reorder-placeholder="unified"]')).not.toBeNull();
+  act(() => useListReorder.getState().end());
 });
 
 it('opens the mixed workspace through a full-width sidebar row with keyboard navigation', () => {

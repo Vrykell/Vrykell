@@ -127,16 +127,16 @@ Vrykell 围绕真实的 Shell 会话组织开发与远程工作。每条命令�
 
 ## 下载
 
-当前稳定版：**0.1.1**。
+当前稳定版：**0.1.3**。
 
 | 平台 | 安装包 |
 | --- | --- |
-| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_x64-setup.exe) |
-| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_aarch64.dmg) |
-| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_x64.dmg) |
-| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_amd64.AppImage) |
+| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.3/Vrykell_0.1.3_x64-setup.exe) |
+| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.3/Vrykell_0.1.3_aarch64.dmg) |
+| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.3/Vrykell_0.1.3_x64.dmg) |
+| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.3/Vrykell_0.1.3_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.3/Vrykell_0.1.3_amd64.AppImage) |
 
-[全部版本](https://github.com/Vrykell/Vrykell/releases) · [发布说明](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.1)
+[全部版本](https://github.com/Vrykell/Vrykell/releases) · [发布说明](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.3)
 
 发布说明记录安装包校验和、精确源码提交与验证覆盖。更新签名用于验证更新载荷，不能替代操作系统的分发签名或公证。上文能力描述跟随开发分支；安装包发布之后的改动需要构建当前源码。
 
@@ -173,7 +173,7 @@ npm run tauri dev
 
 使用内置 Agent 时，在设置中添加模型服务地址、密钥和模型，再选择当前配置。支持原生 Messages、生成接口和兼容的聊天补全接口，也可以连接提供兼容接口的本地模型服务。
 
-使用外部 Agent 时，在 ACP 设置中配置启动命令与工作目录。需要调用应用的终端工具时，选择执行终端。
+使用外部 Agent 时，在 ACP 设置中添加启动命令。项目文件夹留空时会在应用私有的 ACP 工作区下新建目录；也可以显式选择项目文件夹。输入区左下角的添加附件支持文本附件，并在代理声明图片能力后支持图片。需要调用应用的终端工具时，选择执行终端。
 
 ## 参与贡献
 
@@ -190,6 +190,8 @@ npm run check:architecture
 ## 社区与文档
 
 交流群：**1130135497**。欢迎分享工作流程、交流问题和讨论项目。
+
+Discord：[加入 Vrykell 社区](https://discord.gg/ZqKPd5DW)。
 
 <details>
 <summary>交流群二维码</summary>

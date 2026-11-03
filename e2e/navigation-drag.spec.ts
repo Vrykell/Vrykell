@@ -221,6 +221,37 @@ test('workspace navigation rows reorder vertically and retain their order', asyn
   await expect.poll(order).toEqual(['ssh', 'code', 'ai', 'unified', 'terminal']);
 });
 
+test('navigation keeps the end slot and the docked panel stable while dragging below the list', async ({ page }) => {
+  await page.evaluate(async () => {
+    const { useDockStore } = await import('/src/features/workspace/stores/dock.ts');
+    useDockStore.getState().moveButton('files', 'left');
+    useDockStore.getState().openPanel('files');
+  });
+  await expect(page.getByTestId('panel-drag-handle-files')).toBeVisible();
+  const order = () => page.locator('[data-testid^="workspace-area-"]').evaluateAll(rows =>
+    rows.map(row => row.getAttribute('data-testid')?.replace('workspace-area-', '')));
+  const nav = (await page.locator('.workspace-area-navigation').boundingBox())!;
+  const tools = page.getByTestId('workspace-left-dock');
+  const toolsTop = (await tools.boundingBox())!.y;
+  const source = (await page.getByTestId('workspace-area-terminal').boundingBox())!;
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+  await page.mouse.down();
+
+  // Past the list and over the docked panel, the whole container still offers the final slot.
+  await page.mouse.move(source.x + source.width / 2, nav.y + nav.height + 300, { steps: 10 });
+  await expect(page.locator('[data-reorder-placeholder="unified"]')).toBeVisible();
+  expect((await tools.boundingBox())!.y).toBe(toolsTop);
+
+  // Leaving the sidebar reserves the source slot instead of collapsing the list under the pointer.
+  await page.mouse.move(nav.x + nav.width + 120, nav.y + nav.height + 100, { steps: 8 });
+  await expect(page.locator('[data-reorder-placeholder="terminal"]')).toBeVisible();
+  expect((await tools.boundingBox())!.y).toBe(toolsTop);
+
+  await page.mouse.move(source.x + source.width / 2, nav.y + nav.height + 300, { steps: 8 });
+  await page.mouse.up();
+  await expect.poll(order).toEqual(['code', 'ai', 'ssh', 'unified', 'terminal']);
+});
+
 test('panel headings retain their appearance and offer the left middle and right edge', async ({ page }, info) => {
   await button(page, 'files').click();
   const heading = page.getByTestId('panel-drag-handle-files');
@@ -232,7 +263,17 @@ test('panel headings retain their appearance and offer the left middle and right
   const left = (await page.getByTestId('workspace-left-dock').boundingBox())!;
   await page.mouse.move(left.x + 50, left.y + 100, { steps: 8 });
   await expect(page.getByTestId('panel-drop-preview')).toHaveAttribute('data-side', 'left');
+  // The dock preview covers the widened area that the open panel will occupy.
+  const sidebar = (await page.getByTestId('workspace-sidebar').boundingBox())!;
+  const preview = (await page.getByTestId('panel-drop-preview').boundingBox())!;
+  expect(preview.y + preview.height).toBeCloseTo(sidebar.y + sidebar.height, 0);
+  // The preview already renders the docked settings layout.
+  await expect(page.locator('.workspace-sidebar-footer')).toHaveCount(0);
+  await expect(page.locator('.workspace-sidebar-heading').getByTestId('workspace-settings')).toBeVisible();
   await page.mouse.move(body.x + 50, body.y + 200, { steps: 8 });
+  await expect(page.getByTestId('panel-drop-preview')).toHaveCount(0);
+  await expect(page.locator('.workspace-sidebar-footer')).toHaveCount(1);
+  await expect(page.locator('.workspace-sidebar-heading').getByTestId('workspace-settings')).toHaveCount(0);
   await expect(page.getByTestId('panel-drop-preview')).toHaveCount(0);
   await page.mouse.move(body.x + body.width - 24, body.y + 200, { steps: 8 });
   await expect(page.getByTestId('panel-drop-preview')).toHaveAttribute('data-side', 'right');

@@ -83,17 +83,20 @@ function locateTarget(
   if (!hit) return null;
   const list = hit.closest<HTMLElement>('[data-reorder-list]');
   if (!list || list.dataset.reorderList !== listId) {
-    // Opt-in for vertical lists that need the empty area just past their rows (the workspace
-    // navigation). Other lists keep strict bounds so their zone drops stay unambiguous.
+    // Opt-in for vertical lists that need the surrounding area of their rows (the workspace
+    // navigation). The list's container is the whole reachable region, so a docked panel below
+    // the rows never cuts the end slot off. Other lists keep strict bounds so their zone drops
+    // stay unambiguous.
     if (!edgeDrop || axis !== 'vertical') return null;
     const root = document.querySelector<HTMLElement>(`[data-reorder-list="${listId}"]`);
     if (!root) return null;
-    const bounds = root.getBoundingClientRect();
-    if (x < bounds.left || x > bounds.right || y > bounds.bottom + 200) return null;
+    const listBounds = root.getBoundingClientRect();
+    const bounds = (root.parentElement ?? root).getBoundingClientRect();
+    if (x < bounds.left || x > bounds.right || y < bounds.top || y > bounds.bottom) return null;
     const rows = Array.from(root.querySelectorAll<HTMLElement>('[data-reorder-item]:not([data-reorder-dragging="true"])'))
       .filter(item => !item.closest('[hidden]') && accepts(dragKind, item.dataset.reorderKind ?? ''));
     if (!rows.length) return null;
-    if (y < bounds.top) return { itemId: rows[0]!.dataset.reorderItem, after: false };
+    if (y < listBounds.top) return { itemId: rows[0]!.dataset.reorderItem, after: false };
     return { itemId: rows[rows.length - 1]!.dataset.reorderItem, after: true };
   }
   if (hit.closest('[data-reorder-placeholder]')) return undefined;
@@ -434,9 +437,19 @@ export function useListReorderDrag({ listId, accepts, onDrop, axis = 'vertical',
   };
 }
 
-/** Dashed gap rendered before or after the hovered item. */
-export function ListReorderPlaceholder({ listId, itemId, after = false }: { listId: string; itemId: string; after?: boolean }) {
-  const show = useListReorder(state => !!state.drag && state.drag.listId === listId && state.target?.itemId === itemId && !!state.target.after === after);
+/** Insertion gap rendered before or after the hovered item. */
+export function ListReorderPlaceholder({ listId, itemId, after = false, reserveSource = false }: {
+  listId: string;
+  itemId: string;
+  after?: boolean;
+  /** Keep the dragged row's own slot while no destination is resolved, so adjacent content cannot shift. */
+  reserveSource?: boolean;
+}) {
+  const show = useListReorder(state => {
+    if (!state.drag || state.drag.listId !== listId) return false;
+    if (state.target) return state.target.itemId === itemId && !!state.target.after === after;
+    return reserveSource && !after && state.drag.id === itemId;
+  });
   const height = useListReorder(state => state.drag?.height); const width = useListReorder(state => state.drag?.width);
   return show ? <div className="sidebar-reorder-placeholder" style={height ? { height, ...(width ? { width } : {}) } : undefined} data-reorder-placeholder={itemId} aria-hidden="true" /> : null;
 }

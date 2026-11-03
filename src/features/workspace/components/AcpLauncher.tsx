@@ -8,7 +8,7 @@ import AnchoredDropdown, { type DropdownAnchor } from '@ui/menus/AnchoredDropdow
 import { useSettingsNavigationStore } from '@features/settings/stores/navigation';
 import { harnessMark } from '@features/agent/components/HarnessBadge';
 import { useSessionStore, useUiStore } from '@features/workspace';
-import { acpHarnesses } from '@platform/api/acp';
+import { acpHarnesses, acpWorkspaceRoot } from '@platform/api/acp';
 import { invoke } from '@platform/diagnostics';
 import AppMark from '@ui/icons/AppMark';
 import { useAiConfigStore, useUsageStore } from '@features/agent';
@@ -36,6 +36,7 @@ export default function AcpLauncher({ open, onClose, embedded = false, suspended
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
   const [directory, setDirectory] = useState(cwd ?? '');
+  const [workspaceRoot, setWorkspaceRoot] = useState('');
   const settingsOpen = useUiStore(state => state.settingsOpen);
   const close = useRef(onClose); close.current = onClose;
   useEffect(() => { if (open && !embedded && settingsOpen) close.current(); }, [open, embedded, settingsOpen]);
@@ -63,6 +64,9 @@ export default function AcpLauncher({ open, onClose, embedded = false, suspended
         name: entry.name, command: entry.command, args: entry.args, enabled: entry.enabled,
       }))))
       .catch((error: unknown) => setError(String(error)));
+    void acpWorkspaceRoot()
+      .then(root => setWorkspaceRoot(typeof root === 'string' ? root : ''))
+      .catch(() => setWorkspaceRoot(''));
   }, [open, revision]);
 
   useEffect(() => {
@@ -110,7 +114,7 @@ export default function AcpLauncher({ open, onClose, embedded = false, suspended
   };
   if (!open || suspended) return null;
   const folder = <div className="acp-launch-directory"><TextInput variant="field" value={directory} aria-label={t('Project folder')} data-testid="acp-launcher-directory"
-    placeholder={t('Default project folder')} onChange={event => setDirectory(event.target.value)} />
+    placeholder={workspaceRoot ? t('New folder in {{path}}', { path: workspaceRoot }) : t('Default project folder')} onChange={event => setDirectory(event.target.value)} />
     <OutlineButton aria-label={t('Choose project folder')} onClick={() => { void pickPath('directory').then(([path]) => { if (path) setDirectory(path); }).catch(reason => setError(String(reason))); }}><FolderOpen size={16} /></OutlineButton></div>;
 
   if (!embedded) return <AnchoredDropdown open={open} onClose={onClose} panelRef={dialogRef} anchor={anchor} aria-label={t('ACP')}

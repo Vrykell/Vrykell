@@ -1,4 +1,13 @@
 .about-product { display: flex; align-items: center; gap: 20px; padding: 8px 4px 28px; min-width: 0; }
+.about-update-button { position: relative; overflow: hidden; }
+.about-update-button[data-downloading]:disabled {
+  opacity: 1; cursor: progress; color: var(--primary-button-text);
+  background-color: var(--progress-button-track);
+  background-image: linear-gradient(var(--progress-button-fill), var(--progress-button-fill));
+  background-repeat: no-repeat; background-position: left top; background-origin: border-box; background-clip: border-box;
+  transition: background-color var(--dur) var(--ease), background-size 160ms var(--ease);
+}
+.about-update-accessible-progress { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .about-product h2 { margin: 0 0 6px; font-size: calc(28px * var(--ui-font-scale)); line-height: 1.2; font-weight: var(--fw-semibold); letter-spacing: -.5px; color: var(--text-primary); }
 .about-product p { margin: 0; font-size: var(--fs-label); line-height: 1.6; color: var(--text-secondary); }
 .about-version { display: flex; align-items: center; gap: 8px; min-height: 28px; font-family: var(--font-mono); color: var(--text-primary); }

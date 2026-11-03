@@ -70,8 +70,8 @@ test('starts ACP in the side panel and moves the same connection back to the wor
   await expect(page.getByTestId('harness-execution-target')).toBeVisible();
   await page.keyboard.press('Escape');
   const lead = (await sidebar.locator('.chat-composer-lead').boundingBox())!;
-  const newSession = (await sidebar.getByTestId('harness-new-session').boundingBox())!;
-  expect(Math.abs(lead.x + lead.width / 2 - newSession.x - newSession.width / 2)).toBeLessThan(1);
+  const attach = (await sidebar.getByTestId('harness-add-attachment').boundingBox())!;
+  expect(Math.abs(lead.x + lead.width / 2 - attach.x - attach.width / 2)).toBeLessThan(1);
   await expect(sidebar.getByTestId('harness-note')).toHaveCount(0);
   await page.screenshot({ path: info.outputPath('sidebar-agent.png') });
   await page.getByTestId('ai-return-to-workspace').click();

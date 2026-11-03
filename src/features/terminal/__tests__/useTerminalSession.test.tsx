@@ -20,7 +20,7 @@ const {
   outputResolvers: [] as Array<(u: () => void) => void>,
   exitResolvers: [] as Array<(u: () => void) => void>,
   terminalInitOptions: [] as import('@xterm/xterm').ITerminalOptions[],
-  terminalInstances: [] as Array<{ options: Record<string, unknown>; cols: number; rows: number }>,
+  terminalInstances: [] as Array<{ options: Record<string, unknown> }>,
 }));
 
 vi.mock('@xterm/xterm', () => ({
@@ -40,7 +40,6 @@ vi.mock('@xterm/xterm', () => ({
     write = writeMock;
     dispose() {}
     reset() {}
-    resize(cols: number, rows: number) { this.cols = cols; this.rows = rows; }
     focus() {}
     attachCustomKeyEventHandler() {}
     attachCustomWheelEventHandler() {}
@@ -92,7 +91,6 @@ globalThis.ResizeObserver = class {
 } as unknown as typeof ResizeObserver;
 
 import { useTerminalSession } from '@features/terminal/hooks/useTerminalSession';
-import { FitAddon } from '@xterm/addon-fit';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import { useWorkspaceStore } from '@features/workspace/stores/workspace';
@@ -125,26 +123,6 @@ function TestHarness({ tabId, paneId = tabId, onReady }: { tabId: string; paneId
 }
 
 describe('useTerminalSession', () => {
-  it.each([false, true])('resolves a usable startup grid after shell discovery (measurable=%s)', async measurable => {
-    let finish!: (value: unknown[]) => void;
-    const discovery = new Promise<unknown[]>(resolve => { finish = resolve; });
-    invokeMock.mockImplementation(command => command === 'list_shells' ? discovery : Promise.resolve('sess-x'));
-    const fit = vi.spyOn(FitAddon.prototype, 'proposeDimensions').mockReturnValue({ cols: 2, rows: 1 });
-    try {
-      const view = render(<TestHarness tabId="t1" onReady={() => {}} />);
-      const host = view.getByTestId('term-host');
-      expect(terminalInstances[terminalInstances.length - 1]?.cols).toBe(2);
-      if (measurable) {
-        Object.defineProperties(host, { clientWidth: { value: 1000 }, clientHeight: { value: 600 } });
-        fit.mockReturnValue({ cols: 122, rows: 38 });
-      }
-      await act(async () => { finish([]); });
-      await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalledWith(measurable ? 122 : 80, measurable ? 38 : 24, undefined, expect.any(Object)));
-    } finally {
-      fit.mockRestore();
-      invokeMock.mockResolvedValue('sess-x');
-    }
-  });
   it('keeps the process attached when a stable pane moves to a different container', async () => {
     setTab('block');
     const ready = vi.fn(); const view = render(<TestHarness tabId="t1" paneId="t1" onReady={ready} />);

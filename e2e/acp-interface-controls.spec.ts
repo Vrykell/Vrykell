@@ -52,6 +52,28 @@ for (const theme of ['dark', 'light']) for (const width of [760, 1280]) {
   });
 }
 
+test('reuses the last mode and model when a new session starts', async ({ page }) => {
+  await setupTauriMock(page, {});
+  await page.goto('/');
+  await page.getByTestId('workspace-area-ai').click();
+  await page.getByTestId('harness-add-session').click();
+  await page.getByTestId('acp-launcher-Fake ACP').click();
+  const surface = page.locator('[data-testid="harness-page"]:visible');
+  await expect(surface.getByTestId('harness-selector-mode')).toContainText('Default');
+
+  await surface.getByTestId('harness-selector-mode').click();
+  await page.getByRole('option', { name: /Plan/ }).click();
+  await surface.getByTestId('harness-selector-model').click();
+  await page.getByRole('option', { name: /Model Two/ }).click();
+  await expect.poll(() => acpCalls(page)).toEqual(expect.arrayContaining(['acp_set_mode:plan', 'acp_set_model:m2']));
+
+  await surface.getByTestId('harness-new-session').click();
+  const next = page.locator('[data-testid="harness-page"]:visible');
+  await expect(next.getByTestId('harness-selector-mode')).toContainText('Plan');
+  await expect(next.getByTestId('harness-selector-model')).toContainText('Model Two');
+  await expect.poll(async () => (await acpCalls(page)).filter(call => call === 'acp_set_mode:plan')).toHaveLength(2);
+});
+
 test('only offers return to latest after scrolling away and hides it when the reader reaches the bottom', async ({ page }) => {
   await setupTauriMock(page, {});
   await page.goto('/');
@@ -63,6 +85,7 @@ test('only offers return to latest after scrolling away and hides it when the re
   await emitAcpSession(page, acpUpdate('sess_e2e', { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'A long reply paragraph.\n\n'.repeat(120) } }));
   const transcript = surface.locator('.chat-transcript');
   const jump = surface.getByRole('button', { name: '回到最新回复', exact: true });
+  await expect.poll(() => transcript.evaluate(element => element.scrollHeight - element.clientHeight)).toBeGreaterThan(300);
   await transcript.evaluate(element => { element.scrollTop = element.scrollHeight; });
   await expect(jump).not.toBeVisible();
   await transcript.evaluate(element => { element.scrollTop -= 18; });

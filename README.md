@@ -127,16 +127,16 @@ Screenshots show the application with a sample project and simulated session dat
 
 ## Download
 
-Current stable release: **0.1.1**.
+Current stable release: **0.1.3**.
 
 | Platform | Package |
 | --- | --- |
-| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_x64-setup.exe) |
-| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_aarch64.dmg) |
-| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_x64.dmg) |
-| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_amd64.AppImage) |
+| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.3/Vrykell_0.1.3_x64-setup.exe) |
+| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.3/Vrykell_0.1.3_aarch64.dmg) |
+| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.3/Vrykell_0.1.3_x64.dmg) |
+| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.3/Vrykell_0.1.3_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.3/Vrykell_0.1.3_amd64.AppImage) |
 
-[All releases](https://github.com/Vrykell/Vrykell/releases) · [Release notes](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.1)
+[All releases](https://github.com/Vrykell/Vrykell/releases) · [Release notes](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.3)
 
 Release notes record package checksums, the exact source commit and validation coverage. Update signatures verify updater payloads; they do not replace operating-system distribution signing or notarization. The capability descriptions above follow the development branch; build the current source for changes made after the packaged release.
 
@@ -173,7 +173,7 @@ For frontend-only development, use `npm run dev` on port `1420`. To build an ins
 
 To use the built-in agent, add a model service URL, key and model in settings, then select the active configuration. Native Messages, generation and compatible chat-completion interfaces are supported, including compatible local model services.
 
-For an external agent, configure its startup command and working directory in ACP settings. Select an execution terminal when you want it to use the application's terminal tools.
+For an external agent, add its startup command in ACP settings. Leave the project folder empty to start in a new folder under the app's private ACP workspace, or choose a project folder explicitly. The composer's add-attachment action sends text and, when the agent advertises image support, images. Select an execution terminal when you want it to use the application's terminal tools.
 
 ## Contributing
 
@@ -190,6 +190,8 @@ Interactive changes also need matching browser regressions; backend changes need
 ## Community and documentation
 
 Community group: **1130135497**. Share workflows, ask questions and discuss the project.
+
+Discord: [Join the Vrykell community](https://discord.gg/ZqKPd5DW).
 
 <details>
 <summary>Community group QR code</summary>

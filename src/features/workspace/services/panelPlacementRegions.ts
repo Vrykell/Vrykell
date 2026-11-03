@@ -18,6 +18,9 @@ export function panelPlacementRegions(id: string) {
   const width = navigation.collapsed ? Math.min(navigation.sidebarWidth, available < 160 ? window.innerWidth - 40 : available) : slot.width;
   const panelSlot = document.querySelector<HTMLElement>('[data-panel-slot="left"]')?.getBoundingClientRect();
   const panelTop = panelSlot && panelSlot.height > 0 ? panelSlot.top : slot.top;
-  const panelHeight = panelSlot && panelSlot.height > 0 ? panelSlot.height : slot.height;
+  // An open left panel hides the settings foot, so the dock and its placement preview reach
+  // the sidebar's bottom edge. The preview already describes that final surface.
+  const sidebarBottom = document.querySelector<HTMLElement>('.workspace-sidebar')?.getBoundingClientRect().bottom ?? slot.bottom;
+  const panelHeight = Math.max(0, sidebarBottom - panelTop);
   return { right, left: { left: slot.left, top: panelTop, width, height: panelHeight } };
 }

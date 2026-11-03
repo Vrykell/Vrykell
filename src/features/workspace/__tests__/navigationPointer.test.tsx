@@ -88,19 +88,24 @@ describe('auxiliary navigation pointer gestures', () => {
     pointer('pointerdown', 10, 10, button); pointer('pointermove', 100, 10); pointer('pointerup', 100, 10);
     expect(useDockStore.getState().rightZone).toEqual(['files', 'git', 'chat']);
   });
-  it('uses the full left middle area for placement while excluding navigation and footer', () => {
+  it('uses the full left middle area for placement while excluding navigation', () => {
     render(<Harness />);
     const middle = document.createElement('div'); middle.dataset.testid = 'workspace-left-dock'; document.body.append(middle);
+    const sidebar = document.createElement('div'); sidebar.className = 'workspace-sidebar'; document.body.append(sidebar);
     vi.spyOn(middle, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 210, width: 208, height: 500 } as DOMRect);
+    // The open left panel removes the settings foot, so the dock and its preview reach the bottom.
+    vi.spyOn(sidebar, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0, width: 208, height: 800, bottom: 800 } as DOMRect);
     const button = screen.getByText('Files');
     pointer('pointerdown', 10, 10, button); pointer('pointermove', 100, 160);
     expect(useNavigationDrag.getState().target).toBeNull();
     pointer('pointermove', 100, 300);
     expect(useNavigationDrag.getState().target).toMatchObject({ side: 'left', openPanel: true });
+    pointer('pointermove', 100, 750);
+    expect(useNavigationDrag.getState().target).toMatchObject({ side: 'left', openPanel: true });
     pointer('pointerup', 200, 700);
     expect(useDockStore.getState().leftPanels).toEqual(['files']);
     expect(useWorkspaceNavigation.getState().collapsed).toBe(false);
-    middle.remove();
+    middle.remove(); sidebar.remove();
   });
   it('keeps the indicated insertion slot when released inside the placeholder', () => {
     render(<Harness />);
