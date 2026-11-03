@@ -57,6 +57,11 @@ pub fn run() {
         .manage(terminal::pty::KillState::default())
         .manage(platform::context_menu::ForwardedLaunchDirectories::default())
         .on_window_event(|window, event| {
+            if window.label() == "main" {
+                if let tauri::WindowEvent::Focused(focused) = event {
+                    let _ = diagnostics::record("window-native-focus", serde_json::json!({ "focused": focused }));
+                }
+            }
             if window.label() == "main" && matches!(event, tauri::WindowEvent::Destroyed) {
                 for (label, tool) in window.app_handle().webview_windows() {
                     if label.starts_with("tool-") {

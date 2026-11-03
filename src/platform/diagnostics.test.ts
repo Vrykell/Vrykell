@@ -148,7 +148,7 @@ describe('diagnostics', () => {
     expect(invokeMock).toHaveBeenLastCalledWith('diagnostics_log_directory');
   });
 
-  it('separates a stalled main thread from a paused window in the frame gaps', () => {
+  it('labels frame gap durations without assuming their cause', () => {
     const before = diagnosticSnapshot().length;
     reportFrameGap(120);
     reportFrameGap(300);

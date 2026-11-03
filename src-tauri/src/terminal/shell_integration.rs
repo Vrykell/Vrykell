@@ -106,6 +106,40 @@ function Write-VrykellOsc {
     [Console]::Out.Write([char]27 + "]" + $Code + ";" + $Payload + [char]7)
 }
 
+function Get-VrykellGitBranch {
+    param([string]$Directory)
+    try {
+        $gitDirectory = $env:GIT_DIR
+        if ($gitDirectory) {
+            if (-not [IO.Path]::IsPathRooted($gitDirectory)) { $gitDirectory = [IO.Path]::Combine($Directory, $gitDirectory) }
+        } else {
+            $current = [IO.DirectoryInfo]::new($Directory)
+            while ($null -ne $current) {
+                $candidate = [IO.Path]::Combine($current.FullName, '.git')
+                if ([IO.Directory]::Exists($candidate)) { $gitDirectory = $candidate; break }
+                if ([IO.File]::Exists($candidate)) {
+                    $pointer = [IO.File]::ReadAllText($candidate).Trim()
+                    if ($pointer.StartsWith('gitdir: ', [StringComparison]::OrdinalIgnoreCase)) {
+                        $gitDirectory = $pointer.Substring(8).Trim()
+                        if (-not [IO.Path]::IsPathRooted($gitDirectory)) { $gitDirectory = [IO.Path]::Combine($current.FullName, $gitDirectory) }
+                    }
+                    break
+                }
+                if ([IO.File]::Exists([IO.Path]::Combine($current.FullName, 'HEAD')) -and
+                    [IO.Directory]::Exists([IO.Path]::Combine($current.FullName, 'objects'))) {
+                    $gitDirectory = $current.FullName; break
+                }
+                $current = $current.Parent
+            }
+        }
+        if ($gitDirectory) {
+            $head = [IO.File]::ReadAllText([IO.Path]::Combine($gitDirectory, 'HEAD')).Trim()
+            if ($head.StartsWith('ref: refs/heads/', [StringComparison]::Ordinal)) { return $head.Substring(16) }
+        }
+    } catch { }
+    return ''
+}
+
 function prompt {
     $esc = [char]27; $bel = [char]7
 
@@ -130,17 +164,10 @@ function prompt {
     Write-VrykellOsc "133;D" "$ec"
     Write-VrykellOsc "133;A" ""
 
-    # Cache the branch lookup per directory; spawning git on every prompt makes
-    # short commands feel sluggish, especially on Windows file systems.
-    if ($script:__vrykell_git_cwd -ne $PWD.Path) {
-        $script:__vrykell_git_cwd = $PWD.Path
-        $script:__vrykell_git_branch = (& git branch --show-current 2>$null | Out-String).Trim()
-        # The lookup is an implementation detail and must not become the next
-        # prompt's command status (git returns 128 outside a repository).
-        $global:LASTEXITCODE = $null
-    }
-    if ($script:__vrykell_git_branch) {
-        $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($script:__vrykell_git_branch))
+    # Read local metadata without creating another process or changing command status.
+    $branch = Get-VrykellGitBranch -Directory $PWD.Path
+    if ($branch) {
+        $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($branch))
         Write-VrykellOsc "133;G" $b64
     }
 
@@ -488,11 +515,51 @@ HISTTIMEFORMAT='%F %T '
 
     #[test]
     fn powershell_prompt_does_not_leak_git_exit_status() {
-        let lookup = "__vrykell_git_branch = (& git branch --show-current 2>$null | Out-String).Trim()";
         let reset = "$global:LASTEXITCODE = $null";
-        assert!(PS_RC.contains(lookup));
+        assert!(PS_RC.contains("Get-VrykellGitBranch -Directory $PWD.Path"));
+        assert!(!PS_RC.contains("& git"));
         assert!(PS_RC.matches(reset).count() >= 2);
-        assert!(PS_RC.contains("$script:__vrykell_git_cwd -ne $PWD.Path"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn branch_metadata_handles_nested_directories_worktrees_and_detached_heads() {
+        use std::os::windows::process::CommandExt;
+        let root = std::env::temp_dir().join(format!("branch-metadata-{}", uuid::Uuid::new_v4()));
+        let metadata = root.join("repo/.git");
+        let nested = root.join("repo/nested/child");
+        let worktree = root.join("linked");
+        let linked_metadata = root.join("linked-metadata");
+        for directory in [&metadata, &nested, &worktree, &linked_metadata] { fs::create_dir_all(directory).unwrap(); }
+        fs::write(metadata.join("HEAD"), "ref: refs/heads/first\n").unwrap();
+        fs::write(worktree.join(".git"), "gitdir: ../linked-metadata\n").unwrap();
+        fs::write(linked_metadata.join("HEAD"), "ref: refs/heads/linked-branch\n").unwrap();
+        let quote = |path: &Path| path.to_string_lossy().replace('\'', "''");
+        let functions = &PS_RC[..PS_RC.find("function prompt").unwrap()];
+        let script = format!(r#"{functions}
+$env:GIT_DIR = ''
+$timer = [Diagnostics.Stopwatch]::StartNew()
+Write-Output ('nested=' + (Get-VrykellGitBranch -Directory '{nested}'))
+[IO.File]::WriteAllText('{head}', 'ref: refs/heads/changed')
+Write-Output ('changed=' + (Get-VrykellGitBranch -Directory '{nested}'))
+[IO.File]::WriteAllText('{head}', '0123456789012345678901234567890123456789')
+Write-Output ('detached=' + (Get-VrykellGitBranch -Directory '{nested}'))
+Write-Output ('linked=' + (Get-VrykellGitBranch -Directory '{worktree}'))
+Write-Output ('outside=' + (Get-VrykellGitBranch -Directory '{root}'))
+$env:GIT_DIR = '{linked_metadata}'
+Write-Output ('explicit=' + (Get-VrykellGitBranch -Directory '{root}'))
+Write-Output ('lookupMs=' + $timer.ElapsedMilliseconds)
+"#, nested = quote(&nested), head = quote(&metadata.join("HEAD")), worktree = quote(&worktree), root = quote(&root), linked_metadata = quote(&linked_metadata));
+        let output = std::process::Command::new("powershell")
+            .args(["-NoProfile", "-NonInteractive", "-Command", &script])
+            .creation_flags(0x08000000).output().unwrap();
+        fs::remove_dir_all(root).unwrap();
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        let output = String::from_utf8_lossy(&output.stdout);
+        for expected in ["nested=first", "changed=changed", "detached=\r\n", "linked=linked-branch", "outside=\r\n", "explicit=linked-branch"] {
+            assert!(output.contains(expected), "missing {expected}: {output}");
+        }
+        println!("{}", output.lines().last().unwrap_or_default());
     }
 
     /// Start a real zsh to verify the hooks emit OSC 133 markers (zsh is only available on Unix).

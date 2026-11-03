@@ -20,7 +20,7 @@ const {
   outputResolvers: [] as Array<(u: () => void) => void>,
   exitResolvers: [] as Array<(u: () => void) => void>,
   terminalInitOptions: [] as import('@xterm/xterm').ITerminalOptions[],
-  terminalInstances: [] as Array<{ options: Record<string, unknown> }>,
+  terminalInstances: [] as Array<{ options: Record<string, unknown>; cols: number; rows: number }>,
 }));
 
 vi.mock('@xterm/xterm', () => ({
@@ -40,6 +40,7 @@ vi.mock('@xterm/xterm', () => ({
     write = writeMock;
     dispose() {}
     reset() {}
+    resize(cols: number, rows: number) { this.cols = cols; this.rows = rows; }
     focus() {}
     attachCustomKeyEventHandler() {}
     attachCustomWheelEventHandler() {}
@@ -91,6 +92,7 @@ globalThis.ResizeObserver = class {
 } as unknown as typeof ResizeObserver;
 
 import { useTerminalSession } from '@features/terminal/hooks/useTerminalSession';
+import { FitAddon } from '@xterm/addon-fit';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import { useWorkspaceStore } from '@features/workspace/stores/workspace';
@@ -123,6 +125,26 @@ function TestHarness({ tabId, paneId = tabId, onReady }: { tabId: string; paneId
 }
 
 describe('useTerminalSession', () => {
+  it.each([false, true])('resolves a usable startup grid after shell discovery (measurable=%s)', async measurable => {
+    let finish!: (value: unknown[]) => void;
+    const discovery = new Promise<unknown[]>(resolve => { finish = resolve; });
+    invokeMock.mockImplementation(command => command === 'list_shells' ? discovery : Promise.resolve('sess-x'));
+    const fit = vi.spyOn(FitAddon.prototype, 'proposeDimensions').mockReturnValue({ cols: 2, rows: 1 });
+    try {
+      const view = render(<TestHarness tabId="t1" onReady={() => {}} />);
+      const host = view.getByTestId('term-host');
+      expect(terminalInstances[terminalInstances.length - 1]?.cols).toBe(2);
+      if (measurable) {
+        Object.defineProperties(host, { clientWidth: { value: 1000 }, clientHeight: { value: 600 } });
+        fit.mockReturnValue({ cols: 122, rows: 38 });
+      }
+      await act(async () => { finish([]); });
+      await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalledWith(measurable ? 122 : 80, measurable ? 38 : 24, undefined, expect.any(Object)));
+    } finally {
+      fit.mockRestore();
+      invokeMock.mockResolvedValue('sess-x');
+    }
+  });
   it('keeps the process attached when a stable pane moves to a different container', async () => {
     setTab('block');
     const ready = vi.fn(); const view = render(<TestHarness tabId="t1" paneId="t1" onReady={ready} />);
@@ -277,6 +299,7 @@ describe('useTerminalSession', () => {
   });
 
   it('keeps startup pending until the shell emits its prompt-end marker', async () => {
+    const before = diagnosticSnapshot().slice(-1)[0]?.sequence ?? 0;
     render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
     await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
 
@@ -288,9 +311,17 @@ describe('useTerminalSession', () => {
 
     ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;B', payload: '', raw: '\x1b]133;B\x07' }]);
     await waitFor(() => expect(useTerminalStore.getState().startupStates.t1).toBe('ready'));
+    const records = diagnosticSnapshot().filter(record => record.sequence > before && record.event === 'terminal-startup-stage');
+    expect(records.map(record => (record.detail as { stage: string }).stage)).toEqual(expect.arrayContaining([
+      'effect-start', 'renderer-load-start', 'renderer-loaded', 'terminal-opened', 'initial-fit',
+      'shell-detection-start', 'shell-detection-complete', 'pty-invoke', 'pty-returned', 'first-output', 'prompt-marker', 'input-ready',
+    ]));
+    expect(records.slice(-1)[0]?.detail).toMatchObject({ reason: 'prompt-marker', integrated: true, timerLagMs: expect.any(Number) });
+    expect(JSON.stringify(records)).not.toContain('~/project $');
   });
 
   it('marks input ready after quiet output even without a ready marker', async () => {
+    const before = diagnosticSnapshot().slice(-1)[0]?.sequence ?? 0;
     vi.useFakeTimers();
     try {
       render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
@@ -304,6 +335,9 @@ describe('useTerminalSession', () => {
       expect(useTerminalStore.getState().startupStates.t1).toBe('starting');
       await vi.advanceTimersByTimeAsync(200);
       expect(useTerminalStore.getState().startupStates.t1).toBe('ready');
+      const ready = diagnosticSnapshot().find(record => record.sequence > before && record.event === 'terminal-startup-stage'
+        && (record.detail as { stage: string }).stage === 'input-ready');
+      expect(ready?.detail).toMatchObject({ reason: 'idle-fallback', integrated: false });
     } finally {
       vi.useRealTimers();
     }
