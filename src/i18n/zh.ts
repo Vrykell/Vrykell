@@ -1062,6 +1062,8 @@ const zh: Record<string, string> = {
   'Exported to {{path}}': '已导出到 {{path}}',
   'Export failed: {{error}}': '导出失败：{{error}}',
   'Save logs automatically': '自动保存日志',
+  'Trace terminal input': '跟踪终端输入',
+  'Record every key and cursor repaint in the diagnostics log. Turn this on only while investigating input latency.': '在诊断日志中记录每次按键与光标重绘。仅在排查输入延迟时开启。',
   'Exporting…': '导出中…',
   'Export detailed log': '导出详细日志',
   'Log storage': '日志存储',

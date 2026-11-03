@@ -22,7 +22,7 @@ import { getRecentOutputFor } from '@features/terminal/stores/terminal';
 import { useBlockStore } from '@features/terminal';
 import { useHistoryStore } from '@features/terminal/stores/history';
 import { captureHistoryCommand } from '@features/command-history/services/recording';
-import { isTerminalDebugEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
+import { isTerminalDebugEnabled, isTerminalInputTraceEnabled, terminalDebug } from '@features/terminal/services/terminalDebug';
 import { readXtermTheme } from '@features/terminal/model/xtermTheme';
 import { useSessionStore, useUiStore, useWorkspaceNavigation } from '@features/workspace';
 import { leaves as layoutLeaves } from '@features/workspace/model/windowLayout';
@@ -358,9 +358,13 @@ export function useTerminalSession(
     const controller = new SessionController(paneId, term.cols, {      writeMain,
       onTerminalData: data => {
         if (!sessionId || disposed || stopped) return;
-        terminalDebug('block-terminal-data', { paneId, sessionId, chars: data.length, scene: currentScene });
+        if (isTerminalInputTraceEnabled()) {
+          terminalDebug('block-terminal-data', { paneId, sessionId, chars: data.length, scene: currentScene });
+        }
         void writeTerminalInput(sessionId, data).catch(error => {
-          terminalDebug('pty-write-error', { paneId, sessionId, source: 'block-xterm', errorType: error instanceof Error ? error.name : typeof error });
+          if (isTerminalDebugEnabled()) {
+            terminalDebug('pty-write-error', { paneId, sessionId, source: 'block-xterm', errorType: error instanceof Error ? error.name : typeof error });
+          }
         });
       },
       onBlocksChanged: () => {
@@ -748,15 +752,21 @@ export function useTerminalSession(
     let pendingInputAt: number | null = null;
     const inputRenderSub = term.onRender?.(() => {
       if (pendingInputAt === null) return;
-      terminalDebug('terminal-input-render-complete', { paneId, scene: currentScene,
-        durationMs: Math.round((performance.now() - pendingInputAt) * 10) / 10 });
+      const durationMs = Math.round((performance.now() - pendingInputAt) * 10) / 10;
+      controller.ioLog.inputPaint(durationMs);
+      if (isTerminalInputTraceEnabled()) {
+        terminalDebug('terminal-input-render-complete', { paneId, scene: currentScene, durationMs });
+      }
       pendingInputAt = null;
     });
     const dataSub = term.onData((data) => {
       if (sessionId && !stopped) {
         const inputScene = currentScene;
-        if (isTerminalDebugEnabled()) {
-          pendingInputAt ??= performance.now();
+        // The latest key owns the paint latency: an earlier key still waiting must not
+        // hide how long the key the user just pressed takes to reach the screen.
+        pendingInputAt = performance.now();
+        controller.ioLog.input(data.length);
+        if (isTerminalInputTraceEnabled()) {
           terminalDebug('terminal-input', {
             paneId,
             sessionId,
@@ -766,8 +776,10 @@ export function useTerminalSession(
             ...terminalInputModes(term),
           });
         }
+        const started = performance.now();
         writeTerminalInput(sessionId, data).then(() => {
-          if (isTerminalDebugEnabled()) {
+          if (!disposed) controller.ioLog.inputWrite(performance.now() - started);
+          if (isTerminalInputTraceEnabled()) {
             terminalDebug('terminal-input-write-complete', { paneId, sessionId, chars: data.length });
           }
         }).catch((error) => {

@@ -69,7 +69,37 @@ export function sanitizeDiagnostic(value: unknown, key = '', depth = 0): unknown
   return value;
 }
 
-export const useDiagnosticSettings = create<{ autoSave: boolean; saving: boolean; error: string | null }>(() => ({ autoSave: false, saving: false, error: null }));
+const INPUT_TRACE_KEY = 'vrykell-terminal-input-trace';
+
+function storedInputTrace(): boolean {
+  try {
+    return typeof localStorage !== 'undefined' && localStorage.getItem(INPUT_TRACE_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+export const useDiagnosticSettings = create<{ autoSave: boolean; inputTrace: boolean; saving: boolean; error: string | null }>(() => ({
+  autoSave: false,
+  inputTrace: storedInputTrace(),
+  saving: false,
+  error: null,
+}));
+
+/** Per-key terminal tracing is opt-in: it is too frequent for the default log volume. */
+export function isDiagnosticInputTraceEnabled(): boolean {
+  return useDiagnosticSettings.getState().inputTrace;
+}
+
+export function setDiagnosticInputTrace(enabled: boolean): void {
+  useDiagnosticSettings.setState({ inputTrace: enabled });
+  try {
+    localStorage.setItem(INPUT_TRACE_KEY, enabled ? '1' : '0');
+  } catch {
+    // Storage can be unavailable; the in-memory switch still applies to this session.
+  }
+  diagnostic('diagnostics-input-trace', { enabled }, 'info');
+}
 
 export function diagnostic(event: string, detail: unknown = {}, level: DiagnosticRecord['level'] = 'debug'): void {
   try {

@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { applyTerminalCursorPreference } from '../terminalCursor';
 import { terminalDebug } from '../../services/terminalDebug';
 
-vi.mock('../../services/terminalDebug', () => ({ terminalDebug: vi.fn() }));
+vi.mock('../../services/terminalDebug', () => ({ terminalDebug: vi.fn(), isTerminalInputTraceEnabled: () => true }));
 
 function write(term: Terminal, data: string): Promise<void> {
   return new Promise(resolve => term.write(data, resolve));

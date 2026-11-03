@@ -121,6 +121,46 @@ describe('terminalWriteQueue', () => {
     await expect(Promise.all([first, second])).resolves.toEqual([undefined, undefined]);
   });
 
+  it('batches queued keyboard input into one write', async () => {
+    const pending = deferredWrites();
+    const first = writeTerminalInput('batch', 'a');
+    const second = writeTerminalInput('batch', 'b');
+    const third = writeTerminalInput('batch', 'c');
+    expect(pending.map((write) => write.data)).toEqual(['a']);
+
+    pending[0]!.settle();
+    await vi.waitFor(() => expect(pending.map((write) => write.data)).toEqual(['a', 'bc']));
+    pending[1]!.settle();
+    await expect(Promise.all([first, second, third])).resolves.toEqual([undefined, undefined, undefined]);
+  });
+
+  it('keeps abortable input in its own write', async () => {
+    const pending = deferredWrites();
+    const controller = new AbortController();
+    const abortable = writeTerminalInput('batch-signal', 'command', controller.signal);
+    const second = writeTerminalInput('batch-signal', 'b');
+    const third = writeTerminalInput('batch-signal', 'c');
+    expect(pending.map((write) => write.data)).toEqual(['command']);
+
+    pending[0]!.settle();
+    await vi.waitFor(() => expect(pending.map((write) => write.data)).toEqual(['command', 'bc']));
+    pending[1]!.settle();
+    await expect(Promise.all([abortable, second, third])).resolves.toEqual([undefined, undefined, undefined]);
+  });
+
+  it('drops a queued batch when an interrupt arrives', async () => {
+    const pending = deferredWrites();
+    const first = writeTerminalInput('batch-interrupt', 'a');
+    const second = writeTerminalInput('batch-interrupt', 'b');
+    const third = writeTerminalInput('batch-interrupt', 'c');
+    const interrupt = writeTerminalInput('batch-interrupt', '\x03');
+    pending[0]!.settle();
+    // The interrupt drops the queued pair and leads the next write.
+    await vi.waitFor(() => expect(pending.map((write) => write.data)).toEqual(['a', '\x03']));
+    pending[1]!.settle();
+    await expect(Promise.all([first, second, third, interrupt])).resolves.toEqual([undefined, undefined, undefined, undefined]);
+  });
+
   it('sends the next chunk only after the previous write resolved', async () => {
     const pending = deferredWrites();
     const payload = 'y'.repeat(TERMINAL_INPUT_CHUNK_UNITS + 5);

@@ -59,6 +59,11 @@ describe('terminalIoLog', () => {
       blockNotReady: 1,
       echoArmed: 1,
       echoFiltered: 1,
+      inputs: 0,
+      inputChars: 0,
+      inputWrites: 0,
+      inputWriteMaxMs: 0,
+      inputPaintMaxMs: 0,
     });
 
     // A quiet pane writes nothing more; the next window starts from zero.
@@ -89,8 +94,26 @@ describe('terminalIoLog', () => {
     expect(record.detail).toMatchObject({ rxBatches: 2, rxEvents: 2, rxAlt: 2, ctlBatches: 2, ctlEvents: 2, scene: 'altScreen' });
   });
 
-  it('stays silent while detailed logging is off', async () => {
-    useDiagnosticSettings.setState({ autoSave: false });
+  it('aggregates keyboard volume and the slowest input round trips', async () => {
+    const before = ioRecords().length;
+    const log = new TerminalIoLog('pane-input');
+    log.input(3);
+    log.input(17);
+    log.inputWrite(4.2);
+    log.inputWrite(11.6);
+    log.inputPaint(2.4);
+    log.inputPaint(38.2);
+    await vi.advanceTimersByTimeAsync(TERMINAL_IO_WINDOW_MS);
+    expect(ioRecords().slice(before)[0]!.detail).toMatchObject({
+      inputs: 2,
+      inputChars: 20,
+      inputWrites: 2,
+      inputWriteMaxMs: 12,
+      inputPaintMaxMs: 38,
+    });
+  });
+
+  it('stays silent while detailed logging is off', async () => {    useDiagnosticSettings.setState({ autoSave: false });
     const before = ioRecords().length;
     const log = new TerminalIoLog('pane-3');
     log.received([data('x')]);
