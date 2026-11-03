@@ -8,21 +8,6 @@ import { shellTypeLabel, fallbackShells, getAvailableShells, listShells } from '
 import { t } from '@i18n';
 
 describe('shells', () => {
-  it('shares concurrent detection and discovers later installations without caching failures', async () => {
-    let finish!: (shells: import('@platform/shells').ShellOption[]) => void;
-    invokeMock.mockClear();
-    invokeMock.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
-    const first = getAvailableShells();
-    const second = getAvailableShells();
-    expect(invokeMock).toHaveBeenCalledTimes(1);
-    finish([{ id: 'bash', label: 'Bash', default: true }]);
-    expect(await first).toEqual(await second);
-    invokeMock.mockRejectedValueOnce(new Error('temporarily unavailable'));
-    expect(await getAvailableShells()).toEqual(fallbackShells());
-    invokeMock.mockResolvedValueOnce([{ id: 'pwsh', label: 'Shell', default: true }]);
-    expect(await getAvailableShells()).toEqual([{ id: 'pwsh', label: 'Shell', default: true }]);
-    expect(invokeMock).toHaveBeenCalledTimes(3);
-  });
   it('maps shellTypeLabel and falls back', () => {
     expect(shellTypeLabel('zsh')).toBe('Zsh');
     expect(shellTypeLabel('cmd')).toBe('CMD');

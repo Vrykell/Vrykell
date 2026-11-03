@@ -44,19 +44,21 @@ function DemoRow({ id, start, measureContainer = false }: {
   );
 }
 
-function Harness({ onDrop, listId = 'demo', axis, grouped = false, wholeGroups = false }: {
+function Harness({ onDrop, listId = 'demo', axis, grouped = false, wholeGroups = false, edgeDrop = false, reserveSource = false }: {
   onDrop: (drag: ListReorderDrag, target: ListReorderTarget | null) => void;
   listId?: string;
   axis?: 'vertical' | 'horizontal';
   grouped?: boolean;
   wholeGroups?: boolean;
+  edgeDrop?: boolean;
+  reserveSource?: boolean;
 }) {
-  const start = useListReorderDrag({ listId, onDrop, axis, grouped });
+  const start = useListReorderDrag({ listId, onDrop, axis, grouped, edgeDrop });
   return (
     <div data-reorder-list={listId} data-reorder-zone={grouped ? 'members' : undefined} data-reorder-kind={grouped ? 'demo' : undefined}>
       {['a', 'b', 'c'].map((id) => (
         <Fragment key={id}>
-          <ListReorderPlaceholder listId={listId} itemId={id} />
+          <ListReorderPlaceholder listId={listId} itemId={id} reserveSource={reserveSource} />
           {wholeGroups ? <div data-reorder-container><DemoRow id={id} start={start} measureContainer /></div> : <DemoRow id={id} start={start} />}
         </Fragment>
       ))}
@@ -379,6 +381,43 @@ describe('list reorder', () => {
       { itemId: 'c', after: true },
     );
     expect(useListReorder.getState().drag).toBeNull();
+  });
+
+  it('keeps the end slot reachable across the surrounding container below a vertical list', () => {
+    const onDrop = vi.fn();
+    render(<Harness onDrop={onDrop} edgeDrop />);
+    const rows = ['a', 'b', 'c'].map((id) => screen.getByTestId(`row-${id}`));
+    rows.forEach((row, index) => vi.spyOn(row, 'getBoundingClientRect').mockReturnValue(rowRect(index * (ROW_HEIGHT + ROW_GAP))));
+    const list = rows[0]!.parentElement!;
+    const container = list.parentElement!;
+    vi.spyOn(list, 'getBoundingClientRect').mockReturnValue({ ...rowRect(0), bottom: 126, height: 126 });
+    vi.spyOn(container, 'getBoundingClientRect').mockReturnValue({ ...rowRect(0), bottom: 600, height: 600 });
+    Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: vi.fn(() => container) });
+
+    fireEvent.pointerDown(rows[0]!, { pointerId: 1, button: 0, isPrimary: true, clientX: 10, clientY: 10 });
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 10, clientY: 500 });
+    expect(useListReorder.getState().target).toEqual({ itemId: 'c', after: true });
+
+    // Outside the container the list has no destination; leaving it must not fake the end slot.
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 500, clientY: 500 });
+    expect(useListReorder.getState().target).toBeNull();
+    fireEvent.pointerMove(window, { pointerId: 1, clientX: 10, clientY: 500 });
+    expect(useListReorder.getState().target).toEqual({ itemId: 'c', after: true });
+
+    fireEvent.pointerUp(window, { pointerId: 1, clientX: 10, clientY: 500 });
+    expect(onDrop).toHaveBeenCalledWith(expect.objectContaining({ id: 'a' }), { itemId: 'c', after: true });
+  });
+
+  it('reserves the dragged slot until a destination is resolved', () => {
+    render(<Harness onDrop={vi.fn()} reserveSource />);
+    act(() => useListReorder.getState().start({ listId: 'demo', id: 'a', kind: 'demo', height: ROW_HEIGHT }, { x: 10, y: 10 }));
+    const sourceSlot = document.querySelector('[data-reorder-placeholder="a"]');
+    expect(sourceSlot).not.toBeNull();
+    expect(sourceSlot!.nextElementSibling).toBe(screen.getByTestId('row-a'));
+
+    act(() => useListReorder.getState().hover({ itemId: 'c', after: true }));
+    expect(document.querySelector('[data-reorder-placeholder="a"]')).toBeNull();
+    expect(document.querySelector('[data-reorder-placeholder="c"]')).not.toBeNull();
   });
 
   it('cancels the drag on Escape without dropping', () => {

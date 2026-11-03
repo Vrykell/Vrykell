@@ -72,6 +72,9 @@
   --primary-button-bg: var(--primary-action);
   --primary-button-text: var(--primary-action-text);
   --primary-button-hover-bg: var(--primary-action-hover);
+  /* Integrated progress button: the unfilled track is lighter than the filled portion. */
+  --progress-button-track: var(--primary-button-hover-bg);
+  --progress-button-fill: color-mix(in srgb, var(--primary-action) 76%, #000000);
   --shell-powershell-accent: #52ACFF;
   --shell-bash-accent: #30D158;
   --shell-mark-ink: #FFFFFF;

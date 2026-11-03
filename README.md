@@ -127,16 +127,16 @@ Screenshots show the application with a sample project and simulated session dat
 
 ## Download
 
-Current stable release: **0.1.1**.
+Current stable release: **0.1.2**.
 
 | Platform | Package |
 | --- | --- |
-| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_x64-setup.exe) |
-| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_aarch64.dmg) |
-| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_x64.dmg) |
-| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.1/Vrykell_0.1.1_amd64.AppImage) |
+| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.2/Vrykell_0.1.2_x64-setup.exe) |
+| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.2/Vrykell_0.1.2_aarch64.dmg) |
+| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.2/Vrykell_0.1.2_x64.dmg) |
+| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.2/Vrykell_0.1.2_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.2/Vrykell_0.1.2_amd64.AppImage) |
 
-[All releases](https://github.com/Vrykell/Vrykell/releases) · [Release notes](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.1)
+[All releases](https://github.com/Vrykell/Vrykell/releases) · [Release notes](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.2)
 
 Release notes record package checksums, the exact source commit and validation coverage. Update signatures verify updater payloads; they do not replace operating-system distribution signing or notarization. The capability descriptions above follow the development branch; build the current source for changes made after the packaged release.
 

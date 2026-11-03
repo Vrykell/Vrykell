@@ -44,13 +44,16 @@ for (const theme of ['dark', 'light']) test(`workspace chrome and cards share th
   await expect(page.locator('[data-dock-zone="left"] [data-dock-btn]')).toHaveCount(0);
   expect(await left.evaluate(element => getComputedStyle(element).borderTopWidth)).toBe('0px');
   expect(await page.getByTestId('workspace-left-dock').evaluate(element => getComputedStyle(element).borderTopWidth)).toBe('0px');
-  // Workspace and settings rows keep the shared geometry after the dock rows were removed.
+  // Workspace rows keep the shared geometry; settings uses the compact heading control while docked.
   const workspaceRow = page.getByTestId('workspace-area-terminal').locator('.sidebar-row-content');
-  const settingsRow = page.getByTestId('workspace-settings').locator('.sidebar-row-content');
+  const settingsButton = page.locator('.workspace-sidebar-heading').getByTestId('workspace-settings');
   expect((await workspaceRow.boundingBox())!.width).toBeGreaterThan(120);
-  expect((await workspaceRow.boundingBox())!.height).toBe((await settingsRow.boundingBox())!.height);
+  expect((await workspaceRow.boundingBox())!.height).toBe(32);
+  await expect(settingsButton).toBeVisible();
+  expect((await settingsButton.boundingBox())!.height).toBe(28);
+  await expect(page.locator('.workspace-sidebar-footer')).toHaveCount(0);
 
-  await page.getByTestId('workspace-settings').click();
+  await settingsButton.click();
   const settingsNav = page.locator('.settings-navigation');
   const settingsCard = page.locator('.settings-group-panel').first();
   expect(await rgb(page, settingsNav)).toBe(auxiliary);
