@@ -1,7 +1,7 @@
 /** Model-facing tool descriptions use one language independently of interface locale. */
 export const DESC_RUN_COMMAND =
   'Execute a shell command in the captured terminal and wait for confirmed completion. A completed result includes completed=true, an exit code and bounded output. ' +
-  'If completed=false, inspect the same terminal with read_terminal; do not queue another command until it is ready. A quiet screen is not completion evidence. ' +
+  'If completed=false, inspect the same terminal with read_terminal; the command guard clears for a newly submitted command only after the terminal reports ready. A quiet screen is not completion evidence. ' +
   'The default 120-second timeout stops waiting without terminating the process. Use terminal_keys and read_terminal for interactive programs.';
 export const DESC_READ_FILE = 'Read a UTF-8 text file by absolute path. Default limit is 256KB; truncation is marked. Binary or invalid UTF-8 files fail.';
 export const DESC_WRITE_FILE = 'Replace an entire file, backing up existing content first. Missing parent directories are created. Prefer edit_file for precise changes.';

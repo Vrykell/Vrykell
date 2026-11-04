@@ -19,7 +19,7 @@ import {
 } from '@features/terminal';
 import { agentControl } from '@features/agent/services/agentControl';
 import { DEFAULT_TOOL_COMMAND_TIMEOUT_MS } from '../model/messageParts';
-import { terminalDisconnected } from '../services/terminalAvailability';
+import { terminalDisconnected, terminalExecutionState } from '../services/terminalAvailability';
 
 export interface RunCommandResult {
   ok: boolean;
@@ -29,6 +29,7 @@ export interface RunCommandResult {
   output: string;
   error?: string;
   completed?: boolean;
+  /** Stable reason for machine decisions: timeout, busy, interactive, aborted, disconnected. */
   code?: string;
   requiresUserAction?: boolean;
 }
@@ -66,13 +67,15 @@ export async function runCommandAndWait(
   if (!sessionId) {
     return terminalDisconnected(paneId)!;
   }
-  if (opts?.signal?.aborted) return { ok: false, completed: false, output: '', error: t('Command cancelled before execution.') };
-  if (agentControl.isControlled(paneId) || (useBlockStore.getState().byTab[paneId] ?? []).some(block => block.status === 'executing')) {
-    return { ok: false, completed: false, output: '', error: t('The terminal is busy. Use read_terminal to inspect it before sending another command.') };
+  if (opts?.signal?.aborted) return { ok: false, completed: false, output: '', code: 'COMMAND_ABORTED', error: t('Command cancelled before execution.') };
+  const executionState = terminalExecutionState(paneId);
+  if (executionState === 'busy') {
+    return { ok: false, completed: false, output: '', code: 'TERMINAL_BUSY', error: t('The terminal is busy. Use read_terminal to inspect it before sending another command.') };
   }
-  if (ts.scenes[paneId] === 'altScreen') {
+  if (executionState === 'interactive') {
     return {
       ok: false,
+      code: 'TERMINAL_INTERACTIVE',
       output: '',
       error:
         '终端正在运行全屏应用（altScreen，如 vim/htop）。run_command 只用于非交互命令；' +
@@ -98,10 +101,10 @@ export async function runCommandAndWait(
     diagnostic('agent-command-completion', { paneId, completed: result.completed ?? false, ok: result.ok, exitCode: result.exitCode, outputChars: result.output.length });
     return result;
   } catch (e) {
-    if (opts?.signal?.aborted) return { ok: false, completed: false, output: '', error: t('Stopped waiting. The command may still be running in the terminal.') };
+    if (opts?.signal?.aborted) return { ok: false, completed: false, output: '', code: 'COMMAND_ABORTED', error: t('Stopped waiting. The command may still be running in the terminal.') };
     const disconnected = terminalDisconnected(paneId, sessionId);
     if (disconnected) return disconnected;
-    return { ok: false, completed: false, output: '', error: t('Could not write to the terminal: {{error}}', { error: e instanceof Error ? e.message : String(e) }) };
+    return { ok: false, completed: false, output: '', code: 'TERMINAL_WRITE_FAILED', error: t('Could not write to the terminal: {{error}}', { error: e instanceof Error ? e.message : String(e) }) };
   } finally {
     completion?.dispose();
     agentControl.release(paneId);
@@ -155,6 +158,7 @@ function waitForCompletion(
       if (s.scenes[paneId] === 'altScreen') {
         finish({
           ok: false,
+          code: 'TERMINAL_INTERACTIVE',
           output: '',
           error:
             '命令切入了全屏交互界面（TUI 模式），run_command 无法读取其输出，已停止等待。' +
@@ -217,7 +221,7 @@ function waitForCompletion(
         if (cur === last) {
           stable += 1;
           if (stable >= 2) {
-            finish({ ok: false, completed: false, output: tail(cur), error: t('Command completion could not be confirmed. This is a terminal snapshot; use read_terminal and do not queue more commands until the shell is ready.') });
+            finish({ ok: false, completed: false, output: tail(cur), code: 'COMMAND_UNCONFIRMED', error: t('Command completion could not be confirmed. This is a terminal snapshot; use read_terminal and do not queue more commands until the shell is ready.') });
           }
         } else {
           last = cur;
@@ -283,11 +287,11 @@ function waitForCompletion(
 
     const timeoutTimer = setTimeout(() => {
       const out = getRecentOutputFor(paneId, 30);
-      finish({ ok: false, completed: false, output: tail(out), error: t('Command timed out after {{seconds}} seconds. It may still be running; use read_terminal before sending another command.', { seconds: Math.round(timeoutMs / 1000) }) });
+      finish({ ok: false, completed: false, output: tail(out), code: 'COMMAND_TIMEOUT', error: t('Command timed out after {{seconds}} seconds. It may still be running; use read_terminal before sending another command.', { seconds: Math.round(timeoutMs / 1000) }) });
     }, timeoutMs);
 
     const onAbort = () => {
-      finish({ ok: false, completed: false, output: tail(getRecentOutputFor(paneId, 30)), error: t('Stopped waiting. The command may still be running in the terminal.') });
+      finish({ ok: false, completed: false, output: tail(getRecentOutputFor(paneId, 30)), code: 'COMMAND_ABORTED', error: t('Stopped waiting. The command may still be running in the terminal.') });
     };
     signal?.addEventListener('abort', onAbort, { once: true });
 
@@ -306,7 +310,7 @@ function waitForCompletion(
     if (terminalDisconnected(paneId, sessionId)) finish(terminalDisconnected(paneId, sessionId)!);
     else if (signal?.aborted) onAbort();
     else if (useTerminalStore.getState().scenes[paneId] === 'altScreen') {
-      finish({ ok: false, completed: false, output: '', error: t('The command entered an interactive screen. Use read_terminal and terminal_keys to continue.') });
+      finish({ ok: false, completed: false, output: '', code: 'TERMINAL_INTERACTIVE', error: t('The command entered an interactive screen. Use read_terminal and terminal_keys to continue.') });
     } else {
       settleCompletion();
       if (!settled) { tryClaim(); collectBlocks(); settleIfDone(); }
