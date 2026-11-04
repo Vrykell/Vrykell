@@ -49,6 +49,10 @@ AI tool denials end tool access for the current turn, including further question
 
 ## 1. Threat model: who can influence what
 
+Structured external questions advertise form elicitation only when the native handler is present. Forms bind to the receiving connection and its live agent session; unsupported setup scopes and URL requests are declined. Flat schemas, fields, choices, pending requests and answer sizes are bounded. Native validation retains typed values, checks required fields and constraints, rejects unknown answers and credential fields, and compiles patterns with a bounded linear-time engine. Answers are one-shot; timeout, stop, close and transport loss release pending state. Questions never create execution grants. Diagnostics record lifecycle identities and status only, without schemas, questions or answers.
+
+External child processes inherit explicit harness proxy settings first, then process proxy settings, then the enabled manual desktop proxy on Windows. Local bridge hosts always bypass configured proxies. Environment changes apply only to the child; credentials and proxy URLs are not logged. Automatic proxy scripts are not evaluated by this fallback.
+
 | Input source | Trust level | What it can reach |
 | --- | --- | --- |
 | The user (keyboard, panels, settings) | Authority | Everything (the terminal is arbitrary code execution — that is the product) |
