@@ -60,7 +60,7 @@ export default function ModelPill({ showThinking = true }: { showThinking?: bool
         width: levelOpen && lockedWidth ? lockedWidth : 'fit-content',
         height: 32, boxSizing: 'border-box',
         display: 'flex', alignItems: 'stretch',
-        borderRadius: 8,
+        borderRadius: 'var(--radius-card)',
         overflow: levelOpen ? 'visible' : 'hidden',
         transition: 'background 0.12s ease',
       }}

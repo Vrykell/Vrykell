@@ -44,7 +44,7 @@ export default function ErrorDetails({
   return (
     <div data-testid={testId} style={{
       background: 'var(--surface)', border: '1px solid var(--border)',
-      borderRadius: 6, overflow: 'hidden',
+      borderRadius: 'var(--radius-inner)', overflow: 'hidden',
       ...style,
     }}>
       <div style={{
@@ -62,7 +62,7 @@ export default function ErrorDetails({
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0,
             fontFamily: 'var(--font-ui)', fontSize: 'calc(11px * var(--ui-font-scale))',
-            padding: '3px 6px', border: 'none', borderRadius: 4,
+            padding: '3px 6px', border: 'none', borderRadius: 'var(--radius-inner)',
             background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
           }}
         >

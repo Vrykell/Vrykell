@@ -16,8 +16,7 @@ const settingsJson = (page: import('@playwright/test').Page) =>
 
 test.describe('model behavior page', () => {
   test('Agent mode persists after toggling, and deep thinking moves to the model configuration', async ({ page }) => {
-    const switches = page.getByRole('switch');
-    const agentSwitch = switches.nth(0);
+    const agentSwitch = fieldOf(page, 'Agent 模式').getByRole('switch');
     await expect(agentSwitch).toHaveAttribute('aria-checked', 'true');
 
     await agentSwitch.click();
@@ -29,6 +28,11 @@ test.describe('model behavior page', () => {
     await page.locator('aside').getByRole('button', { name: '模型配置', exact: true }).click();
     await page.getByTestId('model-settings').first().click();
     const thinking = page.getByLabel('主力模型的思考设置');
+    await expect(thinking.getByText('已开启')).toHaveCount(0);
+    await expect(thinking.getByText('已关闭')).toHaveCount(0);
+    await expect(page.getByTestId('model-context-settings').getByText('已开启')).toHaveCount(0);
+    await expect(page.getByTestId('model-context-settings').getByText('已关闭')).toHaveCount(0);
+    expect(await page.getByTestId('model-context-settings').locator('input[type="number"]').first().evaluate(input => getComputedStyle(input).appearance)).toBe('textfield');
     const thinkSwitch = thinking.getByRole('switch');
     await thinkSwitch.click();
     await expect(thinkSwitch).toHaveAttribute('aria-checked', 'true');
@@ -48,12 +52,35 @@ test.describe('model behavior page', () => {
     expect(saved).toContain('"thinkingLevel":"low"');
   });
 
-  test('context strategy switches to window', async ({ page }) => {
+  test('context strategy defaults globally and can be overridden per model', async ({ page }) => {
     const strategy = fieldOf(page, '上下文策略');
+    await expect(strategy).toBeVisible();
+    const defaultContext = page.getByTestId('default-configuration');
+    await expect(defaultContext.locator('.settings-field')).toHaveCount(6);
+    await expect(defaultContext.locator('.settings-field').nth(1)).toHaveCSS('border-top-width', '1px');
+    await expect(defaultContext.getByText('已开启')).toHaveCount(0);
+    await expect(defaultContext.getByText('已关闭')).toHaveCount(0);
+    expect(await defaultContext.locator('input[type="number"]').first().evaluate(input => getComputedStyle(input).appearance)).toBe('textfield');
     await strategy.getByRole('combobox', { name: '上下文策略' }).click();
     await page.getByRole('option', { name: '窗口', exact: true }).click();
-    const saved = await settingsJson(page);
+    let saved = await settingsJson(page);
     expect(saved).toContain('"contextStrategy":"window"');
+    let state = JSON.parse(saved) as { state: { global: { contextStrategy: string }; overrides: Record<string, { contextStrategy?: string }> } };
+    expect(state.state.global.contextStrategy).toBe('window');
+    expect(state.state.overrides['m-main']).toBeUndefined();
+
+    const bar = page.getByTestId('model-scope-bar');
+    await bar.click();
+    await page.getByRole('option', { name: '主力模型', exact: true }).click();
+    await page.locator('aside').getByRole('button', { name: '模型配置', exact: true }).click();
+    await page.getByTestId('model-settings').first().click();
+    const modelStrategy = fieldOf(page, '上下文策略');
+    await modelStrategy.getByRole('combobox', { name: '上下文策略' }).click();
+    await page.getByRole('option', { name: '汇总', exact: true }).click();
+    saved = await settingsJson(page);
+    state = JSON.parse(saved) as { state: { global: { contextStrategy: string }; overrides: Record<string, { contextStrategy?: string }> } };
+    expect(state.state.global.contextStrategy).toBe('window');
+    expect(state.state.overrides['m-main'].contextStrategy).toBe('compact');
   });
 
   test('system prompt edits persist', async ({ page }) => {
@@ -66,21 +93,21 @@ test.describe('model behavior page', () => {
   });
 
   test('per-model override: selecting a model in the model scope bar overrides the global value and can be reset', async ({ page }) => {
-    // Model scope bar: global default is selected; open the menu and pick the "primary model"
+    // Model scope bar: default configuration is selected; open the menu and pick the "primary model"
     const bar = page.getByTestId('model-scope-bar');
-    await expect(bar).toContainText('全局默认');
+    await expect(bar).toContainText('默认配置');
     await bar.click();
     await page.getByRole('option', { name: '主力模型', exact: true }).click();
-    await expect(page.getByText('跟随全局默认')).toBeVisible();
+    await expect(page.getByText('使用默认配置', { exact: true })).toBeVisible();
     // Turn off Agent mode for this model
-    const switches = page.getByRole('switch');
-    await switches.nth(0).click();
+    const agentSwitch = fieldOf(page, 'Agent 模式').getByRole('switch');
+    await agentSwitch.click();
     await expect(page.getByText(/已覆盖 1 项/)).toBeVisible();
     const saved = await settingsJson(page);
     expect(saved).toContain('"overrides"');
     // Reset
-    await page.getByRole('button', { name: '重置为全局默认' }).click();
-    await expect(page.getByText('跟随全局默认')).toBeVisible();
+    await page.getByRole('button', { name: '重置为默认配置' }).click();
+    await expect(page.getByText('使用默认配置', { exact: true })).toBeVisible();
     const after = await settingsJson(page);
     expect(after).not.toContain('"m-main"');
   });

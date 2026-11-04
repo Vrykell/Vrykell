@@ -217,7 +217,8 @@ async function captureClassicTerminal(locale) {
     await expect(page.locator('.xterm:visible')).toHaveCount(1);
     await expect(page.locator('[data-terminal-input]:visible')).toHaveCount(0);
     await page.evaluate(async () => {
-      document.documentElement.style.clipPath = 'inset(0 round 16px)';
+      const radius = getComputedStyle(document.documentElement).getPropertyValue('--radius-block').trim() || '14px';
+      document.documentElement.style.clipPath = `inset(0 round ${radius})`;
       const { useTypographyStore } = await import('/src/config/typography.ts');
       const { useWorkspaceStore } = await import('/src/features/workspace/stores/workspace.ts');
       useTypographyStore.getState().update({ terminalFontSize: 17 });
@@ -286,7 +287,10 @@ async function scene(locale, remote = false) {
   }, { locale, code });
   await page.goto(origin);
   await waitForWorkbench(page);
-  await page.evaluate(() => { document.documentElement.style.clipPath = 'inset(0 round 16px)'; });
+  await page.evaluate(() => {
+    const radius = getComputedStyle(document.documentElement).getPropertyValue('--radius-block').trim() || '14px';
+    document.documentElement.style.clipPath = `inset(0 round ${radius})`;
+  });
   await expect(page.locator('.terminal-pane:visible').first()).toBeVisible();
   await page.evaluate(() => {
     const invoke = window.__TAURI_INTERNALS__.invoke;
@@ -493,7 +497,8 @@ export function rememberCommand(
   }, { locale });
   await page.goto(origin); await waitForWorkbench(page);
   await page.evaluate(async ({ original, modified }) => {
-    document.documentElement.style.clipPath = 'inset(0 round 16px)';
+    const radius = getComputedStyle(document.documentElement).getPropertyValue('--radius-block').trim() || '14px';
+    document.documentElement.style.clipPath = `inset(0 round ${radius})`;
     const { useTypographyStore } = await import('/src/config/typography.ts');
     useTypographyStore.getState().update({ terminalFontSize: 17, editorFontSize: 15, commandHighlighting: true });
     const invoke = window.__TAURI_INTERNALS__.invoke;

@@ -4,6 +4,13 @@ import { setupTauriMock } from './tauri-mock';
 test('new terminal diagnostics correlate creation, repeated mounts and shell readiness', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
+  // Let the restored terminal finish its own detection before creating the traced one.
+  await expect.poll(() => page.evaluate(async () => {
+    const path = '/src/platform/diagnostics.ts';
+    const { diagnosticSnapshot } = await import(path) as typeof import('../src/platform/diagnostics');
+    return diagnosticSnapshot().some(record => record.event === 'terminal-startup-stage'
+      && (record.detail as { stage: string }).stage === 'input-ready');
+  })).toBe(true);
   const create = page.getByTestId('tab-new-default');
   await expect(create).toBeVisible();
   await create.click();
@@ -35,13 +42,18 @@ test('new terminal diagnostics correlate creation, repeated mounts and shell rea
     const recent = records.filter(record => record.sequence > request.sequence);
     return {
       detections: recent.filter(record => record.event === 'ipc-start' && (record.detail as { commandName: string }).commandName === 'list_shells').length,
-      grid: recent.filter(record => record.event === 'terminal-startup-stage' && (record.detail as { stage: string }).stage === 'pty-invoke').map(record => record.detail as { cols: number; rows: number }),
+      grid: recent.filter(record => record.event === 'terminal-startup-stage' && (record.detail as { stage: string }).stage === 'pty-invoke').map(record => record.detail as { cols: number; rows: number; startupId: string }),
     };
   });
-  expect(startup.detections).toBe(1);
-  expect(startup.grid).toHaveLength(1);
-  expect(startup.grid[0]!.cols).toBeGreaterThan(2);
-  expect(startup.grid[0]!.rows).toBeGreaterThan(1);
+  // A development strict-mode mount can probe shells twice; validate the grid of the
+  // startup that became ready, not the cancelled first mount.
+  expect(startup.detections).toBeGreaterThanOrEqual(1);
+  const liveGrids = startup.grid.filter(grid => grid.startupId === ready.startupId);
+  expect(liveGrids).toHaveLength(1);
+  for (const grid of liveGrids) {
+    expect(grid.cols).toBeGreaterThan(2);
+    expect(grid.rows).toBeGreaterThan(1);
+  }
 });
 
 test('a real blocked main thread leaves a long-task observation beside the frame gap', async ({ page }) => {

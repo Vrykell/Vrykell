@@ -108,7 +108,7 @@ export default function TerminalView({ active = true }: { active?: boolean }) {
   };
   const commonActions: ContextMenuItem[] = [
     ...(!hasRunningCommand ? [{ label: t('Reset terminal input modes'), disabled: !sessions[focusedTermId], onClick: () => resetTerminalInputModes(focusedTermId) }] : []),
-    ...(canSplit ? [{ ...workspaceSplitMenu(unified ? 'unified' : 'terminal', kind => requestWorkspaceSplit(`terminal:${focusedTermId}`, undefined, kind)), group: 'view' as const }] : []),
+    ...(canSplit ? [{ ...workspaceSplitMenu(unified ? 'unified' : 'terminal', (kind, anchor) => requestWorkspaceSplit(`terminal:${focusedTermId}`, anchor, kind)), group: 'view' as const }] : []),
     ...[{
       label: t('Change pane position'), group: 'view' as const, disabled: !multiPane,
       onClick: beginPaneMoveAction,
@@ -273,7 +273,7 @@ function PaneLayout({ layout, windowId, focusedTermId, active, setRatioNode }: {
       if (controls.pendingMergeTab) void mergeWorkspaceContainers(controls.pendingMergeTab, windowId, target);
       controls.chooseMerge();
     }} onCancel={() => controls.chooseMerge()}
-    onSplit={(id, kind) => requestWorkspaceSplit(id, undefined, kind)}
+    onSplit={(id, kind, anchor) => requestWorkspaceSplit(id, anchor, kind)}
     onMovePane={(paneId, target) => moveWorkspacePane(windowId, paneId, target)}
     onRemove={id => closeTerminalPane(id.slice('terminal:'.length))} onDetach={id => detachWorkspacePane('terminal', id)}
     />;

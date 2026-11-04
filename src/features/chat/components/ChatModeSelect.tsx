@@ -61,14 +61,14 @@ export default function ChatModeSelect({ compact = false }: { compact?: boolean 
       onClick={event => { navigation.setKeyboardNavigation(event.detail === 0); setOpen(!open); }} onKeyDown={event => {
         if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); navigation.setKeyboardNavigation(true); setOpen(true); }
       }}
-      style={{ display: 'flex', alignItems: 'center', gap: 4, height: compact ? 'var(--control-size-compact)' : 30, borderRadius: 8,
+      style={{ display: 'flex', alignItems: 'center', gap: 4, height: compact ? 'var(--control-size-compact)' : 30, borderRadius: 'var(--radius-card)',
         border: 'none', color: current.tone !== 'neutral' ? 'var(--accent-warm)' : 'var(--text-secondary)',
         fontSize: 'calc(12px * var(--ui-font-scale))', cursor: 'pointer' }}>
       <Icon size={compact ? iconSizes.control : iconSizes.compact} />
       {!compact && <><span className="chat-mode-label">{t(current.label)}</span><ChevronDown size={iconSizes.compact} /></>}
     </button>
     {open && createPortal(<div {...navigation.props} ref={menu} role="listbox" aria-label={t('Chat and approval mode')} className="workspace-floating"
-      style={{ ...position, zIndex: 10000, padding: 4, borderRadius: 10 }}>
+      style={{ ...position, zIndex: 10000, padding: 4 }}>
       {MODES.map((mode, index) => {
         const selected = selectedId === mode.id;
         const OptionIcon = mode.icon;
@@ -89,7 +89,7 @@ export default function ChatModeSelect({ compact = false }: { compact?: boolean 
             } else if (event.key === 'Tab') setOpen(false);
           }}
           style={{ display: 'flex', alignItems: 'center', gap: 6, width: '100%',
-            padding: '6px 8px', borderRadius: 6, textAlign: 'left', cursor: 'pointer', color: mode.tone === 'danger' ? 'var(--accent-warm)' : 'var(--text-primary)' }}>
+            padding: '6px 8px', borderRadius: 'var(--radius-inner)', textAlign: 'left', cursor: 'pointer', color: mode.tone === 'danger' ? 'var(--accent-warm)' : 'var(--text-primary)' }}>
           <OptionIcon size={iconSizes.control} />
           <span className="chat-approval-option-copy">
             <span>{t(mode.label)}</span>

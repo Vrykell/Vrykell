@@ -23,7 +23,7 @@
 .git-message-field { position: relative; display: flex; border-radius: var(--radius-inner); background: var(--field-bg); border: 1px solid var(--border); }
 .git-message-field textarea { display: block; width: 100%; min-height: 76px; max-height: 180px; padding: 9px 34px 9px 10px; border: none; outline: none; background: transparent; color: var(--text-primary); font: var(--fs-caption)/1.5 var(--font-ui); }
 .git-message-field > button { position: absolute; right: 4px; top: 4px; }
-.git-commit-buttons { display: flex; align-items: stretch; gap: 0; border-radius: 6px; overflow: hidden; background: var(--primary-button-bg); flex-shrink: 0; }
+.git-commit-buttons { display: flex; align-items: stretch; gap: 0; border-radius: var(--radius-inner); overflow: hidden; background: var(--primary-button-bg); flex-shrink: 0; }
 .git-commit-primary { display: flex; align-items: center; justify-content: center; gap: 6px; flex: 1; min-width: 0; padding: 4px 10px; border: none; border-radius: 0; background: transparent; color: var(--primary-button-text); font: var(--fs-label)/1.5 var(--font-ui); cursor: pointer; }
 .git-commit-primary:hover:enabled { background: var(--primary-button-hover-bg); }
 .git-commit-primary:disabled { opacity: .45; cursor: default; }

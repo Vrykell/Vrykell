@@ -1,5 +1,4 @@
 import { OutlineButton } from '@ui/actions/OutlineButton';
-import { useSettingsNavigationStore } from '../stores/navigation';
 import { t } from '@i18n';
 import KeyHint from '@ui/feedback/KeyHint';
 /**
@@ -7,23 +6,21 @@ import KeyHint from '@ui/feedback/KeyHint';
  */
 import { useState } from 'react';
 import { useAiConfigStore, useAgentSettings, type AgentSettings, type ModelBehaviorSettings } from '@features/agent';
-import Select from '@ui/fields/Select';
 import { ModelScopeBar } from '@features/chat/components/ModelPicker';
 import { SettingsGroup, Field, Toggle, NumberInput, inputStyle } from '@features/settings/components/ui';
 import AutoSaveInput from '../components/AutoSaveInput';
-import { useSettingsSave } from '../components/SettingsSaveProvider';
+import ModelContextSettings from '../components/ModelContextSettings';
 
 export function AiBehaviorPage() {
-  const targetField = useSettingsNavigationStore(state => state.targetField);
   const models = useAiConfigStore((s) => s.models);
   const agentSettings = useAgentSettings();
   const [scope, setScope] = useState<string>('global');
-  const { save } = useSettingsSave();
 
   const isGlobal = scope === 'global';
   const model = models.find((m) => m.id === scope) ?? null;
   const eff = agentSettings.resolve(isGlobal ? undefined : scope);
-  const overrideKeys = !isGlobal && model ? Object.keys(agentSettings.overrides[model.id] ?? {}) : [];
+  const behaviorFields: (keyof ModelBehaviorSettings)[] = ['systemPrompt', 'agentMode', 'maxSteps'];
+  const overrideKeys = !isGlobal && model ? Object.keys(agentSettings.overrides[model.id] ?? {}).filter(key => behaviorFields.includes(key as keyof ModelBehaviorSettings)) : [];
   const hasOverride = overrideKeys.length > 0;
 
   const update = (patch: Partial<AgentSettings>) => {
@@ -36,7 +33,7 @@ export function AiBehaviorPage() {
       <SettingsGroup title={t('Instructions')}>
         <Field
           title={t('Configuration scope')}
-          description={t("Apply these options globally or to one model.")}
+          description={t('Use the default configuration, or override one model.')}
         >
           <ModelScopeBar
             options={models.map((m) => ({ value: m.id, label: m.name || m.model }))}
@@ -52,11 +49,11 @@ export function AiBehaviorPage() {
             background: hasOverride ? 'var(--accent-warm-dim)' : 'var(--hover)',
             fontSize: 'calc(11px * var(--ui-font-scale))', color: hasOverride ? 'var(--accent-warm)' : 'var(--text-muted)',
           }}>
-            <span>{hasOverride ? t('Overrides {{count}} settings', { count: overrideKeys.length }) : t('Uses global defaults')}</span>
+            <span>{hasOverride ? t('Overrides {{count}} settings', { count: overrideKeys.length }) : t('Uses the default configuration')}</span>
             <div style={{ flex: 1 }} />
             {hasOverride && (
-              <OutlineButton data-subtle onClick={() => agentSettings.resetModel(model.id)} >
-                {t('Reset to global defaults')}
+              <OutlineButton data-subtle onClick={() => agentSettings.resetModelFields(model.id, behaviorFields)} >
+                {t('Reset to default configuration')}
               </OutlineButton>
             )}
           </div>
@@ -86,62 +83,18 @@ export function AiBehaviorPage() {
         </Field>
 
       </SettingsGroup>
-      <SettingsGroup title={t('Tools and context')}>
+      {isGlobal && (
+        <SettingsGroup title={t('Default configuration')} testId="default-configuration">
+          <ModelContextSettings global focusTargets={false} />
+        </SettingsGroup>
+      )}
+      <SettingsGroup title={t('Tools')}>
         <Field title={t('Agent mode')} description={t("Allow AI to use tools.")}>
           <Toggle on={eff.agentMode} onChange={(v) => update({ agentMode: v })} />
         </Field>
         <Field title={t('Maximum iterations')} description={t("Maximum tool rounds per response, from 1 to 100.")}>
           <NumberInput key={scope} value={eff.maxSteps} min={1} max={100} onChange={(v) => update({ maxSteps: v })} />
         </Field>
-        <Field title={t('Context strategy')} description={t("Keep all messages, recent messages or a summary of older messages.")}>
-          <Select
-            aria-label={t('Context strategy')}
-            options={[
-              { value: 'off', label: t('All messages') },
-              { value: 'window', label: t('Window') },
-              { value: 'compact', label: t('Summary') },
-            ]}
-            value={eff.contextStrategy}
-            onChange={(v) => { void save(() => update({ contextStrategy: v })); }}
-          />
-        </Field>
-        <Field title={t('Context token budget')} description={t('Estimated input budget including instructions, images, tool schemas and results. Counts vary by model. Use 0 for no limit.')}>
-          <NumberInput key={scope} value={eff.contextMaxTokens} min={0} max={1000000} onChange={(v) => update({ contextMaxTokens: v })} />
-        </Field>
-        {(eff.contextStrategy === 'compact' || targetField === t('Summary length limit')) && (
-          <Field title={t('Summary length limit')} description={t('Maximum tokens in a context summary.')}>
-            <NumberInput key={scope} value={eff.contextSummaryTokens} min={64} max={8000} onChange={(v) => update({ contextSummaryTokens: v })} />
-          </Field>
-        )}
-        <Field title={t('Tool output truncation')} description={t('Maximum characters in the tool preview. Complete results are retained for conversation history.')}>
-          <NumberInput key={scope} value={eff.contextToolChars} min={256} max={65536} onChange={(v) => update({ contextToolChars: v })} />
-        </Field>
-      </SettingsGroup>
-      <SettingsGroup title={t('Responses')}>
-        <Field title={t('Reply token limit')} description={t('Maximum reply tokens. Use 0 for the provider default.')}>
-          <NumberInput key={scope} value={eff.maxOutputTokens} min={0} max={32768} onChange={(v) => update({ maxOutputTokens: v })} />
-        </Field>
-        <Field title={t('Sampling temperature')} description={t("Response randomness. Turn off to use the provider default.")}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <Toggle on={eff.temperature != null} onChange={(v) => update({ temperature: v ? 0.7 : null })} />
-            {eff.temperature != null && (
-              <AutoSaveInput
-                key={`temperature-${scope}`}
-                type="number"
-                step={0.1}
-                min={0}
-                max={2}
-                value={String(eff.temperature)}
-                onCommit={next => {
-                  const n = Number(next);
-                  if (Number.isFinite(n)) return update({ temperature: Math.min(2, Math.max(0, n)) });
-                }}
-                style={{ ...inputStyle, width: 100 }}
-              />
-            )}
-          </div>
-        </Field>
-
       </SettingsGroup>
       {isGlobal && (
         <>

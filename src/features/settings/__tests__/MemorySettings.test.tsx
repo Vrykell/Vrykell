@@ -13,7 +13,7 @@ it('shows bounded aggregate status without loading or displaying memory content'
   await waitFor(() => expect(screen.getByTestId('memory-count-total')).toHaveTextContent('100000'));
   expect(screen.queryByRole('textbox')).toBeNull();
   expect(storage.memoryStats).toHaveBeenCalledTimes(1);
-  expect(document.querySelector('dl')).toBeNull();
+  expect(screen.getByTestId('memory-count-active')).toHaveTextContent('60000');
   fireEvent.click(screen.getByRole('button', { name: '让 AI 整理' }));
   expect(storage.organize).toHaveBeenCalledTimes(1);
 });

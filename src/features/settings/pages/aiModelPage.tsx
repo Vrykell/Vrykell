@@ -5,7 +5,7 @@
  * below edit it. A provider is an endpoint (API family plus effective base URL); the menu, the
  * selection and the row filtering all derive from the model list itself (see providerList).
  */
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { IconButton } from '@ui/actions/IconButton';
 import ContextMenu from '@ui/menus/ContextMenu';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
@@ -23,6 +23,8 @@ import ProviderModelList from '@features/settings/components/ProviderModelList';
 import { providerHasKey, providerId, providerList, type ProviderRow } from '@features/settings/model/providerList';
 import { commitModels, newModelId, selectModel } from '@features/settings/model/modelWrites';
 import { useSettingsSave } from '../components/SettingsSaveProvider';
+import { useSettingsNavigationStore } from '../stores/navigation';
+import { MODEL_CONTEXT_FIELDS } from '../components/ModelContextSettings';
 
 export function AiModelPage() {
   const aiCfg = useAiConfigStore();
@@ -38,6 +40,13 @@ export function AiModelPage() {
 
   const models = aiCfg.models;
   const rows = useMemo(() => providerList(models), [models]);
+  const targetField = useSettingsNavigationStore(state => state.targetField);
+  const targetRequest = useSettingsNavigationStore(state => state.request);
+  useEffect(() => {
+    if (!targetField || !MODEL_CONTEXT_FIELDS.some(field => t(field) === targetField)) return;
+    const active = rows.find(row => row.models.some(model => model.id === useAiConfigStore.getState().activeModel));
+    if (active) selectProvider(active.id);
+  }, [targetField, targetRequest, rows]);
   const selectedId = useMemo(() => {
     const wanted = aiCfg.selectedProvider ?? aiCfg.lastSelectedProvider;
     if (wanted && rows.some((row) => row.id === wanted)) return wanted;

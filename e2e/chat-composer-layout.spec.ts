@@ -41,8 +41,8 @@ test('model shape, approval hover and attachment chip hover share one visual lan
   const status = page.locator('.chat-input-status');
 
   // The model control uses the permission button's rounded-square shape, not a pill.
-  await expect(status.getByTestId('model-pill')).toHaveCSS('border-radius', '8px');
-  await expect(status.getByTestId('chat-approval-select')).toHaveCSS('border-radius', '8px');
+  await expect(status.getByTestId('model-pill')).toHaveCSS('border-radius', '10px');
+  await expect(status.getByTestId('chat-approval-select')).toHaveCSS('border-radius', '10px');
 
   // The approval menu keeps a single fill: hovering another row overrides the selection.
   await status.getByTestId('chat-approval-select').click();
@@ -75,9 +75,10 @@ test('long terminal names and directories fit at the minimum width with larger U
   await page.goto('/');
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.evaluate(async () => {
-    const path = '/src/features/workspace/stores/workspace.ts';
-    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
-    useWorkspaceStore.setState(state => ({
+    // Import the domain entry so the test talks to the same module instance as the app.
+    const path = '/src/features/workspace/model/session/store.ts';
+    const { useSessionStore } = await import(path) as typeof import('../src/features/workspace/model/session/store');
+    useSessionStore.setState(state => ({
       tabs: state.tabs.map(tab => tab.kind === 'session' && tab.layout.type === 'leaf' ? {
         ...tab, layout: { ...tab.layout, terminal: { ...tab.layout.terminal, shellType: 'powershell' } },
       } : tab),

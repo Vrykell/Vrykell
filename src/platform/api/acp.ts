@@ -98,7 +98,7 @@ export interface HarnessOpenResult {
 /** What the backend pushes while a session lives. */
 export interface AcpSessionEvent {
   sessionId: string;
-  kind: 'update' | 'permission' | 'stop' | 'error' | 'app-tool';
+  kind: 'update' | 'permission' | 'stop' | 'error' | 'app-tool' | 'elicitation' | 'elicitation-end';
   payload: Record<string, unknown>;
 }
 
@@ -149,6 +149,17 @@ export const acpSetConfigOption = (sessionId: string, configId: string, value: s
 /** Answer a permission request: an option the agent offered, or `null` for the protocol's cancel. */
 export const acpAnswerPermission = (sessionId: string, toolCallId: string, optionId: string | null) =>
   invoke<void>('acp_answer_permission', { sessionId, toolCallId, optionId });
+
+export interface AcpQuestionField {
+  key: string; title: string; description: string; kind: 'string' | 'number' | 'integer' | 'boolean' | 'array'; required: boolean;
+  options: Array<{ value: string; label: string; description: string }>;
+  default: string | number | boolean | string[] | null;
+  minimum: number | null; maximum: number | null; minLength: number; maxLength: number; minItems: number; maxItems: number;
+}
+export interface AcpQuestion { requestId: string; form: { message: string; fields: AcpQuestionField[] } }
+export type AcpQuestionResponse = { action: 'accept'; content: Record<string, string | number | boolean | string[]> } | { action: 'decline' | 'cancel' };
+export const acpAnswerElicitation = (sessionId: string, requestId: string, response: AcpQuestionResponse) =>
+  invoke<void>('acp_answer_elicitation', { sessionId, requestId, response });
 
 /** Close a session; the harness process goes with it. */
 export const acpClose = (sessionId: string) => invoke<void>('acp_close', { sessionId });

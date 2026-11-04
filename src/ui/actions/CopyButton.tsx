@@ -61,7 +61,7 @@ export default function CopyButton({ text, label, testId, className, style, quie
     onMouseLeave={event => { event.currentTarget.style.background = 'transparent'; event.currentTarget.style.color = 'var(--text-muted)'; }}
     style={{
       display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      width: 22, height: 22, padding: 0, border: 'none', borderRadius: 4, flexShrink: 0,
+      width: 22, height: 22, padding: 0, border: 'none', borderRadius: 'var(--radius-inner)', flexShrink: 0,
       background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
       ...style,
     }}

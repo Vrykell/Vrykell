@@ -20,7 +20,7 @@ typography:
     fontFamily: "var(--font-mono)"
     fontSize: "14px"
 rounded:
-  DEFAULT: "8px"
+  DEFAULT: "10px"
   block: "14px"
 spacing:
   small: "4px"
@@ -87,6 +87,8 @@ Additional light schemes use their own surface ratios, stronger boundaries and c
 
 ## Typography
 
+Conversation card headings center their text, icons and status badges vertically. Tool names and monospace details share a baseline inside one centered text group. Reasoning and terminal-reference summaries use the same header centering at normal and enlarged chat sizes.
+
 Interface text and host-card connection addresses use a selectable bundled variable sans face through `--font-ui`; terminal output and editor text use the bundled monospaced face through the existing typography tokens. Two interface and three monospaced families are distributed. The default faces cover Chinese and Latin text; terminal resources also cover prompt symbols. Font lists show plain family names, include bundled faces and only offer local alternatives after explicit local-face probes succeed. An explicit system default option selects native interface or monospace fonts instead of bundled faces. Unavailable saved preferences retain the bundled fallback. `src/app/fonts.css` owns local face declarations and `src/config/typography.ts` owns preference resolution. The six compressed font files together stay below 30 MB and load before the application mounts, so the initial terminal and editor measurements use the actual faces. System fonts remain failure and unsupported-script fallbacks. The font and display page owns interface, terminal and editor typography. Labels use `--fs-label` (13 px at default scale), captions use 12 px and body text uses 14 px. Preserve user font scaling and measure clipping at actual display scaling; do not compensate by enlarging every card.
 
 ## Layout
@@ -111,11 +113,13 @@ Drag insertion placeholders use the existing rounded hover fill without an edge 
 
 ## Shapes
 
-Shared inner corners are 8 px and block corners are 14 px. Favorites and tag filters are compact capsules; primary split buttons are one continuous shape with a single internal separator. Favorite marks in the editor header have no background.
+`theme.css` owns three global corner tiers: large 14 px, medium 10 px and small 10 px, matching the user's explicit values. Large settings groups, history groups, full usage sections, dialogs and application-painted window content use `--radius-lg` through `--radius-block`. Composers, host cards, compact usage cards, notifications, errors and floating menus use `--radius-md` through `--radius-card`. Sent messages, tool cards and shared fields use `--radius-sm` through `--radius-inner`. Small and medium remain independent even while their values match. The native compositor owns the outer frame on Windows; its content must not add another corner mask that separates the native border from its edge. Maximized and fullscreen windows stay flush. Segmented thumbs derive their corners from the track minus its inset. Circular status marks and switches retain their functional shapes; connected edges and full-bleed rows retain their zero-radius joins. Favorites and tag filters are compact capsules; primary split buttons are one continuous shape with a single internal separator. Favorite marks in the editor header have no background.
 
 ## Components
 
-Memory settings uses the existing grouped settings rows: a quiet aggregate status row with reload, followed by a review row with an explicit assistant action. The panel has no nested statistic cards, invented switches or bulk activation. It never lists or edits memory bodies. Loading and failures reuse the shared status and persistent notification components. Assistant review opens its own briefly named conversation through the usual authorization path.
+Memory settings has one compact two-row card: aggregate status and a text reload action, followed by assistant review. Counts stay inline with their labels, without large statistic tiles or icons. It never lists or edits memory bodies. Loading and failures reuse the shared status and persistent notification components. Assistant review opens its own briefly named conversation through the usual authorization path.
+
+Skills uses a page header with catalog and import actions, a count and search row, and one quiet list with identity, description, enable switch and detail chevron. Rows have no permanent button fill. A detail replaces the page title with its breadcrumb, then shows identity, actions, availability, trust and real metadata. Instructions and files open explicitly; unavailable author/version metadata is never invented. Search and list state survive returning from details. Model context and response controls use compact paired rows in the model dialog, followed by capability declarations. Each font group contains its own controls and preview, with no separate preview section or stacked outer padding.
 
 The common start page groups terminal profiles and saved hosts, native and external conversations, and file creation and opening as distinct tasks. It reuses the launcher grid and typography rather than promoting the default terminal as the only creation path. Mixed history rows show a shared split icon, pane count and member types; expansion reveals members without loading their transcripts. Terminal panes are individually placed existing hosts, not nested terminal workspaces.
 

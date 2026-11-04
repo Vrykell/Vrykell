@@ -1,6 +1,6 @@
 import type { WorkspaceScope } from './workbench';
 import { t } from '@i18n';
-import type { ContextMenuItem } from '@ui/menus/ContextMenu';
+import type { ContextMenuItem, MenuAnchor } from '@ui/menus/ContextMenu';
 
 export type WorkspaceCreation = 'terminal' | 'ssh' | 'document' | 'file' | 'conversation' | 'agent';
 const choices: Record<WorkspaceScope, WorkspaceCreation[]> = {
@@ -12,6 +12,6 @@ const labels: Record<WorkspaceCreation, string> = {
 };
 
 /** Every split entry exposes resource types before opening their existing creation flow. */
-export function workspaceSplitMenu(scope: WorkspaceScope, pick: (kind: WorkspaceCreation) => void): ContextMenuItem {
-  return { label: t('Split tab'), submenu: { items: choices[scope].map(kind => ({ label: t(labels[kind]), onClick: () => pick(kind) })) } };
+export function workspaceSplitMenu(scope: WorkspaceScope, pick: (kind: WorkspaceCreation, anchor?: MenuAnchor) => void): ContextMenuItem {
+  return { label: t('Split tab'), submenu: { items: choices[scope].map(kind => ({ label: t(labels[kind]), onClick: anchor => pick(kind, anchor) })) } };
 }

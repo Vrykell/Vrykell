@@ -30,7 +30,7 @@ for (const theme of ['dark', 'light']) test(`connection actions keep compact geo
   for (const width of [1240, 640]) {
     await page.setViewportSize({ width, height: 800 });
     for (const button of [save, cancel, testAuthentication, saveAndConnect, browse]) {
-      await expect(button).toHaveCSS('border-radius', '8px');
+      await expect(button).toHaveCSS('border-radius', '10px');
       expect((await button.boundingBox())!.height).toBe(28);
     }
     await page.mouse.move(0, 0);

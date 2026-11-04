@@ -6,7 +6,7 @@
  * a model without one cannot be set as current, and deleting a row asks first because its
  * overrides cannot be recovered.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { t } from '@i18n';
 import { IconButton } from '@ui/actions/IconButton';
 import ReloadButton from '@ui/actions/ReloadButton';
@@ -19,11 +19,14 @@ import { ModelCapabilityBadge } from '@features/agent/components/ModelCapability
 import { providerFetchModels, useAiConfigStore, type ModelProfile } from '@features/agent';
 import { commitModels } from '@features/settings/model/modelWrites';
 import { filterModels, groupModelsByVendor } from '@features/settings/model/modelGroups';
+import { readCollapsedModelGroups, saveCollapsedModelGroups } from '@features/settings/model/modelGroupCollapse';
 import type { ProviderRow } from '@features/settings/model/providerList';
 import { SettingsGroup, Field } from './ui';
 import AddModelDialog from './AddModelDialog';
 import ModelSettingsDialog from './ModelSettingsDialog';
 import { useSettingsSave } from './SettingsSaveProvider';
+import { useSettingsNavigationStore } from '../stores/navigation';
+import { MODEL_CONTEXT_FIELDS } from './ModelContextSettings';
 
 type Toast = (msg: string, type: 'info' | 'success' | 'error') => void;
 
@@ -52,6 +55,11 @@ function ModelRow({ model, active, onRemove }: {
   onRemove: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const target = useSettingsNavigationStore(state => state.targetField);
+  const request = useSettingsNavigationStore(state => state.request);
+  useEffect(() => {
+    if (active && target && MODEL_CONTEXT_FIELDS.some(field => t(field) === target)) setEditing(true);
+  }, [active, target, request]);
   const Mark = modelMark(model.provider, model.model, model.baseUrl);
   return (
     <div className="settings-model-row" data-testid="model-row" data-active={active || undefined} style={{ padding: '6px 10px' }}>
@@ -97,7 +105,7 @@ export default function ProviderModelList({ row, toast }: {
   const [searchOpen, setSearchOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [capability, setCapability] = useState<ModelCapability | 'all'>('all');
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(readCollapsedModelGroups);
   const [syncing, setSyncing] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<ModelProfile | null>(null);
@@ -108,13 +116,18 @@ export default function ProviderModelList({ row, toast }: {
   const groups = useMemo(() => groupModelsByVendor(visible), [visible]);
   const allCollapsed = groups.length > 0 && groups.every(group => collapsed.has(group.key));
 
-  const toggleGroup = (key: string) => setCollapsed((current) => {
-    const next = new Set(current);
+  const toggleGroup = (key: string) => {
+    const next = new Set(collapsed);
     if (next.has(key)) next.delete(key);
     else next.add(key);
-    return next;
-  });
-  const toggleAll = () => setCollapsed(allCollapsed ? new Set() : new Set(groups.map(group => group.key)));
+    setCollapsed(next);
+    saveCollapsedModelGroups(next);
+  };
+  const toggleAll = () => {
+    const next = allCollapsed ? new Set<string>() : new Set(groups.map(group => group.key));
+    setCollapsed(next);
+    saveCollapsedModelGroups(next);
+  };
 
   const requestRemove = (model: ModelProfile) => {
     if (models.length <= 1) {

@@ -2,7 +2,7 @@ import { preferredShell, useTerminalDefaults } from '@config/terminalDefaults';
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import AnchoredDropdown, { type DropdownAnchor } from '@ui/menus/AnchoredDropdown';
-import { iconSizes, Check, ChevronRight, Columns2, FolderOpen, Settings, PanelLeft } from '@ui/icons';
+import { iconSizes, Check, Columns2, FolderOpen, Settings, PanelLeft } from '@ui/icons';
 import { useSettingsNavigationStore } from '@features/settings';
 import HomeMark from '~icons/mdi/home-outline';
 import FolderPlusMark from '~icons/mdi/folder-plus-outline';
@@ -256,7 +256,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick, source = '
             onClose();
             if (source === 'ssh') { useHostEditor.getState().open(); selectWorkspaceArea('ssh'); }
             else { useSettingsNavigationStore.getState().setSelected(`profile:${preferredShell(defaultShell, shells) ?? 'powershell'}`); useSessionStore.getState().openSettings(); }
-          }}><Settings size={20} /><span>{t(source === 'ssh' ? 'Add connection' : 'More profiles…')}</span><ChevronRight size={16} /></button>
+          }}><Settings size={20} /><span>{t(source === 'ssh' ? 'Add connection' : 'More profiles…')}</span></button>
         </section>
 
         {source !== 'ssh' && <section className="new-tab-section" aria-labelledby="new-tab-location">
@@ -278,7 +278,7 @@ export default function NewTabModal({ open, onClose, groupId, onPick, source = '
             <PanelLeft size={20} /><span>{t('Open in new window')}</span><KeyHint shortcut={isMacOS ? 'Meta+N' : 'Control+N'} /></button>}
           <button type="button" className="new-tab-row workspace-floating-row" onClick={() => {
             onClose(); requestTerminalSplit(null);
-          }}><Columns2 size={18} /><span>{t('Split tab')}</span><ChevronRight size={16} /></button>
+          }}><Columns2 size={18} /><span>{t('Split tab')}</span></button>
         </section>
     </AnchoredDropdown>
 

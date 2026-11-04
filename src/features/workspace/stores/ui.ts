@@ -24,7 +24,8 @@ interface UiState {
   /** Terminal-type picker visibility. */
   splitPickerOpen: boolean;
   splitPickerSource?: 'shell' | 'ssh';
-  openSplitPicker: (source?: 'shell' | 'ssh') => void;
+  splitPickerAnchor?: { x: number; y: number };
+  openSplitPicker: (source?: 'shell' | 'ssh', anchor?: { x: number; y: number }) => void;
   closeSplitPicker: () => void;
   /** Split placement picker. */
   splitPlacement: SplitPlacement;
@@ -44,8 +45,8 @@ export const useUiStore = create<UiState>((set) => ({
   globalSearchOpen: false,
   setGlobalSearchOpen: (open) => set({ globalSearchOpen: open }),
   splitPickerOpen: false,
-  openSplitPicker: source => set({ splitPickerOpen: true, splitPickerSource: source }),
-  closeSplitPicker: () => set({ splitPickerOpen: false, splitPickerSource: undefined }),
+  openSplitPicker: (source, anchor) => set({ splitPickerOpen: true, splitPickerSource: source, splitPickerAnchor: anchor }),
+  closeSplitPicker: () => set({ splitPickerOpen: false, splitPickerSource: undefined, splitPickerAnchor: undefined }),
   splitPlacement: { open: false, spec: null },
   beginSplit: (spec) => set({ splitPlacement: { open: true, spec: spec ?? null } }),
   cancelSplit: () => set({ splitPlacement: { open: false, spec: null } }),

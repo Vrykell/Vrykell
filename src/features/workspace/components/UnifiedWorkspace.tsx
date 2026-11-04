@@ -69,7 +69,9 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
     if (!state.choosingSplit || !visible || !newButton.current) return;
     const kind = state.splitCreation;
     const box = newButton.current.getBoundingClientRect();
-    const origin: DropdownAnchor = { x: box.right, y: box.bottom + 4, aboveY: box.top, align: 'end' };
+    const origin: DropdownAnchor = state.splitAnchor
+      ? { x: state.splitAnchor.x, y: state.splitAnchor.y, aboveY: Math.max(8, state.splitAnchor.y - 4) }
+      : { x: box.right, y: box.bottom + 4, aboveY: box.top, align: 'end' };
     if (kind === 'terminal' || kind === 'ssh') setTerminalPicker({ source: kind === 'ssh' ? 'ssh' : 'shell', split: true, anchor: origin });
     else if (kind === 'document' || kind === 'conversation') setPlacement({ kind: 'new', resource: kind });
     else if (kind === 'file') void pickWorkspaceFile().then(file => { if (file) setPlacement({ kind: 'file', file }); });
@@ -154,7 +156,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
       onConnect={() => setTerminalPicker({ source: 'ssh', split: false })} onAgent={() => setLauncher({ split: false })} onHistory={history} />}
     <WorkspacePaneCanvas containerId={state.activeTabId} layout={state.layout} focused={state.focused} resources={resources} visible={visible && !state.startActive} toolbarTarget={resourceToolbar}
       onFocus={focusUnifiedResource} onRatio={state.ratio} placing={!!placement} onPlace={commit} onCancel={() => { setPlacement(null); state.chooseMerge(); }}
-      onSplit={(id, kind) => requestWorkspaceSplit(id, undefined, kind)}
+      onSplit={(id, kind, anchor) => requestWorkspaceSplit(id, anchor, kind)}
       onMovePane={(paneId, target) => moveWorkspacePane(state.activeTabId, paneId, target)}
       onRemove={removeUnifiedPane} onDetach={detachCompositionPane} />
     {menu && <ContextMenu anchor={menu.anchor} label={t(menu.split ? 'Choose a tab to split' : 'New workspace tab')} itemRole="menuitem" onClose={() => setMenu(null)} items={flattenSingleSubmenu<ContextMenuItem>(menu.split

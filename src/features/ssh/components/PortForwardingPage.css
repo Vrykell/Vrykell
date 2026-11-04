@@ -1,16 +1,11 @@
 .ssh-forwarding-page { container: hosts / inline-size; display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; background: var(--canvas); }
 .ssh-forwarding-page > .ssh-host-page-header { flex-wrap: wrap; }
-.ssh-forwarding-breadcrumb { flex: 1; gap: 6px; max-width: 100%; }
-.ssh-forwarding-page .ssh-forwarding-breadcrumb { font-size: calc(24px * var(--ui-font-scale)); }
-.ssh-forwarding-breadcrumb > button { min-width: 0; overflow: hidden; background: transparent; border: 0; padding: 0; color: var(--text-muted); font: inherit; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
-.ssh-forwarding-breadcrumb > button:hover { color: var(--text-primary); background: transparent; }
-.ssh-forwarding-page .ssh-forwarding-breadcrumb h2 { flex-shrink: 0; font-size: inherit; }
-.ssh-forwarding-breadcrumb > svg { flex-shrink: 0; }
+.ssh-forwarding-breadcrumb { flex: 1; }
 .ssh-forwarding-content { flex: 1; min-height: 0; overflow: auto; padding: 12px 24px 24px; }
 .ssh-forwarding-group { margin-bottom: 20px; }
 .ssh-forwarding-group h3 { display: flex; gap: 8px; min-width: 0; margin: 8px 2px; color: var(--text-secondary); font-size: var(--fs-caption); }
 .ssh-forwarding-group h3 > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--font-mono); color: var(--text-muted); }
-.ssh-forwarding-rules, .ssh-forwarding-fields { border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--card-bg); }
+.ssh-forwarding-rules, .ssh-forwarding-fields { border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--card-bg); }
 .ssh-forwarding-row { display: flex; align-items: center; gap: 10px; min-height: 42px; padding: 8px 12px; }
 .ssh-forwarding-row + .ssh-forwarding-row { border-top: 1px solid var(--border); }
 .ssh-forwarding-description { display: flex; flex: 1; flex-direction: column; min-width: 0; gap: 3px; font-size: var(--fs-caption); }

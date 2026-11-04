@@ -207,7 +207,7 @@ export default function SidebarItem({
             onClick={(event) => { event.stopPropagation(); action.onClick(event); }}
             style={{
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-              width: historyCompact || command ? 24 : 28, height: historyCompact || command ? 24 : 28, padding: 0, border: 'none', borderRadius: 4,
+              width: historyCompact || command ? 24 : 28, height: historyCompact || command ? 24 : 28, padding: 0, border: 'none', borderRadius: 'var(--radius-inner)',
               flexShrink: 0, background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
               ...(command ? { position: 'absolute', right: 6, top: '50%', transform: 'translateY(-50%)' } : {}),
               alignSelf: historyCompact ? 'center' : undefined,

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { open as openDialog } from '@tauri-apps/plugin-dialog';
 import {
   listSkills, getSkill, removeSkill, installSkillMd, fetchRemoteSkills, importSkillsFromPath,
@@ -11,7 +11,14 @@ import { t } from '@i18n';
 /** Manages the skill settings page list, detail, imports and trust state. */
 export function useSkillsSettings() {
   const [metas, setMetas] = useState<SkillMeta[]>([]);
-  const [detail, setDetail] = useState<SkillDetail | null>(null);
+  const [detail, updateDetail] = useState<SkillDetail | null>(null);
+  const detailRequest = useRef(0);
+  const listRequest = useRef(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [changing, setChanging] = useState<string[]>([]);
+  const changes = useRef(new Set<string>());
+  const setDetail = useCallback((next: SkillDetail | null) => { detailRequest.current++; updateDetail(next); }, []);
   const [importUrl, setImportUrl] = useState('');
   const [importing, setImporting] = useState(false);
   const [warnDismissed, setWarnDismissed] = useState(false);
@@ -22,18 +29,24 @@ export function useSkillsSettings() {
   }, []);
 
   const refresh = useCallback(() => {
+    const request = ++listRequest.current;
+    setLoading(true); setError(null);
     void listSkills()
-      .then(setMetas)
-      .catch((error) => toast(String((error as Error)?.message ?? error), 'error'));
-  }, [toast]);
+      .then(next => { if (request === listRequest.current) setMetas(next); })
+      .catch(failure => { if (request === listRequest.current) setError(String(failure)); })
+      .finally(() => { if (request === listRequest.current) setLoading(false); });
+  }, []);
 
   useEffect(() => {
     refresh();
+    return () => { detailRequest.current++; listRequest.current++; };
   }, [refresh]);
 
   const openDetail = useCallback(async (name: string) => {
+    const request = ++detailRequest.current;
     try {
-      setDetail(await getSkill(name));
+      const next = await getSkill(name);
+      if (request === detailRequest.current) updateDetail(next);
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
     }
@@ -87,11 +100,15 @@ export function useSkillsSettings() {
   }, [refresh, toast]);
 
   const toggleEnabled = useCallback(async (skill: SkillMeta) => {
+    if (changes.current.has(skill.name)) return;
+    changes.current.add(skill.name); setChanging([...changes.current]);
     try {
       await setSkillState(skill.name, undefined, !skill.enabled);
       refresh();
     } catch (error) {
       toast(String((error as Error)?.message ?? error), 'error');
+    } finally {
+      changes.current.delete(skill.name); setChanging([...changes.current]);
     }
   }, [refresh, toast]);
 
@@ -107,6 +124,7 @@ export function useSkillsSettings() {
 
   return {
     metas,
+    loading, error, setError, changing,
     detail,
     importUrl,
     importing,

@@ -263,6 +263,7 @@ pub fn run() {
             agent::acp::acp_set_config_option,
             agent::acp::acp_close,
             agent::acp::acp_answer_permission,
+            agent::acp::acp_answer_elicitation,
             agent::acp::acp_app_tool_result,
             files::file_open::file_open,
             files::file_open::file_open_with,

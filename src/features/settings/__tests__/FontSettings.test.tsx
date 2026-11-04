@@ -1,9 +1,16 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 import FontSettings from '../components/FontSettings';
 import { useTypographyStore } from '@config/typography';
 
 describe('theme font settings', () => {
+  it('keeps every font preview in the group that owns its controls', () => {
+    render(<FontSettings />);
+    for (const [group, preview] of [['界面字体', '界面字体预览'], ['终端字体', '终端字体预览'], ['对话字体', 'AI Chat 字号预览'], ['编辑器字体设置', '编辑器字体预览']]) {
+      expect(within(screen.getByRole('group', { name: group })).getByLabelText(preview)).toBeVisible();
+    }
+    expect(screen.queryByRole('group', { name: '预览' })).toBeNull();
+  });
   it('also offers terminal font families for the interface without changing content fonts', () => {
     render(<FontSettings />);
     fireEvent.click(screen.getByRole('combobox', { name: '页面字体' }));

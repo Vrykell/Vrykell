@@ -36,7 +36,7 @@
   gap: 8px;
   min-height: 32px;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-inner);
   cursor: pointer;
   transition: background var(--dur-fast) var(--ease);
 }
@@ -57,7 +57,7 @@
   padding: 6px 10px;
   border: 0;
   border-top: 1px solid var(--border);
-  border-radius: 0 0 4px 4px;
+  border-radius: 0 0 var(--radius-inner) var(--radius-inner);
   background: transparent;
   color: var(--text-secondary);
   font: inherit;

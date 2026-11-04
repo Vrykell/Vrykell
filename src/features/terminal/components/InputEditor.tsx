@@ -281,7 +281,7 @@ export default function InputEditor({
           <TextButton className="terminal-ask-ai" aria-label={t('Ask AI')} data-tip={t('Ask AI')} onClick={askAi}>
             <Sparkles size={iconSizes.control} /><span>{t('Ask AI')}</span>
           </TextButton>
-          <InputActionBtn title={t('Choose split type')} onClick={() => useUiStore.getState().openSplitPicker()}>
+          <InputActionBtn title={t('Choose split type')} onClick={event => useUiStore.getState().openSplitPicker(undefined, { x: event.clientX, y: event.clientY })}>
             <Columns2 size={iconSizes.control} />
           </InputActionBtn>
           {(!unified || canRemovePane) && <InputActionBtn title={t(unified ? 'Remove pane' : 'Close terminal')} onClick={() => closeTerminalPane(paneId)}>
@@ -296,7 +296,7 @@ export default function InputEditor({
 /** Composer actions use the shared themed target. */
 function InputActionBtn({ title, onClick, children }: {
   title: string;
-  onClick: () => void;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
   children: React.ReactNode;
 }) {
   return <IconButton data-subtle data-tip={title} aria-label={title} onClick={onClick}>{children}</IconButton>;

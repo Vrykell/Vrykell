@@ -100,6 +100,7 @@ interface AgentSettingsState {
   updateModel: (modelId: string, patch: Partial<ModelBehaviorSettings>) => void;
   /** Clear one model's behavior overrides (falls back to the global defaults). */
   resetModel: (modelId: string) => void;
+  resetModelFields: (modelId: string, fields: (keyof ModelBehaviorSettings)[]) => void;
   /** Merge global defaults with the model overrides into the effective values; no modelId = global only. */
   resolve: (modelId?: string) => AgentSettings;
 }
@@ -134,6 +135,14 @@ export const useAgentSettings = create<AgentSettingsState>()(
           delete overrides[modelId];
           return { overrides };
         }),
+      resetModelFields: (modelId, fields) => set(state => {
+        const next = { ...state.overrides[modelId] };
+        for (const field of fields) delete next[field];
+        const overrides = { ...state.overrides };
+        if (Object.keys(next).length) overrides[modelId] = next;
+        else delete overrides[modelId];
+        return { overrides };
+      }),
       resolve: (modelId) => {
         const s = get();
         const ov = modelId ? s.overrides[modelId] : undefined;

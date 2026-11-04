@@ -22,7 +22,7 @@ export default function FileDragPreview() {
         pointerEvents: 'none',
         width: 30,
         height: 30,
-        borderRadius: 7,
+        borderRadius: 'var(--radius-card)',
         background: 'var(--elevated)',
         border: '1px solid var(--border)',
         boxShadow: '0 6px 18px rgba(0, 0, 0, 0.28)',
@@ -36,7 +36,7 @@ export default function FileDragPreview() {
       {items.length > 1 && (
         <span style={{
           position: 'absolute', right: -6, bottom: -6, minWidth: 15, height: 15, padding: '0 3px',
-          borderRadius: 8, background: 'var(--accent)', color: 'var(--accent-contrast, #fff)',
+          borderRadius: 999, background: 'var(--accent)', color: 'var(--accent-contrast, #fff)',
           fontSize: 'calc(10px * var(--ui-font-scale))', lineHeight: '15px', textAlign: 'center',
         }}>
           {items.length}

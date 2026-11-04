@@ -56,7 +56,7 @@
 .ssh-host-editor .ssh-form-body { padding: 20px max(20px, calc((100cqw - 720px) / 2)); scroll-padding-block: 20px; }
 .ssh-host-editor .ssh-form-section { gap: 8px; margin-bottom: 20px; }
 .ssh-host-editor .ssh-form-section > h3, .ssh-editor-note > label { color: var(--text-muted); font-size: var(--fs-label); font-weight: var(--fw-semibold); }
-.ssh-host-editor .ssh-form-section-fields { gap: 0; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--card-bg); }
+.ssh-host-editor .ssh-form-section-fields { gap: 0; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--card-bg); }
 .ssh-host-editor .ssh-form-section-fields > :is(label, .ssh-editor-field-row) { display: grid; grid-template-columns: 112px minmax(0, 1fr); align-items: center; gap: 8px 12px; min-height: 44px; padding: 6px 12px; color: var(--text-primary); font-size: var(--fs-caption); }
 .ssh-host-editor .ssh-form-section-fields > :not(:empty) ~ :not(:empty) { border-top: 1px solid var(--border); }
 .ssh-host-editor .ssh-form-fields { grid-template-columns: minmax(0, 1fr) 120px; }

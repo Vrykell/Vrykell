@@ -307,4 +307,16 @@ test.describe('Model configuration page', () => {
     await openSettings(page);
     await expect(page.getByTestId('provider-switch').locator('.provider-switch-name')).toHaveText('127.0.0.1:11434');
   });
+
+  test('collapsed model groups survive a reload', async ({ page }) => {
+    await gotoSetting(page, '模型配置');
+    const header = page.locator('.settings-model-group-header').first();
+    await expect(header).toHaveAttribute('aria-expanded', 'true');
+    await header.click();
+    await expect(header).toHaveAttribute('aria-expanded', 'false');
+    await page.reload();
+    await openSettings(page);
+    await gotoSetting(page, '模型配置');
+    await expect(page.locator('.settings-model-group-header').first()).toHaveAttribute('aria-expanded', 'false');
+  });
 });

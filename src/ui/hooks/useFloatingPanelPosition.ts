@@ -10,7 +10,7 @@ export function useFloatingPanelPosition(ref: RefObject<HTMLElement | null>, anc
     let frame = 0;
     const update = () => {
       const bounds = panel.getBoundingClientRect();
-      const row = submenuOf?.getBoundingClientRect();
+      const row = submenuOf?.isConnected ? submenuOf.getBoundingClientRect() : undefined;
       const trigger = anchor.align === 'end' && anchor.trigger?.isConnected ? anchor.trigger.getBoundingClientRect() : undefined;
       const left = row ? row.right + bounds.width + 4 <= window.innerWidth - 8 ? row.right + 4 : row.left - bounds.width - 4
         : anchor.align === 'end' ? (trigger?.right ?? anchor.x) - bounds.width : anchor.x;

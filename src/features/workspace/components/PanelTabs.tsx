@@ -32,7 +32,7 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
   const defaultShellType = useDefaultShellType();
   const [query, setQuery] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
-  const [modal, setModal] = useState<{ groupId?: string } | null>(null);
+  const [modal, setModal] = useState<{ groupId?: string; anchor?: { x: number; y: number } } | null>(null);
   const native = tabs.filter(isSessionTab);
   const containers = useWorkbenchStore(state => state.snapshot.tabs);
   const nativeOwner = (id: string) => {
@@ -69,7 +69,7 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
   const select = (id: string) => { if (pages.some(page => page.id === id)) useWorkspaceStore.getState().activate(id); else strip.onSelect(id); };
   const close = (id: string) => { if (pages.some(page => page.id === id)) useWorkspaceStore.getState().closeTab(id); else strip.onClose(id); };
   const filtered = handles.filter(handle => handle.label.toLowerCase().includes(query.trim().toLowerCase()));
-  const grouping = strip.grouping && { ...strip.grouping, add: (id: string) => setModal({ groupId: id }) };
+  const grouping = strip.grouping && { ...strip.grouping, add: (id: string, anchor?: { x: number; y: number }) => setModal({ groupId: id, anchor: anchor ? { x: anchor.x, y: anchor.y } : undefined }) };
   const selected = native.some(tab => tab.id === activeId) ? strip.selected ?? activeId : activeId;
   return <WorkspaceHeader active={active}><FolderTabs items={filtered} selected={selected} label={t('Terminal sessions')} listId="session-tabs" className="terminal-tab-list"
     leading={<WorkspaceResourceSwitcher />}
@@ -78,7 +78,7 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
     menuLabel={t('More terminal actions')} menuItems={[
       ...(strip.tabActions?.(strip.selected ?? '') ?? []),
       { label: t('Create terminal'), onClick: create },
-      { label: t('New terminal options'), onClick: () => setModal({}) },
+      { label: t('New terminal options'), onClick: anchor => setModal({ anchor: anchor ? { x: anchor.x, y: anchor.y } : undefined }) },
       { label: t('Session history'), onClick: () => useWorkspaceStore.getState().openHistoryTab() },
       { label: t('ACP'), onClick: () => useWorkspaceStore.getState().openHarnessTab() },
       { label: t('Search session titles…'), onClick: () => setSearchOpen(true) },
@@ -103,8 +103,8 @@ export default function PanelTabs({ active = true }: { active?: boolean }) {
         <IconBtn title={t('ACP')} data-testid="tab-acp-btn" onClick={() => useWorkspaceStore.getState().openHarnessTab()}><Bot size={iconSizes.control} /></IconBtn>
       </span>
       <span className="terminal-new-controls"><IconBtn title={t('Create terminal')} data-testid="tab-new-default" onClick={create}><Plus size={iconSizes.control} /></IconBtn>
-        <IconBtn title={t('New terminal options')} data-testid="tab-new-btn" aria-haspopup="dialog" onClick={() => setModal({})}><ChevronDown size={iconSizes.control} /></IconBtn></span>
+        <IconBtn title={t('New terminal options')} data-testid="tab-new-btn" aria-haspopup="dialog" onClick={event => setModal({ anchor: { x: event.clientX, y: event.clientY } })}><ChevronDown size={iconSizes.control} /></IconBtn></span>
     </>} />
-    <NewTabModal open={!!modal} groupId={modal?.groupId} onClose={() => setModal(null)} />
+    <NewTabModal open={!!modal} groupId={modal?.groupId} anchor={modal?.anchor} onClose={() => setModal(null)} />
   </WorkspaceHeader>;
 }
