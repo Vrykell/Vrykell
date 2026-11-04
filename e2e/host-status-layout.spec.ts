@@ -43,7 +43,14 @@ for (const theme of ['dark', 'light']) test(`aligned host columns, inline states
     expect(dashCenter).toBeCloseTo(headingCenter, 0);
   }
   await root.getByTestId('ssh-dashboard-metrics').click();
-  await page.getByRole('menu', { name: '采集并显示' }).getByTestId('ssh-dashboard-refresh').click();
+  const refresh = page.getByRole('menu', { name: '采集并显示' }).getByTestId('ssh-dashboard-refresh');
+  await expect(refresh).toHaveClass(/outline-button/);
+  const corners = await refresh.evaluate(element => { const style = getComputedStyle(element); return [style.borderTopLeftRadius, style.borderTopRightRadius, style.borderBottomRightRadius, style.borderBottomLeftRadius]; });
+  expect(corners.every(corner => parseFloat(corner) >= 8)).toBe(true);
+  await refresh.click();
+  await expect(refresh).toHaveAttribute('aria-busy', 'true');
+  await expect(page.getByRole('menu', { name: '采集并显示' })).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(root.getByTestId('ssh-row-ssh-1').locator('.ssh-dashboard-metric').first().locator('i')).toBeVisible();
   await page.screenshot({ path: info.outputPath(`host-table-aligned-${theme}.png`) });
   const columnsBox = (await root.locator('.ssh-host-columns').boundingBox())!;
@@ -59,6 +66,14 @@ for (const theme of ['dark', 'light']) test(`aligned host columns, inline states
   await page.keyboard.press('Escape'); await root.getByTestId('ssh-row-ssh-1').focus(); await page.keyboard.press('Space'); await expect(page.getByRole('dialog', { name: '主机详情' })).toContainText('root@prod.example.com:22'); await page.keyboard.press('Escape');
   await page.screenshot({ path: info.outputPath(`host-table-${theme}.png`) });
   await root.getByRole('button', { name: '卡片视图' }).click(); await offline.click();
+  const retry = root.getByTestId('ssh-row-auth').getByRole('button', { name: '重试读取主机状态' });
+  await expect(retry).toHaveClass(/outline-button/);
+  expect(await retry.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+  const footer = root.getByTestId('ssh-row-ssh-1').locator('.ssh-host-card-times');
+  await expect(footer).toContainText('最后读取于');
+  const connectionTime = (await footer.locator('.ssh-host-last-connected').boundingBox())!;
+  const readTime = (await footer.locator('.ssh-resource-last-read').boundingBox())!;
+  expect(connectionTime.y).toBeCloseTo(readTime.y, 0);
   const neutral = await offline.evaluate(element => { const sample = document.createElement('div'); sample.style.backgroundColor = 'var(--card-hover-bg)'; element.appendChild(sample); const color = getComputedStyle(sample).backgroundColor; sample.remove(); return color; });
   await expect.poll(() => offline.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(neutral);
   await page.screenshot({ path: info.outputPath(`host-cards-${theme}.png`) });
