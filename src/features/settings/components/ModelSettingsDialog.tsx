@@ -21,6 +21,7 @@ import { useSettingsSave } from './SettingsSaveProvider';
 import AutoSaveInput from './AutoSaveInput';
 import ModelThinkingSettings from './ModelThinkingSettings';
 import SettingsDialog from './SettingsDialog';
+import ModelContextSettings from './ModelContextSettings';
 
 /** API families a model row can use, in the order the select offers them. */
 const PROVIDER_KINDS = PROVIDERS.map((provider) => provider.kind);
@@ -43,7 +44,7 @@ export default function ModelSettingsDialog({ open, model, focusModelId = false,
       open={open}
       testId="model-settings-dialog"
       title={name}
-      width={480}
+      width={560}
       initialFocus={focusModelId ? '[data-testid="model-id-input"]' : undefined}
       onClose={onClose}
       icon={
@@ -96,6 +97,7 @@ export default function ModelSettingsDialog({ open, model, focusModelId = false,
           onCommit={value => updateModel(model.id, { model: value, capabilities: detectCapabilities(model.provider, value) })}
           style={{ flex: 1 }} />
       </div>
+      <ModelContextSettings key={model.id} modelId={model.id} />
       <div className="model-capability-settings" role="group" aria-label={t('Model capabilities')}>
         {CAPABILITIES.map(capability => <ModelCapabilityToggle key={capability} capability={capability}
           selected={capabilities[capability]}

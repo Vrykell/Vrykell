@@ -9,6 +9,7 @@
 import { useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
+import HarnessQuestion from './HarnessQuestion';
 import { ArrowDown, ArrowUp, Plus, SlidersHorizontal, Sparkles, Square, iconSizes } from '@ui/icons';
 import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';
 import { IconButton } from '@ui/actions/IconButton';
@@ -351,6 +352,7 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
             </div>
           </div>
         )}
+        {session?.sessionId && session.questions?.map(question => <HarnessQuestion key={question.requestId} sessionId={session.sessionId!} harness={harness} question={question} />)}
       </div>
 
       <div className="chat-jump-slot" style={{ visibility: follow.following ? 'hidden' : 'visible' }} aria-hidden={follow.following}>

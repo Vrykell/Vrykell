@@ -110,7 +110,7 @@ export default function HarnessSelector({ label, value, options, onChange, testI
       </button>
       {open && createPortal(
         <div {...navigation.props} ref={menu} className="workspace-floating harness-select-menu"
-          style={{ ...position, zIndex: 10000, padding: 4, borderRadius: 10 }}>
+          style={{ ...position, zIndex: 10000, padding: 4 }}>
           {options.length > 8 && <TextInput ref={input} className="harness-select-search" value={query} aria-label={t('Search options…')} placeholder={t('Search options…')} onChange={event => setQuery(event.target.value)} onKeyDown={event => {
             if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); }
             if (event.key === 'ArrowDown') { event.preventDefault(); navigation.setKeyboardNavigation(true); rows.current[0]?.focus(); }

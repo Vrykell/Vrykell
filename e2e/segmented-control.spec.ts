@@ -22,10 +22,13 @@ for (const mode of ['dark', 'light'] as const) for (const width of [1240, 760]) 
         const text = range.getBoundingClientRect(); const bounds = button.getBoundingClientRect();
         return { left: text.left - bounds.left, right: bounds.right - text.right, clipped: button.scrollWidth > button.clientWidth };
       });
-      return { track: hex(getComputedStyle(element).backgroundColor), thumb: hex(getComputedStyle(thumb).backgroundColor),
+      return { radius: getComputedStyle(element).borderTopLeftRadius, thumbRadius: getComputedStyle(thumb).borderTopLeftRadius,
+        track: hex(getComputedStyle(element).backgroundColor), thumb: hex(getComputedStyle(thumb).backgroundColor),
         text: hex(getComputedStyle(selected).color), labels, overflow: element.scrollWidth > element.clientWidth };
     });
     expect(contrast(appearance.track, appearance.thumb)).toBeGreaterThanOrEqual(1.45);
+    expect(appearance.radius).toBe('10px');
+    expect(appearance.thumbRadius).toBe('7px');
     expect(contrast(appearance.text, appearance.thumb)).toBeGreaterThanOrEqual(4.5);
     expect(appearance.labels.every(label => label.left >= 13 && label.right >= 13 && !label.clipped)).toBe(true);
     expect(appearance.overflow).toBe(false);

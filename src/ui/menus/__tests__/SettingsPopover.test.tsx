@@ -4,6 +4,12 @@ import SettingsPopover from '../SettingsPopover';
 import Select from '@ui/fields/Select';
 
 afterEach(cleanup);
+it('offers an explicit close control and returns focus to the trigger', () => {
+  const close = vi.fn(); const trigger = document.createElement('button'); document.body.append(trigger);
+  render(<SettingsPopover anchor={{ x: 8, y: 40, trigger }} label="Preferences" onClose={close}><span>Settings</span></SettingsPopover>);
+  fireEvent.click(screen.getByRole('button', { name: '关闭菜单' }));
+  expect(close).toHaveBeenCalledOnce(); expect(trigger).toHaveFocus(); trigger.remove();
+});
 it('keeps settings open during option selection and child interaction but closes on outside press', () => {
   const close = vi.fn(); const action = vi.fn();
   const view = render(<SettingsPopover anchor={{ x: 8, y: 40 }} label="Preferences" onClose={close}>

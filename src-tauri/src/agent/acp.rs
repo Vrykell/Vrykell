@@ -207,6 +207,8 @@ pub enum PermissionOutcome {
 /// Decides permission requests. `None` answers immediately (a probe never runs a tool); `Some`
 /// means the decision comes later, from the page, and the client waits for it.
 pub type PermissionHandler = Arc<dyn Fn(Value) -> Option<oneshot::Receiver<PermissionOutcome>> + Send + Sync>;
+type FormFuture = std::pin::Pin<Box<dyn std::future::Future<Output = Value> + Send>>;
+type FormHandler = Arc<dyn Fn(Value) -> FormFuture + Send + Sync>;
 
 /// How long a pending permission may hold a turn before it answers itself with the protocol's own
 /// "no". The page normally answers long before this; the deadline exists so an unattended session
@@ -248,15 +250,27 @@ pub struct AcpClient {
     /// Exit code of the agent process, or `i32::MIN` while it is still running.
     exit_code: Arc<AtomicI32>,
     mcp_servers: Mutex<Vec<Value>>,
+    form_support: bool,
+    form_session: Arc<Mutex<Option<String>>>,
 }
 
 impl AcpClient {
     /// Speak ACP over any readable/writable pair. Tests drive this with an in-memory duplex.
+    #[cfg(test)]
     pub fn over<R, W>(reader: R, writer: W, permission: PermissionHandler) -> Self
     where
         R: tokio::io::AsyncRead + Unpin + Send + 'static,
         W: AsyncWrite + Unpin + Send + 'static,
     {
+        Self::over_with_form(reader, writer, permission, None)
+    }
+
+    fn over_with_form<R, W>(reader: R, writer: W, permission: PermissionHandler, form: Option<FormHandler>) -> Self
+    where R: tokio::io::AsyncRead + Unpin + Send + 'static, W: AsyncWrite + Unpin + Send + 'static,
+    {
+        let form_support = form.is_some();
+        let form_session = Arc::new(Mutex::new(None::<String>));
+        let reader_form_session = form_session.clone();
         let (out_tx, mut out_rx) = mpsc::channel::<String>(64);
         let (event_tx, events) = mpsc::channel::<ClientEvent>(EVENT_QUEUE_CAPACITY);
         let event_sender = event_tx.downgrade();
@@ -293,7 +307,9 @@ impl AcpClient {
         let reader_task = tokio::spawn(async move {
             let mut reader = BufReader::new(reader);
             let mut read_failure = None;
+            let mut requests = tokio::task::JoinSet::new();
             loop {
+                while requests.try_join_next().is_some() {}
                 let message = match read_message(&mut reader).await {
                     Ok(Some(message)) => message,
                     Ok(None) => break,
@@ -304,23 +320,48 @@ impl AcpClient {
                     match (id, method) {
                         // Agent → client request: answer through the handler, or refuse.
                         (Some(id), m) => {
-                            let reply = if m == "session/request_permission" {
+                            if requests.len() >= 16 {
+                                let payload = json!({ "jsonrpc": "2.0", "id": id, "error": { "code": -32001, "message": "too many pending client requests" } });
+                                if out_tx_for_error(&answer_tx, payload).await.is_err() { break; }
+                                continue;
+                            }
+                            if m == "elicitation/create" && form.is_some() {
+                                let handler = form.as_ref().unwrap().clone();
                                 let params = message.get("params").cloned().unwrap_or(Value::Null);
-                                // Waiting here is safe: the protocol is sequential at this point (the
-                                // agent holds the turn until it has an answer), and the deadline
-                                // keeps an unattended session from hanging.
-                                let outcome = match permission(params.clone()) {
+                                let owns_session = reader_form_session.lock().ok().and_then(|value| value.clone())
+                                    .is_some_and(|session| params.get("sessionId").and_then(Value::as_str) == Some(session.as_str()) && params.get("requestId").is_none());
+                                if !owns_session {
+                                    note("acp-elicitation-rejected", json!({ "reason": "scope" }));
+                                    let _ = out_tx_for_error(&answer_tx, json!({ "jsonrpc": "2.0", "id": id, "result": { "action": "decline" } })).await;
+                                    continue;
+                                }
+                                let sender = answer_tx.clone();
+                                requests.spawn(async move {
+                                    let reply = handler(params).await;
+                                    let _ = out_tx_for_error(&sender, json!({ "jsonrpc": "2.0", "id": id, "result": reply })).await;
+                                });
+                                continue;
+                            }
+                            if m == "session/request_permission" {
+                                let params = message.get("params").cloned().unwrap_or(Value::Null);
+                                let receiver = permission(params);
+                                let sender = answer_tx.clone();
+                                // Input cards must not block notifications, cancellation or EOF.
+                                requests.spawn(async move {
+                                  let outcome = match receiver {
                                     Some(receiver) => await_permission(receiver, PERMISSION_TIMEOUT).await,
                                     None => PermissionOutcome::Cancelled,
-                                };
-                                match outcome {
+                                  };
+                                  let reply = match outcome {
                                     PermissionOutcome::Selected(option) => json!({
                                         "outcome": { "outcome": "selected", "optionId": option }
                                     }),
                                     PermissionOutcome::Cancelled => json!({
                                         "outcome": { "outcome": "cancelled" }
                                     }),
-                                }
+                                  };
+                                  let _ = out_tx_for_error(&sender, json!({ "jsonrpc": "2.0", "id": id, "result": reply })).await;
+                                });
                             } else {
                                 // Not advertised, or not implemented: say so instead of leaving the
                                 // agent waiting for an answer that never comes.
@@ -330,10 +371,8 @@ impl AcpClient {
                                     "error": { "code": -32601, "message": text }
                                 });
                                 if out_tx_for_error(&answer_tx, payload).await.is_err() { break; }
-                                continue;
-                            };
-                            let payload = json!({ "jsonrpc": "2.0", "id": id, "result": reply });
-                            if out_tx_for_error(&answer_tx, payload).await.is_err() { break; }
+                                note("acp-client-request-unsupported", json!({ "elicitation": m == "elicitation/create" }));
+                            }
                         }
                         // Agent → client notification.
                         (None, _) => {
@@ -348,6 +387,9 @@ impl AcpClient {
                 if let Some(id) = id.and_then(|id| id.as_u64()) {
                     let waiter = reader_pending.lock().ok().and_then(|mut map| map.remove(&id));
                     if let Some(waiter) = waiter {
+                        if let Some(session_id) = message.pointer("/result/sessionId").and_then(Value::as_str) {
+                            if let Ok(mut scope) = reader_form_session.lock() { *scope = Some(session_id.to_string()); }
+                        }
                         let outcome = match message.get("error") {
                             Some(error) => Err(agent_failure(error)),
                             None => Ok(message.get("result").cloned().unwrap_or(Value::Null)),
@@ -372,7 +414,7 @@ impl AcpClient {
         });
 
         Self { out: out_tx, next_id: AtomicU64::new(0), pending, events: tokio::sync::Mutex::new(events), event_sender, mcp_servers: Mutex::new(Vec::new()),
-            child, tasks: vec![writer_task.abort_handle(), reader_task.abort_handle()], closed, closing, stderr, exit_code }
+            child, tasks: vec![writer_task.abort_handle(), reader_task.abort_handle()], closed, closing, stderr, exit_code, form_support, form_session }
     }
 
     /// Spawn a program and speak ACP to it. `kill_on_drop` keeps a killed client from leaking a
@@ -384,6 +426,10 @@ impl AcpClient {
         env: &HashMap<String, String>,
         permission: PermissionHandler,
     ) -> Result<Self, String> {
+        Self::spawn_with_form(command, args, cwd, env, permission, None)
+    }
+
+    fn spawn_with_form(command: &str, args: &[String], cwd: Option<&Path>, env: &HashMap<String, String>, permission: PermissionHandler, form: Option<FormHandler>) -> Result<Self, String> {
         // Resolve the configured program; the process builder owns native argument encoding.
         let (program, program_args) = launch_command(command, args);
         let mut cmd = Command::new(&program);
@@ -402,14 +448,14 @@ impl AcpClient {
         if let Some(dir) = cwd {
             cmd.current_dir(dir);
         }
-        for (key, value) in env {
+        for (key, value) in super::process_env::network_env(env) {
             cmd.env(key, value);
         }
         let mut child = cmd.spawn().map_err(|e| format!("could not start the harness: {e}"))?;
         let stdin = child.stdin.take().ok_or("the harness gave no stdin")?;
         let stdout = child.stdout.take().ok_or("the harness gave no stdout")?;
         let stderr = child.stderr.take();
-        let mut client = Self::over(BufReader::new(stdout), stdin, permission);
+        let mut client = Self::over_with_form(BufReader::new(stdout), stdin, permission, form);
         if let Some(mut stderr) = stderr {
             // Keep reading stderr for the life of the process: a pipe nobody drains would fill up
             // and block a chatty agent, and the tail is what explains a crash.
@@ -548,11 +594,13 @@ impl AcpClient {
 
     /// Negotiate versions and capabilities. The result carries what the agent can do.
     pub async fn initialize(&self, client_name: &str, client_version: &str) -> Result<Value, String> {
+        let mut capabilities = client_capabilities();
+        if self.form_support { capabilities["elicitation"] = json!({ "form": {} }); }
         let request = self.request(
             "initialize",
             json!({
                 "protocolVersion": PROTOCOL_VERSION,
-                "clientCapabilities": client_capabilities(),
+                "clientCapabilities": capabilities,
                 "clientInfo": { "name": client_name, "title": "Vrykell", "version": client_version },
             }),
             HANDSHAKE_TIMEOUT,
@@ -576,6 +624,7 @@ impl AcpClient {
     /// Reopen an existing session. The agent replays the conversation as notifications before it
     /// answers, so the caller must drain [`Self::drain_events`] right afterwards.
     pub async fn load_session(&self, session_id: &str, cwd: &str) -> Result<Value, String> {
+        if let Ok(mut scope) = self.form_session.lock() { *scope = Some(session_id.to_string()); }
         let servers = self.mcp_servers.lock().map_err(|_| "application tools unavailable")?.clone();
         self.request(
             "session/load",
@@ -938,6 +987,7 @@ pub struct AcpRuntime {
     /// Permission requests waiting for the page's answer, keyed by session and tool call id: two
     /// sessions may use the same tool call id, and an answer must only reach the one that asked.
     pending: Arc<Mutex<HashMap<String, oneshot::Sender<PermissionOutcome>>>>,
+    questions: super::elicitation::Requests,
 }
 
 struct RuntimeSession { client: Arc<AcpClient>, agent_session_id: String, app_tools: Option<super::app_mcp::AppMcpServer>, images: bool }
@@ -970,6 +1020,7 @@ impl AcpRuntime {
     }
 
     fn reject_pending(&self, session: &str) {
+        self.questions.cancel(session);
         // Requests this session was waiting on cannot be answered any more; drop them with it so a
         // stale id cannot resolve later.
         if let Ok(mut pending) = self.pending.lock() {
@@ -1008,6 +1059,15 @@ pub fn acp_answer_permission(
     let answered = state.answer(&session_id, &tool_call_id, option_id.clone());
     note("acp-permission-answered", json!({ "sessionId": session_id, "toolCallId": tool_call_id, "optionId": option_id }));
     answered
+}
+
+#[tauri::command]
+pub fn acp_answer_elicitation<R: tauri::Runtime>(window: tauri::WebviewWindow<R>, state: tauri::State<'_, AcpRuntime>, session_id: String, request_id: String, response: Value) -> Result<(), String> {
+    if window.label() != "main" || session_id.len() > 128 || request_id.len() > 64 { return Err("invalid question owner".into()); }
+    state.get(&session_id)?;
+    let result = state.questions.answer(&session_id, &request_id, response);
+    note("acp-elicitation-answered", json!({ "sessionId": session_id, "requestId": request_id, "accepted": result.is_ok() }));
+    result
 }
 
 /// One event from a harness session. `kind` is one of `update`, `permission`, `stop`, `error`.
@@ -1164,6 +1224,7 @@ pub async fn acp_open<R: tauri::Runtime>(
         let session = permission_session.clone();
         let (sender, receiver) = oneshot::channel();
         if let Ok(mut map) = pending_handle.lock() {
+            map.retain(|_, sender| !sender.is_closed());
             map.insert(pending_key(&session, &tool_call_id), sender);
         }
         emit(
@@ -1171,6 +1232,34 @@ pub async fn acp_open<R: tauri::Runtime>(
             AcpEvent { session_id: session, kind: "permission".to_string(), payload: params },
         );
         Some(receiver)
+    });
+    let questions = state.questions.clone();
+    let question_app = app.clone();
+    let question_session = connection_id.clone();
+    let form: FormHandler = Arc::new(move |params| {
+        let questions = questions.clone();
+        let app = question_app.clone();
+        let session = question_session.clone();
+        Box::pin(async move {
+            let form = match super::elicitation::parse(&params) {
+                Ok(form) => form,
+                Err(_) => { note("acp-elicitation-rejected", json!({ "sessionId": session, "reason": "schema" })); return json!({ "action": "decline" }); }
+            };
+            let request_id = uuid::Uuid::new_v4().simple().to_string();
+            let (receiver, _guard) = match questions.insert(&session, &request_id, form.clone()) {
+                Ok(request) => request,
+                Err(_) => { note("acp-elicitation-rejected", json!({ "sessionId": session, "reason": "capacity" })); return json!({ "action": "cancel" }); }
+            };
+            note("acp-elicitation-opened", json!({ "sessionId": session, "requestId": request_id }));
+            emit(&app, AcpEvent { session_id: session.clone(), kind: "elicitation".into(), payload: json!({ "requestId": request_id, "form": form }) });
+            let response = match tokio::time::timeout(PERMISSION_TIMEOUT, receiver).await {
+                Ok(Ok(response)) => response,
+                _ => json!({ "action": "cancel" }),
+            };
+            emit(&app, AcpEvent { session_id: session.clone(), kind: "elicitation-end".into(), payload: json!({ "requestId": request_id }) });
+            note("acp-elicitation-ended", json!({ "sessionId": session, "requestId": request_id }));
+            response
+        })
     });
 
     let session_cwd = if cwd.trim().is_empty() {
@@ -1180,12 +1269,13 @@ pub async fn acp_open<R: tauri::Runtime>(
     } else {
         cwd.clone()
     };
-    let client = Arc::new(AcpClient::spawn(
+    let client = Arc::new(AcpClient::spawn_with_form(
         &harness.command,
         &harness.args,
         Some(process_directory(&harness, &session_cwd)),
         &harness.env,
         permission,
+        Some(form),
     )
     .map_err(|error| {
         // Same reason as the handshake: name the program that could not be started.
@@ -1409,12 +1499,14 @@ pub async fn acp_prompt(
     let generation = client.app_tools.as_ref().map(|tools| tools.begin_turn()).transpose()?;
     note("acp-prompt", json!({ "sessionId": session_id, "images": images.len() }));
     let session = session_id.clone();
+    let questions = state.questions.clone();
     tokio::spawn(async move {
         let started = std::time::Instant::now();
         let outcome = client.client
             .prompt_events(&client.agent_session_id, Value::Array(blocks))
             .await;
         if let Some(tools) = &client.app_tools { tools.end_turn(generation); }
+        questions.cancel(&session);
         let duration_ms = started.elapsed().as_millis().min(u64::MAX as u128) as u64;
         match outcome {
             Ok(stop) => {
@@ -1469,6 +1561,52 @@ mod tests {
     use super::*;
     use serde_json::json;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    #[tokio::test]
+    async fn questions_keep_the_reader_live_and_preserve_request_ids() {
+        let (ours, mut agent) = tokio::io::duplex(8192);
+        let (read, write) = tokio::io::split(ours);
+        let (answer, receiver) = oneshot::channel();
+        let receiver = Arc::new(Mutex::new(Some(receiver)));
+        let handler: FormHandler = Arc::new(move |_| {
+            let receiver = receiver.lock().unwrap().take().unwrap();
+            Box::pin(async move { receiver.await.unwrap_or(json!({"action":"cancel"})) })
+        });
+        let client = AcpClient::over_with_form(read, write, Arc::new(|_| None), Some(handler));
+        *client.form_session.lock().unwrap() = Some("owned".into());
+        let message = json!({"jsonrpc":"2.0","id":"question-1","method":"elicitation/create","params":{"sessionId":"owned","mode":"form"}});
+        agent.write_all(format!("{message}\n").as_bytes()).await.unwrap();
+        let update = json!({"method":"session/update","params":{"sessionId":"owned","update":{"sessionUpdate":"plan","entries":[]}}});
+        agent.write_all(format!("{update}\n").as_bytes()).await.unwrap();
+        assert!(matches!(tokio::time::timeout(Duration::from_secs(2), client.next_event()).await.unwrap(), Some(ClientEvent::Update(_))));
+        answer.send(json!({"action":"accept","content":{"scope":["all"]}})).unwrap();
+        let reply = tokio::time::timeout(Duration::from_secs(2), read_line(&mut agent)).await.unwrap().unwrap();
+        assert_eq!(reply["id"], "question-1");
+        assert_eq!(reply["result"]["content"]["scope"], json!(["all"]));
+        let wrong = json!({"id":2,"method":"elicitation/create","params":{"sessionId":"different","mode":"form"}});
+        agent.write_all(format!("{wrong}\n").as_bytes()).await.unwrap();
+        let reply = read_line(&mut agent).await.unwrap();
+        assert_eq!(reply["result"]["action"], "decline");
+        client.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn form_capability_is_advertised_only_with_a_handler() {
+        let (ours, mut agent) = tokio::io::duplex(8192);
+        let (read, write) = tokio::io::split(ours);
+        let handler: FormHandler = Arc::new(|_| Box::pin(async { json!({"action":"cancel"}) }));
+        let client = AcpClient::over_with_form(read, write, Arc::new(|_| None), Some(handler));
+        let peer = tokio::spawn(async move {
+            let request = read_line(&mut agent).await.unwrap();
+            assert_eq!(request.pointer("/params/clientCapabilities/elicitation/form"), Some(&json!({})));
+            assert!(request.pointer("/params/clientCapabilities/elicitation/url").is_none());
+            agent.write_all(format!("{}\n", json!({"id":request["id"],"result":{"protocolVersion":1}})).as_bytes()).await.unwrap();
+        });
+        client.initialize("test", "1").await.unwrap();
+        peer.await.unwrap();
+        assert!(client_capabilities().get("elicitation").is_none());
+        client.shutdown().await;
+    }
 
     #[tokio::test]
     async fn permission_and_unsupported_requests_preserve_all_valid_id_shapes() {

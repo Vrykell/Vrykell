@@ -189,12 +189,12 @@ function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
       data-testid={`disk-card-${disk.name}`}
       style={{
         display: 'flex', alignItems: 'center', gap: 10,
-        padding: '6px 10px', borderRadius: 8,
+        padding: '6px 10px', borderRadius: 'var(--radius-card)',
         cursor: 'pointer', userSelect: 'none',
       }}
     >
       <span style={{
-        width: 34, height: 34, borderRadius: 8, flexShrink: 0,
+        width: 34, height: 34, borderRadius: 'var(--radius-inner)', flexShrink: 0,
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         background: 'var(--hover)', color: 'var(--primary-action)',
       }}>

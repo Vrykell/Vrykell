@@ -124,7 +124,7 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
               <X size={iconSizes.control} />
             </IconButton>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 8, padding: '6px 10px', background: 'var(--field-bg)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 'var(--radius-card)', padding: '6px 10px', background: 'var(--field-bg)' }}>
             <Search size={iconSizes.control} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <TextInput
               autoFocus
@@ -171,13 +171,13 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
                 }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '9px 10px', borderRadius: 8, cursor: 'pointer',
+                  padding: '9px 10px', borderRadius: 'var(--radius-inner)', cursor: 'pointer',
                   marginBottom: 2,
                 }}
               >
                 <span
                   style={{
-                    width: 30, height: 30, borderRadius: 8, flexShrink: 0,
+                    width: 30, height: 30, borderRadius: 'var(--radius-inner)', flexShrink: 0,
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                     background: active ? 'var(--hover)' : 'var(--block)',
                     color: active ? 'var(--text-primary)' : 'var(--text-muted)',

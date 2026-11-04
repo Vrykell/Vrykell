@@ -400,7 +400,7 @@ test('shows rounded groups, a collapsible file tree and selectable worktrees', a
   expect((await folderRow.locator('.sidebar-row-content').boundingBox())!.height).toBeCloseTo(28, 0);
   await fileRow.click();
   await expect(fileRow).toHaveAttribute('data-active', 'true');
-  await expect(fileRow.locator('.sidebar-row-content')).toHaveCSS('border-radius', '8px');
+  await expect(fileRow.locator('.sidebar-row-content')).toHaveCSS('border-radius', '10px');
   for (const width of [1240, 760]) {
     await page.setViewportSize({ width, height: 800 });
     await panel.locator('.git-group-heading').nth(1).hover();

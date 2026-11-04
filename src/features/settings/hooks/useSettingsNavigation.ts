@@ -37,7 +37,6 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
       { id: 'ai-model', icon: BrainCircuit, label: 'Model configuration' },
       { id: 'ai-behavior', icon: Settings, label: 'Model behavior' },
       { id: 'ai-perms', icon: ShieldCheck, label: 'Tool permissions' },
-      { id: 'ai-web', icon: Globe, label: 'Web search' },
       { id: 'ai-skill', icon: Folder, label: 'Skills' },
       { id: 'ai-mcp', icon: Plug, label: 'MCP servers' },
       { id: 'ai-memory', icon: FileText, label: 'Agent memory' },

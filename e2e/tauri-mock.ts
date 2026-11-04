@@ -1357,6 +1357,11 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'acp_close':
             acpCalls.push(`${cmd}:${String(args.sessionId ?? '')}`);
             return undefined;
+          case 'acp_answer_elicitation': {
+            const memory = window as unknown as { __ELICITATION_ANSWERS__?: unknown[] };
+            (memory.__ELICITATION_ANSWERS__ ??= []).push(args);
+            return undefined;
+          }
           case 'acp_answer_permission':
             answered.push({ toolCallId: String(args.toolCallId ?? ''), optionId: (args.optionId ?? null) as string | null });
             return undefined;

@@ -10,7 +10,7 @@ import { TextInput } from '@ui/fields/TextInput';
  */
 
 import { useState } from 'react';
-import { ArrowLeft, ChevronRight, Download, FileText, Folder, ShieldAlert, Store, Trash2, X } from '@ui/icons';
+import { ArrowLeft, ChevronRight, Download, FileText, Folder, ShieldAlert, Store, X, Plus, Search } from '@ui/icons';
 import { fileOpenWith } from '@platform/api/fs';
 import {
   setSkillState, removeSkill,
@@ -25,6 +25,10 @@ import { useSkillFileBrowser } from '@features/settings/hooks/useSkillFileBrowse
 import type { FileNode } from '@features/settings/model/skillFileTree';
 import { SettingsGroup } from '../components/ui';
 import { inputStyle } from '../components/formStyles';
+import Toggle from '@ui/fields/Toggle';
+import ConfirmDialog from '@ui/feedback/ConfirmDialog';
+import './resources.css';
+import PageBreadcrumb from '@ui/layout/PageBreadcrumb';
 
 const toast = (msg: string, type: 'info' | 'success' | 'error') =>
   useToastStore.getState().addToast(msg, type);
@@ -64,12 +68,13 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
   const render = (nodes: FileNode[], depth: number): React.ReactNode =>
     nodes.map((n) => (
       <div key={n.path}>
-        <div
+        <button type="button" data-subtle
+          aria-expanded={n.isDir ? open.has(n.path) : undefined}
           onClick={() => void pick(n)}
           style={{
             display: 'flex', alignItems: 'center', gap: 4,
             padding: `2px 8px 2px ${8 + depth * 14}px`, fontSize: 'calc(12px * var(--ui-font-scale))',
-            cursor: 'pointer', color: n.isDir ? 'var(--text-primary)' : 'var(--text-secondary)',
+            cursor: 'pointer', color: n.isDir ? 'var(--text-primary)' : 'var(--text-secondary)', border: 0, width: '100%', textAlign: 'left',
             background: selected === n.path ? 'var(--hover)' : 'transparent',
           }}
         >
@@ -82,7 +87,7 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
             <FileText size={12} style={{ marginLeft: 11 }} />
           )}
           <span style={{ fontFamily: n.isDir ? 'var(--font-ui)' : 'var(--font-ui)' }}>{n.name}</span>
-        </div>
+        </button>
         {n.isDir && open.has(n.path) && n.children && render(n.children, depth + 1)}
       </div>
     ));
@@ -118,8 +123,18 @@ function SkillFileBrowser({ skillName, files }: { skillName: string; files: stri
 function SkillDetailPanel({ skill, onClose, onChanged }: {
   skill: SkillDetail;
   onClose: () => void;
-  onChanged: () => void;
+  onChanged: (deleted?: boolean) => void;
 }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showFiles, setShowFiles] = useState(false);
+  const run = async (action: () => Promise<void>) => {
+    if (busy) return;
+    setBusy(true); setError(null);
+    try { await action(); } catch (failure) { setError(String(failure)); }
+    finally { setBusy(false); }
+  };
   const toggleTrust = async () => {
     await setSkillState(skill.name, !skill.trusted, undefined);
     onChanged();
@@ -131,49 +146,39 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
   const del = async () => {
     await removeSkill(skill.name);
     toast(t('Deleted {{name}}.', { name: skill.name }), 'success');
-    onChanged();
+    onChanged(true);
     onClose();
   };
   return (
-    <div style={{
-      position: 'absolute', inset: 0, zIndex: 30, background: 'var(--surface)',
-      display: 'flex', flexDirection: 'column', overflow: 'auto', padding: '14px 18px',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <OutlineButton onClick={onClose}><ArrowLeft size={16} aria-hidden="true" />{t('Back')}</OutlineButton>
-        <div style={{ flex: 1 }} />
-        <OutlineButton onClick={() => void fileOpenWith(skill.dir)} style={btn}>{t('Open folder')}</OutlineButton>
-        <OutlineButton onClick={() => void toggleTrust()} style={btn}>
-          {skill.trusted ? t('Untrust') : t('Trust')}
-        </OutlineButton>
-        <OutlineButton onClick={() => void toggleEnabled()} style={btn}>
-          {skill.enabled ? t('Disable') : t('Enable')}
-        </OutlineButton>
-        <OutlineButton onClick={() => void del()} style={{ ...btn, color: 'var(--control-danger-color)' }}>{t('Delete')}</OutlineButton>
+    <div className="skill-detail" data-testid="skill-detail" aria-busy={busy}>
+      <PageBreadcrumb className="resource-breadcrumb" ancestors={[{ label: t('Skills'), onClick: onClose }]} current={skill.name} />
+      <div className="resource-detail-header">
+        <span className="resource-mark resource-mark-large"><FileText size={28} aria-hidden="true" /></span>
+        <div className="resource-identity"><h2>{skill.name}</h2><p>{skill.description || t('No description')}</p></div>
+        <div className="resource-actions">
+          <OutlineButton aria-expanded={showFiles} onClick={() => setShowFiles(value => !value)}>{t('View instructions')}</OutlineButton>
+          <OutlineButton disabled={busy} onClick={() => setConfirmDelete(true)} style={{ color: 'var(--control-danger-color)' }}>{t('Delete')}</OutlineButton>
+        </div>
       </div>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)' }}>{skill.name}</span>
-        {skill.trusted ? <Badge text={t('Trusted')} tone="ok" /> : <Badge text={t('Untrusted')} tone="warn" />}
-        {!skill.enabled && <Badge text={t('Disabled')} tone="muted" />}
+      <div className="resource-badges">
         {skill.hasScripts && <Badge text={t('Contains scripts')} tone="danger" />}
         {skill.modified && <Badge text={t('Modified')} tone="warn" />}
-        <Badge text={skill.source || t('Local')} tone="muted" />
       </div>
-
-      <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)', marginTop: 8 }}>
-        {skill.description || t('No description')}
-      </div>
-      {skill.allowedTools && (
-        <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', marginTop: 6 }}>
-          {t('Allowed tools:')} <span style={{ fontFamily: 'var(--font-ui)' }}>{skill.allowedTools}</span>
-        </div>
-      )}
-      <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', marginTop: 6, wordBreak: 'break-all' }}>
-        {skill.dir}
-      </div>
-
-      <div style={{ marginTop: 12 }}>
+      <SettingsGroup title={t('Skill settings')}>
+        <div className="resource-setting-row"><div><strong>{t('Enabled')}</strong><p>{t('Make this skill available to the assistant when trusted.')}</p></div>
+          <Toggle label={t('Enable {{name}}', { name: skill.name })} on={skill.enabled} disabled={busy} onChange={() => void run(toggleEnabled)} /></div>
+        <div className="resource-setting-row"><div><strong>{t(skill.trusted ? 'Trusted' : 'Untrusted')}</strong><p>{t('Review the instructions and files before trusting this skill. Script execution still requires tool permissions.')}</p></div>
+          <OutlineButton disabled={busy} onClick={() => void run(toggleTrust)}>{t(skill.trusted ? 'Untrust' : 'Trust')}</OutlineButton></div>
+      </SettingsGroup>
+      <SettingsGroup title={t('About')}>
+        <dl className="resource-metadata">
+          <div><dt>{t('Source')}</dt><dd>{skill.source || t('Local')}</dd></div>
+          <div><dt>{t('Additional files')}</dt><dd>{t('{{count}} files', { count: skill.files.length })}</dd></div>
+          {skill.allowedTools && <div><dt>{t('Allowed tools:')}</dt><dd>{skill.allowedTools}</dd></div>}
+          <div><dt>{t('Folder')}</dt><dd className="skill-location"><span>{skill.dir}</span><OutlineButton disabled={busy} onClick={() => void run(() => fileOpenWith(skill.dir))}>{t('Open folder')}</OutlineButton></dd></div>
+        </dl>
+      </SettingsGroup>
+      {showFiles && <><div style={{ marginTop: 12 }}>
         <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', marginBottom: 6 }}>{t('Files')}</div>
         <SkillFileBrowser skillName={skill.name} files={skill.files} />
       </div>
@@ -188,7 +193,10 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
         }}>
           {skill.prompt || t('Empty prompt')}
         </pre>
-      </div>
+      </div></>}
+      {error && <ErrorBox title={t('Could not update skill')} details={error} onDismiss={() => setError(null)} />}
+      <ConfirmDialog open={confirmDelete} title={t('Delete skill')} message={t('Delete {{name}} and its local files?', { name: skill.name })} danger
+        onCancel={() => setConfirmDelete(false)} onConfirm={() => { setConfirmDelete(false); void run(del); }} />
     </div>
   );
 }
@@ -208,8 +216,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
 
   return (
     <div style={{
-      position: 'absolute', inset: 0, zIndex: 30, background: 'var(--surface)',
-      display: 'flex', flexDirection: 'column', padding: '14px 18px', overflow: 'hidden',
+      display: 'flex', flexDirection: 'column', minHeight: 'min(600px, 70vh)',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
         <OutlineButton onClick={onClose}><ArrowLeft size={16} aria-hidden="true" />{t('Back')}</OutlineButton>
@@ -286,6 +293,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
 export default function SkillsSettings() {
   const {
     metas,
+    loading, error, setError, changing,
     detail,
     importUrl,
     importing,
@@ -299,26 +307,33 @@ export default function SkillsSettings() {
     openDetail,
     doImportUrl,
     doImportPath,
-    toggleTrust,
     toggleEnabled,
-    del,
   } = useSkillsSettings();
+  const [query, setQuery] = useState('');
+  const [adding, setAdding] = useState(false);
+  const visible = metas.filter(skill => `${skill.name} ${skill.description}`.toLowerCase().includes(query.trim().toLowerCase()));
+
+  if (detail) return <SkillDetailPanel key={detail.name} skill={detail} onClose={() => setDetail(null)} onChanged={deleted => { refresh(); if (!deleted) void openDetail(detail.name); }} />;
+  if (market) return <SkillMarketplacePanel metas={metas} onClose={() => setMarket(false)} onInstalled={refresh} />;
 
   return (
     <div style={{ position: 'relative' }}>
-      <SettingsGroup title={t('Import skills')}><div className="settings-record" style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {!warnDismissed && (
+      <header className="resource-page-header">
+        <div><h1>{t('Skills')}</h1><p>{t('Manage the skills available to your assistant.')}</p></div>
+      </header>
+      {adding && !warnDismissed && (
         <div style={{
           display: 'flex', alignItems: 'center', gap: 8,
           padding: '8px 10px', borderRadius: 'var(--radius-inner)',
           background: 'var(--accent-warm-dim)', fontSize: 'calc(11px * var(--ui-font-scale))', lineHeight: 1.5, color: 'var(--accent-warm)',
         }}>
           <ShieldAlert size={14} style={{ flexShrink: 0 }} />
-          <span style={{ flex: 1 }}>{t('Skills may contain scripts; enabling one trusts its content. Script execution still follows AI permission rules. Imported third-party skills are untrusted by default.')}</span>
+          <span style={{ flex: 1 }}>{t('Skills may contain scripts. Imported skills remain untrusted until you review and trust them. Script execution still follows tool permissions.')}</span>
           <IconButton compact onClick={() => setWarnDismissed(true)} data-tip={t('Close')} aria-label={t('Close')}><X size={16} /></IconButton>
         </div>
       )}
 
+      {adding && <div className="resource-import">
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         <TextInput
           value={importUrl}
@@ -338,64 +353,37 @@ export default function SkillsSettings() {
         <OutlineButton onClick={() => void doImportPath(false)} disabled={importing} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           <Download size={13} /> {t('Import archive')}
         </OutlineButton>
-        <OutlineButton onClick={() => setMarket(true)} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <Store size={13} /> {t('Skill marketplace')}
-        </OutlineButton>
       </div>
+      </div>}
 
-      {market && (
-        <SkillMarketplacePanel
-          metas={metas}
-          onClose={() => setMarket(false)}
-          onInstalled={refresh}
-        />
-      )}
-
-      </div></SettingsGroup>
-      <SettingsGroup title={t('Installed skills')}><div className="settings-record-list">
-      {metas.length === 0 && (
+      <div className="resource-library-toolbar">
+        <div className="resource-actions">
+          <OutlineButton onClick={() => setMarket(true)}><Store size={16} />{t('Skill marketplace')}</OutlineButton>
+          <OutlineButton aria-expanded={adding} onClick={() => setAdding(value => !value)}><Plus size={16} />{t('Import skills')}</OutlineButton>
+        </div>
+        <div className="resource-search"><Search size={16} aria-hidden="true" /><TextInput variant="field" aria-label={t('Search skills…')} placeholder={t('Search skills…')} value={query} onChange={event => setQuery(event.target.value)} /></div>
+      </div>
+      <div className="skill-list">
+      {loading && metas.length === 0 && <p role="status" className="resource-caption">{t('Loading…')}</p>}
+      {!loading && !error && metas.length === 0 && (
         <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: '6px 0' }}>
           {t('No skills yet. Import from a URL, folder or archive.')}
         </div>
       )}
 
-      {metas.map((m) => (
-        <div
-          className="settings-record"
-          key={m.name}
-          onClick={() => void openDetail(m.name)}
-          style={{
-            cursor: 'pointer',
-            opacity: m.enabled ? 1 : 0.55,
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>{m.name}</span>
-            {m.trusted ? <Badge text={t('Trusted')} tone="ok" /> : <Badge text={t('Untrusted')} tone="warn" />}
-            {!m.enabled && <Badge text={t('Disabled')} tone="muted" />}
-            {m.hasScripts && <Badge text={t('Contains scripts')} tone="danger" />}
-            {m.modified && <Badge text={t('Modified')} tone="warn" />}
-            <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{m.source || t('Local')}</span>
-            <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{t('{{count}} files', { count: m.files.length })}</span>
-            <div style={{ flex: 1 }} />
-            <OutlineButton onClick={(e) => { e.stopPropagation(); void toggleTrust(m); }} style={btn}>
-              {m.trusted ? t('Untrust') : t('Trust')}
-            </OutlineButton>
-            <OutlineButton onClick={(e) => { e.stopPropagation(); void toggleEnabled(m); }} style={btn}>
-              {m.enabled ? t('Disable') : t('Enable')}
-            </OutlineButton>
-            <IconButton compact tone="danger" onClick={(e) => { e.stopPropagation(); void del(m.name); }} data-tip={t('Delete skill')} aria-label={t('Delete skill')}><Trash2 size={16} /></IconButton>
-          </div>
-          <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)', marginTop: 4 }}>
-            {m.description || t('No description')}
-          </div>
-        </div>
-      ))}
+      {metas.length > 0 && visible.length === 0 && <p className="resource-caption">{t('No matching skills.')}</p>}
+      {visible.map(skill => <div className="skill-list-row" key={skill.name}>
+        <button type="button" data-subtle className="skill-open" aria-label={t('Open {{name}}', { name: skill.name })} onClick={() => void openDetail(skill.name)}>
+          <span className="resource-mark"><FileText size={20} aria-hidden="true" /></span>
+          <span className="resource-identity"><strong>{skill.name}</strong><span>{skill.description || t('No description')}</span>
+            {!skill.trusted && <span className="resource-trust">{t('Untrusted')}</span>}</span>
+        </button>
+        <Toggle label={t('Enable {{name}}', { name: skill.name })} disabled={changing.includes(skill.name)} on={skill.enabled} onChange={() => void toggleEnabled(skill)} />
+        <IconButton aria-label={t('Open {{name}}', { name: skill.name })} onClick={() => void openDetail(skill.name)}><ChevronRight size={16} /></IconButton>
+      </div>)}
 
-      </div></SettingsGroup>
-      {detail && (
-        <SkillDetailPanel skill={detail} onClose={() => setDetail(null)} onChanged={refresh} />
-      )}
+      </div>
+      {error && <ErrorBox title={t('Could not load skills')} details={error} onDismiss={() => setError(null)} actions={<OutlineButton onClick={refresh}>{t('Retry')}</OutlineButton>} />}
     </div>
   );
 }

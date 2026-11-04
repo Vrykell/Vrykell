@@ -17,8 +17,12 @@
      emoji fallbacks, whose proportional advances can break terminal alignment. */
   --font-mono: "Maple Mono NF CN", "Cascadia Mono", "Cascadia Code", Menlo, Monaco, "JetBrains Mono", "Sarasa Mono SC", "Noto Sans Mono CJK SC", "Noto Sans Mono", "DejaVu Sans Mono", monospace, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
 
-  --radius-block: 14px;
-  --radius-inner: 8px;
+  --radius-sm: 10px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-card: var(--radius-md);
+  --radius-block: var(--radius-lg);
+  --radius-inner: var(--radius-sm);
   --ease: cubic-bezier(0.2, 0.8, 0.2, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-fast: 0.14s;
@@ -178,7 +182,7 @@ input, textarea, [contenteditable="true"] { caret-color: var(--text-caret); }
   position: fixed; z-index: 12000; pointer-events: none;
   width: max-content; max-width: min(340px, calc(100vw - 12px)); max-height: calc(100vh - 12px); overflow-y: auto; padding: 3px 8px;
   background: var(--field-bg); color: var(--text-primary);
-  border: 1px solid var(--border-strong); border-radius: 6px;
+  border: 1px solid var(--border-strong); border-radius: var(--radius-inner);
   box-shadow: var(--shadow-md);
   font: var(--fs-caption)/1.5 var(--font-ui);
   overflow-wrap: anywhere;
@@ -194,11 +198,12 @@ body > :not(#root) { --app-portal-opacity: var(--app-opacity, 1); }
 /* Floating surfaces use the workspace palette and an outer shadow for separation. */
 .workspace-floating {
   background: var(--menu-bg); color: var(--text-primary);
-  border: 0; border-radius: 10px;
+  border: 0; border-radius: var(--radius-card);
   box-shadow: var(--shadow-md); font: calc(12px * var(--ui-font-scale))/1.5 var(--font-ui);
   opacity: var(--app-portal-opacity, 1);
 }
 .workspace-floating-dialog { border-radius: var(--radius-block); box-shadow: var(--shadow-lg); }
+.settings-popover-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 2px 6px; color: var(--text-secondary); font-size: var(--fs-caption); }
 .new-tab-overlay { position: fixed; inset: 0; z-index: 9996; display: flex; align-items: center; justify-content: center; background: var(--overlay); }
 .new-tab-overlay.new-tab-dropdown-overlay { display: block; background: transparent; }
 .new-tab-dialog { width: min(304px, calc(100vw - 16px)); max-height: min(480px, calc(100vh - 16px)); display: flex; flex-direction: column; overflow-y: auto; padding: 4px; box-sizing: border-box; background: var(--menu-bg); animation: overlayIn 0.14s var(--ease); }
@@ -279,7 +284,7 @@ html[data-tool-window="true"], html[data-tool-window="true"] body, html[data-too
 .global-search-header { flex-shrink: 0; padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .global-search-clear { border: none; background: transparent; color: var(--text-muted); cursor: pointer; }
 .global-search-input-row { display: flex; align-items: center; gap: 8px; color: var(--text-muted); }
-.global-search-query { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; min-height: 38px; padding: 0 10px; border-radius: 6px; background: transparent; }
+.global-search-query { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; min-height: 38px; padding: 0 10px; border-radius: var(--radius-inner); background: transparent; }
 .global-search-query > svg { flex-shrink: 0; }
 .global-search-dialog .global-search-input-row input:not([type="checkbox"]) {
   width: 0; flex: 1; min-width: 0; height: 36px; padding: 0; background: transparent;
@@ -287,7 +292,7 @@ html[data-tool-window="true"], html[data-tool-window="true"] body, html[data-too
 }
 .workspace-floating .global-search-input-row input:not([type="checkbox"]):focus-visible { outline: none; }
 .global-search-filter-anchor { position: relative; flex-shrink: 0; }
-button.global-search-filter { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px; border: none; border-radius: 6px; background: transparent; color: var(--text-secondary); font: var(--fs-caption) var(--font-ui); cursor: pointer; }
+button.global-search-filter { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px; border: none; border-radius: var(--radius-inner); background: transparent; color: var(--text-secondary); font: var(--fs-caption) var(--font-ui); cursor: pointer; }
 button.global-search-filter:hover, button.global-search-filter[aria-expanded="true"] { background: var(--control-hover-bg); }
 .global-search-source-count { font: var(--fs-micro) var(--font-mono); color: var(--text-muted); }
 .global-search-body { overflow-y: auto; min-height: 0; padding: 8px; background: transparent; flex: 1; max-height: min(350px, 48vh); }
@@ -343,7 +348,7 @@ button.chat-mode-trigger:hover, button.chat-mode-trigger[aria-expanded="true"] {
 .settings-save-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: var(--fs-caption); color: var(--text-muted); }
 .settings-group { margin-bottom: 28px; min-width: 0; }
 .settings-group-title { margin: 0 0 12px; font-size: var(--fs-label); font-weight: var(--fw-medium); color: var(--text-primary); }
-.settings-group-panel { padding: 0 20px; background: var(--card-bg); border: 0; border-radius: var(--radius-inner); box-shadow: none; min-width: 0; }
+.settings-group-panel { padding: 0 20px; background: var(--card-bg); border: 0; border-radius: var(--radius-block); box-shadow: none; min-width: 0; }
 .settings-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto); column-gap: 24px; row-gap: 4px; align-items: center; padding: 18px 20px; margin-bottom: 16px; background: var(--card-bg); border: 0; border-radius: var(--radius-inner); min-width: 0; }
 .settings-group-panel > .settings-field { padding: 18px 0; margin: 0; background: transparent; border-radius: 0; }
 .settings-group-panel > .settings-field + .settings-field, .settings-record + .settings-record { border-top: 1px solid var(--border); }
@@ -381,6 +386,9 @@ button.chat-mode-trigger:hover, button.chat-mode-trigger[aria-expanded="true"] {
 .settings-record { min-width: 0; padding: 18px 0; }
 .settings-record:first-child { padding-top: 0; }
 .settings-group-panel > .settings-record { padding-block: 18px; }
+.settings-typography-page .settings-group-panel > .settings-record { padding: 0 0 12px; }
+.settings-typography-page .settings-font-preview { margin: 0; }
+.settings-typography-page .settings-field:has(+ .settings-record) { padding-bottom: 12px; }
 .settings-record-list { display: flex; flex-direction: column; min-width: 0; }
 .settings-group-panel > .settings-record-list { padding-block: 18px; }
 .settings-record-list > button { margin-top: 12px; align-self: flex-start; }
@@ -497,7 +505,7 @@ button.activity-button[aria-pressed="true"] { background: var(--control-active-b
 .workspace-sidebar-search { position: relative; flex: 1; min-width: 0; height: 30px; }
 .workspace-sidebar-search > svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
 .workspace-sidebar-search > input { display: block; box-sizing: border-box; width: 100%; height: 100%; min-width: 0; background: var(--field-bg); border: 0; border-radius: var(--radius-inner); outline: none; padding: 0 10px 0 31px; font: calc(13px * var(--ui-font-scale)) var(--font-ui); color: var(--text-primary); }
-.terminal-composer { border: none; border-radius: 8px; background: var(--composer-bg); transition: background var(--dur) var(--ease); }
+.terminal-composer { border: none; border-radius: var(--radius-card); background: var(--composer-bg); transition: background var(--dur) var(--ease); }
 .terminal-composer:focus-within { box-shadow: none; }
 /* SSH connection page: spinner and thin progress bar while connecting. */
 .ssh-connect-spinner {
@@ -717,7 +725,7 @@ button.window-control-button {
 .ai-chat-panel .chat-input-status > button.chat-send-button:is(:hover, :focus-visible, :active, :disabled) { border-radius: 50%; background: var(--primary-button-bg); color: var(--primary-button-text); }
 
 /* Session controls in the harness composer: quiet chips, like the panel's mode and model. */
-.harness-selector { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 200px; height: 22px; padding: 0 6px; border: 0; border-radius: 6px; background: transparent; color: var(--text-primary); font: var(--fw-regular) var(--fs-micro) var(--font-ui); cursor: pointer; transition: background var(--dur-fast) var(--ease); }
+.harness-selector { display: inline-flex; align-items: center; gap: 4px; min-width: 0; max-width: 200px; height: 22px; padding: 0 6px; border: 0; border-radius: var(--radius-inner); background: transparent; color: var(--text-primary); font: var(--fw-regular) var(--fs-micro) var(--font-ui); cursor: pointer; transition: background var(--dur-fast) var(--ease); }
 .harness-selector:hover, .harness-selector[aria-expanded="true"] { background: var(--hover); }
 .harness-selector-label { flex-shrink: 0; color: var(--text-muted); white-space: nowrap; }
 .harness-selector-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -730,7 +738,7 @@ button.window-control-button {
 .harness-select-option > svg { flex-shrink: 0; color: var(--text-muted); }
 .harness-select-option .chat-approval-option-copy > span { overflow-wrap: anywhere; }
 .harness-select-option .chat-approval-option-copy > small { line-height: 1.45; }
-.harness-select-search { flex-shrink: 0; width: 100%; padding: 8px 10px; box-sizing: border-box; border: 0; border-radius: 6px; background: var(--field-bg); color: var(--text-primary); outline: none; font: var(--fs-caption) var(--font-ui); }
+.harness-select-search { flex-shrink: 0; width: 100%; padding: 8px 10px; box-sizing: border-box; border: 0; border-radius: var(--radius-inner); background: var(--field-bg); color: var(--text-primary); outline: none; font: var(--fs-caption) var(--font-ui); }
 /* Slash commands above the input: the agent's own list, filtered as the command is typed. */
 .harness-commands { display: flex; flex-direction: column; gap: 2px; margin: 0 0 6px; padding: 4px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--surface); max-height: 220px; overflow-y: auto; }
 .harness-command { display: flex; align-items: baseline; gap: 8px; padding: 4px 8px; border: 0; border-radius: 6px; background: transparent; color: var(--text-primary); text-align: left; cursor: pointer; font: var(--fw-regular) var(--fs-label) var(--font-ui); }
@@ -778,7 +786,7 @@ button.primary-button:is(:hover, :focus):not(:disabled), button.user-primary-act
 .history-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .history-list { flex: 1; min-height: 0; overflow-y: auto; padding: 24px 40px; background: var(--canvas); }
 .history-list > [data-testid^="conversation-row-"], .history-list > [data-testid^="history-session-"] { max-width: 100%; }
-.history-group-card { --history-group-color: var(--text-muted); container: history-card / inline-size; width: 100%; max-width: 640px; min-width: 0; box-sizing: border-box; margin: 0 auto 12px; background: var(--card-bg); border: 0; border-radius: var(--radius-inner); box-shadow: none; }
+.history-group-card { --history-group-color: var(--text-muted); container: history-card / inline-size; width: 100%; max-width: 640px; min-width: 0; box-sizing: border-box; margin: 0 auto 12px; background: var(--card-bg); border: 0; border-radius: var(--radius-block); box-shadow: none; }
 .history-group-card[data-group-color="blue"] { --history-group-color: var(--group-blue); }
 .history-group-card[data-group-color="green"] { --history-group-color: var(--group-green); }
 .history-group-card[data-group-color="violet"] { --history-group-color: var(--group-violet); }
@@ -877,17 +885,18 @@ button.history-palette-auto { display: flex; align-items: center; justify-conten
 
 .history-text-prompt { position: fixed; z-index: 9999; display: flex; flex-direction: column; gap: 8px; padding: 10px; }
 .history-prompt-label { color: var(--text-secondary); font-size: calc(12px * var(--ui-font-scale)); }
-.history-prompt-input { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--field-bg); color: var(--text-primary); font: calc(12px * var(--ui-font-scale))/1.5 var(--font-ui); }
+.history-prompt-input { width: 100%; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--field-bg); color: var(--text-primary); font: calc(12px * var(--ui-font-scale))/1.5 var(--font-ui); }
 .history-prompt-input:focus-visible { outline: none; border-color: var(--border-strong); }
 .history-prompt-actions { display: flex; justify-content: flex-end; gap: 6px; }
-button.history-prompt-action { min-height: 26px; padding: 4px 10px; border: 1px solid transparent; border-radius: 6px; background: var(--action-button-bg); color: var(--text-primary); font-size: calc(12px * var(--ui-font-scale)); cursor: pointer; }
+button.history-prompt-action { min-height: 26px; padding: 4px 10px; border: 1px solid transparent; border-radius: var(--radius-inner); background: var(--action-button-bg); color: var(--text-primary); font-size: calc(12px * var(--ui-font-scale)); cursor: pointer; }
 button.history-prompt-action:is(:hover, :focus) { background: var(--hover); color: var(--text-primary); }
 button.history-prompt-action[data-primary] { border-color: transparent; background: var(--primary-button-bg); color: var(--primary-button-text); }
 button.history-prompt-action[data-primary]:enabled:is(:hover, :focus-visible) { background: var(--primary-button-hover-bg); }
 .ai-history-working { color: var(--text-muted); font-size: var(--fs-micro); }
 .ai-history-empty { padding: 24px; text-align: center; color: var(--text-muted); font-size: calc(12px * var(--ui-font-scale)); }
 /* Usage statistics page: cards carry the chart and the tables, like the reference dashboard. */
-.usage-card { padding: 12px 14px; border: 0; border-radius: var(--radius-inner); background: var(--card-bg); box-shadow: none; min-width: 0; }
+.usage-card { padding: 12px 14px; border: 0; border-radius: var(--radius-card); background: var(--card-bg); box-shadow: none; min-width: 0; }
+section.usage-card { border-radius: var(--radius-block); }
 .usage-page { font-family: var(--font-ui); }
 /* Usage filter row: the source segment bar on the left, then the by-value selects. */
 /* Usage filters use the shared select field; model marks appear in the trigger and list. */
@@ -944,9 +953,8 @@ button.ai-tool-summary:enabled:is(:hover, :focus-visible, :active) { background:
 .ai-tool-summary > svg:last-child { transition: transform var(--dur-fast) var(--ease); }
 .ai-tool-label { flex: 0 1 auto; max-width: 45%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-primary); }
 .ai-tool-description { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-secondary); font-family: var(--font-mono); }
-/* The label and the monospace detail use different fonts; share one baseline so every
-   tool row reads as a single line instead of centring two mismatched line boxes. */
-.ai-tool-label, .ai-tool-description { align-self: baseline; }
+/* Center the text group in its header while keeping the mixed-font text on one baseline. */
+.ai-tool-summary-text { display: flex; align-items: baseline; gap: 7px; flex: 1; min-width: 0; }
 .ai-tool-state { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; max-width: 45%; padding: 1px 6px; border-radius: 4px; color: var(--text-muted); font-size: var(--fs-micro); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ai-tool-state > svg { flex-shrink: 0; }
 .ai-tool-state[data-state="done"] { color: var(--success); background: color-mix(in srgb, var(--success) 12%, transparent); }
@@ -999,7 +1007,7 @@ button.ai-tool-run:enabled:is(:hover, :focus-visible), button.ai-tool-run-menu:e
 .ai-tool-copy[data-copied="true"] { opacity: 1; pointer-events: auto; }
 .chat-references { margin: 8px 0; display: flex; flex-direction: column; gap: 4px; }
 .chat-reference { min-width: 0; margin: 0; }
-.chat-context-tray .chat-reference { padding: 8px 10px; border: none; border-radius: 5px; background: var(--hover); }
+.chat-context-tray .chat-reference { padding: 8px 10px; border: none; border-radius: var(--radius-card); background: var(--hover); }
 .chat-reference-heading { display: flex; align-items: center; gap: 6px; min-width: 0; }
 .chat-reference-toggle { flex: 1; }
 .chat-reference-toggle .ai-tool-description { flex-shrink: 1; }
@@ -1192,8 +1200,8 @@ button.md-code-block-action.text-control { min-height: 22px; gap: 4px; padding: 
 /* Overlay tracks leave the full content width available. */
 .scroll-region, .settings-content { scrollbar-gutter: auto; }
 [data-testid^="terminal-scroll-"] { --scrollbar-size: 10px; }
-.application-window[data-platform="macos"] { border-radius: 10px; }
-/* The native compositor clips Windows corners; a second CSS mask leaves a thin inset. */
+.application-window { border-radius: var(--radius-block); }
+/* The compositor owns the native frame and its clip; a second mask separates the border. */
 .application-window[data-platform="windows"] { border-radius: 0; }
 .application-window:has(.workspace-titlebar[data-fullscreen="true"], [data-window-maximized="true"]) { border-radius: 0; }
 .application-window::after { content: ""; position: absolute; inset: 0; border: 1px solid var(--border-strong); border-radius: inherit; pointer-events: none; z-index: 20000; }
@@ -1295,7 +1303,7 @@ button.global-search-source { border: none; background: transparent; padding: 0;
 .ssh-form-dialog :is(input, textarea):focus, .ssh-form-dialog :is(input, textarea):focus-visible { outline: none; box-shadow: none; border-color: var(--border); }
 
 /* Shared flat controls and key badges inherit the active palette. */
-button.icon-button { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--control-size); height: var(--control-size); padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--icon-color); cursor: pointer; }
+button.icon-button { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: var(--control-size); height: var(--control-size); padding: 0; border: 0; border-radius: var(--radius-inner); background: transparent; color: var(--icon-color); cursor: pointer; }
 button.icon-button[data-compact="true"] { width: var(--control-size-compact); height: var(--control-size-compact); }
 button.icon-button:hover { background: var(--control-hover-bg); color: var(--icon-hover-color); }
 button.icon-button:focus-visible { outline: none; background: var(--control-hover-bg); color: var(--icon-hover-color); }
@@ -1313,7 +1321,7 @@ button.icon-button:disabled:hover { background: transparent; color: var(--contro
 /* The authentication reveal toggle shows its state through the eye icon itself, not a fill. */
 button.ssh-auth-reveal[aria-pressed="true"] { background: transparent; }
 button.ssh-auth-reveal[aria-pressed="true"]:is(:hover, :focus-visible) { background: var(--control-hover-bg); }
-button.text-control { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; padding: 0 8px; border: none; border-radius: 5px; background: transparent; color: var(--icon-color); font: var(--fs-caption) var(--font-ui); cursor: pointer; }
+button.text-control { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; padding: 0 8px; border: none; border-radius: var(--radius-inner); background: transparent; color: var(--icon-color); font: var(--fs-caption) var(--font-ui); cursor: pointer; }
 button.text-control:hover { background: var(--control-hover-bg); color: var(--icon-hover-color); }
 button.text-control[aria-pressed="true"] { background: var(--control-active-bg); color: var(--text-primary); }
 button.text-control:focus-visible { outline: none; background: var(--control-hover-bg); color: var(--icon-hover-color); }
@@ -1356,7 +1364,7 @@ button.terminal-chip:not(:disabled)[aria-expanded="true"] .shell-indicator-label
 /* Keep disabled chips inert even for the shared text-control disabled hover. */
 button.terminal-chip:disabled:hover { background: var(--hover); }
 /* Scope tags share the same quiet appearance in the input and recent searches. */
-.search-scope-chip { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; max-width: 45%; padding: 4px 7px; border-radius: 5px; background: var(--hover); color: var(--text-primary); font-size: var(--fs-caption); }
+.search-scope-chip { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; max-width: 45%; padding: 4px 7px; border-radius: var(--radius-inner); background: var(--hover); color: var(--text-primary); font-size: var(--fs-caption); }
 .search-scope-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .search-scope-chip > button, .search-scope-chip svg { flex-shrink: 0; }
 .search-scope-chip > button { display: inline-flex; align-items: center; padding: 2px; border: none; background: transparent; color: var(--icon-color); }
@@ -1457,7 +1465,7 @@ button.provider-option-row[data-selected="true"] { background: var(--field-bg); 
 .provider-option-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 button.provider-option-add { color: var(--text-secondary); }
 button.provider-option-add:hover { color: var(--text-primary); }
-.settings-preset-cell { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text-secondary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); cursor: pointer; text-align: left; min-width: 0; transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
+.settings-preset-cell { display: flex; align-items: center; gap: 8px; min-height: 34px; padding: 0 10px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--surface); color: var(--text-secondary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); cursor: pointer; text-align: left; min-width: 0; transition: border-color var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
 .settings-preset-cell:hover { color: var(--text-primary); border-color: var(--border-strong); }
 .settings-preset-cell span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -1471,7 +1479,7 @@ button.provider-option-add:hover { color: var(--text-primary); }
 .settings-model-filter-chip:hover { color: var(--text-primary); border-color: var(--border-strong); }
 .settings-model-filter-chip[aria-pressed="true"] { border-color: transparent; background: var(--control-active-bg); color: var(--text-primary); }
 /* ACP server rows: flat at rest, a soft highlight on hover, actions on the right. */
-.acp-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 8px; background: transparent; transition: background var(--dur-fast) var(--ease); }
+.acp-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--radius-inner); background: transparent; transition: background var(--dur-fast) var(--ease); }
 .acp-row:hover { background: var(--hover); }
 /* Capability marks share the same supported state in model lists and pickers. */
 .model-cap-chip { --model-capability-color: var(--group-blue); display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 20px; flex-shrink: 0; border-radius: 999px; color: var(--model-capability-color); background: color-mix(in srgb, var(--model-capability-color) 12%, transparent); }

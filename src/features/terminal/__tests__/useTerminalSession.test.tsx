@@ -11,6 +11,8 @@ const {
   exitResolvers,
   terminalInitOptions,
   terminalInstances,
+  terminalGrid,
+  fitProposal,
 } = vi.hoisted(() => ({
   writeMock: vi.fn(),
   onDataHandlers: [] as Array<(d: string) => void>,
@@ -21,6 +23,8 @@ const {
   exitResolvers: [] as Array<(u: () => void) => void>,
   terminalInitOptions: [] as import('@xterm/xterm').ITerminalOptions[],
   terminalInstances: [] as Array<{ options: Record<string, unknown> }>,
+  terminalGrid: { cols: 80, rows: 24 },
+  fitProposal: { cols: 80, rows: 24 },
 }));
 
 vi.mock('@xterm/xterm', () => ({
@@ -29,8 +33,8 @@ vi.mock('@xterm/xterm', () => ({
       terminalInitOptions.push(options);
       terminalInstances.push(this);
     }
-    cols = 80;
-    rows = 24;
+    cols = terminalGrid.cols;
+    rows = terminalGrid.rows;
     options: Record<string, unknown> = { fontSize: 13 };
     buffer = { active: { viewportY: 0, baseY: 0, cursorY: 0, getLine: () => undefined, getNullCell: () => ({}) } };
     element = document.createElement('div');
@@ -53,7 +57,7 @@ vi.mock('@xterm/xterm', () => ({
     }
   },
 }));
-vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { proposeDimensions() { return { cols: 80, rows: 24 }; } } }));
+vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { proposeDimensions() { return fitProposal; } } }));
 vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: class {} }));
 vi.mock('@features/ssh/services/hostTrust', () => ({ prepareSshHost: vi.fn().mockResolvedValue({ known: true, fingerprint: 'SHA256:test', keyType: 'ed25519' }) }));
 vi.mock('@features/ssh/services/forwarding', () => ({ startAutomaticForwarding: vi.fn().mockResolvedValue(undefined) }));
@@ -132,6 +136,10 @@ describe('useTerminalSession', () => {
     expect(mockedPtySpawn).toHaveBeenCalledOnce(); expect(ptyClose).not.toHaveBeenCalled();
   });
   beforeEach(() => {
+    terminalGrid.cols = 80;
+    terminalGrid.rows = 24;
+    fitProposal.cols = 80;
+    fitProposal.rows = 24;
     terminalInitOptions.length = 0;
     terminalInstances.length = 0;
     vi.mocked(mockedPtySpawn).mockClear();
@@ -163,6 +171,16 @@ describe('useTerminalSession', () => {
   it('configures a 10px native scrollbar so fitting uses the same width', () => {
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     expect(terminalInitOptions[0]?.scrollbar).toEqual({ width: 10, overviewRuler: { showTopBorder: false, showBottomBorder: false } });
+  });
+
+  it('starts the PTY with a usable grid when the pane mounts at a transient tiny size', async () => {
+    terminalGrid.cols = 2;
+    terminalGrid.rows = 1;
+    fitProposal.cols = 0;
+    fitProposal.rows = 0;
+    render(<TestHarness tabId="t1" onReady={() => {}} />);
+    await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalledOnce());
+    expect(mockedPtySpawn).toHaveBeenCalledWith(80, 24, undefined, expect.anything());
   });
 
   it('records the resolved system shell for a live process and clears it on disposal', async () => {

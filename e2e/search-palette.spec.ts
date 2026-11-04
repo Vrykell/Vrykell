@@ -78,7 +78,7 @@ for (const theme of ['深色', '浅色']) {
       return expected;
     });
     await expect.poll(() => secondResult.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(hoverBackground);
-    await expect(secondResult).toHaveCSS('border-radius', '8px');
+    await expect(secondResult).toHaveCSS('border-radius', '10px');
     await dialog.getByTestId('search-filter-button').press('Enter');
     await expect(dialog.getByRole('menu')).toBeVisible();
     await input.press('Escape');
@@ -164,7 +164,7 @@ test('prefixes scope results temporarily and settings search focuses individual 
     return expected;
   });
   await expect.poll(() => result.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(selectedBackground);
-  await expect(result).toHaveCSS('border-radius', '8px');
+  await expect(result).toHaveCSS('border-radius', '10px');
   await result.click();
   await expect(page.getByRole('combobox', { name: '终端字号', exact: true })).toBeFocused();
   await page.getByTestId('global-search-trigger').click();

@@ -58,7 +58,7 @@ export default function ErrorBox({
     background: palette.background,
     color: palette.color,
     border: `1px solid ${palette.border}`,
-    borderRadius: 'var(--radius-inner)',
+    borderRadius: 'var(--radius-card)',
     fontSize: 'var(--fs-label)',
     ...style,
   };

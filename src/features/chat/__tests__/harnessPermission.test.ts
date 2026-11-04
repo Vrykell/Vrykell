@@ -36,6 +36,16 @@ beforeEach(async () => {
 });
 
 describe('harness permission answers', () => {
+  it('queues independent permission requests without replacing the active decision', async () => {
+    useHarnessStore.getState().applyEvent(ask('First') as never);
+    const second = ask('Second'); second.payload.toolCall.toolCallId = 'call-2';
+    useHarnessStore.getState().applyEvent(second as never);
+    expect(useHarnessStore.getState().byTab[TAB]!.permission?.title).toBe('First');
+    await useHarnessStore.getState().answerPermission(TAB, 1, 'allow');
+    expect(useHarnessStore.getState().byTab[TAB]!.permission).toMatchObject({ title: 'Second', generation: 2 });
+    await useHarnessStore.getState().answerPermission(TAB, 2, null);
+    expect(acpAnswerPermission).toHaveBeenLastCalledWith('s1', 'call-2', null);
+  });
   it('carries the request generation on the card', () => {
     const session = useHarnessStore.getState().byTab[TAB];
     useHarnessStore.getState().applyEvent(ask() as never);

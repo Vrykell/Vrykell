@@ -69,15 +69,17 @@ export function ModelTextInput({ value, onCommit, placeholder, style }: {
   return <AutoSaveInput value={value} onCommit={onCommit} placeholder={placeholder} style={style} />;
 }
 
-export function NumberInput({ value, onChange, min, max }: {
+export function NumberInput({ value, onChange, min, max, label }: {
   value: number;
   onChange: (v: number) => void | Promise<void>;
   min: number;
   max: number;
+  label?: string;
 }) {
   return (
     <AutoSaveInput
       type="number"
+      aria-label={label}
       value={String(value)}
       min={min}
       max={max}
