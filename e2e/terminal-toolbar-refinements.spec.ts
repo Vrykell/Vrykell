@@ -44,7 +44,7 @@ for (const theme of ['dark', 'light']) test(`terminal split creation and group m
     await menu.getByRole('menuitem', { name: '搜索会话…', exact: true }).click();
     const search = page.getByTestId('tab-search');
     await expect(search).toHaveClass(/text-input-field/);
-    await expect(search).toHaveCSS('border-radius', '8px');
+    await expect(search).toHaveCSS('border-radius', '10px');
     expect((await search.boundingBox())!.width).toBeLessThan(160);
     await search.fill('missing terminal');
     await expect(page.getByText('无匹配会话', { exact: true })).toBeVisible();
