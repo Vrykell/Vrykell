@@ -1,7 +1,5 @@
-.harness-question { margin: 10px 4px; padding: 12px; border-radius: var(--radius-card); }
-.harness-question-source { color: var(--text-muted); font-size: var(--fs-caption); }
-.harness-question-field { min-width: 0; border: 0; padding: 0; margin: 12px 0; }
-.harness-question-field legend { margin-bottom: 8px; font-size: var(--fs-label); }
+.harness-question-field { min-width: 0; border: 0; padding: 0; margin: 0; }
+.harness-question-field legend { margin-bottom: 8px; font-size: inherit; }
 .harness-question-field p, .harness-question-field small { display: block; margin: 4px 0; color: var(--text-secondary); font-size: var(--fs-caption); line-height: 1.5; }
 .harness-question-choice { display: flex; align-items: flex-start; gap: 8px; padding: 8px; background: var(--hover); border-radius: var(--radius-inner); cursor: pointer; }
 .harness-question-choice span { min-width: 0; overflow-wrap: anywhere; }

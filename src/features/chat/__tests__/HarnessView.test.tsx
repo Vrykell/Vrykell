@@ -28,7 +28,7 @@ beforeEach(() => {
   useHarnessStore.setState({ byTab: { agent: session() } });
   useComposerDrafts.setState({ byTab: {} });
 });
-afterEach(() => { cleanup(); useHarnessStore.setState(initial, true); useComposerDrafts.setState(drafts, true); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); useHarnessStore.setState(initial, true); useComposerDrafts.setState(drafts, true); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
 
 it('keeps permission and model choices in the composer and puts other choices in persistent toolbar settings', () => {
   const view = render(<Surface />);
@@ -61,6 +61,24 @@ it('shows the shared loading animation before any output and removes it when the
   expect(useHarnessStore.getState().byTab.agent.messages).toHaveLength(1);
   act(() => useHarnessStore.setState(state => ({ byTab: { agent: { ...state.byTab.agent, pending: false } } })));
   expect(screen.queryByRole('status')).toBeNull();
+});
+
+it('grows the composer with its content the way the other composers do', () => {
+  vi.spyOn(HTMLTextAreaElement.prototype, 'clientWidth', 'get').mockImplementation(() => 400);
+  vi.spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get').mockImplementation(function (this: HTMLTextAreaElement) {
+    return 22 * Math.max(1, this.value.split('\n').length);
+  });
+  useComposerDrafts.getState().setText('agent', 'one');
+  render(<Surface />);
+  const composer = screen.getByTestId('harness-composer') as HTMLTextAreaElement;
+  expect(composer.style.height).toBe('22px');
+  fireEvent.change(composer, { target: { value: 'one\ntwo\nthree' } });
+  expect(composer.style.height).toBe('66px');
+  expect(composer.style.overflowY).toBe('hidden');
+  // Beyond the shared cap the box stops growing and scrolls internally, like the AI panel.
+  fireEvent.change(composer, { target: { value: Array.from({ length: 8 }, () => 'line').join('\n') } });
+  expect(composer.style.height).toBe('120px');
+  expect(composer.style.overflowY).toBe('auto');
 });
 
 it('keeps the draft when a prompt cannot be accepted', async () => {

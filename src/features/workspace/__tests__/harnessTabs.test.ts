@@ -15,7 +15,7 @@ beforeEach(() => {
   useHarnessWorkspace.setState({ connections: [], selected: '' });
 });
 
-it('keeps one workspace page and separate internal connections without reusing terminal directories', () => {
+it('opens independent connections for repeated agents without reusing terminal directories', () => {
   const workspace = useSessionStore.getState();
   workspace.openHarnessTab('Agent A');
   workspace.openHarnessTab('Agent B', '/other');
@@ -23,9 +23,10 @@ it('keeps one workspace page and separate internal connections without reusing t
   expect(useSessionStore.getState().tabs.filter(tab => tab.kind === 'harness')).toHaveLength(1);
   const sessions = useHarnessWorkspace.getState();
   expect(sessions.connections.map(item => [item.harness, item.cwd])).toEqual([
-    ['Agent A', ''], ['Agent B', '/other'],
+    ['Agent A', ''], ['Agent B', '/other'], ['Agent A', ''],
   ]);
-  expect(sessions.selected).toBe(sessions.connections[0].id);
+  expect(sessions.selected).toBe(sessions.connections[2].id);
+  expect(sessions.connections.every(item => item.fresh)).toBe(true);
 });
 
 it('never uses an SSH directory as a local project', () => {

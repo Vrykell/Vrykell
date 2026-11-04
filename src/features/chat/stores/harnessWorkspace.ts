@@ -18,10 +18,16 @@ let sequence = 0;
 export const useHarnessWorkspace = create<HarnessWorkspaceState>((set, get) => ({
   connections: [], selected: '',
   connect: (harness, cwd = '', fresh = false, resumeSessionId) => {
-    const existing = !fresh && get().connections.find(item => item.harness === harness && item.cwd === cwd && item.resumeSessionId === resumeSessionId);
+    // Only an explicit history identity can reuse a connection; picker launches are fresh.
+    const newSession = fresh || !resumeSessionId;
+    const existing = !newSession && get().connections.find(item => {
+      const session = useHarnessStore.getState().byTab[item.id];
+      return item.harness === harness && (session?.cwd || item.cwd) === cwd
+        && (session?.resumeSessionId ?? item.resumeSessionId) === resumeSessionId;
+    });
     if (existing) { set({ selected: existing.id }); return existing.id; }
     const id = `harness-${Date.now()}-${sequence++}`;
-    set(state => ({ connections: [...state.connections, { id, harness, cwd, fresh, ...(resumeSessionId ? { resumeSessionId } : {}) }], selected: id }));
+    set(state => ({ connections: [...state.connections, { id, harness, cwd, fresh: newSession, ...(resumeSessionId && !newSession ? { resumeSessionId } : {}) }], selected: id }));
     terminalDebug('harness-connection-added', { connectionId: id, hasDirectory: !!cwd });
     return id;
   },
