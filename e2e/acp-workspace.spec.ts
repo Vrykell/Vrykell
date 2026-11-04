@@ -102,11 +102,12 @@ test('matches structured question cards to ordinary tool questions in both theme
     method: 'call', requestId: 'ordinary-question', name: 'ask_user', arguments: { question: 'Choose the changes', options: ['All changes', 'Cache only'] },
   } });
   await emitAcpSession(page, { sessionId: 'sess_e2e', kind: 'elicitation', payload: {
-    requestId: 'structured-question', form: { message: 'Choose the changes', fields: [
-      { key: 'scope', title: 'Scope', kind: 'string', required: true, options: [
+    requestId: 'structured-question', form: { message: 'Questions', fields: [
+      { key: 'scope', title: 'Scope', kind: 'string', required: false, options: [
         { value: 'all', label: 'All changes', description: 'Navigation and caching' },
         { value: 'cache', label: 'Cache only', description: '' },
-      ], default: '', description: '', minimum: null, maximum: null, minLength: 0, maxLength: 4000, minItems: 0, maxItems: 0 },
+      ], default: '', description: 'Choose the changes', minimum: null, maximum: null, minLength: 0, maxLength: 4000, minItems: 0, maxItems: 0 },
+      { key: 'scope_other', title: 'Scope (other)', kind: 'string', required: false, options: [], default: '', description: 'Type your own answer', minimum: null, maximum: null, minLength: 0, maxLength: 4000, minItems: 0, maxItems: 0 },
     ] },
   } });
   const surface = current(page);
@@ -114,6 +115,10 @@ test('matches structured question cards to ordinary tool questions in both theme
   const ordinary = surface.locator('.ai-tool-card[data-tool-state="input-pending"]:not([data-testid="harness-question"])');
   await expect(ordinary).toBeVisible();
   await expect(card.getByText('等待回答')).toBeVisible();
+  await expect(card.getByText('Choose the changes', { exact: true })).toHaveCount(1);
+  await expect(card.getByText(/Questions|Scope \(other\)|Type your own answer/)).toHaveCount(0);
+  await expect(card.getByRole('textbox', { name: '你的回答' })).toHaveAttribute('placeholder', '输入你的回答…');
+  await expect(card.getByRole('button', { name: '跳过问题' })).toBeVisible();
   const metrics = (element: Element) => {
     const cardStyle = getComputedStyle(element);
     const header = getComputedStyle(element.querySelector('.ai-tool-summary')!);
@@ -135,6 +140,11 @@ test('matches structured question cards to ordinary tool questions in both theme
       const reference = (await ordinary.boundingBox())!;
       expect(Math.abs(bounds.x - reference.x)).toBeLessThan(1);
       expect(Math.abs(bounds.width - reference.width)).toBeLessThan(1);
+      const input = (await card.getByRole('textbox').boundingBox())!;
+      const nativeInput = (await ordinary.getByRole('textbox').boundingBox())!;
+      expect(input.x).toBeCloseTo(nativeInput.x, 0);
+      expect(input.width).toBeCloseTo(nativeInput.width, 0);
+      expect(input.height).toBeCloseTo(nativeInput.height, 0);
       const choices = card.getByRole('button', { pressed: false }).filter({ hasText: /All changes|Cache only/ });
       const first = (await choices.nth(0).boundingBox())!;
       const second = (await choices.nth(1).boundingBox())!;
@@ -145,13 +155,34 @@ test('matches structured question cards to ordinary tool questions in both theme
   }
   await card.getByRole('button', { name: 'Cache only', exact: true }).focus();
   await page.keyboard.press('Enter');
-  await card.getByRole('button', { name: '发送回答' }).focus();
-  await page.keyboard.press('Enter');
   await expect(card).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => (window as unknown as { __ELICITATION_ANSWERS__: unknown[] }).__ELICITATION_ANSWERS__)).toEqual([
     { sessionId: 'sess_e2e', requestId: 'structured-question', response: { action: 'accept', content: { scope: 'cache' } } },
   ]);
   await ordinary.getByRole('button', { name: 'All changes', exact: true }).click();
+});
+
+test('keeps a localized custom answer attached to its original field and supports native skip', async ({ page }) => {
+  await connect(page);
+  const field = { key: 'target', title: 'Next step', kind: 'string', required: false, options: [{ value: 'local', label: 'Local terminal', description: '' }], default: '', description: 'How should we continue?', minimum: null, maximum: null, minLength: 0, maxLength: 4000, minItems: 0, maxItems: 0 };
+  const form = { message: 'Questions', fields: [field, { ...field, key: 'target_other', title: 'Next step (other)', description: 'Type your own answer', options: [] }] };
+  await emitAcpSession(page, { sessionId: 'sess_e2e', kind: 'elicitation', payload: { requestId: 'custom', form } });
+  const card = current(page).getByTestId('harness-question');
+  await card.getByRole('textbox', { name: '你的回答' }).fill('Please review the local files');
+  await card.getByRole('textbox').press('Control+Enter');
+  await expect(card).toHaveCount(0);
+  await page.evaluate(async () => {
+    const path = '/src/i18n/preferences.ts';
+    const { useLanguagePreferences } = await import(path) as typeof import('../src/i18n/preferences');
+    useLanguagePreferences.getState().setPreference('en');
+  });
+  await emitAcpSession(page, { sessionId: 'sess_e2e', kind: 'elicitation', payload: { requestId: 'skip', form } });
+  await expect(card.getByRole('textbox', { name: 'Your answer' })).toHaveAttribute('placeholder', 'Type your answer…');
+  await card.getByRole('button', { name: 'Skip question' }).click();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __ELICITATION_ANSWERS__: unknown[] }).__ELICITATION_ANSWERS__)).toEqual([
+    { sessionId: 'sess_e2e', requestId: 'custom', response: { action: 'accept', content: { target_other: 'Please review the local files' } } },
+    { sessionId: 'sess_e2e', requestId: 'skip', response: { action: 'decline' } },
+  ]);
 });
 
 for (const width of [1240, 760]) {

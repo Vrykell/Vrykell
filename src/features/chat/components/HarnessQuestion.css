@@ -1,6 +1,2 @@
-.harness-question-field { min-width: 0; border: 0; padding: 0; margin: 0; }
-.harness-question-field legend { margin-bottom: 8px; font-size: inherit; }
-.harness-question-field p, .harness-question-field small { display: block; margin: 4px 0; color: var(--text-secondary); font-size: var(--fs-caption); line-height: 1.5; }
 .harness-question-choice { display: flex; align-items: flex-start; gap: 8px; padding: 8px; background: var(--hover); border-radius: var(--radius-inner); cursor: pointer; }
 .harness-question-choice span { min-width: 0; overflow-wrap: anywhere; }
-.harness-question .ai-question-options button[aria-pressed="true"] { box-shadow: inset 0 0 0 1px var(--primary-action); }
