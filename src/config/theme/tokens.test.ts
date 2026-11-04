@@ -1,4 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest';
+import { contrast } from './presets';
 import {
   hexToRgba,
   toRgba,
@@ -39,6 +40,22 @@ describe('toRgba', () => {
 });
 
 describe('default blue palette', () => {
+  it('keeps all light terminal ANSI foregrounds readable, including shell white and bright white', () => {
+    const palette = themes.light;
+    for (const role of ['Black', 'Red', 'Green', 'Yellow', 'Blue', 'Magenta', 'Cyan', 'White', 'BrightBlack', 'BrightRed', 'BrightGreen', 'BrightYellow', 'BrightBlue', 'BrightMagenta', 'BrightCyan', 'BrightWhite'] as const) {
+      expect(contrast(palette[`xterm${role}`], palette.xtermBg), role).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+  it('separates light workspace chrome, content, cards and editable fields', () => {
+    const palette = themes.light;
+    expect(new Set([palette.surface, palette.canvas, palette.xtermBg, palette.auxiliaryBg, palette.sidebarBg]).size).toBe(5);
+    expect(contrast(palette.surface, palette.xtermBg)).toBeGreaterThan(1.12);
+    expect(contrast(palette.selectionBg, palette.sidebarBg)).toBeGreaterThan(1);
+    expect(palette.cardBg).not.toBe(palette.fieldBg);
+    for (const background of [palette.surface, palette.canvas, palette.cardBg, palette.fieldBg, palette.auxiliaryBg]) {
+      expect(contrast(palette.textMuted, background)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
   it.each(['dark', 'light'] as const)('%s separates vivid destructive controls from muted diagnostic text', mode => {
     expect(themes[mode].dangerAction).not.toBe(themes[mode].errorLight);
     expect(paletteToCssVars(themes[mode])['--danger-action']).toBe(themes[mode].dangerAction);

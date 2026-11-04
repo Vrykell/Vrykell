@@ -190,9 +190,9 @@ const DARK_SURFACES = {
 } as const;
 
 const LIGHT_SURFACES = {
-  content: '#F7F8F9', canvas: '#F7F8F9', sidebar: '#E9F0FA', card: '#F5F5F5',
-  field: '#FFFFFF', elevated: '#FAFAFA', control: '#FFFFFF', hover: '#F2F2F2',
-  border: '#DFE3E5', borderStrong: '#B9C2C8',
+  content: '#FFFFFF', canvas: '#FAFBFC', sidebar: '#DFE7F1', card: '#EBEEF2',
+  field: '#FFFFFF', elevated: '#FFFFFF', control: '#F8FAFC', hover: '#E3E3E3',
+  border: '#D2D9E2', borderStrong: '#ACBAC9',
 } as const;
 
 // Syntax, charts, group swatches and session icons share these accent families.
@@ -408,12 +408,12 @@ const light: ThemePalette = {
   shellZshAccent: '#F15A24',
   groupCoral: LIGHT_ACCENTS.coral,
 
-  chromeBg: '#E9F0FA',
+  chromeBg: '#DFE7F1',
   sidebarBg: LIGHT_SURFACES.sidebar,
-  auxiliaryBg: '#F0F2F3',
+  auxiliaryBg: '#E9EEF4',
   chromeField: LIGHT_SURFACES.control,
-  tabMenuBg: '#E6E6E6',
-  selectionBg: '#FFFFFF',
+  tabMenuBg: LIGHT_SURFACES.elevated,
+  selectionBg: '#E2E2E2',
   segmentedTrack: '#CCD2D9',
   segmentedThumb: '#FFFFFF',
   segmentedText: '#242B30',
@@ -430,7 +430,7 @@ const light: ThemePalette = {
   border: LIGHT_SURFACES.border,
   borderStrong: LIGHT_SURFACES.borderStrong,
   resizeDivider: 'rgba(0,0,0,0.05)',
-  inputBorder: '#DADADA',
+  inputBorder: LIGHT_SURFACES.border,
 
   textPrimary: '#242B30',
   textSecondary: '#535F68',
@@ -517,15 +517,15 @@ const light: ThemePalette = {
   xtermBlue: '#2166A5',
   xtermMagenta: '#7A4E9B',
   xtermCyan: '#087F8C',
-  xtermWhite: '#F3F4F6',
+  xtermWhite: '#41454D',
   xtermBrightBlack: '#6B7280',
   xtermBrightRed: '#D33A2C',
   xtermBrightGreen: LIGHT_ACCENTS.green,
-  xtermBrightYellow: '#A47B00',
-  xtermBrightBlue: '#2F7EC5',
-  xtermBrightMagenta: '#9364B5',
-  xtermBrightCyan: '#1499A5',
-  xtermBrightWhite: '#FFFFFF',
+  xtermBrightYellow: '#8A6500',
+  xtermBrightBlue: '#276FB0',
+  xtermBrightMagenta: '#8954AB',
+  xtermBrightCyan: '#087985',
+  xtermBrightWhite: '#242B30',
 };
 
 // ── Exports ──

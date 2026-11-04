@@ -9,7 +9,9 @@ colors:
   dark-card: "#303030"
   dark-field: "#3C3C3C"
   dark-text: "#EBEDF0"
-  light-canvas: "#F7F8F9"
+  light-canvas: "#FAFBFC"
+  light-toolbar: "#EBEEF2"
+  light-card: "#E7E9EB"
   light-field: "#FFFFFF"
   light-text: "#242B30"
 typography:
@@ -116,6 +118,8 @@ Drag insertion placeholders use the existing rounded hover fill without an edge 
 `theme.css` owns three global corner tiers: large 14 px, medium 10 px and small 10 px, matching the user's explicit values. Large settings groups, history groups, full usage sections, dialogs and application-painted window content use `--radius-lg` through `--radius-block`. Composers, host cards, compact usage cards, notifications, errors and floating menus use `--radius-md` through `--radius-card`. Sent messages, tool cards and shared fields use `--radius-sm` through `--radius-inner`. Small and medium remain independent even while their values match. The native compositor owns the outer frame on Windows; its content must not add another corner mask that separates the native border from its edge. Maximized and fullscreen windows stay flush. Segmented thumbs derive their corners from the track minus its inset. Circular status marks and switches retain their functional shapes; connected edges and full-bleed rows retain their zero-radius joins. Favorites and tag filters are compact capsules; primary split buttons are one continuous shape with a single internal separator. Favorite marks in the editor header have no background.
 
 ## Components
+
+The canonical theme palette in `src/config/theme/tokens.ts` maps through `paletteToCssVars` into `src/app/theme.css` aliases and shared controls. Light appearance separates cool-gray toolbars (`surface`), a near-white canvas, white terminal content, gray cards, white fields, and a distinct auxiliary panel. Active connected tabs inherit their content surface. Deep Black uses the ordinary neutral selection surface and white action text and switch thumbs; action fills retain readable contrast rather than selecting dark ink automatically.
 
 Memory settings has one compact two-row card: aggregate status and a text reload action, followed by assistant review. Counts stay inline with their labels, without large statistic tiles or icons. It never lists or edits memory bodies. Loading and failures reuse the shared status and persistent notification components. Assistant review opens its own briefly named conversation through the usual authorization path.
 
