@@ -24,6 +24,7 @@ import { useSkillMarketplace } from '@features/settings/hooks/useSkillMarketplac
 import { useSkillFileBrowser } from '@features/settings/hooks/useSkillFileBrowser';
 import type { FileNode } from '@features/settings/model/skillFileTree';
 import { SettingsGroup } from '../components/ui';
+import SettingsDialog from '../components/SettingsDialog';
 import { inputStyle } from '../components/formStyles';
 import Toggle from '@ui/fields/Toggle';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
@@ -310,8 +311,10 @@ export default function SkillsSettings() {
     toggleEnabled,
   } = useSkillsSettings();
   const [query, setQuery] = useState('');
-  const [adding, setAdding] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const visible = metas.filter(skill => `${skill.name} ${skill.description}`.toLowerCase().includes(query.trim().toLowerCase()));
+  const importFromUrl = async () => { await doImportUrl(); setImportOpen(false); };
+  const importFromPath = async (directory: boolean) => { await doImportPath(directory); setImportOpen(false); };
 
   if (detail) return <SkillDetailPanel key={detail.name} skill={detail} onClose={() => setDetail(null)} onChanged={deleted => { refresh(); if (!deleted) void openDetail(detail.name); }} />;
   if (market) return <SkillMarketplacePanel metas={metas} onClose={() => setMarket(false)} onInstalled={refresh} />;
@@ -321,45 +324,49 @@ export default function SkillsSettings() {
       <header className="resource-page-header">
         <div><h1>{t('Skills')}</h1><p>{t('Manage the skills available to your assistant.')}</p></div>
       </header>
-      {adding && !warnDismissed && (
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 8,
-          padding: '8px 10px', borderRadius: 'var(--radius-inner)',
-          background: 'var(--accent-warm-dim)', fontSize: 'calc(11px * var(--ui-font-scale))', lineHeight: 1.5, color: 'var(--accent-warm)',
-        }}>
-          <ShieldAlert size={14} style={{ flexShrink: 0 }} />
-          <span style={{ flex: 1 }}>{t('Skills may contain scripts. Imported skills remain untrusted until you review and trust them. Script execution still follows tool permissions.')}</span>
-          <IconButton compact onClick={() => setWarnDismissed(true)} data-tip={t('Close')} aria-label={t('Close')}><X size={16} /></IconButton>
-        </div>
-      )}
-
-      {adding && <div className="resource-import">
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        <TextInput
-          value={importUrl}
-          placeholder={t('Import a skill manifest from a URL')}
-          onChange={(e) => setImportUrl(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') void doImportUrl(); }}
-          style={input}
-        />
-        <OutlineButton onClick={() => void doImportUrl()} disabled={importing} style={{ ...btn, flexShrink: 0 }}>
-          {importing ? t('Importing…') : t('Import')}
-        </OutlineButton>
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-        <OutlineButton onClick={() => void doImportPath(true)} disabled={importing} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <Download size={13} /> {t('Import folder')}
-        </OutlineButton>
-        <OutlineButton onClick={() => void doImportPath(false)} disabled={importing} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <Download size={13} /> {t('Import archive')}
-        </OutlineButton>
-      </div>
-      </div>}
+      <SettingsDialog open={importOpen} title={t('Import skills')} icon={<Download size={16} />} width={520} testId="skills-import-dialog"
+        initialFocus='[data-testid="skill-import-url"]' onClose={() => setImportOpen(false)}>
+        <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {!warnDismissed && (
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '8px 10px', borderRadius: 'var(--radius-inner)',
+              background: 'var(--accent-warm-dim)', fontSize: 'calc(11px * var(--ui-font-scale))', lineHeight: 1.5, color: 'var(--accent-warm)',
+            }}>
+              <ShieldAlert size={14} style={{ flexShrink: 0 }} />
+              <span style={{ flex: 1 }}>{t('Skills may contain scripts. Imported skills remain untrusted until you review and trust them. Script execution still follows tool permissions.')}</span>
+              <IconButton compact onClick={() => setWarnDismissed(true)} data-tip={t('Close')} aria-label={t('Close')}><X size={16} /></IconButton>
+            </div>
+          )}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <TextInput
+              data-testid="skill-import-url"
+              aria-label={t('Import a skill manifest from a URL')}
+              value={importUrl}
+              placeholder={t('Import a skill manifest from a URL')}
+              onChange={(e) => setImportUrl(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') void importFromUrl(); }}
+              style={{ ...inputStyle, flex: 1, width: 'auto' }}
+            />
+            <OutlineButton onClick={() => void importFromUrl()} disabled={importing} style={{ ...btn, flexShrink: 0 }}>
+              {importing ? t('Importing…') : t('Import')}
+            </OutlineButton>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <OutlineButton onClick={() => void importFromPath(true)} disabled={importing} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Download size={13} /> {t('Import folder')}
+            </OutlineButton>
+            <OutlineButton onClick={() => void importFromPath(false)} disabled={importing} style={{ ...btn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              <Download size={13} /> {t('Import archive')}
+            </OutlineButton>
+          </div>
+        </section>
+      </SettingsDialog>
 
       <div className="resource-library-toolbar">
         <div className="resource-actions">
           <OutlineButton onClick={() => setMarket(true)}><Store size={16} />{t('Skill marketplace')}</OutlineButton>
-          <OutlineButton aria-expanded={adding} onClick={() => setAdding(value => !value)}><Plus size={16} />{t('Import skills')}</OutlineButton>
+          <OutlineButton aria-expanded={importOpen} onClick={() => setImportOpen(true)}><Plus size={16} />{t('Import skills')}</OutlineButton>
         </div>
         <div className="resource-search"><Search size={16} aria-hidden="true" /><TextInput variant="field" aria-label={t('Search skills…')} placeholder={t('Search skills…')} value={query} onChange={event => setQuery(event.target.value)} /></div>
       </div>

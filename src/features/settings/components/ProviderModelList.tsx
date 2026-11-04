@@ -19,6 +19,7 @@ import { ModelCapabilityBadge } from '@features/agent/components/ModelCapability
 import { providerFetchModels, useAiConfigStore, type ModelProfile } from '@features/agent';
 import { commitModels } from '@features/settings/model/modelWrites';
 import { filterModels, groupModelsByVendor } from '@features/settings/model/modelGroups';
+import { readCollapsedModelGroups, saveCollapsedModelGroups } from '@features/settings/model/modelGroupCollapse';
 import type { ProviderRow } from '@features/settings/model/providerList';
 import { SettingsGroup, Field } from './ui';
 import AddModelDialog from './AddModelDialog';
@@ -104,7 +105,7 @@ export default function ProviderModelList({ row, toast }: {
   const [searchOpen, setSearchOpen] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [capability, setCapability] = useState<ModelCapability | 'all'>('all');
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [collapsed, setCollapsed] = useState<Set<string>>(readCollapsedModelGroups);
   const [syncing, setSyncing] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState<ModelProfile | null>(null);
@@ -115,13 +116,18 @@ export default function ProviderModelList({ row, toast }: {
   const groups = useMemo(() => groupModelsByVendor(visible), [visible]);
   const allCollapsed = groups.length > 0 && groups.every(group => collapsed.has(group.key));
 
-  const toggleGroup = (key: string) => setCollapsed((current) => {
-    const next = new Set(current);
+  const toggleGroup = (key: string) => {
+    const next = new Set(collapsed);
     if (next.has(key)) next.delete(key);
     else next.add(key);
-    return next;
-  });
-  const toggleAll = () => setCollapsed(allCollapsed ? new Set() : new Set(groups.map(group => group.key)));
+    setCollapsed(next);
+    saveCollapsedModelGroups(next);
+  };
+  const toggleAll = () => {
+    const next = allCollapsed ? new Set<string>() : new Set(groups.map(group => group.key));
+    setCollapsed(next);
+    saveCollapsedModelGroups(next);
+  };
 
   const requestRemove = (model: ModelProfile) => {
     if (models.length <= 1) {

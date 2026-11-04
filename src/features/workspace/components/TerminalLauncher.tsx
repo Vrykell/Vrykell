@@ -20,7 +20,7 @@ import LaunchStats from './LaunchStats';
 export default function TerminalLauncher() {
   const [shells, setShells] = useState<ShellOption[]>([]);
   const [query, setQuery] = useState('');
-  const [optionsOpen, setOptionsOpen] = useState(false);
+  const [optionsOpen, setOptionsOpen] = useState<{ x: number; y: number } | null>(null);
   const profiles = useShellProfiles(state => state.profiles);
   const hosts = useSshStore(state => state.connections);
   const tabs = useSessionStore(state => state.tabs);
@@ -46,7 +46,7 @@ export default function TerminalLauncher() {
         <div className="ai-launch-section-heading"><h3>{t('Shell profiles')}<span>{shells.length}</span></h3><div className="ai-launch-section-actions"><OutlineButton onClick={() => {
           useSettingsNavigationStore.getState().setSelected(`profile:${defaultShell}`);
           useSessionStore.getState().openSettings();
-        }}>{t('Configure profiles')}</OutlineButton><IconBtn title={t('New terminal options')} onClick={() => setOptionsOpen(true)}><MoreHorizontal size={18} /></IconBtn></div></div>
+        }}>{t('Configure profiles')}</OutlineButton><IconBtn title={t('New terminal options')} onClick={event => setOptionsOpen({ x: event.clientX, y: event.clientY })}><MoreHorizontal size={18} /></IconBtn></div></div>
         <div className="workspace-sidebar-search ai-launch-search"><Search size={16} /><TextInput value={query} onChange={event => setQuery(event.target.value)} aria-label={t('Search shell profiles')} placeholder={t('Search shell profiles')} /></div>
         <div className="ai-launch-grid">{visible.map(shell => <button type="button" className="ai-launch-option" key={shell.id} data-testid={`terminal-start-profile-${shell.id}`} onClick={() => useSessionStore.getState().addTab({ shellType: shell.id })}>
           <TerminalProfileIcon shellType={shell.id} size={28} /><span className="ai-launch-copy"><strong>{profiles[shell.id]?.name || shell.label}</strong><small>{profiles[shell.id]?.cwd || t('Inherit current directory')}</small></span><ChevronRight size={16} />
@@ -60,6 +60,6 @@ export default function TerminalLauncher() {
         }}><TerminalProfileIcon kind="ssh" connectionId={host.id} size={28} /><span className="ai-launch-copy"><strong>{host.name}</strong><small>{host.user ? `${host.user}@` : ''}{host.host}:{host.port ?? 22}</small></span><ChevronRight size={16} /></button>)}</div>
       </section>}
     </div>
-    <NewTabModal open={optionsOpen} onClose={() => setOptionsOpen(false)} />
+    <NewTabModal open={!!optionsOpen} anchor={optionsOpen ?? undefined} onClose={() => setOptionsOpen(null)} />
   </section></div>;
 }

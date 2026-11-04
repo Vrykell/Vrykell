@@ -17,6 +17,16 @@ it('retains existing defaults and keeps context limits independent for each mode
   view.rerender(<SettingsSaveProvider><ModelContextSettings key="second" modelId="second" /></SettingsSaveProvider>);
   expect(screen.getAllByRole('spinbutton')[0]).toHaveValue(128000);
 });
+it('edits the default configuration without creating a model override and hides toggle state text', async () => {
+  useAgentSettings.setState({ global: { ...initial.global, contextMaxTokens: 1000000, temperature: 0.7 }, overrides: {} });
+  render(<SettingsSaveProvider><ModelContextSettings global /></SettingsSaveProvider>);
+  expect(screen.queryByText('已开启')).toBeNull();
+  const budget = screen.getAllByRole('spinbutton')[0];
+  fireEvent.change(budget, { target: { value: '200000' } });
+  fireEvent.blur(budget);
+  await waitFor(() => expect(useAgentSettings.getState().global.contextMaxTokens).toBe(200000));
+  expect(useAgentSettings.getState().overrides).toEqual({});
+});
 it('resetting behavior fields preserves independent context and thinking limits', () => {
   useAgentSettings.setState({ overrides: { first: { agentMode: false, contextMaxTokens: 128000, deepThink: true } } });
   useAgentSettings.getState().resetModelFields('first', ['agentMode', 'systemPrompt', 'maxSteps']);

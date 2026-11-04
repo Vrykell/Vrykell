@@ -1,3 +1,5 @@
+import type { MenuAnchor } from '@ui/menus/ContextMenu';
+
 export interface TabGroupHandle { id: string; title: string; collapsed: boolean; members: string[]; archivable?: boolean }
 
 /** The strip owns presentation; providers implement the shared group operations. */
@@ -12,5 +14,5 @@ export interface TabGroupController {
   remove: (id: string, mode: 'delete' | 'archive') => void;
   color: (id: string, value: string | null) => void;
   move: (id: string, over: string | undefined, after: boolean) => void;
-  add?: (id: string) => void;
+  add?: (id: string, anchor?: MenuAnchor) => void;
 }

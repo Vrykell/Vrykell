@@ -484,7 +484,7 @@ export default function FilePanel({
               style={{
                 flex: 1, minWidth: 0, height: 22, padding: '0 6px',
                 background: 'var(--field-bg)', border: '1px solid var(--border)',
-                borderRadius: 4, outline: 'none',
+                borderRadius: 'var(--radius-inner)', outline: 'none',
                 fontFamily: 'var(--font-mono)', fontSize: 'calc(11px * var(--ui-font-scale))',
                 color: 'var(--text-primary)',
               }}

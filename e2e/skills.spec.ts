@@ -104,6 +104,7 @@ test.describe('Skills settings page', () => {
 
   test('URL import: install remote skills in bulk', async ({ page }) => {
     await page.getByRole('button', { name: '导入技能', exact: true }).click();
+    await expect(page.getByTestId('skills-import-dialog')).toBeVisible();
     await page.getByPlaceholder('从 URL 导入技能清单').fill('https://example.com/skills.json');
     await page.getByRole('button', { name: '导入', exact: true }).click();
     await expect(page.getByText('已安装 2 个技能')).toBeVisible({ timeout: 5000 });

@@ -8,5 +8,6 @@ it.each([
   const pick = vi.fn(); const menu = workspaceSplitMenu(scope, pick);
   expect(menu.onClick).toBeUndefined();
   expect(menu.submenu!.items).toHaveLength(kinds.length);
-  menu.submenu!.items.forEach((item, index) => { item.onClick!(); expect(pick).toHaveBeenLastCalledWith(kinds[index]); });
+  const anchor = { x: 12, y: 34 };
+  menu.submenu!.items.forEach((item, index) => { item.onClick!(anchor); expect(pick).toHaveBeenLastCalledWith(kinds[index], anchor); });
 });

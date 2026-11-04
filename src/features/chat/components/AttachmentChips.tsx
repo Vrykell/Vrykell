@@ -85,7 +85,7 @@ function AttachmentPreview({ att, id, trigger, panelRef }: { att: AttachmentMeta
     >
       {isImage ? (
         dataUrl ? (
-          <img src={dataUrl} alt={att.name} style={{ maxWidth: '100%', maxHeight: 220, display: 'block', borderRadius: 4 }} />
+          <img src={dataUrl} alt={att.name} style={{ maxWidth: '100%', maxHeight: 220, display: 'block', borderRadius: 'var(--radius-inner)' }} />
         ) : (
           <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{t('Loading…')}</span>
         )

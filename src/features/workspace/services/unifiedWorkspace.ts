@@ -119,7 +119,7 @@ export function reconcileUnifiedResources(ids: string[]) {
 export function requestWorkspaceSplit(resourceId?: string, anchor?: { x: number; y: number }, creation?: import('../model/workspaceCreation').WorkspaceCreation) {
   const navigation = useWorkspaceNavigation.getState(); const workspace = useWorkspaceStore.getState();
   if (navigation.area === 'terminal') {
-    if (creation === 'terminal' || creation === 'ssh') useUiStore.getState().openSplitPicker(creation === 'ssh' ? 'ssh' : 'shell');
+    if (creation === 'terminal' || creation === 'ssh') useUiStore.getState().openSplitPicker(creation === 'ssh' ? 'ssh' : 'shell', anchor);
     else requestTerminalSplit(null);
     return;
   }

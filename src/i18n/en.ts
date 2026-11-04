@@ -73,7 +73,7 @@ const en: Record<string, string> = {
   'empty.title1': 'Enter a command in the input below', 'empty.title2': 'Enter to run · Shift+Enter for a new line · Select $ for AI mode',
   'toast.tabRestored': 'Closed tab restored', 'toast.renamed': 'Renamed to "{{title}}"',
   'settings.title': 'Settings', 'settings.apiKeyLabel': 'Anthropic API Key', 'settings.modelLabel': 'Model ID', 'settings.save': 'Save',
-  'model.scope.aria': 'Configuration scope', 'model.scope.global': 'Global defaults',
+  'model.scope.aria': 'Configuration scope', 'model.scope.global': 'Default configuration',
   'apiKey.missing': 'Configure an API key to use AI features', 'apiKey.placeholder': 'Enter an Anthropic API key (sk-ant-...)', 'apiKey.save': 'Save',
   'palette.search': 'Search commands…', 'palette.noMatch': 'No matching commands',
   'terminal.menu.copy': 'Copy', 'terminal.menu.paste': 'Paste',

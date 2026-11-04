@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, aiModelCalls } from './tauri-mock';
-import { gotoSetting } from './settings';
+import { gotoSetting, fieldOf } from './settings';
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
@@ -9,7 +9,7 @@ test.beforeEach(async ({ page }) => {
 
 test('numeric feedback shows the actual saved value after bounds and rounding', async ({ page }) => {
   await gotoSetting(page, '模型行为');
-  const steps = page.getByRole('spinbutton').first();
+  const steps = fieldOf(page, '最大迭代步数').getByRole('spinbutton');
   for (const [draft, saved] of [['101', '100'], ['0', '1'], ['3.6', '4']]) {
     await steps.fill(draft);
     await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
@@ -17,7 +17,7 @@ test('numeric feedback shows the actual saved value after bounds and rounding', 
   }
   await page.locator('aside').getByRole('button', { name: '主题', exact: true }).click();
   await page.locator('aside').getByRole('button', { name: '模型行为', exact: true }).click();
-  await expect(page.getByRole('spinbutton').first()).toHaveValue('4');
+  await expect(fieldOf(page, '最大迭代步数').getByRole('spinbutton')).toHaveValue('4');
 });
 
 test('model text waits for a pause and the last write carries the whole row', async ({ page }) => {

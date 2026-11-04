@@ -44,6 +44,17 @@ for (const theme of ['dark', 'light']) for (const width of [760, 1280]) {
     await page.getByTestId('model-settings').first().click();
     const dialog = page.getByTestId('model-settings-dialog').getByRole('dialog');
     await expect(dialog).toHaveCSS('border-top-left-radius', '23px');
+    await expect(dialog.locator('.model-options-title')).toHaveCount(0);
+    const overlap = await dialog.locator('.model-option > span, .model-option > div').evaluateAll(nodes => {
+      const boxes = nodes.map(node => { const rect = node.getBoundingClientRect(); return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom }; });
+      for (let first = 0; first < boxes.length; first++) for (let second = first + 1; second < boxes.length; second++) {
+        const a = boxes[first]!; const b = boxes[second]!;
+        if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > 0.5
+          && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > 0.5) return { first, second };
+      }
+      return null;
+    });
+    expect(overlap).toBeNull();
     expect(await dialog.locator('.model-context-settings').boundingBox().then(box => box!.height)).toBeLessThan(240);
     const context = await dialog.locator('.model-context-settings').boundingBox();
     const caps = await dialog.locator('.model-capability-settings').boundingBox();
