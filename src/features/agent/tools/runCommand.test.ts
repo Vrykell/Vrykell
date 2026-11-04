@@ -66,7 +66,7 @@ describe('runCommandAndWait', () => {
     controller.abort();
     release();
     await earlier;
-    await expect(pending).resolves.toMatchObject({ ok: false, completed: false });
+    await expect(pending).resolves.toMatchObject({ ok: false, completed: false, code: 'COMMAND_ABORTED' });
     expect(vi.mocked(ptyWrite).mock.calls.filter(([, data]) => data.includes('cancelled'))).toEqual([]);
     expect(clearPending).toHaveBeenCalledOnce();
   });
@@ -238,7 +238,7 @@ describe('runCommandAndWait', () => {
     const paneId = setupPane();
     useTerminalStore.setState((s) => ({ scenes: { ...s.scenes, [paneId]: 'altScreen' } }));
     const r = await runCommandAndWait('ls');
-    expect(r.ok).toBe(false);
+    expect(r).toMatchObject({ ok: false, code: 'TERMINAL_INTERACTIVE' });
     expect(r.error).toContain('altScreen');
   });
 
@@ -248,7 +248,7 @@ describe('runCommandAndWait', () => {
     const promise = runCommandAndWait('sleep 999', { timeoutMs: 50 });
     await vi.advanceTimersByTimeAsync(100);
     const r = await promise;
-    expect(r.ok).toBe(false);
+    expect(r).toMatchObject({ ok: false, completed: false, code: 'COMMAND_TIMEOUT' });
     expect(r.error).toContain('超时');
   });
 
@@ -259,8 +259,7 @@ describe('runCommandAndWait', () => {
     // 1500ms grace (no blocks) -> snapshot mode; completes once output is stable for 2 x 500ms
     await vi.advanceTimersByTimeAsync(3000);
     const r = await promise;
-    expect(r.ok).toBe(false);
-    expect(r.completed).toBe(false);
+    expect(r).toMatchObject({ ok: false, completed: false, code: 'COMMAND_UNCONFIRMED' });
     expect(r.error).toContain('无法确认');
   });
 
@@ -338,7 +337,7 @@ describe('runCommandAndWait', () => {
     // the command switches the terminal into fullscreen interaction (a fullscreen TUI)
     useTerminalStore.setState((s) => ({ scenes: { ...s.scenes, [paneId]: 'altScreen' } }));
     const r = await promise;
-    expect(r.ok).toBe(false);
+    expect(r).toMatchObject({ ok: false, code: 'TERMINAL_INTERACTIVE' });
     expect(r.error).toContain('全屏交互界面');
   });
 

@@ -14,6 +14,7 @@ it('forces a text-only handoff after any denial in the current turn', () => {
     { toolResults: [{ output: { ok: true } }] },
   ] })).toEqual({ toolChoice: 'none' });
   expect(TOOL_RECOVERY_GUIDANCE).toContain('Never retry with another tool');
+  expect(TOOL_RECOVERY_GUIDANCE).toContain('soft completion guard');
   expect(TOOL_RECOVERY_GUIDANCE).toContain('executionState=unknown');
   expect(prepareToolRecoveryStep({ steps: [{ toolResults: [{ output: { denied: true } }] }] }, ['ask_user', 'run_command'])).toEqual({ toolChoice: 'none' });
 });

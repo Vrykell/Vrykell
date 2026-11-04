@@ -4,6 +4,10 @@
 
 The read-only `acp_workspace_root` command returns the application-owned default workspace path and prepares that directory; it accepts no caller-supplied path. A session without an explicit project starts in its own new folder. This prevents accidental project inheritance, but does not sandbox the external process. Attachments reuse the existing picker/drop grants and application-owned storage. Image prompts require the capability advertised by the agent, bounded image blocks and a separately bounded outbound frame; inbound and replay limits stay unchanged. Closing or cancelling a session invalidates pending attachment reads, and failed reads retain the composer draft. No capability, CSP origin, arbitrary read or authorization grant is added.
 
+## External execution context
+
+External tool initialization and descriptions explain the distinction between the agent host and the explicitly selected application terminal. Successful terminal reads return bounded host, directory, shell and user-provided notes captured for that turn. Only host/user/port metadata is copied; authentication fields are excluded. Notes remain untrusted context and grant no permissions. Missing-target and remote/local file mismatches return distinct guidance without selecting a terminal, establishing another connection or changing tool permissions. Native authorization, captured-target ownership and diagnostic redaction remain unchanged; no IPC commands, capabilities or content sources are added.
+
 ## Conversation turn and transport limits
 
 Local tools share per-turn serialized execution. A refusal or an unanswered question closes queued and later calls in that turn; each subsequent user message starts a new scope. Native policy, confirmations and execution leases still apply. External protocol frames and replay buffers have explicit size limits and bounded queues; replay is consumed while its response is pending. Turn completion follows already received content, and a failed history load cannot inject its partial transcript into a replacement session. Request identifiers retain their original types. These changes add no commands, capabilities, file grants or network sources; independently configured external tools remain outside this adapter's control.
@@ -39,7 +43,7 @@ The internal tool adapter uses authenticated, ephemeral loopback framing and a s
 
 ## Reference-only compositions and tool recovery
 
-Within a request, terminal command calls execute in submission order before authorization and PTY writes. A denied, cancelled or unconfirmed command prevents queued successors from writing. Completed nonzero diagnostics do not poison the queue. The existing busy guard still protects against human or independent callers; cancellation never kills the live process.
+Within a request, terminal command calls execute in submission order before authorization and PTY writes. A denied, cancelled or unconfirmed command prevents queued successors from writing. An unconfirmed command lifts its soft boundary for a newly submitted command only after the terminal is confirmed ready again; calls already queued at the boundary stay blocked. Completed nonzero diagnostics do not poison the queue. The existing busy guard still protects against human or independent callers; cancellation never kills the live process.
 
 `save_workspace_history` accepts bounded, versioned layout references with whitelisted member fields; it rejects content-bearing payloads, invalid layouts and attempts to overwrite terminal rows. Writes are atomic historical metadata, not startup process records. The additive metadata migration retains existing rows. Source and split filtering use indexed flags maintained on writes. `get_conversation` validates its identifier and performs one parameter-bound metadata lookup without loading messages. Neither command expands file access, network origins, capabilities, CSP or execution privileges.
 

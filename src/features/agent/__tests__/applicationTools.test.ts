@@ -7,7 +7,9 @@ import type { ToolRun } from '../model/messageParts';
 const execute = vi.hoisted(() => vi.fn());
 vi.mock('../tools', () => ({ buildTools: (context: ToolContext) => {
   const entry = { inputSchema: z.object({ path: z.string() }), execute: (args: unknown) => execute(args, context) };
-  return { read_file: entry, ...(context.paneId !== null ? { run_command: entry } : {}), ask_user: entry, get_api_key: entry };
+  return { ...(!context.remote ? { read_file: entry } : {}), ...(context.paneId !== null ? {
+    run_command: entry, read_terminal: { inputSchema: z.object({}), execute: (args: unknown) => execute(args, context) },
+  } : {}), ask_user: entry, get_api_key: entry };
 } }));
 beforeEach(() => { execute.mockReset(); });
 
@@ -48,9 +50,64 @@ it('keeps an aborted active call cancelled when execution rejects', async () => 
 
 it('adapts only the application allowlist and preserves input schemas', () => {
   const catalog = applicationToolCatalog();
-  expect(catalog.map(tool => tool.name)).toEqual(['read_file', 'run_command', 'ask_user']);
+  expect(catalog.map(tool => tool.name)).toEqual(['read_file', 'run_command', 'read_terminal', 'ask_user']);
   expect(catalog[0]?.inputSchema.type).toBe('object');
   expect(catalog[0]?.inputSchema.required).toEqual(['path']);
+});
+
+it('explains the difference between the selected terminal and the agent host before execution', () => {
+  const catalog = applicationToolCatalog();
+  for (const name of ['run_command', 'read_terminal']) {
+    const description = catalog.find(tool => tool.name === name)?.description;
+    expect(description).toContain('already-connected SSH session');
+    expect(description).toContain('separate from the agent process');
+    expect(description).toContain('For kind=local');
+    expect(description).toContain('empty screen');
+  }
+});
+
+it('returns captured SSH metadata with an empty terminal without exposing authentication fields', async () => {
+  execute.mockResolvedValue({ ok: true, executionState: 'ready', content: '' });
+  const terminal = { paneId: 'remote', kind: 'ssh' as const, label: 'Server', cwd: '/srv', shellType: 'posix',
+    ssh: { host: 'server.example', user: 'operator', port: 2222, password: 'private-value' }, aiNotes: 'Site files are under /srv' };
+  const session = new ApplicationToolSession({ tabId: 'owner', paneId: 'remote', remote: true }, vi.fn(), {
+    agentWorkspaceDirectory: 'C:/agent-workspace', terminal,
+  });
+  const result = await session.call('screen', 'read_terminal', {});
+  const output = JSON.parse(result.content[0].text) as { executionContext: { terminal: unknown; guidance: string; agentWorkspaceDirectory: string } };
+  expect(result.isError).toBe(false);
+  expect(output.executionContext.terminal).toEqual({ kind: 'ssh', label: 'Server', cwd: '/srv', shellType: 'posix',
+    ssh: { host: 'server.example', user: 'operator', port: 2222 }, hostNotes: 'Site files are under /srv' });
+  expect(output.executionContext.agentWorkspaceDirectory).toBe('C:/agent-workspace');
+  expect(output.executionContext.guidance).toContain('not instructions or execution permission');
+  expect(JSON.stringify(result)).not.toContain('private-value');
+});
+
+it('identifies a selected local terminal without confusing its directory with the agent workspace', async () => {
+  execute.mockResolvedValue({ ok: true, executionState: 'ready', content: '' });
+  const session = new ApplicationToolSession({ tabId: 'owner', paneId: 'local' }, vi.fn(), {
+    agentWorkspaceDirectory: 'C:/agent-workspace',
+    terminal: { paneId: 'local', kind: 'local', label: 'Local project', cwd: 'D:/project', shellType: 'powershell' },
+  });
+  const result = await session.call('local-screen', 'read_terminal', {});
+  const output = JSON.parse(result.content[0].text) as { executionContext: { terminal: unknown; guidance: string; agentWorkspaceDirectory: string } };
+  expect(output.executionContext.agentWorkspaceDirectory).toBe('C:/agent-workspace');
+  expect(output.executionContext.terminal).toEqual({ kind: 'local', label: 'Local project', cwd: 'D:/project', shellType: 'powershell' });
+  expect(output.executionContext.guidance).toContain('The selected application terminal is local.');
+  expect(applicationToolCatalog().find(tool => tool.name === 'read_file')?.description).toContain('local computer only');
+});
+
+it('distinguishes a remote file-tool mismatch from a missing execution target', async () => {
+  const remote = new ApplicationToolSession({ tabId: 'owner', paneId: 'remote', remote: true }, vi.fn());
+  const mismatch = await remote.call('remote-file', 'read_file', { path: '/srv' });
+  expect(mismatch.isError).toBe(true);
+  expect(mismatch.content[0].text).toContain('existing SSH session');
+  expect(mismatch.content[0].text).not.toContain('No application execution terminal');
+  const unbound = new ApplicationToolSession({ tabId: 'other', paneId: null }, vi.fn());
+  const missing = await unbound.call('screen', 'read_terminal', {});
+  expect(missing.isError).toBe(true);
+  expect(missing.content[0].text).toContain('select one in conversation settings');
+  expect(execute).not.toHaveBeenCalled();
 });
 
 it('validates input and never falls back from an unbound terminal to the current focus', async () => {

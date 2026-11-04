@@ -12,6 +12,7 @@ import { t } from '@i18n';
 import HarnessQuestion from './HarnessQuestion';
 import { ArrowDown, ArrowUp, Plus, SlidersHorizontal, Sparkles, Square, iconSizes } from '@ui/icons';
 import { useListNavigationMode } from '@ui/hooks/useListNavigationMode';
+import { useAutoSizeTextarea } from '@ui/hooks/useAutoSizeTextarea';
 import { IconButton } from '@ui/actions/IconButton';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import { useToastStore } from '@ui/feedback/Toast';
@@ -163,6 +164,9 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
     useAttachmentComposer({ attachments: composerDraft.attachments, updateAttachments, scopeKey: tabId, accept: acceptAttachment });
   const follow = useTranscriptFollow(tabId, session?.messages, active);
   const composerRef = useRef<HTMLTextAreaElement>(null);
+  // The harness composer grows with its content exactly like the terminal and AI-chat composers:
+  // same hook, same 120px cap, same internal scrolling once the cap is reached.
+  useAutoSizeTextarea(composerRef, text, 120);
   const submitting = useRef(false);
   const [terminalPicker, setTerminalPicker] = useState<{ anchor?: DropdownAnchor } | null>(null);
   const [settingsMenu, setSettingsMenu] = useState<MenuAnchor | null>(null);

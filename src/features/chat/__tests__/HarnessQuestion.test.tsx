@@ -11,6 +11,8 @@ afterEach(() => { cleanup(); vi.mocked(acpAnswerElicitation).mockReset(); });
 it('lets the user review multiple choices and sends typed answers to their owner', async () => {
   render(<HarnessQuestion sessionId="connection-one" harness="Example agent" question={question} />);
   expect(screen.getByText('Example agent 正在提问')).toBeVisible();
+  expect(screen.getByRole('button', { name: /Example agent 正在提问 等待回答/ })).toBeDisabled();
+  expect(screen.getByText('等待回答')).toBeVisible();
   fireEvent.click(screen.getByLabelText('Cache only'));
   expect(acpAnswerElicitation).not.toHaveBeenCalled();
   fireEvent.change(screen.getByLabelText('Count'), { target: { value: '5' } });

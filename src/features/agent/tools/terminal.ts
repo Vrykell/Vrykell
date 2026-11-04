@@ -26,8 +26,7 @@ import {
   useBlockStore,
 } from '@features/terminal';
 import { gate, type ToolContext } from '@features/agent/stores/permissions';
-import { agentControl } from '../services/agentControl';
-import { terminalDisconnected } from '../services/terminalAvailability';
+import { terminalDisconnected, terminalExecutionState } from '../services/terminalAvailability';
 
 const BLOCK_OUTPUT_CAP = 2000;
 const BLOCK_COUNT = 4;
@@ -57,8 +56,7 @@ export function buildTerminalTools(ctx: ToolContext) {
         const disconnected = terminalDisconnected(paneId);
         if (disconnected) return disconnected;
         const screen = ts.scenes[paneId] === 'blockList' ? null : getTerminalScreen(paneId);
-        const executionState = agentControl.isControlled(paneId) || (useBlockStore.getState().byTab[paneId] ?? []).some(block => block.status === 'executing')
-          ? 'busy' : ts.scenes[paneId] === 'altScreen' ? 'interactive' : ts.scenes[paneId] === 'blockList' ? 'ready' : 'unknown';
+        const executionState = terminalExecutionState(paneId);
         if (screen) return { ok: true, ...screen, executionState };
         // No main terminal surface (blockList): compose the "screen" from command block output.
         return {

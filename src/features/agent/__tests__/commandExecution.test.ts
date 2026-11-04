@@ -69,20 +69,20 @@ it('retains completion delivered before the terminal write promise resolves', as
 it('rejects concurrent commands before they can be queued in the same terminal', async () => {
   const first = runCommandAndWait('sleep 5', { paneId });
   await vi.advanceTimersByTimeAsync(1);
-  expect(await runCommandAndWait('echo queued', { paneId })).toMatchObject({ ok: false, completed: false });
+  expect(await runCommandAndWait('echo queued', { paneId })).toMatchObject({ ok: false, completed: false, code: 'TERMINAL_BUSY' });
   expect(ptyWrite).toHaveBeenCalledOnce();
   complete(); await first;
 });
 
 it('does not execute a command that was already cancelled', async () => {
   const controller = new AbortController(); controller.abort();
-  expect(await runCommandAndWait('echo cancelled', { paneId, signal: controller.signal })).toMatchObject({ ok: false, completed: false });
+  expect(await runCommandAndWait('echo cancelled', { paneId, signal: controller.signal })).toMatchObject({ ok: false, completed: false, code: 'COMMAND_ABORTED' });
   expect(ptyWrite).not.toHaveBeenCalled();
 });
 
 it('reports a timeout without claiming that the process has completed', async () => {
   const result = runCommandAndWait('sleep 99', { paneId, timeoutMs: 100 });
   await vi.advanceTimersByTimeAsync(100);
-  expect(await result).toMatchObject({ ok: false, completed: false });
+  expect(await result).toMatchObject({ ok: false, completed: false, code: 'COMMAND_TIMEOUT' });
   expect(dispose).toHaveBeenCalledOnce();
 });

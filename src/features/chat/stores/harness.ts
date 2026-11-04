@@ -411,7 +411,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     applicationSessions.set(tabId, new ApplicationToolSession({ tabId: session.toolContextId ?? tabId, paneId, remote: executionPaneSpec(paneId)?.kind === 'ssh' }, run => {
       if (turnVersions.get(tabId) !== version) return;
       patch(tabId, current => ({ ...current, messages: upsertHarnessTool(current.messages, run, { paneId: paneId ?? undefined, environment: toolEnvironment }) }));
-    }));
+    }, { agentWorkspaceDirectory: session.cwd, terminal: toolEnvironment }));
     try {
       armFirstResponse(tabId);
       await acpPrompt(sessionId, content.text, content.images);

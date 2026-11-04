@@ -16,6 +16,7 @@ import { isWindows } from '@platform/runtime';
 import { DESC_RUN_COMMAND } from '@features/agent/model/toolTexts';
 import { z } from 'zod';
 import { executionPaneSpec } from '../services/executionTarget';
+import { terminalCommandReady } from '../services/terminalAvailability';
 import { getFocusedTerminalId } from '@features/terminal';
 import { runCommandAndWait } from '@features/agent/tools/runCommand';
 import { buildFileTools } from '@features/agent/tools/files';
@@ -52,7 +53,7 @@ export function buildTools(ctx: ToolContext) {
   const pane = executionPaneSpec(paneId);
   const shellType = ctx.shellType ?? shellFamilyForPane(pane);
   ctx = { ...ctx, paneId, remote: ctx.remote || pane?.kind === 'ssh', shellType };
-  const queueCommand = createCommandQueue();
+  const queueCommand = createCommandQueue(paneId ? { isReady: () => terminalCommandReady(paneId) } : {});
   const all = {
     run_command: tool({
       description: DESC_RUN_COMMAND,
