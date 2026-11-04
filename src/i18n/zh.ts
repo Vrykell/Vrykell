@@ -658,6 +658,7 @@ const zh: Record<string, string> = {
   'Type your answer…': '输入你的回答…',
   'Skip question': '跳过问题',
   'Send answer': '发送回答',
+  'Sending…': '发送中…',
   'Question skipped': '已跳过问题',
   'Question cancelled': '问题已取消',
   'This question is no longer active. Send a message to continue.': '此问题已失效，请发送消息继续。',

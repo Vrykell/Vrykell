@@ -64,7 +64,7 @@ pub fn parse(params: &Value) -> Result<Form, String> {
     for (key, value) in properties {
         if key.len() > 256 || ["__proto__", "constructor", "prototype"].contains(&key.as_str()) { return Err("invalid question field name".into()); }
         let identity: String = key.chars().filter(|letter| letter.is_ascii_alphanumeric()).flat_map(char::to_lowercase).collect();
-        if ["password", "apikey", "accesstoken", "refreshtoken", "privatekey", "recoverycode", "creditcard", "cardnumber", "cvv"].contains(&identity.as_str()) { return Err("credentials cannot be requested in a question form".into()); }
+        if ["password", "apikey", "apisecret", "accesstoken", "refreshtoken", "authtoken", "sessiontoken", "privatekey", "secretkey", "clientsecret", "recoverycode", "creditcard", "cardnumber", "cvv", "token", "secret", "credential", "credentials", "passphrase"].contains(&identity.as_str()) { return Err("credentials cannot be requested in a question form".into()); }
         if value.get("writeOnly").and_then(Value::as_bool) == Some(true) || value.get("format").and_then(Value::as_str).is_some_and(|format| ["password", "secret", "token"].contains(&format)) { return Err("credentials cannot be requested in a question form".into()); }
         let kind = value.get("type").and_then(Value::as_str).ok_or("question field type is missing")?;
         if !["string", "number", "integer", "boolean", "array"].contains(&kind) { return Err("unsupported question field type".into()); }
@@ -173,6 +173,14 @@ mod tests {
     fn refuses_unsupported_and_sensitive_forms() {
         for schema in [json!({"type":"object"}), json!({"type":"string","format":"password"}), json!({"type":"string","writeOnly":true}), json!({"type":"array","items":{"type":"object"}})] {
             assert!(parse(&json!({"mode":"form","requestedSchema":{"properties":{"x":schema}}})).is_err());
+        }
+        for params in [
+            json!({"mode":"form","requestedSchema":{"properties":{"token":{"type":"string"}}}}),
+            json!({"mode":"form","requestedSchema":{"properties":{"api_secret":{"type":"string"}}}}),
+            json!({"mode":"form","requestedSchema":{"properties":{"credentials":{"type":"string"}}}}),
+            json!({"mode":"form","requestedSchema":{"properties":{"passphrase":{"type":"string"}}}}),
+        ] {
+            assert!(parse(&params).is_err());
         }
     }
     #[tokio::test]
