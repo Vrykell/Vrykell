@@ -147,6 +147,8 @@ The existing credential-write command can copy a configured endpoint's key to a 
 
 Fenced-code highlighting renders token slices as escaped text elements, never injected HTML; unknown languages and oversized input remain plain text. Modal editor commands reuse existing save, picker, revision checks and close guards; explicit force-close does not save a draft. Copy operators write only the text selected by the user to the existing system clipboard channel. No new native command, file grant, network origin or capability is added.
 
+The shared field caret re-lays its text in an off-screen mirror node to learn where the insertion point sits; a password field is mirrored only as masked characters of the same length, and the mirror is emptied when the field loses focus. The node carries `aria-hidden`, exists only for measurement, and adds no rendering trust, file access, network origin or capability.
+
 New local terminal processes read registered system/user executable search paths and merge them into the child environment. They never mutate the parent process environment or run a script to obtain paths. Inherited custom entries retain priority; this does not grant access to additional files or change remote environments.
 
 ## Completion and marketplace requests
