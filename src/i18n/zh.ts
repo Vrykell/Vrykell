@@ -1025,7 +1025,8 @@ const zh: Record<string, string> = {
   'Used for new tabs, startup and opening files in a terminal.': '用于新建标签页、启动应用和在终端中打开文件。',
   'System default': '系统默认',
 
-  "Apply these options globally or to one model.": "选择全局配置或单个模型配置。",
+  "Use the default configuration, or override one model.": "使用默认配置，或为单个模型单独配置。",
+  'Default configuration': '默认配置',
   "Allow AI to use tools.": "允许 AI 调用工具。",
   "Maximum tool rounds per response, from 1 to 100.": "每次回复最多调用的工具轮数，范围 1–100。",
   "Keep all messages, recent messages or a summary of older messages.": "保留全部消息、近期消息，或压缩旧消息为摘要。",
@@ -1051,8 +1052,8 @@ const zh: Record<string, string> = {
   'Servers': '服务器',
   'Add server': '添加服务器',
   'Overrides {{count}} settings': '已覆盖 {{count}} 项',
-  'Uses global defaults': '跟随全局默认',
-  'Reset to global defaults': '重置为全局默认',
+  'Uses the default configuration': '使用默认配置',
+  'Reset to default configuration': '重置为默认配置',
   'Leave empty for the built-in prompt': '留空使用内置默认提示词',
   'All messages': '全量',
   'Window': '窗口',
@@ -1470,7 +1471,7 @@ const zh: Record<string, string> = {
   'settings.apiKeyLabel': 'Anthropic API Key',
   'settings.modelLabel': '模型 ID',
   'model.scope.aria': '配置作用域',
-  'model.scope.global': '全局默认',
+  'model.scope.global': '默认配置',
   'settings.save': '保存',
 
   // ── API key prompts ──

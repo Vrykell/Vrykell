@@ -9,6 +9,7 @@ import { useAiConfigStore, useAgentSettings, type AgentSettings, type ModelBehav
 import { ModelScopeBar } from '@features/chat/components/ModelPicker';
 import { SettingsGroup, Field, Toggle, NumberInput, inputStyle } from '@features/settings/components/ui';
 import AutoSaveInput from '../components/AutoSaveInput';
+import ModelContextSettings from '../components/ModelContextSettings';
 
 export function AiBehaviorPage() {
   const models = useAiConfigStore((s) => s.models);
@@ -32,7 +33,7 @@ export function AiBehaviorPage() {
       <SettingsGroup title={t('Instructions')}>
         <Field
           title={t('Configuration scope')}
-          description={t("Apply these options globally or to one model.")}
+          description={t('Use the default configuration, or override one model.')}
         >
           <ModelScopeBar
             options={models.map((m) => ({ value: m.id, label: m.name || m.model }))}
@@ -48,11 +49,11 @@ export function AiBehaviorPage() {
             background: hasOverride ? 'var(--accent-warm-dim)' : 'var(--hover)',
             fontSize: 'calc(11px * var(--ui-font-scale))', color: hasOverride ? 'var(--accent-warm)' : 'var(--text-muted)',
           }}>
-            <span>{hasOverride ? t('Overrides {{count}} settings', { count: overrideKeys.length }) : t('Uses global defaults')}</span>
+            <span>{hasOverride ? t('Overrides {{count}} settings', { count: overrideKeys.length }) : t('Uses the default configuration')}</span>
             <div style={{ flex: 1 }} />
             {hasOverride && (
               <OutlineButton data-subtle onClick={() => agentSettings.resetModelFields(model.id, behaviorFields)} >
-                {t('Reset to global defaults')}
+                {t('Reset to default configuration')}
               </OutlineButton>
             )}
           </div>
@@ -82,6 +83,11 @@ export function AiBehaviorPage() {
         </Field>
 
       </SettingsGroup>
+      {isGlobal && (
+        <SettingsGroup title={t('Default configuration')} testId="default-configuration">
+          <ModelContextSettings global focusTargets={false} />
+        </SettingsGroup>
+      )}
       <SettingsGroup title={t('Tools')}>
         <Field title={t('Agent mode')} description={t("Allow AI to use tools.")}>
           <Toggle on={eff.agentMode} onChange={(v) => update({ agentMode: v })} />
