@@ -26,6 +26,13 @@ it('offers a near-black palette with darker surfaces and readable secondary text
   }
   expect(contrast(palette.textMuted, palette.fieldBg)).toBeGreaterThanOrEqual(4.5);
   expect(contrast(palette.textSecondary, palette.cardBg)).toBeGreaterThanOrEqual(7);
+  expect(palette.selectionBg).toBe('rgba(72, 72, 72, 1)');
+  expect(palette.xtermSelection).toBe(palette.selectionBg);
+  expect(palette.primaryActionText).toBe('#FFFFFF');
+  expect(palette.accentText).toBe('#FFFFFF');
+  expect(palette.dangerActionText).toBe('#FFFFFF');
+  expect(contrast(palette.accent, palette.fieldBg)).toBeGreaterThanOrEqual(4.5);
+  expect(contrast(palette.primaryActionText, palette.primaryAction)).toBeGreaterThanOrEqual(4.5);
 });
 
 it('maps each scheme across application, editor and terminal with readable controls', () => {

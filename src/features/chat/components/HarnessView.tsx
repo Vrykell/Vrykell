@@ -356,7 +356,7 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
             </div>
           </div>
         )}
-        {session?.sessionId && session.questions?.map(question => <HarnessQuestion key={question.requestId} sessionId={session.sessionId!} harness={harness} question={question} />)}
+        {session?.sessionId && session.questions?.map(question => <HarnessQuestion key={question.requestId} sessionId={session.sessionId!} question={question} />)}
       </div>
 
       <div className="chat-jump-slot" style={{ visibility: follow.following ? 'hidden' : 'visible' }} aria-hidden={follow.following}>

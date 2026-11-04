@@ -854,6 +854,7 @@ button.history-option-row[aria-pressed="true"] { color: var(--text-primary); }
 .history-combination-members { margin-left: 24px; padding-left: 8px; border-left: 1px solid var(--border); }
 .ai-user-question { display: flex; flex-direction: column; gap: 12px; }
 .ai-question-options { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+.ai-question-options small { display: block; margin: 4px 0; color: var(--text-secondary); font-size: var(--fs-caption); line-height: 1.5; }
 .acp-launch-directory { display: flex; align-items: stretch; gap: 8px; margin: 8px 0; min-width: 0; }
 .acp-launch-directory > input { flex: 1; min-width: 0; }
 .ai-question-options button { justify-content: flex-start; min-height: 32px; max-width: 100%; padding: 8px 10px; text-align: left; white-space: normal; overflow-wrap: anywhere; }
@@ -1517,7 +1518,7 @@ button.outline-button.model-capability-toggle[aria-pressed="true"] { background:
 .command-block-output [style*="letter-spacing"] { letter-spacing: var(--terminal-letter-spacing, 0px) !important; }
 
 /* Configuration controls share neutral fields and keyboard focus feedback. */
-.themed-checkbox { appearance: auto; width: 16px; height: 16px; margin: 0; flex: 0 0 16px; vertical-align: middle; accent-color: var(--accent); cursor: pointer; }
+.themed-checkbox { appearance: auto; width: 16px; height: 16px; margin: 0; flex: 0 0 16px; vertical-align: middle; accent-color: var(--primary-action); cursor: pointer; }
 input.themed-checkbox:focus-visible { outline: 2px solid var(--border-strong); outline-offset: 2px; }
 input.themed-checkbox:disabled { opacity: .55; cursor: default; }
 .config-text-area-label { display: block; margin-bottom: 6px; color: var(--text-secondary); font: var(--fs-caption) var(--font-ui); }

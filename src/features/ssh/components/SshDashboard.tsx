@@ -8,11 +8,13 @@ import SidebarItem from '@ui/layout/sidebarItem';
 import { ListReorderPlaceholder, ListReorderPreview, useListReorderDrag } from '@ui/layout/listReorder';
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import { TextButton } from '@ui/actions/TextButton';
+import ReloadButton from '@ui/actions/ReloadButton';
 import Toggle from '@ui/fields/Toggle';
 import ToolDialog from '@ui/feedback/ToolDialog';
 import SegmentedControl from '@ui/fields/SegmentedControl';
-import { AlertCircle, ArrowDown, ArrowUp, ArrowLeftRight, ChevronDown, Columns2, EyeOff, Folder, Grid, Lock, MoreHorizontal, Plus, RefreshCw, ServerStack, Star, StarFilled, Tag, iconSizes } from '@ui/icons';
+import { AlertCircle, ArrowDown, ArrowUp, ArrowLeftRight, ChevronDown, Columns2, EyeOff, Folder, Grid, Lock, MoreHorizontal, Plus, ServerStack, Star, StarFilled, Tag, iconSizes } from '@ui/icons';
 import { isSshAuthenticationFailure } from '../model/fileServiceState';
+import { parseSshConnectionFailure, sshConnectionFailureMessage } from '../model/connectionFailure';
 import { requestSshAuthentication, useSessionAuthenticationStore } from '../stores/sessionAuthentication';
 import ContextMenu, { type MenuAnchor } from '@ui/menus/ContextMenu';
 import { TerminalProfileIcon } from '@ui/icons/shellIcons';
@@ -168,7 +170,7 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
         <SegmentedControl variant="buttons" label={t('Host view')} value={layout} onChange={setLayout} options={[{ value: 'table', label: t('List'), ariaLabel: t('Table view'), icon: <Columns2 size={14} /> }, { value: 'cards', label: t('Cards'), ariaLabel: t('Card view'), icon: <Grid size={14} /> }]} />
         {resources && <span className="ssh-dashboard-metric-menu"><IconBtn ref={metricTrigger} title={t('More metrics')} data-testid="ssh-dashboard-metrics" onClick={() => setMetricsOpen(value => !value)}><MoreHorizontal size={16} /></IconBtn>
           {active && metricsOpen && <CheckboxMenu anchored title={t('Collect and show')} triggerRef={metricTrigger} checkmark options={HOST_METRICS.map(id => ({ id, label: t(METRIC_LABELS[id]), checked: metrics[id] }))} onToggle={id => setMetrics(current => ({ ...current, [id]: !current[id] }))} onClose={() => setMetricsOpen(false)}
-            footer={<TextButton className="ssh-metrics-refresh" data-testid="ssh-dashboard-refresh" onClick={() => { refresh(); setMetricsOpen(false); }}><RefreshCw size={14} />{t('Refresh')}</TextButton>} />}
+            footer={<ReloadButton className="ssh-metrics-refresh" testId="ssh-dashboard-refresh" label={t('Refresh')} text={t('Refresh')} variant="outline" onReload={refresh} />} />}
         </span>}
       </div>
     </div>
@@ -199,8 +201,8 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
           }}>
           <div className="ssh-dashboard-card-title">{icon(connection)}<strong>{connection.name}</strong>{favorite(connection)}{connectButton(connection)}</div>
           <div className="ssh-dashboard-address">{address(connection)}</div>{tags(connection)}
-          {resources && <HostResources state={samples[connection.id] ?? {}} disabled={metadata[connection.id]?.resourceDisabled} metrics={metrics} compact onRetry={() => retryHost(connection)} />}
-          {!samples[connection.id]?.error && <span className="ssh-host-last-connected">{lastConnected(connection)}</span>}
+          {resources ? <HostResources state={samples[connection.id] ?? {}} disabled={metadata[connection.id]?.resourceDisabled} metrics={metrics} compact recentConnection={lastConnected(connection)} onRetry={() => retryHost(connection)} />
+            : <span className="ssh-host-last-connected">{lastConnected(connection)}</span>}
         </article>}</Fragment>)}
       </section>)}
       {layout === 'table' && visible.length > 0 && <ListReorderPlaceholder listId="ssh-hosts" itemId={visible[visible.length - 1]!.id} after />}
@@ -216,32 +218,38 @@ export default function SshDashboard({ active = true, onManage, onImport, onQuic
   </div>;
 }
 
-export function HostResources({ state: collected, metrics, compact = false, disabled = false, onRetry }: { state: HostResourceState; metrics: HostMetricSelection; compact?: boolean; disabled?: boolean; onRetry: () => void }) {
+export function HostResources({ state: collected, metrics, compact = false, disabled = false, recentConnection, onRetry }: { state: HostResourceState; metrics: HostMetricSelection; compact?: boolean; disabled?: boolean; recentConnection?: string; onRetry: () => void }) {
   const state = disabled ? {} : collected;
   const sample = state.data;
   const authentication = !!state.error && isSshAuthenticationFailure(state.error);
   const offline = !!state.error && !sample && !authentication && /offline|refused|timed?\s?out|unreachable|network|disconnected|无法连接|连接.*断/i.test(state.error);
-  const retry = <TextButton className="ssh-resource-retry" aria-label={t('Retry host status')} disabled={state.busy} onClick={event => { event.stopPropagation(); onRetry(); }}>{compact ? t('Retry') : <RefreshCw size={14} />}</TextButton>;
+  const retry = <ReloadButton className="ssh-resource-retry" label={t('Retry host status')} text={compact ? t('Retry') : undefined} variant="outline" busy={state.busy} onReload={onRetry} />;
   const errorLabel = t(authentication ? 'Login failed' : offline ? 'Offline' : 'Read failed');
-  const detail = authentication ? t('The server rejected the username, password or private key.') : state.error ?? '';
+  const detail = authentication ? t('The server rejected the username, password or private key.')
+    : parseSshConnectionFailure(state.error ?? '')?.cause === 'Remote system does not support resource collection' ? t('This host does not support resource collection.')
+      : sshConnectionFailureMessage(state.error ?? '') ?? state.error ?? '';
   return <span className="ssh-host-resource-summary" data-stale={!!state.error && !!sample || undefined}>
     {!sample && state.error && compact ? <span className="ssh-resource-state" data-kind={authentication ? 'authentication' : 'offline'} role="status">
       {authentication ? <Lock size={22} /> : offline ? <EyeOff size={22} /> : <AlertCircle size={22} />}<strong>{errorLabel}</strong>
-      {!offline && <span>{detail}</span>}{!offline && retry}
+      {!offline && <span data-tip={state.error} tabIndex={0}>{detail}</span>}{!offline && retry}
     </span> : <>
-    {state.error && !compact && <span className="ssh-resource-inline-error" data-kind={authentication ? 'authentication' : offline ? 'offline' : 'error'}><span data-tip={detail} aria-label={`${errorLabel}: ${detail}`}>{errorLabel}{!offline && `: ${detail}`}</span>{!offline && retry}</span>}
+    {state.error && !compact && <span className="ssh-resource-inline-error" data-kind={authentication ? 'authentication' : offline ? 'offline' : 'error'}><span data-tip={state.error} tabIndex={0} aria-label={`${errorLabel}: ${detail}`}>{errorLabel}{!offline && `: ${detail}`}</span>{!offline && retry}</span>}
     {!state.error && !compact && <span className="ssh-dashboard-table-status" data-online={sample ? 'true' : undefined}>{disabled ? t('Not collected') : !metrics.status ? '—' : sample && !sample.system.toLowerCase().includes('linux') && sample.memoryTotal == null ? t('Online status only ({{system}})', { system: sample.system }) : t(sample ? 'Online' : state.busy ? 'Connecting…' : 'Offline')}</span>}
     {metrics.cpu && <MetricBar label="CPU" value={state.cpu ?? null} />}
     {metrics.memory && <MetricBar label={t('Memory')} value={resourcePercent(sample?.memoryTotal == null ? null : sample.memoryTotal - (sample.memoryAvailable ?? 0), sample?.memoryTotal)} />}
     {metrics.disk && <MetricBar label={t('Disk')} value={resourcePercent(sample?.diskUsed, sample?.diskTotal)} />}
-    {compact && state.error && sample && <span className="ssh-resource-card-error" role="status"><AlertCircle size={13} /><span data-tip={detail}>{t('Read failed')}: {detail}</span></span>}
+    {compact && state.error && sample && <span className="ssh-resource-card-error" role="status"><AlertCircle size={13} /><span data-tip={state.error} tabIndex={0}>{t('Read failed')}: {detail}</span></span>}
     {(metrics.network || metrics.load || metrics.uptime) && <span className="ssh-host-resource-footer">
       {metrics.network && <span className="ssh-dashboard-network"><ArrowDown size={12} />{resourceRate(state.download)}<ArrowUp size={12} />{resourceRate(state.upload)}</span>}
       {metrics.load && <span>{t('Load')} {sample?.load || '—'}</span>}
       {metrics.uptime && <span>{t('Uptime')} {sample?.uptimeSeconds != null ? statusDuration(sample.uptimeSeconds) : '—'}</span>}
     </span>}
-    {compact && state.error && sample && <span className="ssh-resource-last-read"><span>{t('Last read {{time}}', { time: new Date(state.updatedAt ?? 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })}</span>{retry}</span>}
     </>}
+    {compact && (sample || !state.error) && (recentConnection || state.updatedAt) && <span className="ssh-host-card-times">
+      {!state.error && recentConnection && <span className="ssh-host-last-connected">{recentConnection}</span>}
+      {state.updatedAt && <span className="ssh-resource-last-read">{t('Last read {{time}}', { time: new Date(state.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })}</span>}
+      {state.error && sample && retry}
+    </span>}
   </span>;
 }
 

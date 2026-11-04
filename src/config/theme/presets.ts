@@ -6,6 +6,7 @@ interface Seed {
   terminalBackground?: string;
   selectionOpacity?: number;
   selectionColor?: string;
+  actionText?: string;
   foreground: string;
   colors: Colors;
   orange: string;
@@ -37,7 +38,7 @@ export const themePresets: readonly ThemePreset[] = [
     colors: ['#45475A', '#F38BA8', '#A6E3A1', '#F9E2AF', '#89B4FA', '#CBA6F7', '#94E2D5', '#BAC2DE'],
   } },
   { id: 'deep-black', name: 'Deep Black', mode: 'dark', seed: {
-    background: '#1C1C1C', terminalBackground: '#111111', selectionColor: '#0076FF', selectionOpacity: 0.65, foreground: '#E2E2E2', orange: '#F3AA70',
+    background: '#1C1C1C', terminalBackground: '#111111', selectionColor: '#484848', selectionOpacity: 1, actionText: '#FFFFFF', foreground: '#E2E2E2', orange: '#F3AA70',
     colors: ['#353535', '#F47C7C', '#59D69A', '#E9C46A', '#168BFF', '#C3A6FF', '#64D8DF', '#E2E2E2'],
   } },
   { id: 'default-light', name: 'Default light', mode: 'light' },
@@ -104,8 +105,10 @@ export function presetPalette(base: ThemePalette, preset: ThemePreset): ThemePal
   const muted = light ? readable(blend(bg, fg, 0.76)) : blend(bg, fg, 0.76);
   const terminal = light ? c.map(color => fitContrast(color, terminalBg, fg)) : c;
   const [red, green, yellow, blue, violet, cyan] = [c[1], c[2], c[3], c[4], c[5], c[6]].map(readable);
-  const onAccent = contrast(bg, blue) > contrast(fg, blue) ? bg : fg;
-  const onDanger = contrast(bg, red) > contrast(fg, red) ? bg : fg;
+  const onAccent = preset.seed.actionText ?? (contrast(bg, blue) > contrast(fg, blue) ? bg : fg);
+  const onDanger = preset.seed.actionText ?? (contrast(bg, red) > contrast(fg, red) ? bg : fg);
+  const action = preset.seed.actionText ? fitContrast(blue, onAccent, bg) : blue;
+  const danger = preset.seed.actionText ? fitContrast(red, onDanger, bg) : red;
   const selection = alpha(preset.seed.selectionColor ?? blue, preset.seed.selectionOpacity ?? 0.25);
   const dim = (color: string) => alpha(color, 0.12);
   return {
@@ -126,10 +129,10 @@ export function presetPalette(base: ThemePalette, preset: ThemePreset): ThemePal
     accent: blue, accentDim: dim(blue), accentText: onAccent,
     accentBlue: blue, accentBlueDim: dim(blue), accentBlueStrong: blue,
     accentWarm: yellow, accentWarmDim: dim(yellow), accentUser: violet, accentUserDim: dim(violet),
-    primaryAction: blue, primaryActionText: onAccent,
-    primaryActionHover: blend(blue, contrast(onAccent, '#FFFFFF') > contrast(onAccent, '#000000') ? '#FFFFFF' : '#000000', 0.12),
+    primaryAction: action, primaryActionText: onAccent,
+    primaryActionHover: blend(action, contrast(onAccent, '#FFFFFF') > contrast(onAccent, '#000000') ? '#FFFFFF' : '#000000', 0.12),
     success: green, successDim: dim(green), error: red, errorText: red,
-    dangerAction: red, dangerActionText: onDanger, errorDim: dim(red), errorLight: red, warning: yellow,
+    dangerAction: danger, dangerActionText: onDanger, errorDim: dim(red), errorLight: red, warning: yellow,
     blockCmdText: fg, blockCmdFailed: red, blockDivider: border,
     cmdProgram: green, cmdArgument: fg, cmdNumber: readable(orange), cmdVariable: violet,
     cmdFlag: violet, cmdPath: cyan, cmdPipe: muted, cmdRedirect: yellow, cmdString: yellow,

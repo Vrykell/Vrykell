@@ -32,3 +32,18 @@ it('honors external disabled and busy states without invoking the action', () =>
   expect(reload).not.toHaveBeenCalled();
   expect(button).toHaveAttribute('aria-busy', 'true');
 });
+
+it('supports visible labeled and icon-only outline actions with shared reload feedback', async () => {
+  const reload = vi.fn();
+  const parent = vi.fn();
+  const { rerender } = render(<div onClick={parent}><ReloadButton label="Retry status" text="Retry" variant="outline" onReload={reload} /></div>);
+  const button = screen.getByRole('button', { name: 'Retry status' });
+  expect(button).toHaveClass('outline-button');
+  expect(button).toHaveTextContent('Retry');
+  await act(async () => { fireEvent.click(button); });
+  expect(reload).toHaveBeenCalledOnce();
+  expect(parent).not.toHaveBeenCalled();
+  expect(button).toHaveAttribute('aria-busy', 'true');
+  rerender(<ReloadButton label="Retry status" variant="outline" onReload={reload} />);
+  expect(screen.getByRole('button', { name: 'Retry status' })).toHaveTextContent('');
+});

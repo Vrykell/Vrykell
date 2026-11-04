@@ -70,16 +70,51 @@ test('near-black colors persist and original dark remains available', async ({ p
   await expect.poll(() => themeConfig(page)).toMatchObject({ darkPreset: 'deep-black' });
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim())).toBe('#1C1C1C');
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--xterm-bg').trim())).toBe('#111111');
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary-action-text').trim())).toBe('#FFFFFF');
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--selection-bg').trim())).toBe('rgba(72, 72, 72, 1)');
   for (const width of [760, 1240]) {
     await page.setViewportSize({ width, height: 900 });
     await expect(page.getByRole('radio', { name: '默认深色', exact: true })).toBeVisible();
     expect(await page.locator('.settings-content').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
     await page.screenshot({ path: info.outputPath(`deep-black-${width}.png`), animations: 'disabled' });
   }
+  if (await page.getByRole('button', { name: '展开侧栏', exact: true }).isVisible()) await page.getByRole('button', { name: '展开侧栏', exact: true }).click();
+  await page.getByTestId('workspace-area-ssh').click();
+  const hosts = page.getByTestId('ssh-dashboard');
+  await expect(hosts.locator('.ssh-host-new-actions > button').first()).toHaveCSS('color', 'rgb(255, 255, 255)');
+  const resources = hosts.getByRole('switch', { name: '资源占用', exact: true });
+  await resources.click();
+  await expect(resources.locator('span')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(hosts.getByRole('button', { name: /连接 / }).first()).toHaveCSS('color', 'rgb(255, 255, 255)');
+  await page.screenshot({ path: info.outputPath('deep-black-controls.png'), animations: 'disabled' });
   await page.reload(); await gotoSetting(page, '主题');
   await expect(page.getByRole('radio', { name: 'Deep Black', exact: true })).toBeChecked();
   await page.getByRole('radio', { name: '默认深色', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme-preset', 'default-dark');
+});
+
+test('light workspace tabs and toolbars remain distinct from content, panels and fields', async ({ page }, info) => {
+  await setupTauriMock(page);
+  await page.addInitScript(() => localStorage.setItem('vrykell-theme-mode', 'light'));
+  await page.goto('/');
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
+  const strip = page.locator('.folder-header:visible').first();
+  const activeTab = strip.locator('.folder-tab[data-active="true"]').first();
+  await expect(strip).toHaveCSS('background-color', 'rgb(235, 238, 242)');
+  await expect(activeTab).toHaveCSS('background-color', 'rgb(255, 255, 255)');
+  await expect(activeTab).not.toHaveCSS('background-color', await strip.evaluate(element => getComputedStyle(element).backgroundColor));
+  for (const width of [1240, 760]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.screenshot({ path: info.outputPath(`light-workspace-layers-${width}.png`), animations: 'disabled' });
+  }
+  await page.setViewportSize({ width: 1240, height: 900 });
+  if (await page.getByRole('button', { name: '展开侧栏', exact: true }).isVisible()) await page.getByRole('button', { name: '展开侧栏', exact: true }).click();
+  await page.getByTestId('workspace-area-ssh').click();
+  const hosts = page.getByTestId('ssh-dashboard');
+  await hosts.getByRole('button', { name: '卡片视图', exact: true }).click();
+  await expect(hosts).toHaveCSS('background-color', 'rgb(250, 251, 252)');
+  await expect(hosts.locator('.ssh-dashboard-card').first()).toHaveCSS('background-color', 'rgb(231, 233, 235)');
+  await page.screenshot({ path: info.outputPath('light-host-layers.png'), animations: 'disabled' });
 });
 
 test('built-in schemes update live colors, survive reload, follow the system and restore original defaults', async ({ page }, info) => {
