@@ -164,6 +164,13 @@ it('shows compact profile, location and advanced sections with shared row stylin
   expect((await screen.findByTestId('new-tab-option-shell:zsh')).className).toContain('workspace-floating-row');
 });
 
+it('does not mark action-only rows as submenus', async () => {
+  openPicker();
+  await screen.findByTestId('new-tab-option-shell:zsh');
+  expect(screen.getByRole('button', { name: '更多配置文件…' }).querySelectorAll('svg')).toHaveLength(1);
+  expect(screen.getByRole('button', { name: '拆分标签页' }).querySelectorAll('svg')).toHaveLength(1);
+});
+
 it('uses the selected open location for the default profile', async () => {
   vi.mocked(pickPath).mockResolvedValueOnce(['/chosen/project']);
   openPicker();

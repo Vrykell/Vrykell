@@ -93,7 +93,7 @@ export default function GroupedTabList({ items, selected, label, listId, classNa
     ];
   };
   const groupActions = (group: TabGroupHandle): ContextMenuItem[] => [
-    ...(grouping?.add ? [{ label: t('Add terminal to group'), onClick: () => grouping.add?.(group.id) }] : []),
+    ...(grouping?.add ? [{ label: t('Add terminal to group'), onClick: (anchor: MenuAnchor | undefined) => grouping.add?.(group.id, anchor) }] : []),
     { label: t(group.collapsed ? 'Expand group' : 'Collapse group'), onClick: () => grouping?.collapse(group.id, !group.collapsed) },
     ...(group.archivable === false ? [] : [{ label: t('Archive tab group'), group: 'danger' as const, onClick: () => setConfirmation({ group, mode: 'archive' }) }]),
     { label: t('Delete tab group'), group: 'danger', danger: true, onClick: () => setConfirmation({ group, mode: 'delete' }) },

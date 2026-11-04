@@ -255,3 +255,26 @@ test('opens or selects resource tabs from the unified switcher and keeps native 
   await expect(bar.getByRole('tab')).toHaveCount(2);
   await expect(page.getByTestId('workspace-area-unified')).toHaveAttribute('aria-current', 'page');
 });
+
+test('opens split pickers beside the chosen submenu row', async ({ page }) => {
+  await setupTauriMock(page, {}); await page.goto('/');
+  await page.getByTestId('workspace-area-unified').click();
+  await openFirstResource(page);
+  const bar = page.getByTestId('workspace-instance-bar');
+  for (const [label, dialogName] of [['新终端', '新建标签'], ['连接服务器', '连接服务器']] as const) {
+    await bar.locator('.folder-tab[data-active="true"]').first().click({ button: 'right' });
+    await page.getByRole('menu', { name: '标签页操作', exact: true }).getByText('拆分标签页', { exact: true }).hover();
+    const chooser = page.getByRole('menu', { name: '拆分标签页', exact: true });
+    await expect(chooser).toBeVisible();
+    const row = chooser.getByText(label, { exact: true });
+    const rowBox = (await row.boundingBox())!;
+    await row.click();
+    const picker = page.getByRole('dialog', { name: dialogName });
+    await expect(picker).toBeVisible();
+    const box = (await picker.boundingBox())!;
+    expect(box.x).toBeGreaterThan(40);
+    expect(Math.abs(box.x - rowBox.x)).toBeLessThan(40);
+    await page.keyboard.press('Escape');
+    await expect(picker).toHaveCount(0);
+  }
+});
