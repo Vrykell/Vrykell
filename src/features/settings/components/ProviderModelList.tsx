@@ -6,7 +6,7 @@
  * a model without one cannot be set as current, and deleting a row asks first because its
  * overrides cannot be recovered.
  */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { t } from '@i18n';
 import { IconButton } from '@ui/actions/IconButton';
 import ReloadButton from '@ui/actions/ReloadButton';
@@ -24,6 +24,8 @@ import { SettingsGroup, Field } from './ui';
 import AddModelDialog from './AddModelDialog';
 import ModelSettingsDialog from './ModelSettingsDialog';
 import { useSettingsSave } from './SettingsSaveProvider';
+import { useSettingsNavigationStore } from '../stores/navigation';
+import { MODEL_CONTEXT_FIELDS } from './ModelContextSettings';
 
 type Toast = (msg: string, type: 'info' | 'success' | 'error') => void;
 
@@ -52,6 +54,11 @@ function ModelRow({ model, active, onRemove }: {
   onRemove: () => void;
 }) {
   const [editing, setEditing] = useState(false);
+  const target = useSettingsNavigationStore(state => state.targetField);
+  const request = useSettingsNavigationStore(state => state.request);
+  useEffect(() => {
+    if (active && target && MODEL_CONTEXT_FIELDS.some(field => t(field) === target)) setEditing(true);
+  }, [active, target, request]);
   const Mark = modelMark(model.provider, model.model, model.baseUrl);
   return (
     <div className="settings-model-row" data-testid="model-row" data-active={active || undefined} style={{ padding: '6px 10px' }}>

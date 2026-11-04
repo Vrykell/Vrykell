@@ -44,7 +44,7 @@ button.ssh-host-connect { flex-shrink: 0; height: 28px; padding: 0 10px; opacity
 .ssh-dashboard-group-section { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(auto-fill, minmax(min(250px, 100%), 1fr)); gap: 12px; min-width: 0; }
 .ssh-dashboard-group { grid-column: 1 / -1; display: flex; align-items: center; gap: 8px; margin: 14px 8px 6px; color: var(--text-secondary); font: var(--fw-medium) var(--fs-caption) var(--font-ui); }
 .ssh-dashboard-group > span { color: var(--text-muted); }
-.ssh-dashboard-card { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 116px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--card-bg); color: var(--text-primary); cursor: pointer; transition: background var(--dur) var(--ease); }
+.ssh-dashboard-card { display: flex; flex-direction: column; gap: 8px; min-width: 0; min-height: 116px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--card-bg); color: var(--text-primary); cursor: pointer; transition: background var(--dur) var(--ease); }
 .ssh-dashboard-card:is(:hover, :focus-visible) { background: var(--card-hover-bg); outline: none; }
 .ssh-dashboard-card[data-active="true"] { background: var(--card-hover-bg); border-color: var(--border); }
 .ssh-dashboard-card-title { display: flex; align-items: center; gap: 8px; min-width: 0; }

@@ -69,12 +69,12 @@ registerField("scope", "ai-behavior", "Configuration scope", "Global or per-mode
 registerField("system-prompt", "ai-behavior", "System prompt", "AI role and instructions", () => globalValue("systemPrompt"));
 registerField("agent-mode", "ai-behavior", "Agent mode", "Enable tool calls", () => globalValue("agentMode"));
 registerField("max-steps", "ai-behavior", "Maximum iterations", "Maximum tool execution rounds", () => globalValue("maxSteps"));
-registerField("context-strategy", "ai-behavior", "Context strategy", "Full history, window or summary", () => globalValue("contextStrategy"));
-registerField("context-budget", "ai-behavior", "Context token budget", "Limit context size", () => globalValue("contextMaxTokens"));
-registerField("summary-limit", "ai-behavior", "Summary length limit", "Summary token budget", () => globalValue("contextSummaryTokens"));
-registerField("tool-truncation", "ai-behavior", "Tool output truncation", "Limit tool result length", () => globalValue("contextToolChars"));
-registerField("reply-limit", "ai-behavior", "Reply token limit", "Maximum response tokens", () => globalValue("maxOutputTokens"));
-registerField("temperature", "ai-behavior", "Sampling temperature", "Response randomness", () => globalValue("temperature"));
+registerField("context-strategy", "ai-model", "Context strategy", "Full history, window or summary");
+registerField("context-budget", "ai-model", "Context token budget", "Limit context size");
+registerField("summary-limit", "ai-model", "Summary length limit", "Summary token budget");
+registerField("tool-truncation", "ai-model", "Tool output truncation", "Limit tool result length");
+registerField("reply-limit", "ai-model", "Reply token limit", "Maximum response tokens");
+registerField("temperature", "ai-model", "Sampling temperature", "Response randomness");
 registerField("smart-title", "ai-behavior", "Smart session titles", "Automatic title generation", () => globalValue("autoTitle"));
 registerField("title-model", "ai-behavior", "Title model", "Model for title generation", () => globalValue("titleModel"));
 registerField("completion", "ai-behavior", "Command completion", "Terminal suggestions", () => globalValue("completeEnabled"));
@@ -83,7 +83,6 @@ registerField("completion-model", "ai-behavior", "Completion model", "Model for 
 registerField("permissions", "ai-perms", "Tool permissions", "Allow, ask or deny tools");
 registerField("approval-timeout", "ai-perms", "Approval timeout", "Deny an approval nobody answers", () => `${usePermissions.getState().approvalTimeoutSeconds}`);
 registerField("session-grants", "ai-perms", "Session grants", "Clear temporary permissions");
-registerField("tavily-key", "ai-web", "Tavily API Key", "Web search credentials");
 registerField("mcp", "ai-mcp", "MCP servers", "External tool connections");
 registerField("file-open", "editor-local", "Default editing command", "Local terminal editor command", () => loadConfig().defaultEditor, "Default editing command", undefined, ["File open-with"]);
 registerField("file-extensions", "editor-local", "Open by extension", "Local file extension commands", () => Object.keys(loadConfig().templates).join(", "));

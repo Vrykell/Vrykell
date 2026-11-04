@@ -2,7 +2,7 @@
  * Theme / opening mode / keyboard shortcuts / web search / permissions settings pages e2e.
  */
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, themeConfig, aiKeyCalls } from './tauri-mock';
+import { setupTauriMock, themeConfig } from './tauri-mock';
 import { gotoSetting, fieldOf, rowOf, selectThemeMode } from './settings';
 
 test.beforeEach(async ({ page }) => {
@@ -114,23 +114,9 @@ test.describe('Keyboard shortcuts page', () => {
   });
 });
 
-test.describe('Web search page', () => {
-  test('Shows the search method and saves/clears the Tavily key', async ({ page }) => {
-    await gotoSetting(page, '联网搜索');
-    await expect(page.getByText('备用搜索', { exact: true })).toBeVisible();
-    await expect(page.getByText('未配置', { exact: true })).toBeVisible();
-
-    const keyField = fieldOf(page, 'Tavily API Key');
-    await keyField.getByPlaceholder(/输入 Tavily API Key/).fill('tv-e2e');
-    await expect(page.locator('.settings-page-header').getByRole('status')).toHaveText('已保存');
-    await expect(page.getByText('已配置', { exact: true })).toBeVisible();
-    const calls = await aiKeyCalls(page);
-    expect(calls.some((c) => c.provider === 'tavily' && c.key === 'tv-e2e')).toBe(true);
-
-    await keyField.getByRole('button', { name: '清除' }).click();
-    await expect(page.getByText('已清除 Tavily Key')).toBeVisible();
-    await expect(keyField.getByText('未配置', { exact: true })).toBeVisible();
-  });
+test('retired web search settings are absent from the directory', async ({ page }) => {
+  await gotoSetting(page, '模型配置');
+  await expect(page.locator('aside').getByRole('button', { name: '联网搜索', exact: true })).toHaveCount(0);
 });
 
 test.describe('Model permissions page', () => {

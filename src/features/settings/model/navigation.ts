@@ -5,5 +5,5 @@ export type PageId = `profile:${ShellType}` | 'about' | 'application-language' |
 
 /** Platform-specific destinations stay out of navigation, search and restored selections. */
 export function isSettingsPageAvailable(page: PageId | undefined, windows = isWindows): boolean {
-  return page !== 'context-menu' || windows;
+  return page !== 'ai-web' && (page !== 'context-menu' || windows);
 }

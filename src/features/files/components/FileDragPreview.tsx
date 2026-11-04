@@ -22,7 +22,7 @@ export default function FileDragPreview() {
         pointerEvents: 'none',
         width: 30,
         height: 30,
-        borderRadius: 7,
+        borderRadius: 'var(--radius-card)',
         background: 'var(--elevated)',
         border: '1px solid var(--border)',
         boxShadow: '0 6px 18px rgba(0, 0, 0, 0.28)',

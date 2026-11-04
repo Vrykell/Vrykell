@@ -117,7 +117,9 @@ export default function ToolRunCard({ run, paneId, framed = false, conversationI
   return <div className="ai-tool-card" data-tool-state={run.state} data-open={open}>
     <button type="button" data-subtle className="ai-tool-summary" aria-label={[label, text, status].filter(Boolean).join(' ')} aria-expanded={problem ? notice : open} disabled={!expandable || pending}
       onClick={() => { if (problem) setNotice(true); else setToggled({ state: run.state, open: !open }); }}>
-      {icon}<span className="ai-tool-label">{label}</span><span className="ai-tool-description" data-tip={pending ? undefined : text || undefined}>{pending ? '' : text}</span>
+      {icon}<span className="ai-tool-summary-text">
+        <span className="ai-tool-label">{label}</span><span className="ai-tool-description" data-tip={pending ? undefined : text || undefined}>{pending ? '' : text}</span>
+      </span>
       <span className="ai-tool-state" data-state={run.state}>
         {run.state === 'done' ? <Check size={12} /> : run.state === 'running' ? <RefreshCw size={12} className="reload-spin" />
           : (problem || run.state === 'cancelled') ? <X size={12} /> : null}{status}

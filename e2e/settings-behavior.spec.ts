@@ -49,11 +49,17 @@ test.describe('model behavior page', () => {
   });
 
   test('context strategy switches to window', async ({ page }) => {
+    await expect(page.getByText('上下文策略', { exact: true })).toHaveCount(0);
+    await page.locator('aside').getByRole('button', { name: '模型配置', exact: true }).click();
+    await page.getByTestId('model-settings').first().click();
     const strategy = fieldOf(page, '上下文策略');
     await strategy.getByRole('combobox', { name: '上下文策略' }).click();
     await page.getByRole('option', { name: '窗口', exact: true }).click();
     const saved = await settingsJson(page);
     expect(saved).toContain('"contextStrategy":"window"');
+    const state = JSON.parse(saved) as { state: { global: { contextStrategy: string }; overrides: Record<string, { contextStrategy?: string }> } };
+    expect(state.state.global.contextStrategy).toBe('compact');
+    expect(state.state.overrides['m-main'].contextStrategy).toBe('window');
   });
 
   test('system prompt edits persist', async ({ page }) => {

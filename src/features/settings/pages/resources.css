@@ -1,0 +1,70 @@
+.resource-toolbar, .resource-actions, .resource-detail-header, .resource-breadcrumb, .resource-badges { display: flex; align-items: center; gap: 8px; }
+.resource-toolbar { justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; }
+.resource-actions { flex-wrap: wrap; margin-left: auto; }
+.resource-caption { color: var(--text-muted); font-size: var(--fs-caption); }
+.resource-search { width: min(100%, 280px); position: relative; flex-shrink: 1; min-width: 0; }
+.resource-search > svg { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+.resource-search > input.text-input-field { width: 100%; padding-left: 36px; }
+.skill-location { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.skill-location span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.resource-page-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 32px; }
+.resource-page-header h1 { margin: 0; font-size: calc(24px * var(--ui-font-scale)); font-weight: var(--fw-medium); }
+.resource-page-header p { color: var(--text-secondary); margin: 6px 0 0; font-size: var(--fs-label); }
+.resource-library-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin: 24px 0 32px; }
+.resource-library-toolbar > .resource-actions { margin-left: 0; }
+.skill-list { background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-block); overflow: hidden; }
+.resource-import { display: grid; gap: 8px; margin-top: 12px; }
+.resource-mark { width: 28px; height: 28px; border-radius: var(--radius-inner); background: var(--hover); color: var(--text-secondary); display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.resource-mark-large { width: 36px; height: 36px; }
+.resource-identity { display: flex; flex-direction: column; gap: 4px; min-width: 0; text-align: left; }
+.resource-identity strong { font-size: var(--fs-label); font-weight: var(--fw-semibold); color: var(--text-primary); overflow-wrap: anywhere; }
+.resource-identity > span, .resource-identity p { margin: 0; font-size: var(--fs-caption); line-height: 1.5; color: var(--text-secondary); overflow-wrap: anywhere; }
+.resource-identity h2 { margin: 0; font-size: calc(20px * var(--ui-font-scale)); font-weight: var(--fw-semibold); overflow-wrap: anywhere; }
+.resource-identity .resource-trust { font-size: var(--fs-micro); color: var(--accent-warm); }
+.skill-list-row { position: relative; display: flex; align-items: center; gap: 10px; padding: 6px 16px; min-height: 72px; }
+.skill-list-row:is(:hover, :focus-within) { background: var(--hover); }
+.skill-list-row > button.icon-button:hover { background: transparent; }
+.skill-list-row > button.icon-button:focus-visible { background: transparent; outline: 2px solid var(--focus-ring); outline-offset: -2px; }
+.skill-list-row + .skill-list-row::before { content: ''; position: absolute; top: 0; left: 16px; right: 16px; border-top: 1px solid var(--border); pointer-events: none; }
+.skill-open { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding: 10px 6px; border: 0; border-radius: var(--radius-inner); background: transparent; color: var(--text-primary); cursor: pointer; }
+.skill-open:hover { background: transparent; }
+.skill-open:focus-visible { outline: 2px solid var(--primary-action); outline-offset: -2px; }
+.skill-detail { min-width: 0; }
+.resource-breadcrumb { margin-bottom: 32px; }
+.resource-detail-header { gap: 14px; margin-bottom: 20px; }
+.skill-detail .resource-detail-header { margin-bottom: 28px; }
+.skill-detail .settings-group-panel { padding-block: 0; }
+.resource-badges { flex-wrap: wrap; margin-bottom: 12px; }
+.resource-setting-row { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 16px 0; font-size: var(--fs-label); }
+.resource-setting-row + .resource-setting-row { border-top: 1px solid var(--border); }
+.resource-setting-row strong { font-weight: var(--fw-medium); }
+.resource-setting-row p { color: var(--text-secondary); font-size: var(--fs-caption); margin: 5px 0 0; line-height: 1.6; }
+.resource-metadata { margin: 0; font-size: var(--fs-caption); }
+.resource-metadata > div { display: grid; grid-template-columns: minmax(80px, 22%) 1fr; gap: 16px; padding: 14px 0; }
+.resource-metadata > div + div { border-top: 1px solid var(--border); }
+.resource-metadata dt { color: var(--text-muted); }
+.resource-metadata dd { margin: 0; overflow-wrap: anywhere; }
+.memory-intro { color: var(--text-secondary); font-size: var(--fs-label); margin: -8px 0 24px; }
+.memory-status { padding: 0 20px; background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-block); }
+.memory-status .resource-detail-header { margin-bottom: 0; padding: 20px 0; }
+.memory-status .resource-identity { flex: 1; }
+.memory-counts { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--fs-caption); color: var(--text-secondary); }
+.memory-counts > span > span { color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.memory-review { border-top: 1px solid var(--border); gap: 14px; padding: 20px 0; }
+.model-options-title { font-size: var(--fs-caption); font-weight: var(--fw-medium); color: var(--text-secondary); margin: 0 0 8px; }
+.model-options-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 20px; row-gap: 8px; }
+.model-option { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: 34px; font-size: var(--fs-caption); }
+.model-option > span { min-width: 0; }
+.model-option > div { flex: 0 1 100px; min-width: 0; }
+.model-option > div > input, .model-option > div > button, .model-option > div > .autosave-input { width: 100% !important; }
+.model-option .model-temperature-controls { justify-content: flex-end; }
+.model-temperature-controls { display: flex; align-items: center; gap: 8px; }
+@media (max-width: 520px) { .model-options-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 760px) {
+  .resource-detail-header { flex-wrap: wrap; }
+  .resource-detail-header > .resource-identity { flex: 1; }
+  .resource-detail-header > .resource-actions { width: 100%; margin-left: 0; }
+  .resource-setting-row { flex-wrap: wrap; gap: 12px; }
+  .memory-status { padding: 0 16px; }
+  .memory-review > .resource-identity { flex-basis: 100%; }
+}

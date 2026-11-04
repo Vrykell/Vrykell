@@ -3,10 +3,8 @@ import { t } from '@i18n';
 import { memoryStats, type MemoryStats } from '@features/agent/services/platform';
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import ErrorBox from '@ui/feedback/ErrorBox';
-import { Field, SettingsGroup } from '../components/ui';
-import ReloadButton from '@ui/actions/ReloadButton';
-import { Sparkles } from '@ui/icons';
 import { organizeMemoryWithAssistant } from '@features/workspace/services/workspaceActions';
+import './resources.css';
 
 export function MemorySettings() {
   const [stats, setStats] = useState<MemoryStats | null>(null);
@@ -23,13 +21,23 @@ export function MemorySettings() {
       .finally(() => { if (request === generation.current) setLoading(false); });
     return () => { generation.current++; };
   }, [revision]);
-  return <SettingsGroup title={t('Agent memory')}>
-    <Field title={t('Memory retrieval')} description={<span aria-busy={loading}>{loading && !stats ? <span role="status">{t('Loading…')}</span> : stats ? <>{t('Total memories')}: <span data-testid="memory-count-total">{stats.total}</span> · {t('Active')}: <span data-testid="memory-count-active">{stats.active}</span> · {t('Needs review')}: <span data-testid="memory-count-pending">{stats.pending}</span></> : t('Could not load memory status')}</span>}>
-      <ReloadButton compact label={t('Reload')} busy={loading} onReload={reload} />
-    </Field>
-    <Field title={t('Review memories')} description={t('Review pending and expired memories, combine duplicates, and check outdated facts with the assistant.')}>
-      <OutlineButton onClick={organizeMemoryWithAssistant}><Sparkles size={16} />{t('Organize with AI')}</OutlineButton>
-    </Field>
+  return <div className="memory-overview">
+    <p className="memory-intro">{t('Relevant memories are available to the assistant during conversations.')}</p>
+    <div className="memory-status" aria-busy={loading}>
+      <div className="resource-detail-header">
+        <div className="resource-identity"><strong>{t('Memory retrieval')}</strong>
+          {stats ? <div className="memory-counts">{([
+            ['total', 'Total memories', stats.total], ['active', 'Active', stats.active], ['pending', 'Needs review', stats.pending],
+          ] as const).map(([key, label, value]) => <span key={key}>{t(label)} <span data-testid={`memory-count-${key}`}>{value}</span></span>)}</div>
+            : <p role="status">{t(loading ? 'Loading…' : 'Could not load memory status')}</p>}
+        </div>
+        <OutlineButton disabled={loading} aria-busy={loading} onClick={reload}>{t('Reload')}</OutlineButton>
+      </div>
+    <div className="memory-review resource-setting-row">
+      <div className="resource-identity"><strong>{t('Review memories')}</strong><p>{t('Review pending and expired memories, combine duplicates, and check outdated facts with the assistant.')}</p></div>
+      <OutlineButton onClick={organizeMemoryWithAssistant}>{t('Organize with AI')}</OutlineButton>
+    </div>
+    </div>
     {error && <ErrorBox title={t('Could not load memory status')} details={error} onDismiss={() => setError(null)} actions={<OutlineButton onClick={reload}>{t('Retry')}</OutlineButton>} />}
-  </SettingsGroup>;
+  </div>;
 }

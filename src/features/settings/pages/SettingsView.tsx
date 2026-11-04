@@ -3,7 +3,7 @@ import { OutlineButton } from '@ui/actions/OutlineButton';
 import { t } from '@i18n';
 import { useEffect, useState, type ReactNode } from 'react';
 import { loadConfig, saveConfig, type FileOpenConfig } from '@features/files/services/fileOpen';
-import { refreshAiConfig, setTavilyKey, clearTavilyKey, useAiConfigStore } from '@features/agent';
+import { refreshAiConfig } from '@features/agent';
 import SkillsSettings from '@features/settings/pages/SkillsSettings';
 import { MemorySettings } from '@features/settings/pages/MemorySettings';
 import HarnessPage from '@features/settings/pages/harnessPage';
@@ -82,7 +82,6 @@ function SettingsContent() {
   };
 
   // The configuration store mirrors backend state without exposing credentials.
-  const aiCfg = useAiConfigStore();
   const toast = (msg: string, type: 'info' | 'success' | 'error') =>
     useToastStore.getState().addToast(msg, type);
 
@@ -113,50 +112,6 @@ function SettingsContent() {
 
       case 'ai-behavior':
         return <AiBehaviorPage />;
-
-      case 'ai-web': {
-        const mode =
-          aiCfg.provider !== 'openai-compatible'
-            ? t("Provider search")
-            : aiCfg.hasTavilyKey
-              ? 'Tavily'
-              : t("Fallback search");
-        return (
-          <SettingsGroup title={t('Search services')}>
-            <Field title={t("Current search method")} description={t('Web search works without configuration.')}>
-              <span style={{
-                fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4,
-                color: 'var(--text-secondary)', background: 'var(--hover)',
-              }}>
-                {mode}
-              </span>
-            </Field>
-            <Field layout="stacked" title="Tavily API Key" description={t('Optional search key. Without it, use the built-in fallback.')}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <span style={{
-                  fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 8px', borderRadius: 4,
-                  color: aiCfg.hasTavilyKey ? 'var(--success)' : 'var(--text-muted)',
-                  background: aiCfg.hasTavilyKey ? 'var(--success-bg)' : 'var(--hover)',
-                }}>
-                  {aiCfg.hasTavilyKey ? t("Configured") : t("Not configured")}
-                </span>
-              </div>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <AutoSaveInput
-                  type="password"
-                  value=""
-                  placeholder={aiCfg.hasTavilyKey ? t("Enter to replace; leave empty to keep the current value") : t("Enter Tavily API Key")}
-                  onCommit={key => setTavilyKey(key)}
-                  clearAfterSave
-                  onClear={aiCfg.hasTavilyKey ? async () => { await clearTavilyKey(); toast(t("Tavily key cleared"), 'success'); } : undefined}
-                  validate={key => key.trim() ? undefined : t("Leave empty to keep the current value")}
-                  style={{ flex: 1 }}
-                />
-              </div>
-            </Field>
-          </SettingsGroup>
-        );
-      }
 
       case 'ai-perms':
         return (
@@ -317,7 +272,7 @@ function SettingsContent() {
 
         {/* Content retains a readable width before falling back to horizontal scrolling. */}
         <section className="settings-content">
-          <header className="settings-page-header">
+          {selected !== 'ai-skill' && <header className="settings-page-header">
             <div className="settings-page-heading">
               {profileShell && SHELL_TYPES.includes(profileShell) && <TerminalProfileIcon kind="local" shellType={profileShell} size={28} />}
               <h1>{activeLabel}</h1>
@@ -326,7 +281,7 @@ function SettingsContent() {
               {selected !== 'ai-memory' && <span>{t('Options save immediately; text saves after you stop typing.')}</span>}
               <SaveStatus status={status} onRetry={retry} />
             </div>}
-          </header>
+          </header>}
           <div className="settings-page-body">
             {renderPage()}
           </div>

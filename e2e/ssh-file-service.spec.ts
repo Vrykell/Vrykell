@@ -90,7 +90,7 @@ for (const [theme, width] of [['dark', 1240], ['light', 720]] as const) {
     await expect(secret).toHaveAttribute('type', 'password');
     await expect(secret).toHaveCSS('min-height', '32px');
     await expect(secret).toHaveCSS('padding-top', '6px');
-    await expect(secret).toHaveCSS('border-radius', '8px');
+    await expect(secret).toHaveCSS('border-radius', '10px');
     expect(await secret.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(await dialog.getByRole('combobox', { name: '认证方式' }).evaluate(element => getComputedStyle(element).backgroundColor));
     await secret.fill('masked-layout-fixture');
     await dialog.screenshot({ path: info.outputPath(`service-authentication-${theme}.png`), animations: 'disabled' });

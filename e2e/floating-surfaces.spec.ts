@@ -38,7 +38,7 @@ async function search(page: Page) {
   await expect(results.first()).toBeVisible();
   const selected = dialog.locator('[data-search-result][data-selected="true"]');
   await expect(selected).toHaveCSS('border-left-width', '0px');
-  await expect(selected).toHaveCSS('border-radius', '8px');
+  await expect(selected).toHaveCSS('border-radius', '10px');
   expect(await selected.evaluate(element => getComputedStyle(element, '::before').content)).toBe('none');
   const firstTitle = await selected.textContent();
   await dialog.getByPlaceholder('搜索文件、命令、设置…').press('ArrowDown');

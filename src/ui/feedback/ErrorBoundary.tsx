@@ -97,7 +97,7 @@ function DefaultFallback({ error, componentStack, onReset }: {
         onClick={onReset}
         style={{
           marginTop: 8, padding: '8px 24px', fontSize: 'calc(13px * var(--ui-font-scale))',
-          background: 'var(--primary-button-bg)', border: 'none', borderRadius: 6,
+          background: 'var(--primary-button-bg)', border: 'none', borderRadius: 'var(--radius-inner)',
           color: 'var(--primary-button-text)', cursor: 'pointer',
         }}
       >

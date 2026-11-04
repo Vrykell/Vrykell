@@ -63,4 +63,13 @@ describe('useSkillsSettings', () => {
     expect(result.current.importUrl).toBe('');
     expect(result.current.importing).toBe(false);
   });
+  it('does not reopen a detail after the user has returned to the list', async () => {
+    let finish!: (value: SkillDetail) => void;
+    skillMocks.getSkill.mockImplementationOnce(() => new Promise<SkillDetail>(resolve => { finish = resolve; }));
+    const { result } = renderHook(() => useSkillsSettings());
+    act(() => void result.current.openDetail(meta.name));
+    act(() => result.current.setDetail(null));
+    await act(async () => finish(detail));
+    expect(result.current.detail).toBeNull();
+  });
 });
