@@ -51,15 +51,14 @@
 .memory-counts { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--fs-caption); color: var(--text-secondary); }
 .memory-counts > span > span { color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .memory-review { border-top: 1px solid var(--border); gap: 14px; padding: 20px 0; }
-.model-options-title { font-size: var(--fs-caption); font-weight: var(--fw-medium); color: var(--text-secondary); margin: 0 0 8px; }
-.model-options-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 20px; row-gap: 8px; }
-.model-option { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: 34px; font-size: var(--fs-caption); }
-.model-option > span { min-width: 0; }
-.model-option > div { flex: 0 1 100px; min-width: 0; }
+.model-options-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 20px; row-gap: 10px; }
+.model-option { display: grid; grid-template-columns: minmax(0, 1fr) minmax(96px, 112px); align-items: center; column-gap: 12px; min-width: 0; min-height: 34px; font-size: var(--fs-caption); }
+.model-option > span { min-width: 0; overflow-wrap: anywhere; }
+.model-option > div { min-width: 0; width: 100%; }
 .model-option > div > input, .model-option > div > button, .model-option > div > .autosave-input { width: 100% !important; }
 .model-option .model-temperature-controls { justify-content: flex-end; }
 .model-temperature-controls { display: flex; align-items: center; gap: 8px; }
-@media (max-width: 520px) { .model-options-grid { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 560px) { .model-options-grid { grid-template-columns: minmax(0, 1fr); } }
 @media (max-width: 760px) {
   .resource-detail-header { flex-wrap: wrap; }
   .resource-detail-header > .resource-identity { flex: 1; }

@@ -29,7 +29,6 @@ export default function ModelContextSettings({ modelId }: { modelId: string }) {
   }, [target]);
   const update = (patch: Partial<ModelBehaviorSettings>) => settings.updateModel(modelId, patch);
   return <div ref={ref} className="model-context-settings" data-testid="model-context-settings">
-    <h3 className="model-options-title">{t('Context and responses')}</h3>
     <div className="model-options-grid">
       <Option title={t('Context strategy')} hint={t('Keep all messages, recent messages or a summary of older messages.')}>
         <Select aria-label={t('Context strategy')} value={effective.contextStrategy}

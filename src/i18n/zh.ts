@@ -2625,7 +2625,6 @@ const zh: Record<string, string> = {
   'Authenticate jump services': '认证跳板服务',
   'Authentication target': '认证目标',
   'Authenticate jump hosts in order, then authenticate the destination. Each credential stays with its own connection.': '请按顺序认证跳板机，最后认证目标主机。各连接的凭据独立保留。',
-  'Context and responses': '上下文与回复',
   'Input budget for this model, including instructions, images and tools. Set it within the context window supported by your provider. Use 0 for no local limit.': '此模型的输入预算，包含指令、图片和工具。请按服务商支持的上下文窗口设置；0 表示不设本地限制。',
   'Skill settings': '技能设置',
   'Make this skill available to the assistant when trusted.': '信任后，允许助手使用此技能。',
