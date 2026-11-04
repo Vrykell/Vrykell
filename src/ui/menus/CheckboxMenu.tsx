@@ -131,7 +131,7 @@ export default function CheckboxMenu<Id extends string>({ title, options, onTogg
               color: 'var(--text-muted)',
               background: 'var(--hover)',
               padding: '0 6px',
-              borderRadius: 8,
+              borderRadius: 999,
             }}>
               {option.count}
             </span>
