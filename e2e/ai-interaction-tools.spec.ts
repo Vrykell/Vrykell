@@ -31,7 +31,7 @@ for (const answer of ['option', 'custom', 'skip', 'cancel'] as const) test(`asks
   await page.locator('[data-dock-btn="chat"]').click();
   const composer = page.locator('[data-chat-composer]:visible');
   await composer.fill('Ask before continuing'); await composer.press('Enter');
-  const question = page.getByRole('group', { name: '回答问题', exact: true });
+  const question = page.getByRole('form', { name: '回答问题', exact: true });
   await expect(question).toBeVisible();
   await expect(page.getByRole('button', { name: '允许一次', exact: true })).toHaveCount(0);
   await expect(page.locator('#app-notifications [role="alert"]')).toHaveCount(0);
@@ -79,7 +79,7 @@ for (const answer of ['option', 'custom', 'skip', 'cancel'] as const) test(`asks
       await useChatStore.getState().selectConversation(id); useAiWorkspace.getState().selectSide(`chat:${id}`);
     }, saved);
     await expect(page.getByTestId('ai-sidebar-content')).toBeVisible();
-    await expect(page.getByRole('group', { name: '回答问题', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('form', { name: '回答问题', exact: true })).toHaveCount(0);
     await expect(page.getByTestId('tool-question-result')).toHaveText('Preview');
   }
 });
@@ -91,7 +91,7 @@ test('does not reopen a question when the model requests the same confirmation a
   await page.locator('[data-dock-btn="chat"]').click();
   const composer = page.locator('[data-chat-composer]:visible');
   await composer.fill('Inspect Preview'); await composer.press('Enter');
-  const question = page.getByRole('group', { name: '回答问题', exact: true });
+  const question = page.getByRole('form', { name: '回答问题', exact: true });
   await question.getByRole('button', { name: 'Preview', exact: true }).click();
   await expect(page.getByText('Using the answer without another confirmation.', { exact: true })).toBeVisible();
   await expect(question).toHaveCount(0);

@@ -24,7 +24,8 @@ it('routes a review question to the provided owner instead of a native conversat
   const ask = vi.fn();
   const run: ToolRun = { toolCallId: 'external-review', toolName: 'run_command', state: 'approval-pending', input: { command: 'pwd' }, startedAt: 1 };
   render(<ToolRunCard run={run} onAskAboutTool={ask} />);
-  fireEvent.click(screen.getByRole('button', { name: '先问一下' }));
+  fireEvent.click(screen.getByRole('button', { name: '审批选项' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '先问一下' }));
   expect(ask).toHaveBeenCalledWith(expect.stringContaining('pwd'));
 });
 
@@ -146,7 +147,8 @@ it('rejects the pending action and preserves an existing draft when asking first
   });
   render(<ToolRunCard run={{ ...command, state: 'approval-pending' }} conversationId="owner" />);
   await vi.waitFor(() => expect(states).toContain('approval-pending'));
-  fireEvent.click(screen.getByRole('button', { name: '先问一下' }));
+  fireEvent.click(screen.getByRole('button', { name: '审批选项' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: '先问一下' }));
   expect(await pending).toMatchObject({ proceed: false, result: { denied: true } });
   expect(useComposerDrafts.getState().byTab.owner?.text).toBe('Existing question\n请先解释这个操作的作用，再决定是否运行：npm run build');
 });

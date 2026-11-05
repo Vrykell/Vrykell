@@ -52,7 +52,7 @@ for (const theme of ['dark', 'light']) test(`answers application MCP questions i
   await call(page, 'unbound', 'run_command', { command: 'echo application-mcp' });
   await expect.poll(async () => (await result(page, 'unbound'))?.isError).toBe(true);
   await call(page, 'question', 'ask_user', { question: 'Which folder should be used?', options: ['Current project', 'Another folder'] });
-  const question = page.getByRole('group', { name: '回答问题', exact: true });
+  const question = page.getByRole('form', { name: '回答问题', exact: true });
   await expect(question).toBeVisible();
   await page.screenshot({ path: info.outputPath('application-mcp-question.png') });
   await question.getByRole('button', { name: 'Current project', exact: true }).click();
@@ -80,7 +80,8 @@ test('uses the explicitly selected terminal and does not bypass shared approval 
   await call(page, 'command', 'run_command', { command: 'echo application-mcp' });
   await expect(page.locator('.ai-tool-card')).toHaveAttribute('data-tool-state', 'approval-pending');
   await expect(page.getByRole('button', { name: '运行', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '拒绝', exact: true }).click();
+  await page.getByRole('button', { name: '审批选项' }).click();
+  await page.getByRole('menuitem', { name: '拒绝', exact: true }).click();
   await expect.poll(async () => (await result(page, 'command'))?.isError).toBe(true);
   await call(page, 'retry', 'read_file', { path: '/home/e2e/project/file.txt' });
   await expect.poll(async () => (await result(page, 'retry'))?.isError).toBe(true);
@@ -93,7 +94,7 @@ test('blocks application tools queued behind a skipped question and permits a ne
   await page.getByTestId('harness-composer').fill('Ask before writing');
   await page.getByTestId('harness-send').click();
   await call(page, 'skipped', 'ask_user', { question: 'Which folder should be used?', options: ['Current project'] });
-  await expect(page.getByRole('group', { name: '回答问题', exact: true })).toBeVisible();
+  await expect(page.getByRole('form', { name: '回答问题', exact: true })).toBeVisible();
   await call(page, 'queued-write', 'write_file', { path: '/home/e2e/project/blocked.txt', content: 'blocked' });
   await page.getByRole('button', { name: '跳过问题', exact: true }).click();
   await expect.poll(async () => (await result(page, 'queued-write'))?.isError).toBe(true);
@@ -103,7 +104,7 @@ test('blocks application tools queued behind a skipped question and permits a ne
   await page.getByTestId('harness-composer').fill('New question');
   await page.getByTestId('harness-send').click();
   await call(page, 'new-question', 'ask_user', { question: 'Which environment?', options: ['Preview'] });
-  await expect(page.getByRole('group', { name: '回答问题', exact: true })).toBeVisible();
+  await expect(page.getByRole('form', { name: '回答问题', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Preview', exact: true }).click();
   await expect.poll(async () => (await result(page, 'new-question'))?.isError).toBe(false);
 });
@@ -114,7 +115,8 @@ test('returns an approval review question to the same agent composer', async ({ 
   await page.getByTestId('harness-composer').fill('Inspect the terminal'); await page.getByTestId('harness-send').click();
   await call(page, 'review', 'run_command', { command: 'echo review-target' });
   await expect(page.locator('.ai-tool-card')).toHaveAttribute('data-tool-state', 'approval-pending');
-  await page.getByRole('button', { name: '先问一下', exact: true }).click();
+  await page.getByRole('button', { name: '审批选项' }).click();
+  await page.getByRole('menuitem', { name: '先问一下', exact: true }).click();
   await expect(page.getByTestId('harness-composer')).toHaveValue(/echo review-target/);
   await expect(page.getByTestId('harness-composer')).toBeFocused();
   await expect.poll(async () => (await result(page, 'review'))?.isError).toBe(true);

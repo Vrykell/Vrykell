@@ -305,6 +305,12 @@ test('pausing and resuming the follow never shifts the transcript layout', async
   await expect.poll(async () => (await layout()).slot).toBe('true');
   expect((await layout()).box).toBe(following.box);
   await expect(jump).toHaveCSS('visibility', 'visible');
+  await jump.hover();
+  const hoverAlpha = await jump.evaluate(element => {
+    const alpha = getComputedStyle(element).backgroundColor.match(/[\d.]+/g)?.map(Number) ?? [];
+    return alpha.length === 4 ? alpha[3] : 1;
+  });
+  expect(hoverAlpha).toBe(1);
   await jump.click();
   await expect.poll(async () => (await layout()).slot).toBeNull();
   expect((await layout()).box).toBe(following.box);

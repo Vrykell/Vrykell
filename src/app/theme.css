@@ -692,7 +692,7 @@ button.window-control-button {
    never occupies layout or masks message content. */
 .chat-jump-slot { position: absolute; left: 0; right: 0; bottom: 8px; display: flex; align-items: center; justify-content: center; pointer-events: none; }
 .chat-jump-latest { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--text-secondary); font-size: var(--fs-caption); pointer-events: auto; box-shadow: 0 4px 12px rgb(0 0 0 / 0.22); transition: background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease); }
-.chat-jump-latest:is(:hover, :focus-visible) { background: var(--hover); color: var(--text-primary); }
+.chat-jump-latest:is(:hover, :focus-visible) { background: color-mix(in srgb, var(--surface) 86%, var(--text-primary)); color: var(--text-primary); }
 .chat-composer-wrap { padding: 8px 10px 12px; flex-shrink: 0; }
 .chat-composer { padding: 10px 12px 8px; }
 .chat-composer-input { display: flex; align-items: flex-start; gap: 10px; min-height: 32px; }
@@ -1588,3 +1588,9 @@ textarea.config-text-input[data-font="ui"] { font-family: var(--font-ui) !import
 .ai-launchpad:has(.ai-launch-option:hover) .ai-launch-option:focus-visible:not(:hover) { background: var(--card-bg); }
 .sidebar-row:hover { --sidebar-row-hover: var(--hover); }
 .workspace-sidebar:has(.sidebar-row:hover) .sidebar-row:focus-visible:not(:hover):not([data-active="true"]) > .sidebar-row-content { background: transparent; }
+/* The shared text/icon resets later in this file would turn the approval split action into plain
+ * text. Keep the run half and its options trigger on the primary surface. */
+button.ai-tool-run.text-control { border: 0; background: var(--primary-button-bg); color: var(--primary-button-text); }
+button.ai-tool-run.text-control:enabled:is(:hover, :focus-visible) { background: var(--primary-button-hover-bg); color: var(--primary-button-text); }
+button.ai-tool-run-menu.icon-button { border: 0; background: var(--primary-button-bg); color: var(--primary-button-text); }
+button.ai-tool-run-menu.icon-button:enabled:is(:hover, :focus-visible) { background: var(--primary-button-hover-bg); color: var(--primary-button-text); }

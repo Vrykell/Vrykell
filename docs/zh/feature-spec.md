@@ -410,7 +410,7 @@
 | A6 | SSH 文件边界 | 根据已捕获的目标 pane 判断远程访问，兼容未提供环境元数据的旧调用方；SSH 目标不注册本机文件工具 | executionTarget.test.ts |
 | A7 | 普通对话展示 | AI 面板以普通对话展示：问题使用轻量底色，回答直接渲染，不显示终端块背景、左侧导轨和重复标题。工具保留透明平铺分隔行，消息操作仍可使用。思考行复用工具摘要行的字体与间距，图标在前、预览跟随标题并省略溢出、展开箭头靠右；终端中的历史 AI 内容保留块式展示 | AiBlock 单测与深浅主题 E2E 验证普通回答、Markdown、工具和消息操作 |
 | A8 | 终端回答收起 | 终端历史回答保留显式收起按钮；面板回答正常显示，不提供块式收起控件 | AiBlock 单测与面板 E2E |
-| A9 | 阅读跟随 | 上滚暂停跟随——包括触控板的小幅滚动，暂停依据滚动输入本身而不是距底部的距离；回到最新回复恢复；每段对话分别保留滚动位置 | ai-conversations.spec.ts |
+| A9 | 阅读跟随 | 上滚暂停跟随——包括触控板的小幅滚动，暂停依据滚动输入本身而不是距底部的距离；回到最新回复恢复；每段对话分别保留滚动位置。侧栏、AI 工作区和 ACP 输出流中的回到最新回复按钮悬停时保持不透明底色 | ai-conversations.spec.ts |
 | A10 | 工具与停止 | 命令块或 POSIX shell 私有标记确认执行结束；静止输出仍标记未确认，并拒绝并发排队命令；未确认完成的软阻断在终端重新就绪后允许新命令恢复；空按键配合正数 wait_ms 只等待不输入；块模式读取当前命令输出 | commandExecution.test.ts、commandQueue.test.ts、commandQueueWiring.test.ts、terminalAvailability.test.ts、commandCompletion.test.ts、runCommand.test.ts 与 terminal.test.ts |
 | A11 | 本地记忆 | 范围隔离、有效期、旧资料待确认、版本冲突、有限检索、完整工具历史重放和只显示统计的设置页 | 后端／单元记忆测试、modelHistory.test.ts、agentStream.test.ts、memory.spec.ts |
 | A12 | 保存失败 | 显示统一错误块并保留内存内容，提供重试保存 | conversations.test.ts |

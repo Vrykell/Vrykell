@@ -55,14 +55,12 @@ export default function ToolApproval({ run, paneId, conversationId, environment,
     {isCommand && <div className="ai-tool-timeout">{t('Timeout {{seconds}} seconds', { seconds: DEFAULT_TOOL_COMMAND_TIMEOUT_MS / 1000 })}</div>}
     {warning && <div className="ai-tool-approval-warning">{warning}</div>}
     <div className="ai-tool-approval-actions">
-      <TextButton data-tone="danger" onClick={() => resolveApproval(run.toolCallId, 'deny')}>{t('Reject')}</TextButton>
-      <TextButton onClick={ask}>{t('Ask first')}</TextButton>
       <span className="ai-tool-approval-spacer" />
       {isCommand && <OutlineButton onClick={() => setEditing(!editing)}><Pencil size={14} />{t(editing ? 'Done editing' : 'Edit')}</OutlineButton>}
       <div className="ai-tool-run-actions">
         <TextButton className="ai-tool-run" disabled={isCommand && !command.trim()} onClick={() => approve()}><Play size={14} />{t(isCommand ? 'Run now' : 'Allow once')}</TextButton>
         <IconButton className="ai-tool-run-menu" aria-label={t('Approval options')} aria-haspopup="menu" aria-expanded={menu !== null}
-          disabled={isCommand && !command.trim()} onClick={event => { const box = event.currentTarget.getBoundingClientRect(); setMenu({ x: box.right, y: box.bottom }); }}><ChevronDown size={12} /></IconButton>
+          onClick={event => { const box = event.currentTarget.getBoundingClientRect(); setMenu({ x: box.right, y: box.bottom }); }}><ChevronDown size={12} /></IconButton>
       </div>
     </div>
     {menu && <ContextMenu anchor={menu} itemRole="menuitem" onClose={() => setMenu(null)} items={[
@@ -74,6 +72,8 @@ export default function ToolApproval({ run, paneId, conversationId, environment,
             onClick: () => { setMenu(null); resolveApproval(run.toolCallId, 'shape'); },
           }
         : { label: t('Allow for this conversation'), onClick: () => { setMenu(null); approve(true); } },
+      { label: t('Ask first'), onClick: () => { setMenu(null); ask(); } },
+      { label: t('Reject'), danger: true, onClick: () => { setMenu(null); resolveApproval(run.toolCallId, 'deny'); } },
     ]} />}
   </div>;
 }
