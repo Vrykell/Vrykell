@@ -12,17 +12,17 @@ import { setupTauriMock, acpAnswered, acpCalls, emitAcpSession, acpUpdate } from
 const SESSION = 'sess_e2e';
 
 /** One permission request, shaped like the protocol's. */
-function permissionRequest(toolCallId: string, title: string) {
+function permissionRequest(toolCallId: string, title: string, options = [
+  { optionId: 'allow-once', name: 'Allow once', kind: 'allow_once' },
+  { optionId: 'reject-once', name: 'Reject', kind: 'reject_once' },
+]) {
   return {
     sessionId: SESSION,
     kind: 'permission',
     payload: {
       sessionId: SESSION,
       toolCall: { toolCallId, title },
-      options: [
-        { optionId: 'allow-once', name: 'Allow once', kind: 'allow_once' },
-        { optionId: 'reject-once', name: 'Reject', kind: 'reject_once' },
-      ],
+      options,
     },
   };
 }
@@ -119,13 +119,25 @@ await expect(page.getByTestId('harness-page')).toContainText('Working on it.');
     await expect.poll(() => acpAnswered(page)).toEqual([{ toolCallId: 'call_1', optionId: 'allow-once' }]);
     await expect(card).toHaveCount(0);
 
-    // A second request can be refused instead, which the protocol calls a cancel.
-    await emitAcpSession(page, permissionRequest('call_2', 'Delete the build output'));
+    // A second request can be refused with the protocol cancel when the harness offers no reject.
+    await emitAcpSession(page, permissionRequest('call_2', 'Delete the build output',
+      [{ optionId: 'allow-once', name: 'Allow once', kind: 'allow_once' }]));
     await expect(page.getByTestId('harness-permission')).toContainText('Delete the build output');
     await page.getByTestId('harness-option-deny').click();
     await expect.poll(() => acpAnswered(page)).toEqual([
       { toolCallId: 'call_1', optionId: 'allow-once' },
       { toolCallId: 'call_2', optionId: null },
+    ]);
+
+    // When the harness names its own reject option, that option answers the card and no duplicate
+    // cancel action is added beside it.
+    await emitAcpSession(page, permissionRequest('call_3', 'Remove the cache'));
+    expect(await page.getByTestId('harness-option-deny').count()).toBe(0);
+    await page.getByTestId('harness-option-reject-once').click();
+    await expect.poll(() => acpAnswered(page)).toEqual([
+      { toolCallId: 'call_1', optionId: 'allow-once' },
+      { toolCallId: 'call_2', optionId: null },
+      { toolCallId: 'call_3', optionId: 'reject-once' },
     ]);
 
     // The plan and the context window the agent publishes belong to the session view.

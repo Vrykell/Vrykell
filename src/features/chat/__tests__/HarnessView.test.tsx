@@ -78,6 +78,20 @@ it('renders a pending question above the working row', () => {
   expect(question!.compareDocumentPosition(working!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 });
 
+it('renders a pending permission card above the working row', () => {
+  useHarnessStore.setState({ byTab: { agent: { ...session(), pending: true,
+    messages: [{ id: 'question', role: 'user', content: 'Check this project', createdAt: 1 }],
+    permission: { toolCallId: 'call', generation: 1, title: 'Run the tests',
+      options: [{ optionId: 'allow-once', name: 'Allow once' }] } } } });
+  const view = render(<Surface />);
+  const card = view.container.querySelector('[data-testid="harness-permission"]');
+  const working = view.container.querySelector('.ai-block-working');
+  expect(card).not.toBeNull();
+  expect(card).toHaveClass('ai-tool-card');
+  expect(working).not.toBeNull();
+  expect(card!.compareDocumentPosition(working!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
 it('grows the composer with its content the way the other composers do', () => {
   vi.spyOn(HTMLTextAreaElement.prototype, 'clientWidth', 'get').mockImplementation(() => 400);
   vi.spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get').mockImplementation(function (this: HTMLTextAreaElement) {

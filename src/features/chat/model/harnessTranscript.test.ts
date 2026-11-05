@@ -34,8 +34,16 @@ describe('applyHarnessUpdate', () => {
     expect(messages[1]!.parts).toHaveLength(4);
   });
 
-  it('groups previously fragmented replay messages without mutating them or merging user turns', () => {
-    const old: ChatMessage[] = [
+  it('leaves application MCP tool calls to the application tool card', () => {
+    expect(applyHarnessUpdate([], update({ sessionUpdate: 'tool_call', toolCallId: 'mcp-call',
+      title: 'mcp__application__ask_user', kind: 'other', status: 'pending', rawInput: { question: 'Choose' } }))).toEqual([]);
+    const other = applyHarnessUpdate([], update({ sessionUpdate: 'tool_call', toolCallId: 'other-call',
+      title: 'mcp__other__search', kind: 'other', status: 'pending', rawInput: { query: 'needle' } }));
+    expect(other).toHaveLength(1);
+    expect(other[0]!.parts?.[0]).toMatchObject({ kind: 'tool', tool: { toolCallId: 'other-call', toolName: 'other' } });
+  });
+
+  it('groups previously fragmented replay messages without mutating them or merging user turns', () => {    const old: ChatMessage[] = [
       { id: 'q', role: 'user', content: 'Inspect', createdAt: 1 },
       { id: 'thought', role: 'assistant', content: '', reasoning: 'Checking', createdAt: 2 },
       { id: 'tool', role: 'assistant', content: '', parts: [{ kind: 'tool', tool: { toolCallId: 'one', toolName: 'read_file', state: 'done', input: {}, startedAt: 2 } }], createdAt: 3 },

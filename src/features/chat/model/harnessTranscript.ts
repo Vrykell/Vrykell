@@ -199,6 +199,10 @@ export function applyHarnessUpdate(messages: ChatMessage[], payload: Record<stri
       const previous = messages.flatMap(message => message.parts ?? []).find(part => part.kind === 'tool' && part.tool.toolCallId === toolCallId);
       const existing = previous?.kind === 'tool' ? previous.tool : undefined;
       const title = typeof update.title === 'string' ? update.title : '';
+      // The application MCP server runs through ApplicationToolSession, which already adds its
+      // own tool card. The agent also reports the MCP call with a generic ACP title; keeping that
+      // duplicate leaves a second card spinning after the real card has answered.
+      if (/^(?:mcp__)?application__/.test(title)) return messages;
       const run: ToolRun = {
         toolCallId,
         // Our card falls back to the provided title for tools it does not know (the ACP case).

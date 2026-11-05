@@ -6,7 +6,7 @@
  * something (approvals, the process, the protocol) happens in Rust; this page sends the user's
  * intent and renders what comes back.
  */
-import { useCallback, useContext, useEffect, useRef, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
 import HarnessQuestion from './HarnessQuestion';
@@ -41,6 +41,7 @@ import AiBlock, { WorkingIndicator } from '@features/chat/components/AiBlock';
 import AttachmentChips from './AttachmentChips';
 import ChatComposerShell from './ChatComposerShell';
 import QueuedMessages from './QueuedMessages';
+import HarnessPermission from './HarnessPermission';
 import HarnessSelector, { type HarnessSelectorOption } from './HarnessSelector';
 import { useHarnessStore, type HarnessSession } from '../stores/harness';
 import { isModelOption, isPermissionOption } from '../model/harnessOptions';
@@ -162,7 +163,11 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
   }, [agentKnown, imageSupport]);
   const { attachments, previewId, panelRef, addPastedText, pickFiles, addBlobs, togglePreview, removeAttachment } =
     useAttachmentComposer({ attachments: composerDraft.attachments, updateAttachments, scopeKey: tabId, accept: acceptAttachment });
-  const follow = useTranscriptFollow(tabId, session?.messages, active);
+  const followRevision = useMemo(
+    () => [session?.messages, session?.permission, session?.questions, session?.plan],
+    [session?.messages, session?.permission, session?.questions, session?.plan],
+  );
+  const follow = useTranscriptFollow(tabId, followRevision, active);
   const composerRef = useRef<HTMLTextAreaElement>(null);
   // The harness composer grows with its content exactly like the terminal and AI-chat composers:
   // same hook, same 120px cap, same internal scrolling once the cap is reached.
@@ -312,7 +317,7 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
             onRetry={exchange.question && !session?.pending && !session?.opening && !session?.stopping
               ? () => { follow.jumpToLatest(); void useHarnessStore.getState().prompt(tabId, exchange.question!.content, exchange.question!.attachments); } : undefined}
             allowExchangeActions={false} toolContextId={session?.toolContextId ?? tabId} presentation="conversation"
-            suppressPending={index === exchanges.length - 1 && !!session?.questions?.length} onAskAboutTool={question => {
+            suppressPending={index === exchanges.length - 1 && (!!session?.questions?.length || !!session?.permission)} onAskAboutTool={question => {
             const drafts = useComposerDrafts.getState(); const previous = drafts.byTab[tabId]?.text;
             drafts.setText(tabId, previous ? `${previous}\n${question}` : question);
             requestAnimationFrame(() => composerRef.current?.focus());
@@ -341,26 +346,13 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
         {/* The approval card sits at the end of the transcript, where the turn is: it reuses the
             app's own approval styling, and its buttons are the options the harness offered. */}
         {session?.permission && (
-          <div data-testid="harness-permission" className="ai-tool-approval" style={{ margin: '10px 4px', padding: '8px 10px' }}>
-            <div>{t('The harness is waiting for your decision:')} {session.permission.title}</div>
-            <div className="ai-tool-approval-actions">
-              {session.permission.options.map((option) => (
-                <button key={option.optionId} type="button" data-testid={`harness-option-${option.optionId}`} data-subtle
-                  onClick={() => void useHarnessStore.getState().answerPermission(tabId, session.permission!.generation, option.optionId)}>
-                  {option.name}
-                </button>
-              ))}
-              <button type="button" data-testid="harness-option-deny" data-subtle
-                onClick={() => void useHarnessStore.getState().answerPermission(tabId, session.permission!.generation, null)}>
-                {t('Deny')}
-              </button>
-            </div>
-          </div>
+          <HarnessPermission permission={session.permission}
+            onAnswer={optionId => useHarnessStore.getState().answerPermission(tabId, session.permission!.generation, optionId)} />
         )}
         {session?.sessionId && session.questions?.map(question => <HarnessQuestion key={question.requestId} sessionId={session.sessionId!} question={question} />)}
         {/* The agent is blocked on the answer, so the shared working row follows the question
             instead of sitting between the reply and the card. */}
-        {session?.pending && !!session.questions?.length && (
+        {session?.pending && (!!session.questions?.length || !!session.permission) && (
           <div style={{ margin: '6px 4px' }}><WorkingIndicator /></div>
         )}
       </div>

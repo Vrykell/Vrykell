@@ -652,6 +652,8 @@ const zh: Record<string, string> = {
   'The previous tool call failed. End this turn and send a new message before requesting more commands.': '上一条工具调用失败。请结束本轮并发送新消息，再请求执行命令。',
   'Add connection': '添加连接',
   'Awaiting answer': '等待回答',
+  'Permission required': '需要权限',
+  'Awaiting decision': '等待选择',
   'Project folder': '项目路径',
   'Pane actions': '窗格操作',
   'Ask the user': '询问用户',
