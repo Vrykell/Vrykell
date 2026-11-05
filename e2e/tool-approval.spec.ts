@@ -53,7 +53,13 @@ test('compact AI cards keep their color on disclosure, react to hover and review
   await tool.hover(); await expect(tool).not.toHaveCSS('background-color', color);
   const approval = page.locator('.ai-tool-card[data-tool-state="approval-pending"]');
   await expect(approval.getByText('Project terminal')).toBeVisible();
-  await approval.getByRole('button', { name: '编辑', exact: true }).click();
+  const edit = approval.getByRole('button', { name: '编辑', exact: true });
+  const run = approval.getByRole('button', { name: '运行', exact: true });
+  const options = approval.getByRole('button', { name: '审批选项' });
+  const boxes = await Promise.all([edit.boundingBox(), run.boundingBox(), options.boundingBox()]);
+  for (const box of boxes) expect(Math.abs(box!.height - 28)).toBeLessThanOrEqual(1);
+  expect(await run.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+  await edit.click();
   await approval.getByRole('textbox', { name: '要运行的命令' }).fill('npm run check');
   await page.screenshot({ path: info.outputPath('approval-edit.png') });
   await approval.getByRole('button', { name: '运行', exact: true }).click();

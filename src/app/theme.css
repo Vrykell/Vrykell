@@ -983,8 +983,9 @@ button.ai-tool-target { display: flex; align-items: center; gap: 6px; width: 100
 textarea.ai-tool-command-editor { min-height: 68px; }
 .ai-tool-timeout { margin: 6px 0 0; color: var(--text-muted); font-size: var(--fs-micro); }
 .ai-tool-approval-warning { margin-top: 6px; color: var(--approval-status); }
-.ai-tool-approval-actions { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin-top: 8px; }
-.ai-tool-approval-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 5px; padding: 4px 6px; font-size: var(--fs-caption); }
+.ai-tool-approval-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.ai-tool-approval-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; min-height: 28px; padding: 0 10px; font-size: var(--fs-caption); }
+.ai-tool-approval-actions button.icon-button { padding: 0; }
 .ai-tool-approval-spacer { flex: 1; }
 .ai-tool-run-actions { display: inline-flex; align-items: stretch; }
 button.ai-tool-run, button.ai-tool-run-menu { background: var(--primary-button-bg); color: var(--primary-button-text); border: 0; border-radius: var(--radius-inner) 0 0 var(--radius-inner); padding-inline: 9px; }
@@ -1590,7 +1591,7 @@ textarea.config-text-input[data-font="ui"] { font-family: var(--font-ui) !import
 .workspace-sidebar:has(.sidebar-row:hover) .sidebar-row:focus-visible:not(:hover):not([data-active="true"]) > .sidebar-row-content { background: transparent; }
 /* The shared text/icon resets later in this file would turn the approval split action into plain
  * text. Keep the run half and its options trigger on the primary surface. */
-button.ai-tool-run.text-control { border: 0; background: var(--primary-button-bg); color: var(--primary-button-text); }
+button.ai-tool-run.text-control { border: 0; height: 28px; min-height: 28px; padding: 0 10px; background: var(--primary-button-bg); color: var(--primary-button-text); }
 button.ai-tool-run.text-control:enabled:is(:hover, :focus-visible) { background: var(--primary-button-hover-bg); color: var(--primary-button-text); }
-button.ai-tool-run-menu.icon-button { border: 0; background: var(--primary-button-bg); color: var(--primary-button-text); }
+button.ai-tool-run-menu.icon-button { border: 0; width: 24px; min-width: 24px; height: 28px; min-height: 28px; padding: 0; background: var(--primary-button-bg); color: var(--primary-button-text); }
 button.ai-tool-run-menu.icon-button:enabled:is(:hover, :focus-visible) { background: var(--primary-button-hover-bg); color: var(--primary-button-text); }
