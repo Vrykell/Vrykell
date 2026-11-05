@@ -46,7 +46,7 @@ export default function ToolApproval({ run, conversationId, onAskAboutTool }: {
     {isCommand && <div className="ai-tool-timeout">{t('Timeout {{seconds}} seconds', { seconds: DEFAULT_TOOL_COMMAND_TIMEOUT_MS / 1000 })}</div>}
     {warning && <div className="ai-tool-approval-warning">{warning}</div>}
     <div className="ai-tool-approval-actions">
-      <TextButton data-tone="danger" onClick={() => resolveApproval(run.toolCallId, 'deny')}>{t('Reject')}</TextButton>
+      <OutlineButton onClick={() => resolveApproval(run.toolCallId, 'deny')}>{t('Reject')}</OutlineButton>
       <span className="ai-tool-approval-spacer" />
       {isCommand && <OutlineButton onClick={() => setEditing(!editing)}><Pencil size={14} />{t(editing ? 'Done editing' : 'Edit')}</OutlineButton>}
       <div className="ai-tool-run-actions">

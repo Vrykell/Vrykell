@@ -4,12 +4,12 @@ import { AskQuestion, Brain, Check, ChevronRight, FileText, Folder, Globe, Penci
 import ErrorBox from '@ui/feedback/ErrorBox';
 import ToolOutput from './ToolOutput';
 import BlockOutput from '@features/terminal/components/BlockOutput';
-import { useBlockStore, useTerminalStore } from '@features/terminal';
+import { useBlockStore } from '@features/terminal';
 import { agentControl } from '@features/agent/services/agentControl';
 import ToolApproval from './ToolApproval';
 import ToolQuestion from './ToolQuestion';
 import type { ChatEnvironment } from '../model/conversation';
-import { environmentForPane, showExecutionTerminal } from '../services/conversationContext';
+import { environmentForPane } from '../services/conversationContext';
 import type { ToolRun, ToolRunState } from '@features/agent/model/messageParts';
 
 const STATE_LABEL: Record<ToolRunState, I18nKey> = {
@@ -102,7 +102,6 @@ export default function ToolRunCard({ run, paneId, framed = false, conversationI
     // Restored results never replay notifications. A live transition or explicit review opens one.
     setNotice(last.id === run.toolCallId && last.state !== run.state && run.state === 'error');
   }, [run.toolCallId, run.state, problem]);
-  const sessions = useTerminalStore(state => state.sessions);
   const { icon, label, text } = summarize(run);
   const pending = run.state === 'approval-pending' || run.state === 'input-pending';
   const summaryTarget = run.state === 'approval-pending' ? environment ?? (paneId ? environmentForPane(paneId) : null) : null;
@@ -147,7 +146,5 @@ export default function ToolRunCard({ run, paneId, framed = false, conversationI
             <pre className="ai-tool-output" data-selectable>{truncated ? `${t('Only the end of the output is shown')}\n` : ''}{body.slice(-6000) || t('No output')}</pre>
           </ToolOutput>}
     </div>}
-    {isCommand && paneId && sessions[paneId] && (open || run.state === 'approval-pending') && <button type="button" data-subtle
-      className="ai-tool-terminal-link" onClick={() => showExecutionTerminal(paneId)}>{t('View terminal')}</button>}
   </div>;
 }

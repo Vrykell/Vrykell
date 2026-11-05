@@ -62,6 +62,7 @@ test('compact AI cards keep their color on disclosure, react to hover and review
   expect(Math.abs((boxes[2]!.x + boxes[2]!.width) - boxes[3]!.x)).toBeLessThanOrEqual(1);
   const approvalBox = (await approval.boundingBox())!;
   expect(boxes[1]!.x - approvalBox.x).toBeLessThan(40);
+  expect(await reject.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
   expect(await approval.locator('.ai-tool-run-actions').evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
   await edit.click();
   await approval.getByRole('textbox', { name: '要运行的命令' }).fill('npm run check');
