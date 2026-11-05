@@ -7,6 +7,7 @@ import { emptyWorkbench } from '@features/workspace/model/workbench';
 import { useWorkbenchStore } from '@features/workspace/stores/workbench';
 import { useEditorDocuments } from '../stores/documents';
 import { newEditorFile, saveDocument } from '../services/documentActions';
+import { registerEditorChangeFlush } from '@ui/editor/code/pendingChanges';
 vi.mock('@platform/api/fs', () => ({ pickPath: vi.fn() }));
 vi.mock('@platform/api/editor', () => ({ readEditorFile: vi.fn(), saveEditorFile: vi.fn() }));
 vi.mock('@platform/diagnostics', () => ({ invoke: vi.fn(), diagnostic: vi.fn() }));
@@ -35,6 +36,19 @@ it('saves an untitled document at the chosen location and keeps a close guard ta
   expect(await saveDocument(page.selected)).toBe(true);
   expect(useSessionStore.getState().tabs[0]).toMatchObject({ selected: { path: '/notes/another.txt' } });
   expect(saveEditorFile).toHaveBeenCalledWith({ path: '/notes/another.txt', encoding: 'utf8' }, 'note', 'new');
+});
+
+it('flushes coalesced editor edits before saving', async () => {
+  newEditorFile();
+  const page = useSessionStore.getState().tabs[0]; if (page.kind !== 'editor') throw new Error('Expected editor');
+  const flush = vi.fn(() => useEditorDocuments.getState().edit(page.selected, 'latest'));
+  const stop = registerEditorChangeFlush(flush);
+  try {
+    vi.mocked(pickPath).mockResolvedValueOnce(['/notes/flushed.txt']);
+    expect(await saveDocument(page.selected, false, true)).toBe(true);
+    expect(flush).toHaveBeenCalled();
+    expect(saveEditorFile).toHaveBeenCalledWith({ path: '/notes/flushed.txt', encoding: 'utf8' }, 'latest', 'new');
+  } finally { stop(); }
 });
 
 it('keeps a saved draft in its existing split placement', async () => {

@@ -22,6 +22,10 @@ it('keeps newer edits typed while a save is pending and saves against the loaded
   expect(useEditorDocuments.getState().documents[key]).toMatchObject({ text: 'saved', value: 'newer', revision: 'v2' });
   expect(saveEditorFile).toHaveBeenCalledWith({ ...file, encoding: 'utf8' }, 'saved', 'v1');
 });
+it('ignores a coalesced edit that arrives after the document was dropped', () => {
+  useEditorDocuments.getState().edit(file, 'late');
+  expect(useEditorDocuments.getState().documents[key]).toBeUndefined();
+});
 it('preserves an unsaved draft on a disk conflict and isolates saved connections', async () => {
   const store = useEditorDocuments.getState(); await store.load(file); store.edit(file, 'draft');
   vi.mocked(saveEditorFile).mockRejectedValue(new Error('Changed on disk')); expect(await store.save(file)).toBe(false);

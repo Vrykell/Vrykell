@@ -531,14 +531,20 @@ input.ssh-auth-response::-ms-reveal, input.ssh-auth-response::-ms-clear { displa
 input.ssh-auth-response::-webkit-credentials-auto-fill-button,
 input.ssh-auth-response::-webkit-strong-password-auto-fill-button { display: none; }
 .terminal-composer-heading { display: flex; justify-content: space-between; gap: 12px; color: var(--text-secondary); font-size: calc(11px * var(--ui-font-scale)); margin-bottom: 6px; }
-.terminal-composer-heading span:last-child { color: var(--text-muted); white-space: nowrap; }
+.terminal-composer-heading > span:last-child { color: var(--text-muted); white-space: nowrap; }
 .terminal-composer-heading .composer-key-hints { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+/* The heading may carry a working-directory chip instead of plain text; it truncates inside the row
+   and leaves the key hints visible. */
+.chat-composer-title { min-width: 0; overflow: hidden; }
+.chat-composer-title > .terminal-directory { max-width: 100%; }
+.chat-composer-title .terminal-chip > span { color: inherit; }
 .terminal-input-status { min-width: 0; }
 .terminal-input-status > button { flex-shrink: 0; }
 .terminal-input-status > .terminal-chip:first-child { flex-shrink: 1; max-width: 32%; }
 .terminal-input-status > .terminal-chip:first-child > span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .terminal-input-status > .directory-picker-trigger { flex: 0 1 auto; min-width: 0; max-width: 40%; }
 .terminal-directory { min-width: 0; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.terminal-directory > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .directory-picker-trigger { min-width: 0; max-width: 50%; }
 .directory-picker-trigger span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .directory-picker { padding: 0; overflow: hidden; font-size: var(--fs-caption); line-height: 1.4; }
@@ -559,7 +565,7 @@ input.ssh-auth-response::-webkit-strong-password-auto-fill-button { display: non
   .terminal-branch { display: none !important; }
 }
 @container (max-width: 420px) {
-  .terminal-composer-heading span:last-child, .terminal-branch { display: none !important; }
+  .terminal-composer-heading > span:last-child, .terminal-branch { display: none !important; }
   .terminal-directory { max-width: 30%; }
 }
 @media (max-width: 900px) {
@@ -693,8 +699,8 @@ button.window-control-button {
 .chat-composer-lead { box-sizing: content-box; flex-shrink: 0; margin-top: 4px; padding-inline: calc((var(--composer-lead-width, var(--control-size)) - 20px) / 2); color: var(--text-secondary); }
 .chat-composer-input > textarea { flex: 1; min-width: 0; resize: none; padding: 4px 0; border: 0; outline: none; background: transparent; color: var(--text-primary); font: var(--chat-font-size)/22px var(--font-ui); }
 .chat-context-tray { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 5px; min-width: 0; margin-bottom: 8px; }
-.chat-queued-messages { display: grid; gap: 8px; max-height: 120px; overflow-y: auto; margin-bottom: 8px; }
-.chat-queued-message { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: var(--radius-inner); background: var(--field-bg); }
+.chat-queued-messages { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; max-height: 120px; overflow-x: hidden; overflow-y: auto; margin-bottom: 8px; }
+.chat-queued-message { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 8px; border-radius: var(--radius-inner); background: var(--field-bg); }
 .chat-queued-message > span { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .chat-queued-message small { color: var(--text-muted); font-size: var(--fs-caption); }
 .chat-queued-message > span > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1352,6 +1358,8 @@ button.text-control:disabled:hover { background: transparent; color: var(--contr
 }
 .terminal-chip > svg { display: block; flex-shrink: 0; }
 .terminal-chip > span { min-width: 0; line-height: inherit; }
+/* The canonical quiet chip keeps its radius even when it is a shared text-control button. */
+button.terminal-chip { border-radius: 5px; }
 button.terminal-chip.text-control { min-height: calc(20px * var(--ui-font-scale)); padding: 1px 7px; background: var(--hover); font-family: var(--font-mono); font-size: calc(11px * var(--ui-font-scale)); line-height: calc(18px * var(--ui-font-scale)); }
 /* Clickable chips: hovering or focusing clears the resting gray and brightens the label, while the
    open (expanded) state keeps the pressed tint. The :not(:disabled) guard keeps disabled chips

@@ -201,16 +201,28 @@ describe('harness session state', () => {
     expect(acpPrompt).toHaveBeenLastCalledWith(SESSION, 'Third', []);
   });
 
+  it('starts a queued input as the next turn after an acknowledged cancellation', async () => {
+    vi.mocked(acpPrompt).mockClear();
+    await useHarnessStore.getState().prompt(TAB, 'First');
+    await useHarnessStore.getState().prompt(TAB, 'Queued next');
+    const cancelled = useHarnessStore.getState().cancel(TAB);
+    useHarnessStore.getState().applyEvent({ sessionId: SESSION, kind: 'stop', payload: { stopReason: 'cancelled' } });
+    await cancelled;
+    await vi.waitFor(() => expect(acpPrompt).toHaveBeenLastCalledWith(SESSION, 'Queued next', []));
+    expect(current()).toMatchObject({ sessionId: SESSION, pending: true, stopping: false });
+  });
+
   it('releases an unresponsive cancelled session and resumes without accepting late output', async () => {
     vi.useFakeTimers();
     await useHarnessStore.getState().prompt(TAB, 'First');
     await useHarnessStore.getState().prompt(TAB, 'Discard');
     const cancelled = useHarnessStore.getState().cancel(TAB);
     expect(current().pending).toBe(false);
-    expect(current().queuedInputs).toEqual([]);
+    expect(current().queuedInputs?.map(item => item.text)).toEqual(['Discard']);
     await vi.advanceTimersByTimeAsync(1201); await cancelled;
     expect(current().sessionId).toBeNull();
     expect(current().stopping).toBe(false);
+    expect(current().queuedInputs?.map(item => item.text)).toEqual(['Discard']);
     expect(acpClose).toHaveBeenCalledWith(SESSION);
     const before = current().messages;
     useHarnessStore.getState().applyEvent(notification({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Late output' } }) as never);
@@ -239,12 +251,14 @@ describe('harness session state', () => {
     await vi.waitFor(() => expect(finish).toBeTypeOf('function'));
     await useHarnessStore.getState().prompt(TAB, 'Queued during connection');
     await useHarnessStore.getState().cancel(TAB);
-    expect(current()).toMatchObject({ pending: false, opening: false, queuedInputs: [] });
+    expect(current()).toMatchObject({ pending: false, opening: false });
+    expect(current().queuedInputs?.map(item => item.text)).toEqual(['Queued during connection']);
     finish({ sessionId: 'late-open', resumeSessionId: 'late-history', harness: 'Claude Code', cwd: '/tmp/project',
       agent: { protocolVersion: 1, agentInfo: null, agentCapabilities: null, authMethods: [] }, modes: null, models: null, configOptions: null });
     await opening;
     expect(acpClose).toHaveBeenCalledWith('late-open');
     expect(current().sessionId).toBeNull();
+    expect(current().queuedInputs?.map(item => item.text)).toEqual(['Queued during connection']);
   });
   it('rotates the authorization identity when the execution target changes', () => {
     const original = current().toolContextId;

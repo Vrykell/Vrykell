@@ -30,7 +30,13 @@ export const useEditorDocuments = create<{
       if (get().documents[key]?.request === request) set(state => ({ documents: { ...state.documents, [key]: { ...state.documents[key]!, ...content, value: content.text, loading: false } } }));
     } catch (reason) { if (get().documents[key]?.request === request) set(state => ({ documents: { ...state.documents, [key]: { ...state.documents[key]!, loading: false, error: String(reason) } } })); }
   },
-  edit: (file, value) => { const key = editorFileKey(file); if (get().documents[key]?.readOnly) return; set(state => ({ documents: { ...state.documents, [key]: { ...state.documents[key]!, value } } })); },
+  edit: (file, value) => {
+    const key = editorFileKey(file);
+    const document = get().documents[key];
+    // A coalesced editor flush can arrive after the document was closed.
+    if (!document || document.readOnly) return;
+    set(state => ({ documents: { ...state.documents, [key]: { ...state.documents[key]!, value } } }));
+  },
   setDraftEncoding: (file, encoding) => { const key = editorFileKey(file); if (file.draftId && get().documents[key]) set(state => ({ documents: { ...state.documents, [key]: { ...state.documents[key], encoding } } })); },
   save: async (file, encoding) => {
     const key = editorFileKey(file); const document = get().documents[key];

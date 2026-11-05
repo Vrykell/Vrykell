@@ -24,6 +24,7 @@ import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import { useToastStore } from '@ui/feedback/Toast';
 import { t } from '@i18n';
+import { flushEditorChanges } from '@ui/editor/code/pendingChanges';
 import { useNativeCloseGuard } from '../hooks/useNativeCloseGuard';
 import { isDocumentDirty, useEditorDocuments } from '../stores/documents';
 import { newEditorFile, saveDocument } from '../services/documentActions';
@@ -50,16 +51,17 @@ export default function EditorWorkspace({ children }: { children: ReactNode }) {
   useEffect(() => { useSessionStore.getState().configureEditorTabs(); }, [pageCount]);
   useEffect(() => { useEditorDocuments.getState().drop(new Set(JSON.parse(keys) as string[])); }, [keys]);
   useEffect(() => registerEditorCloseGuard((requested, complete) => {
+    flushEditorChanges();
     const files = requested === 'all' ? Object.values(useEditorDocuments.getState().documents).map(document => document.file) : requested;
     if (!files.some(file => isDocumentDirty(useEditorDocuments.getState().documents[editorFileKey(file)]))) return false;
     setCloseError(''); setClosing({ files, complete }); return true;
   }), []);
   useEffect(() => {
-    const beforeUnload = (event: BeforeUnloadEvent) => { if (Object.values(useEditorDocuments.getState().documents).some(isDocumentDirty)) { event.preventDefault(); event.returnValue = ''; } };
+    const beforeUnload = (event: BeforeUnloadEvent) => { flushEditorChanges(); if (Object.values(useEditorDocuments.getState().documents).some(isDocumentDirty)) { event.preventDefault(); event.returnValue = ''; } };
     window.addEventListener('beforeunload', beforeUnload); return () => window.removeEventListener('beforeunload', beforeUnload);
   }, []);
   const saveClose = async () => {
-    if (!closing || saving) return; setSaving(true); setCloseError('');
+    if (!closing || saving) return; setSaving(true); setCloseError(''); flushEditorChanges();
     const results: boolean[] = [];
     for (const file of closing.files.filter(item => isDocumentDirty(useEditorDocuments.getState().documents[editorFileKey(item)]))) results.push(await saveDocument(file, false, true));
     setSaving(false);
@@ -118,13 +120,14 @@ function DocumentContent({ file, active, focused }: { file: EditorFile; active: 
   const markdown = /\.(md|markdown|mdown)$/i.test(file.path);
   useEffect(() => { void useEditorDocuments.getState().load(file); }, [file.path, file.connectionId]);
   const dirty = isDocumentDirty(document);
-  const load = () => useEditorDocuments.getState().load(file, true);
+  const load = () => { flushEditorChanges(); return useEditorDocuments.getState().load(file, true); };
   const save = () => { void saveDocument(file); };
   const saveAs = () => { void saveDocument(file, true); };
   const run = (command: EditorCommand) => editor.current?.run(command);
   const canEdit = !!document && document.kind === 'text' && !document.loading && !document.readOnly;
   const canSave = canEdit && !document.saving && (dirty || !!file.draftId);
-  const reloadFile = () => { if (dirty) setReload(true); else void load(); };
+  const currentDirty = () => isDocumentDirty(useEditorDocuments.getState().documents[editorFileKey(file)]);
+  const reloadFile = () => { flushEditorChanges(); if (currentDirty()) setReload(true); else void load(); };
   const terminal = () => { void openInTerminal(file).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); };
   const elevatedLabel = t(!file.connectionId && isWindows ? 'Open as administrator' : 'Open with sudo in terminal');
   const elevated = () => { void openInTerminal(file, true).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); };
@@ -187,8 +190,8 @@ function DocumentContent({ file, active, focused }: { file: EditorFile; active: 
       status={<><span className="folder-path editor-status-path" data-testid="editor-file-path" data-tip={file.connectionId ? file.path : normPath(file.path)}><span>{file.connectionId ? file.path : normPath(file.path)}</span></span>{file.draftId && <span>{t('Not saved')}</span>}{document.readOnly && <ReadOnlyFileAccess file={file} permissionDenied={document.permissionDenied} active={active} />}<TextButton aria-label={t('Character encoding')} onClick={event => { const trigger = event.currentTarget; const box = trigger.getBoundingClientRect(); setEncodingMenu({ x: box.left, y: box.top, above: trigger, trigger }); }}>{EDITOR_ENCODINGS[document.encoding ?? 'utf8']}</TextButton></>} />}
     {document?.kind === 'binary' && <TextButton className="editor-binary-reopen" onClick={event => { const trigger = event.currentTarget; const box = trigger.getBoundingClientRect(); setEncodingMenu({ x: box.left, y: box.top, above: trigger, trigger }); }}>{t('Reopen with encoding')}</TextButton>}
     {encodingMenu && <ContextMenu anchor={encodingMenu} label={t('Character encoding')} onClose={() => setEncodingMenu(null)} items={[
-      ...(!file.draftId ? [{ label: t('Reopen with encoding'), submenu: { items: (Object.entries(EDITOR_ENCODINGS) as [EditorEncoding, string][]).map(([encoding, label]) => ({ label, checked: document?.encoding === encoding, onClick: () => { if (dirty) setReopenEncoding(encoding); else void useEditorDocuments.getState().load(file, true, encoding); } })) } }] : []),
-      { label: t('Save with encoding'), submenu: { items: (Object.entries(EDITOR_ENCODINGS) as [EditorEncoding, string][]).map(([encoding, label]) => ({ label, checked: document?.encoding === encoding, disabled: !canEdit, onClick: () => { if (file.draftId) { useEditorDocuments.getState().setDraftEncoding(file, encoding); void saveDocument(file); } else void useEditorDocuments.getState().save(file, encoding); } })) } },
+      ...(!file.draftId ? [{ label: t('Reopen with encoding'), submenu: { items: (Object.entries(EDITOR_ENCODINGS) as [EditorEncoding, string][]).map(([encoding, label]) => ({ label, checked: document?.encoding === encoding, onClick: () => { flushEditorChanges(); if (currentDirty()) setReopenEncoding(encoding); else void useEditorDocuments.getState().load(file, true, encoding); } })) } }] : []),
+      { label: t('Save with encoding'), submenu: { items: (Object.entries(EDITOR_ENCODINGS) as [EditorEncoding, string][]).map(([encoding, label]) => ({ label, checked: document?.encoding === encoding, disabled: !canEdit, onClick: () => { flushEditorChanges(); if (file.draftId) { useEditorDocuments.getState().setDraftEncoding(file, encoding); void saveDocument(file); } else void useEditorDocuments.getState().save(file, encoding); } })) } },
     ]} />}
     <ConfirmDialog open={reopenEncoding !== null} title={t('Reopen with encoding')} message={t('Reload this file and discard your unsaved changes?')} confirmLabel={t('Reload')} cancelLabel={t('Cancel')} onCancel={() => setReopenEncoding(null)} onConfirm={() => { const encoding = reopenEncoding; setReopenEncoding(null); if (encoding) void useEditorDocuments.getState().load(file, true, encoding); }} />
     <ConfirmDialog open={reload} title={t(file.draftId ? 'Discard changes' : 'Reload file')} message={t('Reload this file and discard your unsaved changes?')} confirmLabel={t(file.draftId ? 'Discard changes' : 'Reload')} cancelLabel={t('Cancel')} onCancel={() => setReload(false)} onConfirm={() => { setReload(false); void load(); }} />

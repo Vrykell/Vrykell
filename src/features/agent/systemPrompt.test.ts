@@ -25,5 +25,8 @@ describe('system instructions', () => {
     expect(DEFAULT_SYSTEM_PROMPT).toContain('Never put tool invocation syntax in answer text');
     expect(DEFAULT_SYSTEM_PROMPT).toContain('read_terminal');
     expect(DEFAULT_SYSTEM_PROMPT).toContain('terminal_keys');
+    expect(DEFAULT_SYSTEM_PROMPT).toContain('A program you started in this conversation may be stopped');
+    expect(DEFAULT_SYSTEM_PROMPT).toContain('Never stop a program you did not start in this conversation');
+    expect(descriptions.DESC_TERMINAL_KEYS).toContain('interrupting a program you started in this conversation is allowed');
   });
 });

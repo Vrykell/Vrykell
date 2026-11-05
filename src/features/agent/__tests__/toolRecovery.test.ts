@@ -16,6 +16,8 @@ it('forces a text-only handoff after any denial in the current turn', () => {
   expect(TOOL_RECOVERY_GUIDANCE).toContain('Never retry with another tool');
   expect(TOOL_RECOVERY_GUIDANCE).toContain('soft completion guard');
   expect(TOOL_RECOVERY_GUIDANCE).toContain('executionState=unknown');
+  expect(TOOL_RECOVERY_GUIDANCE).toContain('a program you started in this conversation may be stopped');
+  expect(TOOL_RECOVERY_GUIDANCE).toContain('do not interrupt a program you did not start in this conversation');
   expect(prepareToolRecoveryStep({ steps: [{ toolResults: [{ output: { denied: true } }] }] }, ['ask_user', 'run_command'])).toEqual({ toolChoice: 'none' });
 });
 

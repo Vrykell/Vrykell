@@ -563,7 +563,7 @@ export const useChatStore = create<ChatState>((set, get) => {
     // Reject every pending approval so a tool execute cannot hang the turn.
     denyAllPending(tabId);
     for (const message of get().byTab[tabId] ?? []) if (message.pending && !hasChatContent(message)) void deleteMessage(tabId, message.id).catch(() => {});
-    set(state => ({ sendingTabs: state.sendingTabs.filter(id => id !== tabId), queuedSends: state.queuedSends.filter(item => item.ownerId !== tabId),
+    set(state => ({ sendingTabs: state.sendingTabs.filter(id => id !== tabId),
       byTab: { ...state.byTab, ...(state.byTab[tabId] ? { [tabId]: state.byTab[tabId].flatMap(message => message.pending
         ? hasChatContent(message) ? [stopChatMessage(message)] : [] : [message]) } : {}) } }));
     for (const message of get().byTab[tabId] ?? []) if (message.stopped) void persistMessage(tabId, message).catch(() => {});

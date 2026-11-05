@@ -4,6 +4,10 @@ import { t } from '@i18n';
 import OverlayScrollbar from '@ui/layout/OverlayScrollbar';
 
 const candidates = 'textarea, [style*="overflow"], .scroll-region, .settings-content, .ui-select-options, .directory-picker-list, .global-search-body, .md pre, .md table';
+/** A burst of input or DOM changes is scanned once it goes quiet, so typing never pays per key. */
+const RESCAN_IDLE_MS = 120;
+/** Continuous output still refreshes the scroll surfaces at this cadence instead of waiting for silence. */
+const RESCAN_MAX_WAIT_MS = 600;
 interface Surface { element: HTMLElement; ref: RefObject<HTMLElement>; host: HTMLElement; container: HTMLElement; id: string; horizontal: boolean; vertical: boolean; }
 
 /** Stacking context that owns the content, so a popup track cannot escape above other overlays. */
@@ -23,6 +27,8 @@ export default function OverlayScrollbars() {
     const layers = new Map<HTMLElement, HTMLDivElement>();
     let sequence = 0;
     let frame = 0;
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+    let burstStart = 0;
     // A dedicated container keeps React portals out of React-rendered nodes while remaining inside the owning layer.
     const layerFor = (host: HTMLElement) => {
       let layer = layers.get(host);
@@ -67,18 +73,38 @@ export default function OverlayScrollbars() {
       setSurfaces(previous => !removed && previous.length === next.length && previous.every((item, index) => item === next[index]) ? previous : next);
       window.dispatchEvent(new Event('overlay-scroll-layout'));
     };
-    const schedule = () => { if (!frame) frame = requestAnimationFrame(scan); };
+    const schedule = () => {
+      const now = performance.now();
+      if (!burstStart) burstStart = now;
+      if (idleTimer !== null) clearTimeout(idleTimer);
+      // A short burst waits for silence; continuous activity (streamed output, held keys) scans on a
+      // bounded cadence so scroll surfaces still appear while the page keeps changing.
+      const delay = now - burstStart >= RESCAN_MAX_WAIT_MS ? 0 : RESCAN_IDLE_MS;
+      idleTimer = setTimeout(() => {
+        idleTimer = null;
+        burstStart = 0;
+        if (!frame) frame = requestAnimationFrame(scan);
+      }, delay);
+    };
+    const onInput = (event: Event) => {
+      // Editor and terminal input cannot create or remove a scroll surface; do not schedule a scan
+      // for it, so typing stays off the scrollbar manager's path entirely.
+      if (event.target instanceof Element && event.target.closest('.monaco-editor, .xterm')) return;
+      schedule();
+    };
     const observer = new MutationObserver(records => {
-      if (records.some(record => !(record.target instanceof Element && record.target.closest('[data-scroll-overlay-layer]')))) schedule();
+      if (records.some(record => !(record.target instanceof Element
+        && record.target.closest('[data-scroll-overlay-layer], .monaco-editor, .xterm')))) schedule();
     });
     observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style'] });
-    document.addEventListener('input', schedule);
+    document.addEventListener('input', onInput);
     document.addEventListener('animationend', schedule, true);
     scan();
     return () => {
-      document.removeEventListener('input', schedule);
+      document.removeEventListener('input', onInput);
       document.removeEventListener('animationend', schedule, true);
       observer.disconnect();
+      if (idleTimer !== null) clearTimeout(idleTimer);
       cancelAnimationFrame(frame);
       for (const element of known.keys()) element.classList.remove('overlay-scroll-target');
       for (const layer of layers.values()) layer.remove();

@@ -63,6 +63,7 @@ it('explains the difference between the selected terminal and the agent host bef
     expect(description).toContain('separate from the agent process');
     expect(description).toContain('For kind=local');
     expect(description).toContain('empty screen');
+    expect(description).toContain('never stop a program you did not start in this conversation');
   }
 });
 

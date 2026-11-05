@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { registerEditorCloseGuard, type EditorCloseTarget } from '@core/editor';
 import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { useNativeCloseGuard } from '../hooks/useNativeCloseGuard';
+import { registerEditorChangeFlush } from '@ui/editor/code/pendingChanges';
 
 const api = vi.hoisted(() => ({ handler: undefined as undefined | ((event: { preventDefault: () => void }) => void),
   close: vi.fn(async () => {}), stop: vi.fn() }));
@@ -22,6 +23,17 @@ it('allows a clean native close and unregisters its listener on unmount', async 
   expect(preventDefault).not.toHaveBeenCalled();
   await act(async () => {}); unmount();
   expect(api.stop).toHaveBeenCalledOnce();
+});
+
+it('flushes coalesced editor edits before asking the close guard', () => {
+  const flush = vi.fn();
+  const stop = registerEditorChangeFlush(flush);
+  const guard = vi.fn(() => false); release = registerEditorCloseGuard(guard);
+  useWorkspaceStore.setState({ tabs: [] });
+  renderHook(useNativeCloseGuard);
+  act(() => api.handler?.({ preventDefault: vi.fn() }));
+  expect(flush).toHaveBeenCalledOnce();
+  stop();
 });
 
 it('preserves cancellation and permits the follow-up native close only after approval', () => {

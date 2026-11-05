@@ -37,7 +37,7 @@ import { groupHarnessMessages } from '../model/harnessTranscript';
 import { createExecutionTerminal } from '@features/workspace/services/executionTerminal';
 import NewTabModal from '@features/workspace/components/NewTabModal';
 import type { DropdownAnchor } from '@ui/menus/AnchoredDropdown';
-import AiBlock from '@features/chat/components/AiBlock';
+import AiBlock, { WorkingIndicator } from '@features/chat/components/AiBlock';
 import AttachmentChips from './AttachmentChips';
 import ChatComposerShell from './ChatComposerShell';
 import QueuedMessages from './QueuedMessages';
@@ -311,7 +311,8 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
           <AiBlock key={exchange.id} exchange={exchange.answer && index === exchanges.length - 1 ? { ...exchange, answer: { ...exchange.answer, pending: session?.pending ?? false } } : exchange}
             onRetry={exchange.question && !session?.pending && !session?.opening && !session?.stopping
               ? () => { follow.jumpToLatest(); void useHarnessStore.getState().prompt(tabId, exchange.question!.content, exchange.question!.attachments); } : undefined}
-            allowExchangeActions={false} toolContextId={session?.toolContextId ?? tabId} presentation="conversation" onAskAboutTool={question => {
+            allowExchangeActions={false} toolContextId={session?.toolContextId ?? tabId} presentation="conversation"
+            suppressPending={index === exchanges.length - 1 && !!session?.questions?.length} onAskAboutTool={question => {
             const drafts = useComposerDrafts.getState(); const previous = drafts.byTab[tabId]?.text;
             drafts.setText(tabId, previous ? `${previous}\n${question}` : question);
             requestAnimationFrame(() => composerRef.current?.focus());
@@ -357,6 +358,11 @@ export default function HarnessView({ tabId, harness, cwd, fresh = false, active
           </div>
         )}
         {session?.sessionId && session.questions?.map(question => <HarnessQuestion key={question.requestId} sessionId={session.sessionId!} question={question} />)}
+        {/* The agent is blocked on the answer, so the shared working row follows the question
+            instead of sitting between the reply and the card. */}
+        {session?.pending && !!session.questions?.length && (
+          <div style={{ margin: '6px 4px' }}><WorkingIndicator /></div>
+        )}
       </div>
 
       <div className="chat-jump-slot" style={{ visibility: follow.following ? 'hidden' : 'visible' }} aria-hidden={follow.following}>

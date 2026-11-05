@@ -20,8 +20,10 @@ import TerminalReferences from './TerminalReferences';
 import type { ChatExchange } from '../model/exchanges';
 
 /** Shared message content supports conversation flow and terminal block presentation. */
-export default function AiBlock({ exchange, conversationId, toolContextId, onAskAboutTool, onRetry, allowExchangeActions = true, presentation = 'block', dividerBefore = false, style }: {
-  exchange: ChatExchange; conversationId?: string; toolContextId?: string; onAskAboutTool?: (question: string) => void; onRetry?: () => void; allowExchangeActions?: boolean; presentation?: 'block' | 'conversation'; dividerBefore?: boolean; style?: CSSProperties;
+export default function AiBlock({ exchange, conversationId, toolContextId, onAskAboutTool, onRetry, allowExchangeActions = true, presentation = 'block', dividerBefore = false, suppressPending = false, style }: {
+  exchange: ChatExchange; conversationId?: string; toolContextId?: string; onAskAboutTool?: (question: string) => void; onRetry?: () => void; allowExchangeActions?: boolean; presentation?: 'block' | 'conversation'; dividerBefore?: boolean;
+  /** Hide the inline working row when the caller renders it after a pending question. */
+  suppressPending?: boolean; style?: CSSProperties;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
@@ -112,7 +114,7 @@ export default function AiBlock({ exchange, conversationId, toolContextId, onAsk
         : part.text ? <div key={index} className="md"><SafeMarkdown content={visibleAssistantText(part.text)} paneId={executionPane} />
           {showOutputCursor && index === parts.length - 1 && <PendingCursor />}</div> : null)
         : answer.content ? <div className="md"><SafeMarkdown content={visibleAssistantText(answer.content)} paneId={executionPane} />{showOutputCursor && <PendingCursor />}</div> : null}
-      {answer.pending && !showOutputCursor && <div className="ai-block-working" role="status"><PendingCursor />{t('Working')}</div>}
+      {answer.pending && !showOutputCursor && !suppressPending && <WorkingIndicator />}
       {answer.error && <ErrorBox placement="inline" dismissible={false} title={t('The reply could not be completed')} details={answer.errorText}
         actions={question && !sending && (allowExchangeActions || onRetry) ? <button type="button" onClick={onRetry ?? regenerate}>{t('Retry')}</button> : undefined}>
         {answer.errorSummary}
@@ -165,6 +167,11 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
     </button>
     {open && <div ref={bodyRef} className="ai-thinking-body md"><SafeMarkdown content={text} paneId={null} /></div>}
   </div>;
+}
+
+/** The shared working row, also rendered after a question that blocks the turn. */
+export function WorkingIndicator() {
+  return <div className="ai-block-working" role="status"><PendingCursor />{t('Working')}</div>;
 }
 
 function PendingCursor() {

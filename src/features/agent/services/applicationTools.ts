@@ -24,6 +24,7 @@ const TERMINAL_GUIDANCE = [
   'For kind=local, run_command uses the selected local terminal on this computer; resolve local paths against its directory and use its shell syntax. Do not assume SSH or use the agent workspace as the terminal directory.',
   'For kind=ssh, this is an already-connected SSH session. Use run_command for remote files; local file tools cannot access them. Do not search local credentials or reconnect merely to use this existing terminal.',
   'An empty screen means no captured output, not an empty filesystem or missing authentication. A bare path may name a directory, not a filename extension; inspect bounded paths on the correct host before a broad search.',
+  'A program you started in this conversation through run_command or terminal_keys may be stopped when its work is done; never stop a program you did not start in this conversation, including anything that was already running when it began.',
   'Follow the user\'s latest correction rather than repeating an earlier assumption. If no terminal is selected, ask the user to select one in conversation settings; never choose the focused terminal implicitly.',
 ].join(' ');
 const LOCAL_FILE_GUIDANCE = 'This tool accesses the local computer only. For a selected local terminal, resolve relative user paths against that terminal\'s directory, not the agent workspace. For a selected SSH terminal, use application.run_command for remote files instead.';

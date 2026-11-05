@@ -63,6 +63,21 @@ it('shows the shared loading animation before any output and removes it when the
   expect(screen.queryByRole('status')).toBeNull();
 });
 
+it('renders a pending question above the working row', () => {
+  useHarnessStore.setState({ byTab: { agent: { ...session(), pending: true,
+    messages: [{ id: 'question', role: 'user', content: 'Check this project', createdAt: 1 }],
+    questions: [{ requestId: 'pending-question', form: { message: 'Choose the next step', fields: [
+      { key: 'choice', title: 'Choice', description: '', kind: 'string', required: false, options: [], default: '',
+        minimum: null, maximum: null, minLength: 0, maxLength: 100, minItems: 0, maxItems: 0 },
+    ] } }] } } });
+  const view = render(<Surface />);
+  const question = view.container.querySelector('.ai-user-question');
+  const working = view.container.querySelector('.ai-block-working');
+  expect(question).not.toBeNull();
+  expect(working).not.toBeNull();
+  expect(question!.compareDocumentPosition(working!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
 it('grows the composer with its content the way the other composers do', () => {
   vi.spyOn(HTMLTextAreaElement.prototype, 'clientWidth', 'get').mockImplementation(() => 400);
   vi.spyOn(HTMLTextAreaElement.prototype, 'scrollHeight', 'get').mockImplementation(function (this: HTMLTextAreaElement) {

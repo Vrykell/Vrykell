@@ -5,21 +5,23 @@ import { useEditorPreferences } from '@config/editor';
 import { useTypographyStore } from '@config/typography';
 import { act } from '@testing-library/react';
 
-const mocks = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), dispose: vi.fn(), modelDispose: vi.fn(), trigger: vi.fn(), command: vi.fn(), vim: vi.fn(), vimDispose: vi.fn(), vimOn: vi.fn(), defineEx: vi.fn(), theme: vi.fn(), diagnostic: vi.fn() }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), dispose: vi.fn(), modelDispose: vi.fn(), trigger: vi.fn(), command: vi.fn(), vim: vi.fn(), vimDispose: vi.fn(), vimOn: vi.fn(), defineEx: vi.fn(), theme: vi.fn(), diagnostic: vi.fn(), modelValue: '', changeListener: null as null | (() => void) }));
 vi.mock('@platform/diagnostics', () => ({ diagnostic: mocks.diagnostic }));
 vi.mock('@ui/editor/code/runtime', () => ({
   applyCodeTheme: mocks.theme, languageForFile: () => 'plaintext',
   editorApi: { KeyMod: { CtrlCmd: 2048 }, KeyCode: { KeyS: 49 }, editor: {
     create: mocks.create, ShowLightbulbIconMode: { Off: 'off' },
     createModel: (initial: string) => {
-      let value = initial;
-      return { getValue: () => value, setValue: (next: string) => { value = next; }, onDidChangeContent: vi.fn(), dispose: mocks.modelDispose };
+      mocks.modelValue = initial;
+      return { getValue: () => mocks.modelValue, setValue: (next: string) => { mocks.modelValue = next; },
+        onDidChangeContent: (listener: () => void) => { mocks.changeListener = listener; }, dispose: mocks.modelDispose };
     },
   } },
 }));
 vi.mock('monaco-vim', () => ({ default: { initVimMode: mocks.vim, VimMode: { Vim: { defineEx: mocks.defineEx } } } }));
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.changeListener = null;
   useEditorPreferences.setState({ lineNumbers: true });
   useTypographyStore.getState().reset();
   vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
@@ -46,6 +48,24 @@ it('uses restrained text-editor defaults and exposes common edit commands withou
   const save = mocks.command.mock.calls[0][1] as () => void; save(); expect(props.onSave).toHaveBeenCalledTimes(1);
   unmount(); expect(mocks.dispose).toHaveBeenCalledTimes(1); expect(mocks.modelDispose).toHaveBeenCalledTimes(1);
   expect(handle).toBeNull();
+});
+
+it('coalesces held keys into one document update and flushes before saving', async () => {
+  const props = { path: 'note.txt', value: '', onChange: vi.fn(), onSave: vi.fn() };
+  render(<CodeEditor {...props} />);
+  await waitFor(() => expect(mocks.changeListener).not.toBeNull());
+  vi.useFakeTimers();
+  try {
+    mocks.modelValue = 'a'; mocks.changeListener!();
+    mocks.modelValue = 'ab'; mocks.changeListener!();
+    expect(props.onChange).not.toHaveBeenCalled();
+    act(() => { vi.advanceTimersByTime(120); });
+    expect(props.onChange).toHaveBeenCalledExactlyOnceWith('ab');
+    mocks.modelValue = 'abc'; mocks.changeListener!();
+    act(() => { (mocks.command.mock.calls[0]![1] as () => void)(); });
+    expect(props.onChange).toHaveBeenLastCalledWith('abc');
+    expect(props.onSave).toHaveBeenCalledTimes(1);
+  } finally { vi.useRealTimers(); }
 });
 
 it('adds optional modal bindings and disposes them when disabled without replacing the editor', async () => {

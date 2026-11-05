@@ -28,7 +28,7 @@ beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} disconnect
 afterEach(() => vi.unstubAllGlobals());
 
 describe('viewport command header', () => {
-  it('pins running controls as soon as their status row leaves view, even while the command is visible', () => {
+  it('pins running controls as soon as their status row starts to leave view, even while the command is visible', () => {
     const { scroll, add } = fixture();
     const item = add('running', 20, 900, 150);
     item.block.dataset.running = 'true';
@@ -37,10 +37,23 @@ describe('viewport command header', () => {
     item.block.prepend(row);
     const rowBounds = vi.spyOn(row, 'getBoundingClientRect').mockReturnValue(bounds(20, 90));
     expect(measurePinnedCommand(scroll)).toEqual({ id: 'running', remaining: 800 });
-    rowBounds.mockReturnValue(bounds(90, 110));
+    // Partially above the edge: the toolbar must already be pinned instead of painted in half.
+    rowBounds.mockReturnValue(bounds(90, 130));
+    expect(measurePinnedCommand(scroll)).toEqual({ id: 'running', remaining: 800 });
+    rowBounds.mockReturnValue(bounds(100, 140));
+    expect(measurePinnedCommand(scroll)).toBeNull();
+    rowBounds.mockReturnValue(bounds(101, 141));
     expect(measurePinnedCommand(scroll)).toBeNull();
     item.rect.mockReturnValue(bounds(-400, 80));
     expect(measurePinnedCommand(scroll)).toBeNull();
+  });
+  it('keeps completed command lines scrolling until they fully leave view', () => {
+    const { scroll, add } = fixture();
+    const item = add('done', 20, 900, 150);
+    item.header.mockReturnValue(bounds(90, 110));
+    expect(measurePinnedCommand(scroll)).toBeNull();
+    item.header.mockReturnValue(bounds(80, 100));
+    expect(measurePinnedCommand(scroll)).toEqual({ id: 'done', remaining: 800 });
   });
   it('waits until the original title leaves view and follows the block crossing the top', () => {
     const { scroll, add } = fixture();

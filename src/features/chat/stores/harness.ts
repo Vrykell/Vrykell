@@ -434,10 +434,10 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
     turnVersions.set(tabId, (turnVersions.get(tabId) ?? 0) + 1);
     if (!session.sessionId) {
       openVersions.set(tabId, (openVersions.get(tabId) ?? 0) + 1);
-      patch(tabId, current => ({ ...current, opening: false, pending: false, queuedInputs: [], permission: null }));
+      patch(tabId, current => ({ ...current, opening: false, pending: false, permission: null }));
       return;
     }
-    patch(tabId, current => ({ ...current, pending: false, stopping: true, interrupted: true, permission: null, permissionQueue: [], questions: [], queuedInputs: [], note: t('Harness stopped.') }));
+    patch(tabId, current => ({ ...current, pending: false, stopping: true, interrupted: true, permission: null, permissionQueue: [], questions: [], note: t('Harness stopped.') }));
     let timer: ReturnType<typeof setTimeout> | undefined;
     const acknowledged = await new Promise<boolean>(resolve => {
       cancellationAcks.set(tabId, () => resolve(true));
@@ -450,9 +450,13 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       tabOfSession.delete(session.sessionId);
       patch(tabId, current => ({ ...current, sessionId: null, stopping: false, opening: false }));
       void acpClose(session.sessionId).catch(() => undefined);
-    } else patch(tabId, current => ({ ...current, stopping: false }));
+    } else {
+      patch(tabId, current => ({ ...current, stopping: false }));
+      // A queued input is not part of the turn being stopped: keep it and start it as the
+      // next turn once the session has acknowledged the cancellation.
+      drainHarnessQueue(tabId);
+    }
     terminalDebug('harness-turn-stopped', { tabId, acknowledged });
-    drainHarnessQueue(tabId);
   },
 
   setMode: async (tabId, modeId) => {

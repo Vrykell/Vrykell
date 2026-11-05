@@ -201,3 +201,69 @@ test('collapsed titles never flash while scrolling across history and live outpu
   await expect(pinned).toHaveAttribute('data-collapsed', 'false');
   await expect(pinned.locator('.command-block-label')).toHaveText('tail -f hidden-live.log');
 });
+
+test('pins the running toolbar in the same frame its status row starts to leave view', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  await expect(page.locator('[data-terminal-input]:visible')).toBeVisible();
+  await emitPtyOutput(page, `\x1b]133;A\x07\x1b]133;E;${btoa('tail -f live.log')}\x07\x1b]133;C\x07${'live log\r\n'.repeat(140)}`);
+  const host = page.getByTestId('running-term');
+  await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
+  const scroll = page.locator('[data-testid^="terminal-scroll-"]').first();
+  const pinned = page.getByTestId('pinned-command');
+  await expect(async () => {
+    await scroll.evaluate(element => { element.scrollTop = element.scrollHeight; });
+    await expect(pinned).toHaveAttribute('data-running', 'true');
+  }).toPass();
+  // Park the status row twelve pixels below the viewport top, then let a wheel gesture push it
+  // just past the edge. The frame recorder below must never observe a partially clipped row
+  // without the pinned copy already in place.
+  await scroll.evaluate(element => {
+    const row = element.querySelector<HTMLElement>('[data-testid^="running-block-"] .command-block-info')!;
+    element.scrollTop += row.getBoundingClientRect().top - element.getBoundingClientRect().top - 12;
+  });
+  await expect(pinned).toHaveCount(0);
+  await page.evaluate(() => {
+    const scope = window as unknown as {
+      __pinFrames: Array<{ rowTop: number; rowBottom: number; pinned: boolean }>;
+      __stopPinFrames: () => void;
+    };
+    scope.__pinFrames = [];
+    const scroll = document.querySelector<HTMLElement>('[data-testid^="terminal-scroll-"]')!;
+    let running = true;
+    const tick = () => {
+      if (!running) return;
+      const viewport = scroll.getBoundingClientRect();
+      const row = scroll.querySelector<HTMLElement>('[data-testid^="running-block-"] .command-block-info');
+      if (row) {
+        const bounds = row.getBoundingClientRect();
+        scope.__pinFrames.push({
+          rowTop: bounds.top - viewport.top,
+          rowBottom: bounds.bottom - viewport.top,
+          pinned: !!document.querySelector('[data-testid="pinned-command"]'),
+        });
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    scope.__stopPinFrames = () => { running = false; };
+  });
+  const screen = host.locator('.xterm-screen');
+  const screenBox = (await screen.boundingBox())!;
+  await screen.hover({ position: { x: screenBox.width / 2, y: screenBox.height / 2 } });
+  await page.mouse.wheel(0, 20);
+  await page.waitForTimeout(250);
+  const frames = await page.evaluate(() => {
+    const scope = window as unknown as { __pinFrames: unknown[]; __stopPinFrames: () => void };
+    scope.__stopPinFrames();
+    return scope.__pinFrames;
+  });
+  const partial = (frames as Array<{ rowTop: number; rowBottom: number; pinned: boolean }>)
+    .filter(frame => frame.rowTop < 0 && frame.rowBottom > 0);
+  expect(partial.length).toBeGreaterThan(0);
+  expect(partial.filter(frame => !frame.pinned)).toEqual([]);
+  await expect(pinned).toHaveAttribute('data-running', 'true');
+  const pinnedBox = (await pinned.boundingBox())!;
+  const viewportBox = (await scroll.boundingBox())!;
+  expect(Math.abs(pinnedBox.y - viewportBox.y)).toBeLessThan(1);
+});

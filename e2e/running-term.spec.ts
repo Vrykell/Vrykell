@@ -1,9 +1,10 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { setupTauriMock, emitPtyOutput, expectAnyTermContains, clipboardText, ptyWrites } from './tauri-mock';
 
 interface RunningTermScrollProbe {
   buffer: { active: { viewportY: number; baseY: number } };
   scrollToBottom(): void;
+  scrollToTop(): void;
 }
 
 /**
@@ -25,6 +26,18 @@ async function startRunningBlock(page: import('@playwright/test').Page) {
   });
   await emitPtyOutput(page, `\x1b]133;E;${btoa('sleep 100')}\x07\x1b]133;C\x07`);
   await expect(page.locator('[data-tip="终止命令"]')).toBeVisible({ timeout: 5000 });
+}
+
+/**
+ * Move the pointer over the visible part of the live terminal without letting Playwright scroll
+ * the command history to bring the whole terminal into view.
+ */
+async function pointAtLiveTerminal(page: Page, host: Locator, scroll: Locator) {
+  const screen = (await host.locator('.xterm-screen').boundingBox())!;
+  const viewport = (await scroll.boundingBox())!;
+  const top = Math.max(screen.y + 4, viewport.y + 4);
+  const bottom = Math.min(screen.y + screen.height - 4, viewport.y + viewport.height - 4);
+  await page.mouse.move(screen.x + screen.width / 2, bottom >= top ? (top + bottom) / 2 : top);
 }
 
 test('a running block mounts a visible xterm with live output and switches to a snapshot once finished', async ({ page }) => {
@@ -295,15 +308,102 @@ test('a running block owns the wheel: xterm scrollback moves without scrolling t
   expect(before.baseY).toBeGreaterThan(0);
 
   const parent = page.locator('[data-testid^="terminal-scroll-"]').first();
-  const screen = host.locator('.xterm-screen');
-  const screenBox = await screen.boundingBox();
-  expect(screenBox).not.toBeNull();
-  const screenPoint = { x: screenBox!.width / 2, y: screenBox!.height / 2 };
-  await screen.hover({ position: screenPoint });
+  await pointAtLiveTerminal(page, host, parent);
   const parentTop = await parent.evaluate((el) => el.scrollTop);
+  // The live scrollback owns the gesture; the dead zone at the boundary is covered separately.
+  await page.mouse.wheel(0, -300);
   await page.mouse.wheel(0, -300);
   await expect.poll(async () => (await blockScroll()).viewportY).toBeLessThan(before.viewportY);
   await expect.poll(() => parent.evaluate((el) => el.scrollTop)).toBe(parentTop);
+});
+
+test('a running block hands the wheel to the command history once its own scrollback ends', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.setViewportSize({ width: 800, height: 320 });
+  await page.goto('/');
+  await startRunningBlock(page);
+  const host = page.getByTestId('running-term');
+  await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
+  await emitPtyOutput(
+    page,
+    Array.from({ length: 60 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n',
+  );
+  await expectAnyTermContains(page, 'line-59', 3000);
+  await page.waitForTimeout(200);
+
+  const parent = page.locator('[data-testid^="terminal-scroll-"]').first();
+  await expect.poll(() => parent.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(200);
+  // Park the live terminal at the top of its own scrollback; the surrounding history stays at its bottom.
+  await page.evaluate(() => {
+    const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
+    const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
+    terms?.get(key!)?.scrollToTop();
+  });
+  const parentBefore = await parent.evaluate((el) => el.scrollTop);
+  expect(parentBefore).toBeGreaterThan(0);
+
+  await pointAtLiveTerminal(page, host, parent);
+  // The boundary margin trims only the first few pixels; the same notch then continues in the
+  // command history instead of pausing for a whole event and jumping afterwards.
+  await page.mouse.wheel(0, -300);
+  await expect.poll(() => parent.evaluate((el) => el.scrollTop)).toBeLessThan(parentBefore);
+});
+
+test('the command history owns the wheel until it reaches its newest position', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.setViewportSize({ width: 800, height: 320 });
+  await page.goto('/');
+  await startRunningBlock(page);
+  const host = page.getByTestId('running-term');
+  await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
+  await emitPtyOutput(
+    page,
+    Array.from({ length: 60 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n',
+  );
+  await expectAnyTermContains(page, 'line-59', 3000);
+  await page.waitForTimeout(200);
+
+  const liveState = () => page.evaluate(() => {
+    const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
+    const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
+    const term = key ? terms?.get(key) : undefined;
+    return { viewportY: term?.buffer.active.viewportY ?? -1, baseY: term?.buffer.active.baseY ?? -1 };
+  });
+  const wheel = (deltaY: number) => page.evaluate((value) => {
+    document.querySelector<HTMLElement>('[data-testid="running-term"] .xterm-screen')
+      ?.dispatchEvent(new WheelEvent('wheel', { deltaY: value, bubbles: true, cancelable: true }));
+  }, deltaY);
+  // Park the live terminal at the top of its own scrollback so it can scroll down.
+  await page.evaluate(() => {
+    const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
+    const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
+    terms?.get(key!)?.scrollToTop();
+  });
+  const liveBefore = await liveState();
+  expect(liveBefore.viewportY).toBe(0);
+  expect(liveBefore.baseY).toBeGreaterThan(0);
+
+  const parent = page.locator('[data-testid^="terminal-scroll-"]').first();
+  await expect.poll(() => parent.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(200);
+  // Reading older commands: the history still owns the wheel even over the live terminal.
+  await parent.evaluate((el) => { el.scrollTop = 0; });
+  await wheel(120);
+  await expect.poll(() => parent.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
+  expect(await liveState()).toEqual(liveBefore);
+
+  // At the newest position the live terminal takes over and scrolls its own scrollback.
+  await parent.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  await expect.poll(() => parent.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThanOrEqual(2);
+  const liveAtBottom = await liveState();
+  // The first two small deltas are trimmed at the boundary; the third continues into the live
+  // scrollback, so the handoff neither pauses for a whole event nor loses the accumulated move.
+  await wheel(20);
+  expect((await liveState()).viewportY).toBe(liveAtBottom.viewportY);
+  await wheel(20);
+  expect((await liveState()).viewportY).toBe(liveAtBottom.viewportY);
+  await wheel(60);
+  await expect.poll(async () => (await liveState()).viewportY).toBeGreaterThan(liveAtBottom.viewportY);
+  await expect.poll(() => parent.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThanOrEqual(2);
 });
 
 test('output that arrives before the running block mounts does not break the first wheel scrollback', async ({ page }) => {
@@ -339,10 +439,11 @@ test('output that arrives before the running block mounts does not break the fir
   const before = await blockScroll();
   expect(before.baseY).toBeGreaterThan(30);
 
-  const screen = host.locator('.xterm-screen');
-  const screenBox = await screen.boundingBox();
-  expect(screenBox).not.toBeNull();
-  await screen.hover({ position: { x: screenBox!.width / 2, y: screenBox!.height / 2 } });
+  await pointAtLiveTerminal(page, host, page.locator('[data-testid^="terminal-scroll-"]').first());
+  await page.mouse.wheel(0, -80);
+  // The first wheel trims the boundary margin but keeps moving in the same gesture; the second
+  // settles the scrollback without collapsing it to the start.
+  await page.waitForTimeout(120);
   await page.mouse.wheel(0, -80);
   await page.waitForTimeout(300);
 

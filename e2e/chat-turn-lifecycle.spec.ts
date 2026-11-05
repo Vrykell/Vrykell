@@ -1,27 +1,37 @@
 import { expect, test } from '@playwright/test';
 import { acpCalls, acpUpdate, emitAcpSession, mockAnthropic, paceLlmStream, setupTauriMock } from './tauri-mock';
 
-test('queues native inputs during streaming and stop remains usable for the next turn', async ({ page }) => {
+test('queues native inputs during streaming and keeps the queue through stop', async ({ page }) => {
   await mockAnthropic(page, 'A response delivered in several pieces so the next message can wait.');
   await paceLlmStream(page, 80);
   await setupTauriMock(page, {}); await page.goto('/');
   await page.locator('[data-dock-btn="chat"]').click();
   const composer = page.locator('[data-chat-composer]:visible');
   await composer.fill('First question'); await composer.press('Enter');
-  await expect(page.getByRole('button', { name: '停止生成', exact: true })).toBeVisible();
+  const stop = page.getByRole('button', { name: '停止生成', exact: true });
+  await expect(stop).toBeVisible();
   await composer.fill('Follow-up question'); await composer.press('Enter');
   const queue = page.getByRole('list', { name: '待发送消息', exact: true });
   await expect(queue).toContainText('Follow-up question');
   await expect(composer).toHaveValue('');
   await expect(queue).toHaveCount(0);
   await expect(page.locator('.ai-block-question').filter({ hasText: 'Follow-up question' })).toBeVisible();
-  await expect(page.getByRole('button', { name: '停止生成', exact: true })).toBeVisible();
-  await composer.fill('Cancel this queued input'); await composer.press('Enter');
-  await page.getByRole('button', { name: '停止生成', exact: true }).click();
+  await expect(stop).toBeVisible();
+  // A queued input survives stopping the current turn and becomes the next turn instead of
+  // disappearing with the queue.
+  await composer.fill('Queued through stop'); await composer.press('Enter');
+  await expect(queue).toContainText('Queued through stop');
+  await stop.click();
   await expect(queue).toHaveCount(0);
-  await composer.fill('After stop'); await composer.press('Enter');
-  await expect(page.getByRole('button', { name: '停止生成', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '停止生成', exact: true }).click();
+  await expect(page.locator('.ai-block-question').filter({ hasText: 'Queued through stop' })).toBeVisible();
+  await expect(stop).toBeVisible();
+  // Explicit cancel still removes one queued item without sending it.
+  await composer.fill('Cancel this queued input'); await composer.press('Enter');
+  await expect(queue).toContainText('Cancel this queued input');
+  await queue.getByRole('button', { name: '取消待发送消息' }).click();
+  await expect(queue).toHaveCount(0);
+  await expect(page.locator('.ai-block-question').filter({ hasText: 'Cancel this queued input' })).toHaveCount(0);
+  await stop.click();
   await expect(page.getByRole('button', { name: '发送', exact: true })).toBeVisible();
 });
 
@@ -50,7 +60,7 @@ for (const theme of ['dark', 'light']) test(`keeps agent sidebar headings and qu
       question: 'Which task should run next?', options: ['Inspect the current project before changing its configuration', 'Create a separate preview and ask before connecting the terminal', 'Continue with the current directory'] },
     },
   }));
-  const question = page.getByRole('group', { name: '回答问题', exact: true });
+  const question = page.getByRole('form', { name: '回答问题', exact: true });
   await expect(question).toBeVisible();
   for (const width of [760, 1320]) {
     await page.setViewportSize({ width, height: 850 });

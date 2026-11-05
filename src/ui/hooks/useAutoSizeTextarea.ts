@@ -1,4 +1,13 @@
-import { useCallback, useLayoutEffect, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject } from 'react';
+
+/** Newline count drives the box height; a manual scan avoids allocating an array on every key. */
+function lineCount(value: string): number {
+  let count = 1;
+  for (let index = 0; index < value.length; index++) {
+    if (value.charCodeAt(index) === 10) count += 1;
+  }
+  return count;
+}
 
 /** Recompute text and placeholder wrapping after content, width or typography changes. */
 export function useAutoSizeTextarea(
@@ -7,6 +16,10 @@ export function useAutoSizeTextarea(
   maxHeight = 120,
   enabled = true,
 ) {
+  const frame = useRef(0);
+  const lines = useRef<number | null>(null);
+  const active = useRef(enabled);
+  active.current = enabled;
   const resize = useCallback(() => {
     const element = ref.current;
     if (!element || element.clientWidth <= 0) return;
@@ -23,8 +36,24 @@ export function useAutoSizeTextarea(
   }, [ref, maxHeight]);
 
   useLayoutEffect(() => {
-    if (enabled) resize();
+    if (!enabled) return;
+    const nextLines = lineCount(value);
+    if (lines.current === null || lines.current !== nextLines) {
+      // A new line changes the box immediately; a plain keystroke measures once per frame instead
+      // of inside the key event, so holding a key never queues a synchronous layout per character.
+      lines.current = nextLines;
+      if (frame.current) { cancelAnimationFrame(frame.current); frame.current = 0; }
+      resize();
+      return;
+    }
+    if (frame.current) return;
+    frame.current = requestAnimationFrame(() => {
+      frame.current = 0;
+      if (active.current) resize();
+    });
   }, [resize, value, enabled]);
+
+  useEffect(() => () => { if (frame.current) cancelAnimationFrame(frame.current); }, []);
 
   useLayoutEffect(() => {
     const element = ref.current;

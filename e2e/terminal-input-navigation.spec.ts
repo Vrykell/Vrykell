@@ -118,7 +118,8 @@ test('AI entry shares the command control size and the outer border follows wind
     const style = getComputedStyle(element, '::after');
     return { radius: style.borderTopLeftRadius, hit: style.pointerEvents, width: style.borderTopWidth, platform: element.getAttribute('data-platform') };
   });
-  expect(border.radius).toBe(border.platform === 'macos' ? '10px' : '0px');
+  const blockRadius = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--radius-block').trim());
+  expect(border.radius).toBe(border.platform === 'macos' ? blockRadius : '0px');
   expect(border.hit).toBe('none');
   expect(border.width).toBe('1px');
   await page.screenshot({ path: test.info().outputPath('window-border-and-composer.png') });

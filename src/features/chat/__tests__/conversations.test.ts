@@ -207,6 +207,20 @@ describe('independent conversations', () => {
     expect(useChatStore.getState().byTab[id].filter(message => message.role === 'user').map(message => message.content)).toEqual(['First', 'Second', 'Third']);
   });
 
+  it('starts a queued send after stopping the current turn', async () => {
+    const id = useChatStore.getState().createConversation();
+    let finishFirst!: () => void;
+    const first = useChatStore.getState().send('First', { conversationId: id, streamFn: () => new Promise(resolve => { finishFirst = resolve; }) });
+    await vi.waitFor(() => expect(finishFirst).toBeTypeOf('function'));
+    const queued = vi.fn(async () => {});
+    await useChatStore.getState().send('Queued next', { conversationId: id, streamFn: queued });
+    expect(useChatStore.getState().queuedSends.map(item => item.text)).toEqual(['Queued next']);
+    useChatStore.getState().abortStream(id);
+    await vi.waitFor(() => expect(queued).toHaveBeenCalledTimes(1));
+    expect(useChatStore.getState().byTab[id].filter(message => message.role === 'user').map(message => message.content)).toEqual(['First', 'Queued next']);
+    finishFirst(); await first;
+  });
+
   it('stops a noncooperative stream immediately and fences its late callbacks and finalizer', async () => {
     const id = useChatStore.getState().createConversation();
     let finishOld!: () => void; let oldChunk!: (text: string) => void;
@@ -214,10 +228,8 @@ describe('independent conversations', () => {
       oldChunk = chunk; chunk('Partial'); await new Promise<void>(resolve => { finishOld = resolve; });
     } });
     await vi.waitFor(() => expect(finishOld).toBeTypeOf('function'));
-    await useChatStore.getState().send('Queued', { conversationId: id });
     useChatStore.getState().abortStream(id);
     expect(useChatStore.getState().sendingTabs).toEqual([]);
-    expect(useChatStore.getState().queuedSends).toEqual([]);
     expect(useChatStore.getState().byTab[id][1]).toMatchObject({ content: 'Partial', stopped: true, pending: false });
     let finishNew!: () => void;
     const next = useChatStore.getState().send('Next', { conversationId: id, streamFn: () => new Promise(resolve => { finishNew = resolve; }) });

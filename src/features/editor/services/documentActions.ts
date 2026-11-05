@@ -4,6 +4,7 @@ import { pickPath } from '@platform/api/fs';
 import { useSessionStore } from '@features/workspace';
 import { rebindWorkspaceResourceId, runWithoutWorkbenchSync } from '@features/workspace/services/workbench';
 import { useToastStore } from '@ui/feedback/Toast';
+import { flushEditorChanges } from '@ui/editor/code/pendingChanges';
 import { useEditorDocuments } from '../stores/documents';
 const pendingDestinations = new Set<string>();
 
@@ -17,6 +18,8 @@ export function newEditorFile() {
 }
 
 export async function saveDocument(file: EditorFile, saveAs = false, closing = false): Promise<boolean> {
+  // The editor reports text on a short timer; saving must observe the newest key.
+  flushEditorChanges();
   if (!file.draftId && !saveAs) return useEditorDocuments.getState().save(file);
   const key = editorFileKey(file);
   if (pendingDestinations.has(key)) return false;

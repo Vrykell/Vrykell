@@ -45,6 +45,29 @@ test('runs the same agent twice in one project with independent replies, drafts 
   await expect(current(page).getByRole('button', { name: '停止本轮' })).toBeVisible();
 });
 
+test('keeps a queued message inside the composer at narrow widths', async ({ page }) => {
+  await connect(page, '/shared-project');
+  const main = current(page);
+  await main.getByTestId('harness-composer').fill('First task');
+  await main.getByTestId('harness-send').click();
+  await expect(main.getByRole('button', { name: '停止本轮' })).toBeVisible();
+  await main.getByTestId('harness-composer').fill('这是一个很长的待发送消息，用来检查在窄宽度下卡片是否会被输入内容区盖住，文字应该正常省略而不是溢出到输入区域。');
+  await main.getByTestId('harness-composer').press('Enter');
+  const card = main.locator('.chat-queued-message').first();
+  await expect(card).toBeVisible();
+  for (const width of [420, 760]) {
+    await page.setViewportSize({ width, height: 800 });
+    const metrics = await card.evaluate(element => {
+      const bounds = element.getBoundingClientRect();
+      const host = element.parentElement!.getBoundingClientRect();
+      const text = element.querySelector<HTMLElement>('span > span')!;
+      return { cardRight: bounds.right, hostRight: host.right, clipped: text.scrollWidth > text.clientWidth };
+    });
+    expect(metrics.cardRight).toBeLessThanOrEqual(metrics.hostRight + 1);
+    expect(metrics.clipped).toBe(true);
+  }
+});
+
 for (const kind of ['local', 'ssh'] as const) {
 test(`identifies the selected ${kind} terminal separately from the agent workspace`, async ({ page }) => {
   const directory = kind === 'ssh' ? '/srv' : 'D:/local-project';
