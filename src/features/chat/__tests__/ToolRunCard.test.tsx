@@ -126,8 +126,7 @@ it('reviews the fixed target and approves an edited command only after Run is pr
   render(<ToolRunCard run={{ ...command, state: 'approval-pending' }} paneId="fixed-pane" environment={{ paneId: 'fixed-pane', kind: 'ssh', label: 'Production', ssh: { user: 'deploy', host: 'server.test', port: 2222 } }} />);
   // The gate reaches its approval bridge after the backend answer; clicking earlier would drop the answer.
   await vi.waitFor(() => expect(states).toContain('approval-pending'));
-  expect(screen.getByText('Production')).toBeVisible();
-  expect(screen.getByText('deploy@server.test:2222')).toBeVisible();
+  expect(screen.getByText('Production · deploy@server.test:2222')).toBeVisible();
   expect(screen.getByText('超时 120 秒')).toBeVisible();
   fireEvent.click(screen.getByRole('button', { name: '编辑' }));
   fireEvent.change(screen.getByRole('textbox', { name: '要运行的命令' }), { target: { value: '' } });

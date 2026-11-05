@@ -54,11 +54,15 @@ test('compact AI cards keep their color on disclosure, react to hover and review
   const approval = page.locator('.ai-tool-card[data-tool-state="approval-pending"]');
   await expect(approval.getByText('Project terminal')).toBeVisible();
   const edit = approval.getByRole('button', { name: '编辑', exact: true });
+  const reject = approval.getByRole('button', { name: '拒绝', exact: true });
   const run = approval.getByRole('button', { name: '运行', exact: true });
   const options = approval.getByRole('button', { name: '审批选项' });
-  const boxes = await Promise.all([edit.boundingBox(), run.boundingBox(), options.boundingBox()]);
+  const boxes = await Promise.all([edit.boundingBox(), reject.boundingBox(), run.boundingBox(), options.boundingBox()]);
   for (const box of boxes) expect(Math.abs(box!.height - 28)).toBeLessThanOrEqual(1);
-  expect(await run.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
+  expect(Math.abs((boxes[2]!.x + boxes[2]!.width) - boxes[3]!.x)).toBeLessThanOrEqual(1);
+  const approvalBox = (await approval.boundingBox())!;
+  expect(boxes[1]!.x - approvalBox.x).toBeLessThan(40);
+  expect(await approval.locator('.ai-tool-run-actions').evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
   await edit.click();
   await approval.getByRole('textbox', { name: '要运行的命令' }).fill('npm run check');
   await page.screenshot({ path: info.outputPath('approval-edit.png') });

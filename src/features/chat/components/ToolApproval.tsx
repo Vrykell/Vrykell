@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { t } from '@i18n';
-import { ChevronDown, Pencil, Play, Server, TerminalPrompt } from '@ui/icons';
+import { ChevronDown, Pencil, Play } from '@ui/icons';
 import { TextButton } from '@ui/actions/TextButton';
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import { TextArea } from '@ui/fields/TextInput';
@@ -10,20 +10,16 @@ import { resolveApproval } from '@features/agent';
 import { DEFAULT_TOOL_COMMAND_TIMEOUT_MS, type ToolRun } from '@features/agent/model/messageParts';
 import { useComposerDrafts } from '../stores/composerDrafts';
 import { useChatStore } from '../stores/chat';
-import type { ChatEnvironment } from '../model/conversation';
-import { environmentForPane, showExecutionTerminal } from '../services/conversationContext';
 
 /** Review and edit a pending command without changing its captured execution target. */
-export default function ToolApproval({ run, paneId, conversationId, environment, onAskAboutTool }: {
-  run: ToolRun; paneId?: string; conversationId?: string; environment?: ChatEnvironment; onAskAboutTool?: (question: string) => void;
+export default function ToolApproval({ run, conversationId, onAskAboutTool }: {
+  run: ToolRun; conversationId?: string; onAskAboutTool?: (question: string) => void;
 }) {
   const isCommand = run.toolName === 'run_command';
   const original = typeof run.input.command === 'string' ? run.input.command : '';
   const [command, setCommand] = useState(original);
   const [editing, setEditing] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  const target = environment ?? (paneId ? environmentForPane(paneId) : null);
-  const address = target?.ssh ? `${target.ssh.user ? `${target.ssh.user}@` : ''}${target.ssh.host}:${target.ssh.port ?? 22}` : target?.cwd;
   // The danger reason comes from Rust's authorization of the call; an edited command is checked
   // again on Run, where a dangerous edit still gets the native confirmation.
   const warning = run.danger;
@@ -41,11 +37,6 @@ export default function ToolApproval({ run, paneId, conversationId, environment,
     requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>('[data-chat-composer]')?.focus());
   };
   return <div className="ai-tool-approval">
-    <button type="button" data-subtle className="ai-tool-target" disabled={!paneId} data-tip={address}
-      onClick={() => paneId && showExecutionTerminal(paneId)}>
-      {target?.kind === 'ssh' ? <Server size={13} /> : <TerminalPrompt size={13} />}
-      <strong>{target?.label ?? t('No execution terminal selected')}</strong><span>{address}</span>
-    </button>
     {editing ? <TextArea autoFocus autoSizeMaxHeight={200} className="ai-tool-command-editor" aria-label={t('Command to run')} value={command}
       onChange={event => setCommand(event.target.value)} onKeyDown={event => {
         if (event.nativeEvent.isComposing) return;
@@ -55,6 +46,7 @@ export default function ToolApproval({ run, paneId, conversationId, environment,
     {isCommand && <div className="ai-tool-timeout">{t('Timeout {{seconds}} seconds', { seconds: DEFAULT_TOOL_COMMAND_TIMEOUT_MS / 1000 })}</div>}
     {warning && <div className="ai-tool-approval-warning">{warning}</div>}
     <div className="ai-tool-approval-actions">
+      <TextButton data-tone="danger" onClick={() => resolveApproval(run.toolCallId, 'deny')}>{t('Reject')}</TextButton>
       <span className="ai-tool-approval-spacer" />
       {isCommand && <OutlineButton onClick={() => setEditing(!editing)}><Pencil size={14} />{t(editing ? 'Done editing' : 'Edit')}</OutlineButton>}
       <div className="ai-tool-run-actions">
@@ -73,7 +65,6 @@ export default function ToolApproval({ run, paneId, conversationId, environment,
           }
         : { label: t('Allow for this conversation'), onClick: () => { setMenu(null); approve(true); } },
       { label: t('Ask first'), onClick: () => { setMenu(null); ask(); } },
-      { label: t('Reject'), danger: true, onClick: () => { setMenu(null); resolveApproval(run.toolCallId, 'deny'); } },
     ]} />}
   </div>;
 }

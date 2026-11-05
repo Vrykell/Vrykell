@@ -335,7 +335,7 @@ it('labels the narrowest approval with the shape and keeps the wider one out of 
   expect(screen.getByRole('menuitem', { name: '本会话允许「npm run」' })).toBeInTheDocument();
   expect(screen.queryByRole('menuitem', { name: '本会话允许' })).toBeNull();
   expect(screen.getByRole('button', { name: '运行' })).toBeInTheDocument();
-  expect(screen.getByRole('menuitem', { name: '拒绝' })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: '拒绝' })).toBeInTheDocument();
 });
 
 it('shows a terminal tool row as the bare command without a prompt marker', () => {

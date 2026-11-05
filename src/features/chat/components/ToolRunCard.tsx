@@ -9,7 +9,7 @@ import { agentControl } from '@features/agent/services/agentControl';
 import ToolApproval from './ToolApproval';
 import ToolQuestion from './ToolQuestion';
 import type { ChatEnvironment } from '../model/conversation';
-import { showExecutionTerminal } from '../services/conversationContext';
+import { environmentForPane, showExecutionTerminal } from '../services/conversationContext';
 import type { ToolRun, ToolRunState } from '@features/agent/model/messageParts';
 
 const STATE_LABEL: Record<ToolRunState, I18nKey> = {
@@ -104,21 +104,28 @@ export default function ToolRunCard({ run, paneId, framed = false, conversationI
   }, [run.toolCallId, run.state, problem]);
   const sessions = useTerminalStore(state => state.sessions);
   const { icon, label, text } = summarize(run);
+  const pending = run.state === 'approval-pending' || run.state === 'input-pending';
+  const summaryTarget = run.state === 'approval-pending' ? environment ?? (paneId ? environmentForPane(paneId) : null) : null;
+  const targetAddress = summaryTarget?.ssh
+    ? `${summaryTarget.ssh.user ? `${summaryTarget.ssh.user}@` : ''}${summaryTarget.ssh.host}:${summaryTarget.ssh.port ?? 22}`
+    : summaryTarget?.cwd;
+  const summaryText = run.state === 'approval-pending'
+    ? [summaryTarget?.label, targetAddress].filter(Boolean).join(' · ') || t('No execution terminal selected')
+    : pending ? '' : text;
   const exitCode = commandExitCode(run);
   const status = exitCode !== undefined && (run.state === 'done' || run.state === 'error')
     ? t('Exit code {{code}}', { code: exitCode }) : t(STATE_LABEL[run.state]);
   const body = expandBody(run);
   const isCommand = run.toolName === 'run_command';
-  const pending = run.state === 'approval-pending' || run.state === 'input-pending';
   const open = toggled?.state === run.state ? toggled.open : false;
   const input = JSON.stringify(run.input, null, 2);
   const expandable = problem || run.toolName !== 'ask_user' && (isCommand || Object.keys(run.input).length > 0 || body.length > 0);
   const truncated = body.length > 6000;
   return <div className="ai-tool-card" data-tool-state={run.state} data-open={open}>
-    <button type="button" data-subtle className="ai-tool-summary" aria-label={[label, text, status].filter(Boolean).join(' ')} aria-expanded={problem ? notice : open} disabled={!expandable || pending}
+    <button type="button" data-subtle className="ai-tool-summary" aria-label={[label, summaryText, status].filter(Boolean).join(' ')} aria-expanded={problem ? notice : open} disabled={!expandable || pending}
       onClick={() => { if (problem) setNotice(true); else setToggled({ state: run.state, open: !open }); }}>
       {icon}<span className="ai-tool-summary-text">
-        <span className="ai-tool-label">{label}</span><span className="ai-tool-description" data-tip={pending ? undefined : text || undefined}>{pending ? '' : text}</span>
+        <span className="ai-tool-label">{label}</span><span className="ai-tool-description" data-tip={summaryText || undefined}>{summaryText}</span>
       </span>
       <span className="ai-tool-state" data-state={run.state}>
         {run.state === 'done' ? <Check size={12} /> : run.state === 'running' ? <RefreshCw size={12} className="reload-spin" />
@@ -127,7 +134,7 @@ export default function ToolRunCard({ run, paneId, framed = false, conversationI
       {expandable && !pending && <ChevronRight size={14} style={{ transform: open ? 'rotate(90deg)' : undefined }} />}
     </button>
     {run.toolName === 'ask_user' && <ToolQuestion run={run} conversationId={conversationId} />}
-    {run.state === 'approval-pending' && <ToolApproval run={run} paneId={paneId} conversationId={conversationId} environment={environment} onAskAboutTool={onAskAboutTool} />}
+    {run.state === 'approval-pending' && <ToolApproval run={run} conversationId={conversationId} onAskAboutTool={onAskAboutTool} />}
     {problem && notice && <ErrorBox title={label} details={`${t('Tool input')}\n${input}\n\n${t('Tool output')}\n${body}`} onDismiss={() => setNotice(false)}>
       {run.state === 'denied' ? run.danger || run.error || t('Denied') : run.error || t('Tool execution failed')}
     </ErrorBox>}

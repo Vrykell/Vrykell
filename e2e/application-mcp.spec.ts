@@ -80,8 +80,7 @@ test('uses the explicitly selected terminal and does not bypass shared approval 
   await call(page, 'command', 'run_command', { command: 'echo application-mcp' });
   await expect(page.locator('.ai-tool-card')).toHaveAttribute('data-tool-state', 'approval-pending');
   await expect(page.getByRole('button', { name: '运行', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: '审批选项' }).click();
-  await page.getByRole('menuitem', { name: '拒绝', exact: true }).click();
+  await page.getByRole('button', { name: '拒绝', exact: true }).click();
   await expect.poll(async () => (await result(page, 'command'))?.isError).toBe(true);
   await call(page, 'retry', 'read_file', { path: '/home/e2e/project/file.txt' });
   await expect.poll(async () => (await result(page, 'retry'))?.isError).toBe(true);
