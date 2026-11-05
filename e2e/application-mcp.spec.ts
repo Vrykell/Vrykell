@@ -34,7 +34,8 @@ async function open(page: Page, theme = 'dark') {
 for (const theme of ['dark', 'light']) test(`answers application MCP questions in its transcript without silently binding a terminal in ${theme}`, async ({ page }, info) => {
   await open(page, theme);
   const target = page.getByTestId('harness-execution-target');
-  await expect(target).toContainText('讨论');
+  // The session starts unbound; the question must not bind a terminal behind the user's back.
+  await expect(target).toContainText('不操作终端');
   for (const width of [640, 1240]) {
     await page.setViewportSize({ width, height: 800 });
     await target.click();
@@ -62,6 +63,12 @@ for (const theme of ['dark', 'light']) test(`answers application MCP questions i
   await expect.poll(async () => (await result(page, 'repeat'))?.isError).toBe(true);
   await expect(question).toHaveCount(0);
   await page.getByRole('button', { name: '停止本轮', exact: true }).click();
+  await expect.poll(() => page.evaluate(async () => {
+    const path = '/src/features/chat/stores/harness.ts';
+    const { useHarnessStore } = await import(path) as typeof import('../src/features/chat/stores/harness');
+    const session = Object.values(useHarnessStore.getState().byTab)[0];
+    return !session?.pending && !session?.stopping && !session?.opening;
+  })).toBe(true);
   await page.getByTestId('harness-composer').fill('Ask a new question'); await page.getByTestId('harness-send').click();
   await call(page, 'cancel', 'ask_user', { question: 'Proceed?' });
   await expect(question).toBeVisible();
@@ -100,6 +107,14 @@ test('blocks application tools queued behind a skipped question and permits a ne
   expect((await result(page, 'queued-write'))?.content[0]?.text).toContain('本轮工具调用已结束');
   await expect(page.getByRole('button', { name: '运行', exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '停止本轮', exact: true }).click();
+  // Wait until the stop has settled; a prompt sent while stopping would be queued instead of
+  // starting the next turn this test wants to drive.
+  await expect.poll(() => page.evaluate(async () => {
+    const path = '/src/features/chat/stores/harness.ts';
+    const { useHarnessStore } = await import(path) as typeof import('../src/features/chat/stores/harness');
+    const session = Object.values(useHarnessStore.getState().byTab)[0];
+    return !session?.pending && !session?.stopping && !session?.opening;
+  })).toBe(true);
   await page.getByTestId('harness-composer').fill('New question');
   await page.getByTestId('harness-send').click();
   await call(page, 'new-question', 'ask_user', { question: 'Which environment?', options: ['Preview'] });
