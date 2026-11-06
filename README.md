@@ -127,16 +127,16 @@ Screenshots show the application with a sample project and simulated session dat
 
 ## Download
 
-Current stable release: **0.1.3**.
+Current stable release: **0.1.7**.
 
 | Platform | Package |
 | --- | --- |
-| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.3/Vrykell_0.1.3_x64-setup.exe) |
-| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.3/Vrykell_0.1.3_aarch64.dmg) |
-| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.3/Vrykell_0.1.3_x64.dmg) |
-| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.3/Vrykell_0.1.3_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.3/Vrykell_0.1.3_amd64.AppImage) |
+| Windows x64 | [.exe](https://github.com/Vrykell/Vrykell/releases/download/v0.1.7/Vrykell_0.1.7_x64-setup.exe) |
+| macOS Apple silicon | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.7/Vrykell_0.1.7_aarch64.dmg) |
+| macOS Intel | [.dmg](https://github.com/Vrykell/Vrykell/releases/download/v0.1.7/Vrykell_0.1.7_x64.dmg) |
+| Linux amd64 | [.deb](https://github.com/Vrykell/Vrykell/releases/download/v0.1.7/Vrykell_0.1.7_amd64.deb) · [.AppImage](https://github.com/Vrykell/Vrykell/releases/download/v0.1.7/Vrykell_0.1.7_amd64.AppImage) |
 
-[All releases](https://github.com/Vrykell/Vrykell/releases) · [Release notes](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.3)
+[All releases](https://github.com/Vrykell/Vrykell/releases) · [Release notes](https://github.com/Vrykell/Vrykell/releases/tag/v0.1.7)
 
 Release notes record package checksums, the exact source commit and validation coverage. Update signatures verify updater payloads; they do not replace operating-system distribution signing or notarization. The capability descriptions above follow the development branch; build the current source for changes made after the packaged release.
 
