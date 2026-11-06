@@ -15,6 +15,10 @@
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-3b82f6?style=flat-square" alt="Windows, macOS, Linux" />
 </p>
 
+<p>
+  <a href="https://www.producthunt.com/products/vrykell?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-vrykell"><picture><source media="(prefers-color-scheme: dark)" srcset="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1300533&amp;theme=dark"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1300533&amp;theme=light" alt="Vrykell 在 Product Hunt" width="250" height="54" /></picture></a>
+</p>
+
 </div>
 
 <a href="docs/images/hero-workspace-zh.png"><img src="docs/images/hero-workspace-zh.png" width="1600" alt="同一工作区中的源代码、构建终端与 Agent 对话" /></a>
