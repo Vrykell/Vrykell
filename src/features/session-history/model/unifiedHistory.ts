@@ -63,7 +63,12 @@ interface HistoryRecordBase {
   paneCount: number;
   types: readonly ('terminal' | 'conversation')[];
 }
-export interface UnifiedAgentReference { harness: string; sessionId: string; cwd: string; at: number }
+export interface UnifiedAgentReference { harness: string; sessionId: string; cwd: string; at: number; title?: string }
+
+/** Stable key shared by a standalone ACP row and the same member inside a workspace record. */
+export function agentHistoryKey(harness: string, sessionId: string): string {
+  return historyRecordKey('conversation', `acp:${JSON.stringify([harness, sessionId])}`);
+}
 export type UnifiedHistoryRecord = HistoryRecordBase & (
   { kind: 'terminal'; session: BackendSessionEntry } | { kind: 'conversation'; conversation: Conversation } | { kind: 'agent'; agent: UnifiedAgentReference }
   | { kind: 'workspace'; session: BackendSessionEntry; snapshot: WorkspaceHistorySnapshot }
@@ -108,10 +113,11 @@ export function unifiedHistoryRecords(sessions: readonly BackendSessionEntry[], 
       searchText: [conversation.title, description, note, environment?.kind ?? 'discussion'].join(' ').toLocaleLowerCase() };
   });
   const external: UnifiedHistoryRecord[] = agents.map(agent => {
-    const key = historyRecordKey('conversation', `acp:${JSON.stringify([agent.harness, agent.sessionId])}`); const note = meta.notes[key] ?? '';
-    return { kind: 'agent', agent, key, title: agent.harness, paneCount: 1, types: ['conversation'], timestamp: agent.at, createdAt: agent.at, description: t('ACP session reference'),
+    const key = agentHistoryKey(agent.harness, agent.sessionId); const note = meta.notes[key] ?? '';
+    const title = agent.title?.trim() || agent.harness;
+    return { kind: 'agent', agent, key, title, paneCount: 1, types: ['conversation'], timestamp: agent.at, createdAt: agent.at, description: t('ACP session reference'),
       cwd: agent.cwd, connectionTarget: '', connection: 'local', terminalType: 'ACP', modes: [], local: true, ssh: false,
-      note, starred: !!meta.starred[key], searchText: [agent.harness, agent.cwd, note, 'ACP'].join(' ').toLocaleLowerCase() };
+      note, starred: !!meta.starred[key], searchText: [title, agent.harness, agent.cwd, note, 'ACP'].join(' ').toLocaleLowerCase() };
   });
   const terminalMetadata = new Map(sessions.filter(session => session.kind !== 'workspace').map(session => [session.id, sessionHistoryTerminals(session)]));
   const workspaces: UnifiedHistoryRecord[] = sessions.flatMap(session => {
@@ -119,6 +125,10 @@ export function unifiedHistoryRecords(sessions: readonly BackendSessionEntry[], 
     const parsed = parseWorkspaceHistory(session.payload);
     const snapshot = sessionHistorySnapshot(parsed);
     if (!snapshot) return [];
+    // A combination is a real layout: two or more restorable panes, or an explicit group. A file
+    // pane that history cannot restore does not make a one-member record a combination. Legacy
+    // one-pane records stay in the database but no longer create a combination row.
+    if (snapshot.members.length <= 1 && !snapshot.group && !session.group_id) return [];
     snapshot.members = snapshot.members.map(member => {
       if (member.kind !== 'terminal' || member.shellType) return member;
       const candidates = terminalMetadata.get(member.reference);
@@ -143,6 +153,31 @@ export function unifiedHistoryRecords(sessions: readonly BackendSessionEntry[], 
       searchText: [title, description, cwd, note, ...snapshot.members.map(member => member.kind)].join(' ').toLocaleLowerCase() }];
   });
   return [...terminals, ...chats, ...external, ...workspaces].sort((a, b) => b.timestamp - a.timestamp || a.key.localeCompare(b.key));
+}
+
+/**
+ * A member resource of a visible workspace combination already has a row inside that combination.
+ * Hide its standalone row, but only when the combination itself survives the current layout
+ * filter: choosing "Single pane" should still expose single-panel resources from split layouts.
+ */
+export function collapseWorkspaceMemberRecords(
+  records: readonly UnifiedHistoryRecord[],
+  layout: UnifiedHistoryFilter['layout'] = 'all',
+): UnifiedHistoryRecord[] {
+  const hidden = new Set<string>();
+  for (const record of records) {
+    if (record.kind !== 'workspace') continue;
+    if (layout === 'single' && record.paneCount !== 1) continue;
+    if (layout === 'split' && record.paneCount <= 1) continue;
+    for (const member of record.snapshot.members) {
+      if (member.empty) continue;
+      if (member.kind === 'terminal') hidden.add(historyRecordKey('session', member.reference));
+      else if (member.kind === 'conversation') hidden.add(historyRecordKey('conversation', member.reference));
+      else if (member.kind === 'agent' && member.remoteId) hidden.add(agentHistoryKey(member.reference, member.remoteId));
+    }
+  }
+  if (!hidden.size) return [...records];
+  return records.filter(record => record.kind === 'workspace' || !hidden.has(record.key));
 }
 
 export function filterUnifiedHistory(records: readonly UnifiedHistoryRecord[], filter: UnifiedHistoryFilter, now = Date.now()): UnifiedHistoryRecord[] {

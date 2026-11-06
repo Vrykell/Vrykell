@@ -31,6 +31,9 @@ export interface TauriMockOptions {
   skills?: Record<string, unknown>[];
   /** Seed the SSH workspace mode; management remains the default for existing workflows. */
   sshWorkspaceView?: 'dashboard' | 'manage';
+  /** Return replayed history from `acp_open` when resuming (default true). Set false to exercise
+   *  the local transcript fallback of an agent that cannot replay. */
+  acpResumeReplay?: boolean;
 }
 
 /**
@@ -59,7 +62,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     { name: '旧脚本技能', description: '遗留技能，含脚本', source: 'market', trusted: false, enabled: false, hasScripts: true, modified: true, files: ['SKILL.md', 'scripts/run.sh', 'references/说明.md'], dir: '/home/e2e/.vrykell/skills/旧脚本技能', prompt: '运行 scripts/run.sh 完成工作。' },
   ];
   await page.addInitScript(
-    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, pendingDirs, menuSeed, terminalDirectories, mainPermissions, sshWorkspaceView, shells }) => {
+    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, pendingDirs, menuSeed, terminalDirectories, mainPermissions, sshWorkspaceView, shells, acpReplay }) => {
     const menu = { supported: true, available: true, enabled: false, stale: false, certificateTrusted: false, certificateThumbprint: 'E2E-CERTIFICATE', ...menuSeed };
     localStorage.setItem('vrykell-ssh-workspace-view', sshWorkspaceView ?? 'manage');
     const menuActions: string[] = [];
@@ -132,6 +135,10 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     const acpWorkspace = 'C:/Users/e2e/AppData/Local/com.vrykell.app/acp-workspace';
     let acpServers = JSON.parse(localStorage.getItem('mock-acp-servers') ?? 'null') as Array<Record<string, unknown>> | null;
     acpServers ??= [{ name: 'Fake ACP', command: 'node', args: ['scripts/fake-acp-agent.mjs'], env: {}, cwd: '', enabled: true }];
+    /** The transcript mock mirrors the real SQLite store closely enough to survive a reload. */
+    const acpTranscripts = JSON.parse(localStorage.getItem('mock-acp-transcripts') ?? '{}') as Record<string, Record<string, unknown>>;
+    const acpTranscriptKey = (harness: string, sessionId: string) => JSON.stringify([harness, sessionId]);
+    const persistAcpTranscripts = () => localStorage.setItem('mock-acp-transcripts', JSON.stringify(acpTranscripts));
     /** Native picker invocations the page made, so a spec can assert the mode it asked for. */
     const pickCalls: { mode: string }[] = [];
     const activeProfile = models.find(profile => profile.id === active);
@@ -1334,11 +1341,26 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
                 ],
               },
               configOptions: null,
-              replayed: resuming
+              resumed: resuming,
+              replayed: resuming && acpReplay
                 ? [replay('earlier question', 'user_message_chunk'), replay('earlier answer', 'agent_message_chunk')]
                 : [],
             };
           }
+          case 'acp_transcript_save': {
+            const key = acpTranscriptKey(String(args.harness ?? ''), String(args.sessionId ?? ''));
+            acpTranscripts[key] = args;
+            persistAcpTranscripts();
+            return undefined;
+          }
+          case 'acp_transcript_list':
+            return Object.values(acpTranscripts).sort((left, right) => Number(right.updatedAt ?? 0) - Number(left.updatedAt ?? 0));
+          case 'acp_transcript_get':
+            return acpTranscripts[acpTranscriptKey(String(args.harness ?? ''), String(args.sessionId ?? ''))] ?? null;
+          case 'acp_transcript_delete':
+            delete acpTranscripts[acpTranscriptKey(String(args.harness ?? ''), String(args.sessionId ?? ''))];
+            persistAcpTranscripts();
+            return undefined;
           case 'acp_set_mode':
             acpCalls.push(`acp_set_mode:${String(args.modeId ?? '')}`);
             return undefined;
@@ -1794,7 +1816,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       },
     };
     localStorage.setItem('vrykell-api-key', 'sk-e2e-fake');
-  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, pendingDirs: opts.pendingLaunchDirectories ?? [], menuSeed: opts.contextMenu, terminalDirectories: opts.terminalDirectories ?? false, mainPermissions: mainCapability.permissions.filter((permission): permission is string => typeof permission === 'string'), sshWorkspaceView: opts.sshWorkspaceView ?? 'manage', shells: opts.shells });
+  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, pendingDirs: opts.pendingLaunchDirectories ?? [], menuSeed: opts.contextMenu, terminalDirectories: opts.terminalDirectories ?? false, mainPermissions: mainCapability.permissions.filter((permission): permission is string => typeof permission === 'string'), sshWorkspaceView: opts.sshWorkspaceView ?? 'manage', shells: opts.shells, acpReplay: opts.acpResumeReplay ?? true });
 }
 
 /** Seed the AI reply text: the mock ai_stream emits ai-chunk events chunk by chunk.

@@ -4,7 +4,8 @@ import { workspaceAreaStores } from '../stores/paneWorkspace';
 import { useWorkbenchStore } from '../stores/workbench';
 import { currentWorkspaceResources } from '../services/workspaceResources';
 import { captureContainerHistory, containerHistoryIdentity, persistContainerHistory } from '../services/workspaceHistory';
-import { panesOf, type WorkspaceContainer, type WorkspaceScope } from '../model/workbench';
+import { sessionHistorySnapshot } from '../model/workspaceHistory';
+import { type WorkspaceContainer, type WorkspaceScope } from '../model/workbench';
 import { reportWorkbenchFailure } from '../stores/workbenchFeedback';
 import type { WorkspaceResource } from '../model/workspaceResources';
 import { useHarnessStore } from '@features/chat/stores/harness';
@@ -22,8 +23,11 @@ export function useWorkspaceHistory(resources: WorkspaceResource[], store = useU
     const timers = new Map<string, ReturnType<typeof setTimeout>>();
     const save = (tab: WorkspaceContainer) => {
       if (tab.scope !== scope || tab.scope === 'terminal') return;
-      if (panesOf(tab).length < 2 && !tab.groupId && !tab.historyIdentity) return;
       const snapshot = captureContainerHistory(tab, currentWorkspaceResources());
+      // A single restorable pane is not a combination. An existing identity stays dormant rather
+      // than creating a new row; a former composition that grows again reuses its layout.
+      const retained = sessionHistorySnapshot(snapshot);
+      if ((retained?.members.length ?? 0) < 2 && !tab.groupId && !tab.historyIdentity) return;
       let target = tab;
       const retry = () => {
         const operation = persistContainerHistory(target, snapshot);

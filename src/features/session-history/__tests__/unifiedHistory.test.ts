@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { BackendSessionEntry } from '@platform/api/types';
-import { DEFAULT_UNIFIED_FILTER, filterUnifiedHistory, groupUnifiedHistory, unifiedHistoryRecords } from '../model/unifiedHistory';
+import { collapseWorkspaceMemberRecords, DEFAULT_UNIFIED_FILTER, filterUnifiedHistory, groupUnifiedHistory, unifiedHistoryRecords } from '../model/unifiedHistory';
 
 const session = (id: string, kind: 'local' | 'ssh', time: number): BackendSessionEntry => ({
   id, title: `${kind} ${id}`, status: 'historical', created_at: time - 100, closed_at: time,
@@ -27,14 +27,17 @@ it('matches every member type of a mixed combination without splitting the histo
 it('hides old file-only groups and excludes file members from mixed session history', () => {
   const file = { id: 'file:draft', title: 'Untitled.txt', reference: 'Untitled.txt', kind: 'document', local: true, ssh: false, paneCount: 1 };
   const chat = { id: 'chat:chat', title: 'Discussion', reference: 'chat', kind: 'conversation', local: false, ssh: false, paneCount: 1 };
+  const terminal = { id: 'terminal:shell', title: 'Shell', reference: 'shell', kind: 'terminal', local: true, ssh: false, paneCount: 1 };
   const first = { type: 'pane', id: 'file', resourceId: file.id };
   const second = { type: 'pane', id: 'chat', resourceId: chat.id };
+  const third = { type: 'pane', id: 'term', resourceId: terminal.id };
   const onlyFiles = { ...session('workspace:file', 'local', 200), kind: 'workspace', payload: JSON.stringify({ version: 1, focused: 'file', layout: first, members: [file] }) };
   const mixed = { ...session('workspace:mixed', 'local', 201), kind: 'workspace', payload: JSON.stringify({ version: 1, focused: 'file',
-    layout: { type: 'split', direction: 'row', ratio: 0.5, first, second }, members: [file, chat] }) };
+    layout: { type: 'split', direction: 'row', ratio: 0.5, first: { type: 'split', direction: 'row', ratio: 0.5, first, second }, second: third },
+    members: [file, chat, terminal] }) };
   const records = unifiedHistoryRecords([onlyFiles, mixed], [], { notes: {}, starred: {} });
   expect(records).toHaveLength(1);
-  expect(records[0]).toMatchObject({ title: 'Discussion', paneCount: 1, snapshot: { focused: 'chat', members: [chat] } });
+  expect(records[0]).toMatchObject({ title: 'Discussion + Shell', paneCount: 2, snapshot: { focused: 'chat', members: [chat, terminal] } });
   expect(records[0]!.searchText).not.toContain('untitled');
 });
 
@@ -58,6 +61,49 @@ describe('unified history', () => {
     expect(filterUnifiedHistory(records, { ...DEFAULT_UNIFIED_FILTER, type: 'terminal' })).toHaveLength(0);
     expect(groupUnifiedHistory(records, 'terminal', new Set(), { groupTitles: {}, groupNotes: {}, collapsedGroups: {} })[0]?.title).toBe('ACP 会话');
   });
+
+  it('lists every retained session of one agent and names it after its first question', () => {
+    const records = unifiedHistoryRecords([], [], { notes: {}, starred: {} }, [
+      { harness: 'Agent', sessionId: 'older', cwd: '/agent', at: 1000, title: 'Old question' },
+      { harness: 'Agent', sessionId: 'newer', cwd: '/agent', at: 2000, title: 'New question' },
+    ]);
+    expect(records.map(record => record.title)).toEqual(['New question', 'Old question']);
+    expect(new Set(records.map(record => record.key)).size).toBe(2);
+    expect(filterUnifiedHistory(records, { ...DEFAULT_UNIFIED_FILTER, query: 'old question' })).toHaveLength(1);
+  });
+  it('collapses standalone member rows into their visible workspace combination', () => {
+    const agentMember = { id: 'acp:one', title: 'Investigate', kind: 'agent' as const, reference: 'Agent', remoteId: 'acp-one', cwd: '/agent', paneCount: 1, local: true, ssh: false };
+    const terminalMember = { id: 'terminal:one#0', title: 'Shell', kind: 'terminal' as const, reference: 'one', paneId: 'one#0', cwd: '/repo', paneCount: 1, local: true, ssh: false };
+    const workspace = {
+      ...session('workspace:mixed', 'local', 300), kind: 'workspace',
+      payload: JSON.stringify({ version: 1, focused: 'one',
+        layout: { type: 'split', direction: 'row', ratio: 0.5, first: { type: 'pane', id: 'one', resourceId: 'terminal:one#0' }, second: { type: 'pane', id: 'two', resourceId: 'acp:one' } },
+        members: [terminalMember, agentMember] }),
+    };
+    const records = unifiedHistoryRecords([workspace, session('one', 'local', 250)], [
+      { id: 'other', title: 'Other', createdAt: 1, updatedAt: 2, environment: null },
+    ], { notes: {}, starred: {} }, [{ harness: 'Agent', sessionId: 'acp-one', cwd: '/agent', at: 260, title: 'Investigate' }]);
+
+    expect(collapseWorkspaceMemberRecords(records).map(record => record.kind)).toEqual(['workspace', 'conversation']);
+    const singles = collapseWorkspaceMemberRecords(filterUnifiedHistory(records, { ...DEFAULT_UNIFIED_FILTER, layout: 'single' }), 'single');
+    expect(singles.map(record => record.kind).sort()).toEqual(['agent', 'conversation', 'terminal']);
+  });
+
+  it('hides legacy one-member layout records unless they belong to a group', () => {
+    const member = { id: 'chat:one', title: 'One', reference: 'one', kind: 'conversation' as const, local: false, ssh: false, paneCount: 1 };
+    const layout = { type: 'pane' as const, id: 'one', resourceId: 'chat:one' };
+    const make = (id: string, group?: { id: string; title: string; collapsed: boolean }) => ({
+      ...session(id, 'local', 100), kind: 'workspace',
+      payload: JSON.stringify({ version: 1, focused: 'one', layout, members: [member], ...(group ? { group } : {}) }),
+    });
+    const records = unifiedHistoryRecords([
+      make('workspace:single'),
+      make('workspace:grouped', { id: 'group', title: 'Group', collapsed: false }),
+    ], [], { notes: {}, starred: {} });
+    expect(records).toHaveLength(1);
+    expect(records[0]).toMatchObject({ kind: 'workspace', key: 'session:workspace:grouped' });
+  });
+
   it('merges terminal and AI records chronologically and keeps both search sources', () => {
     const records = unifiedHistoryRecords([session('local', 'local', 1000), session('remote', 'ssh', 3000)], [{
       id: 'chat', title: 'Explain deploy', createdAt: 500, updatedAt: 4000, environment: null,
