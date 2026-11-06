@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { flushBeforeClose } from '@core/closeFlush';
 import type { ChatMessage } from '@features/chat';
 import { useHarnessStore } from '../stores/harness';
 import {
-  harnessTranscriptTitle, loadHarnessTranscript, parseStoredMessages, saveHarnessTranscript,
+  harnessTranscriptTitle, loadHarnessTranscript, parseStoredMessages, saveHarnessTranscript, serializeRetainedMessages,
 } from '../services/harnessTranscripts';
 import { deleteHarnessTranscriptCopy, flushHarnessTranscripts, startHarnessTranscriptRuntime } from '../services/harnessTranscriptRuntime';
 
@@ -34,6 +35,7 @@ describe('retained harness transcripts', () => {
   it('names the history row after the first question and falls back to the agent', () => {
     expect(harnessTranscriptTitle([message(), message({ id: 'a', role: 'assistant', content: 'Done' })], 'Agent')).toBe('Fix the build');
     expect(harnessTranscriptTitle([], 'Agent')).toBe('Agent');
+    expect(Array.from(harnessTranscriptTitle([message({ content: '中'.repeat(130) })], 'Agent'))).toHaveLength(120);
   });
 
   it('validates stored messages and drops reasoning before saving', async () => {
@@ -64,6 +66,27 @@ describe('retained harness transcripts', () => {
     });
     await expect(loadHarnessTranscript('Agent', 'durable')).resolves.toMatchObject({ title: 'Fix the build', messages: [message()] });
     await expect(loadHarnessTranscript('Agent', 'missing')).resolves.toBeNull();
+  });
+
+  it('keeps the newest messages inside the local byte budget', () => {
+    const old = message({ id: 'old', content: 'o'.repeat(160) });
+    const recent = message({ id: 'recent', content: 'r'.repeat(160) });
+    const json = serializeRetainedMessages([old, recent], 250);
+    expect(json).not.toBeNull();
+    expect(JSON.parse(json!).map((entry: ChatMessage) => entry.id)).toEqual(['recent']);
+    expect(serializeRetainedMessages([message({ content: 'x'.repeat(2000) })], 20)).toBeNull();
+  });
+
+  it('restores the execution environment and terminal references', () => {
+    const [restored] = parseStoredMessages(JSON.stringify([{
+      id: 'q', role: 'user', content: 'Run', createdAt: 1,
+      environment: { paneId: 'pane', label: 'Local', kind: 'local', cwd: '/repo' },
+      references: [{ id: 'ref', paneId: 'pane', label: 'Shell', command: 'ls', output: 'a.txt', createdAt: 1 }],
+    }]));
+    expect(restored).toMatchObject({
+      environment: { paneId: 'pane', label: 'Local', kind: 'local', cwd: '/repo' },
+      references: [{ id: 'ref', paneId: 'pane', label: 'Shell', command: 'ls', output: 'a.txt' }],
+    });
   });
 });
 
@@ -99,6 +122,22 @@ describe('harness transcript runtime', () => {
     await flushHarnessTranscripts();
     expect(api.acpTranscriptSave).toHaveBeenCalledOnce();
     expect(api.acpTranscriptSave.mock.calls[0]![0]).toMatchObject({ sessionId: 'durable', pending: true });
+    stop();
+  });
+
+  it('retains a session that was already open when the runtime starts', async () => {
+    useHarnessStore.setState({ byTab: { tab: session({ transcriptSessionId: 'already-open', resumeSessionId: 'already-open' }) as never } });
+    const stop = startHarnessTranscriptRuntime();
+    await flushHarnessTranscripts();
+    expect(api.acpTranscriptSave).toHaveBeenCalledOnce();
+    stop();
+  });
+
+  it('registers its flush with the native close path', async () => {
+    const stop = startHarnessTranscriptRuntime();
+    useHarnessStore.setState({ byTab: { tab: session({ transcriptSessionId: 'close-flush', resumeSessionId: 'close-flush' }) as never } });
+    await flushBeforeClose();
+    expect(api.acpTranscriptSave).toHaveBeenCalledOnce();
     stop();
   });
 

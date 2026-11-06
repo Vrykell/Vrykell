@@ -8,6 +8,7 @@
  */
 import { deserializeParts } from '@features/agent/model/messageParts';
 import { deserializeAttachments } from '@features/agent/model/attachments';
+import { parseEnvironment, parseReferences } from '../model/conversation';
 import {
   acpTranscriptDelete, acpTranscriptGet, acpTranscriptList, acpTranscriptSave,
   type AcpTranscriptSummary,
@@ -26,12 +27,24 @@ export interface RetainedHarnessTranscript {
 }
 
 const MAX_STORED_MESSAGES = 5000;
+/** Mirrors the command-layer bound; an oversized payload would be rejected and never retried successfully. */
+const MAX_TRANSCRIPT_BYTES = 16 * 1024 * 1024;
+const encoder = new TextEncoder();
+
+/** Slice by code points so a multi-byte character at the boundary is never split. */
+function truncateCodePoints(value: string, limit: number): string {
+  let index = 0;
+  for (let count = 0; count < limit && index < value.length; count += 1) {
+    index += (value.codePointAt(index) ?? 0) > 0xffff ? 2 : 1;
+  }
+  return value.slice(0, index);
+}
 
 /** The title a history row shows: the first question, falling back to the agent name. */
 export function harnessTranscriptTitle(messages: readonly ChatMessage[], harness: string): string {
   const first = messages.find(message => message.role === 'user' && message.content.trim());
   const text = first?.content.trim().replace(/\s+/g, ' ');
-  return (text || harness).slice(0, 120);
+  return truncateCodePoints(text || harness, 120);
 }
 
 /** Reasoning is explicitly session memory, never persisted; the same rule applies to this copy. */
@@ -69,6 +82,14 @@ function parseMessage(value: unknown): ChatMessage | null {
     const attachments = deserializeAttachments(JSON.stringify(record.attachments));
     if (attachments) message.attachments = attachments;
   }
+  if (record.environment && typeof record.environment === 'object') {
+    const environment = parseEnvironment(JSON.stringify(record.environment));
+    if (environment) message.environment = environment;
+  }
+  if (Array.isArray(record.references)) {
+    const references = parseReferences(JSON.stringify(record.references));
+    if (references.length) message.references = references;
+  }
   return message;
 }
 
@@ -77,7 +98,7 @@ export function parseStoredMessages(raw: string): ChatMessage[] {
   try {
     const value: unknown = JSON.parse(raw);
     if (!Array.isArray(value)) return [];
-    return value.slice(0, MAX_STORED_MESSAGES).flatMap((entry) => {
+    return value.slice(-MAX_STORED_MESSAGES).flatMap((entry) => {
       const message = parseMessage(entry);
       return message ? [message] : [];
     });
@@ -86,11 +107,30 @@ export function parseStoredMessages(raw: string): ChatMessage[] {
   }
 }
 
+/**
+ * Serialize the newest messages that fit the local store. The command layer rejects oversized
+ * payloads, so trimming the oldest context is better than retrying a snapshot that can never save.
+ * Returns null when even the newest message alone exceeds the limit.
+ */
+export function serializeRetainedMessages(messages: readonly ChatMessage[], byteLimit = MAX_TRANSCRIPT_BYTES): string | null {
+  const exportable = messages.slice(-MAX_STORED_MESSAGES).map(exportableMessage);
+  const serialize = (start: number) => JSON.stringify(exportable.slice(start));
+  const full = serialize(0);
+  if (encoder.encode(full).length <= byteLimit) return full;
+  let low = 0;
+  let high = exportable.length;
+  while (low < high) {
+    const middle = Math.floor((low + high) / 2);
+    if (encoder.encode(serialize(middle)).length <= byteLimit) high = middle;
+    else low = middle + 1;
+  }
+  return low >= exportable.length ? null : serialize(low);
+}
+
 export async function saveHarnessTranscript(input: Omit<RetainedHarnessTranscript, 'messages'> & { messages: ChatMessage[] }) {
-  await acpTranscriptSave({
-    ...input,
-    messages: JSON.stringify(input.messages.slice(0, MAX_STORED_MESSAGES).map(exportableMessage)),
-  });
+  const messages = serializeRetainedMessages(input.messages);
+  if (messages === null) throw new Error('ACP transcript exceeds the local store size limit');
+  await acpTranscriptSave({ ...input, messages });
 }
 
 export async function loadHarnessTranscript(harness: string, sessionId: string): Promise<RetainedHarnessTranscript | null> {

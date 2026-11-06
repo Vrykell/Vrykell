@@ -146,6 +146,8 @@ export async function flushHarnessTranscripts(): Promise<void> {
  */
 export function startHarnessTranscriptRuntime(): () => void {
   if (stopRuntime) return stopRuntime;
+  // The workspace shell can start after a tab has already opened; retain that state too.
+  for (const tabId of Object.keys(useHarnessStore.getState().byTab)) schedule(tabId);
   const unsubscribe = useHarnessStore.subscribe((state, previous) => {
     for (const [tabId, session] of Object.entries(state.byTab)) {
       if (session !== previous.byTab[tabId]) schedule(tabId);

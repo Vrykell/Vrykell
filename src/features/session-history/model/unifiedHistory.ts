@@ -165,15 +165,31 @@ export function collapseWorkspaceMemberRecords(
   layout: UnifiedHistoryFilter['layout'] = 'all',
 ): UnifiedHistoryRecord[] {
   const hidden = new Set<string>();
+  // A terminal history row restores the whole tab. Hide it only when the combination contains
+  // every pane of that tab; a single-pane member must not take the sibling panes out of reach.
+  const terminalPaneCounts = new Map<string, number>();
+  for (const record of records) {
+    if (record.kind === 'terminal') terminalPaneCounts.set(record.session.id, record.paneCount);
+  }
   for (const record of records) {
     if (record.kind !== 'workspace') continue;
     if (layout === 'single' && record.paneCount !== 1) continue;
     if (layout === 'split' && record.paneCount <= 1) continue;
+    const terminalPanes = new Map<string, Set<string>>();
     for (const member of record.snapshot.members) {
       if (member.empty) continue;
-      if (member.kind === 'terminal') hidden.add(historyRecordKey('session', member.reference));
-      else if (member.kind === 'conversation') hidden.add(historyRecordKey('conversation', member.reference));
+      if (member.kind === 'terminal') {
+        const panes = terminalPanes.get(member.reference) ?? new Set<string>();
+        panes.add(member.paneId ?? '*');
+        terminalPanes.set(member.reference, panes);
+      } else if (member.kind === 'conversation') hidden.add(historyRecordKey('conversation', member.reference));
       else if (member.kind === 'agent' && member.remoteId) hidden.add(agentHistoryKey(member.reference, member.remoteId));
+    }
+    for (const [reference, panes] of terminalPanes) {
+      const total = terminalPaneCounts.get(reference);
+      if (panes.has('*') || (total !== undefined && panes.size >= total)) {
+        hidden.add(historyRecordKey('session', reference));
+      }
     }
   }
   if (!hidden.size) return [...records];

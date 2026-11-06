@@ -31,9 +31,6 @@ export interface TauriMockOptions {
   skills?: Record<string, unknown>[];
   /** Seed the SSH workspace mode; management remains the default for existing workflows. */
   sshWorkspaceView?: 'dashboard' | 'manage';
-  /** Return replayed history from `acp_open` when resuming (default true). Set false to exercise
-   *  the local transcript fallback of an agent that cannot replay. */
-  acpResumeReplay?: boolean;
 }
 
 /**
@@ -62,7 +59,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     { name: '旧脚本技能', description: '遗留技能，含脚本', source: 'market', trusted: false, enabled: false, hasScripts: true, modified: true, files: ['SKILL.md', 'scripts/run.sh', 'references/说明.md'], dir: '/home/e2e/.vrykell/skills/旧脚本技能', prompt: '运行 scripts/run.sh 完成工作。' },
   ];
   await page.addInitScript(
-    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, pendingDirs, menuSeed, terminalDirectories, mainPermissions, sshWorkspaceView, shells, acpReplay }) => {
+    ({ enableIntegration, enableReadyMarker, models, active, skillsSeed, sshHost, sshTrustConfirmed, sshPreexec, groupedHistoricalSession, launchDirectory, pendingDirs, menuSeed, terminalDirectories, mainPermissions, sshWorkspaceView, shells }) => {
     const menu = { supported: true, available: true, enabled: false, stale: false, certificateTrusted: false, certificateThumbprint: 'E2E-CERTIFICATE', ...menuSeed };
     localStorage.setItem('vrykell-ssh-workspace-view', sshWorkspaceView ?? 'manage');
     const menuActions: string[] = [];
@@ -1342,7 +1339,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               },
               configOptions: null,
               resumed: resuming,
-              replayed: resuming && acpReplay
+              replayed: resuming
                 ? [replay('earlier question', 'user_message_chunk'), replay('earlier answer', 'agent_message_chunk')]
                 : [],
             };
@@ -1816,7 +1813,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
       },
     };
     localStorage.setItem('vrykell-api-key', 'sk-e2e-fake');
-  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, pendingDirs: opts.pendingLaunchDirectories ?? [], menuSeed: opts.contextMenu, terminalDirectories: opts.terminalDirectories ?? false, mainPermissions: mainCapability.permissions.filter((permission): permission is string => typeof permission === 'string'), sshWorkspaceView: opts.sshWorkspaceView ?? 'manage', shells: opts.shells, acpReplay: opts.acpResumeReplay ?? true });
+  }, { enableIntegration: integration, enableReadyMarker: opts.shellReadyMarker !== false, models: seedModels, active: seedActive, skillsSeed: seedSkills, sshHost: opts.sshHost ?? 'known', sshTrustConfirmed: opts.sshTrustConfirmed ?? true, sshPreexec: opts.sshPreexec ?? true, groupedHistoricalSession: opts.groupedHistoricalSession ?? false, launchDirectory: opts.launchDirectory, pendingDirs: opts.pendingLaunchDirectories ?? [], menuSeed: opts.contextMenu, terminalDirectories: opts.terminalDirectories ?? false, mainPermissions: mainCapability.permissions.filter((permission): permission is string => typeof permission === 'string'), sshWorkspaceView: opts.sshWorkspaceView ?? 'manage', shells: opts.shells });
 }
 
 /** Seed the AI reply text: the mock ai_stream emits ai-chunk events chunk by chunk.

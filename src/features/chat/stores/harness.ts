@@ -323,7 +323,10 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       // Read the local copy alongside the agent handshake: the agent's replay wins when it can
       // provide one, but a running turn or an agent without `session/load` must not lose the
       // transcript that was already visible here.
-      const retainedRequest = resume ? loadHarnessTranscript(harness, resume).catch(() => null) : Promise.resolve(null);
+      const retainedRequest = resume ? loadHarnessTranscript(harness, resume).catch((error: unknown) => {
+        terminalDebug('harness-transcript-load-failed', { harness, sessionId: resume, reason: String(error).slice(0, 200) });
+        return null;
+      }) : Promise.resolve(null);
       const [result, retained] = await Promise.all([acpOpen(harness, cwd, resume, applicationToolCatalog()), retainedRequest]);
       const known = get().byTab[tabId];
       if (!known || openVersions.get(tabId) !== version) {
@@ -348,7 +351,8 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       const useLocal = retainedHasContent && (!resumed || retained!.pending || !replayHasTranscript(replayed));
       // A failed load falls back to a new agent session; the visible transcript keeps the durable
       // identity the resume asked for, so a later restart still finds one record instead of
-      // creating a second row from the preserved messages.
+      // creating a second row from the preserved messages. The fallback agent session itself is
+      // deliberately not remembered while the local copy remains the visible conversation.
       const transcriptSessionId = resume ?? result.resumeSessionId ?? result.sessionId;
       const note = useLocal && retained?.pending
         ? t('The turn did not finish; the partial transcript is shown.')
@@ -359,7 +363,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
           resumeSessionId: result.resumeSessionId ?? result.sessionId, transcriptSessionId, cwd: result.cwd || cwd,
           messages: useLocal
             ? (retained!.pending ? interruptedTranscript(retained!.messages) : retained!.messages)
-            : replayed.length ? [] : current.messages,
+            : replayHasTranscript(replayed) ? [] : current.messages,
           agent: result.agent, error: null, appToolsConnected: result.appToolsConnected ?? false, toolContextId: `${result.sessionId}:app:${++toolScopeSequence}`,
           modes: restored?.modes ?? result.modes ?? null,
           models: restored?.models ?? result.models ?? null,

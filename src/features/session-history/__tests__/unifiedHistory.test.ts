@@ -89,6 +89,36 @@ describe('unified history', () => {
     expect(singles.map(record => record.kind).sort()).toEqual(['agent', 'conversation', 'terminal']);
   });
 
+  it('keeps a terminal tab row when a combination only covers one of its panes', () => {
+    const leaf = (id: string) => ({ type: 'leaf', terminal: { id, kind: 'local', cwd: '/repo' } });
+    const multi = { ...session('multi', 'local', 250), payload: JSON.stringify({
+      layout: { type: 'split', first: leaf('multi#0'), second: leaf('multi#1') },
+    }) };
+    const terminal = (id: string, paneId: string) => ({
+      id, title: 'Shell', kind: 'terminal' as const, reference: 'multi', paneId, cwd: '/repo', paneCount: 1, local: true, ssh: false,
+    });
+    const chatMember = { id: 'chat:one', title: 'Chat', kind: 'conversation' as const, reference: 'chat:one', local: false, ssh: false, paneCount: 1 };
+    const workspace = (id: string, members: Array<ReturnType<typeof terminal> | typeof chatMember>) => ({
+      ...session(id, 'local', 300), kind: 'workspace',
+      payload: JSON.stringify({ version: 1, focused: 'one',
+        layout: { type: 'split', direction: 'row', ratio: 0.5,
+          first: { type: 'pane', id: 'one', resourceId: members[0]!.id },
+          second: { type: 'pane', id: 'two', resourceId: members[1]!.id } },
+        members }),
+    });
+    const conversations = [{ id: 'chat:one', title: 'Chat', createdAt: 1, updatedAt: 2, environment: null }];
+
+    const partial = collapseWorkspaceMemberRecords(unifiedHistoryRecords([
+      workspace('workspace:partial', [terminal('terminal:multi#0', 'multi#0'), chatMember]), multi,
+    ], conversations, { notes: {}, starred: {} }));
+    expect(partial.map(record => record.key)).toContain('session:multi');
+
+    const complete = collapseWorkspaceMemberRecords(unifiedHistoryRecords([
+      workspace('workspace:complete', [terminal('terminal:multi#0', 'multi#0'), terminal('terminal:multi#1', 'multi#1')]), multi,
+    ], [], { notes: {}, starred: {} }));
+    expect(complete.map(record => record.key)).not.toContain('session:multi');
+  });
+
   it('hides legacy one-member layout records unless they belong to a group', () => {
     const member = { id: 'chat:one', title: 'One', reference: 'one', kind: 'conversation' as const, local: false, ssh: false, paneCount: 1 };
     const layout = { type: 'pane' as const, id: 'one', resourceId: 'chat:one' };

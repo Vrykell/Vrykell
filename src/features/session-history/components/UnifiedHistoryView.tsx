@@ -42,7 +42,7 @@ import type { WorkspaceHistoryMember } from '@features/workspace/model/workspace
 const TYPE_LABELS = { all: 'All', terminal: 'Terminal history', conversation: 'AI conversations' } as const;
 const DATE_FIELD_LABELS = { activity: 'Latest activity', created: 'Created date' } as const;
 const openLabel = (record: UnifiedHistoryRecord) => t(record.kind === 'workspace' ? 'Restore workspace combination' : record.kind === 'terminal' ? 'Restore session' : record.kind === 'agent' ? 'Resume ACP session' : 'Open conversation');
-const deleteLabel = (record: UnifiedHistoryRecord) => t(record.kind === 'workspace' ? 'Forget workspace combination' : record.kind === 'terminal' ? 'Delete this session' : record.kind === 'agent' ? 'Delete ACP local copy' : 'Delete conversation');
+const deleteLabel = (record: UnifiedHistoryRecord) => t(record.kind === 'workspace' ? 'Forget workspace combination' : record.kind === 'terminal' ? 'Delete this session' : record.kind === 'agent' ? 'Delete ACP session record' : 'Delete conversation');
 const anchorFrom = (trigger: HTMLButtonElement, align: 'start' | 'end' = 'start'): MenuAnchor => {
   const rect = trigger.getBoundingClientRect();
   return { x: align === 'end' ? rect.right : rect.left, y: rect.bottom + 4, trigger };
@@ -121,7 +121,7 @@ export default function UnifiedHistoryView({ preset, destination }: { preset?: H
     if (!targets.length || batchBusy) return;
     const ok = await ask(t(targets.every(record => record.kind === 'workspace')
       ? 'Forget {{count}} workspace combinations? Their sessions and documents are kept.' : targets.some(record => record.kind === 'agent')
-      ? 'Delete {{count}} matching records? ACP local copies are deleted; their agent-owned history is kept. Locked and working records are excluded.'
+      ? 'Delete {{count}} matching records? ACP transcript copies and session references are deleted; their agent-owned history is kept. Locked and working records are excluded.'
       : 'Delete {{count}} matching records and their history? Locked and working records are excluded.', {
       count: targets.length,
     }), { title: t('Delete history records'), kind: 'warning' });
