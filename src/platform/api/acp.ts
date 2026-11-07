@@ -93,6 +93,25 @@ export interface HarnessOpenResult {
   configOptions: AcpConfigOption[] | null;
   /** The conversation an agent replayed for a loaded session, in arrival order. */
   replayed?: AcpSessionEvent[];
+  /** True when the requested agent-owned session was loaded instead of replaced by a new one. */
+  resumed?: boolean;
+}
+
+/** Metadata of one locally retained ACP transcript. */
+export interface AcpTranscriptSummary {
+  harness: string;
+  sessionId: string;
+  cwd: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  /** The application stopped while a turn was still running. */
+  pending: boolean;
+}
+
+export interface AcpTranscriptDetail extends AcpTranscriptSummary {
+  /** Serialized `ChatMessage[]`; validated by the caller before rendering. */
+  messages: string;
 }
 
 /** What the backend pushes while a session lives. */
@@ -163,6 +182,33 @@ export const acpAnswerElicitation = (sessionId: string, requestId: string, respo
 
 /** Close a session; the harness process goes with it. */
 export const acpClose = (sessionId: string) => invoke<void>('acp_close', { sessionId });
+
+/**
+ * Persist one transcript locally. The agent still owns its own history; this copy exists so a
+ * running turn and an agent that cannot replay remain readable after the application restarts.
+ */
+export const acpTranscriptSave = (input: AcpTranscriptSummary & { messages: string }) =>
+  invoke<void>('acp_transcript_save', {
+    harness: input.harness,
+    sessionId: input.sessionId,
+    cwd: input.cwd,
+    title: input.title,
+    createdAt: input.createdAt,
+    updatedAt: input.updatedAt,
+    pending: input.pending,
+    messages: input.messages,
+  });
+
+/** Metadata of every locally retained transcript, newest activity first. */
+export const acpTranscriptList = () => invoke<AcpTranscriptSummary[]>('acp_transcript_list');
+
+/** One locally retained transcript, or null after it was deleted. */
+export const acpTranscriptGet = (harness: string, sessionId: string) =>
+  invoke<AcpTranscriptDetail | null>('acp_transcript_get', { harness, sessionId });
+
+/** Delete the local copy; an agent's own history is not touched. */
+export const acpTranscriptDelete = (harness: string, sessionId: string) =>
+  invoke<void>('acp_transcript_delete', { harness, sessionId });
 
 /** Merge adjacent text deltas while preserving every boundary in delivery order. */
 export function batchAcpEvents(handler: (event: AcpSessionEvent) => void) {

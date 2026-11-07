@@ -1169,13 +1169,13 @@ async fn open_session(
     cwd: &str,
     resume: Option<&str>,
     can_load: bool,
-) -> Result<(Value, String, Vec<AcpEvent>), String> {
+) -> Result<(Value, String, Vec<AcpEvent>, bool), String> {
     if let (Some(id), true) = (resume, can_load) {
         match collect_open_events(client, client.load_session(id, cwd)).await {
             Ok((loaded, messages)) => {
                 let replayed = replay_events(messages, id);
                 note("acp-load-ok", json!({ "name": name, "sessionId": id, "replayed": replayed.len() }));
-                return Ok((loaded, id.to_string(), replayed));
+                return Ok((loaded, id.to_string(), replayed, true));
             }
             Err(_) => note("acp-load-failed", json!({ "name": name, "stage": "load" })),
         }
@@ -1185,7 +1185,7 @@ async fn open_session(
         .map_err(|e| format!("harness could not open a session: {e}"))?;
     let id = session.get("sessionId").and_then(Value::as_str).unwrap_or_default().to_string();
     let replayed = replay_events(messages, &id);
-    Ok((session, id, replayed))
+    Ok((session, id, replayed, false))
 }
 
 /// Start a harness and open a session in `cwd` (or reopen `resume_session_id`), then pump its
@@ -1321,7 +1321,7 @@ pub async fn acp_open<R: tauri::Runtime>(
         if let Ok(mut servers) = client.mcp_servers.lock() { *servers = vec![bridge.descriptor()]; }
         Some(bridge)
     };
-    let (session, agent_session_id, mut replayed) = match open_session(&client, &harness.name, &session_cwd, resume.as_deref(), can_load).await {
+    let (session, agent_session_id, mut replayed, resumed) = match open_session(&client, &harness.name, &session_cwd, resume.as_deref(), can_load).await {
         Ok(result) => result,
         Err(error) => { client.shutdown().await; state.reject_pending(&connection_id); return Err(error); }
     };
@@ -1399,6 +1399,7 @@ pub async fn acp_open<R: tauri::Runtime>(
         "sessionId": session_id,
         "appToolsConnected": app_tools_connected,
         "resumeSessionId": agent_session_id,
+        "resumed": resumed,
         "harness": harness.name,
         "cwd": session_cwd,
         "agent": describe_agent(&info),
@@ -1683,8 +1684,8 @@ mod tests {
             }
             agent.write_all(format!("{}\n", json!({"id": request["id"], "result": {}})).as_bytes()).await.unwrap();
         });
-        let (_, id, replayed) = tokio::time::timeout(Duration::from_secs(5), open_session(&client, "fixture", "/project", Some("saved"), true)).await.unwrap().unwrap();
-        assert_eq!(id, "saved"); assert_eq!(replayed.len(), EVENT_QUEUE_CAPACITY * 3);
+        let (_, id, replayed, resumed) = tokio::time::timeout(Duration::from_secs(5), open_session(&client, "fixture", "/project", Some("saved"), true)).await.unwrap().unwrap();
+        assert_eq!(id, "saved"); assert!(resumed); assert_eq!(replayed.len(), EVENT_QUEUE_CAPACITY * 3);
         writer.await.unwrap();
         client.shutdown().await;
     }
@@ -2262,18 +2263,20 @@ mod tests {
         });
 
         // The agent supports loading but the id is stale: a new session opens instead of failing.
-        let (session, id, replayed) = open_session(&client, "Fake", "/tmp/project", Some("stale"), true)
+        let (session, id, replayed, resumed) = open_session(&client, "Fake", "/tmp/project", Some("stale"), true)
             .await
             .expect("fallback");
         assert_eq!(id, "fresh");
+        assert!(!resumed);
         assert_eq!(session.get("sessionId").and_then(Value::as_str), Some("fresh"));
         assert!(replayed.is_empty());
 
         // An agent that cannot load skips the attempt entirely.
-        let (_, id, replayed) = open_session(&client, "Fake", "/tmp/project", Some("stale"), false)
+        let (_, id, replayed, resumed) = open_session(&client, "Fake", "/tmp/project", Some("stale"), false)
             .await
             .expect("new session");
         assert_eq!(id, "fresh");
+        assert!(!resumed);
         assert!(replayed.is_empty());
         agent.abort();
     }

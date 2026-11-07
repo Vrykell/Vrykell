@@ -2,6 +2,7 @@ import type { WorkspaceResource } from '../model/workspaceResources';
 import { useWorkspaceStore } from '../stores/workspace';
 import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useChatStore } from '@features/chat/stores/chat';
+import { deleteHarnessTranscriptCopy } from '@features/chat/services/harnessTranscriptRuntime';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { closeAiWorkspaceSession } from '@features/chat/services/aiSessionClose';
 import { workspaceResources } from '../model/workspaceResources';
@@ -29,7 +30,7 @@ export function workspacePaneResource(resource: WorkspaceResource): PaneResource
 export async function deleteWorkspaceResource(resource: WorkspaceResource) {
   const member = resource.kind === 'agent' ? workspaceHistoryMember(resource) : null;
   const session = resource.kind === 'agent' ? useHarnessStore.getState().byTab[resource.sessionId] : undefined;
-  const remote = member?.remoteId ?? session?.resumeSessionId ?? session?.sessionId;
+  const remote = member?.remoteId ?? session?.transcriptSessionId ?? session?.resumeSessionId ?? session?.sessionId;
   if (resource.kind === 'terminal') {
     if (resource.paneId) await deleteTerminalPanes(resource.tabId, [resource.paneId]);
     else await deleteSession(resource.tabId);
@@ -43,7 +44,12 @@ export async function deleteWorkspaceResource(resource: WorkspaceResource) {
     if (useChatStore.getState().conversations.some(item => item.id === resource.sessionId)) throw new Error(useChatStore.getState().persistenceError ?? t('The conversation could not be deleted.'));
   }
   if (resource.kind === 'agent') {
-    if (member && remote) useHarnessSessionRefs.getState().forget(member.reference, remote);
+    if (member && remote) {
+      // The runtime settles the closing tab's final snapshot before deleting the row; forgetting
+      // its save signature lets a later explicit reopen create a fresh copy.
+      await deleteHarnessTranscriptCopy(member.reference, remote);
+      useHarnessSessionRefs.getState().forget(member.reference, remote);
+    }
   }
 }
 

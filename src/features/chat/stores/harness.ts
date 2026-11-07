@@ -26,7 +26,8 @@ import { ApplicationToolSession, applicationToolCatalog } from '@features/agent/
 import { clearSessionGrants } from '@features/agent/stores/permissions';
 import { executionPaneSpec } from '@features/agent/services/executionTarget';
 import { environmentForPane } from '../services/conversationContext';
-import { hasChatContent } from '../model/chatContent';
+import { hasChatContent, stopChatMessage } from '../model/chatContent';
+import { loadHarnessTranscript } from '../services/harnessTranscripts';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 
 /** One step of the plan an agent publishes while it works. */
@@ -51,6 +52,8 @@ export interface HarnessSession {
   stopping?: boolean;
   interrupted?: boolean;
   resumeSessionId?: string;
+  /** Durable identity of the local transcript this page appends to after a failed load. */
+  transcriptSessionId?: string;
   appToolsConnected?: boolean;
   executionPaneId?: string | null;
   toolContextId?: string;
@@ -317,7 +320,14 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       // would blur where the agent is allowed to work.
       const stored = useHarnessSessionRefs.getState().refs[harness];
       const resume = resumeSessionId ?? (!newSession && stored && !!cwd && stored.cwd === cwd ? stored.sessionId : undefined);
-      const result = await acpOpen(harness, cwd, resume, applicationToolCatalog());
+      // Read the local copy alongside the agent handshake: the agent's replay wins when it can
+      // provide one, but a running turn or an agent without `session/load` must not lose the
+      // transcript that was already visible here.
+      const retainedRequest = resume ? loadHarnessTranscript(harness, resume).catch((error: unknown) => {
+        terminalDebug('harness-transcript-load-failed', { harness, sessionId: resume, reason: String(error).slice(0, 200) });
+        return null;
+      }) : Promise.resolve(null);
+      const [result, retained] = await Promise.all([acpOpen(harness, cwd, resume, applicationToolCatalog()), retainedRequest]);
       const known = get().byTab[tabId];
       if (!known || openVersions.get(tabId) !== version) {
         // The tab was closed while this open was in flight: do not resurrect it, and do not leave a
@@ -336,17 +346,36 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       }
       tabOfSession.set(result.sessionId, tabId);
       const replayed = result.replayed ?? [];
-      patch(tabId, (current) => replayEvents({
-        ...current, opening: false, stopping: false, sessionId: result.sessionId, resumeSessionId: result.resumeSessionId ?? result.sessionId, cwd: result.cwd || cwd,
-        messages: replayed.length ? [] : current.messages,
-        agent: result.agent, error: null, appToolsConnected: result.appToolsConnected ?? false, toolContextId: `${result.sessionId}:app:${++toolScopeSequence}`,
-        modes: restored?.modes ?? result.modes ?? null,
-        models: restored?.models ?? result.models ?? null,
-        configOptions: restored?.configOptions ?? result.configOptions ?? null,
-        note: null,
-      }, replayed));
+      const retainedHasContent = !!retained?.messages.some(hasChatContent);
+      const resumed = result.resumed === true;
+      const useLocal = retainedHasContent && (!resumed || retained!.pending || !replayHasTranscript(replayed));
+      // A failed load falls back to a new agent session; the visible transcript keeps the durable
+      // identity the resume asked for, so a later restart still finds one record instead of
+      // creating a second row from the preserved messages. The fallback agent session itself is
+      // deliberately not remembered while the local copy remains the visible conversation.
+      const transcriptSessionId = resume ?? result.resumeSessionId ?? result.sessionId;
+      const note = useLocal && retained?.pending
+        ? t('The turn did not finish; the partial transcript is shown.')
+        : useLocal && !resumed ? t('The agent could not reopen this session; the local copy is shown.') : null;
+      patch(tabId, (current) => {
+        const next = replayEvents({
+          ...current, opening: false, stopping: false, sessionId: result.sessionId,
+          resumeSessionId: result.resumeSessionId ?? result.sessionId, transcriptSessionId, cwd: result.cwd || cwd,
+          messages: useLocal
+            ? (retained!.pending ? interruptedTranscript(retained!.messages) : retained!.messages)
+            : replayHasTranscript(replayed) ? [] : current.messages,
+          agent: result.agent, error: null, appToolsConnected: result.appToolsConnected ?? false, toolContextId: `${result.sessionId}:app:${++toolScopeSequence}`,
+          modes: restored?.modes ?? result.modes ?? null,
+          models: restored?.models ?? result.models ?? null,
+          configOptions: restored?.configOptions ?? result.configOptions ?? null,
+          note: null,
+        }, useLocal ? replayMetadata(replayed) : replayed);
+        // The fallback warning describes the displayed transcript, so a replayed notice cannot
+        // replace it while the conversation still comes from the local copy.
+        return note ? { ...next, note } : next;
+      });
       if (get().byTab[tabId]?.messages.some(hasChatContent)) useHarnessSessionRefs.getState().remember(harness, {
-        sessionId: result.resumeSessionId ?? result.sessionId, cwd: result.cwd || cwd, at: Date.now(),
+        sessionId: transcriptSessionId, cwd: result.cwd || cwd, at: Date.now(),
       });
       const queued = openingEvents.get(result.sessionId) ?? [];
       terminalDebug('harness-session-mapped', { tabId, sessionId: result.sessionId, replayedCount: replayed.length, bufferedCount: queued.length });
@@ -404,7 +433,7 @@ export const useHarnessStore = create<HarnessStore>()((set, get) => ({
       ...(attachments.length ? { attachments } : {}),
     };
     patch(tabId, (current) => ({ ...current, messages: [...current.messages, question], pending: true, interrupted: false, note: null, error: null, errorDetails: null, authRequired: false }));
-    useHarnessSessionRefs.getState().remember(session.harness, { sessionId: session.resumeSessionId ?? sessionId, cwd: session.cwd, at: Date.now() });
+    useHarnessSessionRefs.getState().remember(session.harness, { sessionId: session.transcriptSessionId ?? session.resumeSessionId ?? sessionId, cwd: session.cwd, at: Date.now() });
     stopApplicationTools(tabId);
     const paneId = session.executionPaneId ?? null;
     const toolEnvironment = paneId ? environmentForPane(paneId) : null;
@@ -722,6 +751,31 @@ function foldSessionEvent(session: HarnessSession, event: AcpSessionEvent): Harn
 /** Fold the history a loaded session replayed, in order. */
 function replayEvents(session: HarnessSession, events: AcpSessionEvent[]): HarnessSession {
   return events.reduce((current, event) => foldSessionEvent(current, event), session);
+}
+
+const TRANSCRIPT_UPDATES = new Set([
+  'user_message_chunk', 'agent_message_chunk', 'agent_thought_chunk', 'tool_call', 'tool_call_update',
+]);
+
+/** A replay that carries no messages cannot replace a local transcript that has content. */
+function replayHasTranscript(events: readonly AcpSessionEvent[]): boolean {
+  return events.some(event => event.kind === 'update'
+    && TRANSCRIPT_UPDATES.has(String(harnessUpdate(event.payload).sessionUpdate ?? '')));
+}
+
+/** Keep session state that travels in a replay while the transcript itself comes from the local copy. */
+function replayMetadata(events: readonly AcpSessionEvent[]): AcpSessionEvent[] {
+  return events.filter(event => event.kind === 'update'
+    && !TRANSCRIPT_UPDATES.has(String(harnessUpdate(event.payload).sessionUpdate ?? '')));
+}
+
+/** A local copy saved while a turn was running has no final reply; mark the visible partial answer. */
+function interruptedTranscript(messages: ChatMessage[]): ChatMessage[] {
+  const summary = t('The turn did not finish; the partial transcript is shown.');
+  const failure = { pending: false, error: true, errorSummary: summary, errorText: summary };
+  const last = messages[messages.length - 1];
+  if (last?.role === 'assistant') return [...messages.slice(0, -1), { ...stopChatMessage(last), ...failure }];
+  return [...messages, { id: `harness-interrupted-${Date.now()}-${inputSequence++}`, role: 'assistant', content: '', createdAt: Date.now(), ...failure }];
 }
 
 /**

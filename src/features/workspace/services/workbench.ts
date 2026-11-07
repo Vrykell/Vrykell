@@ -5,6 +5,7 @@ import { useChatStore } from '@features/chat/stores/chat';
 import { useComposerDrafts } from '@features/chat/stores/composerDrafts';
 import { hasChatContent } from '@features/chat/model/chatContent';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
+import { useHarnessStore } from '@features/chat/stores/harness';
 import { useTerminalStore } from '@features/terminal/stores/terminal';
 import * as groupApi from '@platform/api/group';
 import { t } from '@i18n';
@@ -18,6 +19,7 @@ import { useWorkspaceNavigation } from '../stores/navigation';
 import { useUiStore } from '../stores/ui';
 import { currentWorkspaceResources, renameWorkspaceResource, workspacePaneResource } from './workspaceResources';
 import { captureContainerHistory, clearWorkspaceHistorySuppression, containerHistoryIdentity, persistContainerHistory, releaseContainerHistory, settleContainerHistory, suppressWorkspaceHistory, workspaceHistoryMember } from './workspaceHistory';
+import { sessionHistorySnapshot } from '../model/workspaceHistory';
 import { close as closeSessionOwner, remove as removeSessionOwner, saveLayout, transferPanes, persistedSessionIds, settlePaneTransfers } from './sessionManager';
 import { reportWorkbenchFailure } from '../stores/workbenchFeedback';
 import type { PaneTarget } from '@core/paneLayout';
@@ -170,7 +172,14 @@ export function closeContainer(id: string, force = false) {
     const scope = tabs[0]!.scope;
     let tab = tabs[0]!;
     const snapshot = captureContainerHistory(tab, all);
+    // A workspace record means a real layout: at least two restorable panes or a group. A single
+    // ungrouped tab keeps only its own resource history, so closing it must not create a one-member
+    // "combination". An existing identity is retained so a former composition that shrank to one
+    // pane stays dormant instead of being recreated as a new row.
+    const retained = sessionHistorySnapshot(snapshot);
+    const keepLayout = (retained?.members.length ?? 0) > 1 || !!tab.groupId || !!containerHistoryIdentity(tab);
     const save = () => {
+      if (!keepLayout) return;
       const operation = persistContainerHistory(tab, snapshot);
       tab = { ...tab, historyIdentity: containerHistoryIdentity(tab) };
       void operation.catch(error => reportWorkbenchFailure(error, save));
@@ -380,6 +389,22 @@ export function startWorkbenchRuntime() {
         state.byTab[id] !== previous.byTab[id] && !!state.byTab[id]?.some(hasChatContent) !== !!previous.byTab[id]?.some(hasChatContent))) update();
     }),
     useHarnessWorkspace.subscribe((state, previous) => { if (state.connections !== previous.connections) update(); }),
+    // An ACP session resolves its durable id and directory only after opening. The workbench
+    // snapshot has to learn them before the window closes, or a restored tab starts a fresh agent
+    // instead of reopening the conversation it was showing.
+    useHarnessStore.subscribe((state, previous) => {
+      const changed = Object.keys({ ...previous.byTab, ...state.byTab }).some(id => {
+        const before = previous.byTab[id];
+        const after = state.byTab[id];
+        if (before === after) return false;
+        return before?.sessionId !== after?.sessionId
+          || before?.resumeSessionId !== after?.resumeSessionId
+          || before?.transcriptSessionId !== after?.transcriptSessionId
+          || (before?.cwd ?? '') !== (after?.cwd ?? '')
+          || !!before?.messages.some(hasChatContent) !== !!after?.messages.some(hasChatContent);
+      });
+      if (changed) update();
+    }),
   ];
   disposers.push(useWorkbenchStore.subscribe((state, previous) => {
     if (synchronizing || state.snapshot === previous.snapshot) return;

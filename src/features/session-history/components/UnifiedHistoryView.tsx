@@ -42,7 +42,7 @@ import type { WorkspaceHistoryMember } from '@features/workspace/model/workspace
 const TYPE_LABELS = { all: 'All', terminal: 'Terminal history', conversation: 'AI conversations' } as const;
 const DATE_FIELD_LABELS = { activity: 'Latest activity', created: 'Created date' } as const;
 const openLabel = (record: UnifiedHistoryRecord) => t(record.kind === 'workspace' ? 'Restore workspace combination' : record.kind === 'terminal' ? 'Restore session' : record.kind === 'agent' ? 'Resume ACP session' : 'Open conversation');
-const deleteLabel = (record: UnifiedHistoryRecord) => t(record.kind === 'workspace' ? 'Forget workspace combination' : record.kind === 'terminal' ? 'Delete this session' : record.kind === 'agent' ? 'Forget ACP session reference' : 'Delete conversation');
+const deleteLabel = (record: UnifiedHistoryRecord) => t(record.kind === 'workspace' ? 'Forget workspace combination' : record.kind === 'terminal' ? 'Delete this session' : record.kind === 'agent' ? 'Delete ACP session record' : 'Delete conversation');
 const anchorFrom = (trigger: HTMLButtonElement, align: 'start' | 'end' = 'start'): MenuAnchor => {
   const rect = trigger.getBoundingClientRect();
   return { x: align === 'end' ? rect.right : rect.left, y: rect.bottom + 4, trigger };
@@ -121,7 +121,7 @@ export default function UnifiedHistoryView({ preset, destination }: { preset?: H
     if (!targets.length || batchBusy) return;
     const ok = await ask(t(targets.every(record => record.kind === 'workspace')
       ? 'Forget {{count}} workspace combinations? Their sessions and documents are kept.' : targets.some(record => record.kind === 'agent')
-      ? 'Delete {{count}} matching records? ACP references are only forgotten; their agent-owned history is kept. Locked and working records are excluded.'
+      ? 'Delete {{count}} matching records? ACP transcript copies and session references are deleted; their agent-owned history is kept. Locked and working records are excluded.'
       : 'Delete {{count}} matching records and their history? Locked and working records are excluded.', {
       count: targets.length,
     }), { title: t('Delete history records'), kind: 'warning' });
@@ -296,7 +296,8 @@ export default function UnifiedHistoryView({ preset, destination }: { preset?: H
     </>}>
     {history.terminalError && <ErrorBox title={t(pageTitle)} actions={<OutlineButton onClick={() => void history.refresh()}>{t('Retry')}</OutlineButton>}>{history.terminalError}</ErrorBox>}
     {history.conversationError && history.conversationError !== history.terminalError && <ErrorBox title={t('AI conversation history')} actions={<OutlineButton onClick={() => void history.refresh()}>{t('Retry')}</OutlineButton>}>{history.conversationError}</ErrorBox>}
-    {!history.visible.length && !history.loading && !history.terminalError && !history.conversationError && <div className="history-empty"><History size={24} />
+    {history.acpError && <ErrorBox title={t('ACP sessions')} actions={<OutlineButton onClick={() => void history.refresh()}>{t('Retry')}</OutlineButton>}>{history.acpError}</ErrorBox>}
+    {!history.visible.length && !history.loading && !history.terminalError && !history.conversationError && !history.acpError && <div className="history-empty"><History size={24} />
       <span>{t(history.filter.query || hasNarrowingFilter ? 'No matching history' : 'No history yet')}</span></div>}
     {originalCards.map(({ group, all, visible }) => {
       const key = historyGroupKey('session', 'original', group.id);
@@ -387,7 +388,7 @@ function UnifiedHistoryRow({ record, active, locked, busy, onOpen, onDelete, onM
   const [expanded, setExpanded] = useState(false);
   const label = t(record.kind === 'workspace' ? 'Workspace combination' : record.kind === 'conversation' ? 'AI conversation' : record.kind === 'agent' ? 'ACP session reference' : record.local && record.ssh ? 'Mixed connections' : record.ssh ? 'SSH terminal' : 'Local terminal');
   const AgentMark = record.kind === 'agent' ? harnessMark(record.agent.harness, Bot) : Bot;
-  const activity = t(record.kind === 'conversation' ? 'Updated {{date}}' : record.kind === 'agent' ? 'Last opened {{date}}' : 'Closed {{date}}', {
+  const activity = t(record.kind === 'conversation' || record.kind === 'agent' ? 'Updated {{date}}' : 'Closed {{date}}', {
     date: new Date(record.timestamp).toLocaleString(undefined, {
       year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
     }),

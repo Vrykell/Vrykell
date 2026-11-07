@@ -31,6 +31,7 @@ import { editorFileKey } from '@core/editor';
 import { gitComparisonKey } from '@core/git';
 import { useGitSelection } from '@features/git';
 import { startWorkbenchRuntime } from '@features/workspace/services/workbench';
+import { startHarnessTranscriptRuntime } from '@features/chat/services/harnessTranscriptRuntime';
 import WorkbenchFeedback from '@features/workspace/components/WorkbenchFeedback';
 
 const StableTerminalView = memoLocalized(TerminalView);
@@ -45,6 +46,7 @@ const StableSidePanel = memoLocalized(SidePanel);
 /** Compose navigation, auxiliary panels and the terminal workspace. */
 export default function WorkspaceShell() {
   useEffect(startWorkbenchRuntime, []);
+  useEffect(startHarnessTranscriptRuntime, []);
   useSshAuthenticationLifetime();
   useGitContext();
   const settingsOpen = useUiStore(state => state.settingsOpen);

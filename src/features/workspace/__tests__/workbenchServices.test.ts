@@ -96,6 +96,26 @@ it('adopts every native resource once, retains multi-pane terminal containers an
   expect(useWorkbenchStore.getState().snapshot.tabs.some(tab => tab.scope === 'code')).toBe(true);
 });
 
+it('refreshes an agent container when its session resolves a durable identity or content', () => {
+  const stop = startWorkbenchRuntime();
+  useHarnessWorkspace.setState({ connections: [{ id: 'agent', harness: 'Agent', cwd: '', fresh: true }] });
+  synchronizeWorkbench();
+  expect(current('acp:agent').restoreSnapshot?.members[0]).toMatchObject({ empty: true, remoteId: undefined });
+
+  useHarnessStore.setState({
+    byTab: {
+      agent: {
+        harness: 'Agent', sessionId: 'live', resumeSessionId: 'durable', transcriptSessionId: 'durable', cwd: '/work',
+        messages: [{ id: 'q', role: 'user', content: 'Question', createdAt: 1 }],
+      } as unknown as import('@features/chat/stores/harness').HarnessSession,
+    },
+  });
+
+  expect(current('acp:agent').restoreSnapshot?.members[0]).toMatchObject({ remoteId: 'durable', cwd: '/work' });
+  expect(current('acp:agent').restoreSnapshot?.members[0]?.empty).toBeUndefined();
+  stop();
+});
+
 it('leaves unrelated placements untouched when rebinding a resource', () => {
   useWorkbenchStore.setState({ ready: true, snapshot: emptyWorkbench(), lastClosed: null });
   useWorkbenchStore.getState().update(state => putContainer(putContainer(state, {
@@ -538,9 +558,17 @@ it('keeps pane and history identifiers bounded even when a document path is long
   expect(saveWorkspaceHistory).toHaveBeenCalledOnce();
 });
 
-it('retries a failed close save under the same captured history identity after its live owner is gone', async () => {
-  const chat = conversation(); synchronizeWorkbench(); vi.mocked(saveWorkspaceHistory).mockRejectedValueOnce(new Error('close storage failed'));
+it('does not archive a single ungrouped tab as a workspace combination', () => {
+  const chat = conversation(); synchronizeWorkbench();
   closeContainer(chat);
+  expect(saveWorkspaceHistory).not.toHaveBeenCalled();
+  expect(useWorkbenchStore.getState().lastClosed).toMatchObject({ scope: 'ai' });
+});
+
+it('retries a failed close save under the same captured history identity after its live owner is gone', async () => {
+  const first = conversation('first'); const second = conversation('second'); const mixedId = mixed(first, second);
+  synchronizeWorkbench(); vi.mocked(saveWorkspaceHistory).mockRejectedValueOnce(new Error('close storage failed'));
+  closeContainer(mixedId);
   await vi.waitFor(() => expect(useWorkbenchFeedback.getState().failure?.error).toEqual(new Error('close storage failed')));
   const id = vi.mocked(saveWorkspaceHistory).mock.calls[0]![0].id;
   useWorkbenchFeedback.getState().failure!.retry(); await vi.waitFor(() => expect(saveWorkspaceHistory).toHaveBeenCalledTimes(2));
