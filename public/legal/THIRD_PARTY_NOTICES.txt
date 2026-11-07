@@ -2850,9 +2850,9 @@ Notice file: LICENSE-MIT
 License text reference: license-text-bde59a7e336fcb58
 
 ==============================================================================
-crate:rfd@0.16.0
+crate:rfd@0.17.2
 License expression: MIT
-Source: https://crates.io/api/v1/crates/rfd/0.16.0/download
+Source: https://crates.io/api/v1/crates/rfd/0.17.2/download
 Notice file: LICENSE
 License text reference: license-text-1a6dd9555214dc74
 
@@ -3525,9 +3525,9 @@ Notice file: LICENSE-MIT
 License text reference: license-text-89ff9689dcf9dd53
 
 ==============================================================================
-crate:tauri-plugin-clipboard-manager@2.3.3
+crate:tauri-plugin-clipboard-manager@2.5.0
 License expression: Apache-2.0 OR MIT
-Source: https://crates.io/api/v1/crates/tauri-plugin-clipboard-manager/2.3.3/download
+Source: https://crates.io/api/v1/crates/tauri-plugin-clipboard-manager/2.5.0/download
 Notice file: LICENSE.spdx
 License text reference: license-text-eb8a6c84630461b3
 Notice file: LICENSE_APACHE-2.0
@@ -3536,9 +3536,9 @@ Notice file: LICENSE_MIT
 License text reference: license-text-89ff9689dcf9dd53
 
 ==============================================================================
-crate:tauri-plugin-dialog@2.7.2
+crate:tauri-plugin-dialog@2.8.4
 License expression: Apache-2.0 OR MIT
-Source: https://crates.io/api/v1/crates/tauri-plugin-dialog/2.7.2/download
+Source: https://crates.io/api/v1/crates/tauri-plugin-dialog/2.8.4/download
 Notice file: LICENSE.spdx
 License text reference: license-text-eb8a6c84630461b3
 Notice file: LICENSE_APACHE-2.0
@@ -3556,9 +3556,9 @@ Notice file: LICENSE_MIT
 License text reference: license-text-5a54ded175eb476b
 
 ==============================================================================
-crate:tauri-plugin-fs@2.5.1
+crate:tauri-plugin-fs@2.7.1
 License expression: Apache-2.0 OR MIT
-Source: https://crates.io/api/v1/crates/tauri-plugin-fs/2.5.1/download
+Source: https://crates.io/api/v1/crates/tauri-plugin-fs/2.7.1/download
 Notice file: LICENSE.spdx
 License text reference: license-text-eb8a6c84630461b3
 Notice file: LICENSE_APACHE-2.0
@@ -3567,9 +3567,9 @@ Notice file: LICENSE_MIT
 License text reference: license-text-89ff9689dcf9dd53
 
 ==============================================================================
-crate:tauri-plugin-opener@2.5.4
+crate:tauri-plugin-opener@2.7.2
 License expression: Apache-2.0 OR MIT
-Source: https://crates.io/api/v1/crates/tauri-plugin-opener/2.5.4/download
+Source: https://crates.io/api/v1/crates/tauri-plugin-opener/2.7.2/download
 Notice file: LICENSE.spdx
 License text reference: license-text-eb8a6c84630461b3
 Notice file: LICENSE_APACHE-2.0
@@ -3589,9 +3589,9 @@ Notice file: LICENSE_MIT
 License text reference: license-text-89ff9689dcf9dd53
 
 ==============================================================================
-crate:tauri-plugin-single-instance@2.4.5
+crate:tauri-plugin-single-instance@2.5.5
 License expression: Apache-2.0 OR MIT
-Source: https://crates.io/api/v1/crates/tauri-plugin-single-instance/2.4.5/download
+Source: https://crates.io/api/v1/crates/tauri-plugin-single-instance/2.5.5/download
 Notice file: LICENSE.spdx
 License text reference: license-text-eb8a6c84630461b3
 Notice file: LICENSE_APACHE-2.0
@@ -4304,15 +4304,6 @@ Notice file: license-mit
 License text reference: license-text-d9a1b1e30d633d57
 
 ==============================================================================
-crate:windows-collections@0.2.0
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows-collections/0.2.0/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
 crate:windows-collections@0.3.2
 License expression: MIT OR Apache-2.0
 Source: https://crates.io/api/v1/crates/windows-collections/0.3.2/download
@@ -4349,27 +4340,9 @@ Notice file: license-mit
 License text reference: license-text-d9a1b1e30d633d57
 
 ==============================================================================
-crate:windows-core@0.61.2
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows-core/0.61.2/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
 crate:windows-core@0.62.2
 License expression: MIT OR Apache-2.0
 Source: https://crates.io/api/v1/crates/windows-core/0.62.2/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
-crate:windows-future@0.2.1
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows-future/0.2.1/download
 Notice file: license-apache-2.0
 License text reference: license-text-72de958052e494b0
 Notice file: license-mit
@@ -4457,27 +4430,9 @@ Notice file: license-mit
 License text reference: license-text-d9a1b1e30d633d57
 
 ==============================================================================
-crate:windows-link@0.1.3
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows-link/0.1.3/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
 crate:windows-link@0.2.1
 License expression: MIT OR Apache-2.0
 Source: https://crates.io/api/v1/crates/windows-link/0.2.1/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
-crate:windows-numerics@0.2.0
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows-numerics/0.2.0/download
 Notice file: license-apache-2.0
 License text reference: license-text-72de958052e494b0
 Notice file: license-mit
@@ -4520,15 +4475,6 @@ Notice file: license-mit
 License text reference: license-text-d9a1b1e30d633d57
 
 ==============================================================================
-crate:windows-result@0.3.4
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows-result/0.3.4/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
 crate:windows-result@0.4.1
 License expression: MIT OR Apache-2.0
 Source: https://crates.io/api/v1/crates/windows-result/0.4.1/download
@@ -4541,15 +4487,6 @@ License text reference: license-text-d9a1b1e30d633d57
 crate:windows-strings@0.1.0
 License expression: MIT OR Apache-2.0
 Source: https://crates.io/api/v1/crates/windows-strings/0.1.0/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
-crate:windows-strings@0.4.2
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows-strings/0.4.2/download
 Notice file: license-apache-2.0
 License text reference: license-text-72de958052e494b0
 Notice file: license-mit
@@ -4628,15 +4565,6 @@ Notice file: license-mit
 License text reference: license-text-d9a1b1e30d633d57
 
 ==============================================================================
-crate:windows-threading@0.1.0
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows-threading/0.1.0/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
 crate:windows-threading@0.2.1
 License expression: MIT OR Apache-2.0
 Source: https://crates.io/api/v1/crates/windows-threading/0.2.1/download
@@ -4667,15 +4595,6 @@ License text reference: license-text-d9a1b1e30d633d57
 crate:windows@0.56.0
 License expression: MIT OR Apache-2.0
 Source: https://crates.io/api/v1/crates/windows/0.56.0/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
-crate:windows@0.61.3
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows/0.61.3/download
 Notice file: license-apache-2.0
 License text reference: license-text-72de958052e494b0
 Notice file: license-mit
@@ -5111,23 +5030,23 @@ Notice file: LICENSE.spdx
 License text reference: license-text-7c667b0cf9860e6a
 
 ==============================================================================
-npm:@tauri-apps/plugin-clipboard-manager@2.3.3
+npm:@tauri-apps/plugin-clipboard-manager@2.5.0
 License expression: MIT OR Apache-2.0
-Source: https://www.npmjs.com/package/@tauri-apps/plugin-clipboard-manager/v/2.3.3
+Source: https://www.npmjs.com/package/@tauri-apps/plugin-clipboard-manager/v/2.5.0
 Notice file: LICENSE.spdx
 License text reference: license-text-eb8a6c84630461b3
 
 ==============================================================================
-npm:@tauri-apps/plugin-dialog@2.7.2
+npm:@tauri-apps/plugin-dialog@2.8.4
 License expression: MIT OR Apache-2.0
-Source: https://www.npmjs.com/package/@tauri-apps/plugin-dialog/v/2.7.2
+Source: https://www.npmjs.com/package/@tauri-apps/plugin-dialog/v/2.8.4
 Notice file: LICENSE.spdx
 License text reference: license-text-eb8a6c84630461b3
 
 ==============================================================================
-npm:@tauri-apps/plugin-opener@2.5.4
+npm:@tauri-apps/plugin-opener@2.7.2
 License expression: MIT OR Apache-2.0
-Source: https://www.npmjs.com/package/@tauri-apps/plugin-opener/v/2.5.4
+Source: https://www.npmjs.com/package/@tauri-apps/plugin-opener/v/2.7.2
 Notice file: LICENSE.spdx
 License text reference: license-text-eb8a6c84630461b3
 
