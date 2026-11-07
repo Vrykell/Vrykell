@@ -17,11 +17,13 @@ import { terminalDebug } from '@features/terminal/services/terminalDebug';
 vi.mock('@features/terminal/services/terminalDebug', () => ({ terminalDebug: vi.fn() }));
 
 const readAttachmentDataUrl = vi.hoisted(() => vi.fn());
+const loadHarnessTranscript = vi.hoisted(() => vi.fn());
 
 vi.mock('@features/agent/model/attachments', async (importOriginal) => ({
   ...await importOriginal<typeof import('@features/agent/model/attachments')>(),
   readAttachmentDataUrl,
 }));
+vi.mock('@features/chat/services/harnessTranscripts', () => ({ loadHarnessTranscript }));
 
 vi.mock('@platform/api/acp', () => ({
   acpAnswerPermission: vi.fn(async () => undefined),
@@ -73,6 +75,7 @@ beforeEach(async () => {
   vi.mocked(acpSetModel).mockClear();
   vi.mocked(acpSetConfigOption).mockClear();
   vi.mocked(acpOpen).mockClear();
+  loadHarnessTranscript.mockReset().mockResolvedValue(null);
   useHarnessStore.setState({ byTab: {} });
   useHarnessSessionRefs.setState({ refs: {} });
   useHarnessConfigPrefs.setState({ prefs: {} });
@@ -378,6 +381,83 @@ describe('harness session state', () => {
     expect(transcript).toContain('earlier answer');
     expect(current().note).toBeNull();
     expect(useHarnessSessionRefs.getState().refs['Claude Code']?.sessionId).toBe('older');
+  });
+
+  it('shows a retained partial transcript when the agent cannot reopen the session', async () => {
+    const retained = {
+      harness: 'Claude Code', sessionId: 'durable', cwd: '/tmp/project', title: 'Earlier work',
+      createdAt: 1, updatedAt: 2, pending: true,
+      messages: [
+        { id: 'q', role: 'user' as const, content: 'Earlier question', createdAt: 1 },
+        { id: 'a', role: 'assistant' as const, content: 'Partial answer', createdAt: 2 },
+      ],
+    };
+    loadHarnessTranscript.mockResolvedValueOnce(retained);
+    vi.mocked(acpOpen).mockResolvedValueOnce({
+      sessionId: 'fresh-live', resumeSessionId: 'fresh-history', resumed: false,
+      harness: 'Claude Code', cwd: '/tmp/project',
+      agent: { protocolVersion: 1, agentInfo: { name: 'Fake' }, agentCapabilities: null, authMethods: [] },
+      modes: null, models: null, configOptions: null, replayed: [],
+    });
+    useHarnessStore.setState({ byTab: {} });
+    await useHarnessStore.getState().open(TAB, 'Claude Code', '/tmp/project', false, 'durable');
+
+    expect(loadHarnessTranscript).toHaveBeenCalledWith('Claude Code', 'durable');
+    expect(current().messages.map(message => message.content)).toEqual(['Earlier question', 'Partial answer']);
+    expect(current().messages[current().messages.length - 1]).toMatchObject({ error: true, errorSummary: t('The turn did not finish; the partial transcript is shown.') });
+    expect(current()).toMatchObject({
+      transcriptSessionId: 'durable', resumeSessionId: 'fresh-history', pending: false,
+      note: t('The turn did not finish; the partial transcript is shown.'),
+    });
+  });
+
+  it('prefers a complete agent replay over a completed local copy', async () => {
+    loadHarnessTranscript.mockResolvedValueOnce({
+      harness: 'Claude Code', sessionId: 'durable', cwd: '/tmp/project', title: 'Local',
+      createdAt: 1, updatedAt: 2, pending: false,
+      messages: [{ id: 'local', role: 'user' as const, content: 'Local question', createdAt: 1 }],
+    });
+    vi.mocked(acpOpen).mockResolvedValueOnce({
+      sessionId: 'durable', resumeSessionId: 'durable', resumed: true,
+      harness: 'Claude Code', cwd: '/tmp/project',
+      agent: { protocolVersion: 1, agentInfo: { name: 'Fake' }, agentCapabilities: null, authMethods: [] },
+      modes: null, models: null, configOptions: null,
+      replayed: [
+        { sessionId: 'durable', kind: 'update', payload: { params: { sessionId: 'durable', update: { sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'Agent question' } } } } },
+        { sessionId: 'durable', kind: 'update', payload: { params: { sessionId: 'durable', update: { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Agent answer' } } } } },
+      ],
+    });
+    useHarnessStore.setState({ byTab: {} });
+    await useHarnessStore.getState().open(TAB, 'Claude Code', '/tmp/project', false, 'durable');
+
+    expect(current().messages[0]).toMatchObject({ role: 'user', content: 'Agent question' });
+    expect(current().messages[1]).toMatchObject({ role: 'assistant', parts: [{ kind: 'text', text: 'Agent answer' }] });
+    expect(current().note).toBeNull();
+  });
+
+  it('uses a completed local copy when the agent reopens the session but replays nothing', async () => {
+    loadHarnessTranscript.mockResolvedValueOnce({
+      harness: 'Claude Code', sessionId: 'durable', cwd: '/tmp/project', title: 'Local',
+      createdAt: 1, updatedAt: 2, pending: false,
+      messages: [{ id: 'local', role: 'user' as const, content: 'Local question', createdAt: 1 }],
+    });
+    vi.mocked(acpOpen).mockResolvedValueOnce({
+      sessionId: 'durable', resumeSessionId: 'durable', resumed: true,
+      harness: 'Claude Code', cwd: '/tmp/project',
+      agent: { protocolVersion: 1, agentInfo: { name: 'Fake' }, agentCapabilities: null, authMethods: [] },
+      modes: null, models: null, configOptions: null, replayed: [],
+    });
+    useHarnessStore.setState({ byTab: {} });
+    await useHarnessStore.getState().open(TAB, 'Claude Code', '/tmp/project', false, 'durable');
+
+    expect(current().messages.map(message => message.content)).toEqual(['Local question']);
+    expect(current().note).toBeNull();
+  });
+
+  it('does not read a local copy for an explicitly fresh session', async () => {
+    useHarnessStore.setState({ byTab: {} });
+    await useHarnessStore.getState().open(TAB, 'Claude Code', '/tmp/project', true);
+    expect(loadHarnessTranscript).not.toHaveBeenCalled();
   });
 
   it('sends an attached image with the prompt and keeps it on the question', async () => {

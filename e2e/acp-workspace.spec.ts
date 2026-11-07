@@ -45,6 +45,25 @@ test('runs the same agent twice in one project with independent replies, drafts 
   await expect(current(page).getByRole('button', { name: '停止本轮' })).toBeVisible();
 });
 
+test('retains a running ACP transcript locally and reopens it after reload', async ({ page }) => {
+  await connect(page, '/shared-project');
+  const main = current(page);
+  await main.getByTestId('harness-composer').fill('Long investigation');
+  await main.getByTestId('harness-send').click();
+  await expect.poll(() => acpCalls(page)).toContain('acp_prompt:sess_e2e');
+  await emitAcpSession(page, acpUpdate('sess_e2e', { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Partial finding' } }));
+  await expect(main).toContainText('Partial finding');
+  await expect.poll(async () => page.evaluate(() => Object.keys(JSON.parse(localStorage.getItem('mock-acp-transcripts') ?? '{}')).length)).toBe(1);
+
+  await page.reload();
+  await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId('workspace-area-ai').click();
+  await expect(current(page)).toContainText('Long investigation');
+  await expect(current(page)).toContainText('Partial finding');
+  await expect(current(page)).toContainText('本轮未完成');
+  expect(await acpCalls(page)).toContain('acp_open:Fake ACP:resume');
+});
+
 test('keeps a queued message inside the composer at narrow widths', async ({ page }) => {
   await connect(page, '/shared-project');
   const main = current(page);

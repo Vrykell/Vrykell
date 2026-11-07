@@ -1,6 +1,7 @@
 //! Tauri command layer: split by domain to avoid a single god module.
 //! Each submodule exposes only `#[tauri::command]`; all data access goes through `crate::db`.
 
+pub mod acp_transcript;
 pub mod clipboard;
 pub mod conversation;
 pub mod history_page;

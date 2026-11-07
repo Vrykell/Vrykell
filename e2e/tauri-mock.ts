@@ -132,6 +132,10 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     const acpWorkspace = 'C:/Users/e2e/AppData/Local/com.vrykell.app/acp-workspace';
     let acpServers = JSON.parse(localStorage.getItem('mock-acp-servers') ?? 'null') as Array<Record<string, unknown>> | null;
     acpServers ??= [{ name: 'Fake ACP', command: 'node', args: ['scripts/fake-acp-agent.mjs'], env: {}, cwd: '', enabled: true }];
+    /** The transcript mock mirrors the real SQLite store closely enough to survive a reload. */
+    const acpTranscripts = JSON.parse(localStorage.getItem('mock-acp-transcripts') ?? '{}') as Record<string, Record<string, unknown>>;
+    const acpTranscriptKey = (harness: string, sessionId: string) => JSON.stringify([harness, sessionId]);
+    const persistAcpTranscripts = () => localStorage.setItem('mock-acp-transcripts', JSON.stringify(acpTranscripts));
     /** Native picker invocations the page made, so a spec can assert the mode it asked for. */
     const pickCalls: { mode: string }[] = [];
     const activeProfile = models.find(profile => profile.id === active);
@@ -1334,11 +1338,26 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
                 ],
               },
               configOptions: null,
+              resumed: resuming,
               replayed: resuming
                 ? [replay('earlier question', 'user_message_chunk'), replay('earlier answer', 'agent_message_chunk')]
                 : [],
             };
           }
+          case 'acp_transcript_save': {
+            const key = acpTranscriptKey(String(args.harness ?? ''), String(args.sessionId ?? ''));
+            acpTranscripts[key] = args;
+            persistAcpTranscripts();
+            return undefined;
+          }
+          case 'acp_transcript_list':
+            return Object.values(acpTranscripts).sort((left, right) => Number(right.updatedAt ?? 0) - Number(left.updatedAt ?? 0));
+          case 'acp_transcript_get':
+            return acpTranscripts[acpTranscriptKey(String(args.harness ?? ''), String(args.sessionId ?? ''))] ?? null;
+          case 'acp_transcript_delete':
+            delete acpTranscripts[acpTranscriptKey(String(args.harness ?? ''), String(args.sessionId ?? ''))];
+            persistAcpTranscripts();
+            return undefined;
           case 'acp_set_mode':
             acpCalls.push(`acp_set_mode:${String(args.modeId ?? '')}`);
             return undefined;

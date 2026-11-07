@@ -23,7 +23,7 @@ export const useHarnessWorkspace = create<HarnessWorkspaceState>((set, get) => (
     const existing = !newSession && get().connections.find(item => {
       const session = useHarnessStore.getState().byTab[item.id];
       return item.harness === harness && (session?.cwd || item.cwd) === cwd
-        && (session?.resumeSessionId ?? item.resumeSessionId) === resumeSessionId;
+        && (session?.transcriptSessionId ?? session?.resumeSessionId ?? item.resumeSessionId) === resumeSessionId;
     });
     if (existing) { set({ selected: existing.id }); return existing.id; }
     const id = `harness-${Date.now()}-${sequence++}`;

@@ -5,6 +5,7 @@ use std::sync::Mutex;
 
 pub mod download;
 pub mod conversation;
+pub mod acp;
 pub mod history;
 pub mod history_page;
 pub mod workspace_history;
@@ -16,6 +17,7 @@ pub mod workspace;
 
 pub use download::DownloadEntry;
 pub use conversation::{ConversationEntry, ConversationMessageEntry};
+pub use acp::{AcpTranscriptDetail, AcpTranscriptSummary};
 pub use history::HistoryEntry;
 pub use session::{BlockEntry, ChatMessageEntry, GroupEntry, SessionEntry};
 pub use ssh_connection::SshConnection;
@@ -187,6 +189,7 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
             .map_err(|e| e.to_string())?;
     }
     conversation::init_conversations(conn)?;
+    acp::init(conn)?;
     workspace_history::init_history_metadata(conn)?;
     workspace_history::remove_file_history(conn)?;
     command_history::init(conn)?;

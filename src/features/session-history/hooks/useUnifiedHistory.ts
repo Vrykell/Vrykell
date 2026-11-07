@@ -3,17 +3,19 @@ import { useChatStore } from '@features/chat';
 import { useWorkspaceNavigation, type HistoryTypePreset } from '@features/workspace';
 import { suppressWorkspaceHistory } from '@features/workspace/services/workspaceHistory';
 import { useHarnessSessionRefs } from '@features/chat/stores/harnessSessions';
+import { deleteHarnessTranscriptCopy } from '@features/chat/services/harnessTranscriptRuntime';
 import { historyGroupKey, useHistoryMetaStore } from '@utils/historyMeta';
 import { safeJsonParse } from '@utils/errorHandler';
 import { useToastStore } from '@ui/feedback/Toast';
 import { SESSION_DATE_OPTIONS } from '../model/sessionHistoryModel';
 import {
   DEFAULT_UNIFIED_FILTER, HISTORY_TYPES, UNIFIED_GROUP_BY_OPTIONS, UNIFIED_SORT_OPTIONS,
-  filterUnifiedHistory, unifiedHistoryGroupIdentity, unifiedHistoryRecords, type UnifiedHistoryFilter, type UnifiedHistoryRecord,
+  collapseWorkspaceMemberRecords, filterUnifiedHistory, unifiedHistoryGroupIdentity, unifiedHistoryRecords, type UnifiedAgentReference, type UnifiedHistoryFilter, type UnifiedHistoryRecord,
   originalWorkspaceGroupId,
 } from '../model/unifiedHistory';
 import { useSessionHistory } from './useSessionHistory';
 import { useHistoryPages } from './useHistoryPages';
+import { useAcpHistory } from './useAcpHistory';
 import { parseEnvironment } from '@features/chat/model/conversation';
 import { readHistoryPage, type HistoryCursor } from '@platform/api/historyPage';
 import type { BackendSessionEntry } from '@platform/api/types';
@@ -58,6 +60,7 @@ export function useUnifiedHistory(preset?: HistoryTypePreset, destinationOverrid
   const notes = useHistoryMetaStore(state => state.notes);
   const starred = useHistoryMetaStore(state => state.starred);
   const agentRefs = useHarnessSessionRefs(state => state.refs);
+  const acp = useAcpHistory();
   const groupTitles = useHistoryMetaStore(state => state.groupTitles);
   const groupNotes = useHistoryMetaStore(state => state.groupNotes);
   const loading = pages.loading;
@@ -66,9 +69,22 @@ export function useUnifiedHistory(preset?: HistoryTypePreset, destinationOverrid
     return () => useWorkspaceNavigation.getState().setHistoryLoading(false);
   }, [loading]);
   useEffect(() => { try { sessionStorage.setItem(FILTER_KEY, JSON.stringify(filter)); } catch { /* Preferences are optional. */ } }, [filter]);
+  const agents = useMemo(() => {
+    const merged = new Map<string, UnifiedAgentReference>();
+    for (const entry of acp.summaries) {
+      merged.set(JSON.stringify([entry.harness, entry.sessionId]), {
+        harness: entry.harness, sessionId: entry.sessionId, cwd: entry.cwd, at: entry.updatedAt, title: entry.title,
+      });
+    }
+    for (const [harness, ref] of Object.entries(agentRefs)) {
+      if (!ref || typeof ref.sessionId !== 'string' || typeof ref.cwd !== 'string' || !Number.isFinite(ref.at)) continue;
+      const key = JSON.stringify([harness, ref.sessionId]);
+      if (!merged.has(key)) merged.set(key, { ...ref, harness });
+    }
+    return [...merged.values()];
+  }, [acp.summaries, agentRefs]);
   const enrich = useCallback((sessions: BackendSessionEntry[], chats: Conversation[]) => {
     const titles = new Map(terminal.originalGroups.map(group => [group.id, group.title]));
-    const agents = Object.entries(agentRefs).flatMap(([harness, ref]) => ref && typeof ref.sessionId === 'string' && typeof ref.cwd === 'string' && Number.isFinite(ref.at) ? [{ ...ref, harness }] : []);
     return unifiedHistoryRecords(sessions, chats, { notes, starred }, agents).map(record => {
       const identity = unifiedHistoryGroupIdentity(record, filter.groupBy);
       const groupKey = historyGroupKey('session', `unified-${filter.groupBy}`, identity.id);
@@ -77,9 +93,9 @@ export function useUnifiedHistory(preset?: HistoryTypePreset, destinationOverrid
       return { ...record, searchText: [record.searchText, identity.title, groupTitles[groupKey], groupNotes[groupKey], originalTitle]
         .filter(Boolean).join(' ').toLocaleLowerCase() };
     });
-  }, [terminal.originalGroups, filter.groupBy, groupNotes, groupTitles, notes, starred, agentRefs]);
+  }, [terminal.originalGroups, filter.groupBy, groupNotes, groupTitles, notes, starred, agents]);
   const records = useMemo(() => enrich(pages.sessions, conversations), [enrich, pages.sessions, conversations]);
-  const visible = useMemo(() => filterUnifiedHistory(records, filter), [records, filter]);
+  const visible = useMemo(() => collapseWorkspaceMemberRecords(filterUnifiedHistory(records, filter), filter.layout), [records, filter]);
   useEffect(() => {
     if (query !== filter.query || !filter.query && filter.connection === 'all' && filter.mode === 'all' && filter.date === 'all' && !filter.starredOnly) return;
     if (visible.length >= 40 || !pages.hasMore || pages.loading || pages.loadingMore || pages.error) return;
@@ -108,10 +124,10 @@ export function useUnifiedHistory(preset?: HistoryTypePreset, destinationOverrid
       if (cursor) await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
     } while (cursor);
     const all = enrich(sessions, chats);
-    return matching ? filterUnifiedHistory(all, filter) : all;
+    return collapseWorkspaceMemberRecords(matching ? filterUnifiedHistory(all, filter) : all, filter.layout);
   };
   const refresh = async () => {
-    await pages.refresh();
+    await Promise.all([pages.refresh(), acp.reload()]);
   };
   return { records, visible, filter, setFilter: (patch: Partial<UnifiedHistoryFilter>) => setFilter(previous => ({ ...previous, ...patch })),
     openMember: async (member: WorkspaceHistoryMember) => {
@@ -119,8 +135,8 @@ export function useUnifiedHistory(preset?: HistoryTypePreset, destinationOverrid
       try { await restoreHistoryMember(member, destination); }
       catch (error) { notify(t('Could not restore workspace: {{error}}', { error: String(error) }), 'error'); }
     },
-    resetFilter: () => setFilter(DEFAULT_UNIFIED_FILTER), open, terminalError: terminal.loadError, conversationError,
-    loading, loadingMore: pages.loadingMore, hasMore: pages.hasMore, loadMore: pages.loadMore, busy: terminal.batchBusy, refresh, collect,
+    resetFilter: () => setFilter(DEFAULT_UNIFIED_FILTER), open, terminalError: terminal.loadError, conversationError, acpError: acp.error,
+    loading: loading || acp.loading, loadingMore: pages.loadingMore, hasMore: pages.hasMore, loadMore: pages.loadMore, busy: terminal.batchBusy, refresh, collect,
     openMany: async (targets: readonly UnifiedHistoryRecord[]) => {
       for (const record of targets) await open(record);
     },
@@ -133,10 +149,11 @@ export function useUnifiedHistory(preset?: HistoryTypePreset, destinationOverrid
       }
       for (const record of targets) if (record.kind === 'conversation') await useChatStore.getState().deleteConversation(record.conversation.id);
       for (const record of targets) if (record.kind === 'agent') {
+        await deleteHarnessTranscriptCopy(record.agent.harness, record.agent.sessionId);
         useHarnessSessionRefs.getState().forget(record.agent.harness, record.agent.sessionId);
         useHistoryMetaStore.getState().removeRecords([record.key]);
       }
-      await pages.refresh();
+      await Promise.all([pages.refresh(), acp.reload()]);
     },
     originalGroups: terminal.originalGroups, renameOriginalGroup: terminal.renameOriginalGroup };
 }
