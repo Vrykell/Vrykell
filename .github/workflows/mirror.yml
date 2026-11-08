@@ -1,0 +1,63 @@
+name: Mirror
+
+# Publish stable refs one way from this repository to the mirror hosts.
+# The mirrors are read-only; development, issues and pull requests stay here.
+on:
+  push:
+    branches: [main, dev]
+    tags: ['v*']
+  schedule:
+    # Daily fallback at 03:00 Asia/Shanghai, in case a push event was missed.
+    - cron: '0 19 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror
+  cancel-in-progress: false
+
+jobs:
+  mirror:
+    name: Mirror stable refs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Push main, dev and release tags
+        env:
+          GITEE_USER: ${{ secrets.GITEE_USER }}
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          ATOMGIT_USER: ${{ secrets.ATOMGIT_USER }}
+          ATOMGIT_TOKEN: ${{ secrets.ATOMGIT_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${GITEE_USER}" ] || [ -z "${GITEE_TOKEN}" ] || [ -z "${ATOMGIT_USER}" ] || [ -z "${ATOMGIT_TOKEN}" ]; then
+            echo "Mirror credentials are not configured. Add the GITEE_USER, GITEE_TOKEN, ATOMGIT_USER and ATOMGIT_TOKEN repository secrets." >&2
+            exit 1
+          fi
+
+          git fetch origin \
+            '+refs/heads/main:refs/remotes/origin/main' \
+            '+refs/heads/dev:refs/remotes/origin/dev' \
+            --tags
+
+          status=0
+          sync() {
+            local name="$1" user="$2" token="$3" host="$4"
+            echo "Syncing main and dev to ${name}..."
+            git push --force "https://${user}:${token}@${host}/Vrykell/Vrykell.git" \
+              refs/remotes/origin/main:refs/heads/main \
+              refs/remotes/origin/dev:refs/heads/dev || status=1
+            echo "Syncing release tags to ${name}..."
+            git push "https://${user}:${token}@${host}/Vrykell/Vrykell.git" --tags || status=1
+          }
+
+          sync "Gitee" "${GITEE_USER}" "${GITEE_TOKEN}" "gitee.com"
+          sync "AtomGit" "${ATOMGIT_USER}" "${ATOMGIT_TOKEN}" "atomgit.com"
+          exit "${status}"
