@@ -50,11 +50,7 @@ jobs:
           TARGET=$(jq -r '.targetCommitish' release.json)
           PRERELEASE=$(jq -r '.isPrerelease' release.json)
 
-          BODY="${BODY}
-
----
-
-下载 / Downloads: https://github.com/Vrykell/Vrykell/releases/tag/${TAG}"
+          printf -v BODY '%s\n\n---\n\n下载 / Downloads: https://github.com/Vrykell/Vrykell/releases/tag/%s' "$BODY" "$TAG"
 
           EXISTING=$(curl -sS --fail-with-body \
             "https://gitee.com/api/v5/repos/Vrykell/Vrykell/releases?per_page=100&access_token=${GITEE_TOKEN}" \
