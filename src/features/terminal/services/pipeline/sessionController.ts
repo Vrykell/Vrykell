@@ -42,6 +42,14 @@ export interface SessionSinks {
 const RAW_CAP = 256 * 1024;
 const MAX_FULL_BLOCKS = 200;    // Beyond this, drop the oldest blocks' output but keep their headers
 const MAX_TOTAL_BLOCKS = 500;   // Hard cap for block history, including header-only entries.
+/** A command still executing after this long is treated as long-running even while silent. */
+const LONG_RUNNING_BASE_MS = 500;
+/** Minimum runtime before a quiet gap after output marks the command as waiting for input. */
+const LONG_RUNNING_MIN_MS = 200;
+/** Quiet time after command output that marks the command as waiting for input. */
+const LONG_RUNNING_QUIET_MS = 150;
+/** Output before the preexec marker shortens the broken-integration fallback to this. */
+const PENDING_OUTPUT_FALLBACK_MS = 250;
 
 interface InternalBlock extends TermBlock {
   outputTerm: Terminal | null;
@@ -74,7 +82,14 @@ export class SessionController {
   private pendingShellCommand = '';
   private pendingShellEcho = '';
   private pendingPreexecTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Due time of the armed pending fallback; a shorter output fallback must not extend it. */
+  private pendingPreexecDueAt = 0;
+  /** Whether the pending fallback was shortened by output waiting for a missing preexec marker. */
+  private pendingPreexecFromOutput = false;
   private longRunningTimer: ReturnType<typeof setTimeout> | null = null;
+  private longRunningQuietTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Last time the running command wrote output; drives the quiet-output debounce. */
+  private lastRunningOutputAt = 0;
   private _disposed = false;
   /** Last cwd reported by OSC 7: the real RC order is OSC7 → D → A, and new blocks are seeded with it */
   private lastCwd: string | undefined;
@@ -109,6 +124,38 @@ export class SessionController {
       clearTimeout(this.pendingPreexecTimer);
       this.pendingPreexecTimer = null;
     }
+    this.pendingPreexecDueAt = 0;
+    this.pendingPreexecFromOutput = false;
+  }
+
+  /**
+   * Output that arrives while the block is still pending proves the command is already visible.
+   * A shell that never sends its preexec marker must not hide that output for the full fallback
+   * window, so shorten the pending boundary once; a real preexec marker still wins the race.
+   */
+  private shortenPendingPreexecFallback(): void {
+    if (!this.deferBlockUntilPreexec || !this.pendingUiCommand || this.pendingPreexecFromOutput) return;
+    if (!this.pendingPreexecTimer) return;
+    const dueAt = Date.now() + PENDING_OUTPUT_FALLBACK_MS;
+    if (dueAt >= this.pendingPreexecDueAt) return;
+    this.clearPendingPreexecTimer();
+    this.pendingPreexecFromOutput = true;
+    this.pendingPreexecDueAt = dueAt;
+    this.pendingPreexecTimer = setTimeout(() => {
+      this.pendingPreexecTimer = null;
+      this.pendingPreexecDueAt = 0;
+      this.pendingPreexecFromOutput = false;
+      if (this._disposed) return;
+      if (this.deferBlockUntilPreexec && this.pendingUiCommand && this.activeBlock?.status === 'pending') {
+        if (isTerminalDebugEnabled()) {
+          terminalDebug('command-start-output-fallback', {
+            tabId: this.tabId,
+            earlyBufferChars: this.activeBlock.earlyBuf.length,
+          });
+        }
+        this.onPreexec();
+      }
+    }, PENDING_OUTPUT_FALLBACK_MS);
   }
 
   get scene(): Scene {
@@ -198,6 +245,7 @@ export class SessionController {
       });
       if (!output) return;
       ab.outputTerm?.write(output);
+      this.noteRunningOutput(ab);
       // Trim only after crossing 2× the cap to avoid repeated full-string copies.
       ab.outputRaw += output;
       if (ab.outputRaw.length > RAW_CAP * 2) {
@@ -206,6 +254,7 @@ export class SessionController {
     } else {
       this.ioLog.routed('early', text.length, { blockNotReady: ab.outputTerm === null });
       ab.earlyBuf += text;
+      this.shortenPendingPreexecFallback();
     }
   }
 
@@ -240,6 +289,7 @@ export class SessionController {
       // The detached host does not paint or take focus while a short command starts.
       if (!running.outputTerm.element && running.outputEl) running.outputTerm.open(running.outputEl);
       running.outputTerm.write(raw);
+      this.noteRunningOutput(running);
       running.outputRaw += raw;
       if (running.outputRaw.length > RAW_CAP * 2) {
         running.outputRaw = running.outputRaw.slice(-RAW_CAP);
@@ -427,6 +477,10 @@ export class SessionController {
       terminalDebug('block-terminal-ready', { tabId: this.tabId, blockId: ab.id, cols: blk.term.cols, rows: blk.term.rows });
     }
 
+    // Start the long-running debounce before replaying early output, so the quiet-output check
+    // can replace a stale timer without losing the first burst.
+    this.scheduleLongRunning(ab);
+
     // Handle earlyBuf (typeahead / prompt-line stripping heuristic, spec §2)
     const early = ab.earlyBuf;
     ab.earlyBuf = '';
@@ -455,19 +509,83 @@ export class SessionController {
       if (rest.replace(/\x1b\[[0-9;?]*[a-zA-Z]/g, '').trim().length > 0) {
         ab.outputTerm!.write(rest);
         ab.outputRaw = rest.slice(-RAW_CAP);
+        this.noteRunningOutput(ab);
       }
     }
 
-    this.longRunningTimer = setTimeout(() => {
-      if (this._disposed) return;
-      if (this.activeBlock === ab && ab.status === 'executing') {
-        ab.wasLongRunning = true;
-        // The live terminal has no periodic sync afterwards, so a wasLongRunning flip (which hides the composer) must be pushed to the UI
-        this.sinks.onBlocksChanged();
-      }
-    }, 2000);
     this.sinks.onBlockStart(ab);
     this.sinks.onBlocksChanged();
+  }
+
+  /**
+   * A command that keeps running is a foreground program the user must steer. After a short
+   * base wait the composer hides and the running terminal owns the keyboard; output followed
+   * by silence is the stronger signal that the program is waiting for input.
+   */
+  private scheduleLongRunning(ab: InternalBlock): void {
+    this.clearLongRunningTimers();
+    this.longRunningTimer = setTimeout(() => {
+      this.longRunningTimer = null;
+      this.promoteLongRunning(ab, 'base-timeout');
+    }, LONG_RUNNING_BASE_MS);
+  }
+
+  /** Track output activity; one pending check is enough because it re-arms while output continues. */
+  private noteRunningOutput(ab: InternalBlock): void {
+    if (ab.wasLongRunning) return;
+    const now = Date.now();
+    this.lastRunningOutputAt = now;
+    if (this.longRunningQuietTimer) return;
+    const dueAt = Math.max(
+      now + LONG_RUNNING_QUIET_MS,
+      (ab.startedAt ?? now) + LONG_RUNNING_MIN_MS + LONG_RUNNING_QUIET_MS,
+    );
+    this.scheduleQuietCheck(ab, dueAt - now);
+  }
+
+  private scheduleQuietCheck(ab: InternalBlock, delay: number): void {
+    this.longRunningQuietTimer = setTimeout(() => {
+      this.longRunningQuietTimer = null;
+      const quietFor = Date.now() - this.lastRunningOutputAt;
+      if (quietFor >= LONG_RUNNING_QUIET_MS) {
+        this.promoteLongRunning(ab, 'output-quiet');
+        return;
+      }
+      // Output is still arriving: wait for the remaining part of the quiet window.
+      this.scheduleQuietCheck(ab, LONG_RUNNING_QUIET_MS - quietFor);
+    }, delay);
+  }
+
+  private promoteLongRunning(
+    ab: InternalBlock,
+    reason: 'base-timeout' | 'output-quiet' | 'alternate-screen',
+  ): void {
+    if (this._disposed || this.activeBlock !== ab || ab.status !== 'executing' || ab.wasLongRunning) return;
+    this.clearLongRunningTimers();
+    ab.wasLongRunning = true;
+    if (isTerminalDebugEnabled()) {
+      terminalDebug('command-long-running', {
+        tabId: this.tabId,
+        blockId: ab.id,
+        reason,
+        elapsedMs: ab.startedAt === null ? null : Date.now() - ab.startedAt,
+      });
+    }
+    // The composer hides on this flip, so the UI must learn about it immediately: the live
+    // terminal takes the keyboard and the user can steer the foreground program.
+    this.sinks.onBlocksChanged();
+  }
+
+  private clearLongRunningTimers(): void {
+    if (this.longRunningTimer) {
+      clearTimeout(this.longRunningTimer);
+      this.longRunningTimer = null;
+    }
+    if (this.longRunningQuietTimer) {
+      clearTimeout(this.longRunningQuietTimer);
+      this.longRunningQuietTimer = null;
+    }
+    this.lastRunningOutputAt = 0;
   }
 
   setPendingCommand(command: string, wireCommand?: string): boolean {
@@ -502,8 +620,10 @@ export class SessionController {
     // must not hide the output, so fall back to the eager boundary after a grace period.
     if (this.deferBlockUntilPreexec) {
       this.clearPendingPreexecTimer();
+      this.pendingPreexecDueAt = Date.now() + this.deferFallbackMs;
       this.pendingPreexecTimer = setTimeout(() => {
         this.pendingPreexecTimer = null;
+        this.pendingPreexecDueAt = 0;
         if (this._disposed) return;
         if (this.deferBlockUntilPreexec && this.pendingUiCommand && this.activeBlock?.status === 'pending') {
           this.onPreexec();
@@ -651,10 +771,7 @@ export class SessionController {
 
   private finishBlock(block: InternalBlock, exitCode: number | null, status: BlockStatus): void {
     this.setProgramTitle('');
-    if (this.longRunningTimer) {
-      clearTimeout(this.longRunningTimer);
-      this.longRunningTimer = null;
-    }
+    this.clearLongRunningTimers();
     // Publish completion metadata while retaining the live output until its snapshot is ready.
     block.exitCode = exitCode;
     block.status = status;
@@ -745,6 +862,10 @@ export class SessionController {
     }
     // While alt is active, output goes only to the main terminal; the block's outputTerm receives no bytes
     this.preAltScene = this._scene;
+    // A full-screen program is interactive by definition. Keep the composer hidden if it
+    // returns to the block list while the command is still running.
+    const running = this.activeBlock;
+    if (running?.status === 'executing') this.promoteLongRunning(running, 'alternate-screen');
     if (isTerminalDebugEnabled()) terminalDebug('alternate-screen-enter', { tabId: this.tabId, previousScene: this._scene });
     this._scene = 'altScreen';
     this.sinks.writeMain(raw); // the terminal switches to the alt buffer itself
@@ -843,6 +964,7 @@ export class SessionController {
    *  source of truth, so they must be cleared here, otherwise the next onBlocksChanged
    *  refills the blocks the store just cleared. */
   clear(): void {
+    this.clearLongRunningTimers();
     for (const b of this._blocks) {
       b._outputDispose?.();
       b.outputTerm = null;
@@ -859,10 +981,7 @@ export class SessionController {
     // The pane keeps its last counter window even though the pipeline stops here.
     this.ioLog.flush();
     this.ioLog.dispose();
-    if (this.longRunningTimer) {
-      clearTimeout(this.longRunningTimer);
-      this.longRunningTimer = null;
-    }
+    this.clearLongRunningTimers();
     for (const b of this._blocks) {
       b._outputDispose?.();
       b.outputTerm = null;

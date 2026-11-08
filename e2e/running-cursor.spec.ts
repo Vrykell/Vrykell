@@ -46,6 +46,23 @@ test('a running block keeps a solid cursor after the command input takes focus',
   await expect.poll(cursorClass).not.toContain('xterm-cursor-outline');
 });
 
+test('a blocking command hands the keyboard to its live terminal without the old two-second wait', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.goto('/');
+  const input = page.getByPlaceholder(/输入命令/);
+  await expect(input).toBeVisible({ timeout: 5000 });
+
+  await emitPtyOutput(page, `\x1b]133;E;${btoa('sleep 100')}\x07\x1b]133;C\x07`);
+  // Output followed by silence marks the program as waiting for input.
+  await emitPtyOutput(page, 'Password: ');
+
+  await expect(input).toBeHidden({ timeout: 1500 });
+  await expect.poll(
+    () => page.evaluate(() => document.activeElement?.classList.contains('xterm-helper-textarea') ?? false),
+    { timeout: 1500 },
+  ).toBe(true);
+});
+
 /**
  * A program can request a blinking cursor shape. With the blink preference off the
  * shape must still follow the request, but the blink animation must stay disabled so

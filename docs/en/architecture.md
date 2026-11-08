@@ -190,6 +190,8 @@ pending ──(input bar submit / 133;C)──▶ executing ──(133;D)──�
 | `133;C` | preexec | status→executing, creates a single offscreen `outputTerm`; `earlyBuf` is discarded or written back per the typeahead heuristic |
 | `133;D;<code>` | command_finished | Extracts the final outputHtml/outputText, disposes `outputTerm`, status→done |
 
+When a submitted command's output arrives before `133;C`, the pending fallback shortens from its 3 s grace to 250 ms; a real `133;C` still wins if it arrives first.
+
 **Completion progression**:
 1. `finishBlock(exitCode)`: extracts the snapshot from the `outputTerm` buffer and releases the xterm.
 2. Updates `useBlockStore` (status, exitCode, outputHtml/outputText/outputRaw, linesTruncated).
@@ -220,6 +222,8 @@ Corresponds to §7. `isInputBoxVisible` in `inputVisibility.ts` (simplified to 4
 ```
 
 The input box keeps these four conditions; agent-controlled or tagged long-running commands preserve it through the exception. New conditions must update `inputVisibility.test.ts` and the matching terminal scenarios. When a long-running command hides the input box, `getLongRunningHint` provides the hint "● <command> running · press End to return to the input bar".
+
+`wasLongRunning` is decided by the session controller with a heuristic debounce instead of a fixed two-second wait: a command still executing after a short base delay, output followed by a quiet gap (the program is waiting for input), or entering the alternate screen marks it immediately. A command that finishes inside the debounce never flips, so short commands keep the composer.
 
 ## 10. Rendering Pipeline
 
