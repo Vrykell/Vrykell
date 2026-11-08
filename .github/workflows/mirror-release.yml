@@ -1,0 +1,83 @@
+name: Mirror release
+
+# Mirror the release entry to the Gitee mirror. Binary assets stay on the
+# source release; the generated body links to them.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to mirror
+        required: true
+        default: v0.1.8
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mirror-release-${{ inputs.tag || github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  gitee:
+    name: Gitee release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Create the release entry
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
+          TAG: ${{ inputs.tag || github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${TAG}" ]; then
+            echo "A release tag is required." >&2
+            exit 1
+          fi
+          if [ -z "${GITEE_TOKEN}" ]; then
+            echo "GITEE_TOKEN is not configured." >&2
+            exit 1
+          fi
+
+          gh release view "$TAG" --json name,body,tagName,isPrerelease,targetCommitish > release.json
+
+          NAME=$(jq -r '.name // .tagName' release.json)
+          BODY=$(jq -r '.body // ""' release.json)
+          TARGET=$(jq -r '.targetCommitish' release.json)
+          PRERELEASE=$(jq -r '.isPrerelease' release.json)
+
+          BODY="${BODY}
+
+---
+
+下载 / Downloads: https://github.com/Vrykell/Vrykell/releases/tag/${TAG}"
+
+          EXISTING=$(curl -sS --fail-with-body \
+            "https://gitee.com/api/v5/repos/Vrykell/Vrykell/releases?per_page=100&access_token=${GITEE_TOKEN}" \
+            | jq --arg tag "$TAG" '[.[] | select(.tag_name == $tag)][0]')
+
+          if [ "$EXISTING" != "null" ]; then
+            echo "Gitee release ${TAG} already exists:"
+            echo "$EXISTING" | jq -r '.html_url // .url'
+            exit 0
+          fi
+
+          jq -n \
+            --arg tag "$TAG" \
+            --arg name "$NAME" \
+            --arg body "$BODY" \
+            --arg target "$TARGET" \
+            --argjson prerelease "$PRERELEASE" \
+            '{tag_name: $tag, name: $name, body: $body, target_commitish: $target, prerelease: $prerelease}' > payload.json
+
+          curl -sS --fail-with-body -X POST \
+            "https://gitee.com/api/v5/repos/Vrykell/Vrykell/releases?access_token=${GITEE_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data @payload.json > created.json
+
+          echo "Created Gitee release ${TAG}:"
+          jq -r '.html_url // .url' created.json
