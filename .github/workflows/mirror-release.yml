@@ -43,7 +43,7 @@ jobs:
             exit 1
           fi
 
-          gh release view "$TAG" --json name,body,tagName,isPrerelease,targetCommitish > release.json
+          gh release view "$TAG" --repo Vrykell/Vrykell --json name,body,tagName,isPrerelease,targetCommitish > release.json
 
           NAME=$(jq -r '.name // .tagName' release.json)
           BODY=$(jq -r '.body // ""' release.json)
