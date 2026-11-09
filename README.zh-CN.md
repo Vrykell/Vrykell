@@ -19,6 +19,16 @@
   <a href="https://www.producthunt.com/products/vrykell?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-vrykell"><picture><source media="(prefers-color-scheme: dark)" srcset="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1300533&amp;theme=dark"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1300533&amp;theme=light" alt="Vrykell 在 Product Hunt" width="250" height="54" /></picture></a>
 </p>
 
+<p>
+<a href="https://atomgit.com/Vrykell/Vrykell" target="_blank" rel="noopener noreferrer">
+  <img
+    alt="AtomGit Star"
+    src="https://atomgit.com/Vrykell/Vrykell/star/badge.svg"
+    height="28"
+  >
+</a>
+</p>
+
 </div>
 
 <a href="docs/images/hero-workspace-zh.png"><img src="docs/images/hero-workspace-zh.png" width="1600" alt="同一工作区中的源代码、构建终端与 Agent 对话" /></a>
