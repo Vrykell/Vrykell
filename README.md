@@ -13,20 +13,17 @@ Keep command context, manage SSH connections and services, and bring your ACP ag
 <p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="Apache-2.0" /></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-3b82f6?style=flat-square" alt="Windows, macOS, Linux" />
+  <a href="https://atomgit.com/Vrykell/Vrykell" target="_blank" rel="noopener noreferrer">
+  <img
+    alt="AtomGit Star"
+    src="https://atomgit.com/Vrykell/Vrykell/star/badge.svg"
+    height="20"
+  >
+  </a>
 </p>
 
 <p>
   <a href="https://www.producthunt.com/products/vrykell?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-vrykell"><picture><source media="(prefers-color-scheme: dark)" srcset="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1300533&amp;theme=dark"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1300533&amp;theme=light" alt="Vrykell on Product Hunt" width="250" height="54" /></picture></a>
-</p>
-
-<p>
-<a href="https://atomgit.com/Vrykell/Vrykell" target="_blank" rel="noopener noreferrer">
-  <img
-    alt="AtomGit Star"
-    src="https://atomgit.com/Vrykell/Vrykell/star/badge.svg"
-    height="28"
-  >
-</a>
 </p>
 
 </div>
@@ -202,6 +199,8 @@ npm run check:architecture
 Interactive changes also need matching browser regressions; backend changes need native tests. Commit messages use English and the agreed prefixes.
 
 ## Community and documentation
+
+[AtomGit](https://atomgit.com/Vrykell/Vrykell): Host this project domestically to help users in mainland China access the project and download Releases faster.
 
 Community group: **1130135497**. Share workflows, ask questions and discuss the project.
 
