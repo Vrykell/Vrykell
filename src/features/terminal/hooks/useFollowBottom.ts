@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { terminalDebug } from '../services/terminalDebug';
+import { blockTerminalFor } from '../services/terminalRepaint';
 
 const BOTTOM_THRESHOLD_PX = 32;
 
@@ -211,6 +212,7 @@ export function useFollowBottom(
 
   return useCallback(() => {
     atBottomRef.current = true;
+    if (persistKey) blockTerminalFor(persistKey)?.scrollToBottom();
     if (persistKey) scrollMemory.delete(persistKey);
     snap();
   }, [snap, persistKey]);

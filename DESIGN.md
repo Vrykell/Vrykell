@@ -151,7 +151,11 @@ All icons come from shared icon components. Do not substitute text symbols or na
 
 Persistent errors and transient messages use the same notification card, including typography, padding, semantic icon and centered dismissal. Failures retain details and retry. The editor find strip has four equal corners and a vertically centered close control. Editor typeface, size, weight and line spacing are independent of terminal and conversation metrics, and live on the shared font and display page. The editor preferences page owns modal keybindings, wrapping and optional line numbers; local and remote opening pages contain only target-specific destinations.
 
-Agent selection in conversation settings uses the shared dropdown field trigger and existing rich launcher. Refused tool results share the failed badge treatment; cancellation reuses the approval badge palette. Answered questions retain only the selected option or typed answer as inset plain text; no highlighted or inactive options remain. Tool cards never add footer error messages. Live failures and explicit result review use the bottom-right error surface, while restored history stays quiet.
+Agent selection in conversation settings uses the shared dropdown field trigger and existing rich launcher. Refused tool results share the failed badge treatment; cancellation reuses the approval badge palette. Answered questions retain only the selected option or typed answer as inset plain text; no highlighted or inactive options remain. Tool cards never add footer error messages or automatic failure notifications. Explicit result review uses the bottom-right error surface. Routine repository failures stay in the panel as informational status with details and recovery.
+
+Titlebar background actions use the shared context menu: restore, move, resize, minimize, maximize, pin and close. Native window state controls availability; interactive titlebar controls keep their own interactions. Close uses the existing native close request and its unsaved-work protection.
+
+Remote profiles without shell integration use classic terminal rendering regardless of the saved block preference. Password controls appear only for a detected secret prompt and return to live input when it disappears. A missing snapshot never blanks the live surface. Waiting for integration does not add another terminal mode or prove authentication.
 
 ## Do's and Don'ts
 

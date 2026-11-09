@@ -43,6 +43,26 @@ test('large command history stays readable and input reaches the terminal prompt
   const scrollHeight = await scroll.evaluate(element => element.scrollHeight);
   await scroll.evaluate(element => { element.scrollTop = 0; });
   await expect(page.getByText('row-1-0', { exact: true })).toBeVisible();
+  await emitPtyOutput(page, '\x1b]133;E;c3RyZWFt\x07\x1b]133;C\x07');
+  await expect(page.getByTestId('running-term')).toBeVisible();
+  const scrollFrames = await page.evaluate(async () => {
+    const history = document.querySelector<HTMLElement>('.terminal-block-scroll')!;
+    const scope = window as unknown as { __TAURI_INTERNALS__: { emitPtyOutput(data: string): void } };
+    const frames: number[] = [];
+    for (let frame = 0; frame < 90; frame++) {
+      const start = performance.now();
+      scope.__TAURI_INTERNALS__.emitPtyOutput('live output\r\n'.repeat(20));
+      history.scrollTop += frame < 45 ? 800 : -800;
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      frames.push(performance.now() - start);
+    }
+    return frames.sort((a, b) => a - b);
+  });
+  const scrollP95Ms = scrollFrames[Math.floor(scrollFrames.length * 0.95)]!;
+  const scrollWorstMs = scrollFrames.at(-1)!;
+  console.log('TERMINAL-SCROLL-PERFORMANCE', JSON.stringify({ scrollP95Ms, scrollWorstMs }));
+  expect(scrollP95Ms).toBeLessThan(100);
+  expect(scrollWorstMs).toBeLessThan(250);
   const sorted = [...latencies].sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)]!;
   const worst = sorted[sorted.length - 1]!;

@@ -85,6 +85,31 @@ test('a running block no longer stacks a second xterm scrollbar', async ({ page 
   await expect(host.locator('.xterm-scrollable-element > .xterm-scrollbar.xterm-horizontal')).toHaveCSS('display', 'none');
 });
 
+test('End returns to the running output tail without sending application keys', async ({ page }) => {
+  await emitPtyOutput(page, Array.from({ length: 2000 }, (_, index) => `tail row ${index}\r\n`).join(''));
+  await expect.poll(() => page.evaluate(() => {
+    const scope = window as unknown as { __vrykellTerms: Map<string, { buffer: { active: { baseY: number } } }> };
+    return [...scope.__vrykellTerms].find(([key]) => key.startsWith('block:'))?.[1].buffer.active.baseY ?? 0;
+  })).toBeGreaterThan(1000);
+  await page.evaluate(() => {
+    const scope = window as unknown as { __vrykellTerms: Map<string, { scrollToTop(): void }> };
+    const entry = [...scope.__vrykellTerms].find(([key]) => key.startsWith('block:'))!;
+    entry[1].scrollToTop();
+    const history = document.querySelector<HTMLElement>('.terminal-block-scroll')!;
+    history.scrollTop = 0;
+  });
+  const before = await ptyWrites(page);
+  await page.getByTestId('running-term').locator('.xterm-helper-textarea').focus();
+  await page.keyboard.press('End');
+  await expect.poll(() => page.evaluate(() => {
+    const scope = window as unknown as { __vrykellTerms: Map<string, { buffer: { active: { viewportY: number; baseY: number } } }> };
+    const buffer = [...scope.__vrykellTerms].find(([key]) => key.startsWith('block:'))![1].buffer.active;
+    const history = document.querySelector<HTMLElement>('.terminal-block-scroll')!;
+    return buffer.viewportY === buffer.baseY && history.scrollHeight - history.clientHeight - history.scrollTop < 2;
+  })).toBe(true);
+  expect(await ptyWrites(page)).toEqual(before);
+});
+
 test('a running block settles to a smaller repaint frame without a full-screen black tail', async ({ page }) => {
   const block = page.locator('[data-testid^="running-block-"]').first();
   await emitPtyOutput(page, Array.from({ length: 30 }, (_, index) => `frame row ${index}`).join('\r\n') + '\r\n');

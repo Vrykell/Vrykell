@@ -89,6 +89,10 @@ for (const theme of ['dark', 'light']) for (const width of [900, 1440]) {
           ? { kind: 'tool', tool: { ...part.tool, state: 'error', error: 'Live read failed' } } : part),
       })) } }));
     });
+    await expect(notice).toHaveCount(0);
+    const live = side.locator('.ai-tool-summary').filter({ hasText: '/live' });
+    await expect(live).toContainText('失败');
+    await live.click();
     await expect(notice).toContainText('Live read failed');
     await expect(side.locator('[role="alert"]')).toHaveCount(0);
     await notice.evaluate(async element => { await Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished)); });

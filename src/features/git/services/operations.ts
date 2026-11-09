@@ -25,6 +25,6 @@ export async function runGitOperation(target: GitTarget, operation: GitOperation
     store.finish(key);
   } catch (reason) {
     store.finish(key, String(reason)); options.refresh();
-    if (options.notifyError) useToastStore.getState().addToast(`${t('Repository operation failed')}: ${String(reason)}`, 'error');
+    if (options.notifyError) useToastStore.getState().addToast(`${t('Repository operation failed')}: ${String(reason)}`, 'info');
   }
 }

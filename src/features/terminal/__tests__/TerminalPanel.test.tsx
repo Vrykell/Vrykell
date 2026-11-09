@@ -114,17 +114,27 @@ describe('SSH connection input', () => {
     expect(screen.getByRole('status')).toHaveTextContent('自动重连已结束（5 次）');
   });
 
-  it('freezes the screen while masked input is open so no terminal cursor is left behind', () => {
+  it('keeps ordinary shell output live and offers no accidental password switch', () => {
     sessionView.frame.plainText = 'bash-5.2$ ';
     sessionView.frame.html = 'bash-5.2$ ';
     useTerminalStore.setState({ sessions: { p: 'session' } });
     render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
-    chooseInputMode('密码输入');
-    expect(screen.getByLabelText('SSH 认证响应')).toHaveAttribute('type', 'password');
-    // Freeze into a snapshot: a live xterm paints its own cursor, which makes the screen look like it still accepts input
-    expect(screen.getByTestId('ssh-terminal-screen').tagName).toBe('PRE');
-    expect(screen.getByTestId('ssh-terminal-screen')).toHaveClass('ssh-terminal-frame');
+    expect(screen.queryByRole('combobox', { name: '输入方式' })).toBeNull();
+    expect(screen.queryByLabelText('SSH 认证响应')).toBeNull();
+    expect(screen.getByTestId('ssh-terminal-screen').tagName).toBe('DIV');
     expect(screen.queryByText('正在连接远端主机…')).not.toBeInTheDocument();
+  });
+  it('returns to the live terminal when a manually selected password prompt disappears', () => {
+    useTerminalStore.setState({ sessions: { p: 'session' } });
+    const view = render(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    chooseInputMode('直接输入');
+    chooseInputMode('密码输入');
+    sessionView.frame.plainText = '';
+    sessionView.frame.html = '';
+    view.rerender(<TerminalPanel paneId="p" tabId="t" onReady={() => {}} connectionInput />);
+    expect(screen.queryByLabelText('SSH 认证响应')).toBeNull();
+    expect(screen.queryByRole('combobox', { name: '输入方式' })).toBeNull();
+    expect(screen.getByTestId('ssh-terminal-screen')).toHaveStyle({ visibility: 'visible', pointerEvents: 'auto' });
   });
   it('reports a manual interactive disconnect without calling it authentication cancellation', async () => {
     sessionView.frame.plainText = '交互程序';

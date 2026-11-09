@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useFollowBottom, registerFollowEngager, engageFollow } from '@features/terminal/hooks/useFollowBottom';
+import { registerBlockTerminal, unregisterBlockTerminal } from '../services/terminalRepaint';
+import { createBlockTerm } from '../model/terminalSnapshot';
 
 function makeEl(scrollTop: number) {
   const el = document.createElement('div');
@@ -13,6 +15,28 @@ function makeEl(scrollTop: number) {
 }
 
 describe('useFollowBottom', () => {
+  it('returns both the running scrollback and history to the bottom without terminal input', async () => {
+    const block = createBlockTerm(80, 24);
+    const el = makeEl(100);
+    registerBlockTerminal('follow-live', block.term);
+    const { result, unmount } = renderHook(() => useFollowBottom({ current: el }, [], 'follow-live'));
+    try {
+      await new Promise<void>(resolve => block.term.write('line\r\n'.repeat(200), resolve));
+      block.term.scrollToTop();
+      expect(block.term.buffer.active.viewportY).toBe(0);
+      const input = vi.fn();
+      const sub = block.term.onData(input);
+      result.current();
+      expect(block.term.buffer.active.viewportY).toBe(block.term.buffer.active.baseY);
+      expect(el.scrollTop).toBe(el.scrollHeight);
+      expect(input).not.toHaveBeenCalled();
+      sub.dispose();
+    } finally {
+      unmount();
+      unregisterBlockTerminal('follow-live', block.term);
+      block.dispose();
+    }
+  });
   it('leaves live-terminal wheel events to the embedded terminal', async () => {
     const el = makeEl(800);
     const running = document.createElement('div');

@@ -2,7 +2,7 @@
 
 > Last updated: 2026-10-27
 >
-> Rule 43 clarification: tool cards retain their status and stored result without footer errors. Live tool failures use the shared bottom-right ErrorBox; explicitly reviewing a result opens that same surface. Restoring or remounting history must not publish notifications. Approval outcomes do not automatically publish notifications. AI reply failures retain the shared inline ErrorBox; human action notifications retain their existing behavior.
+> Rule 43 clarification: tool cards retain their status and stored result without footer errors or automatic failure notifications. Explicit result review opens the shared bottom-right ErrorBox. Routine repository discovery and operation failures use local informational status with details and recovery. Persistent error notifications are reserved for failures that prevent continued use. Restoring history and approval outcomes never publish notifications. AI reply failures retain the shared inline ErrorBox.
 >
 > This file (`docs/en/development-rules.md`) is the English mirror of the rule book; the canonical
 > Chinese version is `docs/zh/development-rules.md`. `AGENTS.md` is the always-on summary, and

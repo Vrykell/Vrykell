@@ -203,7 +203,7 @@ it('opens a restored failure through explicit review and dismisses it outside th
   expect(summary()).toHaveAttribute('aria-expanded', 'false');
 });
 
-it('reopens a failure that arrives after the row was collapsed', () => {
+it('retains a late failure for explicit review after the row was collapsed', () => {
   const running: ToolRun = { toolCallId: 'late', toolName: 'run_command', input: { command: 'npm run build' }, state: 'running', startedAt: 1 };
   const view = (tool: ToolRun) => (
     <AiBlock conversationId="conversation" presentation="conversation"
@@ -213,8 +213,11 @@ it('reopens a failure that arrives after the row was collapsed', () => {
   const { container, rerender } = render(view(running));
   fireEvent.click(container.querySelector('.ai-tool-summary')!);
   expect(screen.queryByRole('alert')).toBeNull();
-  // ... and its failure still has to be visible when it arrives.
+  // The row exposes its failed state without interrupting the conversation.
   rerender(view({ ...running, state: 'error', error: 'Exit code 2' }));
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(container.querySelector('.ai-tool-state')).toHaveTextContent('失败');
+  fireEvent.click(container.querySelector('.ai-tool-summary')!);
   expect(screen.getByRole('alert')).toHaveTextContent('Exit code 2');
 });
 

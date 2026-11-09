@@ -11,6 +11,10 @@ Security regression checklist:
 
 Appearance and toolbar regression checklist:
 
+- Remote profiles with integration disabled use classic mode even when the saved opening preference is block mode. Missing prompt markers keep the live classic surface usable. Password entry is available only for a detected secret prompt, returns to live input when that prompt disappears, and never hides a live screen behind an empty snapshot. Output silence does not prove authentication.
+
+- Titlebar background opens the shared window menu; verify restore/move/resize/minimize/maximize availability, pin state, keyboard dismissal and guarded close at narrow and wide widths. Block history scroll avoids repeated full-list layout reads; running output height does not scan scrollback during scrolling. End returns both history and live scrollback to the tail without sending terminal keys. Tool failures remain reviewable without automatic alerts; repository failures retain local details and retry.
+
 - Shell opening modes use the shared segmented control for classic and block mode. Click and arrow-key choices persist per profile; profiles without block integration offer only classic mode. Verify dark/light themes, narrow layouts and selection persistence.
 
 - Tool permission rows use the shared segmented control for allow, ask and deny, preserving saved levels and existing authorization rules. Wide settings show two items per row; narrow settings use one column. Verify keyboard switching, search focus, navigation persistence and narrow layouts.
