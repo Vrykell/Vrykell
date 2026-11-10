@@ -48,8 +48,36 @@ test('the connection screen keeps no scrollbar of its own', async ({ page }) => 
   await expect(surface.locator('.xterm-viewport')).toHaveCSS('scrollbar-width', 'none');
   const mode = page.getByTestId('ssh-input-mode').last();
   const disconnect = page.getByTestId('ssh-session-toolbar').last().getByRole('button', { name: '断开连接', exact: true });
-  await expect(mode).toHaveCSS('height', '32px');
+  await expect(mode).toHaveCount(0);
   await expect(disconnect).toHaveCSS('height', '32px');
+});
+
+test('a block preference falls back to classic for a profile without integration and tracks real password prompts', async ({ page }) => {
+  await setupTauriMock(page, { integration: false });
+  await page.addInitScript(() => localStorage.setItem('vrykell-agent-settings', JSON.stringify({ version: 8, state: { global: { sshOpenMode: 'block' }, overrides: {} } })));
+  await page.goto('/');
+  await page.locator('[data-dock-btn="ssh"]').click();
+  await expect(page.getByTestId('ssh-row-ssh-1')).toBeVisible();
+  await page.evaluate(async () => {
+    const path = '/src/features/ssh/stores/store.ts';
+    const { useSshStore } = await import(path) as typeof import('../src/features/ssh/stores/store');
+    const connection = useSshStore.getState().connections.find(item => item.id === 'ssh-1')!;
+    await useSshStore.getState().save({ ...connection, shellIntegration: false });
+  });
+  await page.getByTestId('ssh-row-ssh-1').dblclick();
+  await expect.poll(() => page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: { openMode?: string; ssh?: unknown }[] }).__PTY_SPAWNS__.find(item => item.ssh)?.openMode)).toBe('classic');
+  await emitPtyOutput(page, '\x1b[2J\x1b[HMenu application\r\nChoose an item');
+  const surface = page.getByTestId('ssh-connection-input');
+  await expect(surface.locator('.xterm-screen')).toBeVisible();
+  await expect(page.getByTestId('ssh-input-mode')).toHaveCount(0);
+  await emitPtyOutput(page, '\x1b[2J\x1b[HPassword: ');
+  await expect(surface.getByLabel('SSH 认证响应')).toBeVisible();
+  await emitPtyOutput(page, '\x1b[2J\x1b[HMenu application\r\nChoose an item');
+  await expect(surface.getByLabel('SSH 认证响应')).toHaveCount(0);
+  await expect(page.getByTestId('ssh-input-mode')).toHaveCount(0);
+  await expect(surface.locator('.xterm-screen')).toBeVisible();
+  await surface.getByRole('textbox', { name: 'SSH 交互终端' }).press('ArrowDown');
+  expect(await ptyWrites(page)).toContain('\x1b[B');
 });
 
 test('the connection screen snaps its character cells to whole pixels', async ({ page }) => {
@@ -81,13 +109,24 @@ test('SSH authentication snapshots and disconnected output follow the terminal t
   await expect(snapshot).toHaveCSS('font-size', '18px');
   await expect(snapshot).toHaveCSS('font-weight', '600');
   await expect.poll(() => snapshot.evaluate(element => getComputedStyle(element).fontFamily)).toContain('Cascadia Code');
-  const metrics = await snapshot.evaluate(element => {
+  const metrics = await snapshot.evaluate(async element => {
     const css = getComputedStyle(element);
     const root = getComputedStyle(document.documentElement);
-    return { spacing: css.letterSpacing, expectedSpacing: root.getPropertyValue('--terminal-letter-spacing').trim(), height: css.lineHeight, expectedHeight: root.getPropertyValue('--terminal-row-height').trim() };
+    const path = '/src/features/terminal/stores/terminal.ts';
+    const { termInstances } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    const metricsPath = '/src/utils/termMetrics.ts';
+    const { getCellMetrics } = await import(metricsPath) as typeof import('../src/utils/termMetrics');
+    const term = [...termInstances.values()].find(item => item.element?.closest('[data-testid="ssh-connection-input"]'))!;
+    const probe = document.createElement('span');
+    probe.style.cssText = 'display:inline-block;white-space:pre';
+    probe.textContent = 'W'.repeat(100);
+    element.append(probe);
+    const advance = probe.getBoundingClientRect().width / 100;
+    probe.remove();
+    return { advance, cellWidth: getCellMetrics(term).width, height: css.lineHeight, expectedHeight: root.getPropertyValue('--terminal-row-height').trim() };
   });
   expect(metrics.height).toBe(metrics.expectedHeight);
-  expect(metrics.spacing === 'normal' ? '0px' : metrics.spacing).toBe(metrics.expectedSpacing);
+  expect(Math.abs(metrics.advance - metrics.cellWidth)).toBeLessThan(0.05);
   await page.screenshot({ path: 'test-results/ssh-auth-font-wide.png' });
   await page.setViewportSize({ width: 720, height: 800 });
   await expect(snapshot).toHaveCSS('font-size', '18px');

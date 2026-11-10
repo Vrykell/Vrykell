@@ -121,6 +121,8 @@ Drag insertion placeholders use the existing rounded hover fill without an edge 
 
 File read and write failures use one timed notification, with no duplicate error or reload placeholder in the editor body. The existing toolbar owns reloading. Ordinary file-error cards close after eight seconds of reading time, pausing for hover, keyboard focus, expanded details and hidden pages; persistent failures remain explicitly dismissible.
 
+Remote profiles without shell integration use classic terminal rendering regardless of the saved block preference. Password controls appear only for a detected secret prompt and return to live input when it disappears. A missing snapshot never blanks the live surface. Waiting for integration does not add another terminal mode or prove authentication.
+
 The canonical theme palette in `src/config/theme/tokens.ts` maps through `paletteToCssVars` into `src/app/theme.css` aliases and shared controls. Light appearance separates cool-gray toolbars (`surface`), a near-white canvas, white terminal content, gray cards, white fields, and a distinct auxiliary panel. Active connected tabs inherit their content surface. Deep Black uses the ordinary neutral selection surface and white action text and switch thumbs; action fills retain readable contrast rather than selecting dark ink automatically.
 
 Memory settings has one compact two-row card: aggregate status and a text reload action, followed by assistant review. Counts stay inline with their labels, without large statistic tiles or icons. It never lists or edits memory bodies. Loading and failures reuse the shared status and persistent notification components. Assistant review opens its own briefly named conversation through the usual authorization path.

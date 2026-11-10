@@ -63,7 +63,13 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
   const interactive = connectionInput && (scene !== 'blockList' || cancellation !== 'idle');
   const text = frame?.plainText ?? '';
   const secretPrompt = secretResponsePrompt(text);
-  const secret = !directInput && (manualSecret || (secretPrompt !== null && (dismissedPrompt !== secretPrompt || secretResponseWasRejected(text))));
+  useEffect(() => {
+    setManualSecret(false);
+    setDirectInput(false);
+    setReveal(false);
+    setResponse('');
+  }, [secretPrompt]);
+  const secret = !directInput && secretPrompt !== null && (manualSecret || dismissedPrompt !== secretPrompt || secretResponseWasRejected(text));
   const inputDisabled = !sessionId || cancellation !== 'idle';
   const disconnected = status === 'closed' || status === 'error' || cancellation === 'done';
   const exitNotice = t('terminal.processExited');
@@ -105,7 +111,7 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
     return () => onReconnectReady?.(null);
   }, [connectionInput, onReconnectReady, restart]);
   // Freeze the screen into a snapshot while the secret prompt is open: a live terminal draws its own cursor and looks like it still has input focus.
-  const showSnapshot = !disconnected && secret;
+  const showSnapshot = !disconnected && secret && !!frameHtml;
   // Diagnostics: record the rendered snapshot geometry so a width mismatch between the
   // canvas grid and the DOM frame can be traced from the recorded log.
   const snapshotRef = useRef<HTMLPreElement>(null);
@@ -168,7 +174,7 @@ function ConnectedTerminalPanel({ paneId, tabId, onReady, connectionInput = fals
         {sshTarget && <span className="ssh-session-toolbar-target" data-tip={sshTarget} style={{ color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sshTarget}</span>}
         <span style={{ flex: 1 }} />
         {/* Input mode uses an explicit selection. */}
-        {interactive && !disconnected && sessionId && (
+        {interactive && !disconnected && sessionId && secretPrompt !== null && (
           <Select
             aria-label={t('ssh.input.mode')}
             data-testid="ssh-input-mode"
