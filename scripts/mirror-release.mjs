@@ -29,7 +29,9 @@ try {
     ...(host === 'gitee' ? { prerelease: false } : { release_status: 'latest' }),
   }) });
   else await request(`/releases/${host === 'gitee' ? release.id : encodeURIComponent(source.tagName)}`, {
-    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: source.name, body }),
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: source.name, body,
+      ...(host === 'gitee' ? { tag_name: source.tagName, target_commitish: source.targetCommitish, prerelease: false } : {}),
+    }),
   });
   if (process.env.MIRROR_METADATA_ONLY === 'true') {
     console.log(`${host}: release metadata and download links updated`);
