@@ -26,6 +26,12 @@ test('creates both mirror releases, uploads binaries and verifies attachment mem
           return new Response('{}');
         }
         assert.equal(url.searchParams.get('access_token'), 'fixture-token');
+        if (options.method === 'PATCH') {
+          const body = JSON.parse(options.body);
+          if (host === 'gitee') assert.equal(body.tag_name, 'v0.1.9');
+          assert.match(body.body, /portable.zip/);
+          return Response.json(release);
+        }
         if (url.pathname.endsWith('/upload_url')) return Response.json({ url: 'https://storage.example/upload', headers: {} });
         if (url.pathname.endsWith('/attach_files')) {
           if (options.method === 'POST') {
@@ -45,6 +51,7 @@ test('creates both mirror releases, uploads binaries and verifies attachment mem
         return Response.json(release ? [release] : []);
       };
       await import(`../mirror-release.mjs?fixture=${host}`);
+      await import(`../mirror-release.mjs?fixture=${host}-retry`);
       assert.deepEqual(assets, [{ name: 'portable.zip' }]);
     }
   } finally {
