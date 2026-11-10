@@ -963,6 +963,7 @@ export function useTerminalSession(
       if (el.offsetWidth > 0 && el.offsetHeight > 0) {
         fitTerminal(term, fit);
         useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
+        scheduleFrameCapture('resize');
         applyWidth();
       }
     });

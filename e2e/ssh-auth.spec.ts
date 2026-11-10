@@ -109,7 +109,7 @@ test('SSH authentication snapshots and disconnected output follow the terminal t
   await expect(snapshot).toHaveCSS('font-size', '18px');
   await expect(snapshot).toHaveCSS('font-weight', '600');
   await expect.poll(() => snapshot.evaluate(element => getComputedStyle(element).fontFamily)).toContain('Cascadia Code');
-  const metrics = await snapshot.evaluate(async element => {
+  const measure = () => snapshot.evaluate(async element => {
     const css = getComputedStyle(element);
     const root = getComputedStyle(document.documentElement);
     const path = '/src/features/terminal/stores/terminal.ts';
@@ -125,8 +125,10 @@ test('SSH authentication snapshots and disconnected output follow the terminal t
     probe.remove();
     return { advance, cellWidth: getCellMetrics(term).width, height: css.lineHeight, expectedHeight: root.getPropertyValue('--terminal-row-height').trim() };
   });
-  expect(metrics.height).toBe(metrics.expectedHeight);
-  expect(Math.abs(metrics.advance - metrics.cellWidth)).toBeLessThan(0.05);
+  await expect.poll(async () => {
+    const metrics = await measure();
+    return metrics.height === metrics.expectedHeight && Math.abs(metrics.advance - metrics.cellWidth) < 0.05;
+  }).toBe(true);
   await page.screenshot({ path: 'test-results/ssh-auth-font-wide.png' });
   await page.setViewportSize({ width: 720, height: 800 });
   await expect(snapshot).toHaveCSS('font-size', '18px');
