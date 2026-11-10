@@ -119,6 +119,8 @@ Drag insertion placeholders use the existing rounded hover fill without an edge 
 
 ## Components
 
+File read and write failures use one timed notification, with no duplicate error or reload placeholder in the editor body. The existing toolbar owns reloading. Ordinary file-error cards close after eight seconds of reading time, pausing for hover, keyboard focus, expanded details and hidden pages; persistent failures remain explicitly dismissible.
+
 The canonical theme palette in `src/config/theme/tokens.ts` maps through `paletteToCssVars` into `src/app/theme.css` aliases and shared controls. Light appearance separates cool-gray toolbars (`surface`), a near-white canvas, white terminal content, gray cards, white fields, and a distinct auxiliary panel. Active connected tabs inherit their content surface. Deep Black uses the ordinary neutral selection surface and white action text and switch thumbs; action fills retain readable contrast rather than selecting dark ink automatically.
 
 Memory settings has one compact two-row card: aggregate status and a text reload action, followed by assistant review. Counts stay inline with their labels, without large statistic tiles or icons. It never lists or edits memory bodies. Loading and failures reuse the shared status and persistent notification components. Assistant review opens its own briefly named conversation through the usual authorization path.
@@ -151,7 +153,7 @@ All icons come from shared icon components. Do not substitute text symbols or na
 
 Persistent errors and transient messages use the same notification card, including typography, padding, semantic icon and centered dismissal. Failures retain details and retry. The editor find strip has four equal corners and a vertically centered close control. Editor typeface, size, weight and line spacing are independent of terminal and conversation metrics, and live on the shared font and display page. The editor preferences page owns modal keybindings, wrapping and optional line numbers; local and remote opening pages contain only target-specific destinations.
 
-Agent selection in conversation settings uses the shared dropdown field trigger and existing rich launcher. Refused tool results share the failed badge treatment; cancellation reuses the approval badge palette. Answered questions retain only the selected option or typed answer as inset plain text; no highlighted or inactive options remain. Tool cards never add footer error messages. Live failures and explicit result review use the bottom-right error surface, while restored history stays quiet.
+Agent selection in conversation settings uses the shared dropdown field trigger and existing rich launcher. Refused tool results share the failed badge treatment; cancellation reuses the approval badge palette. Answered questions retain only the selected option or typed answer as inset plain text; no highlighted or inactive options remain. Tool cards never add footer error messages or automatic failure notifications. Explicit result review uses the bottom-right error surface. Routine repository failures use the shared bottom-right informational notification with timed dismissal, details and recovery. Resource monitoring, forwarding and disconnected-session status remain beside their resource; reply failures remain in the transcript.
 
 ## Do's and Don'ts
 

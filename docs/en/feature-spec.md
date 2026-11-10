@@ -785,6 +785,8 @@ Runtime regression checklist, 2026-10-21:
 
 ### Shared text entry
 
+- [x] Routine repository discovery and operation failures use one shared bottom-right informational notification instead of panel messages. Retry, details and dismissal remain available; notifications expire after eight seconds with inspection pauses. Shared unit tests and narrow/wide browser tests cover placement, recovery and expiry. Resource monitoring, forwarding, import summaries and transcript failures retain their contextual state.
+
 - [x] File-service failures use shared persistent notifications with compact authentication, retry and terminal actions, expandable diagnostics and dismissal. Underlying page notifications temporarily hide during modal interaction and restore afterward. Service password and challenge fields retain shared field geometry; browser checks cover both themes, narrow/wide layouts, cancellation focus and file recovery.
 
 - [x] Shared multiline controls disable native resizing. Previously resizable commit, configuration, history-note, tool and connection-argument fields grow within a bounded height and retain internal scrolling for long content. Existing composer autosizing is preserved.

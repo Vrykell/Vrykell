@@ -99,8 +99,8 @@ export default function ToolRunCard({ run, paneId, framed = false, conversationI
   useEffect(() => {
     const last = previous.current;
     previous.current = { id: run.toolCallId, state: run.state };
-    // Restored results never replay notifications. A live transition or explicit review opens one.
-    setNotice(last.id === run.toolCallId && last.state !== run.state && run.state === 'error');
+    // Tool outcomes remain on their row; only explicit review opens diagnostics.
+    if (last.id !== run.toolCallId || last.state !== run.state) setNotice(false);
   }, [run.toolCallId, run.state, problem]);
   const { icon, label, text } = summarize(run);
   const pending = run.state === 'approval-pending' || run.state === 'input-pending';
