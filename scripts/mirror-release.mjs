@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { spawnSync } from 'node:child_process';
 
 const host = process.env.MIRROR_HOST;
 const token = process.env.MIRROR_TOKEN;
@@ -14,6 +15,11 @@ const request = async (route, options = {}) => {
   if (!response.ok) throw new Error(`${host} API ${response.status} on ${route.split('?')[0]}`);
   return response.json();
 };
+const transfer = (args) => {
+  const result = spawnSync('curl', ['--fail', '--silent', '--show-error', '--connect-timeout', '30', '--max-time', '1200', ...args], { encoding: 'utf8', maxBuffer: 1024 * 1024 });
+  // Transport errors can contain signed addresses; report only the exit status.
+  if (result.error || result.status !== 0) throw new Error(`${host}: attachment transfer failed (${result.status ?? 'spawn'})`);
+};
 try {
   let releases = await request('/releases?per_page=100');
   let release = releases.find(item => item.tag_name === source.tagName);
@@ -26,7 +32,13 @@ try {
     if (path.basename(asset.name) !== asset.name) throw new Error('Invalid asset filename');
     if (existing.some(item => item.name === asset.name)) continue;
     const bytes = await fs.readFile(path.join('release-assets', asset.name));
+    const file = path.join('release-assets', asset.name);
     if (host === 'gitee') {
+      if (process.env.MIRROR_USE_CURL === 'true') {
+        transfer(['-F', `access_token=${token}`, '-F', `file=@${file}`, `${base}/repos/Vrykell/Vrykell/releases/${release.id}/attach_files`]);
+        console.log(`${host}: uploaded ${asset.name}`);
+        continue;
+      }
       const data = new FormData();
       data.set('file', new Blob([bytes]), asset.name);
       await request(`/releases/${release.id}/attach_files`, { method: 'POST', body: data });
@@ -34,6 +46,11 @@ try {
       const upload = await request(`/releases/${encodeURIComponent(source.tagName)}/upload_url?file_name=${encodeURIComponent(asset.name)}`);
       const url = new URL(upload.url);
       if (url.protocol !== 'https:') throw new Error('Invalid upload protocol');
+      if (process.env.MIRROR_USE_CURL === 'true') {
+        transfer(['--request', 'PUT', '--upload-file', file, ...Object.entries(upload.headers).flatMap(([key, value]) => ['-H', `${key}: ${value}`]), url.href]);
+        console.log(`${host}: uploaded ${asset.name}`);
+        continue;
+      }
       const response = await fetch(url, { method: 'PUT', headers: upload.headers, body: bytes, signal: AbortSignal.timeout(600000) });
       if (!response.ok) throw new Error(`${host} upload failed: ${response.status}`);
     }
