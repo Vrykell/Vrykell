@@ -119,7 +119,7 @@ test('generates an editable commit message and runs commit and remote operations
   await message.fill('fix: keep this draft');
   await page.evaluate(() => localStorage.setItem('mock-git-operation-error', 'Permission denied'));
   await panel.getByRole('button', { name: '提交', exact: true }).click();
-  await expect(page.getByRole('alert').filter({ hasText: '版本库操作失败' })).toBeVisible();
+  await expect(panel.getByRole('status').filter({ hasText: '版本库操作失败' })).toBeVisible();
   await expect(message).toHaveValue('fix: keep this draft');
   await page.screenshot({ path: info.outputPath('git-commit-error.png') });
 });
@@ -144,7 +144,8 @@ test('shows binary, conflict, empty and failure states', async ({ page }) => {
   await expect(page.getByTestId('git-diff-review').locator('.monaco-diff-editor')).toBeVisible({ timeout: 15_000 });
   await page.evaluate(() => localStorage.setItem('mock-git-error', 'Repository unavailable'));
   await panel.getByRole('button', { name: '刷新变更' }).click();
-  await expect(page.getByRole('alert').getByText('无法读取版本库', { exact: true })).toBeVisible();
+  await expect(panel.getByRole('status').getByText('无法读取版本库', { exact: true })).toBeVisible();
+  await expect(page.locator('#app-notifications').getByRole('alert')).toHaveCount(0);
   await page.evaluate(() => { localStorage.removeItem('mock-git-error'); localStorage.setItem('mock-git-snapshot', 'null'); });
   await panel.getByRole('button', { name: '刷新变更' }).click();
   await expect(panel.getByText('当前目录不在版本库中。')).toBeVisible();
@@ -441,8 +442,9 @@ test('uses reload feedback and dismisses operation errors from the heading', asy
   await page.evaluate(() => localStorage.setItem('mock-git-operation-error', 'Network unavailable'));
   await panel.getByRole('button', { name: '更多版本控制操作' }).click();
   await page.getByRole('button', { name: '获取', exact: true }).click();
-  const error = page.locator('#app-notifications').getByRole('alert');
+  const error = panel.getByRole('status').filter({ hasText: '版本库操作失败' });
   await expect(error).toBeVisible();
+  await expect(page.locator('#app-notifications').getByRole('alert')).toHaveCount(0);
   await error.getByRole('button', { name: '关闭错误提示' }).click();
   await expect(error).toHaveCount(0);
 });
