@@ -7,6 +7,25 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
 });
 
+for (const width of [1240, 760]) test(`keeps the empty conversation start selected after workspace switches at ${width}px`, async ({ page }, info) => {
+  await page.setViewportSize({ width, height: 800 });
+  const strip = page.getByTestId('workspace-instance-bar');
+  const navigate = async (area: string) => {
+    if (await page.getByTestId('workspace-sidebar').getAttribute('data-collapsed') === 'true') await page.getByTestId('workspace-sidebar-expand').click();
+    await page.getByTestId(`workspace-area-${area}`).click();
+  };
+  for (let visit = 0; visit < 3; visit++) {
+    await navigate('ai');
+    await expect(strip.getByRole('tab', { name: '开始', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('ai-start-page')).toBeVisible();
+    await navigate('code');
+    await expect(strip.getByRole('tab', { name: '开始', exact: true })).toHaveAttribute('aria-selected', 'true');
+    await navigate('terminal');
+  }
+  await navigate('ai');
+  await page.screenshot({ path: info.outputPath(`selected-start-${width}.png`) });
+});
+
 for (const width of [1240, 760]) {
   test(`restores each workspace reading tab after mixed resource navigation at ${width}px`, async ({ page }, info) => {
     test.setTimeout(60_000);
@@ -27,7 +46,7 @@ for (const width of [1240, 760]) {
     await strip.getByRole('tab', { name: 'reading.ts', exact: true }).click();
     await page.setViewportSize({ width, height: 800 });
     const navigate = async (area: string) => {
-      if (!await page.getByTestId(`workspace-area-${area}`).isVisible()) await page.getByTestId('workspace-sidebar-expand').click();
+      if (await page.getByTestId('workspace-sidebar').getAttribute('data-collapsed') === 'true') await page.getByTestId('workspace-sidebar-expand').click();
       await page.getByTestId(`workspace-area-${area}`).click();
     };
     await navigate('unified');

@@ -599,10 +599,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
             ? tabs.find(tab => tab.kind === 'harness')?.id ?? ''
             : tabs.find(tab => workspaceAreaForKind(tab.kind) === area && !isStartTab(tab))?.id ?? '';
         }
-      } else if (!work && start && area === 'ai' && currentArea === 'ai') {
-        // The harness page is an empty container without sessions; show the placeholder instead.
-        const active = tabs.find(tab => tab.id === activeId);
-        if (active?.kind === 'harness') { activeId = start.id; changed = true; }
+      } else if (!work && start && currentArea === area && activeId !== start.id) {
+        // Empty areas select their existing placeholder even when focus belongs to another area.
+        activeId = start.id;
+        changed = true;
       }
     }
     if (changed) set({ tabs, activeId });

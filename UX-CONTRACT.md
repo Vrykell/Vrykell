@@ -61,7 +61,7 @@ Desktop terminal, remote-host, file and conversation workflows use the existing 
 
 ## Navigation and Feedback
 
-Workspace navigation restores the last selected tab in each area, including utility pages. Common-workspace resource activation retains the reading tab remembered by the native workspace. A closed remembered tab falls back to an available instance through the existing container selection rules.
+Workspace navigation restores the last selected tab in each area, including utility pages. Empty workspaces select their existing start page immediately on entry, keeping the tab highlight and content in sync. Common-workspace resource activation retains the reading tab remembered by the native workspace. A closed remembered tab falls back to an available instance through the existing container selection rules.
 
 Main and split AI conversation content has no separate heading or toolbar. Conversation actions stay in the shared tab toolbar when the sidebar opens, closes or changes its selection.
 
