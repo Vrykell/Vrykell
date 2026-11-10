@@ -1,5 +1,9 @@
 # Security model
 
+## Window shell actions
+
+The main window gains native resize dragging and always-on-top capabilities for its shared titlebar menu. Actions target the current window only; close retains existing unsaved-work guards. No new application command, filesystem access, network source, rendered HTML or terminal input is introduced.
+
 ## External session folders and images
 
 The read-only `acp_workspace_root` command returns the application-owned default workspace path and prepares that directory; it accepts no caller-supplied path. A session without an explicit project starts in its own new folder. This prevents accidental project inheritance, but does not sandbox the external process. Attachments reuse the existing picker/drop grants and application-owned storage. Image prompts require the capability advertised by the agent, bounded image blocks and a separately bounded outbound frame; inbound and replay limits stay unchanged. Closing or cancelling a session invalidates pending attachment reads, and failed reads retain the composer draft. No capability, CSP origin, arbitrary read or authorization grant is added.

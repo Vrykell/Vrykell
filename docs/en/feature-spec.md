@@ -11,6 +11,8 @@ Security regression checklist:
 
 Appearance and toolbar regression checklist:
 
+- Titlebar background opens the shared window menu; verify restore/move/resize/minimize/maximize availability, pin state, keyboard dismissal and guarded close at narrow and wide widths.
+
 - Shell opening modes use the shared segmented control for classic and block mode. Click and arrow-key choices persist per profile; profiles without block integration offer only classic mode. Verify dark/light themes, narrow layouts and selection persistence.
 
 - Tool permission rows use the shared segmented control for allow, ask and deny, preserving saved levels and existing authorization rules. Wide settings show two items per row; narrow settings use one column. Verify keyboard switching, search focus, navigation persistence and narrow layouts.
