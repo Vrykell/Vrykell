@@ -1,5 +1,7 @@
 # UX Contract
 
+File read/write errors have one notification and use the existing toolbar for retry. Ordinary file-error cards expire after eight seconds of unpaused reading time; hover, focus, expanded details and hidden pages pause the budget. Persistent failure cards keep their existing lifetime.
+
 Main, split and sidebar conversations run independently. Inputs queue only behind a turn in the same conversation; stopping or completing one owner cannot release another owner's busy state. Background schedules begin while idle but do not block later interactive work. Model connections retry twice with abortable backoff before any response begins; authentication and configuration failures are immediate, and partial responses are never replayed.
 
 Questions stay inside the owning transcript with choices, free text and skip. Restored questions are inert. Split actions retain their workspace and share one layout engine; removing placement is available only for multiple panes. Creation dropdowns retain a trigger snapshot after parent menus close, and toolbar action containers reserve non-overlapping intrinsic width. Agent startup exposes the project directory before connecting. Conversation settings are a persistent non-modal panel: changing an option or choosing a new execution profile does not close it, and Escape closes the child first.

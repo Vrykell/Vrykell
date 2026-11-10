@@ -30,6 +30,7 @@ export default function ErrorDetails({
   testId,
   preStyle,
   style,
+  onOpenChange,
 }: {
   title: string;
   text: string;
@@ -38,6 +39,7 @@ export default function ErrorDetails({
   testId?: string;
   preStyle?: CSSProperties;
   style?: CSSProperties;
+  onOpenChange?: (open: boolean) => void;
 }) {
   const [open, setOpen] = useState(defaultOpen);
 
@@ -57,7 +59,7 @@ export default function ErrorDetails({
           type="button"
           aria-expanded={open}
           data-tip={t(open ? 'Collapse {{name}}' : 'Expand {{name}}', { name: title })}
-          onClick={() => setOpen((value) => !value)}
+          onClick={() => { setOpen(!open); onOpenChange?.(!open); }}
           {...subtleHover}
           style={{
             display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0,
