@@ -10,7 +10,7 @@ const base = host === 'gitee' ? 'https://gitee.com/api/v5' : 'https://api.atomgi
 const request = async (route, options = {}) => {
   const url = new URL(`${base}/repos/Vrykell/Vrykell${route}`);
   url.searchParams.set('access_token', token);
-  const response = await fetch(url, { ...options, headers: { 'PRIVATE-TOKEN': token, ...options.headers }, signal: AbortSignal.timeout(120000) });
+  const response = await fetch(url, { ...options, headers: { 'PRIVATE-TOKEN': token, ...options.headers }, signal: AbortSignal.timeout(options.method === 'POST' ? 600000 : 120000) });
   if (!response.ok) throw new Error(`${host} API ${response.status} on ${route.split('?')[0]}`);
   return response.json();
 };
