@@ -13,6 +13,8 @@ Security regression checklist:
 
 Appearance and toolbar regression checklist:
 
+- Titlebar background opens the shared window menu; verify restore/move/resize/minimize/maximize availability, pin state, keyboard dismissal and guarded close at narrow and wide widths.
+
 - Shell opening modes use the shared segmented control for classic and block mode. Click and arrow-key choices persist per profile; profiles without block integration offer only classic mode. Verify dark/light themes, narrow layouts and selection persistence.
 
 - Remote profiles with integration disabled use classic mode even when the saved opening preference is block mode. Missing prompt markers keep the live classic surface usable. Password entry is available only for a detected secret prompt, returns to live input when that prompt disappears, and never hides a live screen behind an empty snapshot. Output silence does not prove authentication.

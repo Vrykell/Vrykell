@@ -42,6 +42,8 @@ components:
 
 ## Overview
 
+Titlebar background actions use the shared context menu: restore, move, resize, minimize, maximize, pin and close. Native window state controls availability; interactive titlebar controls keep their own interactions. Close uses the existing native close request and its unsaved-work protection.
+
 All four functional workspaces use the same layout-owning tab and scoped group model. `GroupedTabList` owns group cards, reorder feedback, rename input, action menus, color footers and confirmation dialogs. `WorkspacePaneCanvas` owns split geometry, placement and responsive fitting in every scope. Domain providers supply resource presentation and creation tools; they do not add their own group or pane treatment. A resource-picker selection opens or selects the owning container; split placement is an explicit action. Group deletion closes/deletes every member after all guards complete; archive remains a separate history-preserving action.
 
 Each common-workspace tab contains its complete pane layout. Switching tabs preserves that layout and each content host. The start page is an empty-state fallback and disappears when a content tab exists. Opening a resource creates or selects its own tab; only an explicit split changes an existing layout. Pane zoom is absent. Existing tab-strip controls own split, merge and move actions; panes do not gain another toolbar. Native and external AI conversations share the side panel using the same live content owners as the main workspace. Neither conversation type adds an execution-target or directory strip above its transcript.

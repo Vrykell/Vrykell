@@ -93,6 +93,8 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     window.addEventListener('blur', () => { nativeFocused = false; if (windowToken) emit('tauri://blur', null); });
     window.addEventListener('focus', () => { nativeFocused = true; nativeMinimized = false; if (windowToken) emit('tauri://focus', null); });
     let fullscreen = false;
+    let nativeMaximized = false;
+    let nativePinned = false;
     const writes: string[] = [];
     const sshTrusts: Record<string, unknown>[] = [];
     const dialogs: Record<string, unknown>[] = [];
@@ -1789,10 +1791,20 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             windowOps.push({ command: cmd, label: args.label as string });
             return undefined;
           case 'plugin:window|show':
-          case 'plugin:window|set_always_on_top':
           case 'plugin:window|start_dragging':
+          case 'plugin:window|start_resize_dragging':
             windowOps.push({ command: cmd, label: args.label as string, value: args.alwaysOnTop });
             return undefined;
+          case 'plugin:window|set_always_on_top':
+            nativePinned = args.value as boolean;
+            windowOps.push({ command: cmd, label: args.label as string, value: args.value });
+            return undefined;
+          case 'plugin:window|toggle_maximize': nativeMaximized = !nativeMaximized; return undefined;
+          case 'plugin:window|is_maximized': return nativeMaximized;
+          case 'plugin:window|is_always_on_top': return nativePinned;
+          case 'plugin:window|is_resizable':
+          case 'plugin:window|is_maximizable':
+          case 'plugin:window|is_minimizable': return true;
           case 'plugin:event|unlisten':
             return undefined;
           case 'plugin:window|is_fullscreen':

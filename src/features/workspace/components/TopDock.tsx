@@ -7,6 +7,7 @@ import { useUiStore, useWorkspaceNavigation } from '@features/workspace';
 import { WORKSPACE_AREA_LABELS } from '../stores/navigation';
 import DockNavigation from './DockNavigation';
 import WindowControls from '@features/workspace/components/WindowControls';
+import WindowMenu from './WindowMenu';
 import { isMacOS } from '@platform/runtime';
 import { t } from '@i18n';
 import { useBalancedTitlebar } from '../hooks/useBalancedTitlebar';
@@ -59,6 +60,7 @@ export default function TopDock({ sidebarOverlayRequired = false }: { sidebarOve
         <DockNavigation side="right" />
         <WindowControls />
       </div>
+      <WindowMenu titlebar={headerRef} />
     </header>
   );
 }
