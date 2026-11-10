@@ -7,6 +7,7 @@ const token = process.env.MIRROR_TOKEN;
 if (!['gitee', 'atomgit'].includes(host) || !token) throw new Error('Missing mirror configuration');
 const source = JSON.parse(await fs.readFile('release.json', 'utf8'));
 if (!/^v\d+\.\d+\.\d+$/.test(source.tagName)) throw new Error('Invalid stable tag');
+const body = `${source.body || ''}\n\n## Downloads\n\n${source.assets.map(asset => `- [${asset.name}](https://github.com/Vrykell/Vrykell/releases/download/${source.tagName}/${encodeURIComponent(asset.name)})`).join('\n')}`;
 const base = host === 'gitee' ? 'https://gitee.com/api/v5' : 'https://api.atomgit.com/api/v5';
 const request = async (route, options = {}) => {
   const url = new URL(`${base}/repos/Vrykell/Vrykell${route}`);
@@ -24,9 +25,16 @@ try {
   let releases = await request('/releases?per_page=100');
   let release = releases.find(item => item.tag_name === source.tagName);
   if (!release) release = await request('/releases', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
-    tag_name: source.tagName, name: source.name, body: source.body || '', target_commitish: source.targetCommitish,
+    tag_name: source.tagName, name: source.name, body, target_commitish: source.targetCommitish,
     ...(host === 'gitee' ? { prerelease: false } : { release_status: 'latest' }),
   }) });
+  else await request(`/releases/${host === 'gitee' ? release.id : encodeURIComponent(source.tagName)}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: source.name, body }),
+  });
+  if (process.env.MIRROR_METADATA_ONLY === 'true') {
+    console.log(`${host}: release metadata and download links updated`);
+    process.exit(0);
+  }
   let existing = host === 'gitee' ? await request(`/releases/${release.id}/attach_files`) : release.assets || [];
   for (const asset of source.assets) {
     if (path.basename(asset.name) !== asset.name) throw new Error('Invalid asset filename');
