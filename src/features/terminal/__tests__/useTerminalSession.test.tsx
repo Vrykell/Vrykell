@@ -379,6 +379,14 @@ describe('useTerminalSession', () => {
     ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;A', payload: '', raw: '\x1b]133;A\x07' }]);
     await waitFor(() => expect(useTerminalStore.getState().scenes.t1).toBe('blockList'));
   });
+  it('uses classic rendering when the remote profile disables integration despite a block preference', async () => {
+    useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', shellIntegration: false } }) }], activeId: 't1' });
+    render(<TestHarness tabId="t1" onReady={() => {}} />);
+    await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalledWith(80, 24, undefined, expect.objectContaining({ openMode: 'classic' })));
+    act(() => ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;A', payload: '', raw: '\x1b]133;A\x07' }, { kind: 'data', text: 'menu application' }]));
+    expect(useTerminalStore.getState().scenes.t1).toBe('classic');
+    expect(writeMock).toHaveBeenCalledWith(expect.stringContaining('menu application'), expect.any(Function));
+  });
 
   it('keeps a working ssh available when the fingerprint preflight cannot run', async () => {
     // An old server may fail to negotiate with the preflight library: ssh then verifies the host itself,

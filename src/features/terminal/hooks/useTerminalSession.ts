@@ -327,11 +327,12 @@ export function useTerminalSession(
       }, delay);
     };
 
-    // Open mode: spec.openMode wins; a restored session without one falls back to classic for
-    // SSH and to the shell default for local terminals.
-    // Shells without integration must remain interactive, including restored sessions.
-    const openMode = spec?.kind === 'local' && spec.shellType === 'cmd' ? 'classic'
+    // Disabled integration and unsupported local shells use classic rendering. Otherwise the
+    // saved opening mode wins, with classic rendering as the remote restoration default.
+    const integrationDisabled = spec?.kind === 'ssh' && spec.ssh?.shellIntegration === false;
+    const openMode = integrationDisabled || spec?.kind === 'local' && spec.shellType === 'cmd' ? 'classic'
       : spec?.openMode ?? (spec?.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(spec?.shellType));
+    if (integrationDisabled && spec?.openMode === 'block') terminalDebug('terminal-open-mode-fallback', { paneId, reason: 'integration-disabled' });
     const blockEnabled = openMode === 'block';
     // Block mode injects shell integration, which reports the command line through OSC 133;E.
     // Waiting for that marker keeps the visible command authoritative and prevents a late prompt
