@@ -12,6 +12,18 @@ vi.mock('@platform/clipboard', () => ({
 const writeClipboardTextMock = vi.mocked(writeClipboardText);
 
 describe('ErrorBox', () => {
+  it('shows an explicitly placed informational notification outside the panel and expires it', () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(<ErrorBox tone="info" placement="notification" title="Repository unavailable" details="Read failed" actions={<button>Retry</button>} autoDismissMs={1000} />);
+      expect(container.querySelector('[role="status"]')).toBeNull();
+      expect(document.querySelector('#app-notifications [role="status"]')).toHaveAttribute('data-tone', 'info');
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeVisible();
+      expect(screen.queryByRole('alert')).toBeNull();
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.queryByRole('status')).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
   it('pauses ordinary notification expiry while the page is hidden', () => {
     vi.useFakeTimers();
     const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);

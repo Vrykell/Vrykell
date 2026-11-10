@@ -99,7 +99,7 @@ Transient notifications allow at least 3/4/6/8 seconds for success/info/warning/
 
 The About page follows the settings shell and groups. Product identity precedes a version and stable-update group; project, release and license destinations use ordinary shared buttons. Check, download, verified readiness and explicit install/restart are separate states. Navigation retains download progress, errors retain retry/details, and installation uses the same dirty-document guard as closing the application.
 
-Tool cards retain result statuses without footer errors or automatic failure notifications. Explicit result review opens the bottom-right ErrorBox. Routine repository discovery and operation failures use local informational status with details and recovery. Restored history and approval outcomes never automatically replay notifications. Refusal shares the failed badge appearance; a cancelled question remains cancellation rather than failure.
+Tool cards retain result statuses without footer errors or automatic failure notifications. Explicit result review opens the bottom-right ErrorBox. Routine repository discovery and operation failures use bottom-right informational notifications with details and recovery, dismissing after eight seconds unless hovered, focused or expanded. Restored history and approval outcomes never automatically replay notifications. Refusal shares the failed badge appearance; a cancelled question remains cancellation rather than failure.
 
 Answered question cards retain only the chosen option or typed answer as selectable plain text with consistent left and right insets. Other choices and selection highlighting disappear after answering and remain absent when history is restored.
 

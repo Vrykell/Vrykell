@@ -35,7 +35,7 @@ export default function ErrorBox({
   style,
   onDismiss,
   dismissible,
-  placement = 'notification',
+  placement,
   autoDismissMs = 0,
 }: {
   tone?: ErrorBoxTone;
@@ -56,9 +56,10 @@ export default function ErrorBox({
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const notification = placement === 'notification' || placement === undefined && tone === 'error';
   const identity = JSON.stringify([tone, typeof title === 'string' ? title : '', typeof children === 'string' ? children : '', details]);
   useNotificationTimeout(identity,
-    tone === 'error' && placement === 'notification' && dismissed !== identity && dismissible !== false ? autoDismissMs : 0,
+    notification && dismissed !== identity && dismissible !== false ? autoDismissMs : 0,
     hovered || focused || detailsOpen, () => { setDismissed(identity); onDismiss?.(); });
   const close = (dismissible ?? tone === 'error') ? <IconButton compact aria-label={t('Dismiss error')} data-tip={t('Dismiss error')}
     onClick={() => { setDismissed(identity); onDismiss?.(); }}><X size={14} /></IconButton> : null;
@@ -73,7 +74,7 @@ export default function ErrorBox({
     ...style,
   };
 
-  if (tone === 'error' && placement === 'notification') return <NotificationPortal><NotificationCard role="alert" data-testid={testId} tone="error" message={title ?? children} data-error-notification="true"
+  if (notification) return <NotificationPortal><NotificationCard role={palette.role} data-testid={testId} tone={tone} message={title ?? children} data-error-notification={tone === 'error' ? 'true' : undefined}
     onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
     onFocusCapture={() => setFocused(true)} onBlurCapture={event => {
       if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setFocused(false);
