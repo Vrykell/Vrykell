@@ -33,6 +33,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           MIRROR_TOKEN: ${{ matrix.host == 'gitee' && secrets.GITEE_TOKEN || secrets.ATOMGIT_TOKEN }}
           MIRROR_HOST: ${{ matrix.host }}
+          MIRROR_USE_CURL: 'true'
           TAG: ${{ inputs.tag || github.event.release.tag_name }}
         run: |
           set -euo pipefail
