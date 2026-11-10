@@ -55,11 +55,12 @@ export default function PinnedCommand({ block, paneId, remaining, insetLeft, ins
   const duration = block.startedAt === null ? null : (block.endedAt ?? Date.now()) - block.startedAt;
   return <div className="pinned-command-clip">
     <div ref={ref} className="pinned-command command-block" data-testid="pinned-command"
+      data-pinned-block-id={block.id}
       data-collapsed={collapsed} data-running={running} data-failed={block.exitCode !== null && block.exitCode !== 0}
       data-menu-open={!!anchor} role="region" aria-label={t('Current command')}
       style={{ paddingLeft: insetLeft + COMMAND_BLOCK_CONTENT_PADDING,
         paddingRight: insetRight + COMMAND_BLOCK_CONTENT_PADDING,
-        transform: `translateY(${Math.min(0, remaining - height)}px)` }}
+        transform: `translateY(min(0px, calc(var(--pinned-command-remaining, ${remaining}px) - ${height}px)))` }}
       onContextMenu={event => {
         event.preventDefault();
         event.stopPropagation();

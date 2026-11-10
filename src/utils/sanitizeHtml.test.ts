@@ -2,6 +2,17 @@ import { describe, it, expect } from 'vitest';
 import { sanitizeOutputHtml } from '@utils/sanitizeHtml';
 
 describe('sanitizeOutputHtml', () => {
+  it('compacts equally styled snapshot rows without changing text, blank lines or cell widths', () => {
+    const span = (text: string) => `<span style="color:var(--success)">${text}</span>`;
+    expect(sanitizeOutputHtml([span('a &amp; b'), span('second'), span('third')].join('<br>'), true))
+      .toBe(span('a &amp; b\nsecond\nthird'));
+    expect(sanitizeOutputHtml(`${span('first')}<br><br>${span('last')}`, true))
+      .toBe(`${span('first')}<br><br>${span('last')}`);
+    const cells = '<span style="display:inline-block;width:2ch">wide</span>';
+    expect(sanitizeOutputHtml(`${cells}<br>${cells}`, true)).toBe(`${cells}<br>${cells}`);
+    expect(sanitizeOutputHtml('<span onclick="unsafe()">a</span><br><span style="background:url(bad)">b</span>', true))
+      .toBe('<span>a\nb</span>');
+  });
   it.each(['u\\72l(https://example.invalid/image)', 'image-set("https://example.invalid/image" 1x)', 'u/**/rl(https://example.invalid/image)'])('rejects encoded or alternate image style sources %s', value => {
     const span = document.createElement('span');
     span.setAttribute('style', `background:${value}`);

@@ -28,6 +28,36 @@ beforeEach(() => vi.stubGlobal('ResizeObserver', class { observe() {} disconnect
 afterEach(() => vi.unstubAllGlobals());
 
 describe('viewport command header', () => {
+  it('updates an existing overlay offset without rendering the history pane again', async () => {
+    const { scroll, add } = fixture();
+    const item = add('live', 20, 900, 70);
+    const parent = document.createElement('div');
+    const clip = document.createElement('div');
+    clip.className = 'pinned-command-clip';
+    const overlay = document.createElement('div');
+    overlay.className = 'pinned-command';
+    clip.append(overlay);
+    parent.append(scroll, clip);
+    document.body.append(parent);
+    const view = renderHook(() => usePinnedCommand({ current: scroll }));
+    try {
+      await waitFor(() => expect(view.result.current?.id).toBe('live'));
+      const previous = view.result.current;
+      act(() => {
+        item.rect.mockReturnValue(bounds(10, 890));
+        fireEvent.scroll(scroll);
+      });
+      expect(view.result.current).toBe(previous);
+      expect(overlay.style.getPropertyValue('--pinned-command-remaining')).toBe('790px');
+    } finally { view.unmount(); parent.remove(); }
+  });
+  it('finds the visible command without reading every historical block geometry', () => {
+    const { scroll, add } = fixture();
+    const items = Array.from({ length: 1024 }, (_, index) =>
+      add(String(index), (index - 1023) * 100, (index - 1023) * 100 + 200, (index - 1023) * 100 + 30));
+    expect(measurePinnedCommand(scroll)?.id).toBe('1023');
+    expect(items.reduce((total, item) => total + item.rect.mock.calls.length, 0)).toBeLessThan(15);
+  });
   it('pins running controls as soon as their status row starts to leave view, even while the command is visible', () => {
     const { scroll, add } = fixture();
     const item = add('running', 20, 900, 150);
@@ -90,5 +120,16 @@ describe('viewport command header', () => {
     await waitFor(() => expect(result.current).toBeNull());
     unmount();
     expect(remove).toHaveBeenCalledWith('scroll', expect.any(Function));
+  });
+  it('refreshes cached history membership when a command is appended', async () => {
+    const { scroll, add } = fixture();
+    const first = add('first', 20, 900, 70);
+    const { result } = renderHook(() => usePinnedCommand({ current: scroll }));
+    await waitFor(() => expect(result.current?.id).toBe('first'));
+    act(() => {
+      first.rect.mockReturnValue(bounds(-500, 90));
+      add('next', 80, 500, 95);
+    });
+    await waitFor(() => expect(result.current?.id).toBe('next'));
   });
 });

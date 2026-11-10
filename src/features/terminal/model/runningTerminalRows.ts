@@ -3,8 +3,9 @@ import type { IBuffer } from '@xterm/xterm';
 /** Keep occupied rows while a running program clears and repaints its screen. */
 export function measureRunningTerminalRows(buffer: IBuffer, rows: number, previous: number): number {
   let contentEnd = buffer.baseY + buffer.cursorY + 1;
+  if (contentEnd >= rows) return rows;
   const bottom = Math.min(buffer.baseY + rows, buffer.length);
-  for (let y = bottom - 1; y >= 0; y--) {
+  for (let y = bottom - 1; y >= contentEnd; y--) {
     if (buffer.getLine(y)?.translateToString(true).trim()) {
       contentEnd = Math.max(contentEnd, y + 1);
       break;

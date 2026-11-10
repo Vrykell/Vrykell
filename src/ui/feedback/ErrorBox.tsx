@@ -5,6 +5,7 @@ import { X } from '@ui/icons';
 import { t } from '@i18n';
 import NotificationPortal from '@ui/feedback/NotificationPortal';
 import NotificationCard from '@ui/feedback/NotificationCard';
+import { useNotificationTimeout } from './useNotificationTimeout';
 
 export type ErrorBoxTone = 'error' | 'info' | 'success';
 
@@ -18,6 +19,7 @@ const TONE: Record<ErrorBoxTone, { background: string; color: string; border: st
  * Shared persistent error notifications and inline informational status.
  *
  * Notifications share the transient-message card and retain actions and diagnostics.
+ * Ordinary failures may opt into timed dismissal; inspection pauses the remaining budget.
  * Informational status may remain inline within its owning surface.
  * `compact` renders a single row for tight spots (message + inline actions).
  */
@@ -33,7 +35,8 @@ export default function ErrorBox({
   style,
   onDismiss,
   dismissible,
-  placement = 'notification',
+  placement,
+  autoDismissMs = 0,
 }: {
   tone?: ErrorBoxTone;
   title?: ReactNode;
@@ -47,9 +50,17 @@ export default function ErrorBox({
   onDismiss?: () => void;
   dismissible?: boolean;
   placement?: 'notification' | 'inline';
+  autoDismissMs?: number;
 }) {
   const [dismissed, setDismissed] = useState<string | null>(null);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const notification = placement === 'notification' || placement === undefined && tone === 'error';
   const identity = JSON.stringify([tone, typeof title === 'string' ? title : '', typeof children === 'string' ? children : '', details]);
+  useNotificationTimeout(identity,
+    notification && dismissed !== identity && dismissible !== false ? autoDismissMs : 0,
+    hovered || focused || detailsOpen, () => { setDismissed(identity); onDismiss?.(); });
   const close = (dismissible ?? tone === 'error') ? <IconButton compact aria-label={t('Dismiss error')} data-tip={t('Dismiss error')}
     onClick={() => { setDismissed(identity); onDismiss?.(); }}><X size={14} /></IconButton> : null;
   if (dismissed === identity) return null;
@@ -63,7 +74,11 @@ export default function ErrorBox({
     ...style,
   };
 
-  if (tone === 'error' && placement === 'notification') return <NotificationPortal><NotificationCard role="alert" data-testid={testId} tone="error" message={title ?? children} data-error-notification="true"
+  if (notification) return <NotificationPortal><NotificationCard role={palette.role} data-testid={testId} tone={tone} message={title ?? children} data-error-notification={tone === 'error' ? 'true' : undefined}
+    onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}
+    onFocusCapture={() => setFocused(true)} onBlurCapture={event => {
+      if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+    }}
     dismissLabel={t('Dismiss error')} onDismiss={(dismissible ?? true) ? () => { setDismissed(identity); onDismiss?.(); } : undefined}
     onKeyDown={event => {
       if (event.key !== 'Escape' || !(dismissible ?? true)) return;
@@ -75,7 +90,7 @@ export default function ErrorBox({
     }}>
     {(title && children || details || actions) ? <>
     {title && children && <div className="error-notification-message">{children}</div>}
-    {details && <ErrorDetails title={detailsTitle} text={details} preStyle={{ maxHeight: 160 }} />}
+    {details && <ErrorDetails title={detailsTitle} text={details} preStyle={{ maxHeight: 160 }} onOpenChange={setDetailsOpen} />}
     {actions && <div className="error-box-actions error-notification-actions">{actions}</div>}
     </> : null}
   </NotificationCard></NotificationPortal>;

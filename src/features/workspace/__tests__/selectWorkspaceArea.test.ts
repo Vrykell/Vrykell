@@ -25,6 +25,20 @@ beforeEach(() => {
 });
 afterEach(() => { dispose(); vi.clearAllMocks(); });
 
+it('selects existing start pages on repeated visits to empty workspaces', () => {
+  const workspace = useWorkspaceStore.getState();
+  workspace.addTab();
+  for (let visit = 0; visit < 3; visit++) {
+    for (const area of ['code', 'ai'] as const) {
+      selectWorkspaceArea(area);
+      const state = useWorkspaceStore.getState();
+      expect(state.tabs.find(tab => tab.id === state.activeId)?.kind).toBe(area === 'ai' ? 'start-ai' : 'start-code');
+      expect(useWorkspaceNavigation.getState().lastTabs[area]).toBe(state.activeId);
+      selectWorkspaceArea('terminal');
+    }
+  }
+});
+
 it.each(['history', 'ai-history', 'usage'] as const)('restores the selected %s page alongside open content tabs', kind => {
   const workspace = useWorkspaceStore.getState();
   workspace.addTab();

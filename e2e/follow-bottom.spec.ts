@@ -73,9 +73,8 @@ test('resizing the terminal preserves the reading position and keeps a pinned vi
   const scroller = page.locator('[data-testid^="terminal-scroll-"]').first();
   const target = page.locator('[data-testid^="command-block-"]').nth(7);
   await target.evaluate((el) => el.scrollIntoView({ block: 'start' }));
-  // Let the scroll event land so the view anchor is captured before the width changes: a resize
-  // that beats the listener falls back to raw scrollTop and the block drifts by its reflow.
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  // Reading anchors settle after a scroll gesture so hit testing does not block wheel input.
+  await page.waitForTimeout(180);
   const relativeTop = async () => target.evaluate((el) => {
     const scroll = el.closest<HTMLElement>('[data-testid^="terminal-scroll-"]')!;
     return el.getBoundingClientRect().top - scroll.getBoundingClientRect().top;

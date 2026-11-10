@@ -108,6 +108,24 @@ jobs:
           updaterJsonPreferNsis: true
           tauriScript: npm run tauri
           args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} -- --locked
+      - name: Build portable Windows archive without updates
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VITE_DISABLE_UPDATES: 'true'
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          npm run tauri -- build --ci --target x86_64-pc-windows-msvc --no-bundle --features portable --config src-tauri/tauri.portable.conf.json -- --locked
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $stage = Join-Path $env:RUNNER_TEMP 'portable'
+          New-Item -ItemType Directory -Path "$stage/legal/fonts" -Force | Out-Null
+          Copy-Item 'src-tauri/target/x86_64-pc-windows-msvc/release/vrykell.exe' "$stage/Vrykell.exe"
+          Copy-Item 'LICENSE', 'NOTICE', 'public/legal/THIRD_PARTY_NOTICES.txt' "$stage/legal/"
+          Copy-Item 'public/fonts/*-OFL.txt' "$stage/legal/fonts/"
+          $archive = Join-Path $env:RUNNER_TEMP "Vrykell_$($env:RELEASE_TAG.Substring(1))_x64-portable.zip"
+          Compress-Archive -Path "$stage/*" -DestinationPath $archive
+          gh release upload $env:RELEASE_TAG $archive --clobber
 
   verify:
     needs: [prepare, build]

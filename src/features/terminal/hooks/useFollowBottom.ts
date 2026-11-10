@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { terminalDebug } from '../services/terminalDebug';
+import { blockTerminalFor } from '../services/terminalRepaint';
 
 const BOTTOM_THRESHOLD_PX = 32;
+const SCROLL_IDLE_MS = 120;
 
 interface ViewAnchor {
   range: Range | null;
@@ -71,14 +73,13 @@ export function useFollowBottom(
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    let width = el.clientWidth;
     let height = el.clientHeight;
     let contentHeight = el.scrollHeight;
     let frame = 0;
     let lastVisibleTop = el.scrollTop;
     let pendingRestoreTop: number | null = null;
     const persist = () => {
-      if (el.clientHeight > 0) lastVisibleTop = el.scrollTop;
+      if (height > 0) lastVisibleTop = el.scrollTop;
       if (persistKey) scrollMemory.set(persistKey, { top: lastVisibleTop, following: atBottomRef.current });
     };
     const record = (reason: string) => terminalDebug('terminal-follow-state', { paneId: persistKey, reason, following: atBottomRef.current, top: el.scrollTop, height: el.clientHeight, contentHeight: el.scrollHeight });
@@ -87,6 +88,18 @@ export function useFollowBottom(
       frame = requestAnimationFrame(() => { frame = 0; if (atBottomRef.current) { snap(); persist(); } });
     };
     let anchor: ViewAnchor | null = null;
+    let anchorTimer: ReturnType<typeof setTimeout> | undefined;
+    const scheduleAnchor = () => {
+      clearTimeout(anchorTimer);
+      anchor = null;
+      if (atBottomRef.current) return;
+      // Hit testing a long text flow forces style and geometry work. Capture the precise
+      // reading anchor once a gesture settles, keeping active scrolling on the native path.
+      anchorTimer = setTimeout(() => {
+        anchorTimer = undefined;
+        if (!atBottomRef.current) anchor = captureViewAnchor(el);
+      }, SCROLL_IDLE_MS);
+    };
     let restoredTop: number | null = null;
     const restoreAnchor = () => {
       if (!anchor) return;
@@ -121,29 +134,28 @@ export function useFollowBottom(
     const onWheel = (event: WheelEvent) => {
       // Keep wheel navigation inside a live terminal's own scrollback or mouse protocol.
       if (event.target instanceof Element && event.target.closest('[data-testid="running-term"]')) return;
-      if (event.deltaY < 0 && el.scrollHeight > el.clientHeight) {
+      if (event.deltaY < 0 && contentHeight > height) {
+        const wasFollowing = atBottomRef.current;
         atBottomRef.current = false;
         snappedTopRef.current = -1;
-        anchor = captureViewAnchor(el);
+        scheduleAnchor();
         persist();
-        record('wheel-up');
+        if (wasFollowing) record('wheel-up');
       }
     };
     const onScroll = () => {
-      if (el.clientHeight <= 0) return;
-      const contentChanged = el.scrollHeight !== contentHeight;
-      contentHeight = el.scrollHeight;
-      if (el.clientWidth !== width || el.clientHeight !== height || (contentChanged && atBottomRef.current)) {
-        // A jump to the bottom may precede its scroll event and a layout resize.
-        if (el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX) {
-          atBottomRef.current = true;
-          anchor = null;
+      // Resize observation owns dimensions; reading layout here stalls compositor scrolling.
+      if (height <= 0) return;
+      if (atBottomRef.current && Math.abs(el.scrollTop - snappedTopRef.current) >= 1) {
+        const nextHeight = el.scrollHeight;
+        if (nextHeight !== contentHeight) {
+          contentHeight = nextHeight;
+          height = el.clientHeight;
+          if (contentHeight - el.scrollTop - height < BOTTOM_THRESHOLD_PX) {
+            scheduleSnap();
+            return;
+          }
         }
-        width = el.clientWidth;
-        height = el.clientHeight;
-        if (atBottomRef.current) scheduleSnap();
-        else restoreAnchor();
-        return;
       }
       if (restoredTop !== null && Math.abs(el.scrollTop - restoredTop) < 1) {
         restoredTop = null;
@@ -159,13 +171,13 @@ export function useFollowBottom(
       }
       const wasFollowing = atBottomRef.current;
       atBottomRef.current =
-        el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX;
-      anchor = atBottomRef.current ? null : captureViewAnchor(el);
+        contentHeight - el.scrollTop - height < BOTTOM_THRESHOLD_PX;
+      scheduleAnchor();
       persist();
       if (wasFollowing !== atBottomRef.current) record('scroll');
     };
     el.addEventListener('scroll', onScroll, { passive: true });
-    el.addEventListener('wheel', onWheel, { capture: true, passive: false });
+    el.addEventListener('wheel', onWheel, { capture: true, passive: true });
     // Observe the whole output flow because live xterm height changes outside React.
     const content = el.firstElementChild;
     const ro = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
@@ -180,7 +192,6 @@ export function useFollowBottom(
         atBottomRef.current = true;
         anchor = null;
       }
-      width = el.clientWidth;
       height = el.clientHeight;
       const previousTop = el.scrollTop;
       if (atBottomRef.current) { snap(); persist(); }
@@ -197,6 +208,7 @@ export function useFollowBottom(
       el.removeEventListener('scroll', onScroll);
       el.removeEventListener('wheel', onWheel, true);
       cancelAnimationFrame(frame);
+      clearTimeout(anchorTimer);
       ro?.disconnect();
     };
     // The output host remains attached for the lifetime of this pane.
@@ -211,6 +223,7 @@ export function useFollowBottom(
 
   return useCallback(() => {
     atBottomRef.current = true;
+    if (persistKey) blockTerminalFor(persistKey)?.scrollToBottom();
     if (persistKey) scrollMemory.delete(persistKey);
     snap();
   }, [snap, persistKey]);

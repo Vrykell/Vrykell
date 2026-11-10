@@ -26,6 +26,28 @@ async function reloadFile(page: Page) {
   }
 }
 
+test('shows one timed file-load error and keeps reload only in the toolbar', async ({ page }, info) => {
+  await page.evaluate(() => localStorage.setItem('mock-editor-missing', JSON.stringify(['/home/e2e/project/src/main.ts'])));
+  const row = page.getByTestId('git-unstaged-src/main.ts');
+  await row.hover();
+  await row.getByRole('button', { name: '打开工作文件' }).click();
+  const editor = page.getByTestId('file-editor');
+  const notice = page.locator('#app-notifications').getByRole('alert');
+  await expect(notice).toContainText('无法读取或保存文件');
+  for (const width of [1240, 760]) {
+    await page.setViewportSize({ width, height: 800 });
+    await expect(editor.getByText('无法读取或保存文件')).toHaveCount(0);
+    await expect(editor.locator('.code-diff-status')).toHaveCount(0);
+    await expect(editor.getByRole('button', { name: '重新加载文件', exact: true })).toHaveCount(0);
+    await page.mouse.move(0, 0);
+    await page.screenshot({ path: info.outputPath(`single-file-error-${width}.png`) });
+  }
+  await expect(notice).toHaveCount(0, { timeout: 12000 });
+  await page.evaluate(() => localStorage.removeItem('mock-editor-missing'));
+  await reloadFile(page);
+  await expect(editor.locator('.monaco-editor')).toBeVisible();
+});
+
 test('identifies read-only files, blocks normal edits and offers explicit administrator opening', async ({ page }, info) => {
   await page.evaluate(() => {
     const host = window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> }; __ELEVATED_FILE__?: unknown; __EDITOR_SAVE_COUNT__?: number; __WRITABLE__?: boolean };

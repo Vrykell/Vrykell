@@ -1,6 +1,6 @@
 [package]
 name = "vrykell"
-version = "0.1.8"
+version = "0.1.9"
 description = "A Tauri App"
 authors = ["Vrykell contributors"]
 license = "Apache-2.0"
@@ -19,6 +19,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[features]
+portable = []
+
 [dependencies]
 tauri = { version = "2", features = ["protocol-asset", "macos-private-api"] }
 tauri-plugin-opener = "2"
@@ -30,7 +33,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 portable-pty = "0.8"
 uuid = { version = "1", features = ["v4"] }
-rusqlite = { version = "0.31", features = ["bundled"] }
+rusqlite = { version = "0.41.1", features = ["bundled", "fallible_uint"] }
 ignore = "0.4"
 regex = "1"
 dirs = "5"

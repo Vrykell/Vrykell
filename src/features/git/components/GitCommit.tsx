@@ -63,7 +63,7 @@ export default function GitCommit({ target, snapshot, refresh }: { target: GitTa
     {busy && <span className="git-commit-hint" role="status">{t(busy === 'generate' ? 'Generating commit message…' : 'Repository operation in progress…')}</span>}
     {snapshot.upstream && <span className="git-commit-hint" data-tip={snapshot.upstream}>{snapshot.upstream}</span>}
     {!remotes.length && <span className="git-commit-hint">{t('No remote configured')}</span>}
-    {error && <ErrorBox title={t('Repository operation failed')} details={error} onDismiss={() => useGitOperations.getState().finish(key)} />}
+    {error && <ErrorBox tone="info" placement="notification" autoDismissMs={8000} dismissible title={t('Repository operation failed')} details={error} onDismiss={() => useGitOperations.getState().finish(key)} />}
     {menu && <ContextMenu anchor={menu} label={t('Commit actions')} onClose={() => setMenu(null)} items={[
       { label: t('Commit'), disabled: !canCommit, onClick: () => { void operate('commit'); } },
       { label: t('Commit and push'), disabled: !canCommit || !remotes.length || snapshot.detached, onClick: () => { void operate('commit', true); } },

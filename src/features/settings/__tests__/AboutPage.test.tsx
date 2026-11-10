@@ -2,8 +2,16 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { AboutPage } from '../pages/aboutPage';
 import { useAppUpdate } from '../stores/appUpdate';
+import { supportsAppUpdates } from '@platform/updater';
 
-vi.mock('@platform/updater', () => ({ applicationVersion: async () => '0.1.0', supportsAppUpdates: () => true, openProjectPage: vi.fn() }));
+vi.mock('@platform/updater', () => ({ applicationVersion: async () => '0.1.0', supportsAppUpdates: vi.fn(() => true), openProjectPage: vi.fn() }));
+
+it('omits update controls when the distribution does not support updates', () => {
+  vi.mocked(supportsAppUpdates).mockReturnValueOnce(false);
+  render(<AboutPage />);
+  expect(screen.queryByRole('button', { name: '检查更新' })).toBeNull();
+  expect(screen.getByTestId('application-version')).toBeVisible();
+});
 afterEach(() => { cleanup(); useAppUpdate.setState({ phase: 'idle', error: '', downloaded: 0, total: undefined, version: '', notes: '' }); vi.restoreAllMocks(); });
 
 it('shows application identity and requires explicit confirmation before installation', async () => {
