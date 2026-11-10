@@ -31,7 +31,7 @@ test('output longer than the viewport stays complete without a false truncation 
   await expect(block).toContainText('help-line-99');
   await expect(block).toContainText('help-line-0');
   await expect(block).not.toContainText('已截断');
-  expect(await block.locator('[data-selectable] > div').last().evaluate(el => el.innerHTML.split('<br>').length)).toBe(100);
+  expect(await block.locator('[data-selectable] > div').last().evaluate(el => el.innerText.split('\n').length)).toBe(100);
 });
 
 /**
@@ -68,12 +68,11 @@ test('long box-drawing rows reflow to the available columns without horizontal s
     `\x1b]133;A\x07~/project\x1b]133;G;${btoa('main')}\x07 $ `;
   await emitPtyOutput(page, E + C + rows + tail);
 
-  // Wait for the output to render (snapshot extraction is asynchronous).
-  // Use the innermost matching div: outer containers also include('<br>') and would match too.
+  // Snapshot extraction is asynchronous; locate its content without depending on line-break tags.
   const findOutput = () =>
     page.evaluate(() => {
-      const matches = Array.from(document.querySelectorAll('div')).filter(
-        (d) => d.innerHTML.includes('<br>') && d.textContent?.includes('─'.repeat(40)),
+      const matches = Array.from(document.querySelectorAll<HTMLElement>('.command-block-output [data-selectable] > div')).filter(
+        (d) => d.textContent?.includes('─'.repeat(40)),
       );
       matches.sort((a, b) => a.innerHTML.length - b.innerHTML.length);
       return matches[0]?.innerHTML.length ?? 0;
@@ -81,14 +80,12 @@ test('long box-drawing rows reflow to the available columns without horizontal s
   await expect.poll(findOutput).toBeGreaterThan(0);
 
   const diag = await page.evaluate((): Diag & { scrollWidth: number } => {
-    const matches = Array.from(document.querySelectorAll('div')).filter(
-      (d) => d.innerHTML.includes('<br>') && d.textContent?.includes('─'.repeat(40)),
+    const matches = Array.from(document.querySelectorAll<HTMLElement>('.command-block-output [data-selectable] > div')).filter(
+      (d) => d.textContent?.includes('─'.repeat(40)),
     );
     matches.sort((a, b) => a.innerHTML.length - b.innerHTML.length);
     const el = matches[0]!;
-    const rows = el.innerHTML.split('<br>');
-    const strip = (s: string) => s.replace(/<[^>]*>/g, '');
-    const rowLens = rows.map((r) => strip(r).length);
+    const rowLens = el.innerText.split('\n').map(row => row.length);
     const cols = Math.max(...rowLens);
 
     const cs = getComputedStyle(el);
@@ -299,6 +296,7 @@ test('command block separators extend to the left and right terminal edges', asy
   for (const command of ['echo first', 'echo second']) {
     await input.fill(command);
     await input.press('Enter');
+    await expect(page.locator('[data-testid^="command-block-"]').filter({ hasText: command })).toHaveCount(1);
   }
   const blocks = page.locator('[data-testid^="command-block-"]');
   await expect(blocks).toHaveCount(2);

@@ -4,6 +4,8 @@
 
 Security regression checklist:
 
+- Block history scroll avoids repeated full-list layout reads, per-frame text hit testing and pane renders. Passive wheel observation preserves native scrolling; text anchors settle after a gesture. Compact equal-style snapshot rows without merging explicit-width cells or blank lines. Running output height does not scan scrollback during scrolling. End returns both history and live scrollback to the tail without sending terminal keys. Cover wrapped text, colors, search, resize anchors and sustained-output frame spikes.
+
 - External conversation footers keep permission and model choices; collaboration, reasoning, execution target and context move to the shared toolbar/sidebar settings. Cover many long options, nested menu dismissal, retained drafts, narrow split panes and both themes. Sending shows the shared loading animation before any output and clears it on completion, failure or cancellation. Return-to-latest appears after scrolling 64 px away and hides within 12 px of the bottom, including when scrolling manually.
 
 - Production content policy permits bundled scripts but blocks inline scripts, external requests and development sockets; development exceptions stay in the separate policy. `production-csp.spec.ts` exercises the configured policy in a browser.

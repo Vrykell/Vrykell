@@ -51,7 +51,7 @@ export default memo(function BlockOutput({ text, maxHeight, flush = false, highl
   const content = useMemo(() => {
     if (isHtml) {
       // Persisted snapshots are untrusted regardless of their original producer.
-      const safe = sanitizeOutputHtml(text);
+      const safe = sanitizeOutputHtml(text, true);
       return highlight ? highlightInHtml(safe, highlight) : safe;
     }
     // Plain text fallback
