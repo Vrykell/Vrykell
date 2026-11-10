@@ -170,19 +170,13 @@ function DocumentContent({ file, active, focused }: { file: EditorFile; active: 
         <IconButton compact className="workspace-open-action" aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}><FolderOpen size={iconSizes.control} /></IconButton>
         <IconButton compact className="workspace-create-action" aria-label={t('New file')} data-tip={t('New file')} onClick={newEditorFile}><Plus size={iconSizes.control} /></IconButton>
       </>} /></WorkspaceHeader>
-    {document?.error && <ErrorBox title={t('Could not read or save file')} details={document.error} />}
+    {document?.error && <ErrorBox title={t('Could not read or save file')} details={document.error} autoDismissMs={8000} />}
     {(!document || document.loading) && <div className="code-diff-status" role="status">{t('Loading file…')}</div>}
     {document && !document.loading && document.kind !== 'text' && <div className="code-diff-status">{t(document.kind === 'binary' ? 'This file is binary or is not UTF-8. Open it with another editor.' : 'This file is too large for the embedded editor.')}</div>}
     {document && !document.loading && document.permissionDenied && !document.revision && !document.error && (
       <div className="code-diff-status" role="status">
         {t('Your current user cannot access or write this file. Open it with elevated permissions to edit.')}
         <div><ReadOnlyFileAccess file={file} permissionDenied active={active} /></div>
-      </div>
-    )}
-    {document && !document.loading && document.error && !document.revision && (
-      <div className="code-diff-status" role="status">
-        {t('Could not read or save file')}
-        <div><OutlineButton onClick={reloadFile}>{t('Reload file')}</OutlineButton></div>
       </div>
     )}
     {document && !document.loading && !!document.revision && document.kind === 'text' && <CodeEditor path={file.path} value={document.value} active={focused} readOnly={document.readOnly} wordWrap={preferences.wordWrap} vimMode={preferences.vimMode} onReady={handle => { editor.current = handle; }} onChange={value => useEditorDocuments.getState().edit(file, value)} onSave={save}

@@ -621,14 +621,138 @@ describe('SessionController', () => {
     expect(st.written).toContain('link');
   });
 
-  it('long-running flag: executing for more than 2 seconds', () => {
+  it('long-running flag: a silent foreground command is promoted after the short base delay', () => {
     vi.useFakeTimers();
     try {
       const { ctrl, feed } = wire();
-      feed(`${A}p$ ${E('npm i')}${C}`);
-      vi.advanceTimersByTime(2100);
-      feed('x'); // Any output triggers the check
+      feed(`${A}p$ ${E('sleep 100')}${C}`);
+      vi.advanceTimersByTime(400);
+      expect(ctrl.blocks[0]!.wasLongRunning).toBe(false);
+      vi.advanceTimersByTime(150);
       expect(ctrl.blocks[0]!.wasLongRunning).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('long-running flag: output followed by silence promotes before the base delay', () => {
+    vi.useFakeTimers();
+    try {
+      const { ctrl, feed } = wire();
+      feed(`${A}p$ ${E('sudo true')}${C}`);
+      vi.advanceTimersByTime(50);
+      feed('Password: ');
+      // The quiet window starts after the minimum runtime (200ms) plus the quiet gap (150ms).
+      vi.advanceTimersByTime(250);
+      expect(ctrl.blocks[0]!.wasLongRunning).toBe(false);
+      vi.advanceTimersByTime(60);
+      expect(ctrl.blocks[0]!.wasLongRunning).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('long-running flag: continuous output falls back to the base delay', () => {
+    vi.useFakeTimers();
+    try {
+      const { ctrl, feed } = wire();
+      feed(`${A}p$ ${E('build')}${C}`);
+      for (let index = 0; index < 4; index++) {
+        vi.advanceTimersByTime(100);
+        feed(`line ${index}\r\n`);
+        expect(ctrl.blocks[0]!.wasLongRunning).toBe(false);
+      }
+      vi.advanceTimersByTime(150);
+      expect(ctrl.blocks[0]!.wasLongRunning).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('long-running flag: a command that completes before the debounce never flips', () => {
+    vi.useFakeTimers();
+    try {
+      const { ctrl, feed } = wire();
+      feed(`${A}p$ ${E('ls')}${C}file\r\n${D(0)}`);
+      vi.advanceTimersByTime(1000);
+      expect(ctrl.blocks[0]!.wasLongRunning).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('long-running flag: entering the alternate screen promotes the running command', () => {
+    const { ctrl, feed } = wire();
+    feed(`${A}p$ ${E('vi')}${C}`);
+    expect(ctrl.blocks[0]!.wasLongRunning).toBe(false);
+    feed('\x1b[?1049h');
+    expect(ctrl.blocks[0]!.wasLongRunning).toBe(true);
+    ctrl.dispose();
+  });
+
+  it('starts a pending block when output arrives before the preexec marker', () => {
+    vi.useFakeTimers();
+    try {
+      const { st, ctrl, feed } = wire('t1', true);
+      feed(A);
+      expect(ctrl.setPendingCommand('sleep 100', 'sleep 100')).toBe(true);
+      feed('partial output');
+      expect(ctrl.activeBlock?.status).toBe('pending');
+      vi.advanceTimersByTime(260);
+      expect(ctrl.activeBlock?.status).toBe('executing');
+      expect(ctrl.activeBlock?.command).toBe('sleep 100');
+      feed(C);
+      expect(ctrl.blocks).toHaveLength(1);
+      expect(st.started).toEqual(['sleep 100']);
+      ctrl.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('a real preexec marker wins over the output fallback', () => {
+    vi.useFakeTimers();
+    try {
+      const { ctrl, feed } = wire('t1', true);
+      feed(A);
+      ctrl.setPendingCommand('sleep 100', 'sleep 100');
+      feed('partial output');
+      vi.advanceTimersByTime(100);
+      feed(C);
+      expect(ctrl.activeBlock?.status).toBe('executing');
+      vi.advanceTimersByTime(500);
+      expect(ctrl.blocks).toHaveLength(1);
+      expect(ctrl.activeBlock?.status).toBe('executing');
+      ctrl.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not extend a shorter pending fallback when output arrives', () => {
+    vi.useFakeTimers();
+    try {
+      const { ctrl, feed } = wire('short-fallback', true, undefined, 20);
+      feed(A);
+      ctrl.setPendingCommand('ls', 'ls');
+      feed('output');
+      vi.advanceTimersByTime(25);
+      expect(ctrl.activeBlock?.status).toBe('executing');
+      ctrl.dispose();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('output does not shorten the fallback without a submitted command', () => {
+    vi.useFakeTimers();
+    try {
+      const { ctrl, feed } = wire('t1', true);
+      feed(A);
+      feed('output from a program started in the shell');
+      vi.advanceTimersByTime(500);
+      expect(ctrl.activeBlock?.status).toBe('pending');
+      ctrl.dispose();
     } finally {
       vi.useRealTimers();
     }

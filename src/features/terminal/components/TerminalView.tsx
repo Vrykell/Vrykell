@@ -322,7 +322,8 @@ function TerminalPane(props: {
   const manualFullscreen = useTerminalStore(s => !!s.manualFullscreen[terminal.id]);
   const fullscreenVisible = useManualFullscreenVisible(terminal.id);
   const hasExecutingBlock = useBlockStore(state => (state.byTab[terminal.id] ?? []).some(block => block.status === 'executing'));
-  useTerminalFocus(focused && scene === 'blockList' && hasExecutingBlock, terminal.id);
+  const hasLongRunningBlock = useBlockStore(state => (state.byTab[terminal.id] ?? []).some(block => block.status === 'executing' && block.wasLongRunning));
+  useTerminalFocus(focused && scene === 'blockList' && hasExecutingBlock, terminal.id, hasLongRunningBlock);
   useLayoutEffect(() => {
     if (!focused) return;
     focusSessionInput(terminal.id);

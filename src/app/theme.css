@@ -1393,7 +1393,8 @@ button.terminal-chip:disabled:hover { background: var(--hover); }
 .command-block-info[data-bar-actions="always"] { padding-right: calc(4 * var(--control-size-compact)); }
 .command-block-info[data-bar-actions="always"] .command-block-actions { opacity: 1; pointer-events: auto; }
 .command-block-actions, .command-block-branch, .command-block .command-status-code, .command-block .command-status-agent, .command-block-truncation { opacity: 0; pointer-events: none; transition: opacity var(--dur-fast) var(--ease); }
-.command-block:is(:hover, :has(.command-block-actions :focus-visible), [data-menu-open="true"]) :is(.command-block-actions, .command-block-branch, .command-status-code, .command-status-agent, .command-block-truncation) { opacity: 1; pointer-events: auto; }
+.command-block:is(:hover, :has(> .command-block-info .command-block-actions :focus-visible), [data-menu-open="true"]) > .command-block-info :is(.command-block-actions, .command-block-branch, .command-status-code, .command-status-agent),
+.command-block:is(:hover, :has(> .command-block-info .command-block-actions :focus-visible), [data-menu-open="true"]) > .command-block-truncation { opacity: 1; pointer-events: auto; }
 .command-block .command-status { color: inherit; }
 .command-block-cwd { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .command-block-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

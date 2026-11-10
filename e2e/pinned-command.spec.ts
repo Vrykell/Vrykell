@@ -209,6 +209,8 @@ test('pins the running toolbar in the same frame its status row starts to leave 
   await emitPtyOutput(page, `\x1b]133;A\x07\x1b]133;E;${btoa('tail -f live.log')}\x07\x1b]133;C\x07${'live log\r\n'.repeat(140)}`);
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
+  // The composer hides once the command is long-running; settle the scroll geometry first.
+  await expect(page.getByPlaceholder(/输入命令/)).toBeHidden({ timeout: 3000 });
   const scroll = page.locator('[data-testid^="terminal-scroll-"]').first();
   const pinned = page.getByTestId('pinned-command');
   await expect(async () => {

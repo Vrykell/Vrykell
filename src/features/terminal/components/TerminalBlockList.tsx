@@ -11,6 +11,7 @@ import { configureTerminalInput } from '@features/terminal/model/terminalInput';
  */
 
 import { memo, useState, useEffect, useRef } from 'react';
+import { memoLocalized } from '@ui/hooks/memoLocalized';
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import { Ellipsis } from '@ui/icons';
 import AiBlock from '@features/chat/components/AiBlock';
@@ -33,6 +34,7 @@ import { isHistoryAtBottom, takeWheelWithinMargin, WHEEL_BOUNDARY_IDLE, wheelLea
 import { repaintTerminal } from '../model/terminalResize';
 import { useSessionStore, useUnifiedWorkspace, useWorkspaceNavigation } from '@features/workspace';
 import { useManualFullscreenVisible } from '../hooks/useManualFullscreenVisible';
+import { engageFollow } from '../hooks/useFollowBottom';
 
 interface Props {
   tabId: string;
@@ -49,7 +51,7 @@ export function hasVisibleContent(b: TermBlock): boolean {
   return hasVisibleBlockContent(b);
 }
 
-export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8 }: Props) {
+export default memoLocalized(function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8 }: Props) {
   const {
     highlightQuery,
     running,
@@ -111,7 +113,7 @@ export default function TerminalBlockList({ tabId, insetLeft = 8, insetRight = 8
       )}
     </>
   );
-}
+});
 
 // Search highlighting.
 
@@ -398,13 +400,15 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
     };
 
     let renderSub: { dispose(): void } | null = null;
+    let resizeSub: { dispose(): void } | null = null;
     if (tuiFs) {
       el.style.height = '100%';
       term.focus();
       syncTermWidth(tabId);
     } else {
       updateHeight();
-      renderSub = term.onRender(updateHeight);
+      renderSub = term.onWriteParsed(updateHeight);
+      resizeSub = term.onResize(updateHeight);
     }
 
     // The controller owns data forwarding for both replies and native keyboard input.
@@ -422,7 +426,13 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
           return false;
         }
       }
-      return !(e.type === 'keydown' && e.key === 'End');
+      if (e.type === 'keydown' && e.key === 'End' && !e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        engageFollow(tabId);
+        return false;
+      }
+      return true;
     });
     let wheelResidual = 0;
     let boundary: WheelBoundaryState = WHEEL_BOUNDARY_IDLE;
@@ -547,6 +557,7 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
         w.__vrykellTerms.delete(`block:${tabId}`);
       }
       renderSub?.dispose();
+      resizeSub?.dispose();
       if (shrinkTimer) { clearTimeout(shrinkTimer); shrinkTimer = null; }
       unsubscribeActiveTab();
       cancelAnimationFrame(restoreRaf);

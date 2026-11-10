@@ -6,11 +6,12 @@ import { activateContainer } from './workbench';
 import { WORKSPACE_SCOPES, type WorkspaceScope } from '../model/workbench';
 
 const isScope = (area: WorkspaceArea): area is WorkspaceScope => WORKSPACE_SCOPES.some(scope => scope === area);
-const systemPage = (kind: string) => kind === 'history' || kind === 'ai-history' || kind === 'usage';
+const startPage = (kind: string) => kind === 'start' || kind === 'start-code' || kind === 'start-ai';
+const systemPage = (kind: string) => kind === 'history' || kind === 'ai-history' || kind === 'usage' || startPage(kind);
 
 export function selectWorkspaceArea(area: WorkspaceArea, historyPreset: HistoryTypePreset = 'all') {
   const navigation = useWorkspaceNavigation.getState();
-  const workspace = useWorkspaceStore.getState();
+  let workspace = useWorkspaceStore.getState();
   const snapshot = useWorkbenchStore.getState().snapshot;
   if (isScope(navigation.area)) {
     const page = workspace.tabs.find(tab => tab.id === workspace.activeId && workspaceAreaForKind(tab.kind) === navigation.area);
@@ -23,8 +24,11 @@ export function selectWorkspaceArea(area: WorkspaceArea, historyPreset: HistoryT
     return;
   }
   navigation.selectArea(area);
+  workspace.ensureStartPages();
+  workspace = useWorkspaceStore.getState();
   const remembered = useWorkspaceNavigation.getState().lastTabs[area];
-  const rememberedPage = workspace.tabs.find(tab => tab.id === remembered && workspaceAreaForKind(tab.kind) === area);
+  const rememberedPage = workspace.tabs.find(tab => tab.id === remembered && workspaceAreaForKind(tab.kind) === area)
+    ?? workspace.tabs.find(tab => startPage(tab.kind) && workspaceAreaForKind(tab.kind) === area);
   if (rememberedPage && systemPage(rememberedPage.kind)) {
     if (area === 'ai') navigation.setAiPlacement('main');
     workspace.activate(rememberedPage.id);

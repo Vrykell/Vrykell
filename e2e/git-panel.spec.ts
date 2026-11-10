@@ -119,7 +119,8 @@ test('generates an editable commit message and runs commit and remote operations
   await message.fill('fix: keep this draft');
   await page.evaluate(() => localStorage.setItem('mock-git-operation-error', 'Permission denied'));
   await panel.getByRole('button', { name: '提交', exact: true }).click();
-  await expect(page.getByRole('alert').filter({ hasText: '版本库操作失败' })).toBeVisible();
+  await expect(page.locator('#app-notifications').getByRole('status').filter({ hasText: '版本库操作失败' })).toBeVisible();
+  await expect(panel.getByText('版本库操作失败', { exact: true })).toHaveCount(0);
   await expect(message).toHaveValue('fix: keep this draft');
   await page.screenshot({ path: info.outputPath('git-commit-error.png') });
 });
@@ -144,10 +145,35 @@ test('shows binary, conflict, empty and failure states', async ({ page }) => {
   await expect(page.getByTestId('git-diff-review').locator('.monaco-diff-editor')).toBeVisible({ timeout: 15_000 });
   await page.evaluate(() => localStorage.setItem('mock-git-error', 'Repository unavailable'));
   await panel.getByRole('button', { name: '刷新变更' }).click();
-  await expect(page.getByRole('alert').getByText('无法读取版本库', { exact: true })).toBeVisible();
+  const notification = page.locator('#app-notifications').getByRole('status').filter({ hasText: '无法读取版本库' });
+  await expect(notification).toBeVisible();
+  await expect(panel.getByText('无法读取版本库', { exact: true })).toHaveCount(0);
+  await expect(page.locator('#app-notifications').getByRole('alert')).toHaveCount(0);
   await page.evaluate(() => { localStorage.removeItem('mock-git-error'); localStorage.setItem('mock-git-snapshot', 'null'); });
-  await panel.getByRole('button', { name: '刷新变更' }).click();
+  await notification.getByRole('button', { name: '重试', exact: true }).click();
   await expect(panel.getByText('当前目录不在版本库中。')).toBeVisible();
+  await expect(notification).toHaveCount(0);
+});
+
+for (const width of [1240, 760]) test(`shows repository failure once outside the panel and automatically dismisses it at ${width}px`, async ({ page }, info) => {
+  await page.setViewportSize({ width, height: 800 });
+  const panel = page.getByTestId('git-panel');
+  await page.evaluate(() => localStorage.setItem('mock-git-error', 'Repository unavailable'));
+  await panel.getByRole('button', { name: '刷新变更' }).click();
+  const notice = page.locator('#app-notifications').getByRole('status').filter({ hasText: '无法读取版本库' });
+  await expect(notice).toBeVisible();
+  await expect(panel.getByText('无法读取版本库', { exact: true })).toHaveCount(0);
+  await notice.getByRole('button', { name: '技术详情', exact: true }).click();
+  await expect(notice.getByText('Repository unavailable', { exact: true })).toBeVisible();
+  const bounds = (await notice.boundingBox())!;
+  expect(bounds.x).toBeGreaterThanOrEqual(0);
+  expect(bounds.x + bounds.width).toBeLessThanOrEqual(width);
+  await page.screenshot({ path: info.outputPath(`repository-notification-${width}.png`) });
+  await notice.getByRole('button', { name: '技术详情', exact: true }).click();
+  await panel.getByRole('textbox', { name: '搜索变更文件' }).focus();
+  await page.mouse.move(0, 0);
+  await expect(notice).toHaveCount(0, { timeout: 12000 });
+  await expect(panel.getByRole('button', { name: '刷新变更' })).toBeEnabled();
 });
 
 test('uses one joined button and adapts clean repositories to synchronization and publication', async ({ page }, info) => {
@@ -441,8 +467,9 @@ test('uses reload feedback and dismisses operation errors from the heading', asy
   await page.evaluate(() => localStorage.setItem('mock-git-operation-error', 'Network unavailable'));
   await panel.getByRole('button', { name: '更多版本控制操作' }).click();
   await page.getByRole('button', { name: '获取', exact: true }).click();
-  const error = page.locator('#app-notifications').getByRole('alert');
+  const error = page.locator('#app-notifications').getByRole('status').filter({ hasText: '版本库操作失败' });
   await expect(error).toBeVisible();
+  await expect(page.locator('#app-notifications').getByRole('alert')).toHaveCount(0);
   await error.getByRole('button', { name: '关闭错误提示' }).click();
   await expect(error).toHaveCount(0);
 });

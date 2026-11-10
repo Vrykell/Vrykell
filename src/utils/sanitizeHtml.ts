@@ -48,7 +48,7 @@ function sanitizeStyleValue(style: string): string {
  * Tags outside the whitelist are replaced by their text; span attributes other than
  * style are removed.
  */
-export function sanitizeOutputHtml(html: string): string {
+export function sanitizeOutputHtml(html: string, compactTextRuns = false): string {
   if (!html || !html.includes('<')) return html;
   const doc = new DOMParser().parseFromString(html, 'text/html');
   const body = doc.body;
@@ -76,6 +76,31 @@ export function sanitizeOutputHtml(html: string): string {
       }
       // Other tags: unwrap (drop the tag and its attributes, keep the sanitized children/text)
       child.replaceWith(...Array.from(child.childNodes));
+    }
+    if (compactTextRuns) {
+      let run: Element | null = null;
+      let separator: Element | null = null;
+      for (const child of Array.from(node.childNodes)) {
+        if (child instanceof Element && child.tagName === 'BR' && run && !separator) {
+          separator = child;
+          continue;
+        }
+        if (child instanceof Element && child.tagName === 'SPAN' && child.childElementCount === 0
+          && !/(?:^|;)(?:display|width):/.test(child.getAttribute('style') ?? '')) {
+          if (run && separator && run.getAttribute('style') === child.getAttribute('style')) {
+            run.append('\n', ...Array.from(child.childNodes));
+            separator.remove();
+            child.remove();
+            separator = null;
+            continue;
+          }
+          run = child;
+          separator = null;
+          continue;
+        }
+        run = null;
+        separator = null;
+      }
     }
   };
   walk(body);

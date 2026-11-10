@@ -235,15 +235,6 @@ Notice file: LICENSE-MIT
 License text reference: license-text-30fefc3a7d6a0041
 
 ==============================================================================
-crate:ahash@0.8.12
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/ahash/0.8.12/download
-Notice file: LICENSE-APACHE
-License text reference: license-text-769f80b5bcb42ed0
-Notice file: LICENSE-MIT
-License text reference: license-text-d03325792f3dbc26
-
-==============================================================================
 crate:aho-corasick@1.1.5
 License expression: Unlicense OR MIT
 Source: https://crates.io/api/v1/crates/aho-corasick/1.1.5/download
@@ -1620,15 +1611,6 @@ Notice file: LICENSE-MIT
 License text reference: license-text-ae9791f02f2bbe0c
 
 ==============================================================================
-crate:hashbrown@0.14.5
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/hashbrown/0.14.5/download
-Notice file: LICENSE-APACHE
-License text reference: license-text-769f80b5bcb42ed0
-Notice file: LICENSE-MIT
-License text reference: license-text-ae9791f02f2bbe0c
-
-==============================================================================
 crate:hashbrown@0.15.5
 License expression: MIT OR Apache-2.0
 Source: https://crates.io/api/v1/crates/hashbrown/0.15.5/download
@@ -1647,9 +1629,9 @@ Notice file: LICENSE-MIT
 License text reference: license-text-ae9791f02f2bbe0c
 
 ==============================================================================
-crate:hashlink@0.9.1
+crate:hashlink@0.12.2
 License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/hashlink/0.9.1/download
+Source: https://crates.io/api/v1/crates/hashlink/0.12.2/download
 Notice file: LICENSE-APACHE
 License text reference: license-text-c144680885b29e47
 Notice file: LICENSE-MIT
@@ -2019,11 +2001,11 @@ Notice file: LICENSE
 License text reference: license-text-bbf1ea3140c4d068
 
 ==============================================================================
-crate:libsqlite3-sys@0.28.0
+crate:libsqlite3-sys@0.39.1
 License expression: MIT
-Source: https://crates.io/api/v1/crates/libsqlite3-sys/0.28.0/download
+Source: https://crates.io/api/v1/crates/libsqlite3-sys/0.39.1/download
 Notice file: LICENSE
-License text reference: license-text-1b22c746764567f5
+License text reference: license-text-6061b8ea5b16d94a
 
 ==============================================================================
 crate:libssh2-sys@0.3.3
@@ -2850,9 +2832,9 @@ Notice file: LICENSE-MIT
 License text reference: license-text-bde59a7e336fcb58
 
 ==============================================================================
-crate:rfd@0.16.0
+crate:rfd@0.17.2
 License expression: MIT
-Source: https://crates.io/api/v1/crates/rfd/0.16.0/download
+Source: https://crates.io/api/v1/crates/rfd/0.17.2/download
 Notice file: LICENSE
 License text reference: license-text-1a6dd9555214dc74
 
@@ -2868,11 +2850,11 @@ Notice file: LICENSE-other-bits
 License text reference: license-text-07414b6c33f30acf
 
 ==============================================================================
-crate:rusqlite@0.31.0
+crate:rusqlite@0.41.1
 License expression: MIT
-Source: https://crates.io/api/v1/crates/rusqlite/0.31.0/download
+Source: https://crates.io/api/v1/crates/rusqlite/0.41.1/download
 Notice file: LICENSE
-License text reference: license-text-1b22c746764567f5
+License text reference: license-text-6061b8ea5b16d94a
 
 ==============================================================================
 crate:rustc_version@0.4.1
@@ -3525,9 +3507,9 @@ Notice file: LICENSE-MIT
 License text reference: license-text-89ff9689dcf9dd53
 
 ==============================================================================
-crate:tauri-plugin-clipboard-manager@2.3.3
+crate:tauri-plugin-clipboard-manager@2.5.0
 License expression: Apache-2.0 OR MIT
-Source: https://crates.io/api/v1/crates/tauri-plugin-clipboard-manager/2.3.3/download
+Source: https://crates.io/api/v1/crates/tauri-plugin-clipboard-manager/2.5.0/download
 Notice file: LICENSE.spdx
 License text reference: license-text-eb8a6c84630461b3
 Notice file: LICENSE_APACHE-2.0
@@ -3536,9 +3518,9 @@ Notice file: LICENSE_MIT
 License text reference: license-text-89ff9689dcf9dd53
 
 ==============================================================================
-crate:tauri-plugin-dialog@2.7.2
+crate:tauri-plugin-dialog@2.8.4
 License expression: Apache-2.0 OR MIT
-Source: https://crates.io/api/v1/crates/tauri-plugin-dialog/2.7.2/download
+Source: https://crates.io/api/v1/crates/tauri-plugin-dialog/2.8.4/download
 Notice file: LICENSE.spdx
 License text reference: license-text-eb8a6c84630461b3
 Notice file: LICENSE_APACHE-2.0
@@ -3556,9 +3538,9 @@ Notice file: LICENSE_MIT
 License text reference: license-text-5a54ded175eb476b
 
 ==============================================================================
-crate:tauri-plugin-fs@2.5.1
+crate:tauri-plugin-fs@2.7.1
 License expression: Apache-2.0 OR MIT
-Source: https://crates.io/api/v1/crates/tauri-plugin-fs/2.5.1/download
+Source: https://crates.io/api/v1/crates/tauri-plugin-fs/2.7.1/download
 Notice file: LICENSE.spdx
 License text reference: license-text-eb8a6c84630461b3
 Notice file: LICENSE_APACHE-2.0
@@ -3567,9 +3549,9 @@ Notice file: LICENSE_MIT
 License text reference: license-text-89ff9689dcf9dd53
 
 ==============================================================================
-crate:tauri-plugin-opener@2.5.4
+crate:tauri-plugin-opener@2.7.2
 License expression: Apache-2.0 OR MIT
-Source: https://crates.io/api/v1/crates/tauri-plugin-opener/2.5.4/download
+Source: https://crates.io/api/v1/crates/tauri-plugin-opener/2.7.2/download
 Notice file: LICENSE.spdx
 License text reference: license-text-eb8a6c84630461b3
 Notice file: LICENSE_APACHE-2.0
@@ -3589,9 +3571,9 @@ Notice file: LICENSE_MIT
 License text reference: license-text-89ff9689dcf9dd53
 
 ==============================================================================
-crate:tauri-plugin-single-instance@2.4.5
+crate:tauri-plugin-single-instance@2.5.5
 License expression: Apache-2.0 OR MIT
-Source: https://crates.io/api/v1/crates/tauri-plugin-single-instance/2.4.5/download
+Source: https://crates.io/api/v1/crates/tauri-plugin-single-instance/2.5.5/download
 Notice file: LICENSE.spdx
 License text reference: license-text-eb8a6c84630461b3
 Notice file: LICENSE_APACHE-2.0
@@ -4304,15 +4286,6 @@ Notice file: license-mit
 License text reference: license-text-d9a1b1e30d633d57
 
 ==============================================================================
-crate:windows-collections@0.2.0
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows-collections/0.2.0/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
 crate:windows-collections@0.3.2
 License expression: MIT OR Apache-2.0
 Source: https://crates.io/api/v1/crates/windows-collections/0.3.2/download
@@ -4349,27 +4322,9 @@ Notice file: license-mit
 License text reference: license-text-d9a1b1e30d633d57
 
 ==============================================================================
-crate:windows-core@0.61.2
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows-core/0.61.2/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
 crate:windows-core@0.62.2
 License expression: MIT OR Apache-2.0
 Source: https://crates.io/api/v1/crates/windows-core/0.62.2/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
-crate:windows-future@0.2.1
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows-future/0.2.1/download
 Notice file: license-apache-2.0
 License text reference: license-text-72de958052e494b0
 Notice file: license-mit
@@ -4457,27 +4412,9 @@ Notice file: license-mit
 License text reference: license-text-d9a1b1e30d633d57
 
 ==============================================================================
-crate:windows-link@0.1.3
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows-link/0.1.3/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
 crate:windows-link@0.2.1
 License expression: MIT OR Apache-2.0
 Source: https://crates.io/api/v1/crates/windows-link/0.2.1/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
-crate:windows-numerics@0.2.0
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows-numerics/0.2.0/download
 Notice file: license-apache-2.0
 License text reference: license-text-72de958052e494b0
 Notice file: license-mit
@@ -4520,15 +4457,6 @@ Notice file: license-mit
 License text reference: license-text-d9a1b1e30d633d57
 
 ==============================================================================
-crate:windows-result@0.3.4
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows-result/0.3.4/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
 crate:windows-result@0.4.1
 License expression: MIT OR Apache-2.0
 Source: https://crates.io/api/v1/crates/windows-result/0.4.1/download
@@ -4541,15 +4469,6 @@ License text reference: license-text-d9a1b1e30d633d57
 crate:windows-strings@0.1.0
 License expression: MIT OR Apache-2.0
 Source: https://crates.io/api/v1/crates/windows-strings/0.1.0/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
-crate:windows-strings@0.4.2
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows-strings/0.4.2/download
 Notice file: license-apache-2.0
 License text reference: license-text-72de958052e494b0
 Notice file: license-mit
@@ -4628,15 +4547,6 @@ Notice file: license-mit
 License text reference: license-text-d9a1b1e30d633d57
 
 ==============================================================================
-crate:windows-threading@0.1.0
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows-threading/0.1.0/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
 crate:windows-threading@0.2.1
 License expression: MIT OR Apache-2.0
 Source: https://crates.io/api/v1/crates/windows-threading/0.2.1/download
@@ -4667,15 +4577,6 @@ License text reference: license-text-d9a1b1e30d633d57
 crate:windows@0.56.0
 License expression: MIT OR Apache-2.0
 Source: https://crates.io/api/v1/crates/windows/0.56.0/download
-Notice file: license-apache-2.0
-License text reference: license-text-72de958052e494b0
-Notice file: license-mit
-License text reference: license-text-d9a1b1e30d633d57
-
-==============================================================================
-crate:windows@0.61.3
-License expression: MIT OR Apache-2.0
-Source: https://crates.io/api/v1/crates/windows/0.61.3/download
 Notice file: license-apache-2.0
 License text reference: license-text-72de958052e494b0
 Notice file: license-mit
@@ -7047,29 +6948,6 @@ CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
 OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
 IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
-
-==============================================================================
-license-text-1b22c746764567f5
-
-Copyright (c) 2014-2021 The rusqlite developers
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
 
 ==============================================================================
 license-text-1b66e3be6894b377
@@ -13440,6 +13318,29 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+==============================================================================
+license-text-6061b8ea5b16d94a
+
+Copyright (c) 2014 The rusqlite developers
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.
 
 ==============================================================================
 license-text-60fd4b5e1281706d
@@ -23477,35 +23378,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-==============================================================================
-license-text-d03325792f3dbc26
-
-Copyright (c) 2018 Tom Kaitchuck
-
-Permission is hereby granted, free of charge, to any
-person obtaining a copy of this software and associated
-documentation files (the "Software"), to deal in the
-Software without restriction, including without
-limitation the rights to use, copy, modify, merge,
-publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software
-is furnished to do so, subject to the following
-conditions:
-
-The above copyright notice and this permission notice
-shall be included in all copies or substantial portions
-of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
-ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
-TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
-PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
-SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
-CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
-IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
-DEALINGS IN THE SOFTWARE.
 
 ==============================================================================
 license-text-d10fa7c720bcb4da

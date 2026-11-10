@@ -1,8 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createBlockTerm } from '../model/terminalSnapshot';
 import { measureRunningTerminalRows } from '../model/runningTerminalRows';
 
 describe('running terminal height', () => {
+  it('does not scan scrollback once the occupied height fills the viewport', async () => {
+    const block = createBlockTerm(80, 24);
+    try {
+      await new Promise<void>(resolve => block.term.write('line\r\n'.repeat(5000), resolve));
+      const read = vi.spyOn(block.term.buffer.active, 'getLine');
+      expect(measureRunningTerminalRows(block.term.buffer.active, 24, 1)).toBe(24);
+      expect(read).not.toHaveBeenCalled();
+    } finally { block.dispose(); }
+  });
   it('keeps its occupied rows when an interactive program clears and repaints its input', async () => {
     const block = createBlockTerm(80, 24);
     try {

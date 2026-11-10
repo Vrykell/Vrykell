@@ -39,7 +39,7 @@ export default function ModelContextSettings({ modelId, global = false, focusTar
     },
     {
       title: t('Context token budget'),
-      description: t('Input budget for this model, including instructions, images and tools. Set it within the context window supported by your provider. Use 0 for no local limit.'),
+      description: t('Input token budget. Stay within the provider limit; 0 means unlimited.'),
       control: <NumberInput label={t('Context token budget')} value={effective.contextMaxTokens} min={0} max={10000000} onChange={value => update({ contextMaxTokens: value })} />,
     },
     {
@@ -49,7 +49,7 @@ export default function ModelContextSettings({ modelId, global = false, focusTar
     },
     {
       title: t('Tool output truncation'),
-      description: t('Maximum characters in the tool preview. Complete results are retained for conversation history.'),
+      description: t('Tool preview character limit. Full results stay in history.'),
       control: <NumberInput label={t('Tool output truncation')} value={effective.contextToolChars} min={256} max={65536} onChange={value => update({ contextToolChars: value })} />,
     },
     {

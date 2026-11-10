@@ -60,7 +60,7 @@ export function AboutPage() {
     </section>
     <SettingsGroup title={t('Software updates')}>
       <Field title={t('Version')}><div className="about-version"><span data-selectable data-testid="application-version">{update.currentVersion || t('Loading…')}</span>{update.currentVersion && <CopyButton quiet text={update.currentVersion} label={t('Copy version')} />}</div></Field>
-      <Field title={t('Stable releases')} description={<span role="status" aria-live="polite">{status}</span>}>
+      {supported && <Field title={t('Stable releases')} description={<span role="status" aria-live="polite">{status}</span>}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, width: 220, maxWidth: '100%' }}>
           <OutlineButton className="primary-button about-update-button" disabled={busy || !supported} onClick={act}
             data-downloading={downloading || undefined}
@@ -71,7 +71,7 @@ export function AboutPage() {
             <ProgressBar value={downloadPercent} label={t('Update download')} />
           </div>}
         </div>
-      </Field>
+      </Field>}
       {update.notes && <Field title={t('Release notes')} layout="stacked"><div className="scroll-region" data-selectable style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', maxHeight: 180, overflowY: 'auto' }}>{update.notes}</div></Field>}
     </SettingsGroup>
     <footer className="about-footer">

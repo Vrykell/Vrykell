@@ -190,6 +190,8 @@ pending ──(输入栏提交 / 133;C)──▶ executing ──(133;D)──�
 | `133;C` | preexec | status→executing，创建单离屏 `outputTerm`；`earlyBuf` 按 typeahead 启发式丢弃或写回 |
 | `133;D;<code>` | command_finished | 提取最终 outputHtml/outputText，dispose `outputTerm`，status→done |
 
+提交的命令在 `133;C` 之前产生输出时，pending 回退从 3 秒宽限缩短为 250 毫秒；真正的 `133;C` 先到则仍以它为准。
+
 **完成推进**：
 1. `finishBlock(exitCode)`：从 `outputTerm` buffer 提取快照，释放 xterm。
 2. 更新 `useBlockStore`（status、exitCode、outputHtml/outputText/outputRaw、linesTruncated）。
@@ -220,6 +222,8 @@ pending ──(输入栏提交 / 133;C)──▶ executing ──(133;D)──�
 ```
 
 输入可见性保持这四个条件；agent 控制或标记的长时间命令通过例外保留输入栏。新增条件必须同步 `inputVisibility.test.ts` 与对应终端场景测试。长运行命令隐藏输入框时，`getLongRunningHint` 提供 "● <命令> 运行中 · 按 End 回到输入栏" 提示。
+
+`wasLongRunning` 由 SessionController 通过启发式防抖判定，而不是固定等待两秒：命令在短基础延时后仍在执行、输出后出现安静间隔（程序在等待输入）或进入备用屏幕时立即标记；在防抖窗口内完成的命令不会翻转，短命令仍保留输入框。
 
 ## 10. 渲染管线
 

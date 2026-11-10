@@ -292,6 +292,8 @@ test('a running block owns the wheel: xterm scrollback moves without scrolling t
     Array.from({ length: 40 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n',
   );
   await expectAnyTermContains(page, 'line-39', 3000);
+  // The composer hides once the command is long-running; measure the settled layout.
+  await expect(page.getByPlaceholder(/输入命令/)).toBeHidden({ timeout: 3000 });
 
   const blockScroll = () => page.evaluate(() => {
     const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
@@ -329,10 +331,12 @@ test('a running block hands the wheel to the command history once its own scroll
     Array.from({ length: 60 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n',
   );
   await expectAnyTermContains(page, 'line-59', 3000);
+  // The composer hides once the command is long-running; measure the settled layout.
+  await expect(page.getByPlaceholder(/输入命令/)).toBeHidden({ timeout: 3000 });
   await page.waitForTimeout(200);
 
   const parent = page.locator('[data-testid^="terminal-scroll-"]').first();
-  await expect.poll(() => parent.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(200);
+  await expect.poll(() => parent.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(60);
   // Park the live terminal at the top of its own scrollback; the surrounding history stays at its bottom.
   await page.evaluate(() => {
     const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
@@ -361,6 +365,8 @@ test('the command history owns the wheel until it reaches its newest position', 
     Array.from({ length: 60 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n',
   );
   await expectAnyTermContains(page, 'line-59', 3000);
+  // The composer hides once the command is long-running; measure the settled layout.
+  await expect(page.getByPlaceholder(/输入命令/)).toBeHidden({ timeout: 3000 });
   await page.waitForTimeout(200);
 
   const liveState = () => page.evaluate(() => {
@@ -384,7 +390,7 @@ test('the command history owns the wheel until it reaches its newest position', 
   expect(liveBefore.baseY).toBeGreaterThan(0);
 
   const parent = page.locator('[data-testid^="terminal-scroll-"]').first();
-  await expect.poll(() => parent.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(200);
+  await expect.poll(() => parent.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(60);
   // Reading older commands: the history still owns the wheel even over the live terminal.
   await parent.evaluate((el) => { el.scrollTop = 0; });
   await wheel(120);

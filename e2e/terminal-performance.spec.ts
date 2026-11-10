@@ -42,7 +42,52 @@ test('large command history stays readable and input reaches the terminal prompt
   const scroll = page.locator('[data-testid^="terminal-scroll-"]').first();
   const scrollHeight = await scroll.evaluate(element => element.scrollHeight);
   await scroll.evaluate(element => { element.scrollTop = 0; });
-  await expect(page.getByText('row-1-0', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('command-block-performance-1')).toContainText('row-1-0');
+  await emitPtyOutput(page, '\x1b]133;E;c3RyZWFt\x07\x1b]133;C\x07');
+  await expect(page.getByTestId('running-term')).toBeVisible();
+  const outputSpans = await page.locator('.command-block-output span').count();
+  expect(outputSpans).toBeLessThan(500);
+  const profiler = process.env.TERMINAL_PROFILE === '1' ? await page.context().newCDPSession(page) : null;
+  await profiler?.send('Performance.enable');
+  await profiler?.send('Profiler.enable');
+  await profiler?.send('Profiler.start');
+  const beforeProfile = await profiler?.send('Performance.getMetrics');
+  const scrollFrames = await page.evaluate(async () => {
+    const history = document.querySelector<HTMLElement>('.terminal-block-scroll')!;
+    const scope = window as unknown as { __TAURI_INTERNALS__: { emitPtyOutput(data: string): void } };
+    const frames: number[] = [];
+    const boundaries: number[] = [];
+    let previousBlock = '';
+    let boundaryFrames = 0;
+    for (let frame = 0; frame < 90; frame++) {
+      const start = performance.now();
+      scope.__TAURI_INTERNALS__.emitPtyOutput('live output\r\n'.repeat(20));
+      history.scrollTop += frame < 45 ? 800 : -800;
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      const elapsed = performance.now() - start;
+      const currentBlock = history.parentElement?.querySelector<HTMLElement>(':scope > .pinned-command-clip > [data-pinned-block-id]')?.dataset.pinnedBlockId ?? '';
+      if (currentBlock !== previousBlock) boundaryFrames = 2;
+      previousBlock = currentBlock;
+      if (boundaryFrames > 0) { boundaries.push(elapsed); boundaryFrames--; }
+      frames.push(elapsed);
+    }
+    return { frames: frames.sort((a, b) => a - b), boundaries };
+  });
+  const scrollP95Ms = scrollFrames.frames[Math.floor(scrollFrames.frames.length * 0.95)]!;
+  if (profiler && beforeProfile) {
+    const afterProfile = await profiler.send('Performance.getMetrics');
+    const { profile } = await profiler.send('Profiler.stop');
+    console.log('SCROLL-COST', afterProfile.metrics.filter(item => /Duration/.test(item.name)).map(item => ({ name: item.name, delta: item.value - (beforeProfile.metrics.find(previous => previous.name === item.name)?.value ?? 0) })));
+    console.log('SCROLL-HOTSPOTS', profile.nodes.filter(item => item.hitCount).sort((a, b) => (b.hitCount ?? 0) - (a.hitCount ?? 0)).slice(0, 18).map(item => ({ name: item.callFrame.functionName, url: item.callFrame.url, line: item.callFrame.lineNumber, hits: item.hitCount })));
+    await profiler.detach();
+  }
+  const scrollWorstMs = scrollFrames.frames.at(-1)!;
+  const boundaryWorstMs = Math.max(...scrollFrames.boundaries);
+  console.log('TERMINAL-SCROLL-PERFORMANCE', JSON.stringify({ scrollP95Ms, scrollWorstMs, boundaryFrames: scrollFrames.boundaries.length, boundaryWorstMs }));
+  expect(scrollFrames.boundaries.length).toBeGreaterThan(4);
+  expect(boundaryWorstMs).toBeLessThan(100);
+  expect(scrollP95Ms).toBeLessThan(40);
+  expect(scrollWorstMs).toBeLessThan(100);
   const sorted = [...latencies].sort((a, b) => a - b);
   const median = sorted[Math.floor(sorted.length / 2)]!;
   const worst = sorted[sorted.length - 1]!;

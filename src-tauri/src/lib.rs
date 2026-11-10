@@ -35,7 +35,10 @@ pub fn run() {
     // a session becomes history only when the user explicitly closes its tab (archive_session).
     let history_state = HistoryState(Mutex::new(history_db));
 
-    let app = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(not(feature = "portable"))]
+    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    let app = builder
         // Single instance first: a second launch is detected here and handed to the running window.
         .plugin(tauri_plugin_single_instance::init(|app, args, _cwd| {
             platform::context_menu::handle_secondary_launch(app, args);
@@ -44,7 +47,6 @@ pub fn run() {
         // PTY sessions before the new page can spawn its own.
         .plugin(terminal::pty::lifecycle_plugin())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_clipboard_manager::init())

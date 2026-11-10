@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { writeClipboardText } from '@platform/clipboard';
 import ErrorBox from '@ui/feedback/ErrorBox';
@@ -12,6 +12,85 @@ vi.mock('@platform/clipboard', () => ({
 const writeClipboardTextMock = vi.mocked(writeClipboardText);
 
 describe('ErrorBox', () => {
+  it('shows an explicitly placed informational notification outside the panel and expires it', () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(<ErrorBox tone="info" placement="notification" title="Repository unavailable" details="Read failed" actions={<button>Retry</button>} autoDismissMs={1000} />);
+      expect(container.querySelector('[role="status"]')).toBeNull();
+      expect(document.querySelector('#app-notifications [role="status"]')).toHaveAttribute('data-tone', 'info');
+      expect(screen.getByRole('button', { name: 'Retry' })).toBeVisible();
+      expect(screen.queryByRole('alert')).toBeNull();
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.queryByRole('status')).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
+  it('pauses ordinary notification expiry while the page is hidden', () => {
+    vi.useFakeTimers();
+    const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(false);
+    try {
+      render(<ErrorBox title="File unavailable" autoDismissMs={1000} />);
+      act(() => vi.advanceTimersByTime(400));
+      hidden.mockReturnValue(true);
+      fireEvent(document, new Event('visibilitychange'));
+      act(() => vi.advanceTimersByTime(10000));
+      expect(screen.getByRole('alert')).toBeVisible();
+      hidden.mockReturnValue(false);
+      fireEvent(document, new Event('visibilitychange'));
+      act(() => vi.advanceTimersByTime(599));
+      expect(screen.getByRole('alert')).toBeVisible();
+      act(() => vi.advanceTimersByTime(1));
+      expect(screen.queryByRole('alert')).toBeNull();
+    } finally { hidden.mockRestore(); vi.useRealTimers(); }
+  });
+  it('retains remaining time while hovered or focused before automatically dismissing an ordinary error', () => {
+    vi.useFakeTimers();
+    try {
+      const dismiss = vi.fn();
+      render(<ErrorBox title="File unavailable" autoDismissMs={1000} onDismiss={dismiss} />);
+      const card = screen.getByRole('alert');
+      act(() => vi.advanceTimersByTime(400));
+      fireEvent.mouseEnter(card);
+      act(() => vi.advanceTimersByTime(5000));
+      expect(card).toBeVisible();
+      fireEvent.focus(card);
+      fireEvent.mouseLeave(card);
+      act(() => vi.advanceTimersByTime(5000));
+      expect(card).toBeVisible();
+      fireEvent.blur(card);
+      act(() => vi.advanceTimersByTime(599));
+      expect(card).toBeVisible();
+      act(() => vi.advanceTimersByTime(1));
+      expect(screen.queryByRole('alert')).toBeNull();
+      expect(dismiss).toHaveBeenCalledOnce();
+    } finally { vi.useRealTimers(); }
+  });
+  it('keeps expanded details available until the user finishes reading', () => {
+    vi.useFakeTimers();
+    try {
+      render(<ErrorBox title="File unavailable" details="Read failed" autoDismissMs={1000} />);
+      fireEvent.click(screen.getByRole('button', { name: '技术详情' }));
+      act(() => vi.advanceTimersByTime(10000));
+      expect(screen.getByText('Read failed')).toBeVisible();
+      fireEvent.click(screen.getByRole('button', { name: '技术详情' }));
+      act(() => vi.advanceTimersByTime(1000));
+      expect(screen.queryByRole('alert')).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
+  it('keeps persistent failures until dismissed and gives a new failure its own time budget', () => {
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(<ErrorBox title="Persistent failure" />);
+      act(() => vi.advanceTimersByTime(60000));
+      expect(screen.getByRole('alert')).toBeVisible();
+      rerender(<ErrorBox title="First failure" autoDismissMs={1000} />);
+      act(() => vi.advanceTimersByTime(900));
+      rerender(<ErrorBox title="Second failure" autoDismissMs={1000} />);
+      act(() => vi.advanceTimersByTime(999));
+      expect(screen.getByRole('alert')).toHaveTextContent('Second failure');
+      act(() => vi.advanceTimersByTime(1));
+      expect(screen.queryByRole('alert')).toBeNull();
+    } finally { vi.useRealTimers(); }
+  });
   it('supports persistent transcript failures inline without a notification portal', () => {
     const { container } = render(<ErrorBox placement="inline" dismissible={false} title="Tool failed" details="Diagnostic output" actions={<button>Retry tool</button>} />);
     expect(container.querySelector('[role="alert"]')).not.toBeNull();

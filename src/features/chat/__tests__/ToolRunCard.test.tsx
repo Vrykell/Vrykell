@@ -47,9 +47,11 @@ it('keeps restored failures quiet until explicitly reviewed in the shared notifi
   }
 });
 
-it('announces a live failure once and keeps refusals and cancellations out of the card footer', () => {
+it('keeps live failures quiet until reviewed and retains refusals and cancellations', () => {
   const view = render(<ToolRunCard run={{ ...command, state: 'running' }} />);
   view.rerender(<ToolRunCard run={{ ...command, state: 'error', error: 'Connection closed' }} />);
+  expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: /运行命令 npm run build/ }));
   expect(document.querySelector('#app-notifications [role="alert"]')).toHaveTextContent('Connection closed');
   expect(view.container.querySelector('.ai-tool-verdict')).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: '关闭错误提示' }));

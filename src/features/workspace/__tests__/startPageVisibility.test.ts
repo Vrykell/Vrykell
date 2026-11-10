@@ -21,3 +21,14 @@ it('shows the main AI start tab when the only conversations belong to the sideba
   expect(starts).toHaveLength(1);
   expect(useWorkspaceStore.getState().activeId).toBe(starts[0]!.id);
 });
+
+it.each(['terminal', 'code', 'ai'] as const)('selects the existing empty %s start when focus still belongs to another area', area => {
+  const kind = { terminal: 'start', code: 'start-code', ai: 'start-ai' }[area] as 'start' | 'start-code' | 'start-ai';
+  useWorkspaceStore.setState({ tabs: [{ id: 'start', title: 'Start', kind, titleSource: 'manual' }], activeId: 'previous-area' });
+  useWorkspaceNavigation.setState({ area });
+  useAiWorkspace.setState({ nativeTabs: [], sideSessions: [], sideSelected: '' });
+  useChatStore.setState({ conversations: [] });
+  useHarnessWorkspace.setState({ connections: [] });
+  useWorkspaceStore.getState().ensureStartPages();
+  expect(useWorkspaceStore.getState().activeId).toBe('start');
+});

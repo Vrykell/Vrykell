@@ -107,6 +107,20 @@ describe('useTerminalFocus', () => {
     unmount();
   });
 
+  it('rechecks idle focus when a running command becomes long-running', () => {
+    const { rerender, unmount } = renderHook(
+      ({ recheck }) => useTerminalFocus(true, 'pane-1', recheck),
+      { initialProps: { recheck: false } },
+    );
+    expect(mocks.focus).toHaveBeenCalledTimes(1);
+
+    mocks.focus.mockClear();
+    rerender({ recheck: true });
+    expect(mocks.focus).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+
   it('falls back to the pane terminal and stays inert without one', () => {
     mocks.executing.mockReturnValue(undefined);
     mocks.instances.set('pane-1', terminal());

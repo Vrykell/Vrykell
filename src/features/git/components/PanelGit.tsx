@@ -107,7 +107,7 @@ export default function PanelGit() {
     </SidebarToolbar>
     {context.unavailableConnection && <div className="git-empty">{t('Save this SSH connection before browsing changes.')}</div>}
     {!context.target && !context.unavailableConnection && <div className="git-empty">{t('Open a terminal in a project to browse changes.')}</div>}
-    {repository.error && <ErrorBox title={t('Could not load repository')} details={repository.error}
+    {repository.error && <ErrorBox tone="info" placement="notification" autoDismissMs={8000} title={t('Could not load repository')} details={repository.error}
       actions={<TextButton onClick={refresh}>{t('Retry')}</TextButton>} />}
     {context.target && !snapshot && !repository.error && <div className="git-empty" role="status">{repository.loading ? t('Finding repository…') : t('The current directory is not in a repository.')}</div>}
     {snapshot && <div className="git-content scroll-region" data-testid="git-content">
