@@ -13,6 +13,13 @@
 <p>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="Apache-2.0" /></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-3b82f6?style=flat-square" alt="Windows, macOS, Linux" />
+  <a href="https://atomgit.com/Vrykell/Vrykell" target="_blank" rel="noopener noreferrer">
+  <img
+    alt="AtomGit Star"
+    src="https://atomgit.com/Vrykell/Vrykell/star/badge.svg"
+    height="20"
+  >
+  </a>
 </p>
 
 <p>
@@ -193,6 +200,8 @@ npm run check:architecture
 
 ## 社区与文档
 
+[AtomGit](https://atomgit.com/Vrykell/Vrykell)：  在国内托管本项目，帮助中国大陆用户更快访问项目与下载 Release
+
 交流群：**1130135497**。欢迎分享工作流程、交流问题和讨论项目。
 
 Discord：[加入 Vrykell 社区](https://discord.gg/ZqKPd5DW)。
@@ -212,6 +221,7 @@ Discord：[加入 Vrykell 社区](https://discord.gg/ZqKPd5DW)。
 - [安全模型](docs/zh/security-model.md)
 - [开发规则](docs/zh/development-rules.md)
 - [CI 与安装包](docs/zh/ci.md)
+
 
 ## 许可
 
