@@ -37,6 +37,7 @@ test('creates both mirror releases, uploads binaries and verifies attachment mem
         if (options.method === 'POST') {
           const body = JSON.parse(options.body);
           assert.equal(body.target_commitish, 'abc');
+          assert.match(body.body, /https:\/\/github.com\/Vrykell\/Vrykell\/releases\/download\/v0.1.9\/portable.zip/);
           assert.equal(host === 'atomgit' ? body.release_status : body.prerelease, host === 'atomgit' ? 'latest' : false);
           release = { ...body, id: 1, assets };
           return Response.json(release);

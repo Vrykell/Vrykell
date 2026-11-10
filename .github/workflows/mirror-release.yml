@@ -9,10 +9,14 @@ on:
         required: true
         default: v0.1.9
         type: string
+      metadata_only:
+        description: Update release notes and download links without binary uploads
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
-  group: mirror-release-${{ inputs.tag || github.event.release.tag_name }}
+  group: mirror-release-${{ inputs.tag || github.event.release.tag_name }}-${{ inputs.metadata_only || false }}
   cancel-in-progress: false
 jobs:
   mirror:
@@ -34,9 +38,10 @@ jobs:
           MIRROR_TOKEN: ${{ matrix.host == 'gitee' && secrets.GITEE_TOKEN || secrets.ATOMGIT_TOKEN }}
           MIRROR_HOST: ${{ matrix.host }}
           MIRROR_USE_CURL: 'true'
+          MIRROR_METADATA_ONLY: ${{ inputs.metadata_only || false }}
           TAG: ${{ inputs.tag || github.event.release.tag_name }}
         run: |
           set -euo pipefail
           gh release view "$TAG" --repo Vrykell/Vrykell --json name,body,tagName,targetCommitish,assets > release.json
-          gh release download "$TAG" --repo Vrykell/Vrykell --dir release-assets
+          if [ "$MIRROR_METADATA_ONLY" != true ]; then gh release download "$TAG" --repo Vrykell/Vrykell --dir release-assets; fi
           node scripts/mirror-release.mjs
