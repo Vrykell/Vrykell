@@ -188,6 +188,8 @@ For an external agent, add its startup command in ACP settings. Leave the projec
 
 ## Contributing
 
+The main repository is hosted on [GitHub](https://github.com/Vrykell/Vrykell). Please submit contribution PRs there.
+
 **Contribution PRs target `dev`.** Maintainers use `main` for integration and version builds. Read the [contributing guide](CONTRIBUTING.en.md) for setup, branch naming, checks and review. Bug reports should include reproduction steps and the platform; discuss substantial features in an issue first.
 
 ```bash

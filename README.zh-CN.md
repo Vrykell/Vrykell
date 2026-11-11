@@ -188,6 +188,8 @@ npm run tauri dev
 
 ## 参与贡献
 
+主仓库托管在 [GitHub](https://github.com/Vrykell/Vrykell)，请将贡献 PR 提交到该仓库。
+
 **贡献 PR 以 `dev` 为目标分支。** `main` 用于维护者集成和版本构建。开发环境、分支命名、检查与评审要求见[贡献指南](CONTRIBUTING.md)。报告问题请附上复现步骤和平台信息；较大的功能请先开 Issue 讨论。
 
 ```bash
