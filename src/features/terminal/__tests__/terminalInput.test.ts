@@ -20,6 +20,26 @@ describe('terminal composition placement', () => {
     expect(view.style.fontFamily).toBe('monospace');
     expect(textarea.getAttribute('autocorrect')).toBe('off');
   });
+
+  it('marks the composition view when the program hides the hardware cursor', () => {
+    const element = document.createElement('div');
+    element.innerHTML = '<textarea></textarea><div class="composition-view"></div>';
+    const textarea = element.querySelector('textarea')!;
+    const term = { element, textarea, options: {}, _core: { coreService: { isCursorHidden: true } } } as unknown as Terminal;
+    configureTerminalInput(term);
+    textarea.dispatchEvent(new CompositionEvent('compositionstart'));
+    expect(element.querySelector('.composition-view')!.getAttribute('data-cursor-hidden')).toBe('true');
+  });
+
+  it('clears the marker when the hardware cursor stays visible', () => {
+    const element = document.createElement('div');
+    element.innerHTML = '<textarea></textarea><div class="composition-view" data-cursor-hidden="true"></div>';
+    const textarea = element.querySelector('textarea')!;
+    const term = { element, textarea, options: {}, _core: { coreService: { isCursorHidden: false } } } as unknown as Terminal;
+    configureTerminalInput(term);
+    textarea.dispatchEvent(new CompositionEvent('compositionstart'));
+    expect(element.querySelector('.composition-view')!.hasAttribute('data-cursor-hidden')).toBe(false);
+  });
 });
 
 it('forwards an otherwise unhandled native text commit once and preserves composition', async () => {

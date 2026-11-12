@@ -1287,9 +1287,13 @@ button.md-code-block-action.text-control { min-height: 22px; gap: 4px; padding: 
  * text with no insertion point. Reserve a cell after the text and paint the terminal
  * cursor colour into it, blinking on the renderer's one-second cycle. The caret is
  * positioned against the box edge on purpose: newer terminal builds lay this overlay out
- * right-to-left, where an in-flow element would land before the text. */
-.xterm .xterm-helpers .composition-view.active { padding-right: 1ch; }
-.xterm .xterm-helpers .composition-view.active::after {
+ * right-to-left, where an in-flow element would land before the text.
+ *
+ * A full-screen program that hides the hardware cursor (DECTCEM) draws its own cursor, so
+ * painting the caret here would show two. `terminalInput` marks the view with
+ * `data-cursor-hidden` in that case and this compensation is skipped. */
+.xterm .xterm-helpers .composition-view.active:not([data-cursor-hidden="true"]) { padding-right: 1ch; }
+.xterm .xterm-helpers .composition-view.active:not([data-cursor-hidden="true"])::after {
   content: '';
   position: absolute;
   top: 0;

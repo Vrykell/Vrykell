@@ -118,6 +118,13 @@ export function configureTerminalInput(term: Terminal): void {
     view.style.fontFamily = term.options.fontFamily ?? '';
     view.style.fontSize = `${term.options.fontSize ?? 14}px`;
     view.style.lineHeight = input.style.lineHeight;
-    terminalDebug('terminal-composition-anchor', { positioned: Boolean(input.style.top && input.style.left) });
+    // A program that hides the hardware cursor (DECTCEM, CSI ?25l) draws its own cursor, so the
+    // compensation caret painted by theme.css would double it. Mark the view and let the program's
+    // own cursor stand alone; shells that keep the hardware cursor visible get the caret as before.
+    const hidden = (term as unknown as { _core?: { coreService?: { isCursorHidden: boolean } } })
+      ._core?.coreService?.isCursorHidden;
+    if (hidden) view.setAttribute('data-cursor-hidden', 'true');
+    else view.removeAttribute('data-cursor-hidden');
+    terminalDebug('terminal-composition-anchor', { positioned: Boolean(input.style.top && input.style.left), cursorHidden: Boolean(hidden) });
   }, { capture: true });
 }
