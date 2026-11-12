@@ -253,7 +253,7 @@ function CommandLibrary({ context, visible, onChooseRoot }: {
         removeLabel={t('Remove filter: {{filter}}', { filter: filter.label })} onRemove={filter.remove}>{filter.label}</FilterChip>)}
     </div>}
     {library.error && <ErrorBox title={t('Could not load or save command history')} details={library.error} actions={<TextButton onClick={library.retry}>{t('Retry')}</TextButton>} />}
-    {error && <ErrorBox title={t('Command action failed')} actions={<TextButton onClick={() => setError('')}>{t('Dismiss')}</TextButton>}>{error}</ErrorBox>}
+    {error && <ErrorBox title={t('Command action failed')} autoDismissMs={8000} actions={<TextButton onClick={() => setError('')}>{t('Dismiss')}</TextButton>}>{error}</ErrorBox>}
     {visible && filterMenu && <HistoryOptionMenu anchor={filterMenu} testId="command-history-filter-menu" width={184} sections={[
       { label: t('Command status'), options: [{ value: 'all', label: t('All statuses') }, { value: 'success', label: t('Succeeded') }, { value: 'failed', label: t('Failed') }]
         .map(option => ({ label: option.label, active: status === option.value, onSelect: () => setStatus(option.value) })) },
