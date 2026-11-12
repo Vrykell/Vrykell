@@ -17,9 +17,9 @@
      emoji fallbacks, whose proportional advances can break terminal alignment. */
   --font-mono: "Maple Mono NF CN", "Cascadia Mono", "Cascadia Code", Menlo, Monaco, "JetBrains Mono", "Sarasa Mono SC", "Noto Sans Mono CJK SC", "Noto Sans Mono", "DejaVu Sans Mono", monospace, "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji";
 
-  --radius-sm: 10px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
   --radius-card: var(--radius-md);
   --radius-block: var(--radius-lg);
   --radius-inner: var(--radius-sm);
