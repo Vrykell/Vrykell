@@ -14,16 +14,15 @@
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="Apache-2.0" /></a>
   <img src="https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-3b82f6?style=flat-square" alt="Windows, macOS, Linux" />
   <a href="https://atomgit.com/Vrykell/Vrykell" target="_blank" rel="noopener noreferrer">
-  <img
-    alt="AtomGit Star"
-    src="https://atomgit.com/Vrykell/Vrykell/star/badge.svg"
-    height="20"
-  >
-  </a>
 </p>
 
 <p>
   <a href="https://www.producthunt.com/products/vrykell?embed=true&amp;utm_source=badge-featured&amp;utm_medium=badge&amp;utm_campaign=badge-vrykell"><picture><source media="(prefers-color-scheme: dark)" srcset="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1300533&amp;theme=dark"><img src="https://api.producthunt.com/widgets/embed-image/v1/featured.svg?post_id=1300533&amp;theme=light" alt="Vrykell 在 Product Hunt" width="250" height="54" /></picture></a>
+  <img
+    alt="AtomGit Star"
+    src="https://atomgit.com/Vrykell/Vrykell/star/new_badge.svg"
+  >
+  </a>
 </p>
 
 </div>
@@ -206,7 +205,7 @@ npm run check:architecture
 
 交流群：**1130135497**。欢迎分享工作流程、交流问题和讨论项目。
 
-Discord：[加入 Vrykell 社区](https://discord.gg/ZqKPd5DW)。
+Discord：[加入 Vrykell 社区](https://discord.gg/kfxmbjbz)。
 
 <details>
 <summary>交流群二维码</summary>
