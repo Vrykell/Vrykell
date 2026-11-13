@@ -30,7 +30,6 @@ import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/
 import { captureTerminalPaste, copyTerminalSelection, hasCopyableSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { measureRunningTerminalRows } from '../model/runningTerminalRows';
-import { isHistoryAtBottom, routeRunningWheel, WHEEL_BOUNDARY_IDLE, type WheelBoundaryState } from '../model/runningWheel';
 import { repaintTerminal } from '../model/terminalResize';
 import { useSessionStore, useUnifiedWorkspace, useWorkspaceNavigation } from '@features/workspace';
 import { useManualFullscreenVisible } from '../hooks/useManualFullscreenVisible';
@@ -434,33 +433,6 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
       }
       return true;
     });
-    // The wheel is routed on the host in the capture phase, before xterm's scrollable element
-    // consumes the event: one decision per gesture, so a continuous scroll crosses surfaces
-    // in real time instead of being handled twice or paused at a boundary.
-    let boundary: WheelBoundaryState = WHEEL_BOUNDARY_IDLE;
-    const routeWheel = (event: WheelEvent) => {
-      // Alternate screens and mouse-protocol programs own their wheel natively.
-      if (term.modes.mouseTrackingMode !== 'none' || term.buffer.active.type === 'alternate') return;
-      const history = host.closest<HTMLElement>('.terminal-block-scroll');
-      let historyDelta = event.deltaY;
-      if (history && event.deltaMode === WheelEvent.DOM_DELTA_PAGE) historyDelta = event.deltaY * history.clientHeight;
-      else if (history && event.deltaMode === WheelEvent.DOM_DELTA_LINE) historyDelta = event.deltaY * (parseFloat(getComputedStyle(history).lineHeight) || 16);
-      const lineHeight = Math.max(1, getCellMetrics(term).height);
-      const delta = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? event.deltaY * lineHeight
-        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? event.deltaY * lineHeight * term.rows : event.deltaY;
-      const decided = routeRunningWheel({
-        position: term.buffer.active,
-        historyScrollable: history ? !isHistoryAtBottom(history) : null,
-        delta,
-        historyDelta,
-      }, boundary);
-      boundary = decided.boundary;
-      if (decided.route.surface === 'terminal') return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (decided.route.surface === 'history' && history) history.scrollTop += decided.route.delta;
-    };
-    host.addEventListener('wheel', routeWheel, { capture: true, passive: false });
     // Recheck terminal columns when the host width changes, including its first layout.
     let lastHostWidth = -1;
     const widthRo = new ResizeObserver(() => {
@@ -516,7 +488,6 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
       unsubscribeActiveTab();
       cancelAnimationFrame(restoreRaf);
       cancelAnimationFrame(openResyncRaf);
-      host.removeEventListener('wheel', routeWheel, { capture: true });
       widthRo.disconnect();
       visibilityRo.disconnect();
       document.removeEventListener('visibilitychange', onVisibilityChange);
