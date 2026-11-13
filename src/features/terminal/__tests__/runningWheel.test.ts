@@ -4,6 +4,7 @@ import {
   routeRunningWheel,
   takeWheelWithinMargin,
   WHEEL_BOUNDARY_IDLE,
+  WHEEL_GESTURE_IDLE,
   WHEEL_ROUTE_MARGIN_PX,
   wheelLeavesRunningTerminal,
 } from '../model/runningWheel';
@@ -84,39 +85,60 @@ describe('running wheel routing', () => {
   it('routes a downward gesture to the history while it still has newer content in view', () => {
     const result = routeRunningWheel(
       { position: terminal(5, 20), historyScrollable: true, delta: 120, historyDelta: 120 },
-      WHEEL_BOUNDARY_IDLE,
+      WHEEL_GESTURE_IDLE,
     );
     expect(result.route).toEqual({ surface: 'history', delta: 120 });
-    expect(result.boundary).toEqual(WHEEL_BOUNDARY_IDLE);
+    expect(result.state).toEqual({ boundary: WHEEL_BOUNDARY_IDLE, historyEndReached: false });
   });
 
   it('routes an upward gesture to the live terminal even while the history is scrollable', () => {
     const result = routeRunningWheel(
       { position: terminal(5, 20), historyScrollable: true, delta: -120, historyDelta: -120 },
-      WHEEL_BOUNDARY_IDLE,
+      WHEEL_GESTURE_IDLE,
     );
     expect(result.route).toEqual({ surface: 'terminal' });
-    expect(result.boundary).toEqual(WHEEL_BOUNDARY_IDLE);
+    expect(result.state).toEqual({ boundary: WHEEL_BOUNDARY_IDLE, historyEndReached: false });
   });
 
   it('keeps the wheel on the native terminal path while the scrollback has room', () => {
     const result = routeRunningWheel(
       { position: terminal(5, 20), historyScrollable: false, delta: 120, historyDelta: 120 },
-      WHEEL_BOUNDARY_IDLE,
+      WHEEL_GESTURE_IDLE,
     );
     expect(result.route).toEqual({ surface: 'terminal' });
-    expect(result.boundary).toEqual(WHEEL_BOUNDARY_IDLE);
+    expect(result.state.historyEndReached).toBe(true);
+  });
+
+  it('latches a downward gesture onto the terminal once the history showed its newest content', () => {
+    // Streaming output reopens a few pixels of bottom gap between follow snaps; the latch
+    // keeps the rest of the gesture on the terminal instead of chasing the moving bottom.
+    const latched = { boundary: WHEEL_BOUNDARY_IDLE, historyEndReached: true };
+    const result = routeRunningWheel(
+      { position: terminal(5, 20), historyScrollable: true, delta: 120, historyDelta: 120 },
+      latched,
+    );
+    expect(result.route).toEqual({ surface: 'terminal' });
+    expect(result.state).toEqual(latched);
+  });
+
+  it('clears the latch when the gesture reverses upward', () => {
+    const result = routeRunningWheel(
+      { position: terminal(5, 20), historyScrollable: true, delta: -120, historyDelta: -120 },
+      { boundary: WHEEL_BOUNDARY_IDLE, historyEndReached: true },
+    );
+    expect(result.route).toEqual({ surface: 'terminal' });
+    expect(result.state.historyEndReached).toBe(false);
   });
 
   it('hands an upward gesture to the history once the live scrollback ends, after the margin', () => {
     const first = routeRunningWheel(
       { position: terminal(0, 20), historyScrollable: false, delta: -120, historyDelta: -120 },
-      WHEEL_BOUNDARY_IDLE,
+      WHEEL_GESTURE_IDLE,
     );
     expect(first.route).toEqual({ surface: 'history', delta: WHEEL_ROUTE_MARGIN_PX - 120 });
     const second = routeRunningWheel(
       { position: terminal(0, 20), historyScrollable: false, delta: -120, historyDelta: -120 },
-      first.boundary,
+      first.state,
     );
     expect(second.route).toEqual({ surface: 'history', delta: -120 });
   });
@@ -124,36 +146,36 @@ describe('running wheel routing', () => {
   it('absorbs a gesture that sits on a boundary with nothing left to move', () => {
     const result = routeRunningWheel(
       { position: terminal(20, 20), historyScrollable: false, delta: 120, historyDelta: 120 },
-      WHEEL_BOUNDARY_IDLE,
+      WHEEL_GESTURE_IDLE,
     );
     expect(result.route).toEqual({ surface: 'boundary' });
-    expect(result.boundary).toEqual({ direction: 1, distance: WHEEL_ROUTE_MARGIN_PX });
+    expect(result.state).toEqual({ boundary: { direction: 1, distance: WHEEL_ROUTE_MARGIN_PX }, historyEndReached: true });
   });
 
   it('chains a scrollback-less terminal straight to the history after the margin', () => {
     const result = routeRunningWheel(
       { position: terminal(0, 0), historyScrollable: false, delta: -120, historyDelta: -120 },
-      WHEEL_BOUNDARY_IDLE,
+      WHEEL_GESTURE_IDLE,
     );
     expect(result.route).toEqual({ surface: 'history', delta: WHEEL_ROUTE_MARGIN_PX - 120 });
   });
 
   it('keeps a fullscreen terminal on its native path with no history to chain into', () => {
-    const held = { direction: -1, distance: WHEEL_ROUTE_MARGIN_PX } as const;
+    const held = { boundary: { direction: -1, distance: WHEEL_ROUTE_MARGIN_PX }, historyEndReached: false } as const;
     const result = routeRunningWheel(
       { position: terminal(0, 20), historyScrollable: null, delta: -120, historyDelta: -120 },
       held,
     );
     expect(result.route).toEqual({ surface: 'terminal' });
-    expect(result.boundary).toEqual(held);
+    expect(result.state).toEqual(held);
   });
 
   it('absorbs zero vertical deltas at a boundary without moving the margin', () => {
     const result = routeRunningWheel(
       { position: terminal(5, 20), historyScrollable: false, delta: 0, historyDelta: 0 },
-      WHEEL_BOUNDARY_IDLE,
+      WHEEL_GESTURE_IDLE,
     );
     expect(result.route).toEqual({ surface: 'boundary' });
-    expect(result.boundary).toEqual(WHEEL_BOUNDARY_IDLE);
+    expect(result.state).toEqual({ boundary: WHEEL_BOUNDARY_IDLE, historyEndReached: true });
   });
 });
