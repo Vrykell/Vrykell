@@ -9,6 +9,12 @@ const source = JSON.parse(await fs.readFile('release.json', 'utf8'));
 if (!/^v\d+\.\d+\.\d+$/.test(source.tagName)) throw new Error('Invalid stable tag');
 const body = `${source.body || ''}\n\n## Downloads\n\n${source.assets.map(asset => `- [${asset.name}](https://github.com/Vrykell/Vrykell/releases/download/${source.tagName}/${encodeURIComponent(asset.name)})`).join('\n')}`;
 const base = host === 'gitee' ? 'https://gitee.com/api/v5' : 'https://api.atomgit.com/api/v5';
+/**
+ * Per-attachment ceiling of the mirror host. Gitee rejects larger single attachments, and one
+ * rejected file must not strand the rest of the release, so oversized assets are reported and
+ * skipped instead of aborting the whole transfer.
+ */
+const ATTACHMENT_LIMIT_BYTES = host === 'gitee' ? 100 * 1024 * 1024 : Infinity;
 const request = async (route, options = {}) => {
   const url = new URL(`${base}/repos/Vrykell/Vrykell${route}`);
   url.searchParams.set('access_token', token);
@@ -38,9 +44,16 @@ try {
     process.exit(0);
   }
   let existing = host === 'gitee' ? await request(`/releases/${release.id}/attach_files`) : release.assets || [];
+  const skipped = new Set();
   for (const asset of source.assets) {
     if (path.basename(asset.name) !== asset.name) throw new Error('Invalid asset filename');
     if (existing.some(item => item.name === asset.name)) continue;
+    if (asset.size > ATTACHMENT_LIMIT_BYTES) {
+      // The host refuses this file outright; note it and keep the remaining attachments moving.
+      skipped.add(asset.name);
+      console.log(`${host}: skipped ${asset.name} (${Math.round(asset.size / 1024 / 1024)} MB exceeds the attachment limit)`);
+      continue;
+    }
     const bytes = await fs.readFile(path.join('release-assets', asset.name));
     const file = path.join('release-assets', asset.name);
     if (host === 'gitee') {
@@ -69,8 +82,10 @@ try {
   releases = await request('/releases?per_page=100');
   release = releases.find(item => item.tag_name === source.tagName);
   existing = host === 'gitee' ? await request(`/releases/${release.id}/attach_files`) : release.assets || [];
-  if (!source.assets.every(asset => existing.some(item => item.name === asset.name))) throw new Error(`${host}: missing release attachments`);
-  console.log(`${host}: verified ${source.tagName}, ${source.assets.length} attachments`);
+  const expected = source.assets.filter(asset => !skipped.has(asset.name));
+  if (!expected.every(asset => existing.some(item => item.name === asset.name))) throw new Error(`${host}: missing release attachments`);
+  if (skipped.size) console.log(`${host}: verified ${source.tagName}, ${expected.length} attachments (${skipped.size} over the limit)`);
+  else console.log(`${host}: verified ${source.tagName}, ${expected.length} attachments`);
 } catch (error) {
   console.error(error.message);
   process.exitCode = 1;
