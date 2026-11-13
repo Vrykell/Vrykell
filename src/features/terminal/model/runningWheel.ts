@@ -58,3 +58,58 @@ export function wheelLeavesRunningTerminal(position: RunningWheelPosition, delta
   if (delta > 0) return position.viewportY >= position.baseY;
   return true;
 }
+
+/** Where a wheel gesture over a running block's live terminal should go next. */
+export type RunningWheelRoute =
+  /** The surrounding command history scrolls by the given distance. */
+  | { surface: 'history'; delta: number }
+  /** The live terminal keeps the gesture on its native wheel path. */
+  | { surface: 'terminal' }
+  /** The gesture sits on a routing boundary with nothing left to move; absorb it. */
+  | { surface: 'boundary' };
+
+/** Inputs the running-block wheel router decides from, measured per surface. */
+export interface RunningWheelGesture {
+  /** Live terminal position and the end of its own scrollback. */
+  position: RunningWheelPosition;
+  /**
+   * Whether the surrounding command history still has content above its newest position;
+   * null when the terminal has no surrounding history (manual fullscreen).
+   */
+  historyScrollable: boolean | null;
+  /** Wheel distance in px measured on the live terminal surface. */
+  delta: number;
+  /** Wheel distance in px measured on the surrounding history surface. */
+  historyDelta: number;
+}
+
+/**
+ * Route one wheel event between the live terminal and the surrounding command history.
+ *
+ * Scrolling down first unwinds the outer history, because that brings the full running
+ * terminal back into view; scrolling up reads the live scrollback first and only reaches
+ * for older commands once that scrollback ends. Either hand-off trims the boundary margin
+ * from the first movement so the same gesture continues without a pause.
+ */
+export function routeRunningWheel(
+  gesture: RunningWheelGesture,
+  boundary: WheelBoundaryState,
+): { route: RunningWheelRoute; boundary: WheelBoundaryState } {
+  const direction = Math.sign(gesture.delta);
+  if (gesture.historyScrollable === true && direction > 0) {
+    return { route: { surface: 'history', delta: gesture.historyDelta }, boundary: WHEEL_BOUNDARY_IDLE };
+  }
+  if (!wheelLeavesRunningTerminal(gesture.position, gesture.delta)) {
+    return { route: { surface: 'terminal' }, boundary: WHEEL_BOUNDARY_IDLE };
+  }
+  if (gesture.historyScrollable === null) {
+    return { route: { surface: 'terminal' }, boundary };
+  }
+  const trimmed = takeWheelWithinMargin(boundary, gesture.delta);
+  if (trimmed.remaining === 0 || direction > 0) {
+    // A downward gesture past the live end has nowhere left to go: the history already shows
+    // its newest content, so the boundary absorbs the rest of the movement.
+    return { route: { surface: 'boundary' }, boundary: trimmed.state };
+  }
+  return { route: { surface: 'history', delta: trimmed.remaining }, boundary: trimmed.state };
+}
