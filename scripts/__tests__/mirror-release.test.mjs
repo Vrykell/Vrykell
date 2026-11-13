@@ -63,3 +63,52 @@ test('creates both mirror releases, uploads binaries and verifies attachment mem
     await fs.rm(directory, { recursive: true, force: true });
   }
 });
+
+test('omits attachments above the host limit instead of stranding the rest of the release', async () => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'release-mirror-limit-'));
+  const original = { cwd: process.cwd(), fetch: globalThis.fetch, host: process.env.MIRROR_HOST, token: process.env.MIRROR_TOKEN };
+  try {
+    await fs.mkdir(path.join(directory, 'release-assets'));
+    await fs.writeFile(path.join(directory, 'release-assets', 'small.zip'), 'archive');
+    // Gitee refuses single attachments above 100 MB; the oversized image must not block the rest.
+    await fs.writeFile(path.join(directory, 'release.json'), JSON.stringify({
+      tagName: 'v0.1.10', name: 'Release', body: 'Changes', targetCommitish: 'abc',
+      assets: [
+        { name: 'huge.AppImage', size: 120 * 1024 * 1024 },
+        { name: 'small.zip', size: 1024 },
+      ],
+    }));
+    process.chdir(directory);
+    process.env.MIRROR_TOKEN = 'fixture-token';
+    process.env.MIRROR_HOST = 'gitee';
+    let release;
+    const assets = [];
+    globalThis.fetch = async (input, options = {}) => {
+      const url = new URL(input);
+      if (url.pathname.endsWith('/attach_files')) {
+        if (options.method === 'POST') {
+          const name = options.body.get('file').name;
+          assert.equal(name, 'small.zip');
+          assets.push({ name });
+        }
+        return Response.json(assets);
+      }
+      if (options.method === 'PATCH') return Response.json(release);
+      if (options.method === 'POST') {
+        const body = JSON.parse(options.body);
+        release = { ...body, id: 1, assets };
+        return Response.json(release);
+      }
+      return Response.json(release ? [release] : []);
+    };
+    await import('../mirror-release.mjs?fixture=limit');
+    assert.deepEqual(assets, [{ name: 'small.zip' }]);
+  } finally {
+    process.chdir(original.cwd);
+    globalThis.fetch = original.fetch;
+    for (const [name, value] of [['MIRROR_HOST', original.host], ['MIRROR_TOKEN', original.token]]) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+    await fs.rm(directory, { recursive: true, force: true });
+  }
+});
