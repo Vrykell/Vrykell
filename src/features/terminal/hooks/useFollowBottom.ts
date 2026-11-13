@@ -5,6 +5,8 @@ import { terminalDebug } from '../services/terminalDebug';
 import { blockTerminalFor } from '../services/terminalRepaint';
 
 const BOTTOM_THRESHOLD_PX = 32;
+/** A user upward gesture keeps its position past the bottom band until this window lapses. */
+const WHEEL_BAND_GUARD_MS = 250;
 const SCROLL_IDLE_MS = 120;
 
 interface ViewAnchor {
@@ -89,6 +91,8 @@ export function useFollowBottom(
     };
     let anchor: ViewAnchor | null = null;
     let anchorTimer: ReturnType<typeof setTimeout> | undefined;
+    let wheelBandGuardUntil = 0;
+    const wheelBandGuarded = () => performance.now() < wheelBandGuardUntil;
     const scheduleAnchor = () => {
       clearTimeout(anchorTimer);
       anchor = null;
@@ -132,9 +136,18 @@ export function useFollowBottom(
       }
     }
     const onWheel = (event: WheelEvent) => {
+      if (event.deltaY >= 0) {
+        // A downward reversal ends the upward guard so the bottom band re-engages right away.
+        wheelBandGuardUntil = 0;
+        return;
+      }
+      if (!(event.target instanceof Element)) return;
+      // Any upward gesture over the surface — including ones the live terminal routes into the
+      // history at a boundary — must keep its position instead of being snapped back mid-move.
+      wheelBandGuardUntil = performance.now() + WHEEL_BAND_GUARD_MS;
       // Keep wheel navigation inside a live terminal's own scrollback or mouse protocol.
-      if (event.target instanceof Element && event.target.closest('[data-testid="running-term"]')) return;
-      if (event.deltaY < 0 && contentHeight > height) {
+      if (event.target.closest('[data-testid="running-term"]')) return;
+      if (contentHeight > height) {
         const wasFollowing = atBottomRef.current;
         atBottomRef.current = false;
         snappedTopRef.current = -1;
@@ -151,7 +164,7 @@ export function useFollowBottom(
         if (nextHeight !== contentHeight) {
           contentHeight = nextHeight;
           height = el.clientHeight;
-          if (contentHeight - el.scrollTop - height < BOTTOM_THRESHOLD_PX) {
+          if (!wheelBandGuarded() && contentHeight - el.scrollTop - height < BOTTOM_THRESHOLD_PX) {
             scheduleSnap();
             return;
           }
@@ -170,8 +183,14 @@ export function useFollowBottom(
         return;
       }
       const wasFollowing = atBottomRef.current;
-      atBottomRef.current =
-        contentHeight - el.scrollTop - height < BOTTOM_THRESHOLD_PX;
+      if (wheelBandGuarded() && snappedTopRef.current >= 0 && el.scrollTop < snappedTopRef.current - 1) {
+        // A guarded upward gesture moved the view above the last snap point: it is reading now.
+        atBottomRef.current = false;
+        snappedTopRef.current = -1;
+      } else if (!wheelBandGuarded()) {
+        atBottomRef.current =
+          contentHeight - el.scrollTop - height < BOTTOM_THRESHOLD_PX;
+      }
       scheduleAnchor();
       persist();
       if (wasFollowing !== atBottomRef.current) record('scroll');
@@ -187,8 +206,10 @@ export function useFollowBottom(
         if (!atBottomRef.current) anchor = captureViewAnchor(el);
       }
       contentHeight = el.scrollHeight;
-      // Honor the visible bottom position before restoring an older reading anchor.
-      if (el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX) {
+      // Honor the visible bottom position before restoring an older reading anchor; a fresh
+      // upward gesture keeps its position even inside the bottom band.
+      if (!wheelBandGuarded()
+        && el.scrollHeight - el.scrollTop - el.clientHeight < BOTTOM_THRESHOLD_PX) {
         atBottomRef.current = true;
         anchor = null;
       }
