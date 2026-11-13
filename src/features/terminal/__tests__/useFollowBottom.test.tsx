@@ -152,6 +152,54 @@ describe('useFollowBottom', () => {
     expect(el.scrollTop).toBe(1400);
     expect(snapped).toBe(1000);
   });
+
+  it('keeps a small upward wheel inside the bottom band instead of snapping it back', async () => {
+    const el = makeEl(800);
+    const ref = { current: el } as React.RefObject<HTMLDivElement>;
+    const { rerender } = renderHook(({ dep }) => useFollowBottom(ref, [dep]), { initialProps: { dep: 1 } });
+    await new Promise((r) => requestAnimationFrame(r));
+    // A small wheel-up lands 20px above the bottom: inside the band, but still a user gesture.
+    el.scrollTop = 180;
+    el.dispatchEvent(new WheelEvent('wheel', { deltaY: -20, bubbles: true, cancelable: true }));
+    el.dispatchEvent(new Event('scroll'));
+    rerender({ dep: 2 });
+    await new Promise((r) => requestAnimationFrame(r));
+    expect(el.scrollTop).toBe(180);
+  });
+
+  it('guards a history scroll the live terminal chains at a routing boundary', async () => {
+    const el = makeEl(800);
+    const running = document.createElement('div');
+    running.dataset.testid = 'running-term';
+    el.appendChild(running);
+    const ref = { current: el } as React.RefObject<HTMLDivElement>;
+    const { rerender } = renderHook(({ dep }) => useFollowBottom(ref, [dep]), { initialProps: { dep: 1 } });
+    await new Promise((r) => requestAnimationFrame(r));
+    // The wheel happens over the live terminal; the router moves the history itself, so the
+    // resulting scroll event must not re-engage the bottom band and snap the move away.
+    running.dispatchEvent(new WheelEvent('wheel', { deltaY: -10, bubbles: true, cancelable: true }));
+    el.scrollTop = 180;
+    el.dispatchEvent(new Event('scroll'));
+    rerender({ dep: 2 });
+    await new Promise((r) => requestAnimationFrame(r));
+    expect(el.scrollTop).toBe(180);
+  });
+
+  it('re-engages the bottom band again once an upward wheel reverses downward', async () => {
+    const el = makeEl(800);
+    const ref = { current: el } as React.RefObject<HTMLDivElement>;
+    const { rerender } = renderHook(({ dep }) => useFollowBottom(ref, [dep]), { initialProps: { dep: 1 } });
+    await new Promise((r) => requestAnimationFrame(r));
+    el.scrollTop = 180;
+    el.dispatchEvent(new WheelEvent('wheel', { deltaY: -20, bubbles: true, cancelable: true }));
+    el.dispatchEvent(new Event('scroll'));
+    el.scrollTop = 780;
+    el.dispatchEvent(new WheelEvent('wheel', { deltaY: 20, bubbles: true, cancelable: true }));
+    el.dispatchEvent(new Event('scroll'));
+    rerender({ dep: 2 });
+    await new Promise((r) => requestAnimationFrame(r));
+    expect(el.scrollTop).toBe(1000);
+  });
 });
 
 describe('registerFollowEngager / engageFollow', () => {

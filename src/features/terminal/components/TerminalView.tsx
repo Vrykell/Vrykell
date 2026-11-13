@@ -48,6 +48,8 @@ import AiWorkspaceSurface from '@features/chat/components/AiWorkspaceSurface';
 import { useTerminalLayoutActions } from '@features/terminal/hooks/useTerminalLayoutActions';
 import { useTuiControls } from '@features/terminal/hooks/useTuiControls';
 import { copyTerminalSelection, getPaneTerminal, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
+import { installRunningWheelRouting } from '@features/terminal/services/runningWheelRouting';
+import { getExecutingTerm } from '@features/terminal/hooks/useTerminalSession';
 import { t } from '@i18n';
 import { focusSessionInput } from '../services/terminalFocus';
 import { resetTerminalInputModes } from '../services/terminalInputRecovery';
@@ -502,6 +504,14 @@ function PaneBlockList({ paneId, insetLeft = 8, insetRight = 8 }: { paneId: stri
   const pinnedBlock = pinned ? blocks.find(block => block.id === pinned.id) : undefined;
   const snap = useFollowBottom(scrollRef, [blocks], paneId);
   useEffect(() => registerFollowEngager(paneId, snap), [paneId, snap]);
+  // Route the wheel on the history scroller itself: a continuous gesture keeps addressing
+  // different elements as the content moves, so a handler on the live terminal would miss the
+  // events between them and swallow them.
+  useEffect(() => {
+    const scroll = scrollRef.current;
+    if (!scroll) return;
+    return installRunningWheelRouting(scroll, () => getExecutingTerm(paneId)?.term ?? null);
+  }, [paneId]);
   return (
     <div className="overlay-scroll-container" style={{ flex: 1, minHeight: 0 }}>
       <div ref={scrollRef} id={scrollId} className="scroll-region terminal-block-scroll" data-testid={`terminal-scroll-${paneId}`} style={{ flex: 1, minHeight: 0, overflowY: 'auto', background: 'var(--xterm-bg)', overflowAnchor: 'none', '--command-content-inset': `${insetLeft + insetRight + 2 * COMMAND_BLOCK_CONTENT_PADDING}px` } as React.CSSProperties}>

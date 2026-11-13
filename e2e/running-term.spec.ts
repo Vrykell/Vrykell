@@ -353,6 +353,72 @@ test('a running block hands the wheel to the command history once its own scroll
   await expect.poll(() => parent.evaluate((el) => el.scrollTop)).toBeLessThan(parentBefore);
 });
 
+test('an upward wheel reads the live scrollback before older command history', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.setViewportSize({ width: 800, height: 320 });
+  await page.goto('/');
+  await startRunningBlock(page);
+  const host = page.getByTestId('running-term');
+  await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
+  await emitPtyOutput(
+    page,
+    Array.from({ length: 60 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n',
+  );
+  await expectAnyTermContains(page, 'line-59', 3000);
+  await expect(page.getByPlaceholder(/输入命令/)).toBeHidden({ timeout: 3000 });
+  await page.waitForTimeout(200);
+
+  const blockScroll = () => page.evaluate(() => {
+    const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
+    const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
+    const term = key ? terms?.get(key) : undefined;
+    return { viewportY: term?.buffer.active.viewportY ?? -1, baseY: term?.buffer.active.baseY ?? -1 };
+  });
+  const parent = page.locator('[data-testid^="terminal-scroll-"]').first();
+  await expect.poll(() => parent.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(60);
+  // The outer history sits above its newest position, yet an upward wheel over the live
+  // terminal reads the live scrollback first: scrolling up prioritizes the inner surface.
+  const parentBefore = await parent.evaluate((el) => el.scrollTop);
+  await pointAtLiveTerminal(page, host, parent);
+  await page.mouse.wheel(0, -120);
+  await expect.poll(async () => (await blockScroll()).viewportY).toBeLessThan((await blockScroll()).baseY);
+  await expect.poll(() => parent.evaluate((el) => el.scrollTop)).toBe(parentBefore);
+});
+
+test('a continuous upward burst crosses into the command history without stopping', async ({ page }) => {
+  await setupTauriMock(page);
+  await page.setViewportSize({ width: 800, height: 320 });
+  await page.goto('/');
+  await startRunningBlock(page);
+  const host = page.getByTestId('running-term');
+  await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
+  await emitPtyOutput(
+    page,
+    Array.from({ length: 60 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n',
+  );
+  await expectAnyTermContains(page, 'line-59', 3000);
+  await expect(page.getByPlaceholder(/输入命令/)).toBeHidden({ timeout: 3000 });
+  await page.waitForTimeout(200);
+
+  const blockScroll = () => page.evaluate(() => {
+    const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
+    const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
+    const term = key ? terms?.get(key) : undefined;
+    return { viewportY: term?.buffer.active.viewportY ?? -1, baseY: term?.buffer.active.baseY ?? -1 };
+  });
+  const parent = page.locator('[data-testid^="terminal-scroll-"]').first();
+  const parentBefore = await parent.evaluate((el) => el.scrollTop);
+  await pointAtLiveTerminal(page, host, parent);
+  // One unbroken burst: the live scrollback ends partway through and the same gesture keeps
+  // moving the command history instead of waiting for the wheel to stop and restart.
+  for (let notch = 0; notch < 30; notch += 1) {
+    await page.mouse.wheel(0, -120);
+  }
+  const after = await blockScroll();
+  expect(after.viewportY).toBe(0);
+  await expect.poll(() => parent.evaluate((el) => el.scrollTop)).toBeLessThan(parentBefore);
+});
+
 test('the command history owns the wheel until it reaches its newest position', async ({ page }) => {
   await setupTauriMock(page);
   await page.setViewportSize({ width: 800, height: 320 });
@@ -375,10 +441,6 @@ test('the command history owns the wheel until it reaches its newest position', 
     const term = key ? terms?.get(key) : undefined;
     return { viewportY: term?.buffer.active.viewportY ?? -1, baseY: term?.buffer.active.baseY ?? -1 };
   });
-  const wheel = (deltaY: number) => page.evaluate((value) => {
-    document.querySelector<HTMLElement>('[data-testid="running-term"] .xterm-screen')
-      ?.dispatchEvent(new WheelEvent('wheel', { deltaY: value, bubbles: true, cancelable: true }));
-  }, deltaY);
   // Park the live terminal at the top of its own scrollback so it can scroll down.
   await page.evaluate(() => {
     const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
@@ -391,23 +453,21 @@ test('the command history owns the wheel until it reaches its newest position', 
 
   const parent = page.locator('[data-testid^="terminal-scroll-"]').first();
   await expect.poll(() => parent.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(60);
-  // Reading older commands: the history still owns the wheel even over the live terminal.
+  // Reading older commands: the history still owns a downward wheel even over the live terminal,
+  // because scrolling down brings the full running terminal back into view first.
   await parent.evaluate((el) => { el.scrollTop = 0; });
-  await wheel(120);
+  await pointAtLiveTerminal(page, host, parent);
+  await page.mouse.wheel(0, 120);
   await expect.poll(() => parent.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
   expect(await liveState()).toEqual(liveBefore);
 
-  // At the newest position the live terminal takes over and scrolls its own scrollback.
+  // At the newest position the live terminal takes over and scrolls its own scrollback on its
+  // native wheel path, while the history stays pinned at its newest position.
   await parent.evaluate((el) => { el.scrollTop = el.scrollHeight; });
   await expect.poll(() => parent.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThanOrEqual(2);
   const liveAtBottom = await liveState();
-  // The first two small deltas are trimmed at the boundary; the third continues into the live
-  // scrollback, so the handoff neither pauses for a whole event nor loses the accumulated move.
-  await wheel(20);
-  expect((await liveState()).viewportY).toBe(liveAtBottom.viewportY);
-  await wheel(20);
-  expect((await liveState()).viewportY).toBe(liveAtBottom.viewportY);
-  await wheel(60);
+  await pointAtLiveTerminal(page, host, parent);
+  await page.mouse.wheel(0, 120);
   await expect.poll(async () => (await liveState()).viewportY).toBeGreaterThan(liveAtBottom.viewportY);
   await expect.poll(() => parent.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThanOrEqual(2);
 });

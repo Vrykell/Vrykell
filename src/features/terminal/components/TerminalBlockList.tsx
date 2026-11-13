@@ -30,7 +30,6 @@ import { hasVisibleContent as hasVisibleBlockContent } from '@features/terminal/
 import { captureTerminalPaste, copyTerminalSelection, hasCopyableSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
 import { TERMINAL_FONT_FAMILY } from '@features/terminal/model/terminalFont';
 import { measureRunningTerminalRows } from '../model/runningTerminalRows';
-import { isHistoryAtBottom, takeWheelWithinMargin, WHEEL_BOUNDARY_IDLE, wheelLeavesRunningTerminal, type WheelBoundaryState } from '../model/runningWheel';
 import { repaintTerminal } from '../model/terminalResize';
 import { useSessionStore, useUnifiedWorkspace, useWorkspaceNavigation } from '@features/workspace';
 import { useManualFullscreenVisible } from '../hooks/useManualFullscreenVisible';
@@ -433,79 +432,6 @@ function RunningTerm({ tabId, blockId }: { tabId: string; blockId: string }) {
         return false;
       }
       return true;
-    });
-    let wheelResidual = 0;
-    let boundary: WheelBoundaryState = WHEEL_BOUNDARY_IDLE;
-    term.attachCustomWheelEventHandler((event) => {
-      // The surrounding command history owns the wheel until its newest command is in view.
-      // Scroll it directly: returning true would let xterm consume the same gesture as well.
-      const history = host.closest<HTMLElement>('.terminal-block-scroll');
-      let historyDelta = event.deltaY;
-      if (history && event.deltaMode === WheelEvent.DOM_DELTA_PAGE) historyDelta = event.deltaY * history.clientHeight;
-      else if (history && event.deltaMode === WheelEvent.DOM_DELTA_LINE) historyDelta = event.deltaY * (parseFloat(getComputedStyle(history).lineHeight) || 16);
-      if (history && historyDelta !== 0 && !isHistoryAtBottom(history)) {
-        wheelResidual = 0;
-        boundary = WHEEL_BOUNDARY_IDLE;
-        event.preventDefault();
-        history.scrollTop += historyDelta;
-        return false;
-      }
-      if (term.modes.mouseTrackingMode !== 'none' || term.buffer.active.type === 'alternate') {
-        wheelResidual = 0;
-        boundary = WHEEL_BOUNDARY_IDLE;
-        return true;
-      }
-      const lineHeight = Math.max(1, getCellMetrics(term).height);
-      let delta = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? event.deltaY * lineHeight
-        : event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? event.deltaY * lineHeight * term.rows : event.deltaY;
-      const buffer = term.buffer.active;
-      // Trim only the boundary margin, then keep the rest of the same gesture moving. Consuming
-      // a whole event here would read as a stop followed by a full-size jump on the next one.
-      const atScrollEnd = !!history && buffer.baseY > 0 && Math.sign(delta) !== 0
-        && (buffer.viewportY <= 0 || buffer.viewportY >= buffer.baseY);
-      if (atScrollEnd) {
-        const trimmed = takeWheelWithinMargin(boundary, delta);
-        boundary = trimmed.state;
-        delta = trimmed.remaining;
-        if (delta === 0) {
-          wheelResidual = 0;
-          event.preventDefault();
-          return false;
-        }
-      } else {
-        boundary = WHEEL_BOUNDARY_IDLE;
-      }
-      const direction = Math.sign(delta);
-      if (!history) {
-        // A fullscreen live terminal has no surrounding history to chain into.
-        if (wheelLeavesRunningTerminal(buffer, delta)) {
-          wheelResidual = 0;
-          return true;
-        }
-      } else if (wheelLeavesRunningTerminal(buffer, delta)) {
-        // The live scrollback ended; continue the same gesture in the history with the
-        // remaining distance instead of letting the whole event bubble a frame later.
-        wheelResidual = 0;
-        event.preventDefault();
-        history.scrollTop += delta;
-        return false;
-      }
-      if (direction !== Math.sign(wheelResidual)) wheelResidual = 0;
-      wheelResidual += delta;
-      const lines = Math.trunc(wheelResidual / lineHeight);
-      const maxLines = direction < 0 ? buffer.viewportY : buffer.baseY - buffer.viewportY;
-      const applied = direction < 0 ? Math.max(lines, -maxLines) : Math.min(lines, maxLines);
-      if (applied !== 0) term.scrollLines(applied);
-      wheelResidual -= applied * lineHeight;
-      // A gesture that reaches the end of the live scrollback mid-event hands its remainder to
-      // the history in the same frame.
-      if (applied !== lines && history) {
-        const leftover = wheelResidual;
-        wheelResidual = 0;
-        if (leftover !== 0) history.scrollTop += leftover;
-      }
-      event.preventDefault();
-      return false;
     });
     // Recheck terminal columns when the host width changes, including its first layout.
     let lastHostWidth = -1;
