@@ -6,15 +6,16 @@
  * a redesign could quietly break: the row hierarchy (name over identifier), the active badge, the
  * row menu order, and the delete confirmation.
  */
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ProviderModelList from '../components/ProviderModelList';
+import { SettingsSaveProvider } from '../components/SettingsSaveProvider';
 import { useAiConfigStore } from '@features/agent';
 import type { ProviderRow } from '../model/providerList';
 import type { ModelProfile } from '@features/agent';
 
 const invokeMock = vi.hoisted(() => vi.fn());
-vi.mock('@platform/diagnostics', () => ({ invoke: invokeMock }));
+vi.mock('@platform/diagnostics', () => ({ invoke: invokeMock, diagnostic: vi.fn() }));
 
 const row: ProviderRow<ModelProfile> = {
   id: 'openai-compatible|https://api.example.com/v1',
@@ -46,6 +47,7 @@ describe('model list', () => {
     expect(rowElement).toHaveAttribute('data-active', 'true');
     expect(rowElement).toHaveAttribute('aria-current', 'true');
     expect(within(rowElement).getByTestId('model-current')).toHaveTextContent('当前');
+    expect(within(rowElement).getByRole('button', { name: 'Chat model的模型操作' })).toBeVisible();
     const inactiveRow = screen.getAllByTestId('model-row')[1]!;
     expect(inactiveRow).not.toHaveAttribute('data-active');
     expect(within(inactiveRow).queryByTestId('model-current')).toBeNull();
@@ -82,11 +84,11 @@ describe('model list', () => {
     expect(screen.getAllByTestId('model-row')).toHaveLength(3);
   });
 
-  it('reports an empty filter result and offers to clear it', () => {
+  it('reports an empty filter result and offers to clear every filter', () => {
     render(<ProviderModelList row={row} toast={() => {}} />);
     fireEvent.change(screen.getByTestId('model-search'), { target: { value: 'nothing-matches' } });
     expect(screen.getByTestId('model-no-match')).toBeVisible();
-    fireEvent.click(within(screen.getByTestId('model-no-match')).getByRole('button', { name: '清空搜索' }));
+    fireEvent.click(within(screen.getByTestId('model-no-match')).getByRole('button', { name: '清除筛选' }));
     expect(screen.getAllByTestId('model-row')).toHaveLength(3);
   });
 
@@ -99,7 +101,8 @@ describe('model list', () => {
   });
 
   it('offers edit and delete in the row menu and switches the current model there', async () => {
-    render(<ProviderModelList row={row} toast={() => {}} />);
+    const toast = vi.fn();
+    render(<ProviderModelList row={row} toast={toast} />);
     const second = screen.getAllByTestId('model-row')[1]!;
     // Delete is not an always-visible row control.
     expect(within(second).queryByTestId('model-remove')).toBeNull();
@@ -108,6 +111,21 @@ describe('model list', () => {
     fireEvent.click(within(menu).getByText('设为当前'));
     await waitFor(() => expect(useAiConfigStore.getState().activeModel).toBe('m2'));
     expect(useAiConfigStore.getState().model).toBe('deepseek-r1');
+    await waitFor(() => expect(toast).toHaveBeenCalledWith('已切换到 Reasoner', 'success'));
+  });
+
+  it('stays quiet about switching when the save fails', async () => {
+    const toast = vi.fn();
+    invokeMock.mockImplementation((command: string) => command === 'set_active_model'
+      ? Promise.reject(new Error('offline'))
+      : Promise.resolve(null));
+    render(<SettingsSaveProvider><ProviderModelList row={row} toast={toast} /></SettingsSaveProvider>);
+    fireEvent.click(within(screen.getAllByTestId('model-row')[1]!).getByTestId('model-actions'));
+    fireEvent.click(within(screen.getByRole('menu')).getByText('设为当前'));
+    await waitFor(() => expect(invokeMock).toHaveBeenCalledWith('set_active_model', { id: 'm2' }));
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+    expect(useAiConfigStore.getState().activeModel).toBe('m1');
+    expect(toast).not.toHaveBeenCalledWith('已切换到 Reasoner', 'success');
   });
 
   it('keeps the current model out of the switch action', () => {
@@ -159,5 +177,68 @@ describe('model list', () => {
     expect(headers.length).toBeGreaterThanOrEqual(2);
     fireEvent.click(headers[0]!);
     expect(headers[0]).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('opens collapsed groups while a search or capability filter is active', () => {
+    render(<ProviderModelList row={row} toast={() => {}} />);
+
+    fireEvent.click(screen.getByTestId('model-collapse-all'));
+    expect(screen.queryAllByTestId('model-row')).toHaveLength(0);
+    fireEvent.change(screen.getByTestId('model-search'), { target: { value: 'Reasoner' } });
+    expect(screen.getAllByTestId('model-row')).toHaveLength(1);
+    expect(screen.getByRole('button', { expanded: true })).toBeVisible();
+
+    fireEvent.click(screen.getByTestId('model-search-clear'));
+    expect(screen.queryAllByTestId('model-row')).toHaveLength(0);
+    fireEvent.click(screen.getByTestId('model-filter'));
+    fireEvent.click(screen.getByRole('option', { name: /推理/ }));
+    expect(screen.getAllByTestId('model-row')).toHaveLength(1);
+    expect(screen.getByRole('button', { expanded: true })).toBeVisible();
+  });
+
+  it('clears the search on Escape without letting the shortcut close settings', () => {
+    const windowKeyDown = vi.fn();
+    window.addEventListener('keydown', windowKeyDown);
+    try {
+      render(<ProviderModelList row={row} toast={() => {}} />);
+      const search = screen.getByTestId('model-search');
+      fireEvent.change(search, { target: { value: 'reasoner' } });
+      expect(screen.getAllByTestId('model-row')).toHaveLength(1);
+      fireEvent.keyDown(search, { key: 'Escape' });
+      expect(search).toHaveValue('');
+      expect(screen.getAllByTestId('model-row')).toHaveLength(3);
+      expect(windowKeyDown).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('keydown', windowKeyDown);
+    }
+  });
+
+  it('keeps the active model inside its provider when the active row is deleted', async () => {
+    const other = { id: 'a1', name: 'Other vendor', provider: 'anthropic' as const, baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-4' };
+    const models = [other, row.models[0]!, row.models[1]!];
+    useAiConfigStore.setState({ models, activeModel: 'm1' });
+    const view = render(<ProviderModelList row={{ ...row, models: [row.models[0]!, row.models[1]!] }} toast={() => {}} />);
+
+    fireEvent.click(within(screen.getAllByTestId('model-row')[0]!).getByTestId('model-actions'));
+    fireEvent.click(within(screen.getByRole('menu')).getByText('删除模型'));
+    fireEvent.click(within(await screen.findByTestId('confirm-dialog')).getByTestId('confirm-ok'));
+
+    await waitFor(() => expect(useAiConfigStore.getState().models.map(model => model.id)).toEqual(['a1', 'm2']));
+    expect(useAiConfigStore.getState().activeModel).toBe('m2');
+    // The provider page re-reads the store row, so the deleted row leaves the list.
+    view.rerender(<ProviderModelList row={{ ...row, models: [row.models[1]!] }} toast={() => {}} />);
+    await waitFor(() => expect(within(screen.getByTestId('model-row')).getByTestId('model-actions')).toHaveFocus());
+  });
+
+  it('leaves the active model alone when another row is deleted', async () => {
+    useAiConfigStore.setState({ models: row.models, activeModel: 'm1' });
+    render(<ProviderModelList row={row} toast={() => {}} />);
+
+    fireEvent.click(within(screen.getAllByTestId('model-row')[1]!).getByTestId('model-actions'));
+    fireEvent.click(within(screen.getByRole('menu')).getByText('删除模型'));
+    fireEvent.click(within(await screen.findByTestId('confirm-dialog')).getByTestId('confirm-ok'));
+
+    await waitFor(() => expect(useAiConfigStore.getState().models.map(model => model.id)).toEqual(['m1', 'm3']));
+    expect(useAiConfigStore.getState().activeModel).toBe('m1');
   });
 });

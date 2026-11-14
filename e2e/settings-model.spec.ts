@@ -346,4 +346,30 @@ test.describe('Model configuration page', () => {
     await gotoSetting(page, '模型配置');
     await expect(page.locator('.settings-model-group-header').first()).toHaveAttribute('aria-expanded', 'false');
   });
+
+  test('search Escape clears the query and keeps settings open', async ({ page }) => {
+    await gotoSetting(page, '模型配置');
+    const search = page.getByTestId('model-search');
+    await search.fill('not-a-model');
+    await expect(page.getByTestId('model-no-match')).toBeVisible();
+    await search.press('Escape');
+    await expect(search).toHaveValue('');
+    await expect(page.getByTestId('model-no-match')).toHaveCount(0);
+    await expect(page.locator('.settings-view')).toBeVisible();
+  });
+
+  test('a search reopens collapsed groups so its matches stay visible', async ({ page }) => {
+    await gotoSetting(page, '模型配置');
+    await page.getByTestId('model-add').click();
+    const addDialog = page.getByTestId('add-model-dialog');
+    await addDialog.getByTestId('add-model-id').fill('deepseek-chat');
+    await addDialog.getByTestId('add-model-group').fill('对话模型');
+    await addDialog.getByTestId('add-model-confirm').click();
+    await expect(page.getByTestId('model-row')).toHaveCount(2);
+    await page.getByTestId('model-collapse-all').click();
+    await expect(page.getByTestId('model-row')).toHaveCount(0);
+    await page.getByTestId('model-search').fill('deepseek');
+    await expect(page.getByTestId('model-row')).toHaveCount(1);
+    await expect(page.getByTestId('model-row')).toContainText('deepseek-chat');
+  });
 });
