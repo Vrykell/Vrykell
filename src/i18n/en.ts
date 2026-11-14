@@ -1,5 +1,10 @@
 /** Internal message identifiers retain explicit English labels. Other keys are their English copy. */
 const en: Record<string, string> = {
+  'Model management': 'Model management',
+  'Manage model configuration, capabilities and the model in use.': 'Manage model configuration, capabilities and the model in use.',
+  'Search by model name or ID…': 'Search by model name or ID…',
+  'Model actions': 'Model actions',
+  'No model ID': 'No model ID',
   'About': 'About',
   '© {{year}} Vrykell contributors': '© {{year}} Vrykell contributors',
   'Application information': 'Application information',
@@ -67,6 +72,7 @@ const en: Record<string, string> = {
   'dock.git': 'Source control', 'dock.command-history': 'Command history', 'dock.tabs': 'Tabs', 'dock.files': 'Files', 'dock.ssh': 'SSH', 'dock.chat': 'AI assistant', 'dock.settings': 'Settings',
   'dock.dragTip': 'Drag to reorder or change sides / click to {{action}}', 'dock.open': 'Open', 'dock.close': 'Close',
   'panel.newTab': 'New tab', 'panel.emptyDir': 'Empty directory', 'panel.goUp': 'Back', 'panel.enterDir': 'Open directory', 'panel.addToInput': 'Add path to AI input',
+  'Forward': 'Forward',
   'panel.tabGroup.count': '{{n}} tabs', 'panel.sessionGroup.count': '{{n}} sessions',
   'statusBar.shellLocal': 'Local shell', 'statusBar.tabs.count': '{{n}} tabs', 'statusBar.version': 'v2',
   'input.command.placeholder': 'Enter a command…', 'input.ai.placeholder': 'Describe what you want to do…',

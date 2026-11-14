@@ -42,18 +42,27 @@ for (const width of [1240, 720]) {
     // Title text drags the window instead of being inert text.
     expect((await elementAt(page, titleSpan.left + 4, middle))?.isDragRegion).toBe(true);
 
-    // Empty space between the title text and the search field.
-    const afterTitle = Math.round((titleSpan.right + searchBox.x) / 2);
-    if (afterTitle - titleSpan.right > 8) {
-      expect((await elementAt(page, afterTitle, middle))?.isDragRegion).toBe(true);
+    // Empty space between the title text and the titlebar history actions.
+    const historyBox = (await page.locator('.workspace-title-history').boundingBox())!;
+    const beforeHistory = Math.round((titleSpan.right + historyBox.x) / 2);
+    if (beforeHistory - titleSpan.right > 8) {
+      expect((await elementAt(page, beforeHistory, middle))?.isDragRegion).toBe(true);
+    }
+
+    // Empty space between the history actions and the search field.
+    const afterHistory = Math.round((historyBox.x + historyBox.width + searchBox.x) / 2);
+    if (afterHistory - historyBox.x - historyBox.width > 8) {
+      expect((await elementAt(page, afterHistory, middle))?.isDragRegion).toBe(true);
     }
 
     // Controls keep their own behaviour: a clickable element without the attribute
     // stops the drag, so clicking them never moves the window.
     const dockButton = (await header.locator('[data-dock-btn]').first().boundingBox())!;
+    const backButton = (await page.getByTestId('workspace-history-back').boundingBox())!;
+    const forwardButton = (await page.getByTestId('workspace-history-forward').boundingBox())!;
     const controls = page.locator('.window-control-button');
     const windowControl = await controls.count() ? await controls.first().boundingBox() : null;
-    for (const target of [searchBox, dockButton, ...(windowControl ? [windowControl] : [])]) {
+    for (const target of [searchBox, dockButton, backButton, forwardButton, ...(windowControl ? [windowControl] : [])]) {
       const hit = await elementAt(page, Math.round(target.x + target.width / 2), middle);
       expect(hit?.isDragRegion).toBe(false);
     }

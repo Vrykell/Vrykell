@@ -60,7 +60,7 @@ WorkspaceShell
 │   ├── Functional navigation
 │   ├── Left auxiliary actions and panel slot
 │   └── Settings
-├── TopDock (42px, beside the sidebar)
+├── TopDock (40px, beside the sidebar)
 └── Workspace body
     ├── Primary column
     │   ├── Horizontal instance tabs (34px)
@@ -76,7 +76,7 @@ WorkspaceShell
 
 导航按钮由 `useNavigationButtonDrag` 通过 Pointer Events 拖动，移动超过 6px 后才开始。来源按钮保留挂载但移出排列，图标通过 `NavigationDragPreview` 跟随指针；目标位置插入 32px 实际占位，其他按钮重新排列让位。占位区域保留对应插入索引，避免让位后重复命中导致落点跳动；按钮之间的间隙按邻近位置计算。预览不修改布局或持久化，松手才提交，取消时恢复原排列。禁止使用 HTML5 Drag and Drop：Windows 桌面窗口的原生文件拖放会拦截这些事件，浏览器预览无法直接验证该行为。保留原生文件拖入；导航按钮及右上方操作区不标记为窗口拖动区域。Esc、失焦、pointercancel 和卸载取消拖动；松手产生的 click 不触发面板切换。交互测试会禁用 HTML 拖放事件，确认指针拖动独立工作。
 
-顶栏通过 `useBalancedTitlebar` 观察操作区、导航偏移和原生控件留白，搜索相对整个应用居中；空间不足时先收紧输入区，避免覆盖操作。导航保存宽度与临时拖动宽度分开，按住收起后可反向恢复，窗口预算不会覆盖已保存的宽度。
+顶栏通过 `useBalancedTitlebar` 观察操作区、导航偏移和原生控件留白，搜索相对整个应用居中；空间不足时先收紧输入区，避免覆盖操作。标题列右端提供前进与后退，按会话内的访问记录回到上一个工作区（`stores/navigation.ts`）；当标题或搜索框将失去可读宽度时自动收起。导航保存宽度与临时拖动宽度分开，按住收起后可反向恢复，窗口预算不会覆盖已保存的宽度。
 
 ## 4. 端到端分层
 

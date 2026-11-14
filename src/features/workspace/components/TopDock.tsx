@@ -1,6 +1,6 @@
 import KeyHint from '@ui/feedback/KeyHint';
 import { useEffect, useRef, useState } from 'react';
-import { iconSizes, Search, PanelLeft } from '@ui/icons';
+import { iconSizes, Search, PanelLeft, ArrowLeft, ArrowRight } from '@ui/icons';
 import { IconButton } from '@ui/actions/IconButton';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { useUiStore, useWorkspaceNavigation } from '@features/workspace';
@@ -11,12 +11,15 @@ import WindowMenu from './WindowMenu';
 import { isMacOS } from '@platform/runtime';
 import { t } from '@i18n';
 import { useBalancedTitlebar } from '../hooks/useBalancedTitlebar';
+import { goBackWorkspaceArea, goForwardWorkspaceArea } from '../services/areaHistory';
 
 /** Keep window controls and global actions separate from workspace navigation. */
 export default function TopDock({ sidebarOverlayRequired = false }: { sidebarOverlayRequired?: boolean }) {
   const settingsOpen = useUiStore(state => state.settingsOpen);
   const area = useWorkspaceNavigation(state => state.area);
   const collapsed = useWorkspaceNavigation(state => state.collapsed);
+  const canGoBack = useWorkspaceNavigation(state => state.areaHistoryIndex > 0);
+  const canGoForward = useWorkspaceNavigation(state => state.areaHistoryIndex < state.areaHistory.length - 1);
   const workspaceTitle = t(WORKSPACE_AREA_LABELS[area]);
   const [fullscreen, setFullscreen] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
@@ -49,6 +52,12 @@ export default function TopDock({ sidebarOverlayRequired = false }: { sidebarOve
         {collapsed && <IconButton compact className="workspace-sidebar-toggle" data-testid="workspace-sidebar-expand" aria-label={t('Expand sidebar')} data-tip={t('Expand sidebar')}
           onClick={() => useWorkspaceNavigation.getState().openSidebar(sidebarOverlayRequired)}><PanelLeft size={iconSizes.control} /></IconButton>}
         <span data-tauri-drag-region>{settingsOpen ? t('Settings') : workspaceTitle}</span>
+        <div className="workspace-title-history" data-tauri-drag-region>
+          <IconButton compact data-testid="workspace-history-back" aria-label={t('Back')} data-tip={t('Back')}
+            disabled={!canGoBack} onClick={goBackWorkspaceArea}><ArrowLeft size={iconSizes.control} /></IconButton>
+          <IconButton compact data-testid="workspace-history-forward" aria-label={t('Forward')} data-tip={t('Forward')}
+            disabled={!canGoForward} onClick={goForwardWorkspaceArea}><ArrowRight size={iconSizes.control} /></IconButton>
+        </div>
       </div>
       <button data-subtle data-testid="global-search-trigger" className="workspace-search" aria-label={t('Search files, commands, settings…')}
         onClick={() => useUiStore.getState().setGlobalSearchOpen(true)}>

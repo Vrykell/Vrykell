@@ -164,11 +164,11 @@ export default function AcpLauncher({ open, onClose, embedded = false, suspended
         { label: t('Configured models'), value: models.length },
       ]} />}
       <section className="ai-launch-agents" aria-label={t('ACP agents')}>
-        {folder}
         <div className="ai-launch-section-heading">
           <h3>{t('ACP agents')}{list && <span>{list.length}</span>}</h3>
           <OutlineButton onClick={configure}>{t('Configure servers')}</OutlineButton>
         </div>
+        {folder}
         <div className="workspace-sidebar-search ai-launch-search">
           <Search size={iconSizes.compact} />
           <TextInput ref={inputRef} value={query} data-testid="acp-launcher-search"

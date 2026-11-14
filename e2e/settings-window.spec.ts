@@ -28,7 +28,7 @@ test('settings cover the content card and toggle back to the unchanged workspace
     const sidebarWidth = width <= 900 ? 0 : 208;
     expect(await rail.evaluate(element => element.getBoundingClientRect().width)).toBe(sidebarWidth);
     await verifyButtonCenters();
-    expect(await settings.boundingBox()).toEqual({ x: sidebarWidth, y: 42, width: width - sidebarWidth, height: 758 });
+    expect(await settings.boundingBox()).toEqual({ x: sidebarWidth, y: 40, width: width - sidebarWidth, height: 760 });
     await expect(settings.locator('.settings-close')).toHaveCount(0);
     await expect(settings.locator('.settings-navigation')).toBeVisible();
     await expect(settings.locator('.settings-navigation-toggle')).toHaveCount(0);

@@ -151,9 +151,9 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
         <IconButton compact aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}><FolderOpen size={16} /></IconButton>
         <IconButton ref={newButton} compact aria-label={t('New workspace tab')} data-tip={t('New workspace tab')} onClick={event => anchor(event.currentTarget, false)}><Plus size={16} /></IconButton>
       </>} /></WorkspaceHeader>
-    {state.startActive && <UnifiedStartPage resources={resources} icon={resource => <WorkspaceResourceIcon resource={resource} size={28} defaultShellType={defaultShellType} />} onSelect={focusUnifiedResource}
+    {state.startActive && <UnifiedStartPage
       onNew={kind => kind === 'terminal' ? setTerminalPicker({ source: 'shell', split: false }) : newItem(kind)} onOpen={() => void openWorkspaceFile()}
-      onConnect={() => setTerminalPicker({ source: 'ssh', split: false })} onAgent={() => setLauncher({ split: false })} onHistory={history} />}
+      onConnect={() => setTerminalPicker({ source: 'ssh', split: false })} onAgent={() => setLauncher({ split: false })} />}
     <WorkspacePaneCanvas containerId={state.activeTabId} layout={state.layout} focused={state.focused} resources={resources} visible={visible && !state.startActive} toolbarTarget={resourceToolbar}
       onFocus={focusUnifiedResource} onRatio={state.ratio} placing={!!placement} onPlace={commit} onCancel={() => { setPlacement(null); state.chooseMerge(); }}
       onSplit={(id, kind, anchor) => requestWorkspaceSplit(id, anchor, kind)}
