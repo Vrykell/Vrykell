@@ -90,10 +90,50 @@ test.describe('SSH remote connection management sidebar', () => {
     await page.locator('[data-testid="ssh-new-btn"]').click();
     await page.locator('[data-testid="ssh-form-host"]').fill('bad.example.com');
     await page.locator('[data-testid="ssh-test-btn"]').click();
-    await expect(page.locator('[data-testid="ssh-test-result"]')).toContainText('连接超时');
+    await expect(page.locator('[data-testid="ssh-test-result"]')).toContainText('无法连接到 SSH 服务器');
     await page.locator('[data-testid="ssh-form-host"]').fill('good.example.com');
     await page.locator('[data-testid="ssh-test-btn"]').click();
     await expect(page.locator('[data-testid="ssh-test-result"]')).toContainText('认证成功');
+  });
+
+  test('first connection asks for the fingerprint and retests after accepting it', async ({ page }) => {
+    await page.locator('[data-testid="ssh-new-btn"]').click();
+    await page.locator('[data-testid="ssh-form-host"]').fill('fresh.example.com');
+    await page.locator('[data-testid="ssh-form-user"]').fill('deploy');
+    await page.locator('[data-testid="ssh-test-btn"]').click();
+    const prompt = page.getByTestId('ssh-host-key-prompt');
+    await expect(prompt).toBeVisible();
+    await expect(prompt).toContainText('首次连接，需要确认主机指纹');
+    await expect(prompt).toContainText('SHA256:e2e-verified-key');
+    await expect(prompt).toContainText('ed25519');
+    await expect(page.getByTestId('ssh-test-result')).toHaveCount(0);
+    await page.getByTestId('ssh-host-key-accept').click();
+    await expect(page.getByTestId('ssh-test-result')).toContainText('认证成功');
+    await expect(page.getByTestId('ssh-host-key-prompt')).toHaveCount(0);
+    expect(await page.evaluate(() => (window as unknown as { __SSH_TRUSTS__: Record<string, unknown>[] }).__SSH_TRUSTS__))
+      .toContainEqual(expect.objectContaining({ expectedFingerprint: 'SHA256:e2e-verified-key' }));
+  });
+
+  test('cancelling a first connection reports an untrusted host instead of a failure', async ({ page }) => {
+    await page.locator('[data-testid="ssh-new-btn"]').click();
+    await page.locator('[data-testid="ssh-form-host"]').fill('fresh.example.com');
+    await page.locator('[data-testid="ssh-test-btn"]').click();
+    await expect(page.getByTestId('ssh-host-key-prompt')).toBeVisible();
+    await page.getByTestId('ssh-host-key-cancel').click();
+    await expect(page.getByTestId('ssh-test-result')).toContainText('主机密钥未信任');
+    await expect(page.getByTestId('ssh-host-key-prompt')).toHaveCount(0);
+    expect(await page.evaluate(() => (window as unknown as { __SSH_TRUSTS__: unknown[] }).__SSH_TRUSTS__)).toEqual([]);
+  });
+
+  test('a changed host key shows a high-risk warning and offers no trust action', async ({ page }) => {
+    await page.locator('[data-testid="ssh-new-btn"]').click();
+    await page.locator('[data-testid="ssh-form-host"]').fill('changed.example.com');
+    await page.locator('[data-testid="ssh-test-btn"]').click();
+    const mismatch = page.getByTestId('ssh-host-key-mismatch');
+    await expect(mismatch).toBeVisible();
+    await expect(mismatch).toContainText('主机密钥不匹配');
+    await expect(mismatch).toContainText('中间人攻击');
+    await expect(page.getByTestId('ssh-host-key-accept')).toHaveCount(0);
   });
 
   test('downloads remote directories and reveals transfers in the file manager', async ({ page }) => {

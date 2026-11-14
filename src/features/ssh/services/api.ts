@@ -107,22 +107,42 @@ export function touchSshConnection(id: string): Promise<void> {
   return invoke('ssh_connection_touch', { id });
 }
 
+/** Structured connection-test outcome; host-key confirmation is not a connection failure. */
+export type SshTestStatus = 'success' | 'unknown_host_key' | 'host_key_mismatch' | 'auth_failed' | 'network_error' | 'other_error';
+
+export interface SshTestResult {
+  status: SshTestStatus;
+  host: string;
+  port: number;
+  keyType?: string;
+  fingerprint?: string;
+  message: string;
+}
+
+/** Non-secret connection options shared by SSH backend commands. */
+export function sshConnectionOptions(target: SshOptions): SshOptions {
+  return {
+    identityFile: target.identityFile, jumpHost: target.jumpHost, jumpConnectionId: target.jumpConnectionId,
+    serverAliveInterval: target.serverAliveInterval, shellIntegration: target.shellIntegration,
+    localForwards: target.localForwards, remoteForwards: target.remoteForwards,
+    dynamicForwards: target.dynamicForwards, proxyId: target.proxyId, environment: target.environment,
+    authenticationMode: target.authenticationMode,
+  };
+}
+
 /** Tests a connection (explicit parameters, so the form can test before saving). */
 export function sshTest(target: {
   host: string;
   port?: number;
   user: string;
   password?: string;
-} & SshOptions): Promise<string> {
+} & SshOptions): Promise<SshTestResult> {
   return invoke('ssh_test', {
     host: target.host,
     port: target.port ?? null,
     user: target.user ?? '',
     password: target.password ?? '',
-    options: { identityFile: target.identityFile, jumpHost: target.jumpHost, jumpConnectionId: target.jumpConnectionId,
-      serverAliveInterval: target.serverAliveInterval, shellIntegration: target.shellIntegration,
-      localForwards: target.localForwards, remoteForwards: target.remoteForwards,
-      dynamicForwards: target.dynamicForwards, proxyId: target.proxyId, environment: target.environment, authenticationMode: target.authenticationMode },
+    options: sshConnectionOptions(target),
   });
 }
 

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { sshHostKeyInfo, sshTrustHostKey } from '../services/api';
-import { prepareSshHost } from '../services/hostTrust';
+import { prepareSshHost, SshHostKeyMismatchError, SshHostTrustCancelledError } from '../services/hostTrust';
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({ ask: vi.fn() }));
 vi.mock('../services/api', () => ({ sshHostKeyInfo: vi.fn(), sshTrustHostKey: vi.fn() }));
@@ -29,12 +29,22 @@ describe('SSH host trust', () => {
   });
   it('cancels without trusting the host', async () => {
     vi.mocked(ask).mockResolvedValue(false);
-    await expect(prepareSshHost('server')).rejects.toThrow('已取消');
+    const pending = prepareSshHost('server');
+    await expect(pending).rejects.toBeInstanceOf(SshHostTrustCancelledError);
+    await expect(pending).rejects.toThrow('已取消');
     expect(sshTrustHostKey).not.toHaveBeenCalled();
   });
   it('rejects a changed key without offering to overwrite it', async () => {
     vi.mocked(sshHostKeyInfo).mockRejectedValue(new Error('主机密钥不匹配'));
     await expect(prepareSshHost('server')).rejects.toThrow('主机密钥不匹配');
+    expect(ask).not.toHaveBeenCalled();
+    expect(sshTrustHostKey).not.toHaveBeenCalled();
+  });
+  it('turns a structured mismatch into a localised warning with no trust action', async () => {
+    vi.mocked(sshHostKeyInfo).mockRejectedValue(new Error('HOST_KEY_MISMATCH: 主机密钥不匹配'));
+    const pending = prepareSshHost('server', 2222);
+    await expect(pending).rejects.toBeInstanceOf(SshHostKeyMismatchError);
+    await expect(pending).rejects.toThrow('中间人攻击');
     expect(ask).not.toHaveBeenCalled();
     expect(sshTrustHostKey).not.toHaveBeenCalled();
   });
