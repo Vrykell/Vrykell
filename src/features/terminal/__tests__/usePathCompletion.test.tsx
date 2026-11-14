@@ -6,7 +6,6 @@ import { useHistoryStore } from '../stores/history';
 import { usePathCompletion } from '../hooks/usePathCompletion';
 import { completeShell, warmShellCompletion } from '@platform/api/completion';
 vi.mock('@platform/api/completion', () => ({ completeShell: vi.fn(), warmShellCompletion: vi.fn() }));
-vi.mock('@platform/runtime', async importOriginal => ({ ...(await importOriginal<typeof import('@platform/runtime')>()), isWindows: true }));
 
 const mocks = vi.hoisted(() => ({ list: vi.fn(), fileOpsFor: vi.fn() }));
 vi.mock('@features/files', () => ({ fileOpsFor: mocks.fileOpsFor }));
@@ -52,6 +51,49 @@ it('accepts, cycles backward and restores the original typed path', async () => 
   act(() => { result.current.restorePathCompletion(); });
   expect(result.current.text).toBe('cat re');
   expect(mocks.fileOpsFor).toHaveBeenCalledWith({ kind: 'local' });
+  // A bare argument is not obviously a path, so the shell gets the first attempt.
+  expect(completeShell).toHaveBeenCalledWith('cat re', 6, '/work', 'bash');
+});
+
+it('ignores Tab on an empty or whitespace-only draft', () => {
+  useHistoryStore.setState({ entries: [
+    { command: 'npm test', cwd: '/work', timestamp: 1, exitCode: 0 },
+  ] });
+  const { result } = mount('');
+  act(() => { expect(result.current.acceptPathCompletion(false)).toBe(false); });
+  expect(result.current.text).toBe('');
+  expect(completeShell).not.toHaveBeenCalled();
+  expect(mocks.list).not.toHaveBeenCalled();
+  act(() => { result.current.setText('   '); });
+  act(() => { expect(result.current.acceptPathCompletion(false)).toBe(false); });
+  expect(result.current.text).toBe('   ');
+});
+
+it('asks the shell before path completion for a non-path argument', async () => {
+  vi.mocked(completeShell).mockResolvedValue([{ text: 'git status', cursor: 10 }]);
+  const { result } = mount('git stat');
+  act(() => { result.current.acceptPathCompletion(false); });
+  await waitFor(() => expect(result.current.text).toBe('git status'));
+  expect(completeShell).toHaveBeenCalledWith('git stat', 8, '/work', 'bash');
+  expect(mocks.list).not.toHaveBeenCalled();
+});
+
+it('completes a command parameter through the shell', async () => {
+  const command = 'Get-Command Get-Chi';
+  const completed = 'Get-Command Get-ChildItem';
+  vi.mocked(completeShell).mockResolvedValue([{ text: completed, cursor: completed.length }]);
+  const { result } = mount(command);
+  act(() => { result.current.acceptPathCompletion(false); });
+  await waitFor(() => expect(result.current.text).toBe(completed));
+  expect(completeShell).toHaveBeenCalledWith(command, command.length, '/work', 'bash');
+  expect(mocks.list).not.toHaveBeenCalled();
+});
+
+it('completes an obvious absolute path without starting the shell', async () => {
+  mocks.list.mockResolvedValue({ entries: [{ name: 'local', path: '/usr/local', is_dir: true }] });
+  const { result } = mount('/usr/lo');
+  act(() => { result.current.acceptPathCompletion(false); });
+  await waitFor(() => expect(result.current.text).toBe('/usr/local/'));
   expect(completeShell).not.toHaveBeenCalled();
 });
 
@@ -131,4 +173,16 @@ it('warms the resident helper for a local PowerShell pane', async () => {
   paneId = `${tabId}#0`;
   mount();
   await waitFor(() => expect(warmShellCompletion).toHaveBeenCalledWith('powershell'));
+});
+
+it('retries a failed warm on the next input change', async () => {
+  const tabId = useSessionStore.getState().addTab({ cwd: '/work', shellType: 'powershell' });
+  paneId = `${tabId}#0`;
+  vi.mocked(warmShellCompletion).mockRejectedValueOnce(new Error('unavailable'));
+  const { result } = mount('l');
+  await waitFor(() => expect(warmShellCompletion).toHaveBeenCalledTimes(1));
+  act(() => { result.current.setText('ls'); });
+  await waitFor(() => expect(warmShellCompletion).toHaveBeenCalledTimes(2));
+  expect(warmShellCompletion).toHaveBeenNthCalledWith(1, 'powershell');
+  expect(warmShellCompletion).toHaveBeenNthCalledWith(2, 'powershell');
 });
