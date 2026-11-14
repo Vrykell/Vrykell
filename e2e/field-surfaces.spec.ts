@@ -47,7 +47,9 @@ async function expectFieldHierarchy(field: Locator, editable: boolean | null = t
   const panel = colors.chain.find(color => !transparent(color)) ?? 'rgba(0, 0, 0, 0)';
   const fieldRgb = channels(colors.field);
   const panelRgb = channels(panel);
-  expect(new Set(fieldRgb).size).toBe(1);
+  // Neutral surfaces may carry a slight tint (the light control is #F8FAFC); reject a strong
+  // colour cast instead of requiring identical channels.
+  expect(Math.max(...fieldRgb) - Math.min(...fieldRgb)).toBeLessThanOrEqual(8);
   if (editable) {
     expect(luminance(colors.field)).toBeGreaterThanOrEqual(luminance(panel));
     expect(Math.max(...fieldRgb.map((value, index) => value - panelRgb[index]))).toBeLessThanOrEqual(36);

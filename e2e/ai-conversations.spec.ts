@@ -258,8 +258,9 @@ test('tool activity stays available within the plain conversation flow', async (
   await failed.locator('.ai-tool-summary').click();
   await expect(failed.locator('.ai-tool-verdict')).toContainText('Exit code 2');
   await expect(page.getByRole('alert')).toHaveCount(0);
-  // The copy target sits in the frame corner and appears with the hovered output.
-  const copy = page.getByTestId('tool-output-copy');
+  // The copy target sits in the frame corner and appears with the hovered output. Scope it to the
+  // first card: an expanded failed card carries its own output frame too.
+  const copy = rows.first().getByTestId('tool-output-copy');
   await expect(copy).toHaveCSS('opacity', '0');
   await output.hover();
   await expect(copy).toHaveCSS('opacity', '1');

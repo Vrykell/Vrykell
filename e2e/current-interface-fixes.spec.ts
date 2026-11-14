@@ -67,14 +67,23 @@ test('loads marketplace presets, exposes recoverable bottom-right errors and use
   await alert.getByRole('button', { name: '重试' }).click();
   await expect(page.getByText('github-skill-1').first()).toBeVisible();
   await expect(alert).toHaveCount(0);
-  const back = page.getByRole('button', { name: '返回', exact: true }); await expect(back.locator('svg')).toHaveCount(1);
+  const back = page.locator('.settings-screen').getByRole('button', { name: '返回', exact: true }); await expect(back.locator('svg')).toHaveCount(1);
   await page.screenshot({ path: info.outputPath('marketplace.png') }); await back.click();
   await page.getByRole('button', { name: 'ACP', exact: true }).click();
   for (const id of ['harness-test-0', 'harness-edit-0', 'harness-remove-0']) {
     const button = page.getByTestId(id); await expect(button).toHaveAttribute('data-compact', 'false');
     expect((await button.boundingBox())!.width).toBeGreaterThanOrEqual(28);
   }
-  const remove = page.getByTestId('harness-remove-0'); expect(await remove.evaluate(element => getComputedStyle(element).color)).toBe('rgb(255, 90, 82)');
+  const remove = page.getByTestId('harness-remove-0');
+  const dangerColor = await page.evaluate(() => {
+    const probe = document.createElement('span');
+    probe.style.color = 'var(--control-danger-color)';
+    document.body.appendChild(probe);
+    const color = getComputedStyle(probe).color;
+    probe.remove();
+    return color;
+  });
+  expect(await remove.evaluate(element => getComputedStyle(element).color)).toBe(dangerColor);
   await page.screenshot({ path: info.outputPath('normal-server-actions.png') });
 });
 

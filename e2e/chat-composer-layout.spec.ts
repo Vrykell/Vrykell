@@ -41,8 +41,9 @@ test('model shape, approval hover and attachment chip hover share one visual lan
   const status = page.locator('.chat-input-status');
 
   // The model control uses the permission button's rounded-square shape, not a pill.
-  await expect(status.getByTestId('model-pill')).toHaveCSS('border-radius', '10px');
-  await expect(status.getByTestId('chat-approval-select')).toHaveCSS('border-radius', '10px');
+  const controlRadius = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--radius-md').trim());
+  await expect(status.getByTestId('model-pill')).toHaveCSS('border-radius', controlRadius);
+  await expect(status.getByTestId('chat-approval-select')).toHaveCSS('border-radius', controlRadius);
 
   // The approval menu keeps a single fill: hovering another row overrides the selection.
   await status.getByTestId('chat-approval-select').click();
