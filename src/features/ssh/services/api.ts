@@ -153,8 +153,12 @@ export function sshConfigCandidates(): Promise<SshConfigCandidate[]> {
 
 /** Queries the host fingerprint and whether it is already trusted (used for first-connection confirmation). */
 export interface SshHostKeyInfo {
+  /** The key the server presented in this query. */
   fingerprint: string;
+  /** The presented key matches the recorded one. */
   known: boolean;
+  /** The presented key differs from the recorded one; never offered for trust. */
+  mismatch: boolean;
   keyType: string;
 }
 
