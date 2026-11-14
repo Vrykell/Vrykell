@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { t } from '@i18n';
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import AppMark from '@ui/icons/AppMark';
@@ -14,6 +14,9 @@ export default function AiStartPage({ open, active, onNewConversation, onPick, s
   onPick: (name: string, cwd?: string) => void; suspended?: boolean;
 }) {
   const [launcher, setLauncher] = useState<{ x: number; y: number } | null>(null);
+  // The picker belongs to this page: leaving the workspace closes it instead of leaving it
+  // floating over whatever the user opened next.
+  useEffect(() => { if (!active) setLauncher(null); }, [active]);
   return <div className="ai-start-page" data-testid="ai-start-page" data-active={active || undefined}>
     <WorkspaceStartPage icon={<AppMark size={40} />} title={t('Start a conversation')}
       description={t('Begin a built-in conversation or continue with a connected agent.')}
@@ -25,7 +28,7 @@ export default function AiStartPage({ open, active, onNewConversation, onPick, s
             setLauncher({ x: box.left, y: box.bottom });
           }}>{t('Choose an agent…')}</OutlineButton>
       </>} />
-    <AcpLauncher open={!!launcher && open && !suspended} anchor={launcher ?? undefined}
+    <AcpLauncher open={!!launcher && open && !suspended && active} anchor={launcher ?? undefined}
       onClose={() => setLauncher(null)} onPick={(name, cwd) => { setLauncher(null); onPick(name, cwd); }} />
   </div>;
 }

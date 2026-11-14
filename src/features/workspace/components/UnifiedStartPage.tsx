@@ -1,3 +1,4 @@
+import type { MouseEvent } from 'react';
 import { t } from '@i18n';
 import { OutlineButton } from '@ui/actions/OutlineButton';
 import { Grid } from '@ui/icons';
@@ -8,8 +9,14 @@ import WorkspaceStartPage from './WorkspaceStartPage';
  * actions place a first resource, and the strip above already lists what is open.
  */
 export default function UnifiedStartPage({ onNew, onOpen, onConnect, onAgent }: {
-  onNew: (kind: 'terminal' | 'document' | 'conversation') => void; onOpen: () => void; onConnect: () => void; onAgent: () => void;
+  onNew: (kind: 'terminal' | 'document' | 'conversation') => void; onOpen: () => void;
+  onConnect: (anchor: { x: number; y: number }) => void; onAgent: (anchor: { x: number; y: number }) => void;
 }) {
+  // Both pickers open under their own trigger, matching the terminal and AI start pages.
+  const openUnderTrigger = (event: MouseEvent<HTMLElement>, open: (anchor: { x: number; y: number }) => void) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    open({ x: box.left, y: box.bottom });
+  };
   return <div className="workspace-launch-page" data-testid="unified-start-page">
     <WorkspaceStartPage icon={<Grid size={40} />} title={t('Unified workspace')}
       description={t('Open terminals, files and conversations side by side in one workspace.')}
@@ -19,8 +26,8 @@ export default function UnifiedStartPage({ onNew, onOpen, onConnect, onAgent }: 
         <OutlineButton onClick={() => onNew('document')}>{t('New file')}</OutlineButton>
         <OutlineButton onClick={onOpen}>{t('Open file')}</OutlineButton>
         <OutlineButton onClick={() => onNew('conversation')}>{t('New conversation')}</OutlineButton>
-        <OutlineButton onClick={onConnect}>{t('Connect a server')}</OutlineButton>
-        <OutlineButton onClick={onAgent}>{t('ACP agents')}</OutlineButton>
+        <OutlineButton onClick={event => openUnderTrigger(event, onConnect)}>{t('Connect a server')}</OutlineButton>
+        <OutlineButton onClick={event => openUnderTrigger(event, onAgent)}>{t('ACP agents')}</OutlineButton>
       </>} />
   </div>;
 }

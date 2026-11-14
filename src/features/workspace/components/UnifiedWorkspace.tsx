@@ -153,7 +153,7 @@ export default function UnifiedWorkspace({ active }: { active: boolean }) {
       </>} /></WorkspaceHeader>
     {state.startActive && <UnifiedStartPage
       onNew={kind => kind === 'terminal' ? setTerminalPicker({ source: 'shell', split: false }) : newItem(kind)} onOpen={() => void openWorkspaceFile()}
-      onConnect={() => setTerminalPicker({ source: 'ssh', split: false })} onAgent={() => setLauncher({ split: false })} />}
+      onConnect={anchor => setTerminalPicker({ source: 'ssh', split: false, anchor })} onAgent={anchor => setLauncher({ split: false, anchor })} />}
     <WorkspacePaneCanvas containerId={state.activeTabId} layout={state.layout} focused={state.focused} resources={resources} visible={visible && !state.startActive} toolbarTarget={resourceToolbar}
       onFocus={focusUnifiedResource} onRatio={state.ratio} placing={!!placement} onPlace={commit} onCancel={() => { setPlacement(null); state.chooseMerge(); }}
       onSplit={(id, kind, anchor) => requestWorkspaceSplit(id, anchor, kind)}
