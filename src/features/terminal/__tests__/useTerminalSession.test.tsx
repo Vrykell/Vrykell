@@ -409,6 +409,15 @@ describe('useTerminalSession', () => {
     expect(mockedPtySpawn).not.toHaveBeenCalled();
   });
 
+  it('stops before spawning when host trust was cancelled without localized text', async () => {
+    // Cancellation carries a stable error name so a locale change cannot turn it into a retry.
+    vi.mocked(prepareSshHost).mockRejectedValueOnce(Object.assign(new Error('Host trust was cancelled'), { name: 'SshHostTrustCancelledError' }));
+    useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', user: 'user' } }) }], activeId: 't1' });
+    render(<TestHarness tabId="t1" onReady={() => {}} />);
+    await waitFor(() => expect(writeMock).toHaveBeenCalledWith(expect.stringContaining('SSH 连接失败'), expect.any(Function)));
+    expect(mockedPtySpawn).not.toHaveBeenCalled();
+  });
+
   it('classic mode: data goes straight to the main xterm without creating blocks', async () => {
     setTab('classic');
     render(<TestHarness tabId="t1" onReady={() => {}} />);
