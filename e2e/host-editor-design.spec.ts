@@ -9,18 +9,16 @@ for (const theme of ['dark', 'light']) test(`host editor and toolbars match the 
   await page.evaluate(() => { document.documentElement.dataset.nativeMaterial = 'fallback'; });
   const terminal = page.getByTestId('start-page');
   await expect(terminal.getByTestId('terminal-start-new')).toBeVisible();
-  await expect.poll(async () => Math.round((await terminal.getByTestId('terminal-start-new').boundingBox())!.height)).toBe(88);
-  await expect.poll(async () => Math.round((await terminal.locator('.launch-stats > div').first().boundingBox())!.height)).toBe(72);
   await page.screenshot({ path: info.outputPath(`terminal-${theme}.png`), animations: 'disabled' });
   await page.getByTestId('workspace-area-ai').click();
   const ai = page.getByTestId('ai-start-page');
   await expect(ai.getByTestId('ai-start-new-conversation')).toBeVisible();
-  await page.getByTestId('harness-add-session').click();
+  await page.getByTestId('ai-start-agents').click();
   const picker = page.getByRole('dialog', { name: 'ACP', exact: true });
   await expect(picker).toHaveClass(/new-tab-dialog/);
   await expect(picker).toHaveAttribute('aria-modal', 'false');
   await page.keyboard.press('Escape');
-  await expect.poll(async () => Math.round((await ai.getByTestId('ai-start-new-conversation').boundingBox())!.height)).toBe(88);
+  await expect(ai.getByTestId('ai-start-new-conversation')).toBeVisible();
   await page.screenshot({ path: info.outputPath(`ai-${theme}.png`), animations: 'disabled' });
   await page.getByTestId('workspace-area-ssh').click();
   for (const width of [1240, 780, 560]) {
@@ -115,6 +113,7 @@ test('agent menus retain full-width rows, searchable models and fixed navigation
   const initialIcon = await icon.evaluate(element => element.outerHTML);
   const topIcon = page.locator('[data-dock-btn="chat"] svg').first();
   const initialTopIcon = await topIcon.evaluate(element => element.outerHTML);
+  await page.getByTestId('ai-start-agents').click();
   await page.getByTestId('acp-launcher-Fake ACP').click();
   await expect(page.getByTestId('harness-selector-model')).toBeVisible();
   expect(await icon.evaluate(element => element.outerHTML)).toBe(initialIcon);

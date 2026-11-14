@@ -19,6 +19,7 @@ import WorkspaceHeader from '@ui/layout/WorkspaceHeader';
 import ResourceContent from '@ui/layout/ResourceContent';
 import { useCodeWorkspaceTabs } from '@features/workspace/hooks/useCodeWorkspaceTabs';
 import { openWorkspaceFile } from '@features/workspace/services/workspaceActions';
+import WorkspaceStartPage from '@features/workspace/components/WorkspaceStartPage';
 import ToolDialog from '@ui/feedback/ToolDialog';
 import ConfirmDialog from '@ui/feedback/ConfirmDialog';
 import ErrorBox from '@ui/feedback/ErrorBox';
@@ -95,12 +96,9 @@ function CodeStartPane({ tab, active }: { tab: Extract<Tab, { kind: 'start-code'
       onClose={() => useSessionStore.getState().closeTab(tab.id)} onMove={() => {}}
       menuItems={[{ label: t('New file'), onClick: newEditorFile }, { label: t('Open file'), onClick: () => void openWorkspaceFile() }]}
       toolbar={<><IconButton compact aria-label={t('Open file')} data-tip={t('Open file')} onClick={() => void openWorkspaceFile()}><FolderOpen size={iconSizes.control} /></IconButton><IconButton compact aria-label={t('New file')} data-tip={t('New file')} onClick={newEditorFile}><Plus size={iconSizes.control} /></IconButton></>} /></WorkspaceHeader>
-    <div className="workspace-empty workspace-start-page" data-testid="code-start-page-content">
-      <FileCode size={40} />
-      <h2>{t('Your text editor')}</h2>
-      <p>{t('Write a note, edit a file, or review changes.')}</p>
-      <div className="editor-start-actions"><OutlineButton className="primary-button" onClick={newEditorFile}>{t('New file')}</OutlineButton><OutlineButton onClick={() => void openWorkspaceFile()}>{t('Open file')}</OutlineButton></div>
-    </div>
+    <WorkspaceStartPage testId="code-start-page-content" icon={<FileCode size={40} />}
+      title={t('Your text editor')} description={t('Write a note, edit a file, or review changes.')}
+      actions={<><OutlineButton className="primary-button" onClick={newEditorFile}>{t('New file')}</OutlineButton><OutlineButton onClick={() => void openWorkspaceFile()}>{t('Open file')}</OutlineButton></>} />
   </section>;
 }
 

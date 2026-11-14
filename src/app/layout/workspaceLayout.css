@@ -1,4 +1,4 @@
-.workspace-layout { position: relative; display: grid; grid-template-columns: var(--workspace-sidebar-width) minmax(0, 1fr); grid-template-rows: 42px minmax(0, 1fr); flex: 1; min-width: 0; min-height: 0; }
+.workspace-layout { position: relative; display: grid; grid-template-columns: var(--workspace-sidebar-width) minmax(0, 1fr); grid-template-rows: var(--workspace-titlebar-height) minmax(0, 1fr); flex: 1; min-width: 0; min-height: 0; }
 .workspace-sidebar-resize { position: absolute; top: 0; bottom: 0; left: var(--workspace-sidebar-width); width: 0; z-index: 60; }
 .workspace-layout[data-sidebar-overlay] .workspace-sidebar { position: absolute; inset: 0 auto 0 0; width: var(--workspace-sidebar-overlay-width); z-index: 55; box-shadow: var(--shadow-lg); }
 .workspace-layout[data-sidebar-overlay] .workspace-sidebar-resize { left: var(--workspace-sidebar-overlay-width); }
@@ -11,11 +11,13 @@
 .workspace-layout .settings-screen { left: 0; }
 .workspace-layout:is([data-settings-open], [data-area="ssh"], [data-area="dashboard"], [data-area="history"]) .workspace-instance-bar { display: none; }
 .workspace-layout .workspace-titlebar[data-platform="macos"][data-fullscreen="false"] { --workspace-title-inset: max(16px, calc(92px - var(--workspace-sidebar-width))); }
-.workspace-layout .workspace-titlebar[data-sidebar-collapsed="true"] { --workspace-title-inset: 7px; }
+/* The collapsed expand button is centered in the first row, so the label inset mirrors its
+   vertical centering. */
+.workspace-layout .workspace-titlebar[data-sidebar-collapsed="true"] { --workspace-title-inset: calc((var(--workspace-titlebar-height) - var(--control-size-compact)) / 2); }
 .workspace-sidebar { grid-column: 1; grid-row: 1 / -1; display: flex; flex-direction: column; min-height: 0; background: var(--sidebar-bg); border-right: 1px solid var(--resize-divider); overflow: hidden; }
 .application-window[data-desktop-tint="true"] .workspace-sidebar { background: var(--chrome-translucent-bg); }
 .workspace-sidebar[data-collapsed="true"] { visibility: hidden; border: 0; }
-.workspace-sidebar-heading { height: 42px; flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; color: var(--text-muted); font-size: var(--fs-caption); user-select: none; }
+.workspace-sidebar-heading { height: var(--workspace-titlebar-height); flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; color: var(--text-muted); font-size: var(--fs-caption); user-select: none; }
 .workspace-sidebar-heading > span { overflow: hidden; white-space: nowrap; }
 .workspace-sidebar-header-actions { display: flex; align-items: center; gap: 2px; }
 .workspace-panel-heading-actions, .ai-secondary-actions { display: flex; align-items: center; gap: 2px; }
@@ -49,6 +51,20 @@ button.workspace-sidebar-toggle.icon-button:focus-visible { outline: 1px solid v
 .workspace-start-page { background: var(--canvas); }
 .workspace-empty h2 { margin: 0; font-size: var(--fs-title); font-weight: var(--fw-semibold); color: var(--text-primary); }
 .workspace-empty p { margin: 0 0 10px; font-size: var(--fs-label); }
+/* The shared simple start page: one icon, a heading, one line of orientation and the primary
+   actions. Every functional workspace rests on this same shape. */
+/* The start page fills the pane and centers its content both ways, matching the file start
+   page it replaces. */
+.workspace-start-simple { flex: 1; }
+.workspace-start-simple-body { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 520px; }
+.workspace-start-simple-icon { display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); }
+.workspace-start-simple-body h2 { margin-top: 2px; }
+.workspace-start-simple-body p { margin: 0; color: var(--text-muted); }
+/* Actions wrap and centre by default; a page whose buttons would otherwise end up ragged
+   opts into an even grid, which gives every action the same width. */
+.workspace-start-simple-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; }
+.workspace-start-simple-actions[data-grid="true"] { display: grid; grid-template-columns: repeat(var(--start-actions-columns, 2), minmax(0, 1fr)); width: 100%; max-width: 360px; }
+.workspace-start-simple-actions[data-grid="true"] > * { width: 100%; }
 .workspace-resource-page { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; background: var(--canvas); }
 .terminal-instance-header { flex: 1; user-select: none; min-width: 0; }
 .terminal-tab-tools { order: 2; }

@@ -9,6 +9,8 @@ export const WORKSPACE_SIDEBAR_WIDTH = 208;
 export const WORKSPACE_SIDEBAR_MIN_WIDTH = 160;
 export const WORKSPACE_SIDEBAR_MAX_WIDTH = 400;
 export const WORKSPACE_COMPACT_BREAKPOINT = 900;
+/** Back and forward keep a bounded, session-only trail of visited workspaces. */
+export const WORKSPACE_AREA_HISTORY_LIMIT = 50;
 const STORAGE_KEY = 'workspace-navigation-v1';
 const DEFAULT_WORKSPACE_ORDER: WorkspaceArea[] = ['terminal', 'code', 'ai', 'ssh', 'unified'];
 
@@ -17,6 +19,9 @@ export { workspaceAreaForKind } from '../model/tabArea';
 interface NavigationState {
   area: WorkspaceArea;
   previousArea: WorkspaceArea;
+  /** Session-only trail of visited workspaces for the titlebar back and forward actions. */
+  areaHistory: WorkspaceArea[];
+  areaHistoryIndex: number;
   collapsed: boolean;
   sidebarOverlay: boolean;
   sidebarWidth: number;
@@ -29,8 +34,10 @@ interface NavigationState {
   historyPresetRevision: number;
   historyLoading: boolean;
   historyDestination: 'native' | 'unified';
-  selectArea: (area: WorkspaceArea) => void;
-  selectHistory: (preset: HistoryTypePreset) => void;
+  selectArea: (area: WorkspaceArea, recordHistory?: boolean) => void;
+  selectHistory: (preset: HistoryTypePreset, recordHistory?: boolean) => void;
+  /** Move along the visited-workspace trail without recording a new entry. */
+  stepAreaHistory: (direction: -1 | 1) => WorkspaceArea | null;
   setHistoryLoading: (loading: boolean) => void;
   rememberTab: (area: WorkspaceArea, id: string) => void;
   setCollapsed: (collapsed: boolean) => void;
@@ -59,18 +66,52 @@ const savedWorkspaceOrder = Array.isArray(saved?.workspaceOrder)
   : [];
 const workspaceOrder = [...new Set([...savedWorkspaceOrder, ...DEFAULT_WORKSPACE_ORDER])];
 
+/** Record a visit without duplicating the current entry or reviving a forward branch. */
+export function pushAreaHistory(history: WorkspaceArea[], index: number, area: WorkspaceArea) {
+  const trimmed = history.slice(0, index + 1);
+  if (trimmed[trimmed.length - 1] === area) return { areaHistory: trimmed, areaHistoryIndex: trimmed.length - 1 };
+  const next = [...trimmed, area].slice(-WORKSPACE_AREA_HISTORY_LIMIT);
+  return { areaHistory: next, areaHistoryIndex: next.length - 1 };
+}
+
+/**
+ * Re-entering a trail entry activates panes, and that activation re-selects the same area.
+ * Recording those cascaded selections would drop the branch the user is stepping through,
+ * so a step runs inside this window and the trail only moves when it begins.
+ */
+let historySuspended = 0;
+export function runWithoutAreaHistory<T>(operation: () => T): T {
+  historySuspended += 1;
+  try { return operation(); }
+  finally { historySuspended -= 1; }
+}
+
 /** Navigation owns presentation preferences; session and document stores retain their data. */
-export const useWorkspaceNavigation = create<NavigationState>((set) => ({
+export const useWorkspaceNavigation = create<NavigationState>((set, get) => ({
   area: 'terminal', previousArea: 'terminal', collapsed: saved?.collapsed === true || window.innerWidth <= WORKSPACE_COMPACT_BREAKPOINT,
   sidebarWidth: normalizeSidebarWidth(saved?.sidebarWidth), sidebarDragWidth: null, sidebarOverlay: false,
   lastTabs: {}, groupColors, workspaceOrder, aiPlacement: 'main',
+  areaHistory: ['terminal'], areaHistoryIndex: 0,
   historyPreset: 'all', historyPresetRevision: 0, historyLoading: false, historyDestination: 'native',
-  selectArea: area => set(state => ({ area, previousArea: state.area !== 'ai' ? state.area : state.previousArea,
+  selectArea: (area, recordHistory = true) => set(state => ({
+    area, previousArea: state.area !== 'ai' ? state.area : state.previousArea,
+    ...(recordHistory && !historySuspended && area !== state.area ? pushAreaHistory(state.areaHistory, state.areaHistoryIndex, area) : {}),
     ...(state.sidebarOverlay && area !== state.area ? { collapsed: true, sidebarOverlay: false, sidebarDragWidth: null } : {}) })),
-  selectHistory: preset => set(state => ({ area: 'history', previousArea: state.area !== 'ai' ? state.area : state.previousArea,
+  selectHistory: (preset, recordHistory = true) => set(state => ({ area: 'history', previousArea: state.area !== 'ai' ? state.area : state.previousArea,
+    ...(recordHistory && !historySuspended && state.area !== 'history' ? pushAreaHistory(state.areaHistory, state.areaHistoryIndex, 'history') : {}),
     historyDestination: state.area === 'history' ? state.historyDestination : state.area === 'unified' ? 'unified' : 'native',
     historyPreset: preset, historyPresetRevision: state.historyPresetRevision + 1,
     ...(state.sidebarOverlay && state.area !== 'history' ? { collapsed: true, sidebarOverlay: false, sidebarDragWidth: null } : {}) })),
+  stepAreaHistory: direction => {
+    const state = get();
+    const index = state.areaHistoryIndex + direction;
+    const target = state.areaHistory[index];
+    if (!target) return null;
+    set({ areaHistoryIndex: index });
+    // The caller re-enters the destination through the shared area selection so panes,
+    // remembered tabs and settings state resolve exactly as they do for a direct visit.
+    return target;
+  },
   setHistoryLoading: historyLoading => set({ historyLoading }),
   rememberTab: (area, id) => set(state => state.lastTabs[area] === id ? state : ({ lastTabs: { ...state.lastTabs, [area]: id } })),
   setCollapsed: collapsed => set({ collapsed, sidebarDragWidth: null, sidebarOverlay: false }),
