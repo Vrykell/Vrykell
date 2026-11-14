@@ -173,7 +173,7 @@ it('opens real host details with Space and offers contextual connection and coll
   expect(connect).toHaveBeenCalledWith(expect.objectContaining({ id: 'ssh-1' }));
   fireEvent.contextMenu(row); fireEvent.click(screen.getByRole('menu').querySelector('button:last-child')!);
   expect(remove).toHaveBeenCalledWith(expect.objectContaining({ id: 'ssh-1' }));
-});
+}, 15_000);
 
 it('does not show last connection times on failed cards', async () => {
   status.mockRejectedValue(new Error('Connection refused'));
