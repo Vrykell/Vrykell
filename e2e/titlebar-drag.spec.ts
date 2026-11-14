@@ -42,8 +42,11 @@ for (const width of [1240, 720]) {
     // Title text drags the window instead of being inert text.
     expect((await elementAt(page, titleSpan.left + 4, middle))?.isDragRegion).toBe(true);
 
-    // Empty space between the title text and the titlebar history actions.
-    const historyBox = (await page.locator('.workspace-title-history').boundingBox())!;
+    // Empty space between the title text and the titlebar history actions. The resize above
+    // also collapses the sidebar, so wait until the pair has been laid out again.
+    const history = page.locator('.workspace-title-history');
+    await expect(history).toBeVisible();
+    const historyBox = (await history.boundingBox())!;
     const beforeHistory = Math.round((titleSpan.right + historyBox.x) / 2);
     if (beforeHistory - titleSpan.right > 8) {
       expect((await elementAt(page, beforeHistory, middle))?.isDragRegion).toBe(true);
