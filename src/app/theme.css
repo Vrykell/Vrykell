@@ -1483,9 +1483,10 @@ button.provider-option-add:hover { color: var(--text-primary); }
 /* Model list: the vendor groups, the toolbar and their rows (ProviderModelList.tsx). */
 /* The list owns one content inset: the first control and the last group clear the panel edge by the
    same amount. A filled control reads tighter than a text label at the same inset, so the block
-   inset sits a little above the 18px a .settings-field uses until the button's edge looks level. */
+   sits 4px below the description instead of the stacked field's 10px. The stacked rule is more
+   specific, so this selector repeats its context to keep the tighter inset. */
 .settings-model-list { min-width: 0; }
-.settings-field-control:has(> .settings-model-list) { margin-top: 4px; }
+.settings-field[data-layout="stacked"] > .settings-field-control:has(> .settings-model-list) { margin-top: 4px; }
 .settings-model-group:last-child { margin-bottom: 0; }
 .settings-model-group { margin-bottom: 8px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--chrome-field); overflow: hidden; }
 /* Rows read at the settings text size: without an explicit size the row text inherits the
@@ -1534,6 +1535,7 @@ button.provider-option-add:hover { color: var(--text-primary); }
 @container settings (max-width: 480px) {
   .settings-model-toolbar-actions > button.outline-button > svg { margin: 0; }
   .settings-model-search { max-width: none; }
+  .settings-model-id:not([data-missing]) { display: none; }
 }
 /* ACP server rows: flat at rest, a soft highlight on hover, actions on the right. */
 .acp-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--radius-inner); background: transparent; transition: background var(--dur-fast) var(--ease); }

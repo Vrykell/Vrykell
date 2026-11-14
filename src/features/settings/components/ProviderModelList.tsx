@@ -7,7 +7,7 @@
  * overrides cannot be recovered. The row itself stays quiet: name, identifier and capability
  * marks at rest, with edit, switch and delete behind one menu.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { t } from '@i18n';
 import { IconButton } from '@ui/actions/IconButton';
 import ReloadButton from '@ui/actions/ReloadButton';
@@ -24,7 +24,7 @@ import { providerFetchModels, useAiConfigStore, type ModelProfile } from '@featu
 import { commitModels, selectModel } from '@features/settings/model/modelWrites';
 import { filterModels, groupModelsByVendor } from '@features/settings/model/modelGroups';
 import { readCollapsedModelGroups, saveCollapsedModelGroups } from '@features/settings/model/modelGroupCollapse';
-import type { ProviderRow } from '@features/settings/model/providerList';
+import { providerId, type ProviderRow } from '@features/settings/model/providerList';
 import { SettingsGroup, Field } from './ui';
 import AddModelDialog from './AddModelDialog';
 import ModelSettingsDialog from './ModelSettingsDialog';
@@ -63,12 +63,13 @@ function ModelRow({ model, active, onSetCurrent, onRemove }: {
   }, [active, target, request]);
   const Mark = modelMark(model.provider, model.model, model.baseUrl);
   const name = model.name || model.model || t('Unnamed model');
+  const actionsLabel = t('{{name}} model actions', { name });
   const identifier = model.model.trim();
   /** A synced row often names itself after its identifier; repeating it would print the same text twice. */
   const showIdentifier = !identifier || identifier.toLowerCase() !== name.trim().toLowerCase();
   return (
-    <div className="settings-model-row" data-testid="model-row" data-active={active || undefined}
-      aria-current={active ? 'true' : undefined}>
+    <div className="settings-model-row" data-testid="model-row" data-model-id={model.id}
+      data-active={active || undefined} aria-current={active ? 'true' : undefined}>
       <span className="settings-model-mark" style={{ color: modelHue(model.provider, model.model, model.baseUrl) }}>
         <Mark size={iconSizes.row} aria-hidden="true" />
       </span>
@@ -97,7 +98,7 @@ function ModelRow({ model, active, onSetCurrent, onRemove }: {
             <Settings size={iconSizes.control} />
           </IconButton>
           <IconButton data-testid="model-actions" aria-haspopup="menu" aria-expanded={menu !== null}
-            aria-label={t('Model actions')} data-tip={t('Model actions')}
+            aria-label={actionsLabel} data-tip={actionsLabel}
             onClick={(event) => {
               const rect = event.currentTarget.getBoundingClientRect();
               setMenu({ x: rect.left, y: rect.bottom + 4, trigger: event.currentTarget, align: 'end' });
@@ -128,6 +129,8 @@ export default function ProviderModelList({ row, toast }: {
 }) {
   const aiCfg = useAiConfigStore();
   const { save } = useSettingsSave();
+  const list = useRef<HTMLDivElement>(null);
+  const pendingFocus = useRef<{ index: number; removedId: string } | null>(null);
   const [query, setQuery] = useState('');
   const [capability, setCapability] = useState<ModelCapability | 'all'>('all');
   const [collapsed, setCollapsed] = useState<Set<string>>(readCollapsedModelGroups);
@@ -139,6 +142,7 @@ export default function ProviderModelList({ row, toast }: {
   const activeId = aiCfg.activeModel;
   const visible = useMemo(() => filterModels(models, query, capability), [models, query, capability]);
   const groups = useMemo(() => groupModelsByVendor(visible), [visible]);
+  const filtering = query.trim().length > 0 || capability !== 'all';
   const allCollapsed = groups.length > 0 && groups.every(group => collapsed.has(group.key));
 
   const toggleGroup = (key: string) => {
@@ -154,12 +158,26 @@ export default function ProviderModelList({ row, toast }: {
     saveCollapsedModelGroups(next);
   };
 
+  // The deleted row's trigger disappears with it; move focus once the list reflects the removal.
+  useEffect(() => {
+    const pending = pendingFocus.current;
+    if (!pending || models.some(model => model.id === pending.removedId)) return;
+    pendingFocus.current = null;
+    const rows = [...(list.current?.querySelectorAll<HTMLElement>('[data-testid="model-row"]') ?? [])];
+    const nextRow = pending.index >= 0 && pending.index < rows.length ? rows[pending.index] : undefined;
+    const trigger = nextRow?.querySelector<HTMLElement>('[data-testid="model-actions"]')
+      ?? list.current?.querySelector<HTMLElement>('[data-testid="model-add"]');
+    trigger?.focus();
+  }, [models]);
+
   const setCurrent = (model: ModelProfile) => {
     if (!model.model.trim()) {
       toast(t('Fill in the model ID first.'), 'info');
       return;
     }
     void save(() => selectModel(model.id)).then(() => {
+      // A failed write is reported by the save status; only a real switch earns the success toast.
+      if (useAiConfigStore.getState().activeModel !== model.id) return;
       toast(t('Switched to {{model}}', { model: model.name || model.model }), 'success');
     });
   };
@@ -174,7 +192,19 @@ export default function ProviderModelList({ row, toast }: {
   const removeConfirmed = () => {
     const target = confirmRemove;
     setConfirmRemove(null);
-    if (target) void save(() => commitModels(current => current.filter(model => model.id !== target.id)));
+    if (!target) return;
+    const provider = providerId(target.provider, target.baseUrl);
+    const rows = [...(list.current?.querySelectorAll<HTMLElement>('[data-testid="model-row"]') ?? [])];
+    const index = rows.findIndex(element => element.dataset.modelId === target.id);
+    pendingFocus.current = { index, removedId: target.id };
+    void save(() => commitModels(
+      current => current.filter(model => model.id !== target.id),
+      // Keep the survivor inside the row it came from instead of jumping to the list's first model.
+      next => next.find(model => providerId(model.provider, model.baseUrl) === provider)?.id,
+    )).then(() => {
+      // On failure the row stays; drop the request so a later rerender does not move focus.
+      if (useAiConfigStore.getState().models.some(model => model.id === target.id)) pendingFocus.current = null;
+    });
   };
 
   /** Pull the endpoint's own list and add the ids the list does not have yet. */
@@ -217,14 +247,20 @@ export default function ProviderModelList({ row, toast }: {
         title={t('Model list')}
         description={t('Configure models and choose the active one. Models from the same provider share an API key.')}
       >
-        <div className="settings-model-list">
+        <div className="settings-model-list" ref={list}>
           <div className="settings-model-toolbar" data-testid="model-list-toolbar">
             <div className="settings-model-search">
               <Search size={iconSizes.compact} aria-hidden="true" />
               <TextInput variant="field" type="search" value={query} data-testid="model-search"
                 aria-label={t('Search models')} placeholder={t('Search by model name or ID…')}
                 onChange={event => setQuery(event.target.value)}
-                onKeyDown={event => { if (event.key === 'Escape' && query) { event.preventDefault(); setQuery(''); } }} />
+                onKeyDown={event => {
+                  if (event.key !== 'Escape' || !query) return;
+                  // Clear the query without letting the window shortcut close settings.
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setQuery('');
+                }} />
               {query && (
                 <IconButton compact data-testid="model-search-clear" aria-label={t('Clear search')}
                   data-tip={t('Clear search')} onClick={() => setQuery('')}>
@@ -241,7 +277,7 @@ export default function ProviderModelList({ row, toast }: {
               style={{ width: 132, flexShrink: 0 }}
             />
             <span className="settings-model-toolbar-actions">
-              <IconButton data-testid="model-collapse-all" disabled={models.length === 0}
+              <IconButton data-testid="model-collapse-all" disabled={models.length === 0 || filtering}
                 aria-label={t(allCollapsed ? 'Expand all groups' : 'Collapse all groups')}
                 data-tip={t(allCollapsed ? 'Expand all groups' : 'Collapse all groups')} onClick={toggleAll}>
                 <ChevronDown size={iconSizes.control} style={{ transform: allCollapsed ? undefined : 'rotate(180deg)', transition: 'transform 0.12s var(--ease)' }} />
@@ -258,11 +294,14 @@ export default function ProviderModelList({ row, toast }: {
           {models.length > 0 && visible.length === 0 && (
             <div className="search-empty-state" data-testid="model-no-match">
               {t('No models match.')}
-              {query && <OutlineButton onClick={() => { setQuery(''); setCapability('all'); }}>{t('Clear search')}</OutlineButton>}
+              {filtering && (
+                <OutlineButton onClick={() => { setQuery(''); setCapability('all'); }}>{t('Clear filters')}</OutlineButton>
+              )}
             </div>
           )}
           {groups.map((group) => {
-            const open = !collapsed.has(group.key);
+            // A filtering list always shows its matches, even inside a group collapsed at rest.
+            const open = filtering || !collapsed.has(group.key);
             return (
               <section key={group.key} data-testid={`model-group-${group.key}`} className="settings-model-group">
                 <button type="button" data-subtle aria-expanded={open} onClick={() => toggleGroup(group.key)}

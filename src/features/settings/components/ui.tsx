@@ -60,15 +60,6 @@ export function Toggle({ on, onChange, label, disabled = false, showState = true
   );
 }
 
-export function ModelTextInput({ value, onCommit, placeholder, style }: {
-  value: string;
-  onCommit: (v: string) => void | Promise<void>;
-  placeholder?: string;
-  style?: React.CSSProperties;
-}) {
-  return <AutoSaveInput value={value} onCommit={onCommit} placeholder={placeholder} style={style} />;
-}
-
 export function NumberInput({ value, onChange, min, max, label }: {
   value: number;
   onChange: (v: number) => void | Promise<void>;

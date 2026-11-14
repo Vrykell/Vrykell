@@ -1,7 +1,7 @@
 /** Internal message identifiers retain explicit English labels. Other keys are their English copy. */
 const en: Record<string, string> = {
   'Search by model name or ID…': 'Search by model name or ID…',
-  'Model actions': 'Model actions',
+  '{{name}} model actions': '{{name}} model actions',
   'No model ID': 'No model ID',
   'Edit model': 'Edit model',
   'About': 'About',

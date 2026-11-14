@@ -9,11 +9,22 @@ import { detectCapabilities, type ModelCapability } from '@features/agent/model/
 
 let modelWrites = Promise.resolve();
 
-export function commitModels(transform: (models: ModelProfile[]) => ModelProfile[]) {
+/**
+ * Apply one transform to the persisted list. When the transform removes the active model, the
+ * caller can name a closer fallback (for example the next model of the same provider) before the
+ * list's first entry is used.
+ */
+export function commitModels(
+  transform: (models: ModelProfile[]) => ModelProfile[],
+  activeFallback?: (next: ModelProfile[]) => string | undefined,
+) {
   const write = modelWrites.then(() => {
     const current = useAiConfigStore.getState();
     const next = transform(current.models);
-    return setAiModels(next, next.some(model => model.id === current.activeModel) ? current.activeModel : next[0]!.id);
+    const active = next.some(model => model.id === current.activeModel)
+      ? current.activeModel
+      : activeFallback?.(next) ?? next[0]!.id;
+    return setAiModels(next, active);
   });
   modelWrites = write.catch(() => {});
   return write;
