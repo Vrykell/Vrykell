@@ -85,7 +85,7 @@ test('terminal error notifications follow the active gray theme and can be close
     await expect(notification).toBeVisible();
     await notification.hover();
     await expect(notification).toHaveCSS('background-color', await resolvedColor(page, '--menu-bg'));
-    await expect(notification).toHaveCSS('border-radius', '10px');
+    await expect(notification).toHaveCSS('border-radius', '12px');
     // Floating surfaces separate with an outer shadow instead of a border.
     await expect(notification).toHaveCSS('border-width', '0px');
     await page.screenshot({ path: `ux-audit.local/after-notification-${theme}.png` });

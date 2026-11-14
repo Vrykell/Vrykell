@@ -60,7 +60,7 @@ for (const theme of ['dark', 'light']) for (const width of [760, 1280]) {
     const caps = await dialog.locator('.model-capability-settings').boundingBox();
     expect(caps!.y).toBeGreaterThan(context!.y + context!.height);
     await dialog.getByRole('combobox', { name: '上下文策略', exact: true }).click();
-    await expect(page.locator('.ui-select-menu')).toHaveCSS('border-top-left-radius', '10px');
+    await expect(page.locator('.ui-select-menu')).toHaveCSS('border-top-left-radius', '12px');
     await page.evaluate(() => document.documentElement.style.setProperty('--radius-md', '17px'));
     await expect(page.locator('.ui-select-menu')).toHaveCSS('border-top-left-radius', '17px');
     await page.keyboard.press('Escape');
@@ -73,7 +73,7 @@ for (const theme of ['dark', 'light']) for (const width of [760, 1280]) {
         return element.getBoundingClientRect().top - control.getBoundingClientRect().bottom;
       });
       expect(gap).toBeLessThanOrEqual(30);
-      await expect(preview).toHaveCSS('border-top-left-radius', '10px');
+      await expect(preview).toHaveCSS('border-top-left-radius', '8px');
     }
     await page.screenshot({ path: info.outputPath(`typography-${theme}-${width}.png`), fullPage: true });
   });
