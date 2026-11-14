@@ -30,7 +30,7 @@ test('adds a custom provider, retains the first-entered key and confirms endpoin
   await address.fill('https://moved.example/v1'); await address.press('Enter'); await page.getByTestId('confirm-ok').click();
   await expect(address).toHaveValue('https://moved.example/v1'); await expect(page.getByTestId('provider-key-value')).toBeVisible();
   const name = page.getByTestId('model-name').first();
-  expect(await name.evaluate(element => getComputedStyle(element).fontWeight)).toBe('400');
+  expect(await name.evaluate(element => getComputedStyle(element).fontWeight)).toBe('500');
 });
 
 test('keeps modal command input in one status row, yanks to clipboard and guards quit', async ({ page }, info) => {

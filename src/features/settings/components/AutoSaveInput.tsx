@@ -26,10 +26,11 @@ interface Props {
   clearAfterSave?: boolean;
   /** Stable hook for tests; the visible copy may change. */
   testId?: string;
+  id?: string;
   'aria-label'?: string;
 }
 
-export default function AutoSaveInput({ value, onCommit, placeholder, style, multiline, rows, type, min, max, step, disabled, trim = true, validate, normalize, onClear, clearAfterSave, testId, 'aria-label': ariaLabel }: Props) {
+export default function AutoSaveInput({ value, onCommit, placeholder, style, multiline, rows, type, min, max, step, disabled, trim = true, validate, normalize, onClear, clearAfterSave, testId, id, 'aria-label': ariaLabel }: Props) {
   const composing = useRef(false);
   const { flex, flexShrink, width, minWidth, marginTop, marginBottom, ...controlStyle } = style ?? {};
   const validateDraft = validate ?? (type === 'number'
@@ -41,7 +42,7 @@ export default function AutoSaveInput({ value, onCommit, placeholder, style, mul
     return normalize ? normalize(result) : result;
   });
   const feedback = useSettingsSave();
-  const props = { value: save.value, placeholder, disabled, 'aria-label': ariaLabel, 'data-testid': testId,
+  const props = { id, value: save.value, placeholder, disabled, 'aria-label': ariaLabel, 'data-testid': testId,
     onChange: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => save.setValue(event.target.value, false, composing.current),
     onBlur: () => { void save.flush(); },
     onCompositionStart: () => { composing.current = true; save.setComposing(true); },
@@ -51,7 +52,7 @@ export default function AutoSaveInput({ value, onCommit, placeholder, style, mul
     },
     style: { ...inputStyle, ...controlStyle, width: '100%' },
   };
-  return <div style={{ minWidth: minWidth ?? 0, flex, flexShrink, width, marginTop, marginBottom }}>
+  return <div className="autosave-input" style={{ minWidth: minWidth ?? 0, flex, flexShrink, width, marginTop, marginBottom }}>
     {multiline ? <ConfigTextArea {...props} rows={rows} /> : <TextInput {...props} type={type} min={min} max={max} step={step} />}
     <SaveStatus inline status={save.status} error={save.error} onRetry={() => { void save.flush(); }} />
     {onClear && <button type="button" onClick={() => { void feedback.save(async () => {

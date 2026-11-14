@@ -51,10 +51,10 @@
 .memory-counts { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: var(--fs-caption); color: var(--text-secondary); }
 .memory-counts > span > span { color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .memory-review { border-top: 1px solid var(--border); gap: 14px; padding: 20px 0; }
-.model-options-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(224px, 1fr)); column-gap: 20px; row-gap: 10px; }
-.model-option { display: grid; grid-template-columns: 104px minmax(96px, 112px); justify-content: start; align-items: center; column-gap: 8px; min-width: 0; min-height: 34px; font-size: var(--fs-caption); }
-.model-option > span { min-width: 0; overflow-wrap: anywhere; }
-.model-option > div { min-width: 0; width: 100%; }
+.model-options-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 12px; row-gap: 10px; }
+.model-option { display: flex; flex-direction: column; align-items: stretch; gap: 5px; min-width: 0; font-size: var(--fs-caption); }
+.model-option > span { min-width: 0; overflow-wrap: anywhere; color: var(--text-secondary); line-height: 1.4; }
+.model-option > div { min-width: 0; width: 100%; margin-top: auto; }
 .model-option > div > input, .model-option > div > button, .model-option > div > .autosave-input { width: 100% !important; }
 .model-option input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
 .model-option input[type="number"]::-webkit-inner-spin-button,
@@ -62,13 +62,17 @@
 .settings-content input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
 .settings-content input[type="number"]::-webkit-inner-spin-button,
 .settings-content input[type="number"]::-webkit-outer-spin-button { appearance: none; -webkit-appearance: none; margin: 0; }
-.model-option .model-temperature-controls { justify-content: flex-end; }
+.model-option .model-temperature-controls { justify-content: flex-start; min-height: 32px; }
 .model-temperature-controls { display: flex; align-items: center; gap: 8px; }
 @media (max-width: 760px) {
+  .model-options-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .resource-detail-header { flex-wrap: wrap; }
   .resource-detail-header > .resource-identity { flex: 1; }
   .resource-detail-header > .resource-actions { width: 100%; margin-left: 0; }
   .resource-setting-row { flex-wrap: wrap; gap: 12px; }
   .memory-status { padding: 0 16px; }
   .memory-review > .resource-identity { flex-basis: 100%; }
+}
+@media (max-width: 560px) {
+  .model-options-grid { grid-template-columns: minmax(0, 1fr); }
 }
