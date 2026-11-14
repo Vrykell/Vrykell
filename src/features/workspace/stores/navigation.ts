@@ -68,9 +68,9 @@ const workspaceOrder = [...new Set([...savedWorkspaceOrder, ...DEFAULT_WORKSPACE
 
 /** Record a visit without duplicating the current entry or reviving a forward branch. */
 export function pushAreaHistory(history: WorkspaceArea[], index: number, area: WorkspaceArea) {
-  const trimmed = history.slice(0, index + 1);
-  if (trimmed[trimmed.length - 1] === area) return { areaHistory: trimmed, areaHistoryIndex: trimmed.length - 1 };
-  const next = [...trimmed, area].slice(-WORKSPACE_AREA_HISTORY_LIMIT);
+  // Re-selecting the entry already under the cursor leaves the trail untouched.
+  if (history[index] === area) return { areaHistory: history, areaHistoryIndex: index };
+  const next = [...history.slice(0, index + 1), area].slice(-WORKSPACE_AREA_HISTORY_LIMIT);
   return { areaHistory: next, areaHistoryIndex: next.length - 1 };
 }
 
