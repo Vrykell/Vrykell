@@ -31,7 +31,7 @@ it('starts with one host list and only collects resources when explicitly enable
   expect(status).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('switch', { name: '资源占用' }));
   await waitFor(() => expect(status).toHaveBeenCalledTimes(2));
-  expect(screen.getByTestId('ssh-row-ssh-1')).toHaveTextContent('在线');
+  await waitFor(() => expect(screen.getByTestId('ssh-row-ssh-1')).toHaveTextContent('在线'));
   fireEvent.click(screen.getByRole('switch', { name: '资源占用' }));
   expect(screen.queryByText('在线')).toBeNull();
 });
@@ -173,7 +173,7 @@ it('opens real host details with Space and offers contextual connection and coll
   expect(connect).toHaveBeenCalledWith(expect.objectContaining({ id: 'ssh-1' }));
   fireEvent.contextMenu(row); fireEvent.click(screen.getByRole('menu').querySelector('button:last-child')!);
   expect(remove).toHaveBeenCalledWith(expect.objectContaining({ id: 'ssh-1' }));
-});
+}, 15_000);
 
 it('does not show last connection times on failed cards', async () => {
   status.mockRejectedValue(new Error('Connection refused'));

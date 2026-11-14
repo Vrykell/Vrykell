@@ -16,6 +16,11 @@ import { savedJumpRoute } from '../model/jumpRoute';
 import { prepareSshHost } from '../services/hostTrust';
 import { sshConnectionFailureMessage } from '../model/connectionFailure';
 
+/** Host-trust outcomes that stay distinct from an authentication failure. */
+type TrustIssue =
+  | { kind: 'mismatch'; host: string; port: number; keyType?: string; fingerprint?: string; details?: string }
+  | { kind: 'cancelled'; host: string; port: number };
+
 function AuthenticationDialog({ target }: { target: SshAuthenticationTarget & { requestId: number } }) {
   const dialog = useRef<HTMLDivElement>(null);
   const submitting = useRef(false);
@@ -33,6 +38,7 @@ function AuthenticationDialog({ target }: { target: SshAuthenticationTarget & { 
   const [secret, setSecret] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [trustIssue, setTrustIssue] = useState<TrustIssue | null>(null);
   const [challenge, setChallenge] = useState<{ value: SshAuthenticationChallenge; reply: SshChallengeReply } | null>(null);
   const [responses, setResponses] = useState<string[]>([]);
   const [responding, setResponding] = useState(false);
@@ -64,7 +70,7 @@ function AuthenticationDialog({ target }: { target: SshAuthenticationTarget & { 
     }
     if (submitting.current || (method !== 'keyboardInteractive' && !secret)) return;
     submitting.current = true;
-    setBusy(true); setError('');
+    setBusy(true); setError(''); setTrustIssue(null);
     const value = secret;
     setSecret('');
     const controller = method === 'keyboardInteractive' ? new AbortController() : null;
@@ -86,7 +92,18 @@ function AuthenticationDialog({ target }: { target: SshAuthenticationTarget & { 
       const next = targets[targets.findIndex(candidate => candidate.connectionId === selected.connectionId) + 1];
       if (next) { setSelectedId(next.connectionId); setMethod('password'); }
     } catch (reason) {
-      if (useSessionAuthenticationStore.getState().request?.requestId === target.requestId) setError(String(reason));
+      if (useSessionAuthenticationStore.getState().request?.requestId !== target.requestId) return;
+      const name = (reason as Error)?.name;
+      const failure = reason as { host?: string; port?: number; keyType?: string; fingerprint?: string; rawMessage?: string; message?: string };
+      const host = failure.host ?? selected.host;
+      const port = failure.port ?? selected.port ?? 22;
+      if (name === 'SshHostKeyMismatchError') {
+        setTrustIssue({ kind: 'mismatch', host, port, keyType: failure.keyType, fingerprint: failure.fingerprint, details: failure.rawMessage ?? failure.message });
+      } else if (name === 'SshHostTrustCancelledError') {
+        setTrustIssue({ kind: 'cancelled', host, port });
+      } else {
+        setError(String(reason));
+      }
     } finally { active.current = null; submitting.current = false; setBusy(false); setChallenge(null); setResponses([]); }
   };
   useDialogKeyboard(dialog, true, { onClose: cancel, onSubmit: () => { void submit(); }, disabled: busy && !active.current, initialFocus: '#ssh-session-secret' });
@@ -95,11 +112,11 @@ function AuthenticationDialog({ target }: { target: SshAuthenticationTarget & { 
     <div ref={dialog} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="ssh-auth-heading" className="workspace-floating workspace-floating-dialog ssh-form-dialog ssh-auth-dialog" data-testid="ssh-auth-dialog">
       <header className="ssh-form-header"><h2 id="ssh-auth-heading">{t('Authenticate file and resource services')}</h2></header>
       <div className="ssh-form-body ssh-form-section ssh-form-section-fields">
-        {targets.length > 1 && <label>{t('Authentication target')}<Select disabled={busy} aria-label={t('Authentication target')} value={selected.connectionId} onChange={id => { setSelectedId(id); setSecret(''); setMethod('password'); setError(''); }} options={targets.map(candidate => ({ value: candidate.connectionId, label: `${candidate.name ?? candidate.host} (${candidate.user ?? ''}@${candidate.host})` }))} /></label>}
+        {targets.length > 1 && <label>{t('Authentication target')}<Select disabled={busy} aria-label={t('Authentication target')} value={selected.connectionId} onChange={id => { setSelectedId(id); setSecret(''); setMethod('password'); setError(''); setTrustIssue(null); }} options={targets.map(candidate => ({ value: candidate.connectionId, label: `${candidate.name ?? candidate.host} (${candidate.user ?? ''}@${candidate.host})` }))} /></label>}
         <p className="ssh-auth-address">{endpoint.user ? `${endpoint.user}@` : ''}{endpoint.host}:{endpoint.port ?? 22}</p>
         {!challenge && <p>{t(method === 'keyboardInteractive' ? 'Answer the server challenges for this connection and its jump hosts. File browsing and monitoring reuse the authenticated connection.' : selected.identityFile ? 'Enter the server password, or the passphrase for the configured private key. File browsing and monitoring share this authentication.' : 'Enter the server password. File browsing and monitoring share this authentication.')}</p>}
         {targets.length > 1 && method !== 'keyboardInteractive' && <p>{t('Authenticate jump hosts in order, then authenticate the destination. Each credential stays with its own connection.')}</p>}
-        {!challenge && <label>{t('Authentication method')}<Select disabled={busy} aria-label={t('Authentication method')} value={method} onChange={value => { setMethod(value as typeof method); if (value === 'keyboardInteractive') setSelectedId(target.connectionId); setSecret(''); setError(''); }} options={[
+        {!challenge && <label>{t('Authentication method')}<Select disabled={busy} aria-label={t('Authentication method')} value={method} onChange={value => { setMethod(value as typeof method); if (value === 'keyboardInteractive') setSelectedId(target.connectionId); setSecret(''); setError(''); setTrustIssue(null); }} options={[
           { value: 'password', label: t('Server password') }, ...(selected.identityFile ? [{ value: 'keyPassphrase', label: t('Private key passphrase') }] : []),
           { value: 'keyboardInteractive', label: t('Server challenges (MFA)') },
         ]} /></label>}
@@ -119,7 +136,18 @@ function AuthenticationDialog({ target }: { target: SshAuthenticationTarget & { 
           </label>)}
         </>}
         {!challenge && !busy && <p>{t('Used only in memory until the last terminal for this connection closes or the app exits. Your saved connection is unchanged.')}</p>}
-        {error && <ErrorBox title={t('Authentication failed')} details={error}>{sshConnectionFailureMessage(error) ?? t(method === 'keyboardInteractive' ? 'The server did not accept authentication. Start again to request new challenges.' : 'Check the password or private key passphrase and try again.')}</ErrorBox>}
+        {trustIssue?.kind === 'mismatch' && <ErrorBox tone="error" placement="inline" title={t('Host key mismatch')} details={trustIssue.details} testId="ssh-auth-host-key-mismatch">
+          <p>{t('The host key presented by {{host}}:{{port}} does not match the saved record. This may indicate a man-in-the-middle attack. Nothing was overwritten; verify the server before continuing.', { host: trustIssue.host, port: trustIssue.port })}</p>
+          <dl className="ssh-host-key-details">
+            <div><dt>{t('Key type')}</dt><dd>{trustIssue.keyType || t('Unknown')}</dd></div>
+            <div><dt>{t('Presented fingerprint')}</dt><dd className="ssh-host-key-fingerprint">{trustIssue.fingerprint || t('Fingerprint unavailable')}</dd></div>
+          </dl>
+        </ErrorBox>}
+        {trustIssue?.kind === 'cancelled' && <ErrorBox tone="info" title={t('Host key not trusted')} testId="ssh-auth-host-key-cancelled">
+          <p>{trustIssue.host}:{trustIssue.port}</p>
+          {t('SSH connection cancelled')}
+        </ErrorBox>}
+        {error && !trustIssue && <ErrorBox title={t('Authentication failed')} details={error}>{sshConnectionFailureMessage(error) ?? t(method === 'keyboardInteractive' ? 'The server did not accept authentication. Start again to request new challenges.' : 'Check the password or private key passphrase and try again.')}</ErrorBox>}
       </div>
       <footer className="ssh-form-footer">
         {hasTemporary && <TextButton disabled={busy} onClick={() => { void forgetSshAuthentication(selected.connectionId).then(cancel).catch(reason => setError(String(reason))); }}>{t('Clear temporary credentials')}</TextButton>}

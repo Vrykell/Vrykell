@@ -666,8 +666,9 @@ export function useTerminalSession(
           spawnOpts.ssh.hostKeyType = info.keyType;
         } catch (error) {
           const message = String((error as Error)?.message ?? error);
+          const name = (error as Error)?.name;
           // Stop when the user cancelled or a recorded host key changed (possible interception).
-          if (message.includes('已取消') || message.includes('cancelled') || message.includes('主机密钥不匹配')) throw error;
+          if (name === 'SshHostTrustCancelledError' || name === 'SshHostKeyMismatchError' || message.includes('已取消') || message.includes('cancelled') || message.includes('主机密钥不匹配')) throw error;
           // Preflight only inspects the fingerprint early. Its failure (for example an old server
           // that cannot negotiate an algorithm with the preflight library) must not prevent a
           // usable SSH session: let SSH validate and ask about unknown fingerprints in-terminal.

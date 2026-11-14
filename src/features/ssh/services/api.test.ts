@@ -153,13 +153,15 @@ describe('sshApi', () => {
   });
 
   it('sshTest / sshFsList map their arguments', async () => {
-    invokeMock.mockResolvedValue(undefined);
-    await sshTest({ host: 'h', port: 2222, user: 'root', password: 'pw' });
-    expect(invokeMock).toHaveBeenCalledWith('ssh_test', {
+    invokeMock.mockResolvedValue({ status: 'success', host: 'h', port: 2222, message: 'Connection succeeded.' });
+    await expect(sshTest({ host: 'h', port: 2222, user: 'root', password: 'pw', proxyId: 'office' })).resolves.toMatchObject({ status: 'success' });
+    const call = invokeMock.mock.calls.find(([command]) => command === 'ssh_test');
+    expect(call?.[1]).toMatchObject({
       host: 'h', port: 2222, user: 'root', password: 'pw',
       options: { identityFile: undefined, jumpHost: undefined, serverAliveInterval: undefined, shellIntegration: undefined,
-        localForwards: undefined, remoteForwards: undefined, dynamicForwards: undefined },
+        localForwards: undefined, remoteForwards: undefined, dynamicForwards: undefined, proxyId: 'office' },
     });
+    expect((call?.[1] as { options: Record<string, unknown> }).options).not.toHaveProperty('password');
 
     await sshFsList('s1', '/home');
     expect(invokeMock).toHaveBeenCalledWith('ssh_list', { id: 's1', path: '/home' });
