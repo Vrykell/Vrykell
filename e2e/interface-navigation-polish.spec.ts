@@ -12,6 +12,18 @@ async function dragTo(page: Page, source: Locator, destination: Locator, after =
   await page.mouse.up();
 }
 
+/** Resolve a theme token to the colour the browser actually paints. */
+async function themeColor(page: Page, variable: string) {
+  return page.evaluate(variable => {
+    const probe = document.createElement('span');
+    probe.style.backgroundColor = `var(${variable})`;
+    document.body.appendChild(probe);
+    const color = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return color;
+  }, variable);
+}
+
 for (const theme of ['dark', 'light'] as const) {
   test(`launch pages, selection and shared surfaces in ${theme}`, async ({ page }, info) => {
     await setupTauriMock(page, {});
@@ -26,10 +38,19 @@ for (const theme of ['dark', 'light'] as const) {
     const terminal = page.getByTestId('workspace-area-terminal');
     const content = terminal.locator('.sidebar-row-content');
     const selection = await content.evaluate(element => getComputedStyle(element).backgroundColor);
+    // The selected row paints the shared selection token, which differs per theme and palette.
+    const selectedToken = await page.evaluate(() => {
+      const probe = document.createElement('span');
+      probe.style.backgroundColor = 'var(--selection-bg)';
+      document.body.appendChild(probe);
+      const color = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return color;
+    });
     await page.getByTestId('workspace-area-code').hover();
     await expect(terminal).toHaveAttribute('aria-current', 'page');
     await expect(content).toHaveCSS('background-color', selection);
-    expect(selection).toBe(theme === 'dark' ? 'rgb(72, 72, 72)' : 'rgb(255, 255, 255)');
+    expect(selection).toBe(selectedToken);
     await expect(page.locator('.workspace-title > span')).toHaveText('终端会话');
     // Profile selection lives in the shared picker the start page opens.
     await start.getByTestId('terminal-start-picker').click();
@@ -47,10 +68,11 @@ for (const theme of ['dark', 'light'] as const) {
     await page.setViewportSize({ width: 1240, height: 800 });
     await page.getByTestId('workspace-sidebar-expand').click();
     await page.getByTestId('tab-new-btn').click();
-    await expect(page.getByRole('dialog', { name: '新建标签页' })).toHaveCSS('background-color', theme === 'dark' ? 'rgb(48, 48, 48)' : 'rgb(250, 250, 250)');
+    // The dialog and the row more-button paint shared tokens; assert the tokens, not literals.
+    await expect(page.getByRole('dialog', { name: '新建标签页' })).toHaveCSS('background-color', await themeColor(page, '--menu-bg'));
     await page.keyboard.press('Escape');
     const more = page.locator('.folder-more-button').first();
-    const menuButtonColor = theme === 'dark' ? 'rgb(32, 32, 32)' : 'rgb(230, 230, 230)';
+    const menuButtonColor = await themeColor(page, '--tab-menu-bg');
     await more.hover(); await expect(more).toHaveCSS('background-color', menuButtonColor);
     await expect(more).toBeDisabled();
     await page.getByTestId('tab-search-toggle').click();
