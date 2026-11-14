@@ -32,6 +32,49 @@ export interface ToolRun {
 
 export type MessagePart = { kind: 'text'; text: string } | { kind: 'tool'; tool: ToolRun };
 
+/** Character cap for the one-line argument preview kept in discussion history. */
+const DISCUSSION_TARGET_CAP = 160;
+
+/** Collapse a tool's command/path/query argument to one bounded line. */
+function discussionTarget(run: ToolRun): string {
+  const value =
+    typeof run.input.command === 'string'
+      ? run.input.command
+      : typeof run.input.path === 'string'
+        ? run.input.path
+        : typeof run.input.query === 'string'
+          ? run.input.query
+          : '';
+  const oneLine = value.replace(/\s+/g, ' ').trim();
+  return oneLine.length > DISCUSSION_TARGET_CAP ? `${oneLine.slice(0, DISCUSSION_TARGET_CAP)}…` : oneLine;
+}
+
+/**
+ * Recreate earlier Agent-mode results as plain text for chat mode. Sending structured
+ * `tool_calls` while no tools are registered invites the model to call them again and some
+ * providers reject that history, so discussion history keeps the evidence but not the schema.
+ */
+export function partsToDiscussionText(content: string, parts?: MessagePart[]): string {
+  if (!parts?.some(part => part.kind === 'tool')) return content;
+  const blocks: string[] = [];
+  let hasText = false;
+  for (const part of parts) {
+    if (part.kind === 'text') {
+      if (!part.text) continue;
+      blocks.push(part.text);
+      hasText = true;
+      continue;
+    }
+    const run = part.tool;
+    const target = discussionTarget(run);
+    blocks.push(`[Earlier tool call in Agent mode: ${run.toolName} (${run.state})${target ? `: ${target}` : ''}]`);
+    const result = run.modelOutput ?? run.output ?? run.error;
+    if (result) blocks.push(`[Untrusted tool output]\n${result}`);
+  }
+  if (!hasText && content) blocks.push(content);
+  return blocks.join('\n\n');
+}
+
 /** Recreate standard call/result pairs in transcript order; history never executes a tool. */
 export function partsToModelMessages(content: string, parts?: MessagePart[]): ModelMessage[] {
   if (!parts?.some(part => part.kind === 'tool')) return [{ role: 'assistant', content }];
