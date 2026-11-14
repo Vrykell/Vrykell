@@ -78,7 +78,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByTestId('workspace-sidebar-expand').click();
     await gotoSetting(page, '字体与显示');
     const nav = page.getByRole('complementary', { name: '设置目录' });
-    await nav.getByRole('button', { name: '模型管理', exact: true }).hover();
+    await nav.getByRole('button', { name: '模型配置', exact: true }).hover();
     await nav.locator('.settings-navigation-list').evaluate(element => { element.scrollTop = 0; });
     await expect(nav.getByRole('button', { name: '字体与显示', exact: true })).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('combobox', { name: '终端字号' })).toHaveCSS('background-color', theme === 'dark' ? 'rgb(60, 60, 60)' : 'rgb(255, 255, 255)');

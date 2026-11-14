@@ -1,10 +1,5 @@
 /** Internal message identifiers retain explicit English labels. Other keys are their English copy. */
 const en: Record<string, string> = {
-  'Model management': 'Model management',
-  'Manage model configuration, capabilities and the model in use.': 'Manage model configuration, capabilities and the model in use.',
-  'Search by model name or ID…': 'Search by model name or ID…',
-  'Model actions': 'Model actions',
-  'No model ID': 'No model ID',
   'About': 'About',
   '© {{year}} Vrykell contributors': '© {{year}} Vrykell contributors',
   'Application information': 'Application information',
