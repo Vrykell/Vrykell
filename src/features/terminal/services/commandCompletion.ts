@@ -19,14 +19,20 @@ interface CompletionRecovery {
 const recoveries = new Map<string, CompletionRecovery>();
 /** Bound the retained terminal reference when a marker never arrives or the pane is abandoned. */
 const RECOVERY_TTL_MS = 10 * 60_000;
+/**
+ * A surviving echo fragment must be long enough to identify the wrapper. Shorter matches are
+ * ordinary output that happens to end with the same characters.
+ */
+const MIN_ECHO_FRAGMENT = 16;
 
 /**
  * A shell can return to the prompt with a carriage return only, leaving the end of the echoed
- * wrapper on the marker row. Strip that echo fragment from the first captured line.
+ * wrapper on the marker row. Strip that echo fragment from the first captured line, but only a
+ * distinctive suffix: a short coincidental match must leave the real output intact.
  */
 function stripEchoTail(line: string, echoTail: string): string {
   if (!echoTail) return line;
-  for (let length = Math.min(line.length, echoTail.length); length >= 2; length--) {
+  for (let length = Math.min(line.length, echoTail.length); length >= MIN_ECHO_FRAGMENT; length--) {
     if (echoTail.endsWith(line.slice(-length))) return line.slice(0, line.length - length);
   }
   return line;
@@ -41,6 +47,7 @@ export function watchShellCommandCompletion(paneId: string): ShellCommandComplet
   let start = buffer.baseY + buffer.cursorY;
   let startColumn = 0;
   let echoTail = '';
+  let echoResetLine = false;
   let startMarker: IMarker | undefined;
   let completed: { exitCode: number; output: string } | null = null;
   const listeners = new Set<() => void>();
@@ -53,6 +60,9 @@ export function watchShellCommandCompletion(paneId: string): ShellCommandComplet
       startColumn = active.cursorX;
       const row = active.getLine(start)?.translateToString(true) ?? '';
       echoTail = (active.cursorX > 0 ? row.slice(0, active.cursorX) : row).trimEnd();
+      // Only a carriage return that reset the column can leave the wrapper echo after this
+      // position; otherwise the echo is entirely before the marked output.
+      echoResetLine = active.cursorX === 0 && echoTail.length >= MIN_ECHO_FRAGMENT;
       startMarker?.dispose();
       startMarker = terminal.registerMarker(0);
       return true;
@@ -67,7 +77,7 @@ export function watchShellCommandCompletion(paneId: string): ShellCommandComplet
       const line = active.getLine(row)?.translateToString(true) ?? '';
       if (line.includes(token)) continue;
       const slice = row === first ? line.slice(startColumn) : line;
-      const text = row === first && markerLine !== null ? stripEchoTail(slice, echoTail) : slice;
+      const text = row === first && markerLine !== null && echoResetLine ? stripEchoTail(slice, echoTail) : slice;
       if (row === first && slice && !text) continue;
       lines.push(text);
     }
@@ -95,6 +105,9 @@ export function retainCompletionForReadiness(paneId: string, completion: ShellCo
   const entry: CompletionRecovery = { terminal, ready: false, dispose: () => {} };
   let unsubscribe = () => {};
   let expiry: ReturnType<typeof setTimeout> | null = null;
+  // A keystroke means the user may have submitted or edited a command, so the retained marker
+  // no longer describes the prompt. Drop it instead of treating the pane as ready.
+  const inputListener = terminal.onData(() => clearCompletionReadiness(paneId));
   const settle = () => {
     if (!completion.result()) return;
     entry.ready = true;
@@ -105,6 +118,7 @@ export function retainCompletionForReadiness(paneId: string, completion: ShellCo
   entry.dispose = () => {
     if (expiry !== null) clearTimeout(expiry);
     expiry = null;
+    inputListener.dispose();
     unsubscribe();
     completion.dispose();
   };

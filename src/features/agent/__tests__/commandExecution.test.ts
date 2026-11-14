@@ -21,6 +21,7 @@ beforeEach(() => {
   dispose = vi.fn();
   terminal = {
     parser: { registerOscHandler: (_code: number, callback: typeof marker) => { marker = callback; return { dispose }; } },
+    onData: () => ({ dispose: vi.fn() }),
     registerMarker: () => ({ line: 0, isDisposed: false, dispose: vi.fn() }),
     buffer: { active: { baseY: 0, cursorY: 0, cursorX: 0, getLine: () => ({ translateToString: () => 'actual output' }) } },
   } as unknown as Terminal;
