@@ -985,6 +985,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'find_skill_reference':
             return null;
           case 'shell_complete': return [];
+          case 'warm_shell_completion': return null;
           case 'market_github_list':
             return [
               { name: 'github-skill-1', dir: 'skills/github-skill-1', description: 'GitHub 操作技能' },
