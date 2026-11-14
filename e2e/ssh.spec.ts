@@ -31,13 +31,15 @@ test.describe('SSH remote connection management sidebar', () => {
       return color;
     });
     await expect(row.locator(':scope > div')).toHaveCSS('background-color', selectionColor);
+    // Shared row geometry follows the theme radius token instead of a literal.
+    const rowRadius = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--radius-inner').trim());
     const rowStyle = async (selector: string) => page.locator(selector).evaluate(el => {
       const inner = el.firstElementChild!;
       const style = getComputedStyle(inner);
       return { outerPadding: getComputedStyle(el).padding, padding: style.padding, radius: style.borderRadius, height: inner.getBoundingClientRect().height, background: style.backgroundColor, gap: style.gap, icon: inner.querySelector('svg')?.getBoundingClientRect().width };
     });
     const sshStyle = await rowStyle('[data-testid="ssh-row-ssh-1"]');
-    expect(sshStyle).toMatchObject({ outerPadding: '0px', padding: '6px 14px', radius: '8px', gap: '12px', icon: 20 });
+    expect(sshStyle).toMatchObject({ outerPadding: '0px', padding: '6px 14px', radius: rowRadius, gap: '12px', icon: 20 });
     await expect(row).toHaveAttribute('data-tip', /root@prod.example.com:22/);
     await ensureTabsOpen(page);
     await expect(page.locator('[data-tab-row-id]').first()).toHaveClass(/folder-tab/);
