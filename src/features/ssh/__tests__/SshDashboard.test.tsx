@@ -31,7 +31,7 @@ it('starts with one host list and only collects resources when explicitly enable
   expect(status).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('switch', { name: '资源占用' }));
   await waitFor(() => expect(status).toHaveBeenCalledTimes(2));
-  expect(screen.getByTestId('ssh-row-ssh-1')).toHaveTextContent('在线');
+  await waitFor(() => expect(screen.getByTestId('ssh-row-ssh-1')).toHaveTextContent('在线'));
   fireEvent.click(screen.getByRole('switch', { name: '资源占用' }));
   expect(screen.queryByText('在线')).toBeNull();
 });

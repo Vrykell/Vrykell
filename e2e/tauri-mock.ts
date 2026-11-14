@@ -110,6 +110,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
     (window as unknown as Record<string, unknown>).__PTY_SPAWNS__ = spawns;
     (window as unknown as Record<string, unknown>).__PTY_CLOSES__ = closes;
     let hostKnown = sshHost === 'known';
+    const trustedHosts = new Set<string>();
     let clipboardText = '';
     let clipboardFiles: { paths: string[]; mode: string } | null = null;
     const signals: { id: string; sig: number }[] = [];
@@ -1183,6 +1184,7 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return { known: hostKnown, fingerprint: 'SHA256:e2e-verified-key', keyType: 'ed25519' };
           case 'ssh_trust_host_key':
             sshTrusts.push(args);
+            trustedHosts.add(String(args.host));
             hostKnown = true;
             return undefined;
           case 'plugin:dialog|message':
@@ -1210,9 +1212,15 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
           case 'ssh_connection_touch':
             sshConnections.forEach((c) => { if (c.id === args.id) c.lastOpenedAt = Date.now(); });
             return undefined;
-          case 'ssh_test':
-            if (args.host === 'bad.example.com') throw new Error('连接超时');
-            return '连接成功';
+          case 'ssh_test': {
+            const host = String(args.host);
+            const port = Number(args.port ?? 22);
+            if (host === 'bad.example.com') return { status: 'network_error', host, port, message: '连接超时' };
+            if (host === 'changed.example.com') return { status: 'host_key_mismatch', host, port, keyType: 'ed25519', fingerprint: 'SHA256:e2e-changed-key', message: 'The host key does not match the saved record.' };
+            if (host === 'fresh.example.com' && !trustedHosts.has(host)) return { status: 'unknown_host_key', host, port, keyType: 'ed25519', fingerprint: 'SHA256:e2e-verified-key', message: 'The host key is not trusted yet.' };
+            if (!hostKnown) return { status: 'unknown_host_key', host, port, keyType: 'ed25519', fingerprint: 'SHA256:e2e-verified-key', message: 'The host key is not trusted yet.' };
+            return { status: 'success', host, port, message: 'Connection succeeded.' };
+          }
           case 'ssh_network_probe': {
             const globals = window as unknown as Record<string, unknown>;
             globals.__NETWORK_PROBE_CALLS__ = Number(globals.__NETWORK_PROBE_CALLS__ ?? 0) + 1;
