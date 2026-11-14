@@ -27,7 +27,7 @@ import { listSkills, buildSkillsContext, availableSkillMetas } from '@features/a
 import { memoryScope, retrieveMemory } from './memory';
 import { environmentForPane } from '@features/chat/services/conversationContext';
 import { listMcpTools, buildMcpTool } from '@features/agent/services/mcp';
-import { levelOf, TOOL_NAMES, type ToolContext } from '@features/agent/stores/permissions';
+import { levelOf, TOOL_NAMES, type ToolContext, type ToolName } from '@features/agent/stores/permissions';
 import { useUsageStore } from '@features/agent/stores/usage';
 import { partsToDiscussionText, partsToModelMessages, type ToolRunState } from '@features/agent/model/messageParts';
 import { executionPaneSpec } from './executionTarget';
@@ -50,6 +50,16 @@ interface AiConfigInfoRust {
     capabilities?: { vision: boolean; reasoning: boolean; tools: boolean; search: boolean };
   }[];
   active_model: string;
+}
+
+/**
+ * Policy entries are groups, not always callable tool names. Name the tool the model would
+ * actually see for this provider so the note never invents an absent tool.
+ */
+export function policyToolLabel(name: ToolName, provider: ProviderKind): string {
+  if (name === 'web_search') return createNativeWebSearchTool(provider)?.name ?? 'web_search';
+  if (name === 'mcp') return 'mcp__*';
+  return name;
 }
 
 function hasKeyFor(info: AiConfigInfoRust): boolean {
@@ -163,7 +173,9 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
   } catch {
     terminalDebug('agent-memory-retrieval', { available: false });
   }
-  const disabledTools = agentMode ? TOOL_NAMES.filter(name => levelOf(name) === 'deny') : [];
+  const disabledTools = agentMode
+    ? TOOL_NAMES.filter(name => levelOf(name) === 'deny').map(name => policyToolLabel(name, info.provider))
+    : [];
   const toolPolicyNote = disabledTools.length
     ? `Tools disabled by the current policy (never call them): ${disabledTools.join(', ')}. Only call the tools provided in this request; if a needed capability is disabled, explain the limitation and ask the user.`
     : '';
@@ -388,7 +400,8 @@ export const agentStream: StreamFn = async (messages, onChunk, ctx) => {
       }
       case 'tool-result': {
         const p = part as { toolCallId: string; toolName?: string; output?: unknown; result?: unknown };
-        if (unavailableCallIds.has(p.toolCallId)) break;
+        // Mirrors tool-error: a stream without registered tools must not create a result card.
+        if (!hasTools || unavailableCallIds.has(p.toolCallId)) break;
         const c = calls.get(p.toolCallId);
         const raw = p.output ?? p.result;
         const out = typeof raw === 'string' ? raw : JSON.stringify(raw ?? null);

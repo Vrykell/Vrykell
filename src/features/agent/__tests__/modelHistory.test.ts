@@ -32,7 +32,20 @@ it('turns earlier Agent-mode calls into plain discussion text without tool-call 
   ];
   const text = partsToDiscussionText('Read completed', parts);
   expect(text).not.toContain('tool-call');
-  expect(text).toContain('Earlier tool call in Agent mode: read_file (done)');
+  expect(text).toContain('Earlier tool call in Agent mode: read_file (done): /project/one.ts');
+  expect(text).toContain('[Untrusted tool output]');
   expect(text).toContain(full);
   expect(text.match(/Read completed/g)).toHaveLength(1);
+});
+it('keeps the argument preview on one bounded line and labels stored output as untrusted', () => {
+  const parts: MessagePart[] = [
+    { kind: 'tool', tool: { toolCallId: 'call-long', toolName: 'run_command', input: { command: `npm test\n${'x'.repeat(400)}` },
+      state: 'done', startedAt: 1, modelOutput: 'all tests passed' } },
+  ];
+  const text = partsToDiscussionText('', parts);
+  const [summary] = text.split('\n');
+  expect(summary).toContain('run_command (done): npm test ');
+  expect(summary!.length).toBeLessThan(300);
+  expect(text).not.toContain('x'.repeat(400));
+  expect(text).toContain('[Untrusted tool output]\nall tests passed');
 });

@@ -23,7 +23,7 @@ vi.mock('@platform/diagnostics', async (importOriginal) => {
 import { invoke, Channel } from '@tauri-apps/api/core';
 import { diagnostic } from '@platform/diagnostics';
 import { useAgentSettings } from '@features/agent/stores/agentSettings';
-import { agentStream } from '@features/agent/services/agentStream';
+import { agentStream, policyToolLabel } from '@features/agent/services/agentStream';
 import { useUsageStore } from '@features/agent/stores/usage';
 import { setToolAuthorizer, usePermissions } from './stores/permissions';
 import { t } from '@i18n';
@@ -113,6 +113,7 @@ describe('agentStream (mocked IPC boundary)', () => {
       const history = request.messages.find(message => message.role === 'assistant');
       expect(history?.content).toContain('Read completed');
       expect(history?.content).toContain('Earlier tool call in Agent mode');
+      expect(history?.content).toContain('Untrusted tool output');
       expect(history?.content).toContain(full);
     } finally { useAgentSettings.setState({ global: original }); }
   });
@@ -121,7 +122,7 @@ describe('agentStream (mocked IPC boundary)', () => {
     const originalSettings = useAgentSettings.getState().global;
     const originalLevels = usePermissions.getState().levels;
     useAgentSettings.setState({ global: { ...originalSettings, agentMode: true } });
-    usePermissions.setState({ levels: { ...originalLevels, run_command: 'deny' } });
+    usePermissions.setState({ levels: { ...originalLevels, run_command: 'deny', mcp: 'deny' } });
     try {
       await agentStream([{ role: 'user', content: 'Run ls' }], () => {}, { paneId: null });
       const raw = mockInvoke.mock.calls.find(([name]) => name === 'llm_stream')?.[1] as { req: { body: string } };
@@ -129,11 +130,19 @@ describe('agentStream (mocked IPC boundary)', () => {
       const system = request.messages.find(message => message.role === 'system')?.content ?? '';
       expect(system).toContain('Tools disabled by the current policy');
       expect(system).toContain('run_command');
+      expect(system).toContain('mcp__*');
       expect(system).toContain('Only call the tools provided in this request');
     } finally {
       usePermissions.setState({ levels: originalLevels });
       useAgentSettings.setState({ global: originalSettings });
     }
+  });
+  it('labels policy groups with the tool names each provider registers', () => {
+    expect(policyToolLabel('web_search', 'gemini')).toBe('google_search');
+    expect(policyToolLabel('web_search', 'anthropic')).toBe('web_search');
+    expect(policyToolLabel('web_search', 'openai-compatible')).toBe('web_search');
+    expect(policyToolLabel('mcp', 'gemini')).toBe('mcp__*');
+    expect(policyToolLabel('run_command', 'gemini')).toBe('run_command');
   });
 
   it('does not surface a tool call in chat mode without tools', async () => {
