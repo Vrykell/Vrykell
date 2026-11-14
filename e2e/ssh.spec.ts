@@ -117,6 +117,7 @@ test.describe('SSH remote connection management sidebar', () => {
   test('cancelling a first connection reports an untrusted host instead of a failure', async ({ page }) => {
     await page.locator('[data-testid="ssh-new-btn"]').click();
     await page.locator('[data-testid="ssh-form-host"]').fill('fresh.example.com');
+    await page.locator('[data-testid="ssh-form-user"]').fill('deploy');
     await page.locator('[data-testid="ssh-test-btn"]').click();
     await expect(page.getByTestId('ssh-host-key-prompt')).toBeVisible();
     await page.getByTestId('ssh-host-key-cancel').click();
@@ -128,12 +129,16 @@ test.describe('SSH remote connection management sidebar', () => {
   test('a changed host key shows a high-risk warning and offers no trust action', async ({ page }) => {
     await page.locator('[data-testid="ssh-new-btn"]').click();
     await page.locator('[data-testid="ssh-form-host"]').fill('changed.example.com');
+    await page.locator('[data-testid="ssh-form-user"]').fill('deploy');
     await page.locator('[data-testid="ssh-test-btn"]').click();
     const mismatch = page.getByTestId('ssh-host-key-mismatch');
     await expect(mismatch).toBeVisible();
     await expect(mismatch).toContainText('主机密钥不匹配');
     await expect(mismatch).toContainText('中间人攻击');
+    await expect(mismatch).toContainText('changed.example.com:22');
+    await expect(mismatch).toContainText('SHA256:e2e-changed-key');
     await expect(page.getByTestId('ssh-host-key-accept')).toHaveCount(0);
+    expect(await page.evaluate(() => (window as unknown as { __SSH_TRUSTS__: unknown[] }).__SSH_TRUSTS__)).toEqual([]);
   });
 
   test('downloads remote directories and reveals transfers in the file manager', async ({ page }) => {

@@ -1180,8 +1180,8 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
               { name: 'db', host: 'db.internal', user: '', port: 22, localForwards: [], remoteForwards: [], dynamicForwards: [] },
             ];
           case 'ssh_host_key_info':
-            if (sshHost === 'changed') throw new Error('主机密钥不匹配，请核对远端主机');
-            return { known: hostKnown, fingerprint: 'SHA256:e2e-verified-key', keyType: 'ed25519' };
+            if (sshHost === 'changed') return { known: false, mismatch: true, fingerprint: 'SHA256:e2e-changed-key', keyType: 'ed25519' };
+            return { known: hostKnown, mismatch: false, fingerprint: 'SHA256:e2e-verified-key', keyType: 'ed25519' };
           case 'ssh_trust_host_key':
             sshTrusts.push(args);
             trustedHosts.add(String(args.host));
