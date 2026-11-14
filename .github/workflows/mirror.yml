@@ -55,7 +55,11 @@ jobs:
               refs/remotes/origin/main:refs/heads/main \
               refs/remotes/origin/dev:refs/heads/dev || status=1
             echo "Syncing release tags to ${name}..."
-            git push "https://${user}:${token}@${host}/Vrykell/Vrykell.git" --tags || status=1
+            # The mirror hosts may already hold a tag with the same name (an annotated tag object
+            # created there, or a tag pushed before the source was rewritten). Stable tags are
+            # release identifiers, not history, so aligning them is the point of this job; a
+            # non-forced push would fail forever on the first such mismatch.
+            git push --force "https://${user}:${token}@${host}/Vrykell/Vrykell.git" --tags || status=1
           }
 
           sync "Gitee" "${GITEE_USER}" "${GITEE_TOKEN}" "gitee.com"
