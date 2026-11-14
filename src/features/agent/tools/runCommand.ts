@@ -53,7 +53,7 @@ function tail(s: string): string {
 function capOutput(s: string): string {
   if (s.length <= OUTPUT_CAP) return s;
   const omitted = s.length - OUTPUT_HEAD - (OUTPUT_CAP - OUTPUT_HEAD);
-  return `${s.slice(0, OUTPUT_HEAD)}\n…（中间 ${omitted} 字符已省略，可用 read_terminal 查看终端画面）…\n${s.slice(-(OUTPUT_CAP - OUTPUT_HEAD))}`;
+  return `${s.slice(0, OUTPUT_HEAD)}\n${t('… ({{count}} characters omitted in the middle; use read_terminal to view the terminal screen) …', { count: omitted })}\n${s.slice(-(OUTPUT_CAP - OUTPUT_HEAD))}`;
 }
 
 export async function runCommandAndWait(
@@ -79,9 +79,7 @@ export async function runCommandAndWait(
       ok: false,
       code: 'TERMINAL_INTERACTIVE',
       output: '',
-      error:
-        '终端正在运行全屏应用（altScreen，如 vim/htop）。run_command 只用于非交互命令；' +
-        '若需驱动这个全屏程序，请改用 read_terminal（看画面）+ terminal_keys（发按键）。',
+      error: t('The terminal is running a full-screen application (altScreen, for example vim or htop). run_command only runs non-interactive commands; to drive this full-screen program, use read_terminal (view the screen) and terminal_keys (send keys).'),
     };
   }
 
@@ -171,10 +169,7 @@ function waitForCompletion(
           ok: false,
           code: 'TERMINAL_INTERACTIVE',
           output: '',
-          error:
-            '命令切入了全屏交互界面（TUI 模式），run_command 无法读取其输出，已停止等待。' +
-            '程序仍在终端中运行。若需继续操作这个全屏程序，请用 read_terminal（看画面）+' +
-            'terminal_keys（发按键）驱动它，或用非交互式命令（加 --help/--version 等标志或重定向输出）。',
+          error: t('The command switched into a full-screen interactive interface (TUI mode); run_command cannot read its output and stopped waiting. The program is still running in the terminal. To keep operating it, use read_terminal (view the screen) and terminal_keys (send keys), or use a non-interactive command (add a flag such as --help/--version, or redirect the output).'),
         });
       }
     });
@@ -202,9 +197,9 @@ function waitForCompletion(
         output: capOutput(body),
         error:
           last.status === 'interrupted' || failed?.status === 'interrupted'
-            ? '命令被中断'
+            ? t('Command interrupted')
             : failed?.exitCode
-              ? `退出码 ${failed.exitCode}`
+              ? t('Exit code: {{code}}', { code: failed.exitCode })
               : undefined,
       };
     };
