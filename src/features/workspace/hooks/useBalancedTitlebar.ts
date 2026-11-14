@@ -1,5 +1,5 @@
 import { useLayoutEffect, type RefObject } from 'react';
-import { globalSearchLayout, titlebarHistoryFits } from '../model/titlebarLayout';
+import { globalSearchLayout, TITLEBAR_SEARCH_MIN_WIDTH, titlebarHistoryFits } from '../model/titlebarLayout';
 
 /** Keep the search centered in the application as navigation, controls and native insets change. */
 export function useBalancedTitlebar(headerRef: RefObject<HTMLElement | null>, actionsRef: RefObject<HTMLElement | null>) {
@@ -20,7 +20,7 @@ export function useBalancedTitlebar(headerRef: RefObject<HTMLElement | null>, ac
       header.style.setProperty('--workspace-search-width', `${layout.width}px`);
       header.style.setProperty('--workspace-title-space', `${layout.titleSpace}px`);
       header.style.setProperty('--workspace-search-gap', `${layout.gap}px`);
-      header.dataset.searchCompact = String(layout.width < 112);
+      header.dataset.searchCompact = String(layout.width < TITLEBAR_SEARCH_MIN_WIDTH);
       // Back and forward fold away before they would squeeze the workspace title.
       header.dataset.history = String(titlebarHistoryFits({ titleSpace: layout.titleSpace, titleReserved: leftReserved, searchWidth: layout.width }));
     };
