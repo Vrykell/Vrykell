@@ -70,6 +70,10 @@
   --placement-hover: color-mix(in srgb, var(--surface) 96%, transparent);
   --control-size: 32px;
   --control-size-compact: 28px;
+  /* Titlebar and sidebar heading share one row height. The search field is sized from the same
+     row so the two stay in proportion when the height changes. */
+  --workspace-titlebar-height: 40px;
+  --workspace-search-height: calc(var(--workspace-titlebar-height) - 12px);
   --control-hover-bg: var(--hover);
   --action-button-bg: color-mix(in srgb, var(--text-primary) 10%, var(--surface));
   --action-button-hover-bg: color-mix(in srgb, var(--text-primary) 16%, var(--surface));
@@ -415,22 +419,36 @@ button.state-icon-button[aria-pressed="true"]:hover { background: var(--selectio
   --workspace-title-gap: 12px;
   --workspace-title-inset: 20px;
   --workspace-actions-inset: 0px;
+  /* How far the history pair leans toward the search field, capped by the actual column gap
+     so a tight bar never overlaps the two. */
+  --workspace-history-pull: 6px;
   display: grid;
   /* The action cluster keeps its intrinsic width so it can never overflow onto the search
      field (a narrow window squeezes the title instead, which truncates). */
   grid-template-columns: minmax(0, var(--workspace-title-space, 1fr)) var(--workspace-search-width, 32px) minmax(var(--workspace-actions-width, 220px), 1fr);
-  align-items: center; flex-shrink: 0; height: 42px;
+  align-items: center; flex-shrink: 0; height: var(--workspace-titlebar-height);
   background: var(--chrome-bg);
   gap: var(--workspace-search-gap, var(--workspace-title-gap)); user-select: none;
 }
 .workspace-titlebar[data-platform="macos"] { --workspace-actions-inset: 16px; }
 .workspace-titlebar[data-platform="macos"][data-fullscreen="false"] { --workspace-title-inset: 92px; }
 .workspace-titlebar[data-platform="macos"] .workspace-right-actions { gap: 8px; }
-.workspace-title { min-width: 0; height: 100%; display: flex; align-items: center; overflow: hidden; padding-left: var(--workspace-title-inset); }
-.workspace-title span { font-size: calc(13px * var(--ui-font-scale)); font-weight: var(--fw-medium); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The label truncates on its own span, so the column itself must not clip: the history pair
+   leans into the shared gap and would otherwise lose its trailing edge. */
+.workspace-title { min-width: 0; height: 100%; display: flex; align-items: center; padding-left: var(--workspace-title-inset); }
+/* The label yields its content width so it truncates instead of pushing the actions out. */
+.workspace-title span { flex: 1 1 auto; min-width: 0; font-size: calc(13px * var(--ui-font-scale)); font-weight: var(--fw-medium); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Back and forward sit at the right edge of the title column: they re-enter the previous
+   workspace without competing with the navigation or window controls. The column yields part
+   of the shared gap so the pair reads as attached to the search field it sits beside. Below
+   the folding threshold they are removed entirely instead of overlapping the search field. */
+.workspace-title-history { display: none; align-items: center; gap: 2px; flex-shrink: 0; margin-left: auto; margin-right: calc(-1 * min(var(--workspace-history-pull), var(--workspace-search-gap, var(--workspace-title-gap)))); }
+.workspace-titlebar[data-history="true"] .workspace-title-history { display: flex; }
+.workspace-title-history > button.icon-button { color: var(--text-muted); }
+.workspace-title-history > button.icon-button:not(:disabled):is(:hover, :focus-visible) { background: var(--control-hover-bg); color: var(--text-primary); }
 .workspace-title-actions { display: flex; align-items: center; justify-content: flex-end; justify-self: end; width: max-content; gap: 12px; height: 100%; min-width: 0; padding-right: var(--workspace-actions-inset); }
 .workspace-search {
-  width: 100%; min-width: 0; height: 30px;
+  width: 100%; min-width: 0; height: var(--workspace-search-height);
   display: flex; align-items: center; gap: 8px; padding: 0 10px;
   background: var(--field-bg); color: var(--text-secondary); border: none;
   border-radius: var(--radius-inner); cursor: pointer; font: calc(13px * var(--ui-font-scale)) var(--font-ui);
@@ -507,6 +525,11 @@ button.activity-button[aria-pressed="true"] { background: var(--control-active-b
 .workspace-sidebar-search > input { display: block; box-sizing: border-box; width: 100%; height: 100%; min-width: 0; background: var(--field-bg); border: 0; border-radius: var(--radius-inner); outline: none; padding: 0 10px 0 31px; font: calc(13px * var(--ui-font-scale)) var(--font-ui); color: var(--text-primary); }
 .terminal-composer { border: none; border-radius: var(--radius-card); background: var(--composer-bg); transition: background var(--dur) var(--ease); }
 .terminal-composer:focus-within { box-shadow: none; }
+/* Light composers share the terminal's white surface; a hairline keeps the primary input
+   visible without adding a shadow or changing the surface color. */
+:root[data-theme="light"] .terminal-composer { outline: 1px solid var(--border); outline-offset: -1px; }
+/* Prompt text is prose: the terminal font spaces CJK glyphs at fixed cell width. */
+.terminal-composer textarea::placeholder { font-family: var(--font-ui); }
 /* SSH connection page: spinner and thin progress bar while connecting. */
 .ssh-connect-spinner {
   width: 22px; height: 22px; border-radius: 50%;
@@ -530,9 +553,12 @@ input.ssh-auth-response::placeholder { font-size: inherit; letter-spacing: inher
 input.ssh-auth-response::-ms-reveal, input.ssh-auth-response::-ms-clear { display: none; }
 input.ssh-auth-response::-webkit-credentials-auto-fill-button,
 input.ssh-auth-response::-webkit-strong-password-auto-fill-button { display: none; }
-.terminal-composer-heading { display: flex; justify-content: space-between; gap: 12px; color: var(--text-secondary); font-size: calc(11px * var(--ui-font-scale)); margin-bottom: 6px; }
+.terminal-composer-heading { display: flex; justify-content: space-between; gap: 12px; color: var(--text-muted); font-size: calc(11px * var(--ui-font-scale)); margin-bottom: 6px; }
 .terminal-composer-heading > span:last-child { color: var(--text-muted); white-space: nowrap; }
-.terminal-composer-heading .composer-key-hints { display: inline-flex; align-items: center; gap: 6px; color: var(--text-secondary); }
+.terminal-composer-heading .composer-key-hints { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); }
+/* Composer hints are reference text, not controls: no chip fill, so they read the same on
+   every theme and leave the input as the focal point. */
+.terminal-composer-heading .key-hint { min-height: 16px; padding: 0 2px; background: transparent; color: var(--text-secondary); }
 /* The heading may carry a working-directory chip instead of plain text; it truncates inside the row
    and leaves the key hints visible. */
 .chat-composer-title { min-width: 0; overflow: hidden; }
@@ -863,6 +889,9 @@ button.history-option-row[aria-pressed="true"] { color: var(--text-primary); }
 .ai-question-options small { display: block; margin: 4px 0; color: var(--text-secondary); font-size: var(--fs-caption); line-height: 1.5; }
 .acp-launch-directory { display: flex; align-items: stretch; gap: 8px; margin: 8px 0; min-width: 0; }
 .acp-launch-directory > input { flex: 1; min-width: 0; }
+/* On the start page the folder belongs to the agent section: it follows the heading at the
+   same rhythm as the search field below it. */
+.ai-launch-agents > .acp-launch-directory { margin: 0 0 8px; }
 .ai-question-options button { justify-content: flex-start; min-height: 32px; max-width: 100%; padding: 8px 10px; text-align: left; white-space: normal; overflow-wrap: anywhere; }
 .ai-tool-verdict.ai-question-result { padding: 6px 10px 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .ai-user-question .ai-tool-approval-actions { margin-top: 0; }
@@ -1541,7 +1570,7 @@ textarea.config-text-input[data-font="ui"] { font-family: var(--font-ui) !import
 .identity-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .identity-icon:not([data-colored="true"]) { filter: grayscale(1); }
 .settings-navigation .identity-icon, .settings-navigation [data-shell-mark] { filter: none; }
-.ai-start-page { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px; background: var(--canvas); }
+.ai-start-page { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px; background: var(--canvas); display: flex; flex-direction: column; }
 .ai-launchpad { container: ai-launchpad / inline-size; width: min(760px, 100%); margin-inline: auto; color: var(--text-primary); animation: modalIn 0.22s var(--ease-out); }
 .acp-profile-search { margin: 4px 6px 6px; }
 .acp-profile-dropdown .acp-launch-directory { margin-inline: 6px; }
@@ -1572,7 +1601,7 @@ textarea.config-text-input[data-font="ui"] { font-family: var(--font-ui) !import
 .ai-launch-availability[data-ready="true"]::before { background: var(--success); }
 .ai-launch-availability[data-missing="true"]::before { background: var(--error); }
 .ai-launch-empty { display: flex; align-items: center; justify-content: center; min-height: 140px; padding: 24px 16px; color: var(--text-muted); font-size: var(--fs-caption); text-align: center; }
-.workspace-launch-page { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px; background: var(--canvas); }
+.workspace-launch-page { flex: 1; min-height: 0; overflow: auto; padding: 20px 24px; background: var(--canvas); display: flex; flex-direction: column; }
 .ai-launch-native > .ai-launch-copy { flex: 1; }
 .launch-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 12px 0 20px; }
 .launch-stats > div { display: flex; flex-direction: column; justify-content: center; min-width: 0; min-height: 72px; box-sizing: border-box; padding: 10px 16px; border-radius: var(--radius-inner); background: var(--card-bg); }

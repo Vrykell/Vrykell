@@ -64,6 +64,26 @@ describe('desktop titlebar', () => {
     expect(screen.queryByRole('button', { name: '连接面板' })).toBeNull();
     useWorkspaceNavigation.setState({ area: previous });
   });
+  it('steps back and forward through visited workspaces and disables the missing direction', () => {
+    useWorkspaceNavigation.setState({ area: 'terminal', areaHistory: ['terminal'], areaHistoryIndex: 0 });
+    render(<TopDock />);
+    const back = screen.getByTestId('workspace-history-back');
+    const forward = screen.getByTestId('workspace-history-forward');
+    expect(back).toBeDisabled();
+    expect(forward).toBeDisabled();
+    act(() => {
+      useWorkspaceNavigation.getState().selectArea('code');
+      useWorkspaceNavigation.getState().selectArea('ssh');
+    });
+    expect(back).toBeEnabled();
+    act(() => fireEvent.click(back));
+    expect(useWorkspaceNavigation.getState().area).toBe('code');
+    expect(forward).toBeEnabled();
+    act(() => fireEvent.click(forward));
+    expect(useWorkspaceNavigation.getState().area).toBe('ssh');
+    expect(forward).toBeDisabled();
+    act(() => useWorkspaceNavigation.setState({ area: 'terminal', previousArea: 'terminal', areaHistory: ['terminal'], areaHistoryIndex: 0 }));
+  });
   it('uses the native-control layout and keeps search clickable', async () => {
     const { container } = render(<TopDock />);
     const header = container.querySelector('header');

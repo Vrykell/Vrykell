@@ -12,7 +12,7 @@ test('uses a full-height sidebar and keeps terminals alive across empty workspac
   const rail = page.getByTestId('workspace-sidebar');
   expect(await rail.boundingBox()).toMatchObject({ x: 0, y: 0, width: 208, height: 800 });
   expect((await page.locator('.workspace-titlebar').boundingBox())!.x).toBe(208);
-  expect((await page.getByTestId('workspace-instance-bar').boundingBox())!.y).toBe(42);
+  expect((await page.getByTestId('workspace-instance-bar').boundingBox())!.y).toBe(40);
   await page.getByTestId('workspace-area-code').click();
   await expect(page.getByTestId('code-start-page')).toBeVisible();
   await page.getByTestId('workspace-area-ssh').click();
@@ -121,8 +121,8 @@ test('routes every auxiliary panel to the right and keeps the workspace full hei
     const visible = page.locator('.workspace-side-panel:visible');
     await expect(visible).toHaveCount(1);
     await expect(visible).toHaveAttribute('data-side', 'right');
-    expect((await visible.boundingBox())!.y).toBe(42);
-    expect((await visible.boundingBox())!.height).toBe(758);
+    expect((await visible.boundingBox())!.y).toBe(40);
+    expect((await visible.boundingBox())!.height).toBe(760);
     const strip = (await page.getByTestId('workspace-instance-bar').boundingBox())!;
     expect(strip.x + strip.width).toBeCloseTo((await visible.boundingBox())!.x, 0);
   }

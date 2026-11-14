@@ -114,10 +114,17 @@ for (const theme of ['dark', 'light'] as const) test(`cards share clear borderle
 
   await page.getByTestId('workspace-area-ai').click();
   await expect(page.getByTestId('ai-start-new-conversation')).toBeVisible();
-  await expectCards(page.locator('.ai-launch-option'), background);
+  await page.getByTestId('ai-start-agents').click();
+  const agentRow = page.getByTestId('acp-launcher-Fake ACP');
+  await expect(agentRow).toBeVisible();
+  // The agent list is a picker dialog, so its rows keep the shared floating-row surface.
+  await expect(agentRow).toHaveCSS('border-width', '0px');
+  await expect(agentRow).toHaveCSS('box-shadow', 'none');
+  await expect(agentRow).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+  await page.keyboard.press('Escape');
+  await expect(agentRow).toHaveCount(0);
   await page.getByTestId('ai-start-new-conversation').hover();
   await expect(page.getByTestId('ai-start-new-conversation')).not.toHaveCSS('background-color', background);
-  await expect(page.getByTestId('acp-launcher-Fake ACP')).toHaveCSS('background-color', background);
   await page.mouse.move(0, 0);
   await page.screenshot({ path: info.outputPath(`ai-start-${theme}.png`), animations: 'disabled' });
   await page.getByTestId('workspace-history').click();

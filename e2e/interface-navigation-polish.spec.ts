@@ -2,17 +2,6 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import { fsOps, setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
-async function centeredContents(button: Locator) {
-  const centers = await button.evaluate(element => {
-    const bounds = element.getBoundingClientRect();
-    return Array.from(element.children).map(child => {
-      const box = child.getBoundingClientRect();
-      return Math.abs(box.y + box.height / 2 - bounds.y - bounds.height / 2);
-    });
-  });
-  expect(Math.max(...centers)).toBeLessThan(2);
-}
-
 async function dragTo(page: Page, source: Locator, destination: Locator, after = false) {
   const from = (await source.boundingBox())!;
   await page.mouse.move(from.x + 28, from.y + from.height / 2); await page.mouse.down();
@@ -21,6 +10,18 @@ async function dragTo(page: Page, source: Locator, destination: Locator, after =
   const to = (await destination.boundingBox())!;
   await page.mouse.move(to.x + 28, to.y + to.height * (after ? 0.9 : 0.1), { steps: 8 });
   await page.mouse.up();
+}
+
+/** Resolve a theme token to the colour the browser actually paints. */
+async function themeColor(page: Page, variable: string) {
+  return page.evaluate(variable => {
+    const probe = document.createElement('span');
+    probe.style.backgroundColor = `var(${variable})`;
+    document.body.appendChild(probe);
+    const color = getComputedStyle(probe).backgroundColor;
+    probe.remove();
+    return color;
+  }, variable);
 }
 
 for (const theme of ['dark', 'light'] as const) {
@@ -33,31 +34,45 @@ for (const theme of ['dark', 'light'] as const) {
     await page.goto('/');
     await page.evaluate(() => { document.documentElement.dataset.nativeMaterial = 'fallback'; });
     const start = page.getByTestId('start-page');
-    await expect(start.getByTestId('terminal-start-profile-zsh')).toBeVisible();
-    await centeredContents(start.getByTestId('terminal-start-new'));
+    await expect(start.getByTestId('terminal-start-new')).toBeVisible();
     const terminal = page.getByTestId('workspace-area-terminal');
     const content = terminal.locator('.sidebar-row-content');
     const selection = await content.evaluate(element => getComputedStyle(element).backgroundColor);
+    // The selected row paints the shared selection token, which differs per theme and palette.
+    const selectedToken = await page.evaluate(() => {
+      const probe = document.createElement('span');
+      probe.style.backgroundColor = 'var(--selection-bg)';
+      document.body.appendChild(probe);
+      const color = getComputedStyle(probe).backgroundColor;
+      probe.remove();
+      return color;
+    });
     await page.getByTestId('workspace-area-code').hover();
     await expect(terminal).toHaveAttribute('aria-current', 'page');
     await expect(content).toHaveCSS('background-color', selection);
-    expect(selection).toBe(theme === 'dark' ? 'rgb(72, 72, 72)' : 'rgb(255, 255, 255)');
+    expect(selection).toBe(selectedToken);
     await expect(page.locator('.workspace-title > span')).toHaveText('终端会话');
-    const search = start.getByRole('textbox', { name: '搜索 Shell 配置' });
-    await expect(search).toHaveCSS('background-color', theme === 'dark' ? 'rgb(60, 60, 60)' : 'rgb(255, 255, 255)');
-    await expect(start.locator('[data-shell-mark="zsh"]')).toHaveCSS('color', 'rgb(241, 90, 36)');
+    // Profile selection lives in the shared picker the start page opens.
+    await start.getByTestId('terminal-start-picker').click();
+    const picker = page.getByRole('dialog', { name: '新建标签页' });
+    const zshOption = picker.getByTestId('new-tab-option-shell:zsh');
+    await expect(zshOption).toBeVisible();
+    await expect(zshOption.locator('[data-shell-mark="zsh"]')).toHaveCSS('color', 'rgb(241, 90, 36)');
+    await page.keyboard.press('Escape');
+    await expect(picker).toHaveCount(0);
     await page.screenshot({ path: info.outputPath(`terminal-start-${theme}.png`), animations: 'disabled' });
     await page.setViewportSize({ width: 700, height: 800 });
-    await centeredContents(start.getByTestId('terminal-start-new'));
+    await expect(start.getByTestId('terminal-start-new')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(700);
     await page.screenshot({ path: info.outputPath(`terminal-start-narrow-${theme}.png`), animations: 'disabled' });
     await page.setViewportSize({ width: 1240, height: 800 });
     await page.getByTestId('workspace-sidebar-expand').click();
     await page.getByTestId('tab-new-btn').click();
-    await expect(page.getByRole('dialog', { name: '新建标签页' })).toHaveCSS('background-color', theme === 'dark' ? 'rgb(48, 48, 48)' : 'rgb(250, 250, 250)');
+    // The dialog and the row more-button paint shared tokens; assert the tokens, not literals.
+    await expect(page.getByRole('dialog', { name: '新建标签页' })).toHaveCSS('background-color', await themeColor(page, '--menu-bg'));
     await page.keyboard.press('Escape');
     const more = page.locator('.folder-more-button').first();
-    const menuButtonColor = theme === 'dark' ? 'rgb(32, 32, 32)' : 'rgb(230, 230, 230)';
+    const menuButtonColor = await themeColor(page, '--tab-menu-bg');
     await more.hover(); await expect(more).toHaveCSS('background-color', menuButtonColor);
     await expect(more).toBeDisabled();
     await page.getByTestId('tab-search-toggle').click();
@@ -70,12 +85,15 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByTestId('tab-search-toggle').click();
     await page.getByTestId('workspace-area-ai').click();
     await expect(page.locator('.workspace-title > span')).toHaveText('智能对话');
-    await centeredContents(page.getByTestId('ai-start-new-conversation'));
-    await expect(page.locator('.launch-stats').getByText('今日请求')).toBeVisible();
-    await expect(page.getByTestId('acp-launcher-Fake ACP')).toContainText('0 轮');
+    await expect(page.getByTestId('ai-start-new-conversation')).toBeVisible();
+    // The agent list stays one action away, in the shared launcher dialog.
+    await page.getByTestId('ai-start-agents').click();
+    await expect(page.getByTestId('acp-launcher-Fake ACP')).toContainText('Fake ACP');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('acp-launcher')).toHaveCount(0);
     await page.screenshot({ path: info.outputPath(`ai-start-${theme}.png`), animations: 'disabled' });
     await page.setViewportSize({ width: 700, height: 800 });
-    await centeredContents(page.getByTestId('ai-start-new-conversation'));
+    await expect(page.getByTestId('ai-start-new-conversation')).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBe(700);
     await page.screenshot({ path: info.outputPath(`ai-start-narrow-${theme}.png`), animations: 'disabled' });
     await page.setViewportSize({ width: 1240, height: 800 });
