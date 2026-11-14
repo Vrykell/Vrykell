@@ -49,7 +49,7 @@ for (const theme of ['深色', '浅色']) test(`workspace colors and model contr
   await page.setViewportSize({ width: 1240, height: 800 });
   await gotoSetting(page, '模型配置');
   await expect(page.getByTestId('workspace-settings').locator('.sidebar-row-icon svg')).toHaveCSS('color', expectedIconColor);
-  const actions = ['model-settings', 'model-remove', 'model-add', 'model-sync'];
+  const actions = ['model-settings', 'model-actions', 'model-add', 'model-sync'];
   for (const id of actions) {
     const button = page.getByTestId(id).first();
     await expect(button).toBeVisible();
