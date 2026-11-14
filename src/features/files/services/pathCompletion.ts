@@ -15,6 +15,17 @@ export interface PathToken {
   directoriesOnly: boolean;
 }
 
+/**
+ * Whether the current token is unmistakably a path. A bare argument after a command (`git stat`)
+ * only becomes path completion after the shell declines it, so obvious paths can skip the shell
+ * process entirely without sending command words to the file channel first.
+ */
+export function isPathShapedToken(token: PathToken): boolean {
+  const value = token.value;
+  return token.directoriesOnly || value.startsWith('.') || value.startsWith('~')
+    || /^[a-z]:/i.test(value) || /[/\\]/.test(value);
+}
+
 export function pathCompletionToken(text: string, cursor: number, shell?: string): PathToken | null {
   if (text.includes('\n') || cursor < 0 || cursor > text.length || text[cursor] && !/\s/.test(text[cursor]!)) return null;
   const windows = shell === 'cmd' || shell === 'pwsh' || shell === 'powershell';
