@@ -52,6 +52,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_drag::init())
         .manage(terminal::pty::PtyState::default())
+        .manage(terminal::completion::CompletionState::default())
         .manage(history_state)
         .manage(agent::ai::AiConfig::load())
         .manage(theme::ThemeState::load())
@@ -92,6 +93,17 @@ pub fn run() {
             }
             // Staged items from undoable deletions left over from the previous session: send them to the system trash (background, non-blocking at startup).
             std::thread::spawn(files::fs::sweep_undo_dir);
+            // A resident shell-completion helper exits after it stays idle; this bounded sweep
+            // releases the process without waiting for the next completion request.
+            let completion = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                loop {
+                    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                    if let Some(state) = completion.try_state::<terminal::completion::CompletionState>() {
+                        state.prune().await;
+                    }
+                }
+            });
             if let Some(cfg) = app.try_state::<theme::ThemeState>() {
                 let path = cfg.0.lock().ok().map(|c| c.background_image.clone());
                 if let Some(Some(p)) = path {
@@ -184,6 +196,7 @@ pub fn run() {
             agent::permissions::tool_policy_clear_session_grants,
             terminal::pty::pty_spawn,
             terminal::completion::shell_complete,
+            terminal::completion::warm_shell_completion,
             terminal::pty::pty_close_all,
             diagnostics::diagnostics_set_auto_save,
             diagnostics::diagnostics_auto_save,
@@ -340,6 +353,9 @@ pub fn run() {
             // Do not rely on the operating system closing handles: terminate every
             // PTY child explicitly before the process exits.
             terminal::pty::close_all_sessions(app_handle);
+            if let Some(state) = app_handle.try_state::<terminal::completion::CompletionState>() {
+                state.close_sync();
+            }
             remote::forwarding::stop_all();
             if let Err(error) = diagnostics::flush_logs() { eprintln!("[diagnostics] {error}"); }
         }
