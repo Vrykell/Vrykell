@@ -16,7 +16,7 @@ export default function ModelThinkingSettings({ modelId, name }: { modelId: stri
   const { save } = useSettingsSave();
   return <div className="model-thinking-settings" aria-label={t('Thinking settings for {{model}}', { model: name })}>
     <span style={{ fontSize: 'calc(12px * var(--ui-font-scale))' }}>{t('Deep thinking')}</span>
-    <Toggle showState={false} on={behavior.deepThink} onChange={deepThink => { void save(() => settings.updateModel(modelId, { deepThink })); }} />
+    <Toggle showState={false} label={t('Deep thinking')} on={behavior.deepThink} onChange={deepThink => { void save(() => settings.updateModel(modelId, { deepThink })); }} />
     {behavior.deepThink && <Select aria-label={t('Thinking effort for {{model}}', { model: name })} value={behavior.thinkingLevel} options={thinkingLevels}
       onChange={thinkingLevel => { void save(() => settings.updateModel(modelId, { thinkingLevel })); }} style={{ width: 90 }} />}
   </div>;

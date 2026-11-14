@@ -49,7 +49,7 @@ test.describe('Model configuration page', () => {
     const row = page.getByTestId('model-row').first();
     await row.getByTestId('model-settings').click();
     const dialog = page.getByTestId('model-settings-dialog');
-    await expect(dialog.getByText('模型能力', { exact: true })).toHaveCount(0);
+    await expect(dialog.getByText('模型能力', { exact: true })).toBeVisible();
     const vision = dialog.getByRole('button', { name: '视觉', exact: true });
     const reasoning = dialog.getByRole('button', { name: '推理', exact: true });
     await expect(vision).toHaveAttribute('aria-pressed', 'false');
@@ -64,9 +64,12 @@ test.describe('Model configuration page', () => {
       return visionColor === reasoningColor;
     }).toBe(true);
     const thinking = await dialog.getByText('深度思考', { exact: true }).boundingBox();
-    expect((await vision.boundingBox())!.y).toBeGreaterThan(thinking!.y + thinking!.height);
+    const preferences = (await dialog.locator('.model-dialog-capabilities').boundingBox())!;
+    expect(thinking!.y).toBeGreaterThanOrEqual(preferences.y);
+    expect(thinking!.y + thinking!.height).toBeLessThanOrEqual(preferences.y + preferences.height);
     const thinkingSwitch = dialog.locator('.model-thinking-settings').getByRole('switch');
     await expect(thinkingSwitch).toHaveAttribute('aria-checked', 'false');
+    await dialog.screenshot({ path: testInfo.outputPath('model-thinking-off.png') });
     await thinkingSwitch.click();
     await expect(thinkingSwitch).toHaveAttribute('aria-checked', 'true');
     for (const width of [760, 1240]) {
@@ -74,8 +77,8 @@ test.describe('Model configuration page', () => {
       await expect(dialog.locator('.model-capability-toggle')).toHaveCount(4);
       expect(await dialog.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
       const providerBox = (await dialog.getByRole('combobox', { name: '本地模型 提供方', exact: true }).boundingBox())!;
-      const thinkingBox = (await dialog.locator('.model-thinking-settings').boundingBox())!;
-      expect(Math.abs(providerBox.y + providerBox.height / 2 - thinkingBox.y - thinkingBox.height / 2)).toBeLessThanOrEqual(1);
+      const modelIdBox = (await dialog.getByTestId('model-id-input').boundingBox())!;
+      expect(Math.abs(providerBox.y + providerBox.height / 2 - modelIdBox.y - modelIdBox.height / 2)).toBeLessThanOrEqual(1);
       await dialog.screenshot({ path: testInfo.outputPath(`model-capabilities-${width}.png`) });
     }
     await dialog.getByTestId('model-settings-done').click();
@@ -207,7 +210,7 @@ test.describe('Model configuration page', () => {
     expect(await page.getByTestId('model-name').count()).toBeGreaterThan(before);
   });
 
-  test('model list: filtered by provider, set as current, add/rename/delete', async ({ page }) => {
+  test('model list: filtered by provider, set as current, add/rename/delete', async ({ page }, testInfo) => {
     const names = page.getByTestId('model-name');
     // By default (the Anthropic row) only the main model appears
     await expect(names).toHaveCount(1);
@@ -222,18 +225,30 @@ test.describe('Model configuration page', () => {
     await expect(localRow.getByTestId('model-cap-tools')).toHaveAttribute('data-supported', 'true');
     await expect(localRow.getByTestId('model-cap-vision')).toHaveCount(0);
     await expect(localRow.getByTestId('model-cap-tools')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(localRow.getByTestId('model-id')).toHaveText('qwen2.5');
+    // The active row combines its rail and tinted surface with an explicit current badge.
+    await expect(localRow).toHaveAttribute('data-active', 'true');
+    await expect(localRow.getByTestId('model-current')).toHaveText('当前');
+    // The capability column sits left of the row actions so the trailing buttons stay grouped.
     const capabilities = (await localRow.locator('.model-cap-chip').last().boundingBox())!;
     const settings = (await localRow.getByTestId('model-settings').boundingBox())!;
-    const remove = (await localRow.getByTestId('model-remove').boundingBox())!;
-    expect(settings.x - (capabilities.x + capabilities.width)).toBeLessThanOrEqual(3);
-    expect(remove.x - (settings.x + settings.width)).toBeLessThanOrEqual(3);
-    await expect(page.getByTestId('model-row').first().getByText('当前', { exact: true })).toHaveCount(0);
-    // Back to the Anthropic row: it has neither Set as current nor a Current badge
+    const actions = (await localRow.getByTestId('model-actions').boundingBox())!;
+    expect(settings.x - (capabilities.x + capabilities.width)).toBeLessThanOrEqual(12);
+    expect(actions.x - (settings.x + settings.width)).toBeLessThanOrEqual(4);
+    for (const width of [760, 1240]) {
+      await page.setViewportSize({ width, height: 800 });
+      await expect(localRow.getByTestId('model-settings')).toBeVisible();
+      await expect(localRow.getByTestId('model-actions')).toBeVisible();
+      expect(await localRow.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+      await page.getByTestId('model-list').screenshot({ path: testInfo.outputPath(`model-list-${width}.png`) });
+    }
+    // The destructive action is not always visible: it lives in the row menu.
+    await expect(localRow.getByTestId('model-remove')).toHaveCount(0);
+    // Switching provider activates that provider's model, so the state follows the switch.
     await page.getByTestId('provider-switch').click();
     await page.getByTestId(`provider-option-${ANTHROPIC_ID}`).click();
     const mainRow = page.getByTestId('model-row').first();
-    await expect(mainRow.getByRole('button', { name: '设为当前' })).toHaveCount(0);
-    await expect(mainRow.getByText('当前', { exact: true })).toHaveCount(0);
+    await expect(mainRow).toHaveAttribute('data-active', 'true');
     // Add a model: fill in the ID (required) and group in the centered form
     await page.getByTestId('model-add').click();
     const addDialog = page.getByTestId('add-model-dialog');
@@ -247,6 +262,17 @@ test.describe('Model configuration page', () => {
     await expect(addDialog).toHaveCount(0);
     await expect(names).toHaveCount(2);
     await expect(page.getByTestId('model-group-custom:对话模型')).toBeVisible();
+    // A second model is not current: the row menu offers the switch, and the state moves once.
+    const addedRow = page.getByTestId('model-row').nth(1);
+    await expect(addedRow).not.toHaveAttribute('data-active');
+    await addedRow.getByTestId('model-actions').click();
+    const rowMenu = page.getByRole('menu');
+    await expect(rowMenu.getByText('设为当前')).toBeVisible();
+    await rowMenu.getByText('设为当前').click();
+    await expect(addedRow).toHaveAttribute('data-active', 'true');
+    await expect(mainRow).not.toHaveAttribute('data-active');
+    const activeCalls = await aiModelCalls(page);
+    expect(activeCalls.some((c) => c.kind === 'set_active')).toBe(true);
     // The gear opens the centered editor to rename the model
     await page.getByTestId('model-row').nth(1).getByTestId('model-settings').click();
     const dialog = page.getByTestId('model-settings-dialog');
@@ -261,8 +287,9 @@ test.describe('Model configuration page', () => {
     const addCall = setModels.filter((c) => c.kind === 'set_models').pop();
     expect(addCall?.models).toHaveLength(3);
     expect((addCall?.models as { name: string }[])[2]?.name).toBe('新模型');
-    // Delete the new model: confirm first -> one row remains
-    await page.getByTestId('model-row').nth(1).getByTestId('model-remove').click();
+    // Delete the new model: the row menu asks first -> one row remains
+    await page.getByTestId('model-row').nth(1).getByTestId('model-actions').click();
+    await page.getByRole('menu').getByText('删除模型').click();
     await page.getByTestId('confirm-ok').click();
     await expect(page.getByTestId('model-name')).toHaveCount(1);
   });
