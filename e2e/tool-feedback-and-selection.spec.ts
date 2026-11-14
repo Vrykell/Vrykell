@@ -70,14 +70,13 @@ for (const theme of ['dark', 'light']) for (const width of [900, 1440]) {
     await expect(cancelled).toHaveCSS('color', approval.color);
     await expect(cancelled).toHaveCSS('background-color', approval.background);
     await expect(side.locator('.ai-tool-verdict')).toHaveCount(0);
-    await expect(page.locator('#app-notifications [role="alert"]')).toHaveCount(0);
-    await refusal.click();
-    const notice = page.locator('#app-notifications [role="alert"]');
-    await expect(notice).toContainText('Confirmation skipped');
-    const bounds = (await notice.boundingBox())!;
-    expect(bounds.x + bounds.width).toBeGreaterThan(width - 40);
-    expect(bounds.y + bounds.height).toBeGreaterThan(740);
-    await notice.getByRole('button', { name: '关闭错误提示' }).click();
+    const notifications = page.locator('#app-notifications [role="alert"]');
+    await expect(notifications).toHaveCount(0);
+    const refusalCard = side.locator('.ai-tool-card[data-tool-state="denied"]');
+    await refusalCard.locator('.ai-tool-summary').click();
+    await expect(refusalCard.locator('.ai-tool-verdict')).toContainText('Confirmation skipped');
+    await expect(refusalCard.locator('.ai-tool-summary')).toHaveAttribute('aria-expanded', 'true');
+    await expect(notifications).toHaveCount(0);
     await page.evaluate(async () => {
       const path = '/src/features/chat/stores/chat.ts';
       const { useChatStore } = await import(path) as typeof import('../src/features/chat/stores/chat');
@@ -89,13 +88,14 @@ for (const theme of ['dark', 'light']) for (const width of [900, 1440]) {
           ? { kind: 'tool', tool: { ...part.tool, state: 'error', error: 'Live read failed' } } : part),
       })) } }));
     });
-    await expect(notice).toHaveCount(0);
+    await expect(notifications).toHaveCount(0);
     const live = side.locator('.ai-tool-summary').filter({ hasText: '/live' });
     await expect(live).toContainText('失败');
     await live.click();
-    await expect(notice).toContainText('Live read failed');
+    await expect(side.locator('.ai-tool-card[data-tool-state="error"]').filter({ hasText: '/live' }).locator('.ai-tool-verdict'))
+      .toContainText('Live read failed');
     await expect(side.locator('[role="alert"]')).toHaveCount(0);
-    await notice.evaluate(async element => { await Promise.all(element.getAnimations({ subtree: true }).map(animation => animation.finished)); });
+    await expect(notifications).toHaveCount(0);
     await page.screenshot({ path: info.outputPath('tool-feedback.png') });
   });
 }
