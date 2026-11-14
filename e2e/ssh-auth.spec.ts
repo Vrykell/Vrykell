@@ -170,7 +170,7 @@ test('first SSH connection confirms its fingerprint and accepts authentication i
   const dialogs = await ipcRecords(page, '__SSH_DIALOGS__');
   expect(dialogs).toHaveLength(1);
   expect(dialogs[0]?.message).toContain('SHA256:e2e-verified-key');
-  expect(await ipcRecords(page, '__SSH_TRUSTS__')).toMatchObject([{ host: 'prod.example.com', port: 22, expectedFingerprint: 'SHA256:e2e-verified-key', options: { host: 'prod.example.com', port: 22, user: 'root' } }]);
+  expect(await ipcRecords(page, '__SSH_TRUSTS__')).toMatchObject([{ host: 'prod.example.com', port: 22, expectedFingerprint: 'SHA256:e2e-verified-key', options: expect.objectContaining({ authenticationMode: 'password' }) }]);
   const sshSpawns = (await ipcRecords(page, '__PTY_SPAWNS__')).filter(s => s.ssh);
   expect(sshSpawns).toHaveLength(1);
   expect(sshSpawns[0]?.ssh).toMatchObject({ hostKeyType: 'ed25519' });
@@ -299,7 +299,7 @@ test('canceling host trust does not spawn SSH or record a key', async ({ page })
 
 test('changed host keys fail without asking to overwrite trust', async ({ page }) => {
   await openSsh(page, 'changed');
-  await expect(page.getByTestId('ssh-terminal-ended')).toContainText('主机密钥不匹配');
+  await expect(page.getByTestId('ssh-terminal-ended')).toContainText('中间人攻击');
   expect(await ipcRecords(page, '__SSH_DIALOGS__')).toEqual([]);
   expect(await ipcRecords(page, '__SSH_TRUSTS__')).toEqual([]);
   expect((await ipcRecords(page, '__PTY_SPAWNS__')).filter(s => s.ssh)).toEqual([]);

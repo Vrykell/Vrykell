@@ -9,7 +9,7 @@ const isScope = (area: WorkspaceArea): area is WorkspaceScope => WORKSPACE_SCOPE
 const startPage = (kind: string) => kind === 'start' || kind === 'start-code' || kind === 'start-ai';
 const systemPage = (kind: string) => kind === 'history' || kind === 'ai-history' || kind === 'usage' || startPage(kind);
 
-export function selectWorkspaceArea(area: WorkspaceArea, historyPreset: HistoryTypePreset = 'all') {
+export function selectWorkspaceArea(area: WorkspaceArea, historyPreset: HistoryTypePreset = 'all', recordHistory = true) {
   const navigation = useWorkspaceNavigation.getState();
   let workspace = useWorkspaceStore.getState();
   const snapshot = useWorkbenchStore.getState().snapshot;
@@ -20,10 +20,10 @@ export function selectWorkspaceArea(area: WorkspaceArea, historyPreset: HistoryT
   }
   useUiStore.getState().setSettingsOpen(false);
   if (area === 'history') {
-    navigation.selectHistory(historyPreset);
+    navigation.selectHistory(historyPreset, recordHistory);
     return;
   }
-  navigation.selectArea(area);
+  navigation.selectArea(area, recordHistory);
   workspace.ensureStartPages();
   workspace = useWorkspaceStore.getState();
   const remembered = useWorkspaceNavigation.getState().lastTabs[area];

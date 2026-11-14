@@ -11,6 +11,7 @@ import { registerHarnessCloseGuard } from '@core/harness';
 import { pickPath } from '@platform/api/fs';
 import { useToastStore } from '@ui/feedback/Toast';
 import AcpLauncher from '@features/workspace/components/AcpLauncher';
+import AiStartPage from './AiStartPage';
 import { useSessionStore, useUiStore, ScopedPaneWorkspace, useScopedPaneActive, WorkspaceResourceSwitcher } from '@features/workspace';
 import { UnifiedHistoryView } from '@features/session-history';
 import UsageView from '@features/agent/components/UsageView';
@@ -109,7 +110,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
     <ScopedPaneWorkspace scope="ai" active={visible && activePage?.kind === 'harness'} selected={selected} />
     {activeSystemPage && <div data-testid={`ai-system-page-${activeSystemPage.kind}`} style={{ display: visible ? 'flex' : 'none', flex: 1, minHeight: 0, minWidth: 0, flexDirection: 'column' }}>
       {activeSystemPage.kind === 'usage' ? <UsageView />
-        : activeSystemPage.kind === 'start-ai' ? <div className="ai-start-page" data-testid="ai-start-page"><AcpLauncher embedded suspended={!!launcherOpen} open={visible} onClose={() => {}} onPick={pick} onNewConversation={newConversation} /></div>
+        : activeSystemPage.kind === 'start-ai' ? <AiStartPage open suspended={!!launcherOpen} active={visible} onPick={pick} onNewConversation={newConversation} />
         : <UnifiedHistoryView preset="conversation" destination="native" />}
     </div>}
     {nativeVisited && <div className="ai-native-surface" inert={!visible || paneActive || activePage?.kind !== 'harness' || !selected.startsWith('chat:')} style={{ display: visible && !paneActive && activePage?.kind === 'harness' && selected.startsWith('chat:') ? 'flex' : 'none' }}>
@@ -119,7 +120,7 @@ export default function HarnessWorkspace({ active, headerActive = active }: { ac
       {state => <HarnessView tabId={item.id} harness={item.harness} cwd={item.cwd} fresh={item.fresh} active={state.visible} resumeSessionId={item.resumeSessionId}
         toolbarTarget={state.placed ? state.header ?? (state.retainsHeader && state.focused ? toolbar : null) : `acp:${item.id}` === selected ? toolbar : null} />}
     </ResourceContent>)}
-    {!activeSystemPage && !selected && <div className="ai-start-page" data-testid="ai-start-page"><AcpLauncher embedded open={visible} onClose={() => {}} onPick={pick} onNewConversation={newConversation} /></div>}
+    {!activeSystemPage && !selected && <AiStartPage open active={visible} onPick={pick} onNewConversation={newConversation} />}
     {closing && createPortal(<ConfirmDialog open title={t('Close ACP sessions?')}
       message={t('Closing stops active work and discards unsent drafts.')} confirmLabel={t('Close sessions')} cancelLabel={t('Cancel')} danger
       onCancel={() => setClosing(null)} onConfirm={() => { const complete = closing; setClosing(null); complete(); }} />, document.body)}

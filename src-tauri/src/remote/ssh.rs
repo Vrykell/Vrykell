@@ -419,13 +419,18 @@ fn tcp_handshake_with_timeout(conn: &SshConnection, timeout: Option<Duration>) -
     handshake_transport(conn, upstream, timeout)
 }
 
+/// Read the trust store before the handshake. A corrupt or unreadable file is a trust
+/// configuration failure, never a network failure.
+fn preferred_host_key_algorithms(sess: &Session, host: &str, port: u16) -> Result<Option<String>, String> {
+    let _guard = KH_LOCK.lock().unwrap_or_else(|error| error.into_inner());
+    prefer_known_host_key(sess, host, port, &known_hosts_path()?)
+}
+
 fn handshake_transport(conn: &SshConnection, upstream: Option<Session>, timeout: Option<Duration>) -> Result<Session, String> {
     let mut sess = Session::new().map_err(|error| error.to_string())?;
     sess.set_timeout(timeout.unwrap_or(Duration::from_secs(15)).as_millis().min(u32::MAX as u128) as u32);
-    let preferred = {
-        let _guard = KH_LOCK.lock().unwrap_or_else(|error| error.into_inner());
-        prefer_known_host_key(&sess, &conn.host, conn.port.unwrap_or(22), &known_hosts_path()?)?
-    };
+    let preferred = preferred_host_key_algorithms(&sess, &conn.host, conn.port.unwrap_or(22))
+        .map_err(|error| format!("SSH_HOST_TRUST_FAILED: {error}"))?;
     if let Some(upstream) = upstream {
         sess.set_tcp_stream(super::jump::tunnel(upstream, &conn.host, conn.port.unwrap_or(22))?);
     } else {
@@ -515,7 +520,7 @@ pub(super) fn connect_interactive(conn: &SshConnection, exchange: &super::intera
                 Err(error) if error.starts_with("HOST_KEY_UNKNOWN:") => {
                     let fingerprint = fingerprint_of(&session);
                     let (_, key_type) = session.host_key().ok_or("The server did not provide a host key")?;
-                    exchange.host_key(endpoint, fingerprint.clone(), format!("{key_type:?}").to_lowercase())?;
+                    exchange.host_key(endpoint, fingerprint.clone(), host_key_type_name(key_type))?;
                     record_host_key(&session, &endpoint.host, endpoint.port.unwrap_or(22), &fingerprint)
                 }
                 result => result,
@@ -600,7 +605,7 @@ fn verify_host_key(sess: &Session, host: &str, port: u16) -> Result<(), String> 
     match kh.check_port(host, port, key) {
         CheckResult::Match => Ok(()),
         CheckResult::NotFound => Err(format!("HOST_KEY_UNKNOWN:{}", fingerprint_of(sess))),
-        CheckResult::Mismatch => Err(format!("主机密钥不匹配（可能存在中间人攻击）：{host}")),
+        CheckResult::Mismatch => Err(format!("HOST_KEY_MISMATCH: 主机密钥不匹配（可能存在中间人攻击）：{host}")),
         CheckResult::Failure => Err(format!("主机密钥校验失败：{host}")),
     }
 }
@@ -623,7 +628,7 @@ fn record_host_key(sess: &Session, host: &str, port: u16, expected_fingerprint: 
     match kh.check_port(host, port, key) {
         CheckResult::Match => return Ok(()),
         CheckResult::NotFound => {},
-        CheckResult::Mismatch => return Err(format!("主机密钥不匹配，请核对远端主机：{host}")),
+        CheckResult::Mismatch => return Err(format!("HOST_KEY_MISMATCH: 主机密钥不匹配，请核对远端主机：{host}")),
         CheckResult::Failure => return Err(format!("主机密钥校验失败：{host}")),
     }
     let fmt = host_key_format(key_type);
@@ -640,7 +645,7 @@ fn record_host_key(sess: &Session, host: &str, port: u16, expected_fingerprint: 
 
 fn validate_confirmed_fingerprint(actual: &str, expected: &str) -> Result<(), String> {
     if actual == "unknown" || actual.trim_end_matches('=') != expected.trim_end_matches('=') {
-        return Err("主机指纹在确认后发生变化，请重新核对后连接".into());
+        return Err("HOST_KEY_MISMATCH: 主机指纹在确认后发生变化，请重新核对后连接".into());
     }
     Ok(())
 }
@@ -710,9 +715,138 @@ fn authenticate_checked(sess: &Session, conn: &SshConnection, user: &str, creden
     Err("SSH_AUTH_FAILED: No accepted SSH credentials are available".to_string())
 }
 
-fn ssh_test_sync(conn: &SshConnection) -> Result<String, String> {
-    let _sess = connect(conn)?;
-    Ok("连接成功".to_string())
+/// Outcome of a connection test. Host-key states stay distinct from real transport and
+/// authentication failures so the form can ask for confirmation instead of reporting a failure.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SshTestStatus {
+    Success,
+    UnknownHostKey,
+    HostKeyMismatch,
+    AuthFailed,
+    NetworkError,
+    OtherError,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SshTestResult {
+    pub status: SshTestStatus,
+    pub host: String,
+    pub port: u16,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub key_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub fingerprint: Option<String>,
+    pub message: String,
+}
+
+struct ConnectionFailure {
+    host: Option<String>,
+    port: Option<u16>,
+    stage: Option<String>,
+    cause: String,
+}
+
+/// Unwrap the stage context added by `connection_stage`, keeping the innermost cause.
+fn parse_connection_failure(error: &str) -> ConnectionFailure {
+    const PREFIX: &str = "SSH_CONNECTION_FAILED:";
+    if let Some(start) = error.find(PREFIX) {
+        if let Ok(value) = serde_json::from_str::<serde_json::Value>(&error[start + PREFIX.len()..]) {
+            let host = value.get("host").and_then(|field| field.as_str()).map(str::to_owned);
+            let port = value.get("port").and_then(|field| field.as_u64()).and_then(|port| u16::try_from(port).ok());
+            let stage = value.get("stage").and_then(|field| field.as_str()).map(str::to_owned);
+            if let Some(cause) = value.get("cause").and_then(|field| field.as_str()) {
+                return ConnectionFailure { host, port, stage, cause: cause.to_owned() };
+            }
+        }
+    }
+    ConnectionFailure { host: None, port: None, stage: None, cause: error.to_owned() }
+}
+
+fn host_key_type_name(key_type: HostKeyType) -> String {
+    format!("{key_type:?}").to_lowercase()
+}
+
+/// Current host key summary, captured before verification so a pending key can be displayed.
+fn host_key_summary(sess: &Session) -> Option<(String, String)> {
+    let (_, key_type) = sess.host_key()?;
+    Some((fingerprint_of(sess), host_key_type_name(key_type)))
+}
+
+/// Structured result for failures that happen before the connection stages run.
+fn structured_error(host: &str, port: u16, message: impl Into<String>) -> SshTestResult {
+    SshTestResult { status: SshTestStatus::OtherError, host: host.to_owned(), port,
+        key_type: None, fingerprint: None, message: message.into() }
+}
+
+/// Map any connection-stage error onto a structured test status. Host-key payload data is
+/// preferred from the live session; jump-host failures only expose the nested error text.
+fn classify_connection_error(error: &str, fallback_host: &str, fallback_port: u16, summary: Option<&(String, String)>) -> SshTestResult {
+    let failure = parse_connection_failure(error);
+    let host = failure.host.unwrap_or_else(|| fallback_host.to_owned());
+    let port = failure.port.unwrap_or(fallback_port);
+    let cause = failure.cause;
+    let (key_type, fingerprint) = summary.map_or((None, None), |(fingerprint, key_type)| (Some(key_type.clone()), Some(fingerprint.clone())));
+    if cause.starts_with("HOST_KEY_UNKNOWN:") {
+        let fingerprint = fingerprint.or_else(|| cause.strip_prefix("HOST_KEY_UNKNOWN:").map(|value| value.trim().to_owned()));
+        return SshTestResult { status: SshTestStatus::UnknownHostKey, host, port,
+            key_type, fingerprint, message: "The host key is not trusted yet.".into() };
+    }
+    if cause.starts_with("HOST_KEY_MISMATCH:") {
+        return SshTestResult { status: SshTestStatus::HostKeyMismatch, host, port,
+            key_type, fingerprint, message: "The host key does not match the saved record.".into() };
+    }
+    let auth_failure = cause.starts_with("SSH_AUTH_FAILED:") || cause.starts_with("SSH_AUTH_TIMEOUT:") || cause.starts_with("SSH_AUTH_CANCELLED:");
+    let trust_failure = cause.starts_with("SSH_HOST_TRUST_FAILED:") || failure.stage.as_deref() == Some("host-trust");
+    let status = if auth_failure {
+        SshTestStatus::AuthFailed
+    } else if trust_failure {
+        SshTestStatus::OtherError
+    } else if failure.stage.as_deref() == Some("handshake") {
+        SshTestStatus::NetworkError
+    } else {
+        SshTestStatus::OtherError
+    };
+    SshTestResult { status, host, port, key_type, fingerprint, message: cause }
+}
+
+/// Test the handshake, host trust and authentication stages without changing trust or caching
+/// credentials. Host trust uses the same `verify_host_key` as every real connection, and it runs
+/// before the username check so a first connection still shows its fingerprint prompt.
+fn ssh_test_sync(conn: &SshConnection) -> SshTestResult {
+    let host = conn.host.clone();
+    let port = conn.port.unwrap_or(22);
+    let user = conn.user.trim();
+    if let Err(error) = crate::terminal::ssh_command::validate_options(&conn.options) {
+        return structured_error(&host, port, error);
+    }
+    let sess = match connection_stage(conn, "handshake", || tcp_handshake_with_timeout(conn, None)) {
+        Ok(sess) => sess,
+        Err(error) => return classify_connection_error(&error, &host, port, None),
+    };
+    let summary = host_key_summary(&sess);
+    if let Err(error) = connection_stage(conn, "host-trust", || verify_host_key(&sess, &host, port)) {
+        return classify_connection_error(&error, &host, port, summary.as_ref());
+    }
+    if user.is_empty() {
+        return SshTestResult { status: SshTestStatus::OtherError, host, port,
+            key_type: summary.as_ref().map(|(_, key_type)| key_type.clone()),
+            fingerprint: summary.as_ref().map(|(fingerprint, _)| fingerprint.clone()),
+            message: "The username must not be empty.".into() };
+    }
+    let authenticated = connection_stage(conn, "authentication", || {
+        authenticate(&sess, conn, user, None)?;
+        if !sess.authenticated() { return Err("SSH_AUTH_FAILED: Additional authentication is required".into()); }
+        Ok(())
+    });
+    match authenticated {
+        Ok(()) => SshTestResult { status: SshTestStatus::Success, host, port,
+            key_type: summary.as_ref().map(|(_, key_type)| key_type.clone()),
+            fingerprint: summary.map(|(fingerprint, _)| fingerprint),
+            message: "Connection succeeded.".into() },
+        Err(error) => classify_connection_error(&error, &host, port, summary.as_ref()),
+    }
 }
 
 fn ssh_list_sync(conn: &SshConnection, path: Option<String>) -> Result<SshListResponse, String> {
@@ -874,10 +1008,15 @@ pub fn ssh_connection_touch(state: State<'_, HistoryState>, id: String) -> Resul
 pub struct SshHostKeyInfo {
     pub fingerprint: String,
     pub known: bool,
+    /// The presented key differs from the recorded one. The fingerprint is the presented key,
+    /// so a failed confirmation can show what the server actually sent.
+    pub mismatch: bool,
     pub key_type: String,
 }
 
-/// Query the host fingerprint and its known_hosts status (never writes anything).
+/// Query the host fingerprint and its known_hosts status (never writes anything). A changed key
+/// is reported as data, not an error, so callers can show the presented fingerprint without
+/// offering to trust it.
 #[tauri::command]
 pub async fn ssh_host_key_info(state: State<'_, HistoryState>, host: String, port: Option<u16>, options: Option<SshOptions>) -> Result<SshHostKeyInfo, String> {
     let mut conn = SshConnection {
@@ -896,15 +1035,18 @@ pub async fn ssh_host_key_info(state: State<'_, HistoryState>, host: String, por
     tauri::async_runtime::spawn_blocking(move || {
         let sess = tcp_handshake(&conn)?;
         let (_, key_type) = sess.host_key().ok_or("远端未返回主机密钥".to_string())?;
+        let mut mismatch = false;
         let known = match verify_host_key(&sess, &conn.host, conn.port.unwrap_or(22)) {
             Ok(()) => true,
             Err(error) if error.starts_with("HOST_KEY_UNKNOWN:") => false,
+            Err(error) if error.starts_with("HOST_KEY_MISMATCH:") => { mismatch = true; false }
             Err(error) => return Err(error),
         };
         Ok(SshHostKeyInfo {
             fingerprint: fingerprint_of(&sess),
             known,
-            key_type: format!("{key_type:?}").to_lowercase(),
+            mismatch,
+            key_type: host_key_type_name(key_type),
         })
     })
     .await
@@ -935,7 +1077,8 @@ pub async fn ssh_trust_host_key(state: State<'_, HistoryState>, host: String, po
     .map_err(|e| e.to_string())?
 }
 
-/// Test a connection with explicit parameters, so a form can test before saving.
+/// Test a connection with explicit parameters, so a form can test before saving. Every failure
+/// is returned as a structured result; only an internal command error would escape.
 #[tauri::command]
 pub async fn ssh_test(
     state: State<'_, HistoryState>,
@@ -944,7 +1087,7 @@ pub async fn ssh_test(
     user: String,
     password: String,
     options: Option<SshOptions>,
-) -> Result<String, String> {
+) -> Result<SshTestResult, String> {
     let mut conn = SshConnection {
         id: String::new(),
         name: String::new(),
@@ -957,10 +1100,17 @@ pub async fn ssh_test(
         has_password: false,
         options: options.unwrap_or_default(),
     };
-    state.0.lock().map_err(|error| error.to_string())?.resolve_ssh_route(&mut conn.options, None)?;
-    tauri::async_runtime::spawn_blocking(move || ssh_test_sync(&conn))
-        .await
-        .map_err(|e| e.to_string())?
+    let host = conn.host.clone();
+    let port = conn.port.unwrap_or(22);
+    let routed = state.0.lock().map_err(|error| error.to_string())
+        .and_then(|db| db.resolve_ssh_route(&mut conn.options, None));
+    if let Err(error) = routed {
+        return Ok(structured_error(&host, port, error));
+    }
+    match tauri::async_runtime::spawn_blocking(move || ssh_test_sync(&conn)).await {
+        Ok(result) => Ok(result),
+        Err(error) => Ok(structured_error(&host, port, format!("The connection test could not run: {error}"))),
+    }
 }
 
 /// List a remote directory by connection id (the backend resolves the password). Returns
@@ -1559,6 +1709,102 @@ mod tests {
         assert_eq!(detail["stage"], "authentication");
         assert_eq!(detail["host"], "gateway.test");
         assert_eq!(detail["port"], 2222);
+    }
+
+    #[test]
+    fn connection_tests_keep_host_key_states_distinct() {
+        let failure = |host: &str, port: u16, stage: &str, cause: &str| format!("SSH_CONNECTION_FAILED:{}", serde_json::json!({
+            "connectionId": "", "host": host, "port": port, "stage": stage, "cause": cause,
+        }));
+        let summary = ("SHA256:fresh-key".to_string(), "ed25519".to_string());
+
+        let unknown = classify_connection_error(
+            &failure("fresh.test", 2222, "host-trust", "HOST_KEY_UNKNOWN:SHA256:fresh-key"),
+            "fresh.test", 2222, Some(&summary));
+        assert_eq!(unknown.status, SshTestStatus::UnknownHostKey);
+        assert_eq!((unknown.host.as_str(), unknown.port), ("fresh.test", 2222));
+        assert_eq!(unknown.key_type.as_deref(), Some("ed25519"));
+        assert_eq!(unknown.fingerprint.as_deref(), Some("SHA256:fresh-key"));
+
+        let jump = format!("SSH_JUMP_FAILED:jump-1: {}", failure("jump.test", 22, "host-trust", "HOST_KEY_UNKNOWN:SHA256:jump-key"));
+        let unknown_hop = classify_connection_error(&jump, "target.test", 2222, None);
+        assert_eq!(unknown_hop.status, SshTestStatus::UnknownHostKey);
+        assert_eq!((unknown_hop.host.as_str(), unknown_hop.port), ("jump.test", 22));
+        assert_eq!(unknown_hop.fingerprint.as_deref(), Some("SHA256:jump-key"));
+        assert_eq!(unknown_hop.key_type, None);
+
+        let mismatch = classify_connection_error(
+            &failure("changed.test", 22, "host-trust", "HOST_KEY_MISMATCH: 主机密钥不匹配（可能存在中间人攻击）：changed.test"),
+            "changed.test", 22, Some(&summary));
+        assert_eq!(mismatch.status, SshTestStatus::HostKeyMismatch);
+        assert_eq!(mismatch.fingerprint.as_deref(), Some("SHA256:fresh-key"));
+
+        let rejected = classify_connection_error(&failure("server.test", 22, "authentication", "SSH_AUTH_FAILED: rejected"), "server.test", 22, None);
+        assert_eq!(rejected.status, SshTestStatus::AuthFailed);
+        let unreachable = classify_connection_error(&failure("server.test", 22, "handshake", "SSH handshake failed: timed out"), "server.test", 22, None);
+        assert_eq!(unreachable.status, SshTestStatus::NetworkError);
+        let trust_store = classify_connection_error(&failure("server.test", 22, "handshake", "SSH_HOST_TRUST_FAILED: known hosts file is corrupt"), "server.test", 22, None);
+        assert_eq!(trust_store.status, SshTestStatus::OtherError);
+        let trust_failure = classify_connection_error(&failure("server.test", 22, "host-trust", "known_hosts unavailable"), "server.test", 22, None);
+        assert_eq!(trust_failure.status, SshTestStatus::OtherError);
+        assert_eq!(classify_connection_error("plain failure", "server.test", 22, None).status, SshTestStatus::OtherError);
+    }
+
+    #[test]
+    fn connection_tests_check_host_trust_before_the_username() {
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = listener.local_addr().unwrap().port();
+        drop(listener);
+        let known_hosts = std::env::temp_dir().join(format!("vrykell-empty-user-{}.known_hosts", uuid::Uuid::new_v4()));
+        TEST_KNOWN_HOSTS.with(|path| *path.borrow_mut() = Some(known_hosts));
+        struct TrustScope;
+        impl Drop for TrustScope { fn drop(&mut self) { TEST_KNOWN_HOSTS.with(|path| *path.borrow_mut() = None); } }
+        let _scope = TrustScope;
+        let conn: SshConnection = serde_json::from_value(serde_json::json!({
+            "id": "empty-user", "name": "server", "host": "127.0.0.1", "port": port,
+            "user": "", "proxyId": "none",
+        })).unwrap();
+        let result = ssh_test_sync(&conn);
+        // Host trust runs before the username check, so an empty account cannot hide the
+        // first-connection fingerprint prompt behind an early form error.
+        assert_eq!(result.status, SshTestStatus::NetworkError);
+        assert_ne!(result.message, "The username must not be empty.");
+        assert_eq!(result.host, "127.0.0.1");
+        assert_eq!(result.port, port);
+    }
+
+    #[test]
+    fn connection_tests_always_return_a_structured_failure() {
+        let result = structured_error("server.test", 2222, "route could not be resolved");
+        assert_eq!(result.status, SshTestStatus::OtherError);
+        assert_eq!((result.host.as_str(), result.port), ("server.test", 2222));
+        assert_eq!(result.message, "route could not be resolved");
+        assert_eq!(result.key_type, None);
+        assert_eq!(result.fingerprint, None);
+    }
+
+    #[test]
+    fn connection_tests_stop_on_invalid_options_before_reaching_the_network() {
+        let conn: SshConnection = serde_json::from_value(serde_json::json!({
+            "id": "invalid-options", "name": "server", "host": "server.test", "user": "tester", "jumpHost": "-oProxyCommand=x",
+        })).unwrap();
+        let result = ssh_test_sync(&conn);
+        assert_eq!(result.status, SshTestStatus::OtherError);
+        assert!(!result.message.is_empty());
+    }
+
+    #[test]
+    fn connection_test_status_names_are_stable_for_the_frontend() {
+        for (status, expected) in [
+            (SshTestStatus::Success, "success"),
+            (SshTestStatus::UnknownHostKey, "unknown_host_key"),
+            (SshTestStatus::HostKeyMismatch, "host_key_mismatch"),
+            (SshTestStatus::AuthFailed, "auth_failed"),
+            (SshTestStatus::NetworkError, "network_error"),
+            (SshTestStatus::OtherError, "other_error"),
+        ] {
+            assert_eq!(serde_json::to_string(&status).unwrap(), format!("\"{expected}\""));
+        }
     }
 
     #[test]

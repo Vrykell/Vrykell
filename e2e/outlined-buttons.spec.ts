@@ -30,7 +30,7 @@ async function checkFeedback(page: Page, button: Locator, gray: string) {
 
 async function auditOutlinedActions(page: Page, scope: Locator, gray: string) {
   const labels: string[] = [];
-  for (const button of await scope.locator('button.outline-button:visible:enabled').all()) {
+  for (const button of await scope.locator('button.outline-button:visible:enabled:not(.primary-button)').all()) {
     await checkFeedback(page, button, gray);
     labels.push((await button.textContent())?.trim() || (await button.getAttribute('aria-label')) || '');
   }
@@ -53,22 +53,30 @@ for (const theme of ['dark', 'light'] as const) {
       await page.locator('aside').getByRole('button', { name: label, exact: true }).click();
       report[label] = await auditOutlinedActions(page, body, gray);
     }
-    expect(Object.values(report).flat().length).toBeGreaterThanOrEqual(20);
+    // Two outlined actions carry the primary treatment (provider import and add model) and are
+    // checked separately, so the neutral audit covers the remaining controls.
+    expect(Object.values(report).flat().length).toBeGreaterThanOrEqual(18);
+
+    // The model page's add action carries the primary treatment, so the neutral audit skips it.
+    await page.locator('aside').getByRole('button', { name: '模型配置', exact: true }).click();
+    const addModel = page.getByTestId('model-add');
+    await expect(addModel).toHaveCSS('background-color', await themeColor(page, '--primary-button-bg'));
+    await addModel.focus();
+    await expect(addModel).toHaveCSS('background-color', await themeColor(page, '--primary-button-hover-bg'));
 
     await page.locator('aside').getByRole('button', { name: '记忆', exact: true }).click();
     const add = page.getByRole('button', { name: '重新加载', exact: true });
-    const iconHover = await themeColor(page, '--control-hover-bg');
     await expect(add).toBeEnabled();
     await add.focus();
     await page.keyboard.press('Shift+Tab');
     await page.keyboard.press('Tab');
     await expect(add).toBeFocused();
-    await expect(add).toHaveCSS('background-color', iconHover);
+    await expect(add).toHaveCSS('background-color', gray);
     await add.click();
     await expect(add).toHaveAttribute('aria-busy', 'false');
     await expect(page.getByTestId('memory-count-total')).toHaveText('1');
     await expect(add).toBeFocused();
-    await expect(add).toHaveCSS('background-color', iconHover);
+    await expect(add).toHaveCSS('background-color', gray);
     await add.scrollIntoViewIfNeeded();
     await page.screenshot({ path: testInfo.outputPath(`outlined-action-${theme}.png`), animations: 'disabled' });
 

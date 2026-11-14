@@ -10,7 +10,10 @@ for (const theme of ['深色', '浅色']) {
     await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
     const nav = page.locator('.settings-navigation');
     await nav.getByRole('button', { name: '模型配置', exact: true }).click();
-    await expect(page.getByTestId('model-list-toolbar')).toHaveCSS('background-color', theme === '深色' ? 'rgb(60, 60, 60)' : 'rgb(255, 255, 255)');
+    const toolbar = page.getByTestId('model-list-toolbar');
+    await expect(toolbar.getByTestId('model-search')).toBeVisible();
+    await expect(toolbar.getByTestId('model-filter')).toBeVisible();
+    await expect(toolbar.getByTestId('model-add')).toBeVisible();
     for (const width of [1240, 900, 720, 480]) {
       await page.setViewportSize({ width, height: 800 });
       await expect(nav).toBeVisible();

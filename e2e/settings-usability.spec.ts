@@ -88,7 +88,7 @@ test('chat mode dropdown persists per model and replaces the two header toggles'
   await mode.press('ArrowDown');
   const menu = page.getByRole('listbox', { name: '对话与审批模式' });
   // The menu uses the shared floating-surface radius.
-  await expect(menu).toHaveCSS('border-radius', '10px');
+  await expect(menu).toHaveCSS('border-radius', '12px');
   await expect(menu.getByRole('option').first()).toHaveCSS('border-top-width', '0px');
   await expect(menu.getByText('只进行对话，不调用工具。')).toBeVisible();
   await expect(menu.getByText('按工具设置判定。')).toBeVisible();

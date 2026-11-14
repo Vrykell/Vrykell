@@ -4,6 +4,7 @@ import { ptyWrite } from '@platform/pty';
 import { useSessionStore } from '@features/workspace';
 import { leaf } from '@features/workspace/model/windowLayout';
 import { registerTerminal, unregisterTerminal, useTerminalStore, useBlockStore } from '@features/terminal';
+import { clearCompletionReadiness } from '@features/terminal/services/commandCompletion';
 import { runCommandAndWait } from '../tools/runCommand';
 
 vi.mock('@platform/pty', () => ({ ptyWrite: vi.fn().mockResolvedValue(undefined) }));
@@ -20,6 +21,7 @@ beforeEach(() => {
   dispose = vi.fn();
   terminal = {
     parser: { registerOscHandler: (_code: number, callback: typeof marker) => { marker = callback; return { dispose }; } },
+    onData: () => ({ dispose: vi.fn() }),
     registerMarker: () => ({ line: 0, isDisposed: false, dispose: vi.fn() }),
     buffer: { active: { baseY: 0, cursorY: 0, cursorX: 0, getLine: () => ({ translateToString: () => 'actual output' }) } },
   } as unknown as Terminal;
@@ -29,6 +31,7 @@ beforeEach(() => {
   useBlockStore.setState({ byTab: {} });
 });
 afterEach(() => {
+  clearCompletionReadiness(paneId);
   unregisterTerminal(paneId, terminal);
   useSessionStore.setState(workspace, true); useTerminalStore.setState(terminals, true); useBlockStore.setState(blocks, true);
   vi.useRealTimers();
@@ -80,9 +83,12 @@ it('does not execute a command that was already cancelled', async () => {
   expect(ptyWrite).not.toHaveBeenCalled();
 });
 
-it('reports a timeout without claiming that the process has completed', async () => {
+it('reports a timeout without claiming completion and keeps listening for the late marker', async () => {
   const result = runCommandAndWait('sleep 99', { paneId, timeoutMs: 100 });
   await vi.advanceTimersByTimeAsync(100);
   expect(await result).toMatchObject({ ok: false, completed: false, code: 'COMMAND_TIMEOUT' });
+  // The shell may still be running; its marker remains the readiness signal for this pane.
+  expect(dispose).not.toHaveBeenCalled();
+  complete();
   expect(dispose).toHaveBeenCalledOnce();
 });

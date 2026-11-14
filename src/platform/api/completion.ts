@@ -3,3 +3,7 @@ export interface ShellCompletion { text: string; cursor: number }
 export function completeShell(text: string, cursor: number, cwd?: string, shell?: string): Promise<ShellCompletion[]> {
   return invoke('shell_complete', { text, cursor, cwd: cwd ?? null, shell: shell ?? null });
 }
+/** Start the resident shell-completion helper before the first Tab so it does not pay process startup. */
+export function warmShellCompletion(shell?: string): Promise<void> {
+  return invoke('warm_shell_completion', { shell: shell ?? null });
+}

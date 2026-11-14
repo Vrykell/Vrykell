@@ -25,7 +25,7 @@ async function assertSurface(surface: Locator, dialog = false) {
   expect(style.background).toBe(style.expectedBackground);
   // Floating surfaces carry no ring: the shadow alone separates them from the page.
   expect(style.borderWidth).toBe('0px');
-  expect(style.radius).toBe(dialog ? '14px' : '10px');
+  expect(style.radius).toBe(dialog ? '16px' : '12px');
   expect(style.shadow).not.toBe('none');
 }
 
@@ -38,7 +38,7 @@ async function search(page: Page) {
   await expect(results.first()).toBeVisible();
   const selected = dialog.locator('[data-search-result][data-selected="true"]');
   await expect(selected).toHaveCSS('border-left-width', '0px');
-  await expect(selected).toHaveCSS('border-radius', '10px');
+  await expect(selected).toHaveCSS('border-radius', '8px');
   expect(await selected.evaluate(element => getComputedStyle(element, '::before').content)).toBe('none');
   const firstTitle = await selected.textContent();
   await dialog.getByPlaceholder('搜索文件、命令、设置…').press('ArrowDown');

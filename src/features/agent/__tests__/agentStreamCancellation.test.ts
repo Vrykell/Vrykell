@@ -21,16 +21,36 @@ vi.mock('@tauri-apps/api/core', () => ({
   } : ''),
 }));
 
+function enableAgentMode() {
+  useAgentSettings.setState(state => ({ global: { ...state.global, agentMode: true } }));
+}
+
 beforeEach(() => {
   useAgentSettings.setState(state => ({ global: { ...state.global, agentMode: false } }));
   useUsageStore.setState({ records: [] }); metrics.resolve = undefined; metrics.parts = [];
 });
 
 it('preserves cancellation in structured tool results', async () => {
+  enableAgentMode();
   metrics.parts = [{ type: 'tool-result', toolCallId: 'question', toolName: 'ask_user', output: { ok: false, answered: false, cancelled: true } }];
   const runs: ToolRun[] = [];
   await agentStream([{ role: 'user', content: 'Question' }], () => {}, { handlers: { onToolEvent: run => runs.push(run) } });
   expect(runs[runs.length - 1]?.state).toBe('cancelled');
+});
+
+it('retains the denial reason from a structured tool result', async () => {
+  enableAgentMode();
+  metrics.parts = [{ type: 'tool-result', toolCallId: 'denied', toolName: 'run_command', output: { ok: false, denied: true, error: 'Policy denied this command' } }];
+  const runs: ToolRun[] = [];
+  await agentStream([{ role: 'user', content: 'Run it' }], () => {}, { handlers: { onToolEvent: run => runs.push(run) } });
+  expect(runs[runs.length - 1]).toMatchObject({ state: 'denied', error: 'Policy denied this command' });
+});
+
+it('ignores tool results when the stream registered no tools', async () => {
+  metrics.parts = [{ type: 'tool-result', toolCallId: 'phantom', toolName: 'run_command', output: { ok: true } }];
+  const runs: ToolRun[] = [];
+  await agentStream([{ role: 'user', content: 'Run it' }], () => {}, { handlers: { onToolEvent: run => runs.push(run) } });
+  expect(runs).toEqual([]);
 });
 
 it('finishes the reply without waiting for optional usage and records it when available', async () => {

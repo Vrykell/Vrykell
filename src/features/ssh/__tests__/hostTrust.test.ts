@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ask } from '@tauri-apps/plugin-dialog';
 import { sshHostKeyInfo, sshTrustHostKey } from '../services/api';
-import { prepareSshHost } from '../services/hostTrust';
+import { prepareSshHost, prepareSshJumpHosts, SshHostKeyMismatchError, SshHostTrustCancelledError } from '../services/hostTrust';
 
 vi.mock('@tauri-apps/plugin-dialog', () => ({ ask: vi.fn() }));
-vi.mock('../services/api', () => ({ sshHostKeyInfo: vi.fn(), sshTrustHostKey: vi.fn() }));
-const info = { known: false, fingerprint: 'SHA256:verified-key', keyType: 'ed25519' };
+vi.mock('../services/api', () => ({
+  sshHostKeyInfo: vi.fn(), sshTrustHostKey: vi.fn(),
+  sshConnectionOptions: (options: unknown) => options,
+}));
+const info = { known: false, mismatch: false, fingerprint: 'SHA256:verified-key', keyType: 'ed25519' };
 
 beforeEach(() => {
   vi.resetAllMocks();
@@ -29,7 +32,10 @@ describe('SSH host trust', () => {
   });
   it('cancels without trusting the host', async () => {
     vi.mocked(ask).mockResolvedValue(false);
-    await expect(prepareSshHost('server')).rejects.toThrow('已取消');
+    const pending = prepareSshHost('server', 2222);
+    await expect(pending).rejects.toBeInstanceOf(SshHostTrustCancelledError);
+    await expect(pending).rejects.toThrow('已取消');
+    await expect(pending).rejects.toMatchObject({ host: 'server', port: 2222 });
     expect(sshTrustHostKey).not.toHaveBeenCalled();
   });
   it('rejects a changed key without offering to overwrite it', async () => {
@@ -37,6 +43,33 @@ describe('SSH host trust', () => {
     await expect(prepareSshHost('server')).rejects.toThrow('主机密钥不匹配');
     expect(ask).not.toHaveBeenCalled();
     expect(sshTrustHostKey).not.toHaveBeenCalled();
+  });
+  it('turns a structured mismatch into a localised warning with no trust action', async () => {
+    vi.mocked(sshHostKeyInfo).mockRejectedValue(new Error('HOST_KEY_MISMATCH: 主机密钥不匹配'));
+    const pending = prepareSshHost('server', 2222);
+    await expect(pending).rejects.toBeInstanceOf(SshHostKeyMismatchError);
+    await expect(pending).rejects.toThrow('中间人攻击');
+    await expect(pending).rejects.toMatchObject({ host: 'server', port: 2222, rawMessage: expect.stringContaining('HOST_KEY_MISMATCH') });
+    expect(ask).not.toHaveBeenCalled();
+    expect(sshTrustHostKey).not.toHaveBeenCalled();
+  });
+  it('keeps the presented key details of a changed fingerprint', async () => {
+    vi.mocked(sshHostKeyInfo).mockResolvedValue({ known: false, mismatch: true, fingerprint: 'SHA256:presented-key', keyType: 'rsa' });
+    await expect(prepareSshHost('server', 2222)).rejects.toMatchObject({
+      name: 'SshHostKeyMismatchError', host: 'server', port: 2222, keyType: 'rsa', fingerprint: 'SHA256:presented-key',
+    });
+    expect(ask).not.toHaveBeenCalled();
+    expect(sshTrustHostKey).not.toHaveBeenCalled();
+  });
+  it('keeps a jump-hop mismatch attached to the failing hop', async () => {
+    vi.mocked(sshHostKeyInfo).mockResolvedValue({ known: false, mismatch: true, fingerprint: 'SHA256:hop-key', keyType: 'rsa' });
+    const connections = [{ id: 'gateway', name: 'Gateway', host: 'gateway.test', port: 2222, user: 'jump-user', authMethod: 'password' as const }];
+    const pending = prepareSshJumpHosts({ jumpConnectionId: 'gateway' }, connections);
+    await expect(pending).rejects.toMatchObject({
+      name: 'SshHostKeyMismatchError', host: 'gateway.test', port: 2222, keyType: 'rsa', fingerprint: 'SHA256:hop-key',
+    });
+    expect(sshHostKeyInfo).toHaveBeenCalledWith('gateway.test', 2222, expect.any(Object));
+    expect(vi.mocked(sshHostKeyInfo).mock.calls[0][2]).not.toHaveProperty('password');
   });
   it('does not trust a host after the pane closes during confirmation', async () => {
     const abort = new AbortController();

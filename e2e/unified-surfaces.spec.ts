@@ -62,7 +62,7 @@ for (const theme of ['dark', 'light']) test(`workspace chrome and cards share th
   expect(await rgb(page, page.locator('.settings-content'))).toBe(canvas);
   expect(await rgb(page, settingsCard)).toBe(card);
   expect(await settingsCard.evaluate(element => getComputedStyle(element).boxShadow)).toBe('none');
-  expect(await settingsCard.evaluate(element => getComputedStyle(element).borderRadius)).toBe('8px');
+  expect(await settingsCard.evaluate(element => getComputedStyle(element).borderRadius)).toBe('16px');
   await page.keyboard.press('Escape');
 
   await page.getByTestId('workspace-history').click();
@@ -72,7 +72,7 @@ for (const theme of ['dark', 'light']) test(`workspace chrome and cards share th
   expect(await rgb(page, page.getByTestId('unified-history-page').locator('.history-list'))).toBe(canvas);
   expect(await rgb(page, historyCard)).toBe(card);
   expect(await historyCard.evaluate(element => getComputedStyle(element).boxShadow)).toBe('none');
-  expect(await historyCard.evaluate(element => getComputedStyle(element).borderRadius)).toBe('8px');
+  expect(await historyCard.evaluate(element => getComputedStyle(element).borderRadius)).toBe('16px');
   expect((await historyHeader.boundingBox())!.height).toBe(34);
 
   await page.getByTestId('workspace-area-ai').click();
@@ -87,6 +87,6 @@ for (const theme of ['dark', 'light']) test(`workspace chrome and cards share th
   await expect(page.getByTestId('usage-page')).toBeVisible();
   expect(await rgb(page, usageCard)).toBe(card);
   expect(await usageCard.evaluate(element => getComputedStyle(element).boxShadow)).toBe('none');
-  expect(await usageCard.evaluate(element => getComputedStyle(element).borderRadius)).toBe('8px');
+  expect(await usageCard.evaluate(element => getComputedStyle(element).borderRadius)).toBe('16px');
   await page.screenshot({ path: info.outputPath(`unified-surfaces-${theme}.png`), animations: 'disabled' });
 });

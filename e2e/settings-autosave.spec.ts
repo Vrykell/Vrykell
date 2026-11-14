@@ -63,7 +63,7 @@ test('save failures keep the draft visible and allow retry', async ({ page }) =>
   await gotoSetting(page, '模型配置');
   // The name lives in the row editor (gear).
   await page.getByTestId('model-settings').first().click();
-  const name = page.getByPlaceholder('模型名称').first();
+  const name = page.getByTestId('model-settings-dialog').getByPlaceholder('模型名称').first();
   await name.fill('失败时保留的草稿');
   const field = name.locator('xpath=..');
   await expect(field.getByRole('status')).toContainText('保存失败');

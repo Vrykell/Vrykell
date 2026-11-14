@@ -60,7 +60,7 @@ WorkspaceShell
 │   ├── Functional navigation
 │   ├── Left auxiliary actions and panel slot
 │   └── Settings
-├── TopDock (42px, beside the sidebar)
+├── TopDock (40px, beside the sidebar)
 └── Workspace body
     ├── Primary column
     │   ├── Horizontal instance tabs (34px)
@@ -76,7 +76,7 @@ The left middle and top-right action zones share `DockNavigation`. `leftZone` / 
 
 Navigation buttons are dragged via Pointer Events by `useNavigationButtonDrag`, starting only after the pointer moves more than 6px. The source button remains mounted but is removed from the arrangement, and its icon follows the pointer via `NavigationDragPreview`; a real 32px placeholder is inserted at the target position and the other buttons rearrange to make room. The placeholder region retains the corresponding insertion index, preventing the drop point from jumping due to repeated hits after the rearrangement; the gaps between buttons are computed from the neighboring positions. The preview does not modify the layout or persist anything; the commit happens only on release, and the original arrangement is restored on cancel. HTML5 Drag and Drop is forbidden: native file drag-and-drop in Windows desktop windows intercepts these events, and browser preview cannot verify that behavior directly. Native file drop-in is retained; navigation buttons and the top-right action zone are not marked as window drag regions. Esc, blur, pointercancel, and unmount cancel the drag; the click produced on release does not trigger a panel switch. Interaction tests disable HTML drag-and-drop events to confirm that pointer dragging works independently.
 
-The titlebar uses `useBalancedTitlebar` to observe the action zone, navigation offset and native control insets. Search is centered relative to the whole application; available space narrows the field before actions overlap. Navigation width is remembered separately from temporary pointer width, so held collapse can reverse and viewport clamping does not overwrite the user's saved size.
+The titlebar uses `useBalancedTitlebar` to observe the action zone, navigation offset and native control insets. Search is centered relative to the whole application; available space narrows the field before actions overlap. Back and forward actions sit at the right edge of the title column and re-enter the previous workspace from a session-only trail (`stores/navigation.ts`); they fold away once the title or the search field would lose its readable share. Navigation width is remembered separately from temporary pointer width, so held collapse can reverse and viewport clamping does not overwrite the user's saved size.
 
 ## 4. End-to-End Layering
 

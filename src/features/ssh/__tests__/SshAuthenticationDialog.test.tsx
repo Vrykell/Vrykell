@@ -145,4 +145,38 @@ describe('temporary SSH authentication', () => {
     await waitFor(() => expect(mocks.forget).toHaveBeenCalledWith('one'));
     expect(useSessionAuthenticationStore.getState().request).toBeNull();
   });
+
+  it('names the failing host and presented key instead of reporting an authentication failure', async () => {
+    useSshStore.setState({ connections: [{ id: 'one', name: 'Internal', host: target.host, user: target.user, authMethod: 'password' }] });
+    vi.mocked(prepareSshHost).mockRejectedValueOnce(Object.assign(new Error('HOST_KEY_MISMATCH: recorded key changed'), {
+      name: 'SshHostKeyMismatchError', host: 'gateway.test', port: 2222, keyType: 'rsa', fingerprint: 'SHA256:changed-key',
+      rawMessage: 'HOST_KEY_MISMATCH: recorded key changed',
+    }));
+    requestSshAuthentication(target); render(<SshAuthenticationDialog />);
+    fireEvent.change(screen.getByTestId('ssh-session-secret'), { target: { value: 'test-password' } });
+    fireEvent.click(screen.getByRole('button', { name: '认证' }));
+
+    const warning = await screen.findByTestId('ssh-auth-host-key-mismatch');
+    expect(warning).toHaveTextContent('gateway.test:2222');
+    expect(warning).toHaveTextContent('rsa');
+    expect(warning).toHaveTextContent('SHA256:changed-key');
+    expect(screen.queryByText('认证失败')).toBeNull();
+    expect(screen.queryByText('请检查服务器密码或私钥解密口令后重试。')).toBeNull();
+    expect(mocks.authenticate).not.toHaveBeenCalled();
+  });
+
+  it('reports a cancelled host confirmation without password advice', async () => {
+    useSshStore.setState({ connections: [{ id: 'one', name: 'Internal', host: target.host, user: target.user, authMethod: 'password' }] });
+    vi.mocked(prepareSshHost).mockRejectedValueOnce(Object.assign(new Error('SSH connection cancelled'), {
+      name: 'SshHostTrustCancelledError', host: 'gateway.test', port: 2222,
+    }));
+    requestSshAuthentication(target); render(<SshAuthenticationDialog />);
+    fireEvent.change(screen.getByTestId('ssh-session-secret'), { target: { value: 'test-password' } });
+    fireEvent.click(screen.getByRole('button', { name: '认证' }));
+
+    const warning = await screen.findByTestId('ssh-auth-host-key-cancelled');
+    expect(warning).toHaveTextContent('主机密钥未信任');
+    expect(screen.queryByText('认证失败')).toBeNull();
+    expect(mocks.authenticate).not.toHaveBeenCalled();
+  });
 });

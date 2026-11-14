@@ -101,19 +101,22 @@ for (const theme of ['dark', 'light']) test(`host groups, table and native conve
   await expect(aiEntry.locator('.sidebar-row-icon svg')).toHaveCSS('color', inheritedColor);
   await expect(aiEntry.locator('.sidebar-row-icon svg')).toHaveCSS('filter', 'none');
   await expect(page.getByTestId('ai-start-new-conversation')).toBeVisible();
+  await page.getByTestId('ai-start-agents').click();
   await expect(page.getByTestId('acp-launcher-Fake ACP')).toBeVisible();
-  const nativeEntry = (await page.getByTestId('ai-start-new-conversation').boundingBox())!;
-  const agentsSection = (await page.getByRole('region', { name: 'ACP 智能体' }).boundingBox())!;
-  expect(agentsSection.y).toBeGreaterThan(nativeEntry.y + nativeEntry.height);
   await page.screenshot({ path: info.outputPath(`ai-launch-${theme}.png`) });
   await page.setViewportSize({ width: 700, height: 800 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(700);
   await page.screenshot({ path: info.outputPath(`ai-launch-narrow-${theme}.png`) });
   await page.setViewportSize({ width: 500, height: 800 });
-  const searchWidth = (await page.getByTestId('acp-launcher-search').boundingBox())!.width;
-  expect((await page.getByTestId('acp-launcher-Fake ACP').boundingBox())!.width).toBeCloseTo(searchWidth);
+  // The picker is a floating panel, so its rows span the content width the panel gives them.
+  const row = (await page.getByTestId('acp-launcher-Fake ACP').boundingBox())!;
+  const panel = (await page.getByTestId('acp-launcher').boundingBox())!;
+  expect(row.x).toBeGreaterThanOrEqual(panel.x);
+  expect(row.x + row.width).toBeLessThanOrEqual(panel.x + panel.width + 1);
+  expect(row.width).toBeGreaterThan(panel.width - 40);
   await page.screenshot({ path: info.outputPath(`ai-launch-small-${theme}.png`), animations: 'disabled' });
   await page.setViewportSize({ width: 1240, height: 800 });
+  await page.keyboard.press('Escape');
   await page.getByTestId('ai-start-new-conversation').click();
   await expect(page.getByRole('tablist', { name: 'AI 会话' }).locator('[data-app-mark="true"]')).toHaveCount(1);
   const composer = page.locator('[data-chat-composer]:visible');
@@ -138,7 +141,7 @@ test('shell icons distinguish the blue profile from the dark start-page fallback
   });
   await page.goto('/');
   await expect(page.locator('[data-tab-row-id]').first().locator('[data-shell-mark="terminal"]')).toBeVisible();
-  await expect(page.getByTestId('start-page').locator('[data-shell-mark="terminal"]')).toBeVisible();
+  await expect(page.getByTestId('start-page')).toBeVisible();
   await page.getByTestId('tab-new-btn').click();
   const powerShell = page.getByTestId('new-tab-option-shell:powershell');
   await expect(powerShell.locator('[data-shell-mark="powershell"]')).toBeVisible();

@@ -27,8 +27,8 @@ for (const mode of ['dark', 'light'] as const) for (const width of [1240, 760]) 
         text: hex(getComputedStyle(selected).color), labels, overflow: element.scrollWidth > element.clientWidth };
     });
     expect(contrast(appearance.track, appearance.thumb)).toBeGreaterThanOrEqual(1.45);
-    expect(appearance.radius).toBe('10px');
-    expect(appearance.thumbRadius).toBe('7px');
+    expect(appearance.radius).toBe('12px');
+    expect(appearance.thumbRadius).toBe('9px');
     expect(contrast(appearance.text, appearance.thumb)).toBeGreaterThanOrEqual(4.5);
     expect(appearance.labels.every(label => label.left >= 13 && label.right >= 13 && !label.clipped)).toBe(true);
     expect(appearance.overflow).toBe(false);

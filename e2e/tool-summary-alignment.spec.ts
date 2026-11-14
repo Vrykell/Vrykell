@@ -45,9 +45,9 @@ test(`centers mixed-font tool text at ${width}px and ${scale}x in ${theme}`, asy
   await expect(page.locator('.ai-thinking .ai-tool-summary')).toHaveCount(1);
   await expect(page.locator('.chat-reference .ai-tool-summary')).toHaveCount(1);
   await expect(page.locator('.ai-tool-summary')).toHaveCount(11);
-  await expect(page.locator('.chat-exchange > .ai-block-question').first()).toHaveCSS('border-top-left-radius', '10px');
-  await expect(page.locator('.ai-tool-card:not(.ai-thinking)').first()).toHaveCSS('border-top-left-radius', '10px');
-  await expect(page.locator('.terminal-composer').first()).toHaveCSS('border-top-left-radius', '10px');
+  await expect(page.locator('.chat-exchange > .ai-block-question').first()).toHaveCSS('border-top-left-radius', '8px');
+  await expect(page.locator('.ai-tool-card:not(.ai-thinking)').first()).toHaveCSS('border-top-left-radius', '8px');
+  await expect(page.locator('.terminal-composer').first()).toHaveCSS('border-top-left-radius', '12px');
   await page.evaluate(() => document.fonts.ready);
   await page.evaluate(scale => {
     document.documentElement.style.setProperty('--ui-font-scale', String(scale));
