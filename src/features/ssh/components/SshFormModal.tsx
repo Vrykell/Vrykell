@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { createPortal } from 'react-dom';
 import { TextArea, TextInput } from '@ui/fields/TextInput';
+import PasswordInput from '@ui/fields/PasswordInput';
 import { Checkbox } from '@ui/fields/Checkbox';
 import { TextButton } from '@ui/actions/TextButton';
 import { OutlineButton } from '@ui/actions/OutlineButton';
@@ -355,7 +356,7 @@ export default function SshFormModal({ open, initial, onClose, onConnect, onSave
               { value: 'ask', label: t('Ask every time'), icon: <Info size={14} /> }, { value: 'agent', label: 'SSH Agent', icon: <Server size={14} /> },
             ]} /></div>
             {authMethod === 'password' ? (
-              <label>{t('Password')}<TextInput variant="field" type="password" value={password} placeholder={initial?.hasPassword ? t('Leave empty to keep the stored password') : '••••••'} onChange={e => setPassword(e.target.value)} data-testid="ssh-form-password" /></label>
+              <label>{t('Password')}<PasswordInput value={password} placeholder={initial?.hasPassword ? t('Leave empty to keep the stored password') : '••••••'} onChange={e => setPassword(e.target.value)} data-testid="ssh-form-password" /></label>
             ) : authMethod === 'key' ? (
               <label>{t('Private key file (optional)')}
                 <div className="ssh-form-file-picker">

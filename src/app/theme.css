@@ -87,12 +87,12 @@
   --shell-bash-accent: #30D158;
   --shell-mark-ink: #FFFFFF;
   --resource-accent: color-mix(in srgb, var(--group-blue) 80%, var(--primary-action));
-  --chart-blue: var(--cmd-argument);
-  --chart-violet: var(--cmd-pipe);
-  --chart-amber: var(--cmd-number);
-  --chart-cyan: var(--cmd-path);
+  --chart-blue: var(--group-blue);
+  --chart-violet: var(--group-violet);
+  --chart-amber: var(--group-amber);
+  --chart-cyan: var(--group-cyan);
   --chart-grid: color-mix(in srgb, var(--border) 85%, var(--text-muted));
-  --history-link-color: var(--group-blue);
+  --history-link-color: var(--accent-blue);
   --key-hint-bg: var(--field-bg);
   --control-active-bg: var(--selection-bg);
   --control-accent-color: var(--primary-action);
@@ -548,11 +548,6 @@ input.ssh-auth-response { padding: 0; line-height: 32px; font-size: calc(20px * 
 /* Empty inputs use the same font metrics as their placeholder. */
 input.ssh-auth-response:placeholder-shown { font-size: calc(13px * var(--ui-font-scale)); letter-spacing: normal; }
 input.ssh-auth-response::placeholder { font-size: inherit; letter-spacing: inherit; }
-/* The authentication row carries its own reveal toggle: hide the browser-painted eye so the
-   WebView's oversized native button does not compete with the themed control. */
-input.ssh-auth-response::-ms-reveal, input.ssh-auth-response::-ms-clear { display: none; }
-input.ssh-auth-response::-webkit-credentials-auto-fill-button,
-input.ssh-auth-response::-webkit-strong-password-auto-fill-button { display: none; }
 .terminal-composer-heading { display: flex; justify-content: space-between; gap: 12px; color: var(--text-muted); font-size: calc(11px * var(--ui-font-scale)); margin-bottom: 6px; }
 .terminal-composer-heading > span:last-child { color: var(--text-muted); white-space: nowrap; }
 .terminal-composer-heading .composer-key-hints { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); }
@@ -1097,8 +1092,15 @@ input, textarea {
 }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
 :is(input, textarea).text-input-field { box-sizing: border-box; width: 100%; min-width: 0; min-height: 32px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--field-bg); color: var(--text-primary); font: calc(12px * var(--ui-font-scale))/1.5 var(--font-ui); outline: none; }
+/* Single-line fields share the compact connection-form geometry; multiline editors keep their roomier padding. */
+input.text-input-field { min-height: var(--control-size-compact); padding: 4px 8px; }
 :is(input, textarea).text-input-field:focus { border-color: var(--border-strong); }
 :is(input, textarea).text-input-field:disabled { opacity: 0.55; }
+/* Password fields pair a themed reveal control; the WebView's own eye moves the caret and cannot be styled. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear,
+input[type="password"]::-webkit-credentials-auto-fill-button,
+input[type="password"]::-webkit-strong-password-auto-fill-button { display: none; }
 .settings-view :is(input, textarea)::placeholder { font-family: var(--font-ui); font-size: inherit; opacity: 1; }
 
 /* Markdown typography inside the chat area. */
@@ -1552,11 +1554,11 @@ button.provider-option-add:hover { color: var(--text-primary); }
 .settings-model-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 0 8px; min-width: 0; }
 .settings-model-search { position: relative; display: flex; flex: 1 1 200px; align-items: center; gap: 2px; min-width: 140px; max-width: 420px; }
 .settings-model-search > svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
-.settings-model-search > input.text-input-field { height: 32px; min-height: 32px; padding: 4px 34px 4px 32px; }
+.settings-model-search > input.text-input-field { padding: 4px 34px 4px 32px; }
 .settings-model-search > input.text-input-field::-webkit-search-cancel-button { display: none; }
 .settings-model-search > button.icon-button { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
 .settings-model-toolbar-actions { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; flex-shrink: 0; }
-.settings-model-toolbar-actions > button.outline-button { min-height: 32px; white-space: nowrap; }
+.settings-model-toolbar-actions > button.outline-button { min-height: var(--control-size-compact); white-space: nowrap; }
 .settings-model-group-header { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; background: var(--field-bg); color: var(--text-primary); cursor: pointer; text-align: left; font: var(--fw-medium) var(--fs-caption) var(--font-ui); transition: background var(--dur-fast) var(--ease); }
 .settings-model-group-header:hover { background: var(--button-hover); }
 .settings-model-group-header:focus-visible { outline: 2px solid var(--border-strong); outline-offset: -2px; }

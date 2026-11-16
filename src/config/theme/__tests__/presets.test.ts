@@ -84,6 +84,16 @@ it('gives bright schemes independent surface separation and readable colored ter
   }
 });
 
+it('keeps light preset group swatches visible without applying the text-contrast floor', () => {
+  for (const preset of themePresets.filter(item => item.mode === 'light' && item.seed)) {
+    const palette = getPresetPalette('light', preset.id);
+    for (const color of [palette.groupBlue, palette.groupGreen, palette.groupViolet, palette.groupAmber,
+      palette.groupCyan, palette.groupRose, palette.groupOrange, palette.groupCoral]) {
+      expect(contrast(color, palette.surface)).toBeGreaterThanOrEqual(2);
+    }
+  }
+});
+
 it('handles malformed startup cache without preventing application startup', () => {
   for (const cached of ['null', 'broken', '{"darkPreset":42}', '["dracula"]']) {
     localStorage.setItem('vrykell-theme-presets', cached);

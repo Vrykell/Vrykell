@@ -8,13 +8,10 @@
 import { useEffect, useState } from 'react';
 import { t } from '@i18n';
 import { OutlineButton } from '@ui/actions/OutlineButton';
-import { TextInput } from '@ui/fields/TextInput';
-import { IconButton } from '@ui/actions/IconButton';
-import { Eye, EyeOff } from '@ui/icons';
+import PasswordInput from '@ui/fields/PasswordInput';
 import { setProviderKey, type ModelProfile } from '@features/agent';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
 import type { ProviderRow } from '@features/settings/model/providerList';
-import { inputStyle } from './formStyles';
 import SettingsDialog from './SettingsDialog';
 
 type Toast = (msg: string, type: 'info' | 'success' | 'error') => void;
@@ -27,13 +24,11 @@ export default function KeyDialog({ open, row, hasKey, toast, onClose }: {
   onClose: () => void;
 }) {
   const [value, setValue] = useState('');
-  const [visible, setVisible] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
       setValue('');
-      setVisible(false);
     }
   }, [open]);
 
@@ -91,32 +86,18 @@ export default function KeyDialog({ open, row, hasKey, toast, onClose }: {
         </button>
       </>}
     >
-      <div style={{ ...inputStyle, display: 'flex', alignItems: 'center', gap: 6, padding: '0 6px 0 10px', minHeight: 34 }}>
-        <TextInput
-          autoFocus
-          type={visible ? 'text' : 'password'}
-          value={value}
-          aria-label={t('Provider API Key')}
-          placeholder={t('Enter API key')}
-          data-testid="key-dialog-input"
-          onChange={(event) => setValue(event.target.value)}
-          onKeyDown={(event) => { if (event.key === 'Enter') void save(); }}
-          style={{
-            flex: 1, minWidth: 0, background: 'transparent', border: 'none', outline: 'none',
-            color: 'var(--text-primary)', fontFamily: 'var(--font-mono)',
-            fontSize: 'calc(12px * var(--ui-font-scale))',
-          }}
-        />
-        <IconButton
-          compact
-          data-testid="key-dialog-reveal"
-          aria-label={t(visible ? 'Hide API key' : 'Reveal API key')}
-          data-tip={t(visible ? 'Hide API key' : 'Reveal API key')}
-          onClick={() => setVisible(current => !current)}
-        >
-          {visible ? <EyeOff size={14} /> : <Eye size={14} />}
-        </IconButton>
-      </div>
+      <PasswordInput
+        autoFocus
+        value={value}
+        aria-label={t('Provider API Key')}
+        placeholder={t('Enter API key')}
+        data-testid="key-dialog-input"
+        revealTestId="key-dialog-reveal"
+        revealLabel={{ show: t('Reveal API key'), hide: t('Hide API key') }}
+        onChange={(event) => setValue(event.target.value)}
+        onKeyDown={(event) => { if (event.key === 'Enter') void save(); }}
+        style={{ fontFamily: 'var(--font-mono)' }}
+      />
       <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>
         {t('The key is stored only on this device and never leaves the backend.')}
       </span>

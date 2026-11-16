@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
 import { TextInput } from '@ui/fields/TextInput';
+import PasswordInput from '@ui/fields/PasswordInput';
 import { TextButton } from '@ui/actions/TextButton';
 import Select from '@ui/fields/Select';
 import ErrorBox from '@ui/feedback/ErrorBox';
@@ -44,7 +45,7 @@ export default function ProxyManager({ config, onChange, onClose }: { config: Pr
         <div className="ssh-form-fields"><label>{t('Host')}<TextInput variant="field" value={draft.host} onChange={event => setDraft({ ...draft, host: event.target.value })} data-testid="proxy-host" /></label><label>{t('Port')}<TextInput variant="field" className="ssh-number-input" type="number" value={draft.port || ''} onChange={event => setDraft({ ...draft, port: Number(event.target.value) })} data-testid="proxy-port" /></label></div>
         <div className="ssh-form-fields">
           <label>{t('Username (optional)')}<TextInput variant="field" value={draft.username} onChange={event => setDraft({ ...draft, username: event.target.value })} data-testid="proxy-username" /></label>
-          <label>{t('Password')}<TextInput variant="field" type="password" value={draft.password ?? ''} placeholder={draft.hasPassword ? t('Leave empty to keep the stored password') : ''} onChange={event => setDraft({ ...draft, password: event.target.value })} data-testid="proxy-password" /></label>
+          <label>{t('Password')}<PasswordInput value={draft.password ?? ''} placeholder={draft.hasPassword ? t('Leave empty to keep the stored password') : ''} onChange={event => setDraft({ ...draft, password: event.target.value })} data-testid="proxy-password" /></label>
         </div>
         <p>{t('Proxy credentials are stored separately from connection profiles.')}</p>
         {error && <ErrorBox compact>{error}</ErrorBox>}

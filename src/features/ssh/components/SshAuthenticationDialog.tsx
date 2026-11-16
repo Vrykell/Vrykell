@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { t } from '@i18n';
 import { TextInput } from '@ui/fields/TextInput';
+import PasswordInput from '@ui/fields/PasswordInput';
 import { TextButton } from '@ui/actions/TextButton';
 import Select from '@ui/fields/Select';
 import ErrorBox from '@ui/feedback/ErrorBox';
@@ -121,7 +122,7 @@ function AuthenticationDialog({ target }: { target: SshAuthenticationTarget & { 
           { value: 'keyboardInteractive', label: t('Server challenges (MFA)') },
         ]} /></label>}
         {!challenge && method !== 'keyboardInteractive' && <label htmlFor="ssh-session-secret">{t(method === 'password' ? 'Server password' : 'Private key passphrase')}
-          <TextInput variant="field" id="ssh-session-secret" type="password" value={secret} maxLength={4096} disabled={busy} onChange={event => setSecret(event.target.value)} data-testid="ssh-session-secret" />
+          <PasswordInput id="ssh-session-secret" value={secret} maxLength={4096} disabled={busy} onChange={event => setSecret(event.target.value)} data-testid="ssh-session-secret" />
         </label>}
         {challenge?.value.kind === 'hostKey' && <>
           <p>{t('Verify the remote host fingerprint before trusting it.')}</p>
@@ -131,8 +132,11 @@ function AuthenticationDialog({ target }: { target: SshAuthenticationTarget & { 
           {challenge.value.instructions && <p className="ssh-auth-instructions">{challenge.value.instructions}</p>}
           {challenge.value.prompts.map((prompt, index) => <label key={`${challenge.value.round}-${index}`} htmlFor={`ssh-auth-response-${index}`}>
             {prompt.text || t('Response {{number}}', { number: index + 1 })}
-            <TextInput variant="field" id={`ssh-auth-response-${index}`} data-auth-response type={prompt.echo ? 'text' : 'password'} autoComplete="off" value={responses[index] ?? ''} maxLength={4096} disabled={responding}
-              onChange={event => setResponses(current => current.map((value, candidate) => candidate === index ? event.target.value : value))} />
+            {prompt.echo
+              ? <TextInput variant="field" id={`ssh-auth-response-${index}`} data-auth-response type="text" autoComplete="off" value={responses[index] ?? ''} maxLength={4096} disabled={responding}
+                onChange={event => setResponses(current => current.map((value, candidate) => candidate === index ? event.target.value : value))} />
+              : <PasswordInput id={`ssh-auth-response-${index}`} data-auth-response value={responses[index] ?? ''} maxLength={4096} disabled={responding}
+                onChange={event => setResponses(current => current.map((value, candidate) => candidate === index ? event.target.value : value))} />}
           </label>)}
         </>}
         {!challenge && !busy && <p>{t('Used only in memory until the last terminal for this connection closes or the app exits. Your saved connection is unchanged.')}</p>}

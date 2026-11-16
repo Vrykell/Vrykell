@@ -232,6 +232,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
           onChange={value => { changeRepo(value); if (value) void browse(value); }}
           placeholder={t('Custom…')} style={{ flexShrink: 0, width: 190 }} />
         <TextInput
+          variant="field"
           value={repo}
           aria-label={t('Repository URL')}
           placeholder={t('Repository URL')}
@@ -246,6 +247,7 @@ function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
         <TextInput
+          variant="field"
           value={query}
           placeholder={t('Search skills…')}
           onChange={(e) => setQuery(e.target.value)}
@@ -340,6 +342,7 @@ export default function SkillsSettings() {
           )}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             <TextInput
+              variant="field"
               data-testid="skill-import-url"
               aria-label={t('Import a skill manifest from a URL')}
               value={importUrl}

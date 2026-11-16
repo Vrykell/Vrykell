@@ -105,6 +105,11 @@ for (const theme of ['dark', 'light'] as const) {
     await card.getByRole('button', { name: '分组颜色', exact: true }).click();
     const palette = page.getByRole('dialog', { name: '分组颜色' });
     const swatches = palette.locator('.history-palette-swatch');
+    if (theme === 'light') {
+      // Decorative swatches keep vivid group hues instead of the darker text palette.
+      await expect(palette.locator('.history-palette-swatch[data-color="violet"]')).toHaveCSS('background-color', 'rgb(168, 85, 247)');
+      await expect(palette.locator('.history-palette-swatch[data-color="rose"]')).toHaveCSS('background-color', 'rgb(236, 72, 153)');
+    }
     const first = (await swatches.first().boundingBox())!;
     const last = (await swatches.last().boundingBox())!;
     const automatic = (await palette.getByRole('button', { name: '自动配色' }).boundingBox())!;

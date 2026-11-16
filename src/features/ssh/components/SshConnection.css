@@ -125,8 +125,6 @@ button.ssh-editor-action { align-self: flex-start; }
 .ssh-proxy-dialog > .ssh-form-section { min-height: 0; padding: 12px 16px 16px; overflow: auto; }
 .ssh-proxy-dialog > .ssh-form-footer { padding-inline: 16px; }
 .ssh-proxy-dialog .ssh-form-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.ssh-proxy-dialog .ui-select { min-height: var(--control-size-compact); padding-block: 4px; }
-.ssh-host-editor input.text-input-field, .ssh-form-dialog:not(.ssh-auth-dialog) input.text-input-field, .ssh-proxy-dialog input.text-input-field { min-height: var(--control-size-compact); padding-block: 4px; }
 .ssh-number-input { appearance: textfield; }
 .ssh-number-input::-webkit-inner-spin-button, .ssh-number-input::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 .ssh-host-editor .segmented-control, .ssh-form-dialog .segmented-control { width: 100%; min-width: 0; box-sizing: border-box; }

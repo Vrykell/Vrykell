@@ -88,8 +88,8 @@ for (const [theme, width] of [['dark', 1240], ['light', 720]] as const) {
     const secret = dialog.getByLabel('服务器密码', { exact: true });
     await expect(secret).toBeFocused();
     await expect(secret).toHaveAttribute('type', 'password');
-    await expect(secret).toHaveCSS('min-height', '32px');
-    await expect(secret).toHaveCSS('padding-top', '6px');
+    await expect(secret).toHaveCSS('min-height', '28px');
+    await expect(secret).toHaveCSS('padding-top', '4px');
     await expect(secret).toHaveCSS('border-radius', '8px');
     expect(await secret.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(await dialog.getByRole('combobox', { name: '认证方式' }).evaluate(element => getComputedStyle(element).backgroundColor));
     await secret.fill('masked-layout-fixture');

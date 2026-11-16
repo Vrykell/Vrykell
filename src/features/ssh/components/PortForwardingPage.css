@@ -22,7 +22,6 @@
 .ssh-forwarding-form { min-height: 0; overflow: auto; padding: 0 28px 24px; }
 .ssh-forwarding-fields > :is(label, .ssh-forwarding-field) { display: grid; grid-template-columns: 120px minmax(0, 1fr); align-items: center; gap: 12px; padding: 7px 12px; min-height: 40px; font-size: var(--fs-caption); }
 .ssh-forwarding-fields > * + * { border-top: 1px solid var(--border); }
-.ssh-forwarding-fields .text-input-field { min-height: 28px; padding-block: 4px; }
 .ssh-forwarding-address { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .ssh-forwarding-address > input:first-child { flex: 1; min-width: 0; }
 .ssh-forwarding-address > input:last-child { width: 72px; min-width: 0; }

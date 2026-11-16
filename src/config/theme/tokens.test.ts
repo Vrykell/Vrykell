@@ -78,10 +78,23 @@ describe('default blue palette', () => {
     expect(palette.aiBlockBg).toBe(palette.surface);
     expect(palette.codeBg).toBe(palette.fieldBg);
   });
-  it.each(['dark', 'light'] as const)('%s uses one green family across status, icons, groups and terminal output', mode => {
+  it.each(['dark', 'light'] as const)('%s keeps status and syntax on one green family', mode => {
     const palette = themes[mode];
     const green = mode === 'dark' ? '#30D158' : '#167C32';
-    for (const color of [palette.success, palette.shellConnected, palette.groupGreen, palette.xtermGreen, palette.xtermBrightGreen, palette.cmdProgram]) expect(color).toBe(green);
+    for (const color of [palette.success, palette.shellConnected, palette.xtermGreen, palette.xtermBrightGreen, palette.cmdProgram]) expect(color).toBe(green);
+  });
+  it('keeps light decorative group colors vivid instead of reusing the darker text palette', () => {
+    const light = themes.light;
+    expect([
+      light.groupBlue, light.groupGreen, light.groupViolet, light.groupAmber,
+      light.groupCyan, light.groupRose, light.groupOrange, light.groupCoral,
+    ]).toEqual(['#2478E8', '#1F9D4D', '#A855F7', '#CC8F00', '#00A991', '#EC4899', '#D2691E', '#F26355']);
+    expect(light.groupViolet).not.toBe(light.cmdVariable);
+    expect(light.groupRose).not.toBe(light.cmdString);
+    // Capability marks use the group hues as icons, so they keep at least a 3:1 edge on the canvas.
+    for (const color of [light.groupBlue, light.groupGreen, light.groupViolet, light.groupOrange]) {
+      expect(contrast(color, light.canvas)).toBeGreaterThanOrEqual(3);
+    }
   });
   it.each(['dark', 'light'] as const)('%s primary actions use the unified action blue', mode => {
     expect(themes[mode].primaryAction).toBe('#2C67C5');
@@ -123,14 +136,23 @@ describe('default blue palette', () => {
       expect((maximum - Math.min(...channels)) / maximum).toBeGreaterThanOrEqual(0.50);
     }
   });
-  it.each(['dark', 'light'] as const)('%s shares accent families between syntax and color pickers', mode => {
+  it.each(['dark', 'light'] as const)('%s shares syntax and picker accents only where text contrast allows', mode => {
     const palette = themes[mode];
-    expect(palette.groupBlue).toBe(palette.cmdArgument);
-    expect(palette.groupGreen).toBe(palette.cmdProgram);
-    expect(palette.groupViolet).toBe(palette.cmdPipe);
-    expect(palette.groupAmber).toBe(palette.cmdNumber);
-    expect(palette.groupCyan).toBe(palette.cmdPath);
-    expect(palette.groupOrange).toBe(palette.cmdString);
+    if (mode === 'dark') {
+      expect(palette.groupBlue).toBe(palette.cmdArgument);
+      expect(palette.groupGreen).toBe(palette.cmdProgram);
+      expect(palette.groupViolet).toBe(palette.cmdPipe);
+      expect(palette.groupAmber).toBe(palette.cmdNumber);
+      expect(palette.groupCyan).toBe(palette.cmdPath);
+      expect(palette.groupOrange).toBe(palette.cmdString);
+    } else {
+      // Decorative group colors must not inherit the darker light-mode text palette.
+      for (const [group, text] of [
+        [palette.groupBlue, palette.cmdArgument], [palette.groupGreen, palette.cmdProgram],
+        [palette.groupViolet, palette.cmdPipe], [palette.groupAmber, palette.cmdNumber],
+        [palette.groupCyan, palette.cmdPath], [palette.groupOrange, palette.cmdString],
+      ]) expect(group).not.toBe(text);
+    }
   });
   it('both dark and light exist', () => {
     expect(themes.dark).toBeDefined();
@@ -243,7 +265,7 @@ describe('default blue palette', () => {
 });
 
 describe('paletteToCssVars', () => {
-  it.each(['dark', 'light'] as const)('%s provides distinct, readable categorical group colors', mode => {
+  it.each(['dark', 'light'] as const)('%s provides distinct, visible categorical group colors', mode => {
     const vars = paletteToCssVars(themes[mode]);
     const colors = ['blue', 'green', 'violet', 'amber', 'cyan', 'rose', 'orange', 'coral'].map(color => vars[`--group-${color}`]);
     expect(new Set(colors).size).toBe(colors.length);
@@ -254,9 +276,10 @@ describe('paletteToCssVars', () => {
       });
       return channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
     };
+    // Group colors are solid swatches, dots and rails, not body text; keep them distinct without darkening.
     for (const color of colors) {
       const values = [luminance(color), luminance(themes[mode].surface)];
-      expect((Math.max(...values) + 0.05) / (Math.min(...values) + 0.05)).toBeGreaterThanOrEqual(4.5);
+      expect((Math.max(...values) + 0.05) / (Math.min(...values) + 0.05)).toBeGreaterThanOrEqual(2);
     }
   });
 

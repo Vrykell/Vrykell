@@ -89,6 +89,7 @@ export default function HarnessDialog({ open, entry, onClose, onSave }: {
           {t('Name')} <span style={{ color: 'var(--error)' }}>*</span>
         </label>
         <TextInput
+          variant="field"
           id="harness-dialog-name"
           autoFocus
           disabled={saving}
@@ -101,6 +102,7 @@ export default function HarnessDialog({ open, entry, onClose, onSave }: {
           {t('Command')} <span style={{ color: 'var(--error)' }}>*</span>
         </label>
         <TextInput
+          variant="field"
           id="harness-dialog-command"
           disabled={saving}
           value={command}
@@ -111,6 +113,7 @@ export default function HarnessDialog({ open, entry, onClose, onSave }: {
         />
         <label htmlFor="harness-dialog-args" style={labelStyle}>{t('Arguments')}</label>
         <TextArea
+          variant="field"
           autoSizeMaxHeight={180}
           id="harness-dialog-args"
           disabled={saving}
