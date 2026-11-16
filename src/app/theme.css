@@ -87,12 +87,12 @@
   --shell-bash-accent: #30D158;
   --shell-mark-ink: #FFFFFF;
   --resource-accent: color-mix(in srgb, var(--group-blue) 80%, var(--primary-action));
-  --chart-blue: var(--cmd-argument);
-  --chart-violet: var(--cmd-pipe);
-  --chart-amber: var(--cmd-number);
-  --chart-cyan: var(--cmd-path);
+  --chart-blue: var(--group-blue);
+  --chart-violet: var(--group-violet);
+  --chart-amber: var(--group-amber);
+  --chart-cyan: var(--group-cyan);
   --chart-grid: color-mix(in srgb, var(--border) 85%, var(--text-muted));
-  --history-link-color: var(--group-blue);
+  --history-link-color: var(--accent-blue);
   --key-hint-bg: var(--field-bg);
   --control-active-bg: var(--selection-bg);
   --control-accent-color: var(--primary-action);

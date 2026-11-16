@@ -63,6 +63,14 @@ test('shared single-line fields use the compact connection-form geometry', async
   expect(focused).not.toBe(resting);
 });
 
+test('light composer keeps a visible resting edge on the light canvas', async ({ page }) => {
+  await openApp(page, 'light');
+  const composer = page.locator('.terminal-composer').first();
+  await expect(composer).toBeVisible();
+  await expect(composer).toHaveCSS('outline-width', '1px');
+  await expect(composer).toHaveCSS('outline-style', 'solid');
+});
+
 test('project root submission uses application validation instead of native validation bubbles', async ({ page }) => {
   await openApp(page);
   await page.getByRole('button', { name: '历史命令', exact: true }).click();

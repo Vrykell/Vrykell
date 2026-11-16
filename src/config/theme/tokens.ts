@@ -206,6 +206,11 @@ const LIGHT_ACCENTS = {
   cyan: '#007564', rose: '#B02571', orange: '#A34A00', coral: '#B53F38',
   sky: '#006BAD', magenta: '#9C219F',
 } as const;
+/** Decorative group hues stay vivid on light surfaces; text and syntax keep LIGHT_ACCENTS. */
+const LIGHT_GROUP_ACCENTS = {
+  blue: '#2478E8', green: '#1F9D4D', violet: '#A855F7', amber: '#CC8F00',
+  cyan: '#00A991', rose: '#EC4899', orange: '#D2691E', coral: '#F26355',
+} as const;
 
 const dark: ThemePalette = {
   iconColor: '#B0B0B8',
@@ -397,16 +402,16 @@ const light: ThemePalette = {
   brandOpenai: '#0E8F71',
   brandGemini: '#4A7FE0',
   brandDeepseek: '#5A66E8',
-  chartBar: '#0891B2',
-  groupBlue: LIGHT_ACCENTS.blue,
-  groupGreen: LIGHT_ACCENTS.green,
-  groupViolet: LIGHT_ACCENTS.violet,
-  groupAmber: LIGHT_ACCENTS.amber,
-  groupCyan: LIGHT_ACCENTS.cyan,
-  groupRose: LIGHT_ACCENTS.rose,
-  groupOrange: LIGHT_ACCENTS.orange,
+  chartBar: '#0A9BD8',
+  groupBlue: LIGHT_GROUP_ACCENTS.blue,
+  groupGreen: LIGHT_GROUP_ACCENTS.green,
+  groupViolet: LIGHT_GROUP_ACCENTS.violet,
+  groupAmber: LIGHT_GROUP_ACCENTS.amber,
+  groupCyan: LIGHT_GROUP_ACCENTS.cyan,
+  groupRose: LIGHT_GROUP_ACCENTS.rose,
+  groupOrange: LIGHT_GROUP_ACCENTS.orange,
   shellZshAccent: '#F15A24',
-  groupCoral: LIGHT_ACCENTS.coral,
+  groupCoral: LIGHT_GROUP_ACCENTS.coral,
 
   chromeBg: '#DFE7F1',
   sidebarBg: LIGHT_SURFACES.sidebar,
