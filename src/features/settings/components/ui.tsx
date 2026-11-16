@@ -114,12 +114,14 @@ export function TemplateListEditor({ value, onChange, placeholder }: {
       {rows.map((r, i) => (
         <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
           <TextInput
+            variant="field"
             value={r.ext}
             placeholder={t('Extension, e.g. md')}
             onChange={(e) => updateRow(i, { ext: e.target.value })}
             style={{ ...inputStyle, width: 120, flexShrink: 0 }}
           />
           <TextInput
+            variant="field"
             value={r.cmd}
             placeholder={placeholder}
             onChange={(e) => updateRow(i, { cmd: e.target.value })}

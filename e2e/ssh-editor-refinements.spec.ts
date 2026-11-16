@@ -22,6 +22,7 @@ for (const theme of ['dark', 'light']) test(`compact shared fields, authenticati
   await page.getByRole('menuitemcheckbox', { name: 'production', exact: true }).click(); await page.keyboard.press('Escape');
   await expect(editor.locator('.tag-input-chip')).toHaveText('production');
   await tagInput.fill('new-tag'); await tagInput.press('Enter'); await expect(editor.locator('.tag-input-chip')).toHaveCount(2);
+  await expect(editor.locator('.tag-input-field')).toHaveCSS('height', '28px');
   await expect(editor.getByTestId('ssh-env-name-0')).toHaveAttribute('placeholder', '变量名');
   const variable = editor.getByTestId('ssh-env-name-0'); await variable.scrollIntoViewIfNeeded();
   await expect(variable).toHaveClass(/text-input-field/); await expect(editor.locator('.ssh-environment-rows > div').first()).toHaveCSS('border-top-width', '0px');
@@ -33,6 +34,28 @@ for (const theme of ['dark', 'light']) test(`compact shared fields, authenticati
   await expect(addForward).toHaveCSS('border-radius', '8px');
   await page.screenshot({ path: info.outputPath(`editor-bottom-${theme}.png`), animations: 'disabled' });
   await editor.getByTestId('ssh-form-name').scrollIntoViewIfNeeded(); await page.screenshot({ path: info.outputPath(`editor-top-${theme}.png`), animations: 'disabled' });
+});
+
+test('password reveal stays inside the field and keeps the caret', async ({ page }) => {
+  await setupTauriMock(page, {}); await page.goto('/');
+  await page.getByTestId('workspace-area-ssh').click(); await page.getByTestId('ssh-new-btn').click();
+  const editor = page.getByTestId('ssh-host-editor');
+  const password = editor.getByTestId('ssh-form-password');
+  await expect(password).toHaveCSS('min-height', '28px');
+  await expect(password).toHaveCSS('padding-top', '4px');
+  // The themed control is present before anything is typed; the WebView's own eye is hidden.
+  await expect(editor.getByRole('button', { name: '显示密码', exact: true })).toBeVisible();
+  await password.fill('secret');
+  await password.focus();
+  await password.evaluate((element: HTMLInputElement) => element.setSelectionRange(2, 2));
+  await editor.getByRole('button', { name: '显示密码', exact: true }).click();
+  await expect(password).toHaveAttribute('type', 'text');
+  await expect(password).toBeFocused();
+  expect(await password.evaluate((element: HTMLInputElement) => element.selectionStart)).toBe(2);
+  await editor.getByRole('button', { name: '隐藏密码', exact: true }).click();
+  await expect(password).toHaveAttribute('type', 'password');
+  await expect(password).toBeFocused();
+  expect(await password.evaluate((element: HTMLInputElement) => element.selectionStart)).toBe(2);
 });
 
 test('quick connection reuses the connection form cards without a native disclosure marker', async ({ page }, info) => {

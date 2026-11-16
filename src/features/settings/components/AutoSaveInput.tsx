@@ -32,7 +32,7 @@ interface Props {
 
 export default function AutoSaveInput({ value, onCommit, placeholder, style, multiline, rows, type, min, max, step, disabled, trim = true, validate, normalize, onClear, clearAfterSave, testId, id, 'aria-label': ariaLabel }: Props) {
   const composing = useRef(false);
-  const { flex, flexShrink, width, minWidth, marginTop, marginBottom, ...controlStyle } = style ?? {};
+  const { flex, flexShrink, width, minWidth, minHeight, marginTop, marginBottom, ...controlStyle } = style ?? {};
   const validateDraft = validate ?? (type === 'number'
     ? (next: string) => next.trim() && Number.isFinite(Number(next)) ? undefined : t('Enter a valid number')
     : undefined);
@@ -50,10 +50,11 @@ export default function AutoSaveInput({ value, onCommit, placeholder, style, mul
     onKeyDown: (event: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       if (!multiline && event.key === 'Enter' && !event.nativeEvent.isComposing && !composing.current) { event.preventDefault(); void save.flush(); }
     },
-    style: { ...inputStyle, ...controlStyle, width: '100%' },
+    // The shared field class supplies the compact single-line floor; multiline editors keep their own minimum.
+    style: { ...inputStyle, ...controlStyle, width: '100%', ...(minHeight !== undefined ? { minHeight } : {}) },
   };
   return <div className="autosave-input" style={{ minWidth: minWidth ?? 0, flex, flexShrink, width, marginTop, marginBottom }}>
-    {multiline ? <ConfigTextArea {...props} rows={rows} /> : <TextInput {...props} type={type} min={min} max={max} step={step} />}
+    {multiline ? <ConfigTextArea {...props} rows={rows} /> : <TextInput {...props} type={type} min={min} max={max} step={step} variant="field" />}
     <SaveStatus inline status={save.status} error={save.error} onRetry={() => { void save.flush(); }} />
     {onClear && <button type="button" onClick={() => { void feedback.save(async () => {
       await save.cancel();
