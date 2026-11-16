@@ -105,6 +105,8 @@ export function presetPalette(base: ThemePalette, preset: ThemePreset): ThemePal
   const muted = light ? readable(blend(bg, fg, 0.76)) : blend(bg, fg, 0.76);
   const terminal = light ? c.map(color => fitContrast(color, terminalBg, fg)) : c;
   const [red, green, yellow, blue, violet, cyan] = [c[1], c[2], c[3], c[4], c[5], c[6]].map(readable);
+  // Decorative swatches keep the preset hue; only their visibility floor is enforced in light mode.
+  const decorative = (color: string) => light ? fitContrast(color, surface, fg, 2.2) : fitContrast(color, raised, fg);
   const onAccent = preset.seed.actionText ?? (contrast(bg, blue) > contrast(fg, blue) ? bg : fg);
   const onDanger = preset.seed.actionText ?? (contrast(bg, red) > contrast(fg, red) ? bg : fg);
   const action = preset.seed.actionText ? fitContrast(blue, onAccent, bg) : blue;
@@ -113,9 +115,9 @@ export function presetPalette(base: ThemePalette, preset: ThemePreset): ThemePal
   const dim = (color: string) => alpha(color, 0.12);
   return {
     ...base,
-    iconColor: muted, iconHoverColor: fg, focusRing: blue, chartBar: blue,
-    groupBlue: blue, groupGreen: green, groupViolet: violet, groupAmber: yellow,
-    groupCyan: cyan, groupRose: violet, groupOrange: readable(orange), groupCoral: red,
+    iconColor: muted, iconHoverColor: fg, focusRing: blue, chartBar: decorative(c[4]),
+    groupBlue: decorative(c[4]), groupGreen: decorative(c[2]), groupViolet: decorative(c[5]), groupAmber: decorative(c[3]),
+    groupCyan: decorative(c[6]), groupRose: decorative(c[5]), groupOrange: decorative(orange), groupCoral: decorative(c[1]),
     chromeBg: surface, sidebarBg: surface, auxiliaryBg: surface, chromeField: raised,
     tabMenuBg: raised, selectionBg: selection,
     segmentedTrack: preset.mode === 'dark' ? blend(bg, fg, 0.10) : blend(bg, fg, 0.25),
