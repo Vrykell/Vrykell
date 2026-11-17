@@ -15,6 +15,10 @@ it('renders partial results while traversal is pending and ignores a superseded 
     requests.push({ signal, progress: progress!, finish: resolve });
   }));
   render(<FileSearchMenu ops={ops} root="/project" returnFocus={null} onChoose={vi.fn()} onClose={vi.fn()} />);
+  expect(screen.getByText('搜索文件')).toBeVisible();
+  const close = screen.getByRole('button', { name: '关闭搜索' });
+  expect(close.textContent).toBe('');
+  expect(close.querySelector('svg')).not.toBeNull();
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'early' } });
   await waitFor(() => expect(requests).toHaveLength(1));
   await act(async () => requests[0].progress(partial));

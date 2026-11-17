@@ -46,7 +46,17 @@ for (const mode of ['global', 'remote'] as const) {
     }, { index, name, mode, finish });
     await publish(0, 'early.log');
     await expect(page.getByText('early.log', { exact: true })).toBeVisible();
-    if (mode === 'remote') await expect(page.getByTestId('file-search-menu').getByRole('status')).toContainText('正在搜索文件');
+    if (mode === 'remote') {
+      const menu = page.getByTestId('file-search-menu');
+      await expect(menu.getByRole('status')).toContainText('正在搜索文件');
+      // The file search keeps its titled sheet, borderless result rows and an icon-only close action.
+      await expect(menu.locator('strong')).toHaveText('搜索文件');
+      const close = menu.getByRole('button', { name: '关闭搜索', exact: true });
+      await expect(close).toBeVisible();
+      await expect(close.locator('svg')).toBeVisible();
+      await expect(close).not.toHaveText('关闭搜索');
+      for (const side of ['top', 'right', 'bottom', 'left']) await expect(menu.locator('[data-file-search-result]').first()).toHaveCSS(`border-${side}-width`, '0px');
+    }
     await page.screenshot({ path: info.outputPath(`${mode}-partial.png`) });
     await input.fill(mode === 'global' ? 'file: latest' : 'latest');
     await expect.poll(() => page.evaluate(() => (window as unknown as { __FILE_REQUESTS__: { cancelled: boolean }[] }).__FILE_REQUESTS__[0].cancelled)).toBe(true);
