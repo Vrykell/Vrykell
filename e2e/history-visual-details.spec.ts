@@ -22,7 +22,7 @@ for (const theme of ['dark', 'light'] as const) {
     await gotoSetting(page, '主题');
     await page.getByRole('radio', { name: theme === 'dark' ? '始终深色' : '始终浅色', exact: true }).click();
     await page.locator('aside').getByRole('button', { name: '主题文件', exact: true }).click();
-    const importTheme = page.getByRole('button', { name: '导入主题', exact: true });
+    const importTheme = page.getByRole('button', { name: '导入', exact: true });
     await importTheme.scrollIntoViewIfNeeded();
     await expect(importTheme).toHaveCSS('display', /^(inline-)?flex$/);
     expect(Math.abs(await centerY(importTheme) - await centerY(importTheme.locator('svg')))).toBeLessThan(1);

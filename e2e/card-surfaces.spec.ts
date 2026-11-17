@@ -14,11 +14,11 @@ function contrast(first: string, second: string) {
   return (Math.max(...values) + 0.05) / (Math.min(...values) + 0.05);
 }
 
-async function expectCards(cards: Locator, background: string) {
+async function expectCards(cards: Locator, background: string, border = '0px') {
   expect(await cards.count()).toBeGreaterThan(0);
   for (const card of await cards.all()) {
     await expect(card).toHaveCSS('background-color', background);
-    await expect(card).toHaveCSS('border-width', '0px');
+    await expect(card).toHaveCSS('border-width', border);
     await expect(card).toHaveCSS('box-shadow', 'none');
   }
 }
@@ -70,7 +70,7 @@ for (const theme of ['dark', 'light'] as const) test(`cards share clear borderle
   });
 
   await gotoSetting(page, '快捷键说明');
-  await expectCards(page.locator('.settings-group-panel'), background);
+  await expectCards(page.locator('.settings-group-panel'), background, '1px');
   const hint = page.locator('.settings-shortcut-row .key-hint').first();
   await expect(hint).toHaveCSS('background-color', await tokenBackground(page, '--field-bg'));
   const hintColors = await hint.evaluate(element => ({ background: getComputedStyle(element).backgroundColor, text: getComputedStyle(element).color }));
@@ -78,7 +78,7 @@ for (const theme of ['dark', 'light'] as const) test(`cards share clear borderle
   expect(contrast(hintColors.background, hintColors.text)).toBeGreaterThanOrEqual(4.5);
   await page.screenshot({ path: info.outputPath(`shortcuts-${theme}.png`), animations: 'disabled' });
   await page.locator('.settings-navigation').getByRole('button', { name: 'Zsh', exact: true }).click();
-  await expectCards(page.locator('.shell-profile-page .settings-group-panel'), background);
+  await expectCards(page.locator('.shell-profile-page .settings-group-panel'), background, '1px');
   await page.screenshot({ path: info.outputPath(`settings-${theme}.png`), animations: 'disabled' });
   await page.getByTestId('workspace-settings').hover();
   const tooltip = page.getByTestId('app-tooltip');

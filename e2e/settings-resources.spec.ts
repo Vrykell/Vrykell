@@ -9,10 +9,14 @@ for (const theme of ['dark', 'light']) for (const width of [760, 1280]) {
     await gotoSetting(page, '技能');
     await page.setViewportSize({ width, height: 900 });
     await expect(page.locator('.skill-list-row')).toHaveCount(2);
+    const listBox = (await page.locator('.skill-list').boundingBox())!;
+    const listRowBox = (await page.locator('.skill-list-row').first().boundingBox())!;
+    expect(Math.abs(listRowBox.width - listBox.width)).toBeLessThanOrEqual(2);
+    expect(await page.locator('.skill-list-row').nth(1).evaluate(row => getComputedStyle(row, '::before').borderTopWidth)).toBe('1px');
     expect(await page.locator('.skill-open').first().evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
     await expect(page.getByRole('textbox', { name: '搜索技能…' })).toHaveClass(/text-input-field/);
     await expect(page.locator('.resource-library-count')).toHaveCount(0);
-    await expect(page.locator('.resource-library-toolbar').getByRole('button', { name: '技能市场', exact: true })).toBeVisible();
+    await expect(page.locator('.resource-library-toolbar').getByRole('button', { name: '技能市场', exact: true })).toHaveCount(0);
     const searchInset = await page.locator('.resource-search').evaluate(element => {
       const icon = element.querySelector('svg')!.getBoundingClientRect(); const input = element.querySelector('input')!;
       return input.getBoundingClientRect().left + parseFloat(getComputedStyle(input).paddingLeft) - icon.right;
@@ -27,6 +31,12 @@ for (const theme of ['dark', 'light']) for (const width of [760, 1280]) {
     await page.screenshot({ path: info.outputPath(`skills-list-${theme}-${width}.png`), fullPage: true });
     await page.getByRole('button', { name: '打开 写单测', exact: true }).first().click();
     await expect(page.getByTestId('skill-detail')).toBeVisible();
+    const detailCard = page.locator('.skill-detail .settings-group-panel').first();
+    const detailRow = detailCard.locator('.resource-setting-row').first();
+    const detailCardBox = (await detailCard.boundingBox())!;
+    const detailRowBox = (await detailRow.boundingBox())!;
+    expect(Math.abs(detailRowBox.width - detailCardBox.width)).toBeLessThanOrEqual(2);
+    await expect(detailCard.locator('.resource-setting-row').nth(1)).toHaveCSS('border-top-width', '1px');
     await page.screenshot({ path: info.outputPath(`skill-detail-${theme}-${width}.png`), fullPage: true });
     await expect(page.locator('.settings-content h1')).toHaveCount(0);
     await page.getByTestId('skill-detail').getByRole('button', { name: '技能', exact: true }).click();
@@ -36,6 +46,12 @@ for (const theme of ['dark', 'light']) for (const width of [760, 1280]) {
     await expect(page.locator('.settings-content h2')).toHaveCount(0);
     await page.screenshot({ path: info.outputPath(`memory-${theme}-${width}.png`), fullPage: true });
     expect(await page.locator('.memory-overview').evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+    const memoryCard = page.locator('.memory-status');
+    const memoryRow = memoryCard.locator('> .resource-setting-row').first();
+    const memoryCardBox = (await memoryCard.boundingBox())!;
+    const memoryRowBox = (await memoryRow.boundingBox())!;
+    expect(Math.abs(memoryRowBox.width - memoryCardBox.width)).toBeLessThanOrEqual(2);
+    await expect(memoryRow).toHaveCSS('border-top-width', '1px');
     await expect(page.locator('.memory-overview svg')).toHaveCount(0);
     await page.evaluate(() => document.documentElement.style.setProperty('--radius-lg', '23px'));
     await expect(page.locator('.memory-status')).toHaveCSS('border-top-left-radius', '23px');

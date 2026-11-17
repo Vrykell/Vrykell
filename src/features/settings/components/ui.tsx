@@ -53,7 +53,7 @@ export function Field({ title, description, children, layout = 'row' }: {
 
 // ── Switch (for the AI behavior page) ──
 
-export function Toggle({ on, onChange, label, disabled = false, showState = true }: { on: boolean; onChange: (v: boolean) => void | Promise<void>; label?: string; disabled?: boolean; showState?: boolean }) {
+export function Toggle({ on, onChange, label, disabled = false, showState = false }: { on: boolean; onChange: (v: boolean) => void | Promise<void>; label?: string; disabled?: boolean; showState?: boolean }) {
   const { save } = useSettingsSave();
   return (
     <span className="settings-toggle"><ToggleControl on={on} label={label} disabled={disabled} onChange={value => { void save(() => onChange(value)); }} />{showState && <span aria-hidden="true">{t(on ? 'On' : 'Off')}</span>}</span>

@@ -127,7 +127,7 @@ export default function HarnessPage() {
         )}
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {list?.map((harness, index) => (
-            <div key={`${harness.name}-${index}`}>
+            <div key={`${harness.name}-${index}`} className="acp-row-item">
             <div data-testid={`harness-row-${index}`} className="acp-row">
               <HarnessBadge name={harness.name} size={30} />
               <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
