@@ -12,8 +12,8 @@ it('exposes the current state and requests an explicit toggle', () => {
   expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
 });
 
-it('uses the compact toolbar geometry without changing its state semantics', () => {
+it('uses the compact toolbar geometry and a full-pill track without changing its state semantics', () => {
   render(<Toggle compact on label="Resource usage" onChange={vi.fn()} />);
-  expect(screen.getByRole('switch')).toHaveStyle({ width: '32px', height: '18px' });
+  expect(screen.getByRole('switch')).toHaveStyle({ width: '32px', height: '18px', borderRadius: '999px' });
   expect(screen.getByRole('switch').firstElementChild).toHaveStyle({ width: '14px', left: '16px' });
 });
