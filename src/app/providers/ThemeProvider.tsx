@@ -3,10 +3,7 @@
  * through component context. Components read the applied mode and the preference via useTheme().
  */
 import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react';
-import {
-  readThemePreference, resolveThemeMode, persistThemePreference,
-  type ThemeMode, type ThemePreference,
-} from '@config/theme/tokens';
+import { readThemePreference, resolveThemeMode, persistThemePreference, type ThemeMode, type ThemePreference } from '@config/theme/tokens';
 import { applyTerminalTheme, useTerminalThemeStore } from '@features/settings/model/terminalTheme';
 
 interface ThemeCtx {

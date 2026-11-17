@@ -39,7 +39,9 @@ if (!command) {
   process.exit(2);
 }
 
-const log = (...parts) => { if (!quiet) console.log(...parts); };
+const log = (...parts) => {
+  if (!quiet) console.log(...parts);
+};
 // Windows starts the command through a shell, which joins argv without quoting; a prompt with
 // spaces would otherwise arrive as several arguments.
 const quoted = (value) => (process.platform === 'win32' && /\s/.test(value) ? `"${value}"` : value);
@@ -88,7 +90,9 @@ child.stdout.on('data', (chunk) => {
     handle(message);
   }
 });
-child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+child.stderr.on('data', (chunk) => {
+  stderr += chunk.toString();
+});
 
 function handle(message) {
   // A request from the agent: answer it the way the app would.
@@ -96,7 +100,7 @@ function handle(message) {
     if (message.method === 'session/request_permission') {
       const options = message.params?.options ?? [];
       const pick = allow
-        ? options.find((option) => String(option.kind ?? '').startsWith('allow')) ?? options[0]
+        ? (options.find((option) => String(option.kind ?? '').startsWith('allow')) ?? options[0])
         : options.find((option) => String(option.kind ?? '').startsWith('reject'));
       log('ask    ' + message.method + ' → ' + (pick ? `${pick.name} (${pick.kind})` : 'no option, cancelling'));
       if (pick) reply(message.id, { outcome: { outcome: 'selected', optionId: pick.optionId } });
@@ -113,9 +117,14 @@ function handle(message) {
     if (kind === 'agent_message_chunk') log('text   ' + String(update.content?.text ?? '').slice(0, 200));
     else if (kind === 'agent_thought_chunk') log('think  ' + String(update.content?.text ?? '').slice(0, 120));
     else if (kind === 'tool_call') log('tool   ' + String(update.title ?? update.toolCallId ?? ''));
-    else if (kind === 'plan') log(`plan   ${(update.entries ?? []).length} entries: ` + (update.entries ?? []).map((entry) => `${entry.status}:${String(entry.content ?? '').slice(0, 40)}`).join(' | '));
+    else if (kind === 'plan')
+      log(
+        `plan   ${(update.entries ?? []).length} entries: ` +
+          (update.entries ?? []).map((entry) => `${entry.status}:${String(entry.content ?? '').slice(0, 40)}`).join(' | '),
+      );
     else if (kind === 'available_commands_update') log(`cmds   ${(update.availableCommands ?? []).length}`);
-    else if (kind === 'usage_update') log(`usage  used=${update.used} size=${update.size}` + (update.cost ? ` cost=${update.cost.amount} ${update.cost.currency}` : ''));
+    else if (kind === 'usage_update')
+      log(`usage  used=${update.used} size=${update.size}` + (update.cost ? ` cost=${update.cost.amount} ${update.cost.currency}` : ''));
     else if (kind) log('update ' + kind);
     sawOutput = true;
     return;

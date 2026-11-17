@@ -27,7 +27,9 @@ let pending: ((confirmed: boolean) => void) | null = null;
 export function requestPasteConfirm(request: PasteConfirmRequest): Promise<boolean> {
   settlePasteConfirm(false);
   usePasteConfirmStore.setState({ request });
-  return new Promise<boolean>((resolve) => { pending = resolve; });
+  return new Promise<boolean>((resolve) => {
+    pending = resolve;
+  });
 }
 
 /** Close the dialog and answer the pending request. */

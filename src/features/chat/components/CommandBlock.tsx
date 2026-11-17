@@ -41,7 +41,7 @@ async function copyText(text: string): Promise<boolean> {
 
 export default function CommandBlock({ children, paneId }: { children?: ReactNode; paneId?: string | null }) {
   const runInTerminal = useTerminalStore((s) => s.runInTerminal);
-  const sessionId = useTerminalStore(state => paneId ? state.sessions[paneId] : undefined);
+  const sessionId = useTerminalStore((state) => (paneId ? state.sessions[paneId] : undefined));
   const code = extractCode(children);
   const isShell = code ? SHELL_LANGS.has(code.lang) : false;
   const [copied, setCopied] = useState(false);
@@ -58,38 +58,35 @@ export default function CommandBlock({ children, paneId }: { children?: ReactNod
     <div className="md-code-block">
       {code && (
         <div className="md-code-block-header">
-          <span className="md-code-block-language">
-            {code.lang || 'code'}
-          </span>
+          <span className="md-code-block-language">{code.lang || 'code'}</span>
           <div className="md-code-block-actions">
             {isShell && paneId !== null && (
-              <TextButton className="primary-button md-code-block-action"
+              <TextButton
+                className="primary-button md-code-block-action"
                 disabled={paneId !== undefined && !sessionId}
                 onClick={() => {
                   const text = code.text.trim();
                   void runInTerminal(text, paneId ?? undefined).catch(() => {
                     useToastStore.getState().addToast(t('Could not run the command in the selected terminal'), 'error');
                   });
-                  if (/[\r\n]/.test(text)) useToastStore.getState().addToast(t('Script added to command input. Press Enter to run.'), 'info');
-                }}
-              >
+                  if (/[\r\n]/.test(text))
+                    useToastStore.getState().addToast(t('Script added to command input. Press Enter to run.'), 'info');
+                }}>
                 <TerminalPrompt size={iconSizes.compact} /> {t('Run in terminal')}
               </TextButton>
             )}
-            <TextButton className="md-code-block-action"
+            <TextButton
+              className="md-code-block-action"
               data-testid="code-copy-btn"
               data-tip={t(copied ? 'Copied' : 'Copy code')}
-              onClick={() => void copy()}
-            >
+              onClick={() => void copy()}>
               {copied ? <Check size={iconSizes.copy} style={{ color: 'var(--success)' }} /> : <Copy size={iconSizes.copy} />}
               {t(copied ? 'Copied' : 'Copy')}
             </TextButton>
           </div>
         </div>
       )}
-      <pre>
-        {code ? <CodeSyntax text={code.text} language={code.lang} /> : children}
-      </pre>
+      <pre>{code ? <CodeSyntax text={code.text} language={code.lang} /> : children}</pre>
     </div>
   );
 }

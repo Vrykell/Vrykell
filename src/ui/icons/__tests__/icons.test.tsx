@@ -5,12 +5,19 @@ import { Brain, ChevronDown, FileCode, Folder, Search, Server, Settings, SquareT
 
 describe('shared icon family', () => {
   it('uses a square terminal outline with restrained corner rounding', () => {
-    const { container } = render(<SquareTerminal />); const rect = container.querySelector('rect')!;
-    expect(rect.getAttribute('width')).toBe(rect.getAttribute('height')); expect(rect).toHaveAttribute('rx', '1.75');
+    const { container } = render(<SquareTerminal />);
+    const rect = container.querySelector('rect')!;
+    expect(rect.getAttribute('width')).toBe(rect.getAttribute('height'));
+    expect(rect).toHaveAttribute('rx', '1.75');
   });
   it.each([
-    [Brain, 24], [ChevronDown, 24], [Folder, 24], [Search, 24],
-    [Server, 24], [Settings, 24], [SquareTerminal, 24],
+    [Brain, 24],
+    [ChevronDown, 24],
+    [Folder, 24],
+    [Search, 24],
+    [Server, 24],
+    [Settings, 24],
+    [SquareTerminal, 24],
     [Navigation, 24],
   ] as const)('renders themed vector icons at the requested size', (Icon, intrinsicSize) => {
     const { container } = render(<Icon size={16} style={{ color: 'var(--text-secondary)' }} />);
@@ -25,7 +32,9 @@ describe('shared icon family', () => {
   });
 
   it('allows explicit accessible labels and per-icon styling', () => {
-    const { container } = render(<Folder size={32} color="var(--accent)" primaryFill="var(--text-secondary)" role="img" aria-label="文件夹" />);
+    const { container } = render(
+      <Folder size={32} color="var(--accent)" primaryFill="var(--text-secondary)" role="img" aria-label="文件夹" />,
+    );
     expect(container.querySelector('svg')).not.toHaveAttribute('aria-hidden', 'true');
     expect(container.querySelector('svg')).toHaveStyle({ width: '32px', height: '32px', color: 'var(--accent)' });
     expect(container.querySelector('svg')).toHaveAttribute('fill', 'var(--text-secondary)');

@@ -1,16 +1,33 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-const mocks = vi.hoisted(() => ({ windows: false, add: vi.fn(() => 'new-tab'), write: vi.fn(), admin: vi.fn(), open: vi.fn(), present: vi.fn() }));
-vi.mock('@platform/runtime', () => ({ get isWindows() { return mocks.windows; } }));
+const mocks = vi.hoisted(() => ({
+  windows: false,
+  add: vi.fn(() => 'new-tab'),
+  write: vi.fn(),
+  admin: vi.fn(),
+  open: vi.fn(),
+  present: vi.fn(),
+}));
+vi.mock('@platform/runtime', () => ({
+  get isWindows() {
+    return mocks.windows;
+  },
+}));
 vi.mock('@platform/shells', () => ({ getAvailableShells: async () => [{ id: 'bash', label: 'Bash', default: true }] }));
 vi.mock('@platform/api/editor', () => ({ openElevatedEditorFile: mocks.admin }));
 vi.mock('@platform/pty', () => ({ ptyWrite: mocks.write }));
 vi.mock('@features/terminal/services/terminalStartup', () => ({ waitForTerminalStartup: vi.fn(async () => 'new-session') }));
-vi.mock('@features/workspace', () => ({ useSessionStore: { getState: () => ({ tabs: [{ kind: 'ssh', ssh: { connectionId: 'remote' } }], addTab: mocks.add }) }, terminalsOf: (tab: unknown) => [tab] }));
+vi.mock('@features/workspace', () => ({
+  useSessionStore: { getState: () => ({ tabs: [{ kind: 'ssh', ssh: { connectionId: 'remote' } }], addTab: mocks.add }) },
+  terminalsOf: (tab: unknown) => [tab],
+}));
 vi.mock('@features/workspace/services/unifiedWorkspace', () => ({ presentWorkspaceResource: mocks.present }));
 vi.mock('../services/fileOpen', () => ({ openFile: mocks.open, loadConfig: () => ({}), remoteOpenCommand: () => 'vim /remote/file\n' }));
 import { openInTerminal } from '../services/openInTerminal';
 
-beforeEach(() => { vi.clearAllMocks(); mocks.windows = false; });
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.windows = false;
+});
 it('separates normal remote editing from an explicitly elevated terminal', async () => {
   await openInTerminal({ path: '/remote/file', connectionId: 'remote' });
   expect(mocks.write).toHaveBeenLastCalledWith('new-session', 'vim /remote/file\n');

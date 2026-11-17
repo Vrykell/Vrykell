@@ -59,14 +59,14 @@ function loadFilter(): SessionHistoryFilter {
     const raw = sessionStorage.getItem(FILTER_KEY);
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<SessionHistoryFilter>;
-      const sort = SESSION_SORT_OPTIONS.some(item => item.value === parsed.sort) ? parsed.sort! : 'closed-desc';
+      const sort = SESSION_SORT_OPTIONS.some((item) => item.value === parsed.sort) ? parsed.sort! : 'closed-desc';
       return {
         query: typeof parsed.query === 'string' ? parsed.query : '',
         type: SESSION_TYPE_OPTIONS.some((item) => item.value === parsed.type) ? parsed.type! : 'all',
         date: SESSION_DATE_OPTIONS.some((item) => item.value === parsed.date) ? parsed.date! : 'all',
-        mode: SESSION_MODE_OPTIONS.some(item => item.value === parsed.mode) ? parsed.mode! : 'all',
+        mode: SESSION_MODE_OPTIONS.some((item) => item.value === parsed.mode) ? parsed.mode! : 'all',
         sort,
-        groupBy: SESSION_GROUP_BY_OPTIONS.some(item => item.value === parsed.groupBy) ? parsed.groupBy! : 'day',
+        groupBy: SESSION_GROUP_BY_OPTIONS.some((item) => item.value === parsed.groupBy) ? parsed.groupBy! : 'day',
         dateField: parsed.dateField === 'created' || parsed.dateField === 'closed' ? parsed.dateField : sessionHistoryDateField(sort),
         starredOnly: parsed.starredOnly === true,
       };
@@ -103,12 +103,22 @@ export function useSessionHistory(options: UseSessionHistoryOptions = {}): Sessi
   const meta = useHistoryMetaStore();
   const starredIds = useMemo(() => scopedIds(meta.starred, 'session'), [meta.starred]);
   const annotations = useMemo(() => {
-    const cards = groupHistoricalSessions(sessions.filter(session => session.status === 'historical'), filter.groupBy ?? 'day', filter.sort, filter.dateField,
-      null, { groups: originalGroups, sessions });
-    const describe = (original: boolean) => cards.filter(card => Boolean(card.originalGroup) === original)
-      .map(card => ({ ...card, recordIds: card.sessions.map(session => session.id) }));
-    return new Map([...historySearchAnnotations('session', filter.groupBy ?? 'day', describe(false), meta),
-      ...historySearchAnnotations('session', 'original', describe(true), meta)]);
+    const cards = groupHistoricalSessions(
+      sessions.filter((session) => session.status === 'historical'),
+      filter.groupBy ?? 'day',
+      filter.sort,
+      filter.dateField,
+      null,
+      { groups: originalGroups, sessions },
+    );
+    const describe = (original: boolean) =>
+      cards
+        .filter((card) => Boolean(card.originalGroup) === original)
+        .map((card) => ({ ...card, recordIds: card.sessions.map((session) => session.id) }));
+    return new Map([
+      ...historySearchAnnotations('session', filter.groupBy ?? 'day', describe(false), meta),
+      ...historySearchAnnotations('session', 'original', describe(true), meta),
+    ]);
   }, [sessions, originalGroups, filter.groupBy, filter.sort, filter.dateField, meta.notes, meta.groupTitles, meta.groupNotes]);
 
   const setFilter = useCallback((patch: Partial<SessionHistoryFilter>) => {
@@ -146,72 +156,103 @@ export function useSessionHistory(options: UseSessionHistoryOptions = {}): Sessi
     if (!options.source) void load();
   }, [load, activeGroups, !!options.source]);
 
-  const openSession = useCallback((session: BackendSessionEntry) => {
-    if (batchBusyRef.current) return;
-    const workspace = useSessionStore.getState();
-    if (session.status !== 'historical' && workspace.tabs.some((tab) => tab.id === session.id)) {
-      workspace.activate(session.id);
-      return;
-    }
-    void sessionManager.restore(session.id, session.title).then(load).catch((error: unknown) => {
-      console.warn('Session restoration failed:', error);
-      notify(t('Could not restore session: {{error}}', { error: String(error) }), 'error');
-    });
-  }, [notify, load]);
+  const openSession = useCallback(
+    (session: BackendSessionEntry) => {
+      if (batchBusyRef.current) return;
+      const workspace = useSessionStore.getState();
+      if (session.status !== 'historical' && workspace.tabs.some((tab) => tab.id === session.id)) {
+        workspace.activate(session.id);
+        return;
+      }
+      void sessionManager
+        .restore(session.id, session.title)
+        .then(load)
+        .catch((error: unknown) => {
+          console.warn('Session restoration failed:', error);
+          notify(t('Could not restore session: {{error}}', { error: String(error) }), 'error');
+        });
+    },
+    [notify, load],
+  );
 
-  const renameOriginalGroup = useCallback(async (id: string, title: string) => {
-    const name = title.trim();
-    if (!name) return;
-    try {
-      await groupRename(id, name);
-      useSessionStore.setState(state => ({ groups: state.groups.map(group => group.id === id ? { ...group, title: name } : group) }));
-      await load();
-    } catch (error) {
-      notify(t('Could not rename group: {{error}}', { error: String(error) }), 'error');
-    }
-  }, [load, notify]);
+  const renameOriginalGroup = useCallback(
+    async (id: string, title: string) => {
+      const name = title.trim();
+      if (!name) return;
+      try {
+        await groupRename(id, name);
+        useSessionStore.setState((state) => ({
+          groups: state.groups.map((group) => (group.id === id ? { ...group, title: name } : group)),
+        }));
+        await load();
+      } catch (error) {
+        notify(t('Could not rename group: {{error}}', { error: String(error) }), 'error');
+      }
+    },
+    [load, notify],
+  );
 
-  const deleteHistoricalSession = useCallback((session: BackendSessionEntry) => {
-    if (batchBusyRef.current || useHistoryMetaStore.getState().lockedRecords[historyRecordKey('session', session.id)]) return;
-    void sessionManager.remove(session.id)
-      .then(() => { useHistoryMetaStore.getState().removeRecords([historyRecordKey('session', session.id)]); return load(); })
-      .catch((error: unknown) => {
-        console.warn('Failed to delete the historical session:', error);
-        notify(t('Could not delete the historical session: {{error}}', { error: String((error as Error)?.message ?? error) }), 'error');
-      });
-  }, [load, notify]);
-
-  const processSessions = useCallback(async (targets: readonly BackendSessionEntry[], action: 'restore' | 'delete') => {
-    if (batchBusyRef.current) return;
-    batchBusyRef.current = true;
-    setBatchBusy(true);
-    try {
-      const eligible = targets.filter(session => session.status === 'historical'
-        && (action !== 'delete' || !useHistoryMetaStore.getState().lockedRecords[historyRecordKey('session', session.id)]));
-      // Keep each restored original group in its saved tab order, independently of display sorting.
-      const ordered = action === 'restore' ? eligible.flatMap((session, index) => {
-        if (!session.group_id) return [session];
-        if (eligible.findIndex(item => item.group_id === session.group_id) !== index) return [];
-        return eligible.filter(item => item.group_id === session.group_id).sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id));
-      }) : eligible;
-      const result = await runHistoryBatch(ordered, async session => {
-        if (action === 'restore') await sessionManager.restore(session.id, session.title);
-        else {
-          if (useHistoryMetaStore.getState().lockedRecords[historyRecordKey('session', session.id)]) throw new Error('Record is locked');
-          await sessionManager.remove(session.id);
+  const deleteHistoricalSession = useCallback(
+    (session: BackendSessionEntry) => {
+      if (batchBusyRef.current || useHistoryMetaStore.getState().lockedRecords[historyRecordKey('session', session.id)]) return;
+      void sessionManager
+        .remove(session.id)
+        .then(() => {
           useHistoryMetaStore.getState().removeRecords([historyRecordKey('session', session.id)]);
-        }
-      });
-      await load();
-      notify(result.failed.length
-        ? t('{{succeeded}} completed; {{failed}} failed', { succeeded: result.succeeded.length, failed: result.failed.length })
-        : t(action === 'restore' ? '{{count}} sessions restored' : '{{count}} sessions deleted', { count: result.succeeded.length }),
-      result.failed.length ? 'error' : 'success');
-    } finally {
-      batchBusyRef.current = false;
-      setBatchBusy(false);
-    }
-  }, [load, notify]);
+          return load();
+        })
+        .catch((error: unknown) => {
+          console.warn('Failed to delete the historical session:', error);
+          notify(t('Could not delete the historical session: {{error}}', { error: String((error as Error)?.message ?? error) }), 'error');
+        });
+    },
+    [load, notify],
+  );
+
+  const processSessions = useCallback(
+    async (targets: readonly BackendSessionEntry[], action: 'restore' | 'delete') => {
+      if (batchBusyRef.current) return;
+      batchBusyRef.current = true;
+      setBatchBusy(true);
+      try {
+        const eligible = targets.filter(
+          (session) =>
+            session.status === 'historical' &&
+            (action !== 'delete' || !useHistoryMetaStore.getState().lockedRecords[historyRecordKey('session', session.id)]),
+        );
+        // Keep each restored original group in its saved tab order, independently of display sorting.
+        const ordered =
+          action === 'restore'
+            ? eligible.flatMap((session, index) => {
+                if (!session.group_id) return [session];
+                if (eligible.findIndex((item) => item.group_id === session.group_id) !== index) return [];
+                return eligible
+                  .filter((item) => item.group_id === session.group_id)
+                  .sort((a, b) => a.sort_order - b.sort_order || a.id.localeCompare(b.id));
+              })
+            : eligible;
+        const result = await runHistoryBatch(ordered, async (session) => {
+          if (action === 'restore') await sessionManager.restore(session.id, session.title);
+          else {
+            if (useHistoryMetaStore.getState().lockedRecords[historyRecordKey('session', session.id)]) throw new Error('Record is locked');
+            await sessionManager.remove(session.id);
+            useHistoryMetaStore.getState().removeRecords([historyRecordKey('session', session.id)]);
+          }
+        });
+        await load();
+        notify(
+          result.failed.length
+            ? t('{{succeeded}} completed; {{failed}} failed', { succeeded: result.succeeded.length, failed: result.failed.length })
+            : t(action === 'restore' ? '{{count}} sessions restored' : '{{count}} sessions deleted', { count: result.succeeded.length }),
+          result.failed.length ? 'error' : 'success',
+        );
+      } finally {
+        batchBusyRef.current = false;
+        setBatchBusy(false);
+      }
+    },
+    [load, notify],
+  );
 
   const sections = useMemo(
     () => deriveSessionHistorySections(sessions, filter, filter.starredOnly ? starredIds : null, annotations),
@@ -230,8 +271,8 @@ export function useSessionHistory(options: UseSessionHistoryOptions = {}): Sessi
     load,
     openSession,
     deleteHistoricalSession,
-    restoreSessions: targets => processSessions(targets, 'restore'),
-    deleteSessions: targets => processSessions(targets, 'delete'),
+    restoreSessions: (targets) => processSessions(targets, 'restore'),
+    deleteSessions: (targets) => processSessions(targets, 'delete'),
     batchBusy,
     historical: sections.historical,
     grouped: sections.grouped,
@@ -240,6 +281,12 @@ export function useSessionHistory(options: UseSessionHistoryOptions = {}): Sessi
   };
 }
 
-export { filterSessions, isSshSession, sshTargetOf, type SessionDateFilter, type SessionTypeFilter } from '@features/session-history/model/filter';
+export {
+  filterSessions,
+  isSshSession,
+  sshTargetOf,
+  type SessionDateFilter,
+  type SessionTypeFilter,
+} from '@features/session-history/model/filter';
 export { SESSION_DATE_OPTIONS, SESSION_TYPE_OPTIONS } from '@features/session-history/model/sessionHistoryModel';
 export type { SessionHistoryFilter } from '@features/session-history/model/sessionHistoryModel';

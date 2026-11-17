@@ -11,9 +11,13 @@ import { ptyWrites, setupTauriMock } from './tauri-mock';
  */
 const useTerminalOpen = async (page: import('@playwright/test').Page) => {
   await page.addInitScript(() => {
-    localStorage.setItem('vrykell-editor-preferences', JSON.stringify({
-      state: { pageMode: 'single', localOpenMode: 'terminal', remoteOpenMode: 'terminal' }, version: 0,
-    }));
+    localStorage.setItem(
+      'vrykell-editor-preferences',
+      JSON.stringify({
+        state: { pageMode: 'single', localOpenMode: 'terminal', remoteOpenMode: 'terminal' },
+        version: 0,
+      }),
+    );
   });
 };
 

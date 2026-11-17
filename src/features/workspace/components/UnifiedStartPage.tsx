@@ -8,26 +8,46 @@ import WorkspaceStartPage from './WorkspaceStartPage';
  * The unified workspace starts from the same simple page as every other workspace: the
  * actions place a first resource, and the strip above already lists what is open.
  */
-export default function UnifiedStartPage({ onNew, onOpen, onConnect, onAgent }: {
-  onNew: (kind: 'terminal' | 'document' | 'conversation') => void; onOpen: () => void;
-  onConnect: (anchor: { x: number; y: number }) => void; onAgent: (anchor: { x: number; y: number }) => void;
+export default function UnifiedStartPage({
+  onNew,
+  onOpen,
+  onConnect,
+  onAgent,
+}: {
+  onNew: (kind: 'terminal' | 'document' | 'conversation') => void;
+  onOpen: () => void;
+  onConnect: (anchor: { x: number; y: number }) => void;
+  onAgent: (anchor: { x: number; y: number }) => void;
 }) {
   // Both pickers open under their own trigger, matching the terminal and AI start pages.
   const openUnderTrigger = (event: MouseEvent<HTMLElement>, open: (anchor: { x: number; y: number }) => void) => {
     const box = event.currentTarget.getBoundingClientRect();
     open({ x: box.left, y: box.bottom });
   };
-  return <div className="workspace-launch-page" data-testid="unified-start-page">
-    <WorkspaceStartPage icon={<Grid size={40} />} title={t('Unified workspace')}
-      description={t('Open terminals, files and conversations side by side in one workspace.')}
-      columns={3}
-      actions={<>
-        <OutlineButton className="primary-button" onClick={() => onNew('terminal')}>{t('New terminal')}</OutlineButton>
-        <OutlineButton onClick={() => onNew('document')}>{t('New file')}</OutlineButton>
-        <OutlineButton onClick={onOpen}>{t('Open file')}</OutlineButton>
-        <OutlineButton aria-label={t('New conversation')} onClick={() => onNew('conversation')}>{t('New chat')}</OutlineButton>
-        <OutlineButton aria-label={t('Connect a server')} onClick={event => openUnderTrigger(event, onConnect)}>{t('Connect')}</OutlineButton>
-        <OutlineButton onClick={event => openUnderTrigger(event, onAgent)}>{t('ACP agents')}</OutlineButton>
-      </>} />
-  </div>;
+  return (
+    <div className="workspace-launch-page" data-testid="unified-start-page">
+      <WorkspaceStartPage
+        icon={<Grid size={40} />}
+        title={t('Unified workspace')}
+        description={t('Open terminals, files and conversations side by side in one workspace.')}
+        columns={3}
+        actions={
+          <>
+            <OutlineButton className="primary-button" onClick={() => onNew('terminal')}>
+              {t('New terminal')}
+            </OutlineButton>
+            <OutlineButton onClick={() => onNew('document')}>{t('New file')}</OutlineButton>
+            <OutlineButton onClick={onOpen}>{t('Open file')}</OutlineButton>
+            <OutlineButton aria-label={t('New conversation')} onClick={() => onNew('conversation')}>
+              {t('New chat')}
+            </OutlineButton>
+            <OutlineButton aria-label={t('Connect a server')} onClick={(event) => openUnderTrigger(event, onConnect)}>
+              {t('Connect')}
+            </OutlineButton>
+            <OutlineButton onClick={(event) => openUnderTrigger(event, onAgent)}>{t('ACP agents')}</OutlineButton>
+          </>
+        }
+      />
+    </div>
+  );
 }

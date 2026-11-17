@@ -36,15 +36,18 @@ test('settings dropdown supports keyboard selection, cancellation and theme colo
     // The floating surface carries the background; the listbox inside only scrolls.
     const surface = page.locator('.ui-select-menu');
     const background = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--elevated').trim());
-    await expect(surface).toHaveCSS('background-color', await page.evaluate(color => {
-      const sample = document.createElement('div');
-      sample.style.color = color;
-      document.body.appendChild(sample);
-      const result = getComputedStyle(sample).color;
-      sample.remove();
-      return result;
-    }, background));
-    colors.push(await surface.evaluate(element => getComputedStyle(element).backgroundColor));
+    await expect(surface).toHaveCSS(
+      'background-color',
+      await page.evaluate((color) => {
+        const sample = document.createElement('div');
+        sample.style.color = color;
+        document.body.appendChild(sample);
+        const result = getComputedStyle(sample).color;
+        sample.remove();
+        return result;
+      }, background),
+    );
+    colors.push(await surface.evaluate((element) => getComputedStyle(element).backgroundColor));
     await page.screenshot({ path: test.info().outputPath(`select-${theme}.png`) });
     await trigger.press('Escape');
   }
@@ -78,7 +81,7 @@ test('long dropdown stays within a small viewport and scrolls to keyboard select
   await page.mouse.move(thumb.x + thumb.width / 2, thumb.y + 160, { steps: 6 });
   await page.mouse.up();
   await expect(menu).toBeVisible();
-  await expect.poll(() => menu.evaluate(element => element.scrollTop)).toBeGreaterThan(0);
+  await expect.poll(() => menu.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
   await trigger.press('End');
   await expect(menu.getByRole('option', { name: '24px', exact: true })).toBeInViewport();
   await trigger.press('Enter');

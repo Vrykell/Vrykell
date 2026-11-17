@@ -6,19 +6,29 @@ import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 
 function block(patch: Partial<TermBlock>): TermBlock {
   return {
-    id: 'b1', command: 'ls', status: 'done', exitCode: 0,
-    startedAt: 1000, endedAt: 1040, wasLongRunning: false,
-    outputHtml: '', outputText: 'file1\nfile2', outputRaw: '', linesTruncated: 0,
+    id: 'b1',
+    command: 'ls',
+    status: 'done',
+    exitCode: 0,
+    startedAt: 1000,
+    endedAt: 1040,
+    wasLongRunning: false,
+    outputHtml: '',
+    outputText: 'file1\nfile2',
+    outputRaw: '',
+    linesTruncated: 0,
     ...patch,
   };
 }
 
 describe('TerminalBlockList', () => {
   it('renders empty submissions as normal directory blocks without output', () => {
-    useBlockStore.getState().setBlocks('t1', [
-      block({ id: 'empty-1', command: '', cwd: '/Users/test', outputText: '' }),
-      block({ id: 'empty-2', command: '', cwd: '/Users/test', outputText: '' }),
-    ]);
+    useBlockStore
+      .getState()
+      .setBlocks('t1', [
+        block({ id: 'empty-1', command: '', cwd: '/Users/test', outputText: '' }),
+        block({ id: 'empty-2', command: '', cwd: '/Users/test', outputText: '' }),
+      ]);
     render(<TerminalBlockList tabId="t1" />);
     for (const id of ['empty-1', 'empty-2']) {
       const item = screen.getByTestId(`command-block-${id}`);
@@ -31,9 +41,7 @@ describe('TerminalBlockList', () => {
   beforeEach(() => useBlockStore.setState({ byTab: {} }));
 
   it('puts context above the command and leaves only the more control in the block', () => {
-    useBlockStore.getState().setBlocks('t1', [
-      block({ cwd: '/Users/w/work', gitBranch: 'main', startedAt: 1000, endedAt: 2400 }),
-    ]);
+    useBlockStore.getState().setBlocks('t1', [block({ cwd: '/Users/w/work', gitBranch: 'main', startedAt: 1000, endedAt: 2400 })]);
     render(<TerminalBlockList tabId="t1" />);
     const item = screen.getByTestId('command-block-b1');
     const context = item.querySelector('.command-block-info')!;
@@ -63,9 +71,13 @@ describe('TerminalBlockList', () => {
   });
 
   it('a command without output stays blank and keeps only the command header and exit code', () => {
-    useBlockStore.getState().setBlocks('t1', [block({
-      outputText: '', outputHtml: '', outputRaw: '\x1b[H\x1b[2J\x1b[K\r\n',
-    })]);
+    useBlockStore.getState().setBlocks('t1', [
+      block({
+        outputText: '',
+        outputHtml: '',
+        outputRaw: '\x1b[H\x1b[2J\x1b[K\r\n',
+      }),
+    ]);
     render(<TerminalBlockList tabId="t1" />);
     expect(screen.queryByText('命令未产生输出')).toBeNull();
     expect(screen.getByTestId('exit-code')).toHaveTextContent('0');
@@ -109,34 +121,25 @@ describe('TerminalBlockList', () => {
   });
 
   it('a pending block renders no placeholder card (the fixed bottom input bar is the prompt)', () => {
-    useBlockStore.getState().setBlocks('t1', [
-      block({ id: 'p1', status: 'pending', command: '', outputText: '', cwd: '/Users/w' }),
-    ]);
+    useBlockStore.getState().setBlocks('t1', [block({ id: 'p1', status: 'pending', command: '', outputText: '', cwd: '/Users/w' })]);
     const { container } = render(<TerminalBlockList tabId="t1" />);
     // With only a pending block the whole list renders nothing
     expect(container.innerHTML).toBe('');
   });
 
   it('an empty done block (no command, no output, produced by pressing Enter) renders no empty card', () => {
-    useBlockStore.getState().setBlocks('t1', [
-      block({ id: 'e1', command: '', outputText: '', outputHtml: '', exitCode: null, startedAt: null }),
-    ]);
+    useBlockStore
+      .getState()
+      .setBlocks('t1', [block({ id: 'e1', command: '', outputText: '', outputHtml: '', exitCode: null, startedAt: null })]);
     const { container } = render(<TerminalBlockList tabId="t1" />);
     expect(container.innerHTML).toBe('');
   });
 
   it('executing block displays controls and mounts live output for sustained commands', async () => {
-    useBlockStore.getState().setBlocks('t1', [
-      block({ status: 'executing', command: 'npm i', outputText: 'fetching…' }),
-    ]);
+    useBlockStore.getState().setBlocks('t1', [block({ status: 'executing', command: 'npm i', outputText: 'fetching…' })]);
     render(<TerminalBlockList tabId="t1" />);
     await waitFor(() => expect(screen.getByLabelText('终止命令')).toBeTruthy());
-    for (const name of [
-      '重绘终端',
-      '终止命令',
-      '结束前台应用',
-      '进入全屏交互',
-    ]) {
+    for (const name of ['重绘终端', '终止命令', '结束前台应用', '进入全屏交互']) {
       const button = screen.getByRole('button', { name });
       expect(button).toHaveClass('icon-button');
       expect(button).toHaveAttribute('data-compact', 'true');
@@ -152,9 +155,7 @@ describe('TerminalBlockList', () => {
   it('unstyled multiline outputHtml (no <span) renders as HTML without showing a literal <br>', () => {
     // Regression: extractSnapshotFromBuffer produces 'file1<br>file2' for unstyled multiline output,
     // and the old content sniffing (includes('<span')) misread it as plain text -> rendering a visible '&lt;br&gt;' literal.
-    useBlockStore.getState().setBlocks('t1', [
-      block({ outputHtml: 'file1<br>file2', outputText: 'file1\nfile2' }),
-    ]);
+    useBlockStore.getState().setBlocks('t1', [block({ outputHtml: 'file1<br>file2', outputText: 'file1\nfile2' })]);
     const { container } = render(<TerminalBlockList tabId="t1" />);
     expect(container.innerHTML).toContain('file1<br>file2');
     expect(container.innerHTML).not.toContain('&lt;br&gt;');

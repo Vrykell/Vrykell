@@ -4,9 +4,11 @@ import { emitPtyOutput, ptyResizes, setupTauriMock } from './tauri-mock';
 for (const renderer of ['dom', 'webgl']) {
   test(`classic ${renderer} keeps its text origin stable through continuous resizing`, async ({ page }) => {
     await setupTauriMock(page, { integration: false });
-    await page.addInitScript(renderer => {
-      localStorage.setItem('vrykell-agent-settings', JSON.stringify({ version: 8,
-        state: { global: { openModeByShell: { zsh: 'classic' } }, overrides: {} } }));
+    await page.addInitScript((renderer) => {
+      localStorage.setItem(
+        'vrykell-agent-settings',
+        JSON.stringify({ version: 8, state: { global: { openModeByShell: { zsh: 'classic' } }, overrides: {} } }),
+      );
       localStorage.setItem('vrykell-typography', JSON.stringify({ state: { terminalRenderer: renderer } }));
     }, renderer);
     await page.goto('/');
@@ -16,16 +18,25 @@ for (const renderer of ['dom', 'webgl']) {
     const measurements = [];
     for (let width = 1240; width >= 800; width -= 20) {
       await page.setViewportSize({ width, height: 800 });
-      await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
-      measurements.push(await screen.evaluate(element => {
-        const host = element.closest('.terminal-pane')!;
-        return { offset: element.getBoundingClientRect().left - host.getBoundingClientRect().left,
-          width: element.getBoundingClientRect().width,
-          sidebar: document.querySelector('[data-testid="workspace-sidebar"]')!.getBoundingClientRect().width };
-      }));
+      await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+      measurements.push(
+        await screen.evaluate((element) => {
+          const host = element.closest('.terminal-pane')!;
+          return {
+            offset: element.getBoundingClientRect().left - host.getBoundingClientRect().left,
+            width: element.getBoundingClientRect().width,
+            sidebar: document.querySelector('[data-testid="workspace-sidebar"]')!.getBoundingClientRect().width,
+          };
+        }),
+      );
     }
-    expect(Math.max(...measurements.map(item => item.offset)) - Math.min(...measurements.map(item => item.offset))).toBeLessThanOrEqual(.5);
-    for (let index = 1; index < measurements.length; index++) expect(measurements[index]!.width + measurements[index]!.sidebar).toBeLessThanOrEqual(measurements[index - 1]!.width + measurements[index - 1]!.sidebar);
+    expect(Math.max(...measurements.map((item) => item.offset)) - Math.min(...measurements.map((item) => item.offset))).toBeLessThanOrEqual(
+      0.5,
+    );
+    for (let index = 1; index < measurements.length; index++)
+      expect(measurements[index]!.width + measurements[index]!.sidebar).toBeLessThanOrEqual(
+        measurements[index - 1]!.width + measurements[index - 1]!.sidebar,
+      );
     const resizes = await ptyResizes(page);
     for (let index = 1; index < resizes.length; index++) expect(resizes[index]).not.toEqual(resizes[index - 1]);
     await page.screenshot({ path: test.info().outputPath(`resize-${renderer}.png`), animations: 'disabled' });
@@ -35,7 +46,10 @@ for (const renderer of ['dom', 'webgl']) {
 test('a held divider drag keeps the local grid live and notifies the remote once, on release', async ({ page }) => {
   await setupTauriMock(page);
   await page.addInitScript(() => {
-    localStorage.setItem('vrykell-agent-settings', JSON.stringify({ version: 8, state: { global: { openModeByShell: { zsh: 'classic' } }, overrides: {} } }));
+    localStorage.setItem(
+      'vrykell-agent-settings',
+      JSON.stringify({ version: 8, state: { global: { openModeByShell: { zsh: 'classic' } }, overrides: {} } }),
+    );
   });
   await page.goto('/');
   const screen = page.locator('.xterm-screen').first();
@@ -74,10 +88,15 @@ test('short commands complete without mounting a temporary live output canvas', 
   await page.evaluate(() => {
     const scope = window as unknown as { __temporaryCanvases: number };
     scope.__temporaryCanvases = 0;
-    new MutationObserver(records => {
-      for (const record of records) for (const node of record.addedNodes) {
-        if (node instanceof Element && (node.matches('[data-testid="running-term"]') || node.querySelector('[data-testid="running-term"]'))) scope.__temporaryCanvases++;
-      }
+    new MutationObserver((records) => {
+      for (const record of records)
+        for (const node of record.addedNodes) {
+          if (
+            node instanceof Element &&
+            (node.matches('[data-testid="running-term"]') || node.querySelector('[data-testid="running-term"]'))
+          )
+            scope.__temporaryCanvases++;
+        }
     }).observe(document.body, { childList: true, subtree: true });
   });
   for (let index = 0; index < 5; index++) {

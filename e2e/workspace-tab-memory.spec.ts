@@ -7,24 +7,26 @@ test.beforeEach(async ({ page }) => {
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
 });
 
-for (const width of [1240, 760]) test(`keeps the empty conversation start selected after workspace switches at ${width}px`, async ({ page }, info) => {
-  await page.setViewportSize({ width, height: 800 });
-  const strip = page.getByTestId('workspace-instance-bar');
-  const navigate = async (area: string) => {
-    if (await page.getByTestId('workspace-sidebar').getAttribute('data-collapsed') === 'true') await page.getByTestId('workspace-sidebar-expand').click();
-    await page.getByTestId(`workspace-area-${area}`).click();
-  };
-  for (let visit = 0; visit < 3; visit++) {
+for (const width of [1240, 760])
+  test(`keeps the empty conversation start selected after workspace switches at ${width}px`, async ({ page }, info) => {
+    await page.setViewportSize({ width, height: 800 });
+    const strip = page.getByTestId('workspace-instance-bar');
+    const navigate = async (area: string) => {
+      if ((await page.getByTestId('workspace-sidebar').getAttribute('data-collapsed')) === 'true')
+        await page.getByTestId('workspace-sidebar-expand').click();
+      await page.getByTestId(`workspace-area-${area}`).click();
+    };
+    for (let visit = 0; visit < 3; visit++) {
+      await navigate('ai');
+      await expect(strip.getByRole('tab', { name: '开始', exact: true })).toHaveAttribute('aria-selected', 'true');
+      await expect(page.getByTestId('ai-start-page')).toBeVisible();
+      await navigate('code');
+      await expect(strip.getByRole('tab', { name: '开始', exact: true })).toHaveAttribute('aria-selected', 'true');
+      await navigate('terminal');
+    }
     await navigate('ai');
-    await expect(strip.getByRole('tab', { name: '开始', exact: true })).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByTestId('ai-start-page')).toBeVisible();
-    await navigate('code');
-    await expect(strip.getByRole('tab', { name: '开始', exact: true })).toHaveAttribute('aria-selected', 'true');
-    await navigate('terminal');
-  }
-  await navigate('ai');
-  await page.screenshot({ path: info.outputPath(`selected-start-${width}.png`) });
-});
+    await page.screenshot({ path: info.outputPath(`selected-start-${width}.png`) });
+  });
 
 for (const width of [1240, 760]) {
   test(`restores each workspace reading tab after mixed resource navigation at ${width}px`, async ({ page }, info) => {
@@ -32,8 +34,8 @@ for (const width of [1240, 760]) {
     const ids = await page.evaluate(async () => {
       const storePath = '/src/features/workspace/stores/workspace.ts';
       const servicePath = '/src/features/workspace/services/workbench.ts';
-      const { useWorkspaceStore } = await import(storePath) as typeof import('../src/features/workspace/stores/workspace');
-      const { activateContainer } = await import(servicePath) as typeof import('../src/features/workspace/services/workbench');
+      const { useWorkspaceStore } = (await import(storePath)) as typeof import('../src/features/workspace/stores/workspace');
+      const { activateContainer } = (await import(servicePath)) as typeof import('../src/features/workspace/services/workbench');
       const workspace = useWorkspaceStore.getState();
       const first = workspace.addTab({ title: 'Reading terminal' });
       const second = workspace.addTab({ title: 'Other terminal' });
@@ -46,15 +48,16 @@ for (const width of [1240, 760]) {
     await strip.getByRole('tab', { name: 'reading.ts', exact: true }).click();
     await page.setViewportSize({ width, height: 800 });
     const navigate = async (area: string) => {
-      if (await page.getByTestId('workspace-sidebar').getAttribute('data-collapsed') === 'true') await page.getByTestId('workspace-sidebar-expand').click();
+      if ((await page.getByTestId('workspace-sidebar').getAttribute('data-collapsed')) === 'true')
+        await page.getByTestId('workspace-sidebar-expand').click();
       await page.getByTestId(`workspace-area-${area}`).click();
     };
     await navigate('unified');
-    await page.evaluate(async second => {
+    await page.evaluate(async (second) => {
       const path = '/src/features/workspace/services/unifiedWorkspace.ts';
       const editorPath = '/src/core/editor.ts';
-      const { focusUnifiedResource } = await import(path) as typeof import('../src/features/workspace/services/unifiedWorkspace');
-      const { editorFileKey } = await import(editorPath) as typeof import('../src/core/editor');
+      const { focusUnifiedResource } = (await import(path)) as typeof import('../src/features/workspace/services/unifiedWorkspace');
+      const { editorFileKey } = (await import(editorPath)) as typeof import('../src/core/editor');
       focusUnifiedResource(`file:${editorFileKey({ path: '/home/e2e/project/other.ts' })}`);
       focusUnifiedResource(`terminal:${second}#0`);
     }, ids.second);
@@ -76,7 +79,7 @@ test('returns to the usage tab while conversations remain open', async ({ page }
   await page.locator('[data-chat-composer]:visible').fill('Retained conversation draft');
   await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
-    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+    const { useWorkspaceStore } = (await import(path)) as typeof import('../src/features/workspace/stores/workspace');
     useWorkspaceStore.getState().openUsageTab();
   });
   const strip = page.getByTestId('workspace-instance-bar');

@@ -41,11 +41,13 @@ describe('terminal pointer while typing', () => {
 
   it('restores immediately for clicking, dragging, leaving and losing focus', () => {
     const { element, key, move, hover, dispose } = setup();
-    key(); move({ buttons: 1 });
+    key();
+    move({ buttons: 1 });
     expect(hover).toHaveBeenCalledOnce();
     expect(element.hasAttribute('data-terminal-typing')).toBe(false);
     for (const event of [new Event('pointerdown', { bubbles: true }), new Event('mouseleave'), new Event('focusout', { bubbles: true })]) {
-      key(); element.dispatchEvent(event);
+      key();
+      element.dispatchEvent(event);
       expect(element.hasAttribute('data-terminal-typing')).toBe(false);
     }
     dispose();
@@ -69,9 +71,11 @@ describe('terminal pointer while typing', () => {
 
   it('removes its timer and handlers when the terminal is disposed', () => {
     const { element, key, move, hover, dispose } = setup();
-    key(); dispose();
+    key();
+    dispose();
     expect(element.hasAttribute('data-terminal-typing')).toBe(false);
-    key(); move();
+    key();
+    move();
     expect(hover).toHaveBeenCalledOnce();
     expect(vi.getTimerCount()).toBe(0);
   });

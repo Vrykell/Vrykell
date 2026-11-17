@@ -9,9 +9,19 @@ beforeEach(() => {
   useUiStore.setState({ settingsOpen: false });
   useNavigationDrag.getState().end();
   useAuxiliarySidebarStore.setState({ sshStatusOwner: null, dismissRequest: 0 });
-  useDockStore.setState({ leftZone: [], rightZone: ['files', 'git', 'chat'], leftPanels: [], rightPanels: [], collapsedPanels: [], panelWidths: {} });
+  useDockStore.setState({
+    leftZone: [],
+    rightZone: ['files', 'git', 'chat'],
+    leftPanels: [],
+    rightPanels: [],
+    collapsedPanels: [],
+    panelWidths: {},
+  });
 });
-afterEach(() => { cleanup(); act(() => useNavigationDrag.getState().end()); });
+afterEach(() => {
+  cleanup();
+  act(() => useNavigationDrag.getState().end());
+});
 
 it('renders auxiliary controls together with shared icon geometry', () => {
   render(<DockNavigation side="right" />);
@@ -42,9 +52,17 @@ it('dismisses the status sidebar when selecting the assistant', () => {
   expect(ai).toHaveAttribute('aria-pressed', 'true');
 });
 it('reserves an insertion slot without saving until a drag completes', () => {
-  render(<><DockNavigation side="right" /><NavigationDragPreview /></>);
+  render(
+    <>
+      <DockNavigation side="right" />
+      <NavigationDragPreview />
+    </>,
+  );
   const saved = localStorage.getItem('dock-layout-v6');
-  act(() => { useNavigationDrag.getState().start('files', { x: 500, y: 24 }); useNavigationDrag.getState().hover('right', 2); });
+  act(() => {
+    useNavigationDrag.getState().start('files', { x: 500, y: 24 });
+    useNavigationDrag.getState().hover('right', 2);
+  });
   const placeholder = document.querySelector('[data-dock-placeholder="2"]')!;
   expect(placeholder.nextElementSibling).toHaveAttribute('data-dock-slot', 'chat');
   expect(document.querySelector('.workspace-navigation-drag-preview')).toHaveStyle({ left: '500px', top: '24px' });

@@ -12,10 +12,7 @@ import { iconSizes, Search, SlidersHorizontal, X } from '@ui/icons';
 import { IconButton } from '@ui/actions/IconButton';
 import { t } from '@i18n';
 import { useAiConfigStore, setActiveModel, type ModelProfile, useAgentSettings } from '@features/agent';
-import {
-  detectCapabilities, hasCapability,
-  type ModelCapability,
-} from '@features/agent/model/capabilities';
+import { detectCapabilities, hasCapability, type ModelCapability } from '@features/agent/model/capabilities';
 import { modelHue, modelMark, providerLabel } from '@features/agent/components/modelIcon';
 import { ModelCapabilityBadge } from '@features/agent/components/ModelCapabilityBadge';
 import { ModelCapabilityToggle } from '@features/agent/components/ModelCapabilityToggle';
@@ -35,16 +32,17 @@ function ItemControls({ profile }: { profile: ModelProfile }) {
     <div
       style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}
       onClick={(e) => e.stopPropagation()}
-      data-tip={t('Thinking effort')}
-    >
+      data-tip={t('Thinking effort')}>
       <SlidersHorizontal size={iconSizes.compact} style={{ color: 'var(--text-muted)' }} />
       <Select<'low' | 'medium' | 'high'>
         aria-label={t('Thinking effort for {{model}}', { model: profile.name || profile.model })}
         value={eff.thinkingLevel}
-        onChange={(thinkingLevel) =>
-          agentSettings.updateModel(profile.id, { thinkingLevel })
-        }
-        options={[{ value: 'low', label: t('Low') }, { value: 'medium', label: t('Medium') }, { value: 'high', label: t('High') }]}
+        onChange={(thinkingLevel) => agentSettings.updateModel(profile.id, { thinkingLevel })}
+        options={[
+          { value: 'low', label: t('Low') },
+          { value: 'medium', label: t('Medium') },
+          { value: 'high', label: t('High') },
+        ]}
         style={{ width: 84 }}
       />
     </div>
@@ -53,7 +51,15 @@ function ItemControls({ profile }: { profile: ModelProfile }) {
 
 // Model picker dialog
 
-export default function ModelPicker({ open, onClose, showThinking = true }: { open: boolean; onClose: () => void; showThinking?: boolean }) {
+export default function ModelPicker({
+  open,
+  onClose,
+  showThinking = true,
+}: {
+  open: boolean;
+  onClose: () => void;
+  showThinking?: boolean;
+}) {
   const models = useAiConfigStore((s) => s.models);
   const activeModel = useAiConfigStore((s) => s.activeModel);
   const [query, setQuery] = useState('');
@@ -99,32 +105,51 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
 
   return createPortal(
     <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 10000,
+        background: 'var(--overlay)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        animation: 'overlayIn 0.18s var(--ease)',
+      }}
+      onClick={onClose}>
+      <div
+        className="workspace-floating workspace-floating-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t('Select model')}
+        onClick={(e) => e.stopPropagation()}
         style={{
-          position: 'fixed', inset: 0, zIndex: 10000,
-          background: 'var(--overlay)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          animation: 'overlayIn 0.18s var(--ease)',
-        }}
-        onClick={onClose}
-      >
-        <div className="workspace-floating workspace-floating-dialog" role="dialog" aria-modal="true" aria-label={t('Select model')}
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            width: 480, maxWidth: 'calc(100vw - 48px)', maxHeight: 'min(560px, 80vh)',
-            display: 'flex', flexDirection: 'column',
-            overflow: 'hidden',
-            animation: 'modalIn 0.22s var(--ease-out)',
-          }}
-        >
+          width: 480,
+          maxWidth: 'calc(100vw - 48px)',
+          maxHeight: 'min(560px, 80vh)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          animation: 'modalIn 0.22s var(--ease-out)',
+        }}>
         {/* Header: title and search */}
         <div style={{ padding: '14px 16px 10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', flex: 1 }}>{t('Select model')}</span>
+            <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', flex: 1 }}>
+              {t('Select model')}
+            </span>
             <IconButton aria-label={t('Close')} data-tip={t('Close')} onClick={onClose}>
               <X size={iconSizes.control} />
             </IconButton>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, borderRadius: 'var(--radius-card)', padding: '6px 10px', background: 'var(--field-bg)' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              borderRadius: 'var(--radius-card)',
+              padding: '6px 10px',
+              background: 'var(--field-bg)',
+            }}>
             <Search size={iconSizes.control} style={{ color: 'var(--text-muted)', flexShrink: 0 }} />
             <TextInput
               autoFocus
@@ -132,8 +157,13 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('Search models…')}
               style={{
-                flex: 1, minWidth: 0, background: 'transparent', border: 'none',
-                outline: 'none', fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-primary)',
+                flex: 1,
+                minWidth: 0,
+                background: 'transparent',
+                border: 'none',
+                outline: 'none',
+                fontSize: 'calc(12px * var(--ui-font-scale))',
+                color: 'var(--text-primary)',
               }}
             />
           </div>
@@ -141,8 +171,9 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
 
         {/* Capability filters */}
         <div style={{ display: 'flex', gap: 6, padding: '0 16px 10px', flexWrap: 'wrap' }}>
-          {CAP_ORDER.map(cap => <ModelCapabilityToggle key={cap} capability={cap}
-            selected={tags.has(cap)} onChange={() => toggleTag(cap)} />)}
+          {CAP_ORDER.map((cap) => (
+            <ModelCapabilityToggle key={cap} capability={cap} selected={tags.has(cap)} onChange={() => toggleTag(cap)} />
+          ))}
         </div>
 
         {/* Model list */}
@@ -170,26 +201,41 @@ export default function ModelPicker({ open, onClose, showThinking = true }: { op
                   });
                 }}
                 style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  padding: '9px 10px', borderRadius: 'var(--radius-inner)', cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '9px 10px',
+                  borderRadius: 'var(--radius-inner)',
+                  cursor: 'pointer',
                   marginBottom: 2,
-                }}
-              >
+                }}>
                 <span
                   style={{
-                    width: 30, height: 30, borderRadius: 'var(--radius-inner)', flexShrink: 0,
-                    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                    width: 30,
+                    height: 30,
+                    borderRadius: 'var(--radius-inner)',
+                    flexShrink: 0,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
                     background: active ? 'var(--hover)' : 'var(--block)',
                     color: active ? 'var(--text-primary)' : 'var(--text-muted)',
-                  }}
-                >
+                  }}>
                   <Mark size={iconSizes.row} style={{ color: markHue }} />
                 </span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1, minWidth: 0 }}>
-                  <span style={{
-                    minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-regular)', color: 'var(--text-primary)',
-                  }}>{m.name || m.model}</span>
+                  <span
+                    style={{
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      fontSize: 'calc(12px * var(--ui-font-scale))',
+                      fontWeight: 'var(--fw-regular)',
+                      color: 'var(--text-primary)',
+                    }}>
+                    {m.name || m.model}
+                  </span>
                   <span style={{ flexShrink: 0, fontSize: 'calc(10px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>
                     {providerLabel(m.provider)}
                   </span>

@@ -9,7 +9,8 @@
  * Markers covered: the DSML block this endpoint emits, and the two spellings of the native
  * begin-of-calls token. There is no lookbehind: macOS webviews reject it.
  */
-const LEAKED_TOOL_MARKUP = /<\s*(?:[|｜]\s*){1,2}DSML\s*(?:[|｜]\s*){1,2}(calls|invoke|parameter)\b|<\s*[|｜]\s*tool[_▁]calls[_▁]begin\s*[|｜]\s*>/i;
+const LEAKED_TOOL_MARKUP =
+  /<\s*(?:[|｜]\s*){1,2}DSML\s*(?:[|｜]\s*){1,2}(calls|invoke|parameter)\b|<\s*[|｜]\s*tool[_▁]calls[_▁]begin\s*[|｜]\s*>/i;
 
 export function hasLeakedToolCallMarkup(text: string): boolean {
   return LEAKED_TOOL_MARKUP.test(text);
@@ -32,8 +33,16 @@ export function visibleAssistantText(text: string): string {
   const start = remaining.lastIndexOf('<');
   if (start >= 0) {
     const fragment = remaining.slice(start).replace(/\s/g, '').replace(/｜/g, '|').replace(/▁/g, '_').toLowerCase();
-    const prefixes = ['<|dsml|calls', '<||dsml||calls', '<|dsml|invoke', '<||dsml||invoke', '<|dsml|parameter', '<||dsml||parameter', '<|tool_calls_begin|>'];
-    if (prefixes.some(prefix => prefix.startsWith(fragment))) return visible + remaining.slice(0, start);
+    const prefixes = [
+      '<|dsml|calls',
+      '<||dsml||calls',
+      '<|dsml|invoke',
+      '<||dsml||invoke',
+      '<|dsml|parameter',
+      '<||dsml||parameter',
+      '<|tool_calls_begin|>',
+    ];
+    if (prefixes.some((prefix) => prefix.startsWith(fragment))) return visible + remaining.slice(0, start);
   }
   return visible + remaining;
 }

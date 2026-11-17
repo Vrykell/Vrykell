@@ -10,7 +10,9 @@ export function terminalStartupTrace(paneId: string, host: HTMLElement) {
   return (stage: string, detail: Record<string, unknown> = {}) => {
     const now = performance.now();
     terminalDebug('terminal-startup-stage', {
-      paneId, startupId, stage,
+      paneId,
+      startupId,
+      stage,
       elapsedMs: Math.round(now - startedAt),
       stageDurationMs: Math.round(now - previousAt),
       visibility: document.visibilityState,

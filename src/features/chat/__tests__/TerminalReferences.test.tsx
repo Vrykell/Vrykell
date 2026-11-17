@@ -9,9 +9,21 @@ import type { TerminalReference } from '../model/conversation';
 
 vi.mock('../services/conversationContext', () => ({ showExecutionTerminal: vi.fn() }));
 const terminal = useTerminalStore.getState();
-const reference: TerminalReference = { id: 'one', paneId: 'pane', label: 'Build terminal', command: 'npm run build',
-  cwd: '/project', output: 'Built successfully', exitCode: 0, createdAt: 1 };
-afterEach(() => { cleanup(); vi.clearAllMocks(); useTerminalStore.setState(terminal, true); });
+const reference: TerminalReference = {
+  id: 'one',
+  paneId: 'pane',
+  label: 'Build terminal',
+  command: 'npm run build',
+  cwd: '/project',
+  output: 'Built successfully',
+  exitCode: 0,
+  createdAt: 1,
+};
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+  useTerminalStore.setState(terminal, true);
+});
 
 it('opens all references independently, including newly added snapshots', () => {
   const second = { ...reference, id: 'two', command: 'pwd', output: '/project' };
@@ -27,8 +39,12 @@ it('opens all references independently, including newly added snapshots', () => 
 });
 
 it('shares command glyphs and output framing with tool calls', () => {
-  const { container } = render(<><TerminalReferences references={[reference]} />
-    <ToolRunCard framed run={{ toolCallId: 'call', toolName: 'run_command', input: { command: 'pwd' }, state: 'done', startedAt: 1 }} /></>);
+  const { container } = render(
+    <>
+      <TerminalReferences references={[reference]} />
+      <ToolRunCard framed run={{ toolCallId: 'call', toolName: 'run_command', input: { command: 'pwd' }, state: 'done', startedAt: 1 }} />
+    </>,
+  );
   const headers = container.querySelectorAll('.ai-tool-summary');
   expect(headers).toHaveLength(2);
   expect(headers[0].querySelector('svg')!.innerHTML).toBe(headers[1].querySelector('svg')!.innerHTML);

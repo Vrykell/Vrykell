@@ -19,9 +19,17 @@ vi.mock('../services/terminalRepaint', () => ({ redrawTerminal: mocks.redrawTerm
 
 function block(patch: Partial<TermBlock>): TermBlock {
   return {
-    id: 'block-1', command: 'npm run dev', status: 'done', exitCode: 0,
-    startedAt: 1, endedAt: 2, wasLongRunning: false,
-    outputHtml: '', outputText: '', outputRaw: '', linesTruncated: 0,
+    id: 'block-1',
+    command: 'npm run dev',
+    status: 'done',
+    exitCode: 0,
+    startedAt: 1,
+    endedAt: 2,
+    wasLongRunning: false,
+    outputHtml: '',
+    outputText: '',
+    outputRaw: '',
+    linesTruncated: 0,
     ...patch,
   };
 }
@@ -64,7 +72,9 @@ describe('useRunningCommandActions', () => {
     act(() => result.current[2]!.onClick?.());
     expect(mocks.ptyWrite).toHaveBeenCalledWith('session-1', '\x03');
 
-    await act(async () => { result.current[3]!.onClick?.(); });
+    await act(async () => {
+      result.current[3]!.onClick?.();
+    });
     expect(mocks.killForeground).toHaveBeenCalledWith('session-1');
     expect(result.current[3]!.label).toBe('强制结束前台应用');
   });

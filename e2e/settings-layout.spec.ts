@@ -25,7 +25,7 @@ for (const theme of ['深色', '浅色']) {
     await expect(panel).toHaveCSS('border-top-width', '1px');
     const panelBox = (await panel.boundingBox())!;
     const rowBox = (await row.boundingBox())!;
-    const panelContent = await panel.evaluate(element => {
+    const panelContent = await panel.evaluate((element) => {
       const style = getComputedStyle(element);
       return element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
     });
@@ -45,7 +45,7 @@ for (const theme of ['深色', '浅色']) {
     const narrowLabel = (await label.boundingBox())!;
     const narrowControl = (await control.boundingBox())!;
     expect(narrowControl.y).toBeGreaterThan(narrowLabel.y + narrowLabel.height);
-    await expect.poll(() => page.locator('.settings-content').evaluate(e => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+    await expect.poll(() => page.locator('.settings-content').evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
     await page.screenshot({ path: test.info().outputPath('grouped-theme-narrow.png'), animations: 'disabled' });
     await page.setViewportSize({ width: 1240, height: 800 });
     await page.locator('aside').getByRole('button', { name: '模型行为', exact: true }).click();

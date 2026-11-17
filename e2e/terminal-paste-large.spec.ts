@@ -7,16 +7,21 @@ import { setupTauriMock, emitPtyOutput, ptyWrites } from './tauri-mock';
  * keyboard input in the command bar, so its xterm never sees a shortcut.
  */
 async function openClassicShell(page: Page) {
-  await page.addInitScript(() => localStorage.setItem('vrykell-agent-settings', JSON.stringify({
-    version: 8,
-    state: { global: { openModeByShell: { zsh: 'classic', bash: 'classic' } }, overrides: {} },
-  })));
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'vrykell-agent-settings',
+      JSON.stringify({
+        version: 8,
+        state: { global: { openModeByShell: { zsh: 'classic', bash: 'classic' } }, overrides: {} },
+      }),
+    ),
+  );
   await setupTauriMock(page);
   await page.goto('/');
   // The classic scene has no command bar to wait for: the ready PTY session is the signal.
   await page.waitForFunction(async () => {
     const path = '/src/features/terminal/stores/terminal.ts';
-    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    const { useTerminalStore } = (await import(path)) as typeof import('../src/features/terminal/stores/terminal');
     return Object.keys(useTerminalStore.getState().sessions).length > 0;
   });
 }
@@ -26,11 +31,14 @@ const terminalInput = (page: Page) => page.locator('.terminal-pane:visible .xter
 /** A representative seven-line script, including its trailing newline. */
 const MULTI_LINE = 'one\ntwo\nthree\nfour\nfive\nsix\n';
 
-const seedClipboard = (page: Page, text: string) => page.evaluate((value) => {
-  (window as unknown as Record<string, string>).__CLIPBOARD_TEXT__ = value;
-}, text);
+const seedClipboard = (page: Page, text: string) =>
+  page.evaluate((value) => {
+    (window as unknown as Record<string, string>).__CLIPBOARD_TEXT__ = value;
+  }, text);
 
-test('classic scene asks before a multiline paste: cancel writes nothing, confirm writes with normalized line endings', async ({ page }) => {
+test('classic scene asks before a multiline paste: cancel writes nothing, confirm writes with normalized line endings', async ({
+  page,
+}) => {
   await openClassicShell(page);
   await seedClipboard(page, MULTI_LINE);
 
@@ -49,23 +57,27 @@ test('classic scene asks before a multiline paste: cancel writes nothing, confir
   await expect(dialog).toBeVisible();
   await page.getByTestId('confirm-ok').click();
   // The terminal paste path normalizes every line ending to CR before the write.
-  await expect.poll(async () => (await ptyWrites(page)).slice(before))
-    .toEqual(['one\rtwo\rthree\rfour\rfive\rsix\r']);
+  await expect.poll(async () => (await ptyWrites(page)).slice(before)).toEqual(['one\rtwo\rthree\rfour\rfive\rsix\r']);
 });
 
-test('with bracketed paste enabled by a foreground program, a multiline paste skips confirmation and keeps the wrapper', async ({ page }) => {
+test('with bracketed paste enabled by a foreground program, a multiline paste skips confirmation and keeps the wrapper', async ({
+  page,
+}) => {
   await openClassicShell(page);
   await emitPtyOutput(page, '\x1b[?2004h');
-  await expect.poll(() => page.evaluate(() => {
-    const terms = (window as unknown as { __vrykellTerms: Map<string, { modes?: { bracketedPasteMode?: boolean } }> }).__vrykellTerms;
-    return [...terms.values()].some((term) => term.modes?.bracketedPasteMode === true);
-  })).toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const terms = (window as unknown as { __vrykellTerms: Map<string, { modes?: { bracketedPasteMode?: boolean } }> }).__vrykellTerms;
+        return [...terms.values()].some((term) => term.modes?.bracketedPasteMode === true);
+      }),
+    )
+    .toBe(true);
 
   await seedClipboard(page, MULTI_LINE);
   const before = (await ptyWrites(page)).length;
   await terminalInput(page).press('Control+v');
-  await expect.poll(async () => (await ptyWrites(page)).slice(before))
-    .toEqual(['\x1b[200~one\rtwo\rthree\rfour\rfive\rsix\r\x1b[201~']);
+  await expect.poll(async () => (await ptyWrites(page)).slice(before)).toEqual(['\x1b[200~one\rtwo\rthree\rfour\rfive\rsix\r\x1b[201~']);
   await expect(page.getByTestId('confirm-dialog')).toBeHidden();
 });
 
@@ -104,6 +116,5 @@ test('a running block asks for confirmation before a multiline paste as well', a
   await expect(dialog).toBeVisible();
 
   await page.getByTestId('confirm-ok').click();
-  await expect.poll(async () => (await ptyWrites(page)).slice(before))
-    .toEqual(['one\rtwo\rthree\rfour\rfive\rsix\r']);
+  await expect.poll(async () => (await ptyWrites(page)).slice(before)).toEqual(['one\rtwo\rthree\rfour\rfive\rsix\r']);
 });

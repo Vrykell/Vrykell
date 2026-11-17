@@ -8,7 +8,9 @@ describe('pending command registry', () => {
     const calls: Array<[string, string, string]> = [];
     registerPendingCommand('pane', 'command', 'payload');
     expect(calls).toEqual([]);
-    setPendingCommandRegistrar((paneId, command, payload) => { calls.push([paneId, command, payload]); });
+    setPendingCommandRegistrar((paneId, command, payload) => {
+      calls.push([paneId, command, payload]);
+    });
     registerPendingCommand('pane', 'command', 'payload');
     expect(calls).toEqual([['pane', 'command', 'payload']]);
     setPendingCommandRegistrar(null);

@@ -20,7 +20,7 @@ test.describe('Command block actions end to end', () => {
     const output = block.locator('.command-block-output');
     const before = { command: await command.boundingBox(), output: await output.boundingBox() };
     const bounds = (await block.boundingBox())!;
-    const background = await block.evaluate(element => getComputedStyle(element).backgroundColor);
+    const background = await block.evaluate((element) => getComputedStyle(element).backgroundColor);
     expect(before.command!.x - bounds.x).toBe(16);
     expect(before.output!.x).toBe(before.command!.x);
     const gap = before.output!.y - before.command!.y - before.command!.height;
@@ -69,12 +69,14 @@ test.describe('Command block actions end to end', () => {
     const block = page.locator('[data-testid^="command-block-"]').filter({ hasText: 'echo context-menu-position' }).first();
     await expect(block).toBeVisible({ timeout: 5000 });
     await block.evaluate((element) => {
-      element.dispatchEvent(new MouseEvent('contextmenu', {
-        bubbles: true,
-        cancelable: true,
-        clientX: 180,
-        clientY: 160,
-      }));
+      element.dispatchEvent(
+        new MouseEvent('contextmenu', {
+          bubbles: true,
+          cancelable: true,
+          clientX: 180,
+          clientY: 160,
+        }),
+      );
     });
 
     const menu = page.getByRole('menu', { name: '命令块操作' });
@@ -158,11 +160,14 @@ test('narrow panes preserve context above multiline commands and all output', as
   await block.hover();
   const more = block.getByRole('button', { name: '更多操作' });
   await expect(more).toBeVisible();
-  const geometry = await block.evaluate(element => {
+  const geometry = await block.evaluate((element) => {
     const cmd = element.querySelector<HTMLElement>('.command-block-command')!;
     const output = element.querySelector<HTMLElement>('.command-block-output')!;
-    return { overflow: element.scrollWidth - element.clientWidth, aligned: cmd.offsetLeft === output.offsetLeft,
-      rows: cmd.clientHeight / parseFloat(getComputedStyle(cmd).lineHeight) };
+    return {
+      overflow: element.scrollWidth - element.clientWidth,
+      aligned: cmd.offsetLeft === output.offsetLeft,
+      rows: cmd.clientHeight / parseFloat(getComputedStyle(cmd).lineHeight),
+    };
   });
   expect(geometry.overflow).toBeLessThanOrEqual(1);
   expect(geometry.aligned).toBe(true);
@@ -220,15 +225,28 @@ test('the more menu stages a command snapshot for AI analysis while preserving t
 test('two-row command output matches the compact context and spacing proportions', async ({ page }) => {
   await setupTauriMock(page);
   await page.addInitScript(() => {
-    const target = window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args: Record<string, unknown>) => Promise<unknown> } };
+    const target = window as unknown as {
+      __TAURI_INTERNALS__: { invoke: (command: string, args: Record<string, unknown>) => Promise<unknown> };
+    };
     const original = target.__TAURI_INTERNALS__.invoke;
     target.__TAURI_INTERNALS__.invoke = (command, args) => {
       if (command === 'get_session_blocks' && args.sessionId === 't1') {
-        return Promise.resolve([53, 44].map((duration, index) => ({
-          id: `compact-${index}`, session_id: 't1', pane_id: null, command: 'ls', cwd: '~', status: 'done', exit_code: 0,
-          started_at: 0, ended_at: duration, output_raw: '', output_html: '',
-          output_clean: 'Desktop       Downloads     Movies        Pictures\nDocuments     Library       Music         Public',
-        })));
+        return Promise.resolve(
+          [53, 44].map((duration, index) => ({
+            id: `compact-${index}`,
+            session_id: 't1',
+            pane_id: null,
+            command: 'ls',
+            cwd: '~',
+            status: 'done',
+            exit_code: 0,
+            started_at: 0,
+            ended_at: duration,
+            output_raw: '',
+            output_html: '',
+            output_clean: 'Desktop       Downloads     Movies        Pictures\nDocuments     Library       Music         Public',
+          })),
+        );
       }
       return original(command, args);
     };
@@ -239,13 +257,17 @@ test('two-row command output matches the compact context and spacing proportions
   const block = page.getByTestId('command-block-compact-0');
   await expect(block.locator('.command-block-cwd')).toHaveText('~');
   await expect(block.locator('.command-status-duration')).toHaveText('(0.053s)');
-  const geometry = await block.evaluate(element => {
+  const geometry = await block.evaluate((element) => {
     const info = element.querySelector<HTMLElement>('.command-block-info')!;
     const command = element.querySelector<HTMLElement>('.command-block-command')!;
     const output = element.querySelector<HTMLElement>('.command-block-output')!;
-    return { height: element.clientHeight, contextHeight: info.clientHeight,
+    return {
+      height: element.clientHeight,
+      contextHeight: info.clientHeight,
       contextGap: command.getBoundingClientRect().top - info.getBoundingClientRect().bottom,
-      outputHeight: output.clientHeight, font: parseFloat(getComputedStyle(command).fontSize) };
+      outputHeight: output.clientHeight,
+      font: parseFloat(getComputedStyle(command).fontSize),
+    };
   });
   // Row height comes from the measured font metrics, so express the geometry in measured units:
   // one row each for vertical padding, metadata, and command; two output rows with half-row spacing.
@@ -255,5 +277,8 @@ test('two-row command output matches the compact context and spacing proportions
   expect(geometry.outputHeight).toBe(rowHeight * 2);
   expect(geometry.height).toBe(rowHeight * 6.5 + 2);
   expect(geometry.height / rowHeight).toBeLessThan(7);
-  await page.locator('[data-testid^="terminal-flow-"]').first().screenshot({ path: test.info().outputPath('compact-command-blocks.png') });
+  await page
+    .locator('[data-testid^="terminal-flow-"]')
+    .first()
+    .screenshot({ path: test.info().outputPath('compact-command-blocks.png') });
 });

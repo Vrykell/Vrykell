@@ -19,19 +19,50 @@ import { useHarnessStore } from '@features/chat/stores/harness';
 
 vi.mock('@platform/diagnostics', () => ({ invoke: vi.fn(async () => undefined), diagnostic: vi.fn() }));
 vi.mock('@platform/api/historyPage', () => ({ saveWorkspaceHistory: vi.fn().mockResolvedValue(undefined) }));
-vi.mock('@platform/api/group', async original => ({ ...await original<typeof import('@platform/api/group')>(), groupsList: vi.fn(async () => []), groupCreate: vi.fn(async () => undefined), groupRestore: vi.fn(async () => undefined), sessionSetGroup: vi.fn(async () => undefined) }));
-vi.mock('@platform/api/session', async () => ({ ...await vi.importActual<typeof import('@platform/api/session')>('@platform/api/session'), getSession: vi.fn() }));
-vi.mock('@platform/api/conversation', async () => ({ ...await vi.importActual<typeof import('@platform/api/conversation')>('@platform/api/conversation'), listConversationMessages: vi.fn().mockResolvedValue([]) }));
+vi.mock('@platform/api/group', async (original) => ({
+  ...(await original<typeof import('@platform/api/group')>()),
+  groupsList: vi.fn(async () => []),
+  groupCreate: vi.fn(async () => undefined),
+  groupRestore: vi.fn(async () => undefined),
+  sessionSetGroup: vi.fn(async () => undefined),
+}));
+vi.mock('@platform/api/session', async () => ({
+  ...(await vi.importActual<typeof import('@platform/api/session')>('@platform/api/session')),
+  getSession: vi.fn(),
+}));
+vi.mock('@platform/api/conversation', async () => ({
+  ...(await vi.importActual<typeof import('@platform/api/conversation')>('@platform/api/conversation')),
+  listConversationMessages: vi.fn().mockResolvedValue([]),
+}));
 
-const snapshot = (): WorkspaceHistorySnapshot => ({ version: 1, focused: 'first',
-  layout: { type: 'split', direction: 'row', ratio: 0.5, first: { type: 'pane', id: 'first', resourceId: 'terminal:one#0' }, second: { type: 'pane', id: 'second', resourceId: 'chat:two' } },
-  members: [{ id: 'terminal:one#0', title: 'Shell', kind: 'terminal', reference: 'one', paneId: 'one#0', paneCount: 1, local: true, ssh: false },
-    { id: 'chat:two', title: 'Chat', kind: 'conversation', reference: 'two', paneCount: 1, local: false, ssh: false }] });
+const snapshot = (): WorkspaceHistorySnapshot => ({
+  version: 1,
+  focused: 'first',
+  layout: {
+    type: 'split',
+    direction: 'row',
+    ratio: 0.5,
+    first: { type: 'pane', id: 'first', resourceId: 'terminal:one#0' },
+    second: { type: 'pane', id: 'second', resourceId: 'chat:two' },
+  },
+  members: [
+    { id: 'terminal:one#0', title: 'Shell', kind: 'terminal', reference: 'one', paneId: 'one#0', paneCount: 1, local: true, ssh: false },
+    { id: 'chat:two', title: 'Chat', kind: 'conversation', reference: 'two', paneCount: 1, local: false, ssh: false },
+  ],
+});
 
 beforeEach(() => {
   vi.clearAllMocks();
-  useWorkspaceStore.setState({ tabs: [{ id: 'one', title: 'Shell', kind: 'session', layout: leaf({ id: 'one#0', kind: 'local', shellType: 'zsh' }) }], activeId: 'one' });
-  useChatStore.setState({ conversations: [{ id: 'two', title: 'Chat', createdAt: 1, updatedAt: 2, environment: null }], conversationsLoaded: true, conversationsLoading: false, byTab: { two: [] } });
+  useWorkspaceStore.setState({
+    tabs: [{ id: 'one', title: 'Shell', kind: 'session', layout: leaf({ id: 'one#0', kind: 'local', shellType: 'zsh' }) }],
+    activeId: 'one',
+  });
+  useChatStore.setState({
+    conversations: [{ id: 'two', title: 'Chat', createdAt: 1, updatedAt: 2, environment: null }],
+    conversationsLoaded: true,
+    conversationsLoading: false,
+    byTab: { two: [] },
+  });
   useAiWorkspace.setState({ nativeTabs: [], selected: '' });
   useHarnessWorkspace.setState({ connections: [], selected: '' });
   useUnifiedWorkspace.setState({ layout: null, focused: '', historyIdentity: undefined, startActive: true });
@@ -51,7 +82,15 @@ it('validates reference-only layouts and rejects duplicate or missing members', 
     if (change === 'large') value.members[0]!.reference = 'x'.repeat(8193);
     expect(parseWorkspaceHistory(JSON.stringify(value))).toBeNull();
   }
-  expect(() => remapWorkspaceHistory(snapshot(), new Map([['terminal:one#0', 'same'], ['chat:two', 'same']]))).toThrow();
+  expect(() =>
+    remapWorkspaceHistory(
+      snapshot(),
+      new Map([
+        ['terminal:one#0', 'same'],
+        ['chat:two', 'same'],
+      ]),
+    ),
+  ).toThrow();
 });
 
 it('restores empty pane templates without creating empty history records or reviving a saved conversation', async () => {
@@ -63,38 +102,78 @@ it('restores empty pane templates without creating empty history records or revi
   const conversation = await restoreWorkspaceMember({ ...snapshot().members[1]!, empty: true });
   expect(conversation).not.toBe('chat:two');
   expect(useChatStore.getState().byTab[conversation.slice(5)]).toEqual([]);
-  expect(useChatStore.getState().conversations.find(item => item.id === conversation.slice(5))?.title).toBe('Chat');
-  const invalid = snapshot(); invalid.members[0]!.empty = true;
+  expect(useChatStore.getState().conversations.find((item) => item.id === conversation.slice(5))?.title).toBe('Chat');
+  const invalid = snapshot();
+  invalid.members[0]!.empty = true;
   expect(parseWorkspaceHistory(JSON.stringify(invalid))?.members[0]?.empty).toBe(true);
-  expect(parseWorkspaceHistory(JSON.stringify({ ...invalid, members: [{ ...invalid.members[0], empty: 'invalid' }, invalid.members[1]] }))).toBeNull();
+  expect(
+    parseWorkspaceHistory(JSON.stringify({ ...invalid, members: [{ ...invalid.members[0], empty: 'invalid' }, invalid.members[1]] })),
+  ).toBeNull();
 });
 
 it('stores durable external history identities rather than live process identifiers', () => {
   useHarnessWorkspace.setState({ connections: [{ id: 'agent', harness: 'Agent', cwd: '/project', fresh: false }] });
-  useHarnessStore.setState({ byTab: { agent: { harness: 'Agent', sessionId: 'live', resumeSessionId: 'durable', messages: [{ id: 'q', role: 'user', content: 'Question', createdAt: 1 }] } as import('@features/chat/stores/harness').HarnessSession } });
-  const record = captureWorkspaceHistory({ type: 'split', direction: 'row', ratio: 0.5,
-    first: { type: 'pane', id: 'a', resourceId: 'acp:agent' }, second: { type: 'pane', id: 'b', resourceId: 'file:test' } }, 'a', [
-    { id: 'acp:agent', title: 'Agent', kind: 'agent', sessionId: 'agent' },
-    { id: 'file:test', title: 'test', kind: 'document', file: { path: '/test' } },
-  ]);
+  useHarnessStore.setState({
+    byTab: {
+      agent: {
+        harness: 'Agent',
+        sessionId: 'live',
+        resumeSessionId: 'durable',
+        messages: [{ id: 'q', role: 'user', content: 'Question', createdAt: 1 }],
+      } as import('@features/chat/stores/harness').HarnessSession,
+    },
+  });
+  const record = captureWorkspaceHistory(
+    {
+      type: 'split',
+      direction: 'row',
+      ratio: 0.5,
+      first: { type: 'pane', id: 'a', resourceId: 'acp:agent' },
+      second: { type: 'pane', id: 'b', resourceId: 'file:test' },
+    },
+    'a',
+    [
+      { id: 'acp:agent', title: 'Agent', kind: 'agent', sessionId: 'agent' },
+      { id: 'file:test', title: 'test', kind: 'document', file: { path: '/test' } },
+    ],
+  );
   expect(record?.members[0]).toMatchObject({ remoteId: 'durable' });
   expect(record?.members[0]?.empty).toBeUndefined();
 });
 
 it('records the resolved default workspace of an agent session', () => {
   useHarnessWorkspace.setState({ connections: [{ id: 'agent', harness: 'Agent', cwd: '', fresh: true }] });
-  useHarnessStore.setState({ byTab: { agent: { harness: 'Agent', sessionId: 'live', cwd: '/default/session-1', messages: [{ id: 'q', role: 'user', content: 'Question', createdAt: 1 }] } as import('@features/chat/stores/harness').HarnessSession } });
-  const record = captureWorkspaceHistory({ type: 'split', direction: 'row', ratio: 0.5,
-    first: { type: 'pane', id: 'a', resourceId: 'acp:agent' }, second: { type: 'pane', id: 'b', resourceId: 'file:test' } }, 'a', [
-    { id: 'acp:agent', title: 'Agent', kind: 'agent', sessionId: 'agent' },
-    { id: 'file:test', title: 'test', kind: 'document', file: { path: '/test' } },
-  ]);
+  useHarnessStore.setState({
+    byTab: {
+      agent: {
+        harness: 'Agent',
+        sessionId: 'live',
+        cwd: '/default/session-1',
+        messages: [{ id: 'q', role: 'user', content: 'Question', createdAt: 1 }],
+      } as import('@features/chat/stores/harness').HarnessSession,
+    },
+  });
+  const record = captureWorkspaceHistory(
+    {
+      type: 'split',
+      direction: 'row',
+      ratio: 0.5,
+      first: { type: 'pane', id: 'a', resourceId: 'acp:agent' },
+      second: { type: 'pane', id: 'b', resourceId: 'file:test' },
+    },
+    'a',
+    [
+      { id: 'acp:agent', title: 'Agent', kind: 'agent', sessionId: 'agent' },
+      { id: 'file:test', title: 'test', kind: 'document', file: { path: '/test' } },
+    ],
+  );
   expect(record?.members[0]?.cwd).toBe('/default/session-1');
 });
 
 it('updates one combination record rather than producing a record per resize or effect replay', async () => {
   const writer = createWorkspaceHistoryWriter(vi.fn());
-  await writer(snapshot()); await writer(snapshot());
+  await writer(snapshot());
+  await writer(snapshot());
   expect(saveWorkspaceHistory).toHaveBeenCalledOnce();
   const changed = snapshot();
   if (changed.layout.type === 'split') changed.layout.ratio = 0.7;
@@ -109,7 +188,8 @@ it('can retry a failed save without losing the original error or capturing messa
   const error = vi.fn();
   const writer = createWorkspaceHistoryWriter(error);
   vi.mocked(saveWorkspaceHistory).mockRejectedValueOnce(new Error('Offline'));
-  await writer(snapshot()); await writer(snapshot());
+  await writer(snapshot());
+  await writer(snapshot());
   expect(error).toHaveBeenCalledOnce();
   expect(saveWorkspaceHistory).toHaveBeenCalledTimes(2);
   expect(vi.mocked(saveWorkspaceHistory).mock.calls[1]![0].payload).not.toMatch(/messages|password|apiKey/);
@@ -139,14 +219,21 @@ it('republishes a cleared history identity without duplicating its saved record'
 
 it('restores members through their owners and commits the layout without cloning the existing terminal', async () => {
   await restoreWorkspaceComposition(snapshot(), { id: 'workspace:saved', createdAt: 1 });
-  expect(useWorkspaceStore.getState().tabs.filter(tab => tab.kind === 'session')).toHaveLength(1);
+  expect(useWorkspaceStore.getState().tabs.filter((tab) => tab.kind === 'session')).toHaveLength(1);
   expect(useAiWorkspace.getState().nativeTabs).toContain('two');
-  expect(useUnifiedWorkspace.getState()).toMatchObject({ layout: snapshot().layout, focused: 'first', historyIdentity: { id: 'workspace:saved', createdAt: 1 } });
+  expect(useUnifiedWorkspace.getState()).toMatchObject({
+    layout: snapshot().layout,
+    focused: 'first',
+    historyIdentity: { id: 'workspace:saved', createdAt: 1 },
+  });
   expect(useWorkspaceNavigation.getState().area).toBe('unified');
   const captured = captureWorkspaceHistory(snapshot().layout, 'first', currentWorkspaceResources());
   expect(captured).toBeNull();
   useChatStore.setState({ byTab: { two: [{ id: 'q', role: 'user', content: 'First input', createdAt: 1 }] } });
-  expect(captureWorkspaceHistory(snapshot().layout, 'first', currentWorkspaceResources())?.members.map(member => member.kind)).toEqual(['terminal', 'conversation']);
+  expect(captureWorkspaceHistory(snapshot().layout, 'first', currentWorkspaceResources())?.members.map((member) => member.kind)).toEqual([
+    'terminal',
+    'conversation',
+  ]);
 });
 
 it('re-scopes a restored group without nesting the old scope prefix', async () => {
@@ -160,7 +247,9 @@ it('re-scopes a restored group without nesting the old scope prefix', async () =
 it('leaves the current layout intact when a member cannot be restored', async () => {
   const existing = { type: 'pane' as const, id: 'existing', resourceId: 'terminal:one' };
   useUnifiedWorkspace.setState({ layout: existing });
-  const value = snapshot(); value.members[0]!.id = 'terminal:missing'; value.members[0]!.reference = 'missing';
+  const value = snapshot();
+  value.members[0]!.id = 'terminal:missing';
+  value.members[0]!.reference = 'missing';
   if (value.layout.type === 'split' && value.layout.first.type === 'pane') value.layout.first.resourceId = 'terminal:missing';
   vi.mocked(getSession).mockRejectedValueOnce(new Error('Missing'));
   await expect(restoreWorkspaceComposition(value)).rejects.toThrow(t('The saved terminal is no longer available.'));
@@ -168,6 +257,21 @@ it('leaves the current layout intact when a member cannot be restored', async ()
 });
 
 it('keeps an explicit external-session reference isolated from the most recent agent session', async () => {
-  const id = await restoreWorkspaceMember({ id: 'acp:old', title: 'Agent', kind: 'agent', reference: 'Agent', remoteId: 'specific-session', cwd: '/work', paneCount: 1, local: true, ssh: false });
-  expect(useHarnessWorkspace.getState().connections.find(connection => `acp:${connection.id}` === id)).toMatchObject({ harness: 'Agent', cwd: '/work', resumeSessionId: 'specific-session', fresh: false });
+  const id = await restoreWorkspaceMember({
+    id: 'acp:old',
+    title: 'Agent',
+    kind: 'agent',
+    reference: 'Agent',
+    remoteId: 'specific-session',
+    cwd: '/work',
+    paneCount: 1,
+    local: true,
+    ssh: false,
+  });
+  expect(useHarnessWorkspace.getState().connections.find((connection) => `acp:${connection.id}` === id)).toMatchObject({
+    harness: 'Agent',
+    cwd: '/work',
+    resumeSessionId: 'specific-session',
+    fresh: false,
+  });
 });

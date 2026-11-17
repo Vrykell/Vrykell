@@ -27,9 +27,9 @@ export const ALL_FILTER = '';
 export function useUsageStats() {
   const records = useUsageStore((state) => state.records);
   const acp = useUsageStore((state) => state.acp);
-  const configured = useUsageSources(state => state.configured);
-  const sourcesError = useUsageSources(state => state.error);
-  const models = useAiConfigStore(state => state.models);
+  const configured = useUsageSources((state) => state.configured);
+  const sourcesError = useUsageSources((state) => state.error);
+  const models = useAiConfigStore((state) => state.models);
   const [range, setRange] = useState<UsageRange>('today');
   const [source, setSource] = useState<string>(ALL_FILTER);
   const [provider, setProvider] = useState<string>(ALL_FILTER);
@@ -42,8 +42,11 @@ export function useUsageStats() {
   // when the numbers should move. The clock is read at that moment, not on every render.
   const inRange = useMemo(() => recordsInRange(records, range, Date.now()), [records, range, revision]);
   const filtered = useMemo(
-    () => inRange.filter((record) =>
-      (!source || record.source === source) && (!provider || record.provider === provider) && (!model || record.model === model)),
+    () =>
+      inRange.filter(
+        (record) =>
+          (!source || record.source === source) && (!provider || record.provider === provider) && (!model || record.model === model),
+      ),
     [inRange, source, provider, model],
   );
   const totals = useMemo(() => summarize(filtered), [filtered]);
@@ -52,24 +55,39 @@ export function useUsageStats() {
     const storage = (event: StorageEvent) => {
       if (event.key === 'vrykell-usage' || event.key === null) void useUsageStore.persist.rehydrate();
     };
-    const focus = () => { void useUsageSources.getState().refresh(); };
+    const focus = () => {
+      void useUsageSources.getState().refresh();
+    };
     window.addEventListener('storage', storage);
     window.addEventListener('focus', focus);
-    return () => { window.removeEventListener('storage', storage); window.removeEventListener('focus', focus); };
+    return () => {
+      window.removeEventListener('storage', storage);
+      window.removeEventListener('focus', focus);
+    };
   }, []);
 
   // Configured sources remain selectable even before their first report or outside the range.
   const sourceOptions = useMemo(
-    () => [DEFAULT_USAGE_SOURCE, ...[...new Set([...configured, ...records.map(record => record.source), ...Object.keys(acp)])]
-      .filter(name => name !== DEFAULT_USAGE_SOURCE).sort((first, second) => first.localeCompare(second))],
+    () => [
+      DEFAULT_USAGE_SOURCE,
+      ...[...new Set([...configured, ...records.map((record) => record.source), ...Object.keys(acp)])]
+        .filter((name) => name !== DEFAULT_USAGE_SOURCE)
+        .sort((first, second) => first.localeCompare(second)),
+    ],
     [configured, records, acp],
   );
   const providerOptions = useMemo(
-    () => [...new Set([...models.map(profile => profile.provider), ...records.map(record => record.provider)])].sort((first, second) => first.localeCompare(second)),
+    () =>
+      [...new Set([...models.map((profile) => profile.provider), ...records.map((record) => record.provider)])].sort((first, second) =>
+        first.localeCompare(second),
+      ),
     [models, records],
   );
   const modelOptions = useMemo(
-    () => [...new Set([...models.map(profile => profile.model).filter(Boolean), ...records.map(record => record.model)])].sort((first, second) => first.localeCompare(second)),
+    () =>
+      [...new Set([...models.map((profile) => profile.model).filter(Boolean), ...records.map((record) => record.model)])].sort(
+        (first, second) => first.localeCompare(second),
+      ),
     [models, records],
   );
   // Removed configurations without retained reports fall back to the full source list.
@@ -82,26 +100,40 @@ export function useUsageStats() {
   useEffect(() => {
     if (model && !modelOptions.includes(model)) setModel(ALL_FILTER);
   }, [model, modelOptions]);
-  const visibleProfiles = useMemo(() => source && source !== DEFAULT_USAGE_SOURCE ? []
-    : models.filter(profile => profile.model && (!provider || profile.provider === provider) && (!model || profile.model === model)), [models, source, provider, model]);
-  const providerRows = useMemo(() => providerBreakdown(filtered, visibleProfiles.map(profile => profile.provider)), [filtered, visibleProfiles]);
+  const visibleProfiles = useMemo(
+    () =>
+      source && source !== DEFAULT_USAGE_SOURCE
+        ? []
+        : models.filter((profile) => profile.model && (!provider || profile.provider === provider) && (!model || profile.model === model)),
+    [models, source, provider, model],
+  );
+  const providerRows = useMemo(
+    () =>
+      providerBreakdown(
+        filtered,
+        visibleProfiles.map((profile) => profile.provider),
+      ),
+    [filtered, visibleProfiles],
+  );
   const modelRows = useMemo(() => modelBreakdown(filtered, visibleProfiles), [filtered, visibleProfiles]);
   /** Request log: newest first. */
   const logRows = useMemo(() => [...filtered].reverse(), [filtered]);
   /** ACP servers, most recently active first; the source filter narrows them like the records. */
   const acpRows = useMemo(
-    () => [...new Set([...configured, ...Object.keys(acp)])].filter(name => !source || name === source)
-      .map((name): AcpUsageRecord => acp[name] ?? { source: name, at: 0, turns: 0, toolCalls: 0, contextUsed: 0, contextSize: 0, cost: null, currency: '' })
-      .sort((first, second) => second.at - first.at || first.source.localeCompare(second.source)),
+    () =>
+      [...new Set([...configured, ...Object.keys(acp)])]
+        .filter((name) => !source || name === source)
+        .map(
+          (name): AcpUsageRecord =>
+            acp[name] ?? { source: name, at: 0, turns: 0, toolCalls: 0, contextUsed: 0, contextSize: 0, cost: null, currency: '' },
+        )
+        .sort((first, second) => second.at - first.at || first.source.localeCompare(second.source)),
     [configured, acp, source],
   );
   const series = useMemo(() => tokensSeries(filtered, range, Date.now()), [filtered, range, revision]);
   /** Whether any ACP server has reported at all — the clear button clears those too. */
   const hasAcp = useMemo(() => Object.keys(acp).length > 0, [acp]);
-  const latestAt = useMemo(
-    () => records.reduce((latest, record) => (record.at > latest ? record.at : latest), 0),
-    [records],
-  );
+  const latestAt = useMemo(() => records.reduce((latest, record) => (record.at > latest ? record.at : latest), 0), [records]);
   const clear = useCallback(() => useUsageStore.getState().clear(), []);
   /** Re-read saved usage and configured sources before deriving a fresh view. */
   const refresh = useCallback(async () => {
@@ -111,10 +143,30 @@ export function useUsageStats() {
   }, []);
 
   return {
-    records, range, setRange, source, setSource, provider, setProvider, model, setModel,
-    sourceOptions, providerOptions, modelOptions, totals, providerRows, modelRows, logRows, series, latestAt,
-    acpRows, hasAcp, sourcesError,
-    clear, refresh, refreshedAt,
+    records,
+    range,
+    setRange,
+    source,
+    setSource,
+    provider,
+    setProvider,
+    model,
+    setModel,
+    sourceOptions,
+    providerOptions,
+    modelOptions,
+    totals,
+    providerRows,
+    modelRows,
+    logRows,
+    series,
+    latestAt,
+    acpRows,
+    hasAcp,
+    sourcesError,
+    clear,
+    refresh,
+    refreshedAt,
   };
 }
 

@@ -21,19 +21,23 @@ interface ComposerDraftState {
 // Keep unfinished messages in memory across panel closures and session switches.
 export const useComposerDrafts = create<ComposerDraftState>((set) => ({
   byTab: {},
-  setReferences: (tabId, references) => set(state => ({
-    byTab: { ...state.byTab, [tabId]: { ...(state.byTab[tabId] ?? EMPTY_COMPOSER_DRAFT), references } },
-  })),
-  setText: (tabId, text) => set((state) => ({
-    byTab: { ...state.byTab, [tabId]: { ...(state.byTab[tabId] ?? EMPTY_COMPOSER_DRAFT), text } },
-  })),
-  updateAttachments: (tabId, update) => set((state) => {
-    const draft = state.byTab[tabId] ?? EMPTY_COMPOSER_DRAFT;
-    return { byTab: { ...state.byTab, [tabId]: { ...draft, attachments: update(draft.attachments) } } };
-  }),
-  dropTab: (tabId) => set((state) => {
-    const byTab = { ...state.byTab };
-    delete byTab[tabId];
-    return { byTab };
-  }),
+  setReferences: (tabId, references) =>
+    set((state) => ({
+      byTab: { ...state.byTab, [tabId]: { ...(state.byTab[tabId] ?? EMPTY_COMPOSER_DRAFT), references } },
+    })),
+  setText: (tabId, text) =>
+    set((state) => ({
+      byTab: { ...state.byTab, [tabId]: { ...(state.byTab[tabId] ?? EMPTY_COMPOSER_DRAFT), text } },
+    })),
+  updateAttachments: (tabId, update) =>
+    set((state) => {
+      const draft = state.byTab[tabId] ?? EMPTY_COMPOSER_DRAFT;
+      return { byTab: { ...state.byTab, [tabId]: { ...draft, attachments: update(draft.attachments) } } };
+    }),
+  dropTab: (tabId) =>
+    set((state) => {
+      const byTab = { ...state.byTab };
+      delete byTab[tabId];
+      return { byTab };
+    }),
 }));

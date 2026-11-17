@@ -11,14 +11,16 @@ async function expectConnectionTitle(panel: Locator) {
   await expect(panel.locator('.ssh-network-route')).toHaveCount(0);
   await expect(overview).toHaveCSS('border-bottom-width', '0px');
   await expect(overview.getByRole('button', { name: '复制连接地址' })).toHaveAttribute('data-compact', 'true');
-  const spacing = await overview.evaluate(element => {
+  const spacing = await overview.evaluate((element) => {
     const heading = getComputedStyle(element);
-    const reference = document.createElement('div'); reference.className = 'workspace-panel-heading';
+    const reference = document.createElement('div');
+    reference.className = 'workspace-panel-heading';
     element.parentElement!.appendChild(reference);
     const sidebar = getComputedStyle(reference);
     const keys = ['minHeight', 'paddingTop', 'paddingBottom', 'paddingLeft', 'paddingRight', 'fontSize'] as const;
-    const result = keys.map(key => [heading[key], sidebar[key]]);
-    reference.remove(); return result;
+    const result = keys.map((key) => [heading[key], sidebar[key]]);
+    reference.remove();
+    return result;
   });
   for (const [actual, expected] of spacing) expect(actual).toBe(expected);
   await overview.scrollIntoViewIfNeeded();
@@ -31,14 +33,14 @@ async function expectConnectionTitle(panel: Locator) {
   expect(copy!.x - address!.x - address!.width).toBeGreaterThanOrEqual(4);
   expect(copy!.x - address!.x - address!.width).toBeLessThanOrEqual(5);
   expect(actions!.x + actions!.width).toBeLessThanOrEqual(row!.x + row!.width + 1);
-  expect(await overview.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+  expect(await overview.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
 }
 
 for (const theme of ['dark', 'light'] as const) {
   test(`resource history and text readings stay together at narrow and wide widths in ${theme} mode`, async ({ page }, testInfo) => {
     test.setTimeout(60_000);
     await setupTauriMock(page);
-    await page.addInitScript(value => localStorage.setItem('vrykell-ssh-resource-display', value), theme === 'dark' ? 'bars' : 'chart');
+    await page.addInitScript((value) => localStorage.setItem('vrykell-ssh-resource-display', value), theme === 'dark' ? 'bars' : 'chart');
     await page.clock.setFixedTime(new Date('2026-10-17T06:00:00Z'));
     await page.setViewportSize({ width: 1500, height: 1000 });
     await page.goto('/');
@@ -61,12 +63,17 @@ for (const theme of ['dark', 'light'] as const) {
     // A connection-state change while the panel settles drops the counter pair the reading is
     // derived from, so retry with the next 15 s interval until two consecutive samples land.
     let seconds = 15;
-    await expect.poll(async () => {
-      await page.clock.setFixedTime(new Date(Date.parse('2026-10-17T06:00:00Z') + seconds * 1000));
-      seconds += 15;
-      if (await refresh.isEnabled()) await refresh.click();
-      return cpu.textContent();
-    }, { timeout: 30_000 }).toBe('12%');
+    await expect
+      .poll(
+        async () => {
+          await page.clock.setFixedTime(new Date(Date.parse('2026-10-17T06:00:00Z') + seconds * 1000));
+          seconds += 15;
+          if (await refresh.isEnabled()) await refresh.click();
+          return cpu.textContent();
+        },
+        { timeout: 30_000 },
+      )
+      .toBe('12%');
     const writes = await ptyWrites(page);
     const system = panel.locator('.ssh-status-system-section');
     await expect(system).not.toHaveAttribute('open');
@@ -87,7 +94,9 @@ for (const theme of ['dark', 'light'] as const) {
       const before = await page.evaluate(() => (window as unknown as Record<string, number>).__SSH_STATUS_CALLS__);
       await page.clock.setFixedTime(new Date(Date.parse('2026-10-17T06:00:00Z') + seconds * 1000));
       await panel.getByRole('button', { name: '刷新远端资源' }).click();
-      await expect.poll(() => page.evaluate(() => (window as unknown as Record<string, number>).__SSH_STATUS_CALLS__)).toBeGreaterThan(before);
+      await expect
+        .poll(() => page.evaluate(() => (window as unknown as Record<string, number>).__SSH_STATUS_CALLS__))
+        .toBeGreaterThan(before);
       await expect(panel.getByRole('button', { name: '刷新远端资源' })).toBeEnabled();
     }
     const chart = panel.getByRole('img', { name: '资源使用率趋势' });
@@ -102,28 +111,38 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(chart.locator('xpath=../..').locator('.ssh-resource-chart-caption')).toHaveText('资源使用率');
     await expect(traffic.locator('xpath=../..').locator('.ssh-resource-chart-caption')).toHaveText('吞吐量');
     await expect(panel.getByTestId('ssh-network-result')).toHaveCSS('border-top-width', '0px');
-    const colors = await chart.locator('[data-series]').evaluateAll(elements => elements.map(element => getComputedStyle(element).color));
+    const colors = await chart
+      .locator('[data-series]')
+      .evaluateAll((elements) => elements.map((element) => getComputedStyle(element).color));
     expect(new Set(colors).size).toBe(3);
-    const tones = await panel.evaluate(element => {
+    const tones = await panel.evaluate((element) => {
       const canvas = document.createElement('canvas');
       const context = canvas.getContext('2d')!;
       const brightness = (color: string) => {
-        context.fillStyle = color; context.fillRect(0, 0, 1, 1);
-        return Array.from(context.getImageData(0, 0, 1, 1).data).slice(0, 3).reduce((sum, value) => sum + value, 0);
+        context.fillStyle = color;
+        context.fillRect(0, 0, 1, 1);
+        return Array.from(context.getImageData(0, 0, 1, 1).data)
+          .slice(0, 3)
+          .reduce((sum, value) => sum + value, 0);
       };
-      const probe = document.createElement('span'); element.append(probe);
+      const probe = document.createElement('span');
+      element.append(probe);
       const baselines = ['--cmd-argument', '--cmd-pipe', '--cmd-number', '--cmd-path', '--cmd-pipe'];
-      const lines = [...element.querySelectorAll('.ssh-status-resource-summary [data-series]'), ...element.querySelectorAll('.ssh-network-rates [data-series]')];
+      const lines = [
+        ...element.querySelectorAll('.ssh-status-resource-summary [data-series]'),
+        ...element.querySelectorAll('.ssh-network-rates [data-series]'),
+      ];
       const values = lines.map((line, index) => {
         probe.style.color = `var(${baselines[index]})`;
         return { actual: brightness(getComputedStyle(line).color), baseline: brightness(getComputedStyle(probe).color) };
       });
-      probe.remove(); return values;
+      probe.remove();
+      return values;
     });
     expect(tones).toHaveLength(5);
     for (const tone of tones) expect(tone.actual).toBe(tone.baseline);
     for (const plot of [chart, traffic]) {
-      const bounds = await plot.evaluate(element => {
+      const bounds = await plot.evaluate((element) => {
         const chart = element.closest('.ssh-resource-chart')!;
         const frame = chart.getBoundingClientRect();
         const svg = element.getBoundingClientRect();
@@ -131,7 +150,18 @@ for (const theme of ['dark', 'light'] as const) {
         const footer = chart.querySelector('.ssh-status-time-axis')!.getBoundingClientRect();
         const caption = chart.querySelector('.ssh-resource-chart-caption')!.getBoundingClientRect();
         const maximum = chart.querySelector('.ssh-resource-chart-axis > span:last-child')!.getBoundingClientRect();
-        return { frame: frame.width, plot: svg.width, rightInset: svg.right - axis.right, leftInset: axis.left - svg.left, scaleBottom: axis.bottom, plotTop: svg.top, plotBottom: svg.bottom, footerTop: footer.top, captionLeft: caption.left - svg.left, labelGap: maximum.left - caption.right };
+        return {
+          frame: frame.width,
+          plot: svg.width,
+          rightInset: svg.right - axis.right,
+          leftInset: axis.left - svg.left,
+          scaleBottom: axis.bottom,
+          plotTop: svg.top,
+          plotBottom: svg.bottom,
+          footerTop: footer.top,
+          captionLeft: caption.left - svg.left,
+          labelGap: maximum.left - caption.right,
+        };
       });
       expect(Math.abs(bounds.frame - bounds.plot)).toBeLessThanOrEqual(1);
       expect(bounds.rightInset).toBeGreaterThanOrEqual(0);
@@ -149,7 +179,9 @@ for (const theme of ['dark', 'light'] as const) {
       await expect(panel.locator(surface)).toHaveCSS('border-radius', '0px');
     }
     const resultBox = (await panel.getByTestId('ssh-network-result').boundingBox())!;
-    expect(resultBox.y).toBeGreaterThanOrEqual((await panel.locator('.ssh-network-rates').boundingBox())!.y + (await panel.locator('.ssh-network-rates').boundingBox())!.height);
+    expect(resultBox.y).toBeGreaterThanOrEqual(
+      (await panel.locator('.ssh-network-rates').boundingBox())!.y + (await panel.locator('.ssh-network-rates').boundingBox())!.height,
+    );
     await page.screenshot({ path: testInfo.outputPath(`resources-chart-${theme}-300.png`) });
     await panel.locator('.ssh-status-resource').scrollIntoViewIfNeeded();
     await page.screenshot({ path: testInfo.outputPath(`resources-chart-${theme}-detail.png`) });
@@ -172,7 +204,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect.poll(async () => Math.round((await panel.boundingBox())!.width)).toBe(240);
     await expectConnectionTitle(panel);
     await panel.locator('header').screenshot({ path: testInfo.outputPath(`connection-title-${theme}-240.png`) });
-    expect(await panel.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+    expect(await panel.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
     await summary.screenshot({ path: testInfo.outputPath(`combined-resources-${theme}-240.png`) });
     await page.screenshot({ path: testInfo.outputPath(`resources-chart-${theme}-240.png`) });
     await panel.getByRole('button', { name: '关闭 SSH 状态' }).click();
@@ -184,7 +216,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.reload();
     await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
     const sshButton = page.locator('[data-dock-btn="ssh"]');
-    if (!await page.getByTestId('ssh-row-ssh-1').isVisible()) await sshButton.click();
+    if (!(await page.getByTestId('ssh-row-ssh-1').isVisible())) await sshButton.click();
     await page.getByTestId('ssh-row-ssh-1').dblclick();
     await page.getByTestId('ssh-status-toggle').last().click();
     await expect(chart).toBeVisible();
@@ -200,13 +232,15 @@ test('resource text stays aligned with mixed percentage widths and larger UI tex
   await page.setViewportSize({ width: 1500, height: 1000 });
   await page.goto('/');
   await page.evaluate(() => {
-    const internals = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__;
+    const internals = (
+      window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }
+    ).__TAURI_INTERNALS__;
     const invoke = internals.invoke;
     internals.invoke = async (command, args) => {
       const result = await invoke(command, args);
       if (command !== 'ssh_system_status') return result;
       const sample = result as import('../src/features/ssh/services/api').SshSystemStatus;
-      return { ...sample, cpuIdle: sample.cpuTotal! * .99, memoryAvailable: sample.memoryTotal! * .88, diskUsed: sample.diskTotal };
+      return { ...sample, cpuIdle: sample.cpuTotal! * 0.99, memoryAvailable: sample.memoryTotal! * 0.88, diskUsed: sample.diskTotal };
     };
   });
   await page.locator('[data-dock-btn="ssh"]').click();
@@ -223,8 +257,8 @@ test('resource text stays aligned with mixed percentage widths and larger UI tex
   await expect(panel.getByTestId('ssh-resource-disk')).toHaveText('100%');
   const summary = panel.locator('.ssh-status-resource-summary');
   for (const fontSize of [14, 18]) {
-    await page.evaluate(async uiFontSize => {
-      const { useTypographyStore } = await import('/src/config/typography.ts') as typeof import('../src/config/typography');
+    await page.evaluate(async (uiFontSize) => {
+      const { useTypographyStore } = (await import('/src/config/typography.ts')) as typeof import('../src/config/typography');
       useTypographyStore.getState().update({ uiFontSize });
     }, fontSize);
     const separator = page.getByRole('separator', { name: '调整 SSH 状态面板宽度' });
@@ -234,14 +268,16 @@ test('resource text stays aligned with mixed percentage widths and larger UI tex
     await expect.poll(async () => Math.round((await panel.boundingBox())!.width)).toBe(expectedWidth);
     await expectConnectionTitle(panel);
     await panel.locator('header').screenshot({ path: testInfo.outputPath(`connection-title-${fontSize}-${expectedWidth}.png`) });
-    const readingEdges = await panel.locator('.ssh-status-metric-value').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().right));
+    const readingEdges = await panel
+      .locator('.ssh-status-metric-value')
+      .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().right));
     for (const edge of readingEdges) expect(Math.abs(edge - readingEdges[0])).toBeLessThanOrEqual(1);
     await expect(panel.getByRole('meter')).toHaveCount(0);
     const details = summary.locator('.ssh-status-metric-caption');
     await expect(details).toHaveCount(3);
     await expect(details.first()).toHaveText('99% 空闲');
     for (const detail of await details.all()) expect((await detail.boundingBox())!.height).toBeGreaterThan(0);
-    expect(await summary.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+    expect(await summary.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
     await expect(summary.locator('.ssh-resource-chart')).toHaveAttribute('data-window-ms', '60000');
     await expect(panel.locator('.ssh-network-rates .ssh-resource-chart')).toHaveAttribute('data-window-ms', '60000');
     await summary.screenshot({ path: testInfo.outputPath(`aligned-resources-${fontSize}-${expectedWidth}.png`) });
@@ -265,7 +301,13 @@ test('resource plots append samples automatically and never drift while waiting 
   const initialCalls = await calls();
   const chart = panel.getByRole('img', { name: '资源使用率趋势' });
   const frame = chart.locator('xpath=../..');
-  const pointCount = () => chart.locator('[data-series]').nth(1).evaluate(element => [...element.querySelectorAll('polyline')].reduce((count, line) => count + line.getAttribute('points')!.split(' ').length, 0));
+  const pointCount = () =>
+    chart
+      .locator('[data-series]')
+      .nth(1)
+      .evaluate((element) =>
+        [...element.querySelectorAll('polyline')].reduce((count, line) => count + line.getAttribute('points')!.split(' ').length, 0),
+      );
   await expect(chart.locator('circle')).toHaveCount(0);
   expect(await pointCount()).toBe(0);
   for (const additional of [1, 2, 3]) {
@@ -323,11 +365,21 @@ test('automatic probes respect pause and visibility and retain actionable failur
   expect(await calls()).toBe(closed);
   await page.getByTestId('ssh-status-toggle').last().click();
   await expect(result).toHaveAttribute('data-connectivity', 'reachable');
-  await page.evaluate(() => { (window as unknown as Record<string, unknown>).__NETWORK_PROBE_RESULT__ = { dnsMs: 1, attempts: [{ latencyMs: 20, errorKind: null }, { latencyMs: null, errorKind: 'timeout' }] }; });
+  await page.evaluate(() => {
+    (window as unknown as Record<string, unknown>).__NETWORK_PROBE_RESULT__ = {
+      dnsMs: 1,
+      attempts: [
+        { latencyMs: 20, errorKind: null },
+        { latencyMs: null, errorKind: 'timeout' },
+      ],
+    };
+  });
   await panel.getByRole('button', { name: '重新探测', exact: true }).click();
   await expect(result).toHaveAttribute('data-connectivity', 'partial');
   await expect(result).toContainText('50%');
-  await page.evaluate(() => { (window as unknown as Record<string, string>).__NETWORK_PROBE_ERROR__ = 'Address resolution failed'; });
+  await page.evaluate(() => {
+    (window as unknown as Record<string, string>).__NETWORK_PROBE_ERROR__ = 'Address resolution failed';
+  });
   await panel.getByRole('button', { name: '重新探测', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('网络探测失败');
   await expect(result).toContainText('上次探测结果');

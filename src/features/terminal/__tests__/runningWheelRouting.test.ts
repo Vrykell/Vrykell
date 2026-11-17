@@ -11,7 +11,9 @@ function makeScroll(contentHeight: number, viewportHeight: number, scrollTop: nu
     clientHeight: { value: viewportHeight, configurable: true },
     scrollTop: {
       get: () => top,
-      set: (next: number) => { top = Math.max(0, Math.min(next, contentHeight - viewportHeight)); },
+      set: (next: number) => {
+        top = Math.max(0, Math.min(next, contentHeight - viewportHeight));
+      },
       configurable: true,
     },
   });
@@ -39,7 +41,9 @@ function wheel(target: Element, deltaY: number) {
 }
 
 const cleanups: Array<() => void> = [];
-afterEach(() => { while (cleanups.length) cleanups.pop()!(); });
+afterEach(() => {
+  while (cleanups.length) cleanups.pop()!();
+});
 
 /** Mount the router on a scroller that already contains a running-terminal host. */
 function mount(scroll: HTMLElement, terminal: Terminal | null) {

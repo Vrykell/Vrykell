@@ -23,7 +23,9 @@ export function syncWindowMaterial(enabled: boolean, mode: ThemeMode): Promise<v
       if (enabled) await window.setEffects({ effects: [isMacOS ? Effect.Sidebar : Effect.Acrylic] });
       if (revision === materialRevision) root.dataset.nativeMaterial = enabled ? 'active' : 'off';
       syncWindowFrame();
-    } catch { /* Unsupported compositors keep the CSS navigation treatment. */ }
+    } catch {
+      /* Unsupported compositors keep the CSS navigation treatment. */
+    }
   });
   return materialUpdate;
 }
@@ -32,8 +34,7 @@ export function syncWindowMaterial(enabled: boolean, mode: ThemeMode): Promise<v
 export function syncWindowFrame(): void {
   const root = document.documentElement;
   const variable = '--border-strong';
-  const color = root.style.getPropertyValue(variable).trim()
-    || getComputedStyle(root).getPropertyValue(variable).trim();
+  const color = root.style.getPropertyValue(variable).trim() || getComputedStyle(root).getPropertyValue(variable).trim();
   if (!color) return;
   void invoke('apply_window_frame', { color }).catch(() => {});
 }

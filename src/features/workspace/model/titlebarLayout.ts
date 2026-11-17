@@ -1,12 +1,24 @@
 /** Center the global search in the application while preserving fixed controls on either side. */
-export function globalSearchLayout({ viewportWidth, headerLeft, headerWidth, actionsWidth, leftReserved, gap = 12 }: {
-  viewportWidth: number; headerLeft: number; headerWidth: number; actionsWidth: number; leftReserved: number; gap?: number;
+export function globalSearchLayout({
+  viewportWidth,
+  headerLeft,
+  headerWidth,
+  actionsWidth,
+  leftReserved,
+  gap = 12,
+}: {
+  viewportWidth: number;
+  headerLeft: number;
+  headerWidth: number;
+  actionsWidth: number;
+  leftReserved: number;
+  gap?: number;
 }) {
   const center = viewportWidth / 2 - headerLeft;
   const leftRoom = Math.max(0, center - leftReserved);
   const rightRoom = Math.max(0, headerWidth - actionsWidth - center);
   const spacing = Math.max(0, Math.min(gap, leftRoom - 16, rightRoom - 16));
-  const width = Math.max(32, Math.min(420, viewportWidth * .34, 2 * (leftRoom - spacing), 2 * (rightRoom - spacing)));
+  const width = Math.max(32, Math.min(420, viewportWidth * 0.34, 2 * (leftRoom - spacing), 2 * (rightRoom - spacing)));
   return { width, gap: spacing, titleSpace: Math.max(0, center - width / 2 - spacing) };
 }
 
@@ -22,7 +34,14 @@ export const TITLEBAR_SEARCH_MIN_WIDTH = 112;
  * They fold away as soon as the label would be squeezed or the search field has given up its
  * text, so the title keeps a readable share and the search never becomes an icon-only stub.
  */
-export function titlebarHistoryFits({ titleSpace, titleReserved, searchWidth }: { titleSpace: number; titleReserved: number; searchWidth: number }) {
-  return searchWidth >= TITLEBAR_SEARCH_MIN_WIDTH
-    && titleSpace - titleReserved >= TITLEBAR_HISTORY_WIDTH + TITLEBAR_HISTORY_MIN_TITLE;
+export function titlebarHistoryFits({
+  titleSpace,
+  titleReserved,
+  searchWidth,
+}: {
+  titleSpace: number;
+  titleReserved: number;
+  searchWidth: number;
+}) {
+  return searchWidth >= TITLEBAR_SEARCH_MIN_WIDTH && titleSpace - titleReserved >= TITLEBAR_HISTORY_WIDTH + TITLEBAR_HISTORY_MIN_TITLE;
 }

@@ -11,29 +11,35 @@ afterEach(() => vi.restoreAllMocks());
 
 it('opens the globally indexed page before mounting and updates an existing settings view', () => {
   const open = vi.spyOn(useSessionStore.getState(), 'openSettings').mockImplementation(() => {});
-  getSettings().find(setting => setting.id === 'theme')!.onSelect();
+  getSettings()
+    .find((setting) => setting.id === 'theme')!
+    .onSelect();
   const { result } = renderHook(() => useSettingsNavigation());
   expect(result.current.selected).toBe('appearance-theme');
-  act(() => getSettings().find(setting => setting.id === 'file-open')!.onSelect());
+  act(() =>
+    getSettings()
+      .find((setting) => setting.id === 'file-open')!
+      .onSelect(),
+  );
   expect(result.current.selected).toBe('editor-local');
   expect(open).toHaveBeenCalledTimes(2);
 });
 
 it('keeps all pages available and clears field targets when choosing a page', () => {
   const { result } = renderHook(() => useSettingsNavigation());
-  expect(result.current.groups.flatMap(group => group.items)).toHaveLength(isWindows ? 27 : 26);
+  expect(result.current.groups.flatMap((group) => group.items)).toHaveLength(isWindows ? 27 : 26);
   act(() => useSettingsNavigationStore.getState().openField('ai-perms', 'Permissions'));
   act(() => result.current.setSelected('profile:powershell'));
   expect(result.current.selected).toBe('profile:powershell');
   expect(result.current.activeLabel).toBe('Windows PowerShell');
   expect(useSettingsNavigationStore.getState().targetField).toBeNull();
   expect(result.current.groups).toHaveLength(7);
-  expect(result.current.groups.flatMap(group => group.items).some(item => item.label === '终端默认行为')).toBe(false);
+  expect(result.current.groups.flatMap((group) => group.items).some((item) => item.label === '终端默认行为')).toBe(false);
 });
 it('splits the appearance theme page into theme, blocks, typography and files', () => {
   const { result } = renderHook(() => useSettingsNavigation());
-  const appearance = result.current.groups.find(group => group.id === 'appearance')!;
-  expect(appearance.items.map(item => [item.id, item.label])).toEqual([
+  const appearance = result.current.groups.find((group) => group.id === 'appearance')!;
+  expect(appearance.items.map((item) => [item.id, item.label])).toEqual([
     ['appearance-theme', '主题'],
     ['appearance-blocks', '块外观'],
     ['appearance-typography', '字体与显示'],
@@ -41,6 +47,6 @@ it('splits the appearance theme page into theme, blocks, typography and files', 
   ]);
 });
 it('omits obsolete editor and comparison page preferences from settings search', () => {
-  expect(getSettings().find(setting => setting.id === 'git-diff-pages')).toBeUndefined();
-  expect(getSettings().find(setting => setting.id === 'embedded-editor-pages')).toBeUndefined();
+  expect(getSettings().find((setting) => setting.id === 'git-diff-pages')).toBeUndefined();
+  expect(getSettings().find((setting) => setting.id === 'embedded-editor-pages')).toBeUndefined();
 });

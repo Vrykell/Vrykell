@@ -33,8 +33,10 @@ beforeEach(() => {
   subscriptions = [];
   mocks.listen.mockReset().mockImplementation((handler: EventCallback<DragDropEvent>) => {
     listeners.add(handler);
-    const unlisten = vi.fn(() => { listeners.delete(handler); });
-    return new Promise<() => void>(resolve => {
+    const unlisten = vi.fn(() => {
+      listeners.delete(handler);
+    });
+    return new Promise<() => void>((resolve) => {
       subscriptions.push({ resolve: () => resolve(unlisten), unlisten });
     });
   });
@@ -91,7 +93,9 @@ describe('external file drop subscriptions', () => {
   it('uses updated handlers without adding another subscription', async () => {
     const initialDrop = vi.fn();
     const nextDrop = vi.fn();
-    const view = renderHook(({ onDrop }) => useExternalFileDrop({ resolveTarget: () => target, onHover: vi.fn(), onDrop }), { initialProps: { onDrop: initialDrop } });
+    const view = renderHook(({ onDrop }) => useExternalFileDrop({ resolveTarget: () => target, onHover: vi.fn(), onDrop }), {
+      initialProps: { onDrop: initialDrop },
+    });
     await finishSubscriptions();
     view.rerender({ onDrop: nextDrop });
 

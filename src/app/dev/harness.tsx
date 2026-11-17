@@ -39,7 +39,12 @@ window.addEventListener('error', (e) => errors.push(`error: ${e.message}`));
 window.addEventListener('unhandledrejection', (e) => errors.push(`rejection: ${String(e.reason).slice(0, 300)}`));
 const origConsoleError = console.error.bind(console);
 console.error = (...args: unknown[]) => {
-  errors.push(`console.error: ${args.map((a) => String(a)).join(' ').slice(0, 500)}`);
+  errors.push(
+    `console.error: ${args
+      .map((a) => String(a))
+      .join(' ')
+      .slice(0, 500)}`,
+  );
   origConsoleError(...args);
 };
 
@@ -142,4 +147,7 @@ const poll = setInterval(() => {
     setTimeout(publish, 400); // wait for the last frame to paint
   }
 }, 300);
-setTimeout(() => { clearInterval(poll); publish(); }, 30000); // safety timeout
+setTimeout(() => {
+  clearInterval(poll);
+  publish();
+}, 30000); // safety timeout

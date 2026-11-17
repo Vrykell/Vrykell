@@ -20,13 +20,17 @@ export function waitForTerminalStartup(paneId: string, timeoutMs = 15000): Promi
     };
     const check = () => {
       const state = useTerminalStore.getState();
-      const exists = useWorkspaceStore.getState().tabs.some(tab =>
-        tab.kind === 'session' && leaves(tab.layout).some(pane => pane.id === paneId));
+      const exists = useWorkspaceStore
+        .getState()
+        .tabs.some((tab) => tab.kind === 'session' && leaves(tab.layout).some((pane) => pane.id === paneId));
       if (!exists || state.startupStates[paneId] === 'closed') finish(undefined, t('File opening cancelled: the terminal was closed'));
       else if (state.startupStates[paneId] === 'failed') finish(undefined, t('Could not open the file: the terminal failed to start'));
       else if (state.startupStates[paneId] === 'ready' && state.sessions[paneId]) finish(state.sessions[paneId]);
     };
-    const timeout = setTimeout(() => finish(undefined, t('The terminal took too long to start; no shell-ready response arrived, please retry')), timeoutMs);
+    const timeout = setTimeout(
+      () => finish(undefined, t('The terminal took too long to start; no shell-ready response arrived, please retry')),
+      timeoutMs,
+    );
     unsubscribeTerminal = useTerminalStore.subscribe(check);
     unsubscribeWorkspace = useWorkspaceStore.subscribe(check);
     check();

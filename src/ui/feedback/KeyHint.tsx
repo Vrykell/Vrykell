@@ -22,22 +22,53 @@ const paths: Record<string, string> = {
 };
 
 export function shortcutKeys(shortcut: string): string[] {
-  return shortcut.replace(/Ctrl\/Cmd|Cmd\/Ctrl|CmdOrCtrl/g, isMacOS ? 'Meta' : 'Control')
-    .replace(/⌘/g, 'Meta+').replace(/⇧/g, 'Shift+').replace(/⌥/g, 'Alt+')
-    .replace(/⌃/g, 'Control+').split('+').filter(Boolean).map(key => {
+  return shortcut
+    .replace(/Ctrl\/Cmd|Cmd\/Ctrl|CmdOrCtrl/g, isMacOS ? 'Meta' : 'Control')
+    .replace(/⌘/g, 'Meta+')
+    .replace(/⇧/g, 'Shift+')
+    .replace(/⌥/g, 'Alt+')
+    .replace(/⌃/g, 'Control+')
+    .split('+')
+    .filter(Boolean)
+    .map((key) => {
       const value = key.trim();
-      return ({ Cmd: 'Meta', Command: 'Meta', Ctrl: 'Control', Option: 'Alt', Return: 'Enter', Esc: 'Escape', '↑': 'ArrowUp', '↓': 'ArrowDown', '←': 'ArrowLeft', '→': 'ArrowRight', '↵': 'Enter', Spacebar: 'Space' } as Record<string, string>)[value] ?? value;
+      return (
+        (
+          {
+            Cmd: 'Meta',
+            Command: 'Meta',
+            Ctrl: 'Control',
+            Option: 'Alt',
+            Return: 'Enter',
+            Esc: 'Escape',
+            '↑': 'ArrowUp',
+            '↓': 'ArrowDown',
+            '←': 'ArrowLeft',
+            '→': 'ArrowRight',
+            '↵': 'Enter',
+            Spacebar: 'Space',
+          } as Record<string, string>
+        )[value] ?? value
+      );
     });
 }
 
 /** Modifier and navigation keys use glyphs, while letter keys retain their labels. */
 export default function KeyHint({ shortcut }: { shortcut: string }) {
   const keys = shortcutKeys(shortcut);
-  return <kbd className="key-hint" role="img" aria-label={keys.join('+')}>
-    {keys.map((key, index) => key === 'Meta'
-      ? <Command key={index} size={14} aria-hidden="true" data-key-icon={key} />
-      : paths[key] ? <svg key={index} width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" data-key-icon={key}>
-        <path d={paths[key]} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-      </svg> : <span key={index}>{key}</span>)}
-  </kbd>;
+  return (
+    <kbd className="key-hint" role="img" aria-label={keys.join('+')}>
+      {keys.map((key, index) =>
+        key === 'Meta' ? (
+          <Command key={index} size={14} aria-hidden="true" data-key-icon={key} />
+        ) : paths[key] ? (
+          <svg key={index} width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" data-key-icon={key}>
+            <path d={paths[key]} fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : (
+          <span key={index}>{key}</span>
+        ),
+      )}
+    </kbd>
+  );
 }

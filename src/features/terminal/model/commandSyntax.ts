@@ -1,7 +1,29 @@
-export type CommandTokenKind = 'plain' | 'command' | 'argument' | 'number' | 'keyword' | 'flag' | 'path' | 'string' | 'variable' | 'operator' | 'comment';
-export interface CommandToken { text: string; kind: CommandTokenKind }
+export type CommandTokenKind =
+  'plain' | 'command' | 'argument' | 'number' | 'keyword' | 'flag' | 'path' | 'string' | 'variable' | 'operator' | 'comment';
+export interface CommandToken {
+  text: string;
+  kind: CommandTokenKind;
+}
 
-const KEYWORDS = new Set(['if', 'then', 'else', 'elif', 'fi', 'for', 'in', 'while', 'until', 'do', 'done', 'case', 'esac', 'function', 'select', 'time', '!']);
+const KEYWORDS = new Set([
+  'if',
+  'then',
+  'else',
+  'elif',
+  'fi',
+  'for',
+  'in',
+  'while',
+  'until',
+  'do',
+  'done',
+  'case',
+  'esac',
+  'function',
+  'select',
+  'time',
+  '!',
+]);
 const WRAPPERS = new Set(['sudo', 'env', 'command', 'exec', 'nohup']);
 const OPERATORS = '|&;<>()[{}]';
 
@@ -51,8 +73,14 @@ export function tokenizeCommand(source: string): CommandToken[] {
     const delimiter = source[index++];
     while (index < source.length) {
       const character = source[index]!;
-      if (character === delimiter) { index++; break; }
-      if (delimiter === '"' && character === '\\') { index = Math.min(source.length, index + 2); continue; }
+      if (character === delimiter) {
+        index++;
+        break;
+      }
+      if (delimiter === '"' && character === '\\') {
+        index = Math.min(source.length, index + 2);
+        continue;
+      }
       if (delimiter === '"' && (character === '$' || character === '`')) {
         push(start, 'string');
         if (character === '$') variable(depth);
@@ -88,7 +116,11 @@ export function tokenizeCommand(source: string): CommandToken[] {
     while (index < source.length) {
       const start = index;
       const character = source[index]!;
-      if (stop && character === stop) { index++; push(start, 'operator'); return; }
+      if (stop && character === stop) {
+        index++;
+        push(start, 'operator');
+        return;
+      }
       if (/\s/.test(character)) {
         while (index < source.length && /\s/.test(source[index]!)) {
           if (source[index] === '\n') expectsCommand = true;

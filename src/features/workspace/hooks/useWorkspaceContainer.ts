@@ -3,7 +3,9 @@ import type { WorkspaceScope } from '../model/workbench';
 import { workspaceAreaStores } from '../stores/paneWorkspace';
 
 export function useWorkspaceContainer(scope: WorkspaceScope, id?: string) {
-  return useWorkbenchStore(state => state.snapshot.tabs.find(tab => tab.scope === scope && tab.id === (id ?? state.snapshot.selected[scope])));
+  return useWorkbenchStore((state) =>
+    state.snapshot.tabs.find((tab) => tab.scope === scope && tab.id === (id ?? state.snapshot.selected[scope])),
+  );
 }
 
 export function useWorkspacePaneControls(scope: WorkspaceScope) {
@@ -11,5 +13,5 @@ export function useWorkspacePaneControls(scope: WorkspaceScope) {
 }
 
 export function useWorkspacePlacementActive(scope: WorkspaceScope) {
-  return workspaceAreaStores[scope](state => !!(state.pendingMergeTab || state.choosingSplit));
+  return workspaceAreaStores[scope]((state) => !!(state.pendingMergeTab || state.choosingSplit));
 }

@@ -34,36 +34,67 @@ export default function ConfirmDialog({
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 9997,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9997,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         background: 'var(--overlay)',
         animation: 'overlayIn 0.18s var(--ease)',
       }}
       onClick={onCancel}
-      data-testid="confirm-dialog"
-    >
-      <div ref={dialog} tabIndex={-1} className="workspace-floating workspace-floating-dialog" role="dialog" aria-modal="true" aria-label={title}
+      data-testid="confirm-dialog">
+      <div
+        ref={dialog}
+        tabIndex={-1}
+        className="workspace-floating workspace-floating-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         style={{
-          width: 360, maxWidth: 'calc(100vw - 40px)', padding: 16,
-          display: 'flex', flexDirection: 'column', gap: 10,
+          width: 360,
+          maxWidth: 'calc(100vw - 40px)',
+          padding: 16,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 10,
           animation: 'modalIn 0.22s var(--ease-out)',
         }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div style={{ fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>{title}</div>
+        onClick={(e) => e.stopPropagation()}>
+        <div style={{ fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)' }}>
+          {title}
+        </div>
         {message && (
-          <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)', lineHeight: 1.6, wordBreak: 'break-all' }}>
+          <div
+            style={{
+              fontSize: 'calc(12px * var(--ui-font-scale))',
+              color: 'var(--text-secondary)',
+              lineHeight: 1.6,
+              wordBreak: 'break-all',
+            }}>
             {message}
           </div>
         )}
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <OutlineButton onClick={onCancel} data-testid="confirm-cancel">{cancelLabel}</OutlineButton>
-          <button className={danger ? undefined : 'primary-button'} onClick={onConfirm} data-testid="confirm-ok" style={{
-            padding: '5px 16px', fontSize: 'calc(12px * var(--ui-font-scale))', border: 'none',
-            borderRadius: 'var(--radius-inner)',
-            background: danger ? 'var(--danger-action)' : 'var(--primary-button-bg)',
-            color: danger ? 'var(--danger-action-text)' : 'var(--primary-button-text)', cursor: 'pointer',
-          }}>{confirmLabel}</button>
+          <OutlineButton onClick={onCancel} data-testid="confirm-cancel">
+            {cancelLabel}
+          </OutlineButton>
+          <button
+            className={danger ? undefined : 'primary-button'}
+            onClick={onConfirm}
+            data-testid="confirm-ok"
+            style={{
+              padding: '5px 16px',
+              fontSize: 'calc(12px * var(--ui-font-scale))',
+              border: 'none',
+              borderRadius: 'var(--radius-inner)',
+              background: danger ? 'var(--danger-action)' : 'var(--primary-button-bg)',
+              color: danger ? 'var(--danger-action-text)' : 'var(--primary-button-text)',
+              cursor: 'pointer',
+            }}>
+            {confirmLabel}
+          </button>
         </div>
       </div>
     </div>

@@ -22,11 +22,20 @@ test.describe('window splitting (binary split tree + placement selection)', () =
     const rect = (await divider.boundingBox())!;
     const main = (await page.locator('main').boundingBox())!;
     await page.mouse.move(rect.x + rect.width / 2, rect.y + 100);
-    await page.mouse.down(); await page.mouse.move(main.x + 5, rect.y + 100, { steps: 8 }); await page.mouse.up();
+    await page.mouse.down();
+    await page.mouse.move(main.x + 5, rect.y + 100, { steps: 8 });
+    await page.mouse.up();
     const checkWidths = async () => {
-      await expect.poll(() => page.locator('.terminal-pane:visible').evaluateAll(elements =>
-        Math.min(...elements.map(element => element.getBoundingClientRect().width)))).toBeGreaterThanOrEqual(359);
-      const widths = await page.locator('.terminal-pane:visible').evaluateAll(elements => elements.map(element => element.getBoundingClientRect().width));
+      await expect
+        .poll(() =>
+          page
+            .locator('.terminal-pane:visible')
+            .evaluateAll((elements) => Math.min(...elements.map((element) => element.getBoundingClientRect().width))),
+        )
+        .toBeGreaterThanOrEqual(359);
+      const widths = await page
+        .locator('.terminal-pane:visible')
+        .evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().width));
       expect(widths).toHaveLength(2);
       for (const width of widths) expect(width).toBeGreaterThanOrEqual(359);
     };
@@ -49,10 +58,12 @@ test.describe('window splitting (binary split tree + placement selection)', () =
     await expect(page.getByPlaceholder(/输入命令/)).toHaveCount(2);
 
     const sizes = await page.evaluate(() =>
-      Array.from(document.querySelectorAll('.terminal-pane')).filter(el => el.getBoundingClientRect().width > 0).map((el) => {
-        const r = el.getBoundingClientRect();
-        return { w: r.width, h: r.height };
-      }),
+      Array.from(document.querySelectorAll('.terminal-pane'))
+        .filter((el) => el.getBoundingClientRect().width > 0)
+        .map((el) => {
+          const r = el.getBoundingClientRect();
+          return { w: r.width, h: r.height };
+        }),
     );
     for (const s of sizes) {
       expect(s.w).toBeGreaterThan(100);

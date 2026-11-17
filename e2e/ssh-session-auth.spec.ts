@@ -4,7 +4,9 @@ import { ptyWrites, setupTauriMock } from './tauri-mock';
 test('temporary authentication recovers files and resources together without changing the terminal or saved profile', async ({ page }) => {
   await setupTauriMock(page, { integration: false });
   await page.addInitScript(() => {
-    const ipc = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__;
+    const ipc = (
+      window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }
+    ).__TAURI_INTERNALS__;
     const original = ipc.invoke;
     let authenticated = false;
     ipc.invoke = async (command, args) => {
@@ -13,7 +15,10 @@ test('temporary authentication recovers files and resources together without cha
         authenticated = true;
         return undefined;
       }
-      if (command === 'ssh_forget_session_auth') { authenticated = false; return undefined; }
+      if (command === 'ssh_forget_session_auth') {
+        authenticated = false;
+        return undefined;
+      }
       if ((command === 'ssh_list' || command === 'ssh_system_status') && !authenticated) {
         throw new Error('SSH_AUTH_FAILED: Private key authentication failed');
       }
@@ -57,7 +62,9 @@ test('temporary authentication recovers files and resources together without cha
 
 test('cancelling service authentication keeps the terminal connected', async ({ page }) => {
   await setupTauriMock(page, { integration: false });
-  await page.addInitScript(() => { (window as unknown as Record<string, unknown>).__SSH_STATUS_ERROR__ = 'SSH_AUTH_FAILED: Private key authentication failed'; });
+  await page.addInitScript(() => {
+    (window as unknown as Record<string, unknown>).__SSH_STATUS_ERROR__ = 'SSH_AUTH_FAILED: Private key authentication failed';
+  });
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
   await page.getByTestId('ssh-row-ssh-1').dblclick();

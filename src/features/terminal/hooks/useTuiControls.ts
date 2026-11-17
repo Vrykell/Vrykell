@@ -15,9 +15,12 @@ export function useTuiControls(tabId: string) {
   const [killArmed, setKillArmed] = useState(false);
   const killTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => () => {
-    if (killTimer.current) clearTimeout(killTimer.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (killTimer.current) clearTimeout(killTimer.current);
+    },
+    [],
+  );
 
   const runningBlock = useMemo(() => {
     const running = blocks.filter((block) => block.status === 'executing');

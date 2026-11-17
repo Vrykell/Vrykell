@@ -15,8 +15,14 @@ export default function CompletionControl({ onReturnFocus }: { onReturnFocus: ()
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const close = useCallback(() => {
-    setOpen(false); setCapturing(false);
-    if (panel.current?.contains(document.activeElement) || document.activeElement === trigger.current || document.activeElement === document.body) onReturnFocus();
+    setOpen(false);
+    setCapturing(false);
+    if (
+      panel.current?.contains(document.activeElement) ||
+      document.activeElement === trigger.current ||
+      document.activeElement === document.body
+    )
+      onReturnFocus();
   }, [onReturnFocus]);
 
   useLayoutEffect(() => {
@@ -26,7 +32,10 @@ export default function CompletionControl({ onReturnFocus }: { onReturnFocus: ()
       if (!rect) return;
       const height = panel.current?.getBoundingClientRect().height ?? 154;
       const top = rect.top - height - 6;
-      setPosition({ left: Math.max(8, Math.min(rect.left, window.innerWidth - 188)), top: Math.max(8, top >= 8 ? top : Math.min(rect.bottom + 6, window.innerHeight - height - 8)) });
+      setPosition({
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - 188)),
+        top: Math.max(8, top >= 8 ? top : Math.min(rect.bottom + 6, window.innerHeight - height - 8)),
+      });
     };
     update();
     panel.current?.querySelector<HTMLButtonElement>('button')?.focus();
@@ -34,33 +43,83 @@ export default function CompletionControl({ onReturnFocus }: { onReturnFocus: ()
     if (panel.current) observer?.observe(panel.current);
     window.addEventListener('resize', update);
     document.addEventListener('scroll', update, true);
-    return () => { observer?.disconnect(); window.removeEventListener('resize', update); document.removeEventListener('scroll', update, true); };
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', update);
+      document.removeEventListener('scroll', update, true);
+    };
   }, [open]);
 
   const names = { ArrowRight: t('Right arrow'), Tab: 'Tab', 'Shift+ArrowRight': t('Shift + right arrow') };
-  const options = COMPLETION_SHORTCUTS.map(id => ({ id: id as string, label: names[id], displayLabel: id === 'Tab' ? <span>Tab</span> : <KeyHint shortcut={id} />, checked: shortcuts.includes(id) }));
-  if (customShortcut) options.push({ id: customShortcut, label: customShortcut, displayLabel: <KeyHint shortcut={customShortcut} />, checked: shortcuts.includes(customShortcut) });
+  const options = COMPLETION_SHORTCUTS.map((id) => ({
+    id: id as string,
+    label: names[id],
+    displayLabel: id === 'Tab' ? <span>Tab</span> : <KeyHint shortcut={id} />,
+    checked: shortcuts.includes(id),
+  }));
+  if (customShortcut)
+    options.push({
+      id: customShortcut,
+      label: customShortcut,
+      displayLabel: <KeyHint shortcut={customShortcut} />,
+      checked: shortcuts.includes(customShortcut),
+    });
 
-  return <>
-    <button ref={trigger} type="button" data-subtle className="command-completion-trigger terminal-chip"
-      aria-label={t('Completion shortcuts')} aria-haspopup="menu" aria-expanded={open}
-      onClick={() => open ? close() : setOpen(true)}>
-      <KeyHint shortcut={shortcuts[0] ?? 'ArrowRight'} /><ChevronDown size={10} aria-hidden="true" />
-    </button>
-    {open && createPortal(<div ref={panel} style={{ position: 'fixed', ...position, width: 180, zIndex: 200 }}>
-      <CheckboxMenu compact triggerRef={trigger} title={t('Completion shortcuts')} options={options} onToggle={toggle} onClose={close}
-        style={{ position: 'relative', minWidth: 0, width: '100%' }} footer={
-          <button type="button" data-subtle className="completion-shortcut-custom"
-            onClick={event => { event.currentTarget.focus(); setCapturing(true); }} onKeyDown={event => {
-              if (!capturing) return;
-              event.preventDefault(); event.stopPropagation();
-              if (event.key === 'Escape') { setCapturing(false); return; }
-              const shortcut = completionShortcut(event);
-              if (validCustomCompletionShortcut(shortcut)) { setCustom(shortcut); setCapturing(false); }
-            }}>
-            {capturing ? t('Press a modified letter or number…') : t('Custom…')}
-          </button>
-        } />
-    </div>, document.body)}
-  </>;
+  return (
+    <>
+      <button
+        ref={trigger}
+        type="button"
+        data-subtle
+        className="command-completion-trigger terminal-chip"
+        aria-label={t('Completion shortcuts')}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => (open ? close() : setOpen(true))}>
+        <KeyHint shortcut={shortcuts[0] ?? 'ArrowRight'} />
+        <ChevronDown size={10} aria-hidden="true" />
+      </button>
+      {open &&
+        createPortal(
+          <div ref={panel} style={{ position: 'fixed', ...position, width: 180, zIndex: 200 }}>
+            <CheckboxMenu
+              compact
+              triggerRef={trigger}
+              title={t('Completion shortcuts')}
+              options={options}
+              onToggle={toggle}
+              onClose={close}
+              style={{ position: 'relative', minWidth: 0, width: '100%' }}
+              footer={
+                <button
+                  type="button"
+                  data-subtle
+                  className="completion-shortcut-custom"
+                  onClick={(event) => {
+                    event.currentTarget.focus();
+                    setCapturing(true);
+                  }}
+                  onKeyDown={(event) => {
+                    if (!capturing) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (event.key === 'Escape') {
+                      setCapturing(false);
+                      return;
+                    }
+                    const shortcut = completionShortcut(event);
+                    if (validCustomCompletionShortcut(shortcut)) {
+                      setCustom(shortcut);
+                      setCapturing(false);
+                    }
+                  }}>
+                  {capturing ? t('Press a modified letter or number…') : t('Custom…')}
+                </button>
+              }
+            />
+          </div>,
+          document.body,
+        )}
+    </>
+  );
 }

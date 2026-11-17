@@ -9,11 +9,40 @@ import { commandKey, emptyPreferences } from '../model/commands';
 import { COMMAND_COLLAPSE_KEY } from '../model/collapse';
 import type { HistoryCommandPreferences } from '@core/commandHistory';
 
-vi.mock('../hooks/useProjectScope', () => ({ useProjectScope: () => ({ context: { target: 'local', root: '/app', cwd: '/app', scope: 'scope', paneId: 'pane', spec: { id: 'pane', kind: 'local', shellType: 'bash' } },
-  visible: true, available: true, cwd: '/app', error: '', chooseRoot: vi.fn(), retry: vi.fn() }) }));
-vi.mock('@platform/api/commandHistory', () => ({ listCommandHistory: vi.fn(), getHistoryPreferences: vi.fn(), saveHistoryPreferences: vi.fn(), mutateHistoryCommand: vi.fn() }));
-vi.mock('../services/execution', () => ({ fillHistoryCommand: vi.fn(), runHistoryCommand: vi.fn().mockResolvedValue(undefined), hasCommandDraft: vi.fn(() => false) }));
-vi.mock('../services/libraryActions', () => ({ importLegacyCommands: vi.fn().mockResolvedValue([]), copyCommand: vi.fn(), openCommandSettings: vi.fn() }));
+vi.mock('../hooks/useProjectScope', () => ({
+  useProjectScope: () => ({
+    context: {
+      target: 'local',
+      root: '/app',
+      cwd: '/app',
+      scope: 'scope',
+      paneId: 'pane',
+      spec: { id: 'pane', kind: 'local', shellType: 'bash' },
+    },
+    visible: true,
+    available: true,
+    cwd: '/app',
+    error: '',
+    chooseRoot: vi.fn(),
+    retry: vi.fn(),
+  }),
+}));
+vi.mock('@platform/api/commandHistory', () => ({
+  listCommandHistory: vi.fn(),
+  getHistoryPreferences: vi.fn(),
+  saveHistoryPreferences: vi.fn(),
+  mutateHistoryCommand: vi.fn(),
+}));
+vi.mock('../services/execution', () => ({
+  fillHistoryCommand: vi.fn(),
+  runHistoryCommand: vi.fn().mockResolvedValue(undefined),
+  hasCommandDraft: vi.fn(() => false),
+}));
+vi.mock('../services/libraryActions', () => ({
+  importLegacyCommands: vi.fn().mockResolvedValue([]),
+  copyCommand: vi.fn(),
+  openCommandSettings: vi.fn(),
+}));
 vi.mock('./../components/CommandComposer', () => ({ default: () => <div /> }));
 let saved: HistoryCommandPreferences;
 beforeEach(() => {
@@ -21,17 +50,45 @@ beforeEach(() => {
   localStorage.removeItem('command-history-detail-collapsed');
   localStorage.removeItem('command-history-sort');
   localStorage.removeItem(COMMAND_COLLAPSE_KEY);
-  vi.clearAllMocks(); saved = emptyPreferences();
+  vi.clearAllMocks();
+  saved = emptyPreferences();
   vi.mocked(getHistoryPreferences).mockImplementation(async () => saved);
-  vi.mocked(saveHistoryPreferences).mockImplementation(async (_scope, value) => { saved = value; });
-  vi.mocked(mutateHistoryCommand).mockImplementation(async change => { saved = change.preferences; return saved; });
+  vi.mocked(saveHistoryPreferences).mockImplementation(async (_scope, value) => {
+    saved = value;
+  });
+  vi.mocked(mutateHistoryCommand).mockImplementation(async (change) => {
+    saved = change.preferences;
+    return saved;
+  });
   vi.mocked(hasCommandDraft).mockReturnValue(false);
   vi.mocked(listCommandHistory).mockResolvedValue([
-    { id: 'build', target: 'local', shell: 'bash', command: 'npm run build', cwd: '/app', status: 'success', exitCode: 0, timestamp: 1, runCount: 2 },
-    { id: 'test', target: 'local', shell: 'bash', command: 'cargo test', cwd: '/app/src-tauri', status: 'failed', exitCode: 1, timestamp: 2, runCount: 1 },
+    {
+      id: 'build',
+      target: 'local',
+      shell: 'bash',
+      command: 'npm run build',
+      cwd: '/app',
+      status: 'success',
+      exitCode: 0,
+      timestamp: 1,
+      runCount: 2,
+    },
+    {
+      id: 'test',
+      target: 'local',
+      shell: 'bash',
+      command: 'cargo test',
+      cwd: '/app/src-tauri',
+      status: 'failed',
+      exitCode: 1,
+      timestamp: 2,
+      runCount: 1,
+    },
   ]);
 });
-async function menu(id: string) { fireEvent.click(within(await screen.findByTestId(`command-history-${id}`)).getByRole('button', { name: t('Command actions') })); }
+async function menu(id: string) {
+  fireEvent.click(within(await screen.findByTestId(`command-history-${id}`)).getByRole('button', { name: t('Command actions') }));
+}
 
 it('offers terminal binding in the panel actions menu', async () => {
   render(<PanelCommandHistory />);
@@ -86,7 +143,11 @@ it('creates an unexecuted history entry before moving a favorite with no recorde
   fireEvent.pointerMove(window, { pointerId: 1, clientX: 20, clientY: 30 });
   fireEvent.pointerUp(window, { pointerId: 1, clientX: 20, clientY: 30 });
   Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: original });
-  await waitFor(() => expect(mutateHistoryCommand).toHaveBeenCalledWith(expect.objectContaining({ original: null, draft: expect.objectContaining({ command: 'npm run preview' }) })));
+  await waitFor(() =>
+    expect(mutateHistoryCommand).toHaveBeenCalledWith(
+      expect.objectContaining({ original: null, draft: expect.objectContaining({ command: 'npm run preview' }) }),
+    ),
+  );
   await waitFor(() => expect(saved.favorites).toEqual([]));
   expect(saved.historyOrder).toContain(commandKey({ shell: 'bash', cwd: '/app', command: 'npm run preview' }));
   expect(runHistoryCommand).not.toHaveBeenCalled();
@@ -97,7 +158,10 @@ it('previews on click and inserts only with an explicit action; existing drafts 
   fireEvent.click(await screen.findByTestId('command-history-build'));
   expect(fillHistoryCommand).not.toHaveBeenCalled();
   fireEvent.click(screen.getByRole('button', { name: t('Insert command') }));
-  expect(fillHistoryCommand).toHaveBeenCalledWith(expect.objectContaining({ paneId: 'pane' }), expect.objectContaining({ command: 'npm run build' }));
+  expect(fillHistoryCommand).toHaveBeenCalledWith(
+    expect.objectContaining({ paneId: 'pane' }),
+    expect.objectContaining({ command: 'npm run build' }),
+  );
   expect(runHistoryCommand).not.toHaveBeenCalled();
   vi.mocked(hasCommandDraft).mockReturnValue(true);
   fireEvent.doubleClick(screen.getByTestId('command-history-test'));
@@ -115,9 +179,11 @@ it('executes on double-click only when the application setting requests it', asy
 });
 it('persists favorites and hidden commands and restores a hidden entry', async () => {
   render(<PanelCommandHistory />);
-  await menu('build'); fireEvent.click(screen.getByRole('button', { name: t('Save as favorite') }));
+  await menu('build');
+  fireEvent.click(screen.getByRole('button', { name: t('Save as favorite') }));
   await waitFor(() => expect(saved.favorites).toHaveLength(1));
-  await menu('test'); fireEvent.click(screen.getByRole('button', { name: t('Hide this command') }));
+  await menu('test');
+  fireEvent.click(screen.getByRole('button', { name: t('Hide this command') }));
   await waitFor(() => expect(screen.queryByTestId('command-history-test')).toBeNull());
   expect(saved.hidden).toHaveLength(1);
   fireEvent.click(screen.getByRole('button', { name: t('Command history actions') }));
@@ -133,7 +199,17 @@ it('refreshes preferences and history from the actions menu and the list backgro
 
   // A run recorded elsewhere reaches the panel through the menu refresh
   vi.mocked(listCommandHistory).mockResolvedValue([
-    { id: 'deploy', target: 'local', shell: 'bash', command: 'npm run deploy', cwd: '/app', status: 'success', exitCode: 0, timestamp: 3, runCount: 1 },
+    {
+      id: 'deploy',
+      target: 'local',
+      shell: 'bash',
+      command: 'npm run deploy',
+      cwd: '/app',
+      status: 'success',
+      exitCode: 0,
+      timestamp: 3,
+      runCount: 1,
+    },
   ]);
   fireEvent.click(screen.getByTestId('command-history-more'));
   fireEvent.click(screen.getByRole('button', { name: t('Refresh') }));
@@ -158,7 +234,11 @@ it('filters by name and status and lets users select the execution terminal', as
   act(() => useCommandHistorySettings.getState().update({ runIn: 'current' }));
   fireEvent.click(screen.getByTestId('command-history-build'));
   fireEvent.click(screen.getByRole('button', { name: t('Run command') }));
-  expect(runHistoryCommand).toHaveBeenCalledWith(expect.objectContaining({ target: 'local' }), expect.objectContaining({ command: 'npm run build' }), 'current');
+  expect(runHistoryCommand).toHaveBeenCalledWith(
+    expect.objectContaining({ target: 'local' }),
+    expect.objectContaining({ command: 'npm run build' }),
+    'current',
+  );
 });
 
 it('reveals one command detail region at a time without filling or executing', async () => {
@@ -193,7 +273,9 @@ it('keeps collapsed favorites out of keyboard navigation and expands them for se
 
 it('remembers folded sections and groups for the next panel load', async () => {
   saved.favorites = [{ id: 'favorite-build', command: 'npm run build', cwd: '/app', shell: 'bash', name: 'Production build' }];
-  saved.groups = [{ id: 'release', name: 'Release', commandKeys: [commandKey({ shell: 'bash', cwd: '/app/src-tauri', command: 'cargo test' })] }];
+  saved.groups = [
+    { id: 'release', name: 'Release', commandKeys: [commandKey({ shell: 'bash', cwd: '/app/src-tauri', command: 'cargo test' })] },
+  ];
   const first = render(<PanelCommandHistory />);
   await screen.findByTestId('command-history-favorite-build');
   fireEvent.click(screen.getByRole('button', { name: t('Collapse favorites') }));
@@ -253,7 +335,11 @@ it('remembers frequency sorting and keeps it separate from status and directory 
   fireEvent.click(screen.getByRole('menuitem', { name: t('Sort commands') }));
   fireEvent.click(screen.getByRole('menuitemradio', { name: t('Most used commands') }));
   expect(localStorage.getItem('command-history-sort')).toBe('frequent');
-  expect([...screen.getByTestId('command-history-panel').querySelectorAll('[data-command-history]')].map(row => row.getAttribute('data-command-history'))).toEqual(['build', 'test']);
+  expect(
+    [...screen.getByTestId('command-history-panel').querySelectorAll('[data-command-history]')].map((row) =>
+      row.getAttribute('data-command-history'),
+    ),
+  ).toEqual(['build', 'test']);
   fireEvent.click(screen.getByRole('button', { name: t('Filter commands') }));
   expect(screen.getByRole('button', { name: t('All statuses') })).toHaveAttribute('aria-pressed', 'true');
   expect(screen.getByRole('button', { name: t('Entire project') })).toHaveAttribute('aria-pressed', 'true');
@@ -329,9 +415,13 @@ it('opens the command editor focused on the name field from the rename action', 
   await waitFor(() => expect(name).toHaveFocus());
   fireEvent.change(name, { target: { value: 'Release build' } });
   fireEvent.click(within(dialog).getByRole('button', { name: t('Save') }));
-  await waitFor(() => expect(mutateHistoryCommand).toHaveBeenCalledWith(expect.objectContaining({
-    draft: expect.objectContaining({ name: 'Release build', command: 'npm run build', cwd: '/app', shell: 'bash' }),
-  })));
+  await waitFor(() =>
+    expect(mutateHistoryCommand).toHaveBeenCalledWith(
+      expect.objectContaining({
+        draft: expect.objectContaining({ name: 'Release build', command: 'npm run build', cwd: '/app', shell: 'bash' }),
+      }),
+    ),
+  );
   expect(screen.queryByRole('dialog', { name: t('Edit command') })).toBeNull();
   expect(fillHistoryCommand).not.toHaveBeenCalled();
   expect(runHistoryCommand).not.toHaveBeenCalled();
@@ -391,7 +481,9 @@ it('expands matching custom groups for search and shows independently removable 
   expect(screen.getByTestId('command-history-filter-directory')).toBeVisible();
   expect(screen.queryByRole('button', { name: t('Clear filters') })).toBeNull();
   fireEvent.click(within(cards).getByRole('button', { name: t('Remove filter: {{filter}}', { filter: t('Current directory') }) }));
-  fireEvent.click(within(cards).getByRole('button', { name: t('Remove filter: {{filter}}', { filter: t('Starred or grouped commands') }) }));
+  fireEvent.click(
+    within(cards).getByRole('button', { name: t('Remove filter: {{filter}}', { filter: t('Starred or grouped commands') }) }),
+  );
   expect(screen.queryByTestId('command-history-filter-chips')).toBeNull();
 });
 

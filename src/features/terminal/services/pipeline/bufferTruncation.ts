@@ -25,8 +25,16 @@ export function trackBufferTruncation(term: Terminal, onTrim: (lines: number) =>
     reset();
   });
   return {
-    pause: () => { paused = true; },
-    resume: () => { reset(); paused = false; },
-    dispose: () => { subscription.dispose(); marker?.dispose(); },
+    pause: () => {
+      paused = true;
+    },
+    resume: () => {
+      reset();
+      paused = false;
+    },
+    dispose: () => {
+      subscription.dispose();
+      marker?.dispose();
+    },
   };
 }

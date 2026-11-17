@@ -23,8 +23,13 @@ afterEach(async () => {
 
 it('keeps the automatic logging switch disabled until the saved state is confirmed', async () => {
   let complete!: () => void;
-  invokeMock.mockImplementation(command => command === 'diagnostics_set_auto_save'
-    ? new Promise<void>(resolve => { complete = resolve; }) : Promise.resolve(undefined));
+  invokeMock.mockImplementation((command) =>
+    command === 'diagnostics_set_auto_save'
+      ? new Promise<void>((resolve) => {
+          complete = resolve;
+        })
+      : Promise.resolve(undefined),
+  );
   render(<LogsPage />);
   const toggle = screen.getByRole('switch', { name: '自动保存日志' });
   fireEvent.click(toggle);
@@ -32,7 +37,9 @@ it('keeps the automatic logging switch disabled until the saved state is confirm
   expect(toggle).toHaveAttribute('aria-checked', 'false');
   fireEvent.click(toggle);
   await waitFor(() => expect(invokeMock.mock.calls.filter(([command]) => command === 'diagnostics_set_auto_save')).toHaveLength(1));
-  await act(async () => { complete(); });
+  await act(async () => {
+    complete();
+  });
   expect(toggle).toBeEnabled();
   expect(toggle).toHaveAttribute('aria-checked', 'true');
 });

@@ -2,9 +2,9 @@ import { expect, test, type Page } from '@playwright/test';
 import { setupTauriMock, waitForWorkbench } from './tauri-mock';
 
 async function notify(page: Page, message: string) {
-  await page.evaluate(async message => {
+  await page.evaluate(async (message) => {
     const path = '/src/ui/feedback/Toast.tsx';
-    const { useToastStore } = await import(path) as typeof import('../src/ui/feedback/Toast');
+    const { useToastStore } = (await import(path)) as typeof import('../src/ui/feedback/Toast');
     useToastStore.getState().addToast(message, 'info', 1000);
   }, message);
 }

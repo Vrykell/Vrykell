@@ -9,10 +9,14 @@ import { parseWorkbench } from '../workbench';
 import { WORKBENCH_STORAGE_KEY } from '../../stores/workbench';
 
 const startupWorkbench = parseWorkbench(safeJsonParse<unknown>(safeLocalStorageGet(WORKBENCH_STORAGE_KEY) ?? 'null'));
-const startupSessionIds = startupWorkbench ? new Set(startupWorkbench.tabs.flatMap(tab => [
-  ...(tab.scope === 'terminal' ? [tab.id] : []),
-  ...(tab.restoreSnapshot?.members.filter(member => member.kind === 'terminal').map(member => member.reference) ?? []),
-])) : undefined;
+const startupSessionIds = startupWorkbench
+  ? new Set(
+      startupWorkbench.tabs.flatMap((tab) => [
+        ...(tab.scope === 'terminal' ? [tab.id] : []),
+        ...(tab.restoreSnapshot?.members.filter((member) => member.kind === 'terminal').map((member) => member.reference) ?? []),
+      ]),
+    )
+  : undefined;
 
 export interface WorkspaceSession {
   id: string;
@@ -50,9 +54,7 @@ function defaultErrorHandler(message: string, error: unknown): void {
 }
 
 /** Restore saved sessions or create a fresh workspace according to startup preferences. */
-export async function restoreWorkspaceWithDependencies(
-  dependencies: RestoreWorkspaceDependencies,
-): Promise<void> {
+export async function restoreWorkspaceWithDependencies(dependencies: RestoreWorkspaceDependencies): Promise<void> {
   const onError = dependencies.onError ?? defaultErrorHandler;
   if (dependencies.launchDirectory && dependencies.openDirectory) {
     if (!dependencies.hasTabs()) dependencies.openDirectory(dependencies.launchDirectory);
@@ -65,25 +67,28 @@ export async function restoreWorkspaceWithDependencies(
       return [];
     });
     for (const session of saved.filter((item) => item.status === 'active')) {
-      await dependencies.archiveSession(session.id).catch((error: unknown) => onError(t('Failed to archive previous session {{id}}', { id: session.id }), error));
+      await dependencies
+        .archiveSession(session.id)
+        .catch((error: unknown) => onError(t('Failed to archive previous session {{id}}', { id: session.id }), error));
     }
   }
   if (mode === 'empty') return;
   if (mode === 'default') {
     if (dependencies.hasTabs()) return;
     const session = dependencies.createDefaultSession();
-    if (session && dependencies.persistSession) await Promise.resolve(dependencies.persistSession(session)).catch((error: unknown) => {
-      onError(t('Failed to persist the default session {{id}}', { id: session.id }), error);
-    });
+    if (session && dependencies.persistSession)
+      await Promise.resolve(dependencies.persistSession(session)).catch((error: unknown) => {
+        onError(t('Failed to persist the default session {{id}}', { id: session.id }), error);
+      });
     return;
   }
   const sessions = await dependencies.listSessions().catch((error: unknown) => {
     onError(t('Failed to read session list'), error);
     return [];
   });
-  const canRestore = (session: WorkspaceSession) => session.kind !== 'workspace'
-    && (!dependencies.restorableSessionIds || dependencies.restorableSessionIds.has(session.id));
-  for (const session of sessions.filter(session => session.status === 'active' && !canRestore(session))) {
+  const canRestore = (session: WorkspaceSession) =>
+    session.kind !== 'workspace' && (!dependencies.restorableSessionIds || dependencies.restorableSessionIds.has(session.id));
+  for (const session of sessions.filter((session) => session.status === 'active' && !canRestore(session))) {
     await dependencies.archiveSession?.(session.id).catch((error: unknown) => {
       onError(t('Failed to archive previous session {{id}}', { id: session.id }), error);
     });
@@ -126,16 +131,14 @@ function toWorkspaceSession(session: BackendSessionEntry): WorkspaceSession {
 
 function createDefaultSession(): PersistableSession | null {
   const workspace = useWorkspaceStore.getState();
-  if (workspace.tabs.some(tab => !isStartTab(tab))) return null;
+  if (workspace.tabs.some((tab) => !isStartTab(tab))) return null;
 
   const id = workspace.addTab({});
   const tab = useWorkspaceStore.getState().tabs.find((item) => item.id === id);
   if (!tab || !isSessionTab(tab)) return null;
 
   const serialized = serializeSession(tab);
-  return serialized
-    ? { id: tab.id, title: tab.title, kind: serialized.kind, payload: serialized.payload }
-    : null;
+  return serialized ? { id: tab.id, title: tab.title, kind: serialized.kind, payload: serialized.payload } : null;
 }
 
 /** Default production adapter: wires the real IPC layer, stores and sessionManager. */
@@ -145,7 +148,9 @@ export function restoreWorkspace(
   return restoreWorkspaceWithDependencies({
     onError: options.onError,
     launchDirectory: options.launchDirectory,
-    openDirectory: cwd => { useWorkspaceStore.getState().addTab({ cwd }); },
+    openDirectory: (cwd) => {
+      useWorkspaceStore.getState().addTab({ cwd });
+    },
     startupMode: useStartupSettings.getState().mode,
     restorableSessionIds: startupSessionIds,
     archiveSession: (id) => archiveSession(id, Date.now()),
@@ -155,7 +160,7 @@ export function restoreWorkspace(
     },
     loadGroups: () => useWorkspaceStore.getState().loadGroups(),
     restoreSession: (session) => sessionManager.restore(session.id, session.title),
-    hasTabs: () => useWorkspaceStore.getState().tabs.some(tab => !isStartTab(tab)),
+    hasTabs: () => useWorkspaceStore.getState().tabs.some((tab) => !isStartTab(tab)),
     createDefaultSession,
   });
 }

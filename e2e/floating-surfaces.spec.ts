@@ -4,16 +4,18 @@ import { gotoSetting } from './settings';
 
 async function surfaceStyle(surface: Locator) {
   await expect(surface).toBeVisible();
-  return surface.evaluate(el => {
+  return surface.evaluate((el) => {
     const style = getComputedStyle(el);
     const probe = document.createElement('div');
     probe.style.background = 'var(--menu-bg)';
     el.append(probe);
     const palette = getComputedStyle(probe);
     const result = {
-      background: style.backgroundColor, expectedBackground: palette.backgroundColor,
+      background: style.backgroundColor,
+      expectedBackground: palette.backgroundColor,
       borderWidth: style.borderTopWidth,
-      radius: style.borderRadius, shadow: style.boxShadow,
+      radius: style.borderRadius,
+      shadow: style.boxShadow,
     };
     probe.remove();
     return result;
@@ -39,7 +41,7 @@ async function search(page: Page) {
   const selected = dialog.locator('[data-search-result][data-selected="true"]');
   await expect(selected).toHaveCSS('border-left-width', '0px');
   await expect(selected).toHaveCSS('border-radius', '8px');
-  expect(await selected.evaluate(element => getComputedStyle(element, '::before').content)).toBe('none');
+  expect(await selected.evaluate((element) => getComputedStyle(element, '::before').content)).toBe('none');
   const firstTitle = await selected.textContent();
   await dialog.getByPlaceholder('搜索文件、命令、设置…').press('ArrowDown');
   expect(await selected.textContent()).not.toBe(firstTitle);
@@ -78,7 +80,8 @@ for (const theme of ['深色', '浅色']) {
     await newTab.press('Escape');
 
     await page.locator('[data-dock-btn="ssh"]').click();
-    await page.getByTestId('ssh-host-actions').click(); await page.getByRole('button', { name: '快速连接', exact: true }).click();
+    await page.getByTestId('ssh-host-actions').click();
+    await page.getByRole('button', { name: '快速连接', exact: true }).click();
     const sshForm = page.getByRole('dialog', { name: 'SSH 连接' });
     await assertSurface(sshForm, true);
     await sshForm.getByRole('button', { name: '取消', exact: true }).click();
@@ -104,7 +107,7 @@ for (const theme of ['深色', '浅色']) {
     await expect(closeModels).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
     const hint = page.getByTestId('app-tooltip');
     await expect(hint).toBeVisible();
-    const layers = await hint.evaluate(element => ({
+    const layers = await hint.evaluate((element) => ({
       hint: Number(getComputedStyle(element).zIndex),
       scrim: Number(getComputedStyle(document.querySelector('[role="dialog"][aria-modal="true"]')!.parentElement!).zIndex),
     }));

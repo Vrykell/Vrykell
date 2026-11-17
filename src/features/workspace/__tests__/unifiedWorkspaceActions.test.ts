@@ -6,7 +6,17 @@ import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { useChatStore } from '@features/chat/stores/chat';
 import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { createSideConversation, moveSideConversationToMain } from '@features/chat/services/aiWorkspace';
-import { focusUnifiedResource, closeTerminalPane, connectUnifiedAgent, createUnifiedResource, createUnifiedTerminal, presentWorkspaceResource, requestTerminalSplit, requestWorkspaceSplit, showUnifiedTerminalGroup } from '../services/unifiedWorkspace';
+import {
+  focusUnifiedResource,
+  closeTerminalPane,
+  connectUnifiedAgent,
+  createUnifiedResource,
+  createUnifiedTerminal,
+  presentWorkspaceResource,
+  requestTerminalSplit,
+  requestWorkspaceSplit,
+  showUnifiedTerminalGroup,
+} from '../services/unifiedWorkspace';
 import { editorFileKey } from '@core/editor';
 import { renameWorkspaceResource } from '../services/workspaceResources';
 import { workspacePaneCells, workspacePaneIds } from '../model/workspaceResources';
@@ -32,7 +42,7 @@ it('creates and splits new resources without replacing the existing pane or exce
   createUnifiedResource('conversation', 'col');
   createUnifiedResource('terminal', 'row');
   const layout = useUnifiedWorkspace.getState().layout!;
-  expect(workspacePaneIds(layout).map(id => id.split(':')[0])).toEqual(['terminal', 'file', 'chat', 'terminal']);
+  expect(workspacePaneIds(layout).map((id) => id.split(':')[0])).toEqual(['terminal', 'file', 'chat', 'terminal']);
   expect(layout.type === 'split' && layout.first).toBe(terminal);
   const tabs = useWorkspaceStore.getState().tabs;
   createUnifiedResource('document', 'col');
@@ -42,11 +52,15 @@ it('creates and splits new resources without replacing the existing pane or exce
 });
 
 it('selects an existing resource tab without changing either tab layout', () => {
-  createUnifiedResource('terminal'); const active = useUnifiedWorkspace.getState().activeTabId;
-  const file = { path: '/repo/notes.txt' }; useWorkspaceStore.getState().openEditorFile(file);
+  createUnifiedResource('terminal');
+  const active = useUnifiedWorkspace.getState().activeTabId;
+  const file = { path: '/repo/notes.txt' };
+  useWorkspaceStore.getState().openEditorFile(file);
   const id = `file:${editorFileKey(file)}`;
-  useUnifiedWorkspace.getState().show(id); expect(compositionTabs()).toHaveLength(2);
-  useUnifiedWorkspace.getState().selectTab(active); presentWorkspaceResource(id);
+  useUnifiedWorkspace.getState().show(id);
+  expect(compositionTabs()).toHaveLength(2);
+  useUnifiedWorkspace.getState().selectTab(active);
+  presentWorkspaceResource(id);
   expect(compositionTabs()).toHaveLength(2);
   expect(compositionTabs()[0]!.id).toBe(active);
   expect(workspacePaneIds(compositionTabs()[0]!.layout!)).not.toContain(id);
@@ -55,7 +69,8 @@ it('selects an existing resource tab without changing either tab layout', () => 
 });
 
 it('opens a moved side conversation in its own unified tab without switching areas', async () => {
-  createUnifiedResource('terminal'); const active = useUnifiedWorkspace.getState().activeTabId;
+  createUnifiedResource('terminal');
+  const active = useUnifiedWorkspace.getState().activeTabId;
   const id = `chat:${createSideConversation()}`;
   moveSideConversationToMain();
   await vi.waitFor(() => expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toContain(id));
@@ -66,8 +81,10 @@ it('opens a moved side conversation in its own unified tab without switching are
 });
 
 it('routes a presentation by the current workspace instead of leaving the area ambiguous', () => {
-  createUnifiedResource('terminal'); const active = useUnifiedWorkspace.getState().activeTabId;
-  const file = { path: '/repo/routed.txt' }; useWorkspaceStore.getState().openEditorFile(file);
+  createUnifiedResource('terminal');
+  const active = useUnifiedWorkspace.getState().activeTabId;
+  const file = { path: '/repo/routed.txt' };
+  useWorkspaceStore.getState().openEditorFile(file);
   const id = `file:${editorFileKey(file)}`;
   presentWorkspaceResource(id);
   expect(useWorkspaceNavigation.getState().area).toBe('unified');
@@ -100,14 +117,19 @@ it('delegates common tab renaming to the original owner', () => {
 it('projects existing terminal panes into one layout and splits through a separate terminal owner', () => {
   const first = leaf({ id: 'source#0', kind: 'local', shellType: 'zsh' });
   const second = leaf({ id: 'source#1', kind: 'local', shellType: 'bash' });
-  useWorkspaceStore.setState({ tabs: [{ id: 'source', kind: 'session', title: 'Shells', layout: { type: 'split', dir: 'row', ratio: 0.6, first, second } }] });
+  useWorkspaceStore.setState({
+    tabs: [{ id: 'source', kind: 'session', title: 'Shells', layout: { type: 'split', dir: 'row', ratio: 0.6, first, second } }],
+  });
   showUnifiedTerminalGroup('source');
   expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toEqual(['terminal:source#0', 'terminal:source#1']);
   const before = useWorkspaceStore.getState().tabs[0];
   requestTerminalSplit({ id: '', kind: 'local', shellType: 'cmd' });
   expect(useUnifiedWorkspace.getState().choosingSplit).toBe(true);
   useUnifiedWorkspace.setState({ choosingSplit: false });
-  createUnifiedTerminal({ id: '', kind: 'local', shellType: 'cmd' }, { leafId: 'source#0', dir: 'col', position: 'second', rect: { x: 0, y: 0.5, w: 0.5, h: 0.5 } });
+  createUnifiedTerminal(
+    { id: '', kind: 'local', shellType: 'cmd' },
+    { leafId: 'source#0', dir: 'col', position: 'second', rect: { x: 0, y: 0.5, w: 0.5, h: 0.5 } },
+  );
   expect(useWorkspaceStore.getState().tabs[0]).toBe(before);
   expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toHaveLength(3);
   closeTerminalPane('source#1');
@@ -122,7 +144,8 @@ it('retains an explicit restore destination while changing history presets', () 
   expect(useWorkspaceNavigation.getState().historyDestination).toBe('unified');
   navigation.selectHistory('terminal');
   expect(useWorkspaceNavigation.getState().historyDestination).toBe('unified');
-  navigation.selectArea('terminal'); navigation.selectHistory('all');
+  navigation.selectArea('terminal');
+  navigation.selectHistory('all');
   expect(useWorkspaceNavigation.getState().historyDestination).toBe('native');
 });
 
@@ -140,7 +163,11 @@ it('does not remove the only common pane through stale menu or editor actions', 
 
 it('routes both legacy history actions through the common origin and resets native pages explicitly', () => {
   useWorkspaceStore.getState().openAiHistoryTab();
-  expect(useWorkspaceNavigation.getState()).toMatchObject({ area: 'history', historyDestination: 'unified', historyPreset: 'conversation' });
+  expect(useWorkspaceNavigation.getState()).toMatchObject({
+    area: 'history',
+    historyDestination: 'unified',
+    historyPreset: 'conversation',
+  });
   useWorkspaceNavigation.getState().selectArea('unified');
   useWorkspaceStore.getState().openHistoryTab();
   expect(useWorkspaceNavigation.getState()).toMatchObject({ area: 'history', historyDestination: 'unified', historyPreset: 'terminal' });
@@ -178,16 +205,22 @@ it('never adds a fifth pane when a switcher selection arrives at a full composit
     ],
   });
   const panes = ['a', 'b', 'c', 'd'].map((key, index) => ({ type: 'pane' as const, id: `pane-${index}`, resourceId: `terminal:${key}` }));
-  useUnifiedWorkspace.setState({ activeTabId: '', focused: 'pane-0', layout: {
-    type: 'split', direction: 'row', ratio: 0.5,
-    first: { type: 'split', direction: 'row', ratio: 0.5, first: panes[0]!, second: panes[1]! },
-    second: { type: 'split', direction: 'row', ratio: 0.5, first: panes[2]!, second: panes[3]! },
-  } });
+  useUnifiedWorkspace.setState({
+    activeTabId: '',
+    focused: 'pane-0',
+    layout: {
+      type: 'split',
+      direction: 'row',
+      ratio: 0.5,
+      first: { type: 'split', direction: 'row', ratio: 0.5, first: panes[0]!, second: panes[1]! },
+      second: { type: 'split', direction: 'row', ratio: 0.5, first: panes[2]!, second: panes[3]! },
+    },
+  });
 
   focusUnifiedResource('terminal:two#0');
   expect(workspacePaneIds(useUnifiedWorkspace.getState().layout!)).toEqual(['terminal:two#0']);
-  expect(compositionTabs().some(tab => tab.layout && workspacePaneCells(tab.layout).length === 4)).toBe(true);
-  expect(compositionTabs().every(tab => !tab.layout || workspacePaneCells(tab.layout).length <= 4)).toBe(true);
+  expect(compositionTabs().some((tab) => tab.layout && workspacePaneCells(tab.layout).length === 4)).toBe(true);
+  expect(compositionTabs().every((tab) => !tab.layout || workspacePaneCells(tab.layout).length <= 4)).toBe(true);
 
   const current = useUnifiedWorkspace.getState().layout;
   focusUnifiedResource('page:history');

@@ -44,27 +44,29 @@ export default function AcpSessionsTable({ rows }: { rows: AcpUsageRecord[] }) {
                   {t('No ACP server has reported its sessions yet.')}
                 </td>
               </tr>
-            ) : paged.rows.map((row) => (
-              <tr key={row.source} style={usageTable.row} data-testid="usage-acp-row" data-source={row.source}>
-                <td style={{ ...usageTable.td, ...usageTable.primary }} title={row.source}>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    <HarnessBadge name={row.source} size={18} />
-                    {row.source}
-                  </span>
-                </td>
-                <td style={usageTable.td}>{formatTokens(row.turns)}</td>
-                <td style={usageTable.td}>{formatTokens(row.toolCalls)}</td>
-                <td style={usageTable.td} title={contextExact(row)}>
-                  {contextLabel(row)}
-                </td>
-                <td style={usageTable.td} title={row.cost !== null ? `${row.cost.toFixed(4)} ${row.currency}`.trim() : undefined}>
-                  {row.cost !== null ? `${row.cost.toFixed(4)}${row.currency ? ` ${row.currency}` : ''}` : '—'}
-                </td>
-                <td style={{ ...usageTable.td, ...usageTable.mono }} title={row.at > 0 ? formatLogFullTime(row.at) : undefined}>
-                  {row.at > 0 ? formatLogTime(row.at) : t('No usage reported yet')}
-                </td>
-              </tr>
-            ))}
+            ) : (
+              paged.rows.map((row) => (
+                <tr key={row.source} style={usageTable.row} data-testid="usage-acp-row" data-source={row.source}>
+                  <td style={{ ...usageTable.td, ...usageTable.primary }} title={row.source}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <HarnessBadge name={row.source} size={18} />
+                      {row.source}
+                    </span>
+                  </td>
+                  <td style={usageTable.td}>{formatTokens(row.turns)}</td>
+                  <td style={usageTable.td}>{formatTokens(row.toolCalls)}</td>
+                  <td style={usageTable.td} title={contextExact(row)}>
+                    {contextLabel(row)}
+                  </td>
+                  <td style={usageTable.td} title={row.cost !== null ? `${row.cost.toFixed(4)} ${row.currency}`.trim() : undefined}>
+                    {row.cost !== null ? `${row.cost.toFixed(4)}${row.currency ? ` ${row.currency}` : ''}` : '—'}
+                  </td>
+                  <td style={{ ...usageTable.td, ...usageTable.mono }} title={row.at > 0 ? formatLogFullTime(row.at) : undefined}>
+                    {row.at > 0 ? formatLogTime(row.at) : t('No usage reported yet')}
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

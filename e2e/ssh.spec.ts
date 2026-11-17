@@ -17,7 +17,7 @@ test.describe('SSH remote connection management sidebar', () => {
     await edit.press('Enter');
     await expect(page.getByTestId('ssh-form-name')).toHaveValue('生产服务器');
     const spawns = await page.evaluate(() => (window as unknown as Record<string, { ssh?: unknown }[]>).__PTY_SPAWNS__);
-    expect(spawns.filter(s => s.ssh)).toHaveLength(0);
+    expect(spawns.filter((s) => s.ssh)).toHaveLength(0);
   });
   test('SSH resources retain shared sidebar rows while terminal instances use horizontal tabs', async ({ page }) => {
     const row = page.getByTestId('ssh-row-ssh-1');
@@ -33,11 +33,20 @@ test.describe('SSH remote connection management sidebar', () => {
     await expect(row.locator(':scope > div')).toHaveCSS('background-color', selectionColor);
     // Shared row geometry follows the theme radius token instead of a literal.
     const rowRadius = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--radius-inner').trim());
-    const rowStyle = async (selector: string) => page.locator(selector).evaluate(el => {
-      const inner = el.firstElementChild!;
-      const style = getComputedStyle(inner);
-      return { outerPadding: getComputedStyle(el).padding, padding: style.padding, radius: style.borderRadius, height: inner.getBoundingClientRect().height, background: style.backgroundColor, gap: style.gap, icon: inner.querySelector('svg')?.getBoundingClientRect().width };
-    });
+    const rowStyle = async (selector: string) =>
+      page.locator(selector).evaluate((el) => {
+        const inner = el.firstElementChild!;
+        const style = getComputedStyle(inner);
+        return {
+          outerPadding: getComputedStyle(el).padding,
+          padding: style.padding,
+          radius: style.borderRadius,
+          height: inner.getBoundingClientRect().height,
+          background: style.backgroundColor,
+          gap: style.gap,
+          icon: inner.querySelector('svg')?.getBoundingClientRect().width,
+        };
+      });
     const sshStyle = await rowStyle('[data-testid="ssh-row-ssh-1"]');
     expect(sshStyle).toMatchObject({ outerPadding: '0px', padding: '6px 14px', radius: rowRadius, gap: '12px', icon: 20 });
     await expect(row).toHaveAttribute('data-tip', /root@prod.example.com:22/);
@@ -47,7 +56,8 @@ test.describe('SSH remote connection management sidebar', () => {
   });
   test('top bar: search, edit and new-connection buttons', async ({ page }) => {
     await expect(page.locator('[data-testid="ssh-search"]')).toBeVisible();
-    await page.getByTestId('ssh-row-ssh-1').click({ button: 'right' }); await expect(page.getByRole('button', { name: '编辑连接', exact: true })).toBeVisible();
+    await page.getByTestId('ssh-row-ssh-1').click({ button: 'right' });
+    await expect(page.getByRole('button', { name: '编辑连接', exact: true })).toBeVisible();
     await expect(page.locator('[data-testid="ssh-new-btn"]')).toBeVisible();
   });
 
@@ -81,7 +91,8 @@ test.describe('SSH remote connection management sidebar', () => {
 
   test('edits and deletes the selected connection', async ({ page }) => {
     await page.getByText('生产服务器').click(); // select the connection
-    await page.getByTestId('ssh-row-ssh-1').click({ button: 'right' }); await page.getByRole('button', { name: '编辑连接', exact: true }).click();
+    await page.getByTestId('ssh-row-ssh-1').click({ button: 'right' });
+    await page.getByRole('button', { name: '编辑连接', exact: true }).click();
     await expect(page.locator('[data-testid="ssh-form-name"]')).toHaveValue('生产服务器');
     await page.locator('[data-testid="ssh-delete-btn"]').click();
     await page.getByTestId('confirm-ok').click();
@@ -112,8 +123,9 @@ test.describe('SSH remote connection management sidebar', () => {
     await page.getByTestId('ssh-host-key-accept').click();
     await expect(page.getByTestId('ssh-test-result')).toContainText('认证成功');
     await expect(page.getByTestId('ssh-host-key-prompt')).toHaveCount(0);
-    expect(await page.evaluate(() => (window as unknown as { __SSH_TRUSTS__: Record<string, unknown>[] }).__SSH_TRUSTS__))
-      .toContainEqual(expect.objectContaining({ expectedFingerprint: 'SHA256:e2e-verified-key' }));
+    expect(await page.evaluate(() => (window as unknown as { __SSH_TRUSTS__: Record<string, unknown>[] }).__SSH_TRUSTS__)).toContainEqual(
+      expect.objectContaining({ expectedFingerprint: 'SHA256:e2e-verified-key' }),
+    );
   });
 
   test('cancelling a first connection reports an untrusted host instead of a failure', async ({ page }) => {
@@ -184,7 +196,9 @@ test.describe('SSH remote connection management sidebar', () => {
     await expect(dialog).toHaveCount(0);
   });
 
-  test('remote panel: click selects, Ctrl-click adds to the selection, double-click enters a folder and back restores the view and selection', async ({ page }) => {
+  test('remote panel: click selects, Ctrl-click adds to the selection, double-click enters a folder and back restores the view and selection', async ({
+    page,
+  }) => {
     await page.getByText('生产服务器').dblclick();
     await page.locator('[data-dock-btn="files"]').click();
     const tree = page.locator('[data-testid="remote-file-tree"]');
@@ -253,7 +267,9 @@ test.describe('SSH remote connection management sidebar', () => {
     expect(await sshOps(page)).toEqual(expect.arrayContaining([{ op: 'restore', path: '/var/log/app.log' }]));
   });
 
-  test('remote panel: context-menu creation targets the click location, name clashes are avoided and a revert uses the real path', async ({ page }) => {
+  test('remote panel: context-menu creation targets the click location, name clashes are avoided and a revert uses the real path', async ({
+    page,
+  }) => {
     await page.getByText('生产服务器').dblclick();
     await page.locator('[data-dock-btn="files"]').click();
     const tree = page.locator('[data-testid="remote-file-tree"]');
@@ -282,14 +298,19 @@ test.describe('SSH remote connection management sidebar', () => {
     await page.mouse.down();
     for (let i = 1; i <= 6; i++) {
       const box = await targetRow.boundingBox();
-      await page.mouse.move(from.x + 40 + ((box!.x + 40) - (from.x + 40)) * (i / 6), from.y + from.height / 2 + ((box!.y + box!.height / 2) - (from.y + from.height / 2)) * (i / 6));
+      await page.mouse.move(
+        from.x + 40 + (box!.x + 40 - (from.x + 40)) * (i / 6),
+        from.y + from.height / 2 + (box!.y + box!.height / 2 - (from.y + from.height / 2)) * (i / 6),
+      );
       await page.waitForTimeout(12);
     }
     await page.mouse.up();
     await page.locator('[data-testid="remote-more-btn"]').click();
     await page.getByRole('button', { name: /回退移动/ }).click();
     await expect(page.getByText('已回退移动')).toBeVisible();
-    expect(await sshOps(page)).toEqual(expect.arrayContaining([{ op: 'move', path: '/home/root/Documents/app (1).log', destDir: '/home/root' }]));
+    expect(await sshOps(page)).toEqual(
+      expect.arrayContaining([{ op: 'move', path: '/home/root/Documents/app (1).log', destDir: '/home/root' }]),
+    );
   });
 
   test('remote panel: clicking the root breadcrumb returns to the root instead of resolving the home directory again', async ({ page }) => {

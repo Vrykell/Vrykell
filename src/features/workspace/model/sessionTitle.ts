@@ -56,9 +56,35 @@ export function truncateTitle(text: string, max: number): string {
 
 /** Commands that say nothing about the task, so a first-command title skips them. */
 const NOISE_COMMANDS = new Set([
-  'ls', 'll', 'la', 'cd', 'pwd', 'clear', 'cls', 'history', 'exit', 'logout', 'echo', 'cat',
-  'less', 'more', 'head', 'tail', 'which', 'where', 'man', 'help', 'true', 'false', 'env',
-  'export', 'set', 'unset', 'source', 'alias', 'sleep',
+  'ls',
+  'll',
+  'la',
+  'cd',
+  'pwd',
+  'clear',
+  'cls',
+  'history',
+  'exit',
+  'logout',
+  'echo',
+  'cat',
+  'less',
+  'more',
+  'head',
+  'tail',
+  'which',
+  'where',
+  'man',
+  'help',
+  'true',
+  'false',
+  'env',
+  'export',
+  'set',
+  'unset',
+  'source',
+  'alias',
+  'sleep',
 ]);
 
 /**
@@ -88,11 +114,7 @@ export function normalizeCommandForTitle(command: string): string {
  * Effective title to render for a tab: a running program's live title wins over the stored
  * generated title, but a manual name is never replaced.
  */
-export function resolveDisplayTitle(
-  storedTitle: string,
-  source: TitleSource | undefined,
-  programTitle: string,
-): string {
+export function resolveDisplayTitle(storedTitle: string, source: TitleSource | undefined, programTitle: string): string {
   if (source === 'manual') return storedTitle;
   return programTitle.trim() || storedTitle;
 }

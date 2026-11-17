@@ -29,42 +29,53 @@ export function useAttachmentComposer(state?: AttachmentComposerState) {
   const [previewId, setPreviewId] = useState<string | null>(null);
   const panelRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => { setPreviewId(null); }, [state?.scopeKey]);
+  useEffect(() => {
+    setPreviewId(null);
+  }, [state?.scopeKey]);
 
   const toastError = useCallback((message: string) => {
     useToastStore.getState().addToast(message, 'error');
   }, []);
 
-  const addAttachments = useCallback((list: AttachmentMeta[]) => {
-    if (list.length === 0) return;
-    setAttachments((current) => {
-      const next = [...current, ...list];
-      if (totalSize(next) > LIMITS.totalBytes) {
-        toastError(t('Attachments exceed the 10 MB total limit.'));
-        return current;
-      }
-      return next;
-    });
-  }, [toastError, setAttachments]);
-
-  const importPaths = useCallback(async (paths: string[]) => {
-    const imported: AttachmentMeta[] = [];
-    for (const path of paths) {
-      try {
-        const attachment = await importFileAsAttachment(path);
-        if (attachment.kind === 'image' && attachment.size > LIMITS.imageBytes) {
-          toastError(t('Image {{name}} exceeds the 5 MB limit.', { name: attachment.name }));
-          continue;
+  const addAttachments = useCallback(
+    (list: AttachmentMeta[]) => {
+      if (list.length === 0) return;
+      setAttachments((current) => {
+        const next = [...current, ...list];
+        if (totalSize(next) > LIMITS.totalBytes) {
+          toastError(t('Attachments exceed the 10 MB total limit.'));
+          return current;
         }
-        const rejection = accept?.(attachment);
-        if (rejection) { toastError(rejection); continue; }
-        imported.push(attachment);
-      } catch (error) {
-        toastError(String((error as Error)?.message ?? error));
+        return next;
+      });
+    },
+    [toastError, setAttachments],
+  );
+
+  const importPaths = useCallback(
+    async (paths: string[]) => {
+      const imported: AttachmentMeta[] = [];
+      for (const path of paths) {
+        try {
+          const attachment = await importFileAsAttachment(path);
+          if (attachment.kind === 'image' && attachment.size > LIMITS.imageBytes) {
+            toastError(t('Image {{name}} exceeds the 5 MB limit.', { name: attachment.name }));
+            continue;
+          }
+          const rejection = accept?.(attachment);
+          if (rejection) {
+            toastError(rejection);
+            continue;
+          }
+          imported.push(attachment);
+        } catch (error) {
+          toastError(String((error as Error)?.message ?? error));
+        }
       }
-    }
-    addAttachments(imported);
-  }, [accept, addAttachments, toastError]);
+      addAttachments(imported);
+    },
+    [accept, addAttachments, toastError],
+  );
 
   const pickFiles = useCallback(async () => {
     try {
@@ -76,31 +87,37 @@ export function useAttachmentComposer(state?: AttachmentComposerState) {
     }
   }, [importPaths, toastError]);
 
-  const addBlobs = useCallback(async (files: File[]) => {
-    const saved: AttachmentMeta[] = [];
-    for (const file of files) {
-      if (file.type.startsWith('image/') && file.size > LIMITS.imageBytes) {
-        toastError(t('Image {{name}} exceeds the 5 MB limit.', { name: file.name || t('Pasted image') }));
-        continue;
+  const addBlobs = useCallback(
+    async (files: File[]) => {
+      const saved: AttachmentMeta[] = [];
+      for (const file of files) {
+        if (file.type.startsWith('image/') && file.size > LIMITS.imageBytes) {
+          toastError(t('Image {{name}} exceeds the 5 MB limit.', { name: file.name || t('Pasted image') }));
+          continue;
+        }
+        try {
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
+            reader.onerror = () => reject(reader.error);
+            reader.readAsDataURL(file);
+          });
+          const name = file.name || `pasted-${Date.now()}.png`;
+          const attachment = await saveBlobAsAttachment(name, file.type || 'application/octet-stream', base64);
+          const rejection = accept?.(attachment);
+          if (rejection) {
+            toastError(rejection);
+            continue;
+          }
+          saved.push(attachment);
+        } catch (error) {
+          toastError(String((error as Error)?.message ?? error));
+        }
       }
-      try {
-        const base64 = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result).split(',')[1] ?? '');
-          reader.onerror = () => reject(reader.error);
-          reader.readAsDataURL(file);
-        });
-        const name = file.name || `pasted-${Date.now()}.png`;
-        const attachment = await saveBlobAsAttachment(name, file.type || 'application/octet-stream', base64);
-        const rejection = accept?.(attachment);
-        if (rejection) { toastError(rejection); continue; }
-        saved.push(attachment);
-      } catch (error) {
-        toastError(String((error as Error)?.message ?? error));
-      }
-    }
-    addAttachments(saved);
-  }, [accept, addAttachments, toastError]);
+      addAttachments(saved);
+    },
+    [accept, addAttachments, toastError],
+  );
 
   useEffect(() => {
     if (!('__TAURI_INTERNALS__' in window)) return;
@@ -130,20 +147,26 @@ export function useAttachmentComposer(state?: AttachmentComposerState) {
     };
   }, [importPaths]);
 
-  const addPastedText = useCallback((text: string) => {
-    if (text.length <= LIMITS.pasteFoldChars) return false;
-    addAttachments([makePasteAttachment(text)]);
-    return true;
-  }, [addAttachments]);
+  const addPastedText = useCallback(
+    (text: string) => {
+      if (text.length <= LIMITS.pasteFoldChars) return false;
+      addAttachments([makePasteAttachment(text)]);
+      return true;
+    },
+    [addAttachments],
+  );
 
   const togglePreview = useCallback((id: string | null) => {
     setPreviewId((current) => (current === id ? null : id));
   }, []);
 
-  const removeAttachment = useCallback((id: string) => {
-    setAttachments((current) => current.filter((attachment) => attachment.id !== id));
-    setPreviewId((current) => (current === id ? null : current));
-  }, [setAttachments]);
+  const removeAttachment = useCallback(
+    (id: string) => {
+      setAttachments((current) => current.filter((attachment) => attachment.id !== id));
+      setPreviewId((current) => (current === id ? null : current));
+    },
+    [setAttachments],
+  );
 
   const clearAttachments = useCallback(() => {
     setAttachments(() => []);

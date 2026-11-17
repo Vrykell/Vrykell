@@ -30,15 +30,24 @@ export default function FileDragPreview() {
         alignItems: 'center',
         justifyContent: 'center',
         color: first.is_dir ? 'var(--text-primary)' : 'var(--text-secondary)',
-      }}
-    >
+      }}>
       <Icon size={iconSizes.row} />
       {items.length > 1 && (
-        <span style={{
-          position: 'absolute', right: -6, bottom: -6, minWidth: 15, height: 15, padding: '0 3px',
-          borderRadius: 999, background: 'var(--accent)', color: 'var(--accent-contrast, #fff)',
-          fontSize: 'calc(10px * var(--ui-font-scale))', lineHeight: '15px', textAlign: 'center',
-        }}>
+        <span
+          style={{
+            position: 'absolute',
+            right: -6,
+            bottom: -6,
+            minWidth: 15,
+            height: 15,
+            padding: '0 3px',
+            borderRadius: 999,
+            background: 'var(--accent)',
+            color: 'var(--accent-contrast, #fff)',
+            fontSize: 'calc(10px * var(--ui-font-scale))',
+            lineHeight: '15px',
+            textAlign: 'center',
+          }}>
           {items.length}
         </span>
       )}

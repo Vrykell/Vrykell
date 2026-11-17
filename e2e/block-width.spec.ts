@@ -15,7 +15,7 @@ test('maximized command output uses the available columns without a fixed 80-col
   const output = page.locator('[data-testid^="command-block-"] [data-selectable]').last();
   await expect(output).toContainText(line);
   expect(await output.locator(':scope > div').innerHTML()).not.toContain('<br>');
-  const bounds = await output.evaluate(el => ({ width: el.clientWidth, overflow: el.scrollWidth - el.clientWidth }));
+  const bounds = await output.evaluate((el) => ({ width: el.clientWidth, overflow: el.scrollWidth - el.clientWidth }));
   expect(bounds.width).toBeGreaterThan(1400);
   expect(bounds.overflow).toBeLessThanOrEqual(1);
 });
@@ -31,7 +31,12 @@ test('output longer than the viewport stays complete without a false truncation 
   await expect(block).toContainText('help-line-99');
   await expect(block).toContainText('help-line-0');
   await expect(block).not.toContainText('已截断');
-  expect(await block.locator('[data-selectable] > div').last().evaluate(el => el.innerText.split('\n').length)).toBe(100);
+  expect(
+    await block
+      .locator('[data-selectable] > div')
+      .last()
+      .evaluate((el) => el.innerText.split('\n').length),
+  ).toBe(100);
 });
 
 /**
@@ -63,16 +68,14 @@ test('long box-drawing rows reflow to the available columns without horizontal s
   const E = `\x1b]133;E;${btoa('tui-box')}\x07`;
   const C = '\x1b]133;C\x07';
   const rows = Array(3).fill('─'.repeat(400)).join('\r\n') + '\r\n';
-  const tail =
-    `\x1b]7;file://host/home/e2e/project\x07\x1b]133;D;0\x07` +
-    `\x1b]133;A\x07~/project\x1b]133;G;${btoa('main')}\x07 $ `;
+  const tail = `\x1b]7;file://host/home/e2e/project\x07\x1b]133;D;0\x07` + `\x1b]133;A\x07~/project\x1b]133;G;${btoa('main')}\x07 $ `;
   await emitPtyOutput(page, E + C + rows + tail);
 
   // Snapshot extraction is asynchronous; locate its content without depending on line-break tags.
   const findOutput = () =>
     page.evaluate(() => {
-      const matches = Array.from(document.querySelectorAll<HTMLElement>('.command-block-output [data-selectable] > div')).filter(
-        (d) => d.textContent?.includes('─'.repeat(40)),
+      const matches = Array.from(document.querySelectorAll<HTMLElement>('.command-block-output [data-selectable] > div')).filter((d) =>
+        d.textContent?.includes('─'.repeat(40)),
       );
       matches.sort((a, b) => a.innerHTML.length - b.innerHTML.length);
       return matches[0]?.innerHTML.length ?? 0;
@@ -80,12 +83,12 @@ test('long box-drawing rows reflow to the available columns without horizontal s
   await expect.poll(findOutput).toBeGreaterThan(0);
 
   const diag = await page.evaluate((): Diag & { scrollWidth: number } => {
-    const matches = Array.from(document.querySelectorAll<HTMLElement>('.command-block-output [data-selectable] > div')).filter(
-      (d) => d.textContent?.includes('─'.repeat(40)),
+    const matches = Array.from(document.querySelectorAll<HTMLElement>('.command-block-output [data-selectable] > div')).filter((d) =>
+      d.textContent?.includes('─'.repeat(40)),
     );
     matches.sort((a, b) => a.innerHTML.length - b.innerHTML.length);
     const el = matches[0]!;
-    const rowLens = el.innerText.split('\n').map(row => row.length);
+    const rowLens = el.innerText.split('\n').map((row) => row.length);
     const cols = Math.max(...rowLens);
 
     const cs = getComputedStyle(el);
@@ -133,31 +136,35 @@ test('resizing a running block resizes both PTY and terminal buffer, then restor
   // Wait for the shell startup prompt before injecting a sustained command.
   await page.waitForFunction(async () => {
     const path = '/src/features/terminal/stores/terminal.ts';
-    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    const { useTerminalStore } = (await import(path)) as typeof import('../src/features/terminal/stores/terminal');
     return Object.values(useTerminalStore.getState().startupStates).includes('ready');
   });
   await emitPtyOutput(page, `\x1b]133;E;${btoa('running-output')}\x07\x1b]133;C\x07${'x'.repeat(600)}\r\n`);
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm')).toBeVisible();
-  const terminal = () => page.evaluate(() => {
-    const terms = (window as unknown as { __vrykellTerms: Map<string, import('@xterm/xterm').Terminal> }).__vrykellTerms;
-    const term = [...terms.entries()].find(([key]) => key.startsWith('block:'))![1];
-    const lines = Array.from({ length: term.buffer.active.length }, (_, row) => term.buffer.active.getLine(row)?.translateToString(true) ?? '').filter(Boolean);
-    return { cols: term.cols, rows: lines.length, text: lines.join('') };
-  });
-  await expect.poll(() => terminal().then(value => value.text)).toBe('x'.repeat(600));
+  const terminal = () =>
+    page.evaluate(() => {
+      const terms = (window as unknown as { __vrykellTerms: Map<string, import('@xterm/xterm').Terminal> }).__vrykellTerms;
+      const term = [...terms.entries()].find(([key]) => key.startsWith('block:'))![1];
+      const lines = Array.from(
+        { length: term.buffer.active.length },
+        (_, row) => term.buffer.active.getLine(row)?.translateToString(true) ?? '',
+      ).filter(Boolean);
+      return { cols: term.cols, rows: lines.length, text: lines.join('') };
+    });
+  await expect.poll(() => terminal().then((value) => value.text)).toBe('x'.repeat(600));
   const before = await terminal();
   await page.setViewportSize({ width: 850, height: 800 });
-  await expect.poll(() => terminal().then(value => value.cols)).toBeLessThan(before.cols);
+  await expect.poll(() => terminal().then((value) => value.cols)).toBeLessThan(before.cols);
   const narrow = await terminal();
-  await expect.poll(() => ptyResizes(page).then(resizes => resizes.at(-1)?.cols)).toBe(narrow.cols);
+  await expect.poll(() => ptyResizes(page).then((resizes) => resizes.at(-1)?.cols)).toBe(narrow.cols);
   expect(narrow.rows).toBeGreaterThan(before.rows);
   expect(narrow.text).toBe(before.text);
-  expect(await host.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+  expect(await host.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
   await page.setViewportSize({ width: 1240, height: 800 });
   await page.getByTestId('workspace-sidebar-expand').click();
-  await expect.poll(() => terminal().then(value => value.cols)).toBe(before.cols);
-  await expect.poll(() => terminal().then(value => value.rows)).toBe(before.rows);
+  await expect.poll(() => terminal().then((value) => value.cols)).toBe(before.cols);
+  await expect.poll(() => terminal().then((value) => value.rows)).toBe(before.rows);
 });
 
 test('opening the assistant resizes the PTY and wraps completed output without horizontal scrolling', async ({ page }) => {
@@ -171,22 +178,22 @@ test('opening the assistant resizes the PTY and wraps completed output without h
   const output = page.locator('[data-testid^="command-block-"] [data-selectable]').last();
   await expect(output).toContainText('file-name-');
   const grid = output.locator(':scope > div');
-  const before = await grid.evaluate(el => ({ height: el.clientHeight, text: el.textContent, html: el.innerHTML }));
+  const before = await grid.evaluate((el) => ({ height: el.clientHeight, text: el.textContent, html: el.innerHTML }));
   const beforeCols = (await ptyResizes(page)).at(-1)!.cols;
   await page.locator('[data-dock-btn="chat"]').click();
   await expect(page.locator('[data-chat-composer]:visible')).toBeVisible();
-  await expect.poll(() => (ptyResizes(page)).then(resizes => resizes.at(-1)!.cols)).toBeLessThan(beforeCols);
-  await expect.poll(() => grid.evaluate(el => el.clientHeight)).toBeGreaterThan(before.height);
+  await expect.poll(() => ptyResizes(page).then((resizes) => resizes.at(-1)!.cols)).toBeLessThan(beforeCols);
+  await expect.poll(() => grid.evaluate((el) => el.clientHeight)).toBeGreaterThan(before.height);
   expect(await grid.textContent()).toBe(before.text);
   expect(await grid.innerHTML()).toBe(before.html);
-  await expect.poll(() => output.evaluate(el => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
-  const atEnd = await output.evaluate(el => {
+  await expect.poll(() => output.evaluate((el) => el.scrollWidth - el.clientWidth)).toBeLessThanOrEqual(1);
+  const atEnd = await output.evaluate((el) => {
     el.scrollLeft = el.scrollWidth;
     return el.scrollLeft;
   });
   expect(atEnd).toBe(0);
   await page.locator('[data-dock-btn="chat"]').click();
-  await expect.poll(() => grid.evaluate(el => el.clientHeight)).toBe(before.height);
+  await expect.poll(() => grid.evaluate((el) => el.clientHeight)).toBe(before.height);
   expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
 });
 
@@ -195,13 +202,16 @@ test('line-editor repaint does not add a prompt or inherited blank rows to comma
   await page.goto('/');
   await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
-  await emitPtyOutput(page, '\x1b]133;A\x07PS> \r\n\x1b[9;1Hls\r\n\x1b]133;E;bHM=\x07\x1b]133;C\x07\x1b[H\x1b[2JMode  Name\r\nd---  Documents\r\n\x1b]133;D;0\x07');
+  await emitPtyOutput(
+    page,
+    '\x1b]133;A\x07PS> \r\n\x1b[9;1Hls\r\n\x1b]133;E;bHM=\x07\x1b]133;C\x07\x1b[H\x1b[2JMode  Name\r\nd---  Documents\r\n\x1b]133;D;0\x07',
+  );
   const output = page.locator('[data-testid^="command-block-"] [data-selectable]').last();
   await expect(output).toContainText('Documents');
   await expect(output).not.toContainText('PS>');
   const grid = output.locator(':scope > div');
   // Two output rows must stay two rows, without a prompt or inherited blank row.
-  expect(await grid.evaluate(el => el.clientHeight)).toBeLessThanOrEqual((await terminalRowHeight(page)) * 2 + 2);
+  expect(await grid.evaluate((el) => el.clientHeight)).toBeLessThanOrEqual((await terminalRowHeight(page)) * 2 + 2);
 });
 
 test('running card: the PTY and block terminal width follow the card content width with no clipped right edge', async ({ page }) => {
@@ -213,7 +223,7 @@ test('running card: the PTY and block terminal width follow the card content wid
   // Wait for the shell prompt before injecting a sustained command.
   await page.waitForFunction(async () => {
     const path = '/src/features/terminal/stores/terminal.ts';
-    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    const { useTerminalStore } = (await import(path)) as typeof import('../src/features/terminal/stores/terminal');
     return Object.values(useTerminalStore.getState().startupStates).includes('ready');
   });
 
@@ -257,7 +267,7 @@ test('running output and the completed snapshot keep the same character width', 
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
   await page.waitForFunction(async () => {
     const path = '/src/features/terminal/stores/terminal.ts';
-    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    const { useTerminalStore } = (await import(path)) as typeof import('../src/features/terminal/stores/terminal');
     return Object.values(useTerminalStore.getState().startupStates).includes('ready');
   });
   await emitPtyOutput(page, `\x1b]133;E;${btoa('ls')}\x07\x1b]133;C\x07`);

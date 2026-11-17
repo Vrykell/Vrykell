@@ -19,7 +19,11 @@ describe('overlay scrollbar geometry', () => {
   });
 
   it('handles empty, fitting and temporarily hidden surfaces', () => {
-    for (const [viewport, extent] of [[400, 0], [400, 200], [0, 0]]) {
+    for (const [viewport, extent] of [
+      [400, 0],
+      [400, 200],
+      [0, 0],
+    ]) {
       const geometry = scrollbarGeometry(viewport, extent, -20);
       expect(geometry.maximum).toBe(0);
       expect(geometry.top).toBe(0);

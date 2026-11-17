@@ -9,8 +9,17 @@ import { safeJsonParse } from '@utils/errorHandler';
 import { useToastStore } from '@ui/feedback/Toast';
 import { SESSION_DATE_OPTIONS } from '../model/sessionHistoryModel';
 import {
-  DEFAULT_UNIFIED_FILTER, HISTORY_TYPES, UNIFIED_GROUP_BY_OPTIONS, UNIFIED_SORT_OPTIONS,
-  collapseWorkspaceMemberRecords, filterUnifiedHistory, unifiedHistoryGroupIdentity, unifiedHistoryRecords, type UnifiedAgentReference, type UnifiedHistoryFilter, type UnifiedHistoryRecord,
+  DEFAULT_UNIFIED_FILTER,
+  HISTORY_TYPES,
+  UNIFIED_GROUP_BY_OPTIONS,
+  UNIFIED_SORT_OPTIONS,
+  collapseWorkspaceMemberRecords,
+  filterUnifiedHistory,
+  unifiedHistoryGroupIdentity,
+  unifiedHistoryRecords,
+  type UnifiedAgentReference,
+  type UnifiedHistoryFilter,
+  type UnifiedHistoryRecord,
   originalWorkspaceGroupId,
 } from '../model/unifiedHistory';
 import { useSessionHistory } from './useSessionHistory';
@@ -28,52 +37,88 @@ import { t } from '@i18n';
 const FILTER_KEY = 'unified-history-filter-v1';
 function readFilter(): UnifiedHistoryFilter {
   let raw: string | null = null;
-  try { raw = sessionStorage.getItem(FILTER_KEY); } catch { /* Preferences are optional. */ }
+  try {
+    raw = sessionStorage.getItem(FILTER_KEY);
+  } catch {
+    /* Preferences are optional. */
+  }
   const saved = safeJsonParse<Partial<UnifiedHistoryFilter>>(raw ?? '{}');
-  return { query: typeof saved?.query === 'string' ? saved.query : '',
+  return {
+    query: typeof saved?.query === 'string' ? saved.query : '',
     type: saved?.type && HISTORY_TYPES.includes(saved.type) ? saved.type : 'all',
-    connection: saved?.connection === 'local' || saved?.connection === 'ssh' || saved?.connection === 'discussion' ? saved.connection : 'all',
-    date: saved?.date && SESSION_DATE_OPTIONS.some(option => option.value === saved.date) ? saved.date : 'all',
+    connection:
+      saved?.connection === 'local' || saved?.connection === 'ssh' || saved?.connection === 'discussion' ? saved.connection : 'all',
+    date: saved?.date && SESSION_DATE_OPTIONS.some((option) => option.value === saved.date) ? saved.date : 'all',
     mode: saved?.mode === 'block' || saved?.mode === 'classic' ? saved.mode : 'all',
-    sort: saved?.sort && UNIFIED_SORT_OPTIONS.some(option => option.value === saved.sort) ? saved.sort : 'activity-desc',
-    groupBy: saved?.groupBy && UNIFIED_GROUP_BY_OPTIONS.some(option => option.value === saved.groupBy) ? saved.groupBy : 'day',
+    sort: saved?.sort && UNIFIED_SORT_OPTIONS.some((option) => option.value === saved.sort) ? saved.sort : 'activity-desc',
+    groupBy: saved?.groupBy && UNIFIED_GROUP_BY_OPTIONS.some((option) => option.value === saved.groupBy) ? saved.groupBy : 'day',
     dateField: saved?.dateField === 'created' ? 'created' : 'activity',
-    starredOnly: saved?.starredOnly === true, layout: saved?.layout === 'split' || saved?.layout === 'single' ? saved.layout : 'all' };
+    starredOnly: saved?.starredOnly === true,
+    layout: saved?.layout === 'split' || saved?.layout === 'single' ? saved.layout : 'all',
+  };
 }
 
 /** The unified page queries raw sources and reuses their existing restoration paths. */
 export function useUnifiedHistory(preset?: HistoryTypePreset, destinationOverride?: 'native' | 'unified') {
-  const notify = useCallback((message: string, kind: 'success' | 'error') => { useToastStore.getState().addToast(message, kind); }, []);
+  const notify = useCallback((message: string, kind: 'success' | 'error') => {
+    useToastStore.getState().addToast(message, kind);
+  }, []);
   const [filter, setFilter] = useState<UnifiedHistoryFilter>(() => ({ ...readFilter(), ...(preset ? { type: preset } : {}) }));
   const [query, setQuery] = useState(filter.query);
   useEffect(() => {
-    if (!filter.query) { setQuery(''); return; }
+    if (!filter.query) {
+      setQuery('');
+      return;
+    }
     const timer = setTimeout(() => setQuery(filter.query), 300);
     return () => clearTimeout(timer);
   }, [filter.query]);
   const pages = useHistoryPages(filter.type, filter.sort, JSON.stringify({ ...filter, query }), filter.layout);
-  const terminalSource = useMemo(() => ({ ...pages, sessions: pages.sessions.filter(session => session.kind !== 'workspace') }), [pages.sessions, pages.groups, pages.loading, pages.error, pages.refresh]);
+  const terminalSource = useMemo(
+    () => ({ ...pages, sessions: pages.sessions.filter((session) => session.kind !== 'workspace') }),
+    [pages.sessions, pages.groups, pages.loading, pages.error, pages.refresh],
+  );
   const terminal = useSessionHistory({ notify, source: terminalSource });
   const opening = useRef(new Set<string>());
-  const conversations = useMemo(() => pages.conversations.map(record => ({ id: record.id, title: record.title, createdAt: record.created_at, updatedAt: record.updated_at, environment: parseEnvironment(record.environment) })), [pages.conversations]);
+  const conversations = useMemo(
+    () =>
+      pages.conversations.map((record) => ({
+        id: record.id,
+        title: record.title,
+        createdAt: record.created_at,
+        updatedAt: record.updated_at,
+        environment: parseEnvironment(record.environment),
+      })),
+    [pages.conversations],
+  );
   const conversationError = pages.error;
-  const notes = useHistoryMetaStore(state => state.notes);
-  const starred = useHistoryMetaStore(state => state.starred);
-  const agentRefs = useHarnessSessionRefs(state => state.refs);
+  const notes = useHistoryMetaStore((state) => state.notes);
+  const starred = useHistoryMetaStore((state) => state.starred);
+  const agentRefs = useHarnessSessionRefs((state) => state.refs);
   const acp = useAcpHistory();
-  const groupTitles = useHistoryMetaStore(state => state.groupTitles);
-  const groupNotes = useHistoryMetaStore(state => state.groupNotes);
+  const groupTitles = useHistoryMetaStore((state) => state.groupTitles);
+  const groupNotes = useHistoryMetaStore((state) => state.groupNotes);
   const loading = pages.loading;
   useEffect(() => {
     useWorkspaceNavigation.getState().setHistoryLoading(loading);
     return () => useWorkspaceNavigation.getState().setHistoryLoading(false);
   }, [loading]);
-  useEffect(() => { try { sessionStorage.setItem(FILTER_KEY, JSON.stringify(filter)); } catch { /* Preferences are optional. */ } }, [filter]);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(FILTER_KEY, JSON.stringify(filter));
+    } catch {
+      /* Preferences are optional. */
+    }
+  }, [filter]);
   const agents = useMemo(() => {
     const merged = new Map<string, UnifiedAgentReference>();
     for (const entry of acp.summaries) {
       merged.set(JSON.stringify([entry.harness, entry.sessionId]), {
-        harness: entry.harness, sessionId: entry.sessionId, cwd: entry.cwd, at: entry.updatedAt, title: entry.title,
+        harness: entry.harness,
+        sessionId: entry.sessionId,
+        cwd: entry.cwd,
+        at: entry.updatedAt,
+        title: entry.title,
       });
     }
     for (const [harness, ref] of Object.entries(agentRefs)) {
@@ -83,23 +128,37 @@ export function useUnifiedHistory(preset?: HistoryTypePreset, destinationOverrid
     }
     return [...merged.values()];
   }, [acp.summaries, agentRefs]);
-  const enrich = useCallback((sessions: BackendSessionEntry[], chats: Conversation[]) => {
-    const titles = new Map(terminal.originalGroups.map(group => [group.id, group.title]));
-    return unifiedHistoryRecords(sessions, chats, { notes, starred }, agents).map(record => {
-      const identity = unifiedHistoryGroupIdentity(record, filter.groupBy);
-      const groupKey = historyGroupKey('session', `unified-${filter.groupBy}`, identity.id);
-      const groupId = originalWorkspaceGroupId(record);
-      const originalTitle = groupId ? titles.get(groupId) : undefined;
-      return { ...record, searchText: [record.searchText, identity.title, groupTitles[groupKey], groupNotes[groupKey], originalTitle]
-        .filter(Boolean).join(' ').toLocaleLowerCase() };
-    });
-  }, [terminal.originalGroups, filter.groupBy, groupNotes, groupTitles, notes, starred, agents]);
+  const enrich = useCallback(
+    (sessions: BackendSessionEntry[], chats: Conversation[]) => {
+      const titles = new Map(terminal.originalGroups.map((group) => [group.id, group.title]));
+      return unifiedHistoryRecords(sessions, chats, { notes, starred }, agents).map((record) => {
+        const identity = unifiedHistoryGroupIdentity(record, filter.groupBy);
+        const groupKey = historyGroupKey('session', `unified-${filter.groupBy}`, identity.id);
+        const groupId = originalWorkspaceGroupId(record);
+        const originalTitle = groupId ? titles.get(groupId) : undefined;
+        return {
+          ...record,
+          searchText: [record.searchText, identity.title, groupTitles[groupKey], groupNotes[groupKey], originalTitle]
+            .filter(Boolean)
+            .join(' ')
+            .toLocaleLowerCase(),
+        };
+      });
+    },
+    [terminal.originalGroups, filter.groupBy, groupNotes, groupTitles, notes, starred, agents],
+  );
   const records = useMemo(() => enrich(pages.sessions, conversations), [enrich, pages.sessions, conversations]);
   const visible = useMemo(() => collapseWorkspaceMemberRecords(filterUnifiedHistory(records, filter), filter.layout), [records, filter]);
   useEffect(() => {
-    if (query !== filter.query || !filter.query && filter.connection === 'all' && filter.mode === 'all' && filter.date === 'all' && !filter.starredOnly) return;
+    if (
+      query !== filter.query ||
+      (!filter.query && filter.connection === 'all' && filter.mode === 'all' && filter.date === 'all' && !filter.starredOnly)
+    )
+      return;
     if (visible.length >= 40 || !pages.hasMore || pages.loading || pages.loadingMore || pages.error) return;
-    const frame = requestAnimationFrame(() => { void pages.loadMore(); });
+    const frame = requestAnimationFrame(() => {
+      void pages.loadMore();
+    });
     return () => cancelAnimationFrame(frame);
   }, [filter, query, visible.length, records.length, pages.hasMore, pages.loading, pages.loadingMore, pages.error, pages.loadMore]);
   const open = async (record: UnifiedHistoryRecord) => {
@@ -108,8 +167,11 @@ export function useUnifiedHistory(preset?: HistoryTypePreset, destinationOverrid
     const destination = destinationOverride ?? useWorkspaceNavigation.getState().historyDestination;
     try {
       await restoreHistoryRecord(record, destination);
-    } catch (error) { notify(t('Could not restore workspace: {{error}}', { error: String(error) }), 'error'); }
-    finally { opening.current.delete(record.key); }
+    } catch (error) {
+      notify(t('Could not restore workspace: {{error}}', { error: String(error) }), 'error');
+    } finally {
+      opening.current.delete(record.key);
+    }
   };
   const collect = async (matching = true) => {
     if (!pages.hasMore) return matching ? visible : records;
@@ -119,9 +181,17 @@ export function useUnifiedHistory(preset?: HistoryTypePreset, destinationOverrid
     do {
       const page = await readHistoryPage({ source: filter.type, sort: filter.sort, layout: filter.layout, limit: 100, cursor });
       sessions.push(...page.sessions);
-      chats.push(...page.conversations.map(record => ({ id: record.id, title: record.title, createdAt: record.created_at, updatedAt: record.updated_at, environment: parseEnvironment(record.environment) })));
+      chats.push(
+        ...page.conversations.map((record) => ({
+          id: record.id,
+          title: record.title,
+          createdAt: record.created_at,
+          updatedAt: record.updated_at,
+          environment: parseEnvironment(record.environment),
+        })),
+      );
       cursor = page.nextCursor;
-      if (cursor) await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      if (cursor) await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     } while (cursor);
     const all = enrich(sessions, chats);
     return collapseWorkspaceMemberRecords(matching ? filterUnifiedHistory(all, filter) : all, filter.layout);
@@ -129,31 +199,53 @@ export function useUnifiedHistory(preset?: HistoryTypePreset, destinationOverrid
   const refresh = async () => {
     await Promise.all([pages.refresh(), acp.reload()]);
   };
-  return { records, visible, filter, setFilter: (patch: Partial<UnifiedHistoryFilter>) => setFilter(previous => ({ ...previous, ...patch })),
+  return {
+    records,
+    visible,
+    filter,
+    setFilter: (patch: Partial<UnifiedHistoryFilter>) => setFilter((previous) => ({ ...previous, ...patch })),
     openMember: async (member: WorkspaceHistoryMember) => {
       const destination = destinationOverride ?? useWorkspaceNavigation.getState().historyDestination;
-      try { await restoreHistoryMember(member, destination); }
-      catch (error) { notify(t('Could not restore workspace: {{error}}', { error: String(error) }), 'error'); }
+      try {
+        await restoreHistoryMember(member, destination);
+      } catch (error) {
+        notify(t('Could not restore workspace: {{error}}', { error: String(error) }), 'error');
+      }
     },
-    resetFilter: () => setFilter(DEFAULT_UNIFIED_FILTER), open, terminalError: terminal.loadError, conversationError, acpError: acp.error,
-    loading: loading || acp.loading, loadingMore: pages.loadingMore, hasMore: pages.hasMore, loadMore: pages.loadMore, busy: terminal.batchBusy, refresh, collect,
+    resetFilter: () => setFilter(DEFAULT_UNIFIED_FILTER),
+    open,
+    terminalError: terminal.loadError,
+    conversationError,
+    acpError: acp.error,
+    loading: loading || acp.loading,
+    loadingMore: pages.loadingMore,
+    hasMore: pages.hasMore,
+    loadMore: pages.loadMore,
+    busy: terminal.batchBusy,
+    refresh,
+    collect,
     openMany: async (targets: readonly UnifiedHistoryRecord[]) => {
       for (const record of targets) await open(record);
     },
     removeMany: async (targets: readonly UnifiedHistoryRecord[]) => {
-      const sessions = targets.flatMap(record => record.kind === 'terminal' ? [record.session] : []);
+      const sessions = targets.flatMap((record) => (record.kind === 'terminal' ? [record.session] : []));
       if (sessions.length) await terminal.deleteSessions(sessions);
-      for (const record of targets) if (record.kind === 'workspace') {
-        suppressWorkspaceHistory(record.session.id);
-        await deleteSession(record.session.id);
-      }
-      for (const record of targets) if (record.kind === 'conversation') await useChatStore.getState().deleteConversation(record.conversation.id);
-      for (const record of targets) if (record.kind === 'agent') {
-        await deleteHarnessTranscriptCopy(record.agent.harness, record.agent.sessionId);
-        useHarnessSessionRefs.getState().forget(record.agent.harness, record.agent.sessionId);
-        useHistoryMetaStore.getState().removeRecords([record.key]);
-      }
+      for (const record of targets)
+        if (record.kind === 'workspace') {
+          suppressWorkspaceHistory(record.session.id);
+          await deleteSession(record.session.id);
+        }
+      for (const record of targets)
+        if (record.kind === 'conversation') await useChatStore.getState().deleteConversation(record.conversation.id);
+      for (const record of targets)
+        if (record.kind === 'agent') {
+          await deleteHarnessTranscriptCopy(record.agent.harness, record.agent.sessionId);
+          useHarnessSessionRefs.getState().forget(record.agent.harness, record.agent.sessionId);
+          useHistoryMetaStore.getState().removeRecords([record.key]);
+        }
       await Promise.all([pages.refresh(), acp.reload()]);
     },
-    originalGroups: terminal.originalGroups, renameOriginalGroup: terminal.renameOriginalGroup };
+    originalGroups: terminal.originalGroups,
+    renameOriginalGroup: terminal.renameOriginalGroup,
+  };
 }

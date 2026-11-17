@@ -6,9 +6,7 @@ import { iconSizes } from '@ui/icons';
 import { tabCapabilities, type TabHandle } from '@ui/layout/tabHandle';
 import type { Tab } from '../stores/workspace';
 
-export type CodeTabTarget =
-  | { handle: TabHandle; file: EditorFile }
-  | { handle: TabHandle; comparisonId: string };
+export type CodeTabTarget = { handle: TabHandle; file: EditorFile } | { handle: TabHandle; comparisonId: string };
 
 /** Present resources; the common container provider owns strip rows and ordering. */
 export function projectCodeTabs(tabs: Tab[], documents: Record<string, DocumentState>): CodeTabTarget[] {

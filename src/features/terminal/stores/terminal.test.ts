@@ -4,7 +4,13 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 invokeMock.mockResolvedValue(undefined);
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import { useTerminalStore, registerTerminal, unregisterTerminal, getRecentOutput, getFocusedTerminalId } from '@features/terminal/stores/terminal';
+import {
+  useTerminalStore,
+  registerTerminal,
+  unregisterTerminal,
+  getRecentOutput,
+  getFocusedTerminalId,
+} from '@features/terminal/stores/terminal';
 import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { terminalCommandPayload } from '../services/commandSubmission';
 
@@ -14,7 +20,7 @@ const initialWs = useWorkspaceStore.getState();
 describe('terminal store', () => {
   it.each([
     ['cmd', 'echo first\necho second\n'],
-    ['bash', 'eval "$(printf \'%s\\n\' \'echo first\' \'echo second\')"\n'],
+    ['bash', "eval \"$(printf '%s\\n' 'echo first' 'echo second')\"\n"],
   ])('serializes scripts with the actual %s process instead of an unspecified layout preference', (shell, expected) => {
     const paneId = `${useWorkspaceStore.getState().activeId}#0`;
     useTerminalStore.setState({ shellTypes: { [paneId]: shell } });
@@ -34,7 +40,12 @@ describe('terminal store', () => {
   });
 
   it('clears a stopped session and queued input while retaining its scene and dimensions', () => {
-    useTerminalStore.setState({ sessions: { p: 'old', other: 'live' }, pendingCommands: { p: ['secret'], other: ['ls'] }, scenes: { p: 'classic' }, dims: { p: { cols: 80, rows: 24 } } });
+    useTerminalStore.setState({
+      sessions: { p: 'old', other: 'live' },
+      pendingCommands: { p: ['secret'], other: ['ls'] },
+      scenes: { p: 'classic' },
+      dims: { p: { cols: 80, rows: 24 } },
+    });
     useTerminalStore.getState().clearSession('p', 'old');
     expect(useTerminalStore.getState().sessions).toEqual({ other: 'live' });
     expect(useTerminalStore.getState().pendingCommands).toEqual({ other: ['ls'] });

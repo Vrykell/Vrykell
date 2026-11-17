@@ -4,7 +4,7 @@ import { gotoSetting } from './settings';
 import { focusedPane, pickPlacementZone } from './placement';
 
 async function expectQuietFocus(control: Locator) {
-  const border = await control.evaluate(element => getComputedStyle(element).borderColor);
+  const border = await control.evaluate((element) => getComputedStyle(element).borderColor);
   await control.focus();
   await expect(control).toBeFocused();
   await expect(control).toHaveCSS('outline-style', 'none');
@@ -19,16 +19,34 @@ for (const theme of ['深色', '浅色']) {
     await gotoSetting(page, '主题');
     await page.getByRole('radio', { name: `始终${theme}`, exact: true }).click();
     const nav = page.locator('.settings-navigation');
-    const labels = ['启动', '日志与诊断', '模型配置', '模型行为', '工具权限', '联网搜索', '技能',
-      'MCP 服务器', '记忆', '编辑器设置', '本地文件打开方式', '远程文件打开方式', '主题',
-      '块外观', '字体与显示', '主题文件', '快捷键说明'];
+    const labels = [
+      '启动',
+      '日志与诊断',
+      '模型配置',
+      '模型行为',
+      '工具权限',
+      '联网搜索',
+      '技能',
+      'MCP 服务器',
+      '记忆',
+      '编辑器设置',
+      '本地文件打开方式',
+      '远程文件打开方式',
+      '主题',
+      '块外观',
+      '字体与显示',
+      '主题文件',
+      '快捷键说明',
+    ];
     for (const [index, label] of labels.entries()) {
       await nav.getByRole('button', { name: label, exact: true }).click();
       const content = page.locator('.settings-content');
       await expect(content.getByText(label, { exact: true }).first()).toBeVisible();
-      const overflow = await content.evaluate(element => element.scrollWidth - element.clientWidth);
+      const overflow = await content.evaluate((element) => element.scrollWidth - element.clientWidth);
       expect(overflow, label).toBeLessThanOrEqual(1);
-      const controls = content.locator('input:not([type="checkbox"]):not([type="range"]):enabled, textarea:enabled, button[role="combobox"]:enabled');
+      const controls = content.locator(
+        'input:not([type="checkbox"]):not([type="range"]):enabled, textarea:enabled, button[role="combobox"]:enabled',
+      );
       for (const control of await controls.all()) {
         if (await control.isVisible()) await expectQuietFocus(control);
       }
@@ -43,7 +61,7 @@ for (const theme of ['深色', '浅色']) {
     await page.getByTestId('history-search-toggle').click();
     const history = page.getByTestId('unified-history-search');
     await expectQuietFocus(history);
-    const hierarchy = await history.evaluate(element => ({
+    const hierarchy = await history.evaluate((element) => ({
       field: getComputedStyle(element.parentElement!).backgroundColor,
       panel: getComputedStyle(element.closest('main')!.firstElementChild!).backgroundColor,
     }));
@@ -60,7 +78,7 @@ for (const theme of ['深色', '浅色']) {
     await page.keyboard.press('Meta+1');
     const expectRestingEdge = async (input: Locator) => {
       await expectQuietFocus(input);
-      const edge = await input.evaluate(element => {
+      const edge = await input.evaluate((element) => {
         const probe = document.createElement('span');
         probe.style.border = element.classList.contains('text-input-field') ? '1px solid var(--border-strong)' : '1px solid var(--border)';
         element.parentElement!.append(probe);
@@ -89,15 +107,24 @@ for (const theme of ['深色', '浅色']) {
     await pickPlacementZone(page, focusedPane(page), 'right');
     const panes = page.locator('.terminal-pane');
     await expect(panes).toHaveCount(2);
-    const borders = () => panes.evaluateAll(elements => elements.map(element => {
-      const style = getComputedStyle(element);
-      return [style.borderTop, style.borderRight, style.borderBottom, style.borderLeft];
-    }));
+    const borders = () =>
+      panes.evaluateAll((elements) =>
+        elements.map((element) => {
+          const style = getComputedStyle(element);
+          return [style.borderTop, style.borderRight, style.borderBottom, style.borderLeft];
+        }),
+      );
     const resting = await borders();
-    await panes.first().getByPlaceholder(/输入命令/).click();
+    await panes
+      .first()
+      .getByPlaceholder(/输入命令/)
+      .click();
     await expect(panes.first()).toHaveAttribute('data-focused', 'true');
     expect(await borders()).toEqual(resting);
-    await panes.last().getByPlaceholder(/输入命令/).click();
+    await panes
+      .last()
+      .getByPlaceholder(/输入命令/)
+      .click();
     await expect(panes.last()).toHaveAttribute('data-focused', 'true');
     expect(await borders()).toEqual(resting);
   });

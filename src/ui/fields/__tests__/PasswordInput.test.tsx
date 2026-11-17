@@ -34,8 +34,15 @@ describe('password input', () => {
 
   it('forwards the ref, honors disabled and accepts provider-specific reveal labels', () => {
     const ref = createRef<HTMLInputElement>();
-    render(<PasswordInput ref={ref} aria-label="API key" disabled revealTestId="key-reveal"
-      revealLabel={{ show: 'Reveal API key', hide: 'Hide API key' }} />);
+    render(
+      <PasswordInput
+        ref={ref}
+        aria-label="API key"
+        disabled
+        revealTestId="key-reveal"
+        revealLabel={{ show: 'Reveal API key', hide: 'Hide API key' }}
+      />,
+    );
     expect(ref.current).toBe(screen.getByLabelText('API key'));
     expect(ref.current).toBeDisabled();
     const reveal = screen.getByTestId('key-reveal');

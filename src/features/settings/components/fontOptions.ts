@@ -9,16 +9,23 @@ function useAvailableFonts<T extends string>(candidates: readonly T[], bundled: 
   useEffect(() => {
     if (typeof FontFace === 'undefined') return;
     let active = true;
-    const refresh = () => { void availableFontFamilies(candidates, bundled).then(fonts => { if (active) setAvailable(fonts); }); };
+    const refresh = () => {
+      void availableFontFamilies(candidates, bundled).then((fonts) => {
+        if (active) setAvailable(fonts);
+      });
+    };
     refresh();
     window.addEventListener('focus', refresh);
-    return () => { active = false; window.removeEventListener('focus', refresh); };
+    return () => {
+      active = false;
+      window.removeEventListener('focus', refresh);
+    };
   }, [candidates, bundled]);
-  return available.map(value => ({ value, label: value }));
+  return available.map((value) => ({ value, label: value }));
 }
 
-const monoCandidates = TERMINAL_FONT_PRESETS.filter(font => font !== 'system' && font !== 'system-default');
-const uiCandidates = UI_FONT_PRESETS.filter(font => font !== 'system');
+const monoCandidates = TERMINAL_FONT_PRESETS.filter((font) => font !== 'system' && font !== 'system-default');
+const uiCandidates = UI_FONT_PRESETS.filter((font) => font !== 'system');
 const bundledUiFamilies = [...BUNDLED_UI_FONTS, ...BUNDLED_MONO_FONTS];
 
 export function useMonospaceFontOptions() {

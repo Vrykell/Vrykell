@@ -94,14 +94,19 @@ it('previews the docked settings layout while a left placement target is active'
 it('reorders workspace rows and renders them in the saved order', () => {
   act(() => useWorkspaceNavigation.getState().moveWorkspaceArea('ssh', 'terminal', false));
   render(<WorkspaceSidebar />);
-  const rows = Array.from(document.querySelectorAll('[data-testid^="workspace-area-"]'))
-    .map(row => row.getAttribute('data-testid'));
-  expect(rows).toEqual(['workspace-area-ssh', 'workspace-area-terminal', 'workspace-area-code', 'workspace-area-ai', 'workspace-area-unified']);
+  const rows = Array.from(document.querySelectorAll('[data-testid^="workspace-area-"]')).map((row) => row.getAttribute('data-testid'));
+  expect(rows).toEqual([
+    'workspace-area-ssh',
+    'workspace-area-terminal',
+    'workspace-area-code',
+    'workspace-area-ai',
+    'workspace-area-unified',
+  ]);
   expect(useWorkspaceNavigation.getState().workspaceOrder).toEqual(['ssh', 'terminal', 'code', 'ai', 'unified']);
 });
 
-it.each(['terminal', 'unified'] as const)('shows the final slot when dragging the last %s row', id => {
-  const order = navigation.workspaceOrder.filter(item => item !== id);
+it.each(['terminal', 'unified'] as const)('shows the final slot when dragging the last %s row', (id) => {
+  const order = navigation.workspaceOrder.filter((item) => item !== id);
   useWorkspaceNavigation.setState({ collapsed: false, workspaceOrder: [...order, id] });
   render(<WorkspaceSidebar />);
   const lastRemaining = screen.getByTestId(`workspace-area-${order[order.length - 1]!}`);
@@ -121,7 +126,9 @@ it.each(['terminal', 'unified'] as const)('shows the final slot when dragging th
 it('reserves the dragged row slot while no destination is resolved', () => {
   useWorkspaceNavigation.setState({ collapsed: false });
   render(<WorkspaceSidebar />);
-  act(() => useListReorder.getState().start({ listId: 'workspace-areas', id: 'terminal', kind: 'workspace', height: 32 }, { x: 60, y: 250 }));
+  act(() =>
+    useListReorder.getState().start({ listId: 'workspace-areas', id: 'terminal', kind: 'workspace', height: 32 }, { x: 60, y: 250 }),
+  );
   const row = screen.getByTestId('workspace-area-terminal');
   const slot = document.querySelector('[data-reorder-placeholder="terminal"]');
   expect(slot).not.toBeNull();
@@ -150,10 +157,14 @@ it('resizes through the shared separator, keeps a held collapsed drag reversible
   expect(handle).toHaveAttribute('aria-valuenow', '208');
   fireEvent.mouseDown(handle, { clientX: 208 });
   fireEvent.mouseMove(document, { clientX: 150 });
-  await act(async () => { await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); });
+  await act(async () => {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  });
   expect(screen.getByTestId('workspace-sidebar')).toHaveAttribute('inert');
   fireEvent.mouseMove(document, { clientX: 300 });
-  await act(async () => { await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); });
+  await act(async () => {
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  });
   expect(screen.getByTestId('workspace-sidebar')).not.toHaveAttribute('inert');
   fireEvent.mouseUp(document);
   expect(useWorkspaceNavigation.getState().sidebarWidth).toBe(300);

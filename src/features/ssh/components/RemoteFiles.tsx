@@ -32,8 +32,16 @@ import { requestSshAuthentication, useSshAuthenticationRevision } from '../hooks
  * is operated on, and the panel configuration derives menu and drag semantics. The remote-only
  * parts are upload/download, opening in a remote editor and file-service failure messages.
  */
-export default function RemoteFiles({ conn, enabled = true, terminal, terminalMenu }: {
-  conn: SshConnection; enabled?: boolean; terminal?: PanelTerminalState; terminalMenu?: TerminalBindingMenu;
+export default function RemoteFiles({
+  conn,
+  enabled = true,
+  terminal,
+  terminalMenu,
+}: {
+  conn: SshConnection;
+  enabled?: boolean;
+  terminal?: PanelTerminalState;
+  terminalMenu?: TerminalBindingMenu;
 }) {
   const authenticationRevision = useSshAuthenticationRevision(conn.id);
   const target = useMemo<FileOpsTarget>(() => ({ kind: 'ssh', connectionId: conn.id }), [conn.id]);
@@ -41,7 +49,7 @@ export default function RemoteFiles({ conn, enabled = true, terminal, terminalMe
   const storedPath = useRemotePathStore((state) => state.path[conn.id] ?? null);
   const [transferPage, setTransferPage] = useState<'upload' | 'download' | null>(null);
   const paneId = terminal?.isBound ? terminal.paneId : sshPaneIdFor(conn.id);
-  const terminalCwd = useSessionStore((state) => terminal?.isBound ? terminal.cwd : paneId ? state.terminalCwds[paneId] : undefined);
+  const terminalCwd = useSessionStore((state) => (terminal?.isBound ? terminal.cwd : paneId ? state.terminalCwds[paneId] : undefined));
 
   const toast = (message: string, type: 'info' | 'success' | 'error' = 'info') => {
     useToastStore.getState().addToast(message, type);
@@ -54,28 +62,39 @@ export default function RemoteFiles({ conn, enabled = true, terminal, terminalMe
     const store = useTerminalStore.getState();
     const sid = currentPaneId ? store.sessions[currentPaneId] : undefined;
     terminalDebug('remote-file-terminal-action', {
-      action, paneId: currentPaneId, tabId: useSessionStore.getState().activeId, hasSession: Boolean(sid), bound,
+      action,
+      paneId: currentPaneId,
+      tabId: useSessionStore.getState().activeId,
+      hasSession: Boolean(sid),
+      bound,
     });
     if (!sid || !currentPaneId) {
       toast(t('SSH session is not ready'), 'info');
       return;
     }
-    void ptyWrite(sid, command).then(() => {
-      if (bound) {
-        if (action !== 'edit') return;
-      } else if (sshPaneIdFor(conn.id) !== currentPaneId) return;
-      useTerminalStore.getState().setFocusedPane(currentPaneId);
-      getPaneTerminal(currentPaneId)?.focus();
-      if (action === 'edit') presentWorkspaceResource(`terminal:${currentPaneId}`);
-    }).catch((error) => toast(String((error as Error)?.message ?? error), 'error'));
+    void ptyWrite(sid, command)
+      .then(() => {
+        if (bound) {
+          if (action !== 'edit') return;
+        } else if (sshPaneIdFor(conn.id) !== currentPaneId) return;
+        useTerminalStore.getState().setFocusedPane(currentPaneId);
+        getPaneTerminal(currentPaneId)?.focus();
+        if (action === 'edit') presentWorkspaceResource(`terminal:${currentPaneId}`);
+      })
+      .catch((error) => toast(String((error as Error)?.message ?? error), 'error'));
   };
 
   /** Open a remote file in the terminal associated with this file panel. */
   const remoteEdit = (entry: FsEntry) => {
     try {
-      void Promise.resolve(openPreferredFile({ path: entry.path, connectionId: conn.id }, () => writeTerminalCommand(remoteOpenCommand(loadConfig(), entry.path), 'edit')))
-        .catch(error => toast(String(error), 'error'));
-    } catch (error) { toast(String(error), 'error'); }
+      void Promise.resolve(
+        openPreferredFile({ path: entry.path, connectionId: conn.id }, () =>
+          writeTerminalCommand(remoteOpenCommand(loadConfig(), entry.path), 'edit'),
+        ),
+      ).catch((error) => toast(String(error), 'error'));
+    } catch (error) {
+      toast(String(error), 'error');
+    }
   };
 
   /** Upload paths one by one and aggregate the result (shared by the menu and system drops). */
@@ -103,15 +122,18 @@ export default function RemoteFiles({ conn, enabled = true, terminal, terminalMe
       target={target}
       enabled={enabled}
       reloadRevision={authenticationRevision}
-      initialPath={terminal?.isBound ? terminal.cwd ?? storedPath : storedPath}
+      initialPath={terminal?.isBound ? (terminal.cwd ?? storedPath) : storedPath}
       terminalCwd={terminalCwd}
-      followCwd={terminal?.isBound ? terminal.cwd ?? null : null}
+      followCwd={terminal?.isBound ? (terminal.cwd ?? null) : null}
       terminalMenu={terminalMenu}
       onPathChange={(next) => useRemotePathStore.getState().set(conn.id, next)}
       openEntry={remoteEdit}
       onSyncToTerminal={(dir) => {
-        try { writeTerminalCommand(`cd -- ${shellQuote(dir)}\r`, 'sync-directory'); }
-        catch (error) { toast(String(error), 'error'); }
+        try {
+          writeTerminalCommand(`cd -- ${shellQuote(dir)}\r`, 'sync-directory');
+        } catch (error) {
+          toast(String(error), 'error');
+        }
       }}
       pendingLabel={t('Remote files · {{name}}', { name: conn.name })}
       renderError={(error, retry) => {
@@ -120,17 +142,35 @@ export default function RemoteFiles({ conn, enabled = true, terminal, terminalMe
           <ErrorBox
             title={failure.title}
             details={error}
-            actions={<>
-              <TextButton onClick={() => {
-                const dock = useDockStore.getState();
-                const side = dock.leftPanels.includes('files') ? 'left' : 'right';
-                dock.togglePanel(side, 'files');
-                if (paneId) termInstances.get(paneId)?.focus();
-              }}>{t('Continue using terminal')}</TextButton>
-              <OutlineButton onClick={retry}>{t('Retry file service')}</OutlineButton>
-              {failure.kind === 'authentication' && <TextButton className="user-primary-action" onClick={() => requestSshAuthentication({ connectionId: conn.id, host: conn.host, port: conn.port, user: conn.user, identityFile: conn.identityFile })}>{t('Authenticate services')}</TextButton>}
-            </>}
-          >
+            actions={
+              <>
+                <TextButton
+                  onClick={() => {
+                    const dock = useDockStore.getState();
+                    const side = dock.leftPanels.includes('files') ? 'left' : 'right';
+                    dock.togglePanel(side, 'files');
+                    if (paneId) termInstances.get(paneId)?.focus();
+                  }}>
+                  {t('Continue using terminal')}
+                </TextButton>
+                <OutlineButton onClick={retry}>{t('Retry file service')}</OutlineButton>
+                {failure.kind === 'authentication' && (
+                  <TextButton
+                    className="user-primary-action"
+                    onClick={() =>
+                      requestSshAuthentication({
+                        connectionId: conn.id,
+                        host: conn.host,
+                        port: conn.port,
+                        user: conn.user,
+                        identityFile: conn.identityFile,
+                      })
+                    }>
+                    {t('Authenticate services')}
+                  </TextButton>
+                )}
+              </>
+            }>
             {failure.message}
           </ErrorBox>
         );
@@ -154,9 +194,7 @@ export default function RemoteFiles({ conn, enabled = true, terminal, terminalMe
         },
         onUpload: (kind) => {
           void (async () => {
-            const selected = kind === 'dir'
-              ? await open({ directory: true })
-              : await open({ multiple: true, directory: false });
+            const selected = kind === 'dir' ? await open({ directory: true }) : await open({ multiple: true, directory: false });
             const picked = (Array.isArray(selected) ? selected : selected ? [selected] : []).filter(Boolean);
             if (picked.length === 0 || storedPath === null) return;
             await uploadPaths(picked, storedPath);
@@ -165,7 +203,9 @@ export default function RemoteFiles({ conn, enabled = true, terminal, terminalMe
         onOpenDownloads: () => setTransferPage('download'),
         onOpenUploads: () => setTransferPage('upload'),
       }}
-      onExternalDrop={(paths, dropTarget) => { void uploadPaths(paths, dropTarget.dir); }}
+      onExternalDrop={(paths, dropTarget) => {
+        void uploadPaths(paths, dropTarget.dir);
+      }}
       prepareNativeDrag={async (items) => {
         if (!ops.download || items.length === 0) return null;
         setTransferPage('download');

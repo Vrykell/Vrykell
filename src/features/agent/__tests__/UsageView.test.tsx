@@ -8,8 +8,9 @@ import { useUsageSources } from '../stores/usageSources';
 import type { HarnessConfig } from '@platform/api/acp';
 
 const { acpHarnesses } = vi.hoisted(() => ({ acpHarnesses: vi.fn<() => Promise<HarnessConfig[]>>() }));
-vi.mock('@platform/api/acp', async importOriginal => ({
-  ...await importOriginal<typeof import('@platform/api/acp')>(), acpHarnesses,
+vi.mock('@platform/api/acp', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@platform/api/acp')>()),
+  acpHarnesses,
 }));
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -26,8 +27,14 @@ afterEach(() => cleanup());
 
 function seedSonnetTurn(at = Date.now()) {
   useUsageStore.getState().recordTurn({
-    provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 1200, outputTokens: 300,
-    cachedInputTokens: 800, steps: 2, toolCalls: 3, at,
+    provider: 'anthropic',
+    model: 'claude-sonnet-4',
+    inputTokens: 1200,
+    outputTokens: 300,
+    cachedInputTokens: 800,
+    steps: 2,
+    toolCalls: 3,
+    at,
   });
 }
 
@@ -53,10 +60,12 @@ describe('UsageView', () => {
   });
 
   it('keeps unused native model configurations visible in breakdowns and filters', async () => {
-    useAiConfigStore.setState({ models: [
-      { id: 'unused', name: 'Unused model', provider: 'anthropic', baseUrl: '', model: 'claude-sonnet-4' },
-      { id: 'other', name: 'Other model', provider: 'openai-compatible', baseUrl: '', model: 'local-model' },
-    ] });
+    useAiConfigStore.setState({
+      models: [
+        { id: 'unused', name: 'Unused model', provider: 'anthropic', baseUrl: '', model: 'claude-sonnet-4' },
+        { id: 'other', name: 'Other model', provider: 'openai-compatible', baseUrl: '', model: 'local-model' },
+      ],
+    });
     render(<UsageView />);
     fireEvent.click(screen.getByTestId('usage-tab-models'));
     expect(screen.getAllByTestId('usage-model-row')).toHaveLength(2);
@@ -97,10 +106,30 @@ describe('UsageView', () => {
 
   it('restores usage when another window changes persisted storage', () => {
     render(<UsageView />);
-    localStorage.setItem('vrykell-usage', JSON.stringify({ version: 3, state: {
-      records: [{ id: 'external', source: 'vrykell', provider: 'anthropic', model: 'claude-sonnet-4', at: Date.now(), inputTokens: 10, outputTokens: 5, cachedInputTokens: 0, reasoningTokens: 0, steps: 1, toolCalls: 0 }],
-      acp: {},
-    } }));
+    localStorage.setItem(
+      'vrykell-usage',
+      JSON.stringify({
+        version: 3,
+        state: {
+          records: [
+            {
+              id: 'external',
+              source: 'vrykell',
+              provider: 'anthropic',
+              model: 'claude-sonnet-4',
+              at: Date.now(),
+              inputTokens: 10,
+              outputTokens: 5,
+              cachedInputTokens: 0,
+              reasoningTokens: 0,
+              steps: 1,
+              toolCalls: 0,
+            },
+          ],
+          acp: {},
+        },
+      }),
+    );
     fireEvent(window, new StorageEvent('storage', { key: 'vrykell-usage' }));
     expect(screen.getByTestId('usage-total-tokens')).toHaveTextContent('15');
     expect(screen.getByTestId('usage-total-requests')).toHaveTextContent('1');
@@ -220,7 +249,11 @@ describe('UsageView', () => {
 
   it('marks a gateway row with the vendor of the model it serves', () => {
     useUsageStore.getState().recordTurn({
-      provider: 'openai-compatible', model: 'gpt-4o-mini', inputTokens: 100, outputTokens: 10, at: Date.now(),
+      provider: 'openai-compatible',
+      model: 'gpt-4o-mini',
+      inputTokens: 100,
+      outputTokens: 10,
+      at: Date.now(),
     });
     render(<UsageView />);
     const dot = within(screen.getByTestId('usage-log-row')).getByTestId('usage-vendor-dot');
@@ -231,8 +264,12 @@ describe('UsageView', () => {
   it('filters by provider and model, and by range', () => {
     seedSonnetTurn();
     useUsageStore.getState().recordTurn({
-      provider: 'openai-compatible', model: 'gpt-4o-mini', inputTokens: 500, outputTokens: 100,
-      cachedInputTokens: 100, at: Date.now() - 10 * DAY,
+      provider: 'openai-compatible',
+      model: 'gpt-4o-mini',
+      inputTokens: 500,
+      outputTokens: 100,
+      cachedInputTokens: 100,
+      at: Date.now() - 10 * DAY,
     });
     render(<UsageView />);
     // Defaults to "today": only today's entry
@@ -252,7 +289,10 @@ describe('UsageView', () => {
   it('paginates the request log past one page', () => {
     for (let index = 0; index < 25; index += 1) {
       useUsageStore.getState().recordTurn({
-        provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 10, at: Date.now() - index * 1000,
+        provider: 'anthropic',
+        model: 'claude-sonnet-4',
+        inputTokens: 10,
+        at: Date.now() - index * 1000,
       });
     }
     render(<UsageView />);
@@ -281,8 +321,16 @@ describe('UsageView', () => {
       records: [
         ...((stored.state?.records ?? []) as unknown[]),
         {
-          id: 'from-other-window', at: Date.now(), provider: 'anthropic', model: 'claude-sonnet-4',
-          inputTokens: 100, outputTokens: 10, cachedInputTokens: 0, reasoningTokens: 0, steps: 1, toolCalls: 0,
+          id: 'from-other-window',
+          at: Date.now(),
+          provider: 'anthropic',
+          model: 'claude-sonnet-4',
+          inputTokens: 100,
+          outputTokens: 10,
+          cachedInputTokens: 0,
+          reasoningTokens: 0,
+          steps: 1,
+          toolCalls: 0,
         },
       ],
     };
@@ -297,7 +345,11 @@ describe('UsageView', () => {
     seedSonnetTurn();
     // A turn reported by a future ACP harness (opencode stands in for it here)
     useUsageStore.getState().recordTurn({
-      source: 'opencode', provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 100, outputTokens: 10,
+      source: 'opencode',
+      provider: 'anthropic',
+      model: 'claude-sonnet-4',
+      inputTokens: 100,
+      outputTokens: 10,
     });
     render(<UsageView />);
 

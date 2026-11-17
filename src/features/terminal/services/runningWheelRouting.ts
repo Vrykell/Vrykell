@@ -1,12 +1,7 @@
 import type { Terminal } from '@xterm/xterm';
 import { getCellMetrics } from '@utils/termMetrics';
 import { isTerminalDebugEnabled, terminalDebug } from './terminalDebug';
-import {
-  isHistoryAtBottom,
-  routeRunningWheel,
-  WHEEL_GESTURE_IDLE,
-  type WheelGestureState,
-} from '../model/runningWheel';
+import { isHistoryAtBottom, routeRunningWheel, WHEEL_GESTURE_IDLE, type WheelGestureState } from '../model/runningWheel';
 
 /**
  * One wheel gesture's state for a pane's command history and its running block terminal.
@@ -79,8 +74,7 @@ export function installRunningWheelRouting(scroll: HTMLElement, getTerm: () => T
       state.historyEndReached = false;
       return;
     }
-    const overTerminal = event.target instanceof Element
-      && event.target.closest('[data-testid="running-term"]') !== null;
+    const overTerminal = event.target instanceof Element && event.target.closest('[data-testid="running-term"]') !== null;
     const historyCanMove = event.deltaY > 0 ? !isHistoryAtBottom(scroll) : scroll.scrollTop > 0;
     if (!overTerminal && historyCanMove) {
       // Reading the history with the pointer away from the running block stays native.
@@ -90,12 +84,15 @@ export function installRunningWheelRouting(scroll: HTMLElement, getTerm: () => T
       return;
     }
     const lineHeight = Math.max(1, getCellMetrics(term).height);
-    const decided = routeRunningWheel({
-      position: term.buffer.active,
-      historyScrollable: !isHistoryAtBottom(scroll),
-      delta: terminalDistance(event, term, lineHeight),
-      historyDelta: historyDistance(event, scroll),
-    }, state);
+    const decided = routeRunningWheel(
+      {
+        position: term.buffer.active,
+        historyScrollable: !isHistoryAtBottom(scroll),
+        delta: terminalDistance(event, term, lineHeight),
+        historyDelta: historyDistance(event, scroll),
+      },
+      state,
+    );
     state.boundary = decided.state.boundary;
     state.historyEndReached = decided.state.historyEndReached;
     const { route } = decided;

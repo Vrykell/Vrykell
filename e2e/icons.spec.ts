@@ -40,12 +40,13 @@ test('workspace icons remain readable and fit inside their controls', async ({ p
     expect(bounds?.height).toBe(size);
   };
   const checkFits = async (icon: Locator) => {
-    expect(await icon.evaluate(svg => {
-      const glyph = svg.getBoundingClientRect();
-      const button = svg.closest('button, [role="button"]')!.getBoundingClientRect();
-      return glyph.left >= button.left && glyph.top >= button.top &&
-        glyph.right <= button.right && glyph.bottom <= button.bottom;
-    })).toBe(true);
+    expect(
+      await icon.evaluate((svg) => {
+        const glyph = svg.getBoundingClientRect();
+        const button = svg.closest('button, [role="button"]')!.getBoundingClientRect();
+        return glyph.left >= button.left && glyph.top >= button.top && glyph.right <= button.right && glyph.bottom <= button.bottom;
+      }),
+    ).toBe(true);
   };
   const nav = page.locator('[data-dock-btn="tabs"] svg');
   await checkSize(nav, 20);
@@ -89,15 +90,17 @@ test('workspace and settings use the same themed icon family in both themes', as
     await expect(header).toHaveAttribute('viewBox', '0 0 24 24');
     await expect(header).toHaveAttribute('fill', 'currentColor');
     await expect(header).toHaveAttribute('aria-hidden', 'true');
-    const foreground = await header.evaluate(element => getComputedStyle(element).color);
-    expect(foreground).toBe(await page.evaluate(() => {
-      const probe = document.createElement('span');
-      probe.style.color = 'var(--text-primary)';
-      document.body.appendChild(probe);
-      const color = getComputedStyle(probe).color;
-      probe.remove();
-      return color;
-    }));
+    const foreground = await header.evaluate((element) => getComputedStyle(element).color);
+    expect(foreground).toBe(
+      await page.evaluate(() => {
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--text-primary)';
+        document.body.appendChild(probe);
+        const color = getComputedStyle(probe).color;
+        probe.remove();
+        return color;
+      }),
+    );
     await page.getByRole('combobox', { name: '页面字号' }).click();
     await expect(page.getByRole('combobox', { name: '页面字号' }).locator('svg')).toHaveAttribute('data-fui-icon');
     await expect(page.locator('svg.lucide, svg.tabler-icon')).toHaveCount(0);
@@ -117,7 +120,7 @@ test('pickers, tabs and remote connections share profile identities', async ({ p
   for (const shell of ['zsh', 'bash']) {
     const mark = dialog.locator(`[data-shell-mark="${shell}"]`);
     await expect(mark).toHaveAttribute('width', '20');
-    expect(await mark.evaluate(element => getComputedStyle(element).color)).not.toBe('rgb(0, 0, 0)');
+    expect(await mark.evaluate((element) => getComputedStyle(element).color)).not.toBe('rgb(0, 0, 0)');
     await expect(mark.locator('text')).toHaveCount(0);
   }
   await expect(dialog.locator('[data-shell-mark="linux"]')).toBeVisible();
@@ -128,7 +131,7 @@ test('pickers, tabs and remote connections share profile identities', async ({ p
   const remoteRow = page.getByTestId('ssh-row-ssh-1');
   const remoteIcon = remoteRow.locator('[data-shell-mark="linux"]');
   await expect(remoteIcon).toBeVisible();
-  const color = await remoteIcon.evaluate(element => getComputedStyle(element).color);
+  const color = await remoteIcon.evaluate((element) => getComputedStyle(element).color);
   await remoteRow.click();
   await expect(remoteIcon).toHaveCSS('color', color);
 });

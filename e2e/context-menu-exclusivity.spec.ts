@@ -2,9 +2,11 @@ import { test, expect } from '@playwright/test';
 import { ensureTabsOpen, setupTauriMock } from './tauri-mock';
 
 test('unrelated context menus replace each other, including programmatic right clicks', async ({ page }) => {
-  await setupTauriMock(page); await page.goto('/');
+  await setupTauriMock(page);
+  await page.goto('/');
   const input = page.getByPlaceholder(/输入命令/);
-  await input.fill('echo menu-exclusive'); await input.press('Enter');
+  await input.fill('echo menu-exclusive');
+  await input.press('Enter');
   const block = page.locator('[data-testid^="command-block-"]').filter({ hasText: 'echo menu-exclusive' });
   await ensureTabsOpen(page);
   await page.getByTestId('tab-row-t1').click({ button: 'right' });

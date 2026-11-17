@@ -2,7 +2,10 @@ import { invoke } from '@platform/diagnostics';
 import type { BackendSessionEntry } from './types';
 import type { BackendConversation } from './conversation';
 
-export interface HistoryCursor { value: string; key: string }
+export interface HistoryCursor {
+  value: string;
+  key: string;
+}
 export interface HistoryPage {
   sessions: BackendSessionEntry[];
   conversations: BackendConversation[];

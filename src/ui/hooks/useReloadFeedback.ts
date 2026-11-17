@@ -8,7 +8,10 @@ export function useReloadFeedback(action: () => void | Promise<void>) {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
     mounted.current = true;
-    return () => { mounted.current = false; clearTimeout(timer.current); };
+    return () => {
+      mounted.current = false;
+      clearTimeout(timer.current);
+    };
   }, []);
 
   const run = async () => {
@@ -20,10 +23,13 @@ export function useReloadFeedback(action: () => void | Promise<void>) {
       await action();
     } finally {
       if (mounted.current) {
-        timer.current = setTimeout(() => {
-          pending.current = false;
-          setBusy(false);
-        }, Math.max(0, 800 - (Date.now() - started)));
+        timer.current = setTimeout(
+          () => {
+            pending.current = false;
+            setBusy(false);
+          },
+          Math.max(0, 800 - (Date.now() - started)),
+        );
       }
     }
   };

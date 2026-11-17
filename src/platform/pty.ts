@@ -22,12 +22,7 @@ export interface PtySpawnOptions {
 
 const observedInputEpochs = new Map<string, number>();
 
-export function ptySpawn(
-  cols: number,
-  rows: number,
-  cwd?: string,
-  opts?: PtySpawnOptions,
-): Promise<string> {
+export function ptySpawn(cols: number, rows: number, cwd?: string, opts?: PtySpawnOptions): Promise<string> {
   return invoke('pty_spawn', {
     cols,
     rows,
@@ -65,7 +60,7 @@ export function ptyCloseAll(): Promise<number> {
 }
 
 export function onPtyOutput(cb: (id: string, events: DispatchEvent[]) => void): Promise<UnlistenFn> {
-  return listen<{ id: string; events: DispatchEvent[]; inputEpoch?: number }>('pty-output', e => {
+  return listen<{ id: string; events: DispatchEvent[]; inputEpoch?: number }>('pty-output', (e) => {
     if (typeof e.payload.inputEpoch === 'number') observedInputEpochs.set(e.payload.id, e.payload.inputEpoch);
     cb(e.payload.id, e.payload.events);
   });

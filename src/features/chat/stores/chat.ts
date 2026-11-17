@@ -2,17 +2,19 @@ import { create } from 'zustand';
 import { t } from '@i18n';
 import * as conversationApi from '@platform/api/conversation';
 import { safeLocalStorageGet, safeLocalStorageSet } from '@utils/errorHandler';
-import { parseEnvironment, parseReferences, referenceHistoryText, type ChatEnvironment, type Conversation, type TerminalReference } from '../model/conversation';
+import {
+  parseEnvironment,
+  parseReferences,
+  referenceHistoryText,
+  type ChatEnvironment,
+  type Conversation,
+  type TerminalReference,
+} from '../model/conversation';
 import { useShallow } from 'zustand/react/shallow';
 import { useWorkspaceStore } from '@features/workspace/stores/workspace';
 import { leaves } from '@features/workspace/model/windowLayout';
 import { appendChatMessage, deleteChatMessage } from '@platform/api/session';
-import {
-  serializeParts,
-  deserializeParts,
-  type MessagePart,
-  type ToolRun,
-} from '@features/agent/model/messageParts';
+import { serializeParts, deserializeParts, type MessagePart, type ToolRun } from '@features/agent/model/messageParts';
 import { denyAllPending, clearSessionGrants } from '@features/agent/stores/permissions';
 import { clearCompactionCache } from '@features/agent/model/context';
 import { serializeAttachments, deserializeAttachments, type AttachmentMeta } from '@features/agent/model/attachments';
@@ -139,11 +141,13 @@ export function setDefaultStream(fn: StreamFn) {
 
 export const useChatStore = create<ChatState>((set, get) => {
   const drainQueue = () => {
-    const index = get().queuedSends.findIndex(item => !get().sendingTabs.includes(item.ownerId));
+    const index = get().queuedSends.findIndex((item) => !get().sendingTabs.includes(item.ownerId));
     if (index < 0) return;
     const next = get().queuedSends[index];
-    set(state => ({ queuedSends: state.queuedSends.filter(item => item.id !== next.id) }));
-    void get().send(next.text, next.options).finally(() => queueMicrotask(drainQueue));
+    set((state) => ({ queuedSends: state.queuedSends.filter((item) => item.id !== next.id) }));
+    void get()
+      .send(next.text, next.options)
+      .finally(() => queueMicrotask(drainQueue));
     queueMicrotask(drainQueue);
   };
   const saveQueues = new Map<string, Promise<void>>();
@@ -154,9 +158,12 @@ export const useChatStore = create<ChatState>((set, get) => {
     const previous = saveQueues.get(id) ?? Promise.resolve();
     const next = previous.catch(() => {}).then(save);
     saveQueues.set(id, next);
-    const release = () => { if (saveQueues.get(id) === next) saveQueues.delete(id); };
+    const release = () => {
+      if (saveQueues.get(id) === next) saveQueues.delete(id);
+    };
     void next.then(release, (error: unknown) => {
-      release(); set({ persistenceError: error instanceof Error ? error.message : String(error) });
+      release();
+      set({ persistenceError: error instanceof Error ? error.message : String(error) });
     });
     return next;
   };
@@ -164,26 +171,55 @@ export const useChatStore = create<ChatState>((set, get) => {
     const messages = get().byTab[conversation.id];
     if (messages ? !messages.some(hasChatContent) : !savedConversationIds.has(conversation.id)) return Promise.resolve();
     return queueSave(conversation.id, async () => {
-      await conversationApi.saveConversation(conversation.id, conversation.title, conversation.createdAt, conversation.updatedAt, JSON.stringify(conversation.environment));
+      await conversationApi.saveConversation(
+        conversation.id,
+        conversation.title,
+        conversation.createdAt,
+        conversation.updatedAt,
+        JSON.stringify(conversation.environment),
+      );
       savedConversationIds.add(conversation.id);
     });
   };
   const persistMessage = (ownerId: string, message: ChatMessage) => {
     if (!hasChatContent(message)) return Promise.resolve();
-    if (!get().conversations.some(conversation => conversation.id === ownerId)) {
-      return import('@features/workspace/services/sessionManager').then(async manager => {
+    if (!get().conversations.some((conversation) => conversation.id === ownerId)) {
+      return import('@features/workspace/services/sessionManager').then(async (manager) => {
         await manager.ensureContentSession(ownerId);
-        await appendChatMessage(message.id, ownerId, message.role, message.content, message.createdAt,
-          serializeParts(message.parts), serializeAttachments(message.attachments), message.paneId);
+        await appendChatMessage(
+          message.id,
+          ownerId,
+          message.role,
+          message.content,
+          message.createdAt,
+          serializeParts(message.parts),
+          serializeAttachments(message.attachments),
+          message.paneId,
+        );
       });
     }
-    return queueSave(ownerId, () => conversationApi.appendConversationMessage(message.id, ownerId, message.role,
-      message.content, message.createdAt, serializeParts(message.parts), serializeAttachments(message.attachments), message.paneId ?? null,
-      JSON.stringify({ references: message.references ?? [], environment: message.environment ?? null,
-        stopped: message.stopped ?? false, error: message.error ?? false, errorText: message.errorText ?? null })));
+    return queueSave(ownerId, () =>
+      conversationApi.appendConversationMessage(
+        message.id,
+        ownerId,
+        message.role,
+        message.content,
+        message.createdAt,
+        serializeParts(message.parts),
+        serializeAttachments(message.attachments),
+        message.paneId ?? null,
+        JSON.stringify({
+          references: message.references ?? [],
+          environment: message.environment ?? null,
+          stopped: message.stopped ?? false,
+          error: message.error ?? false,
+          errorText: message.errorText ?? null,
+        }),
+      ),
+    );
   };
   const deleteMessage = async (ownerId: string, messageId: string) => {
-    if (!get().conversations.some(conversation => conversation.id === ownerId)) return deleteChatMessage(messageId);
+    if (!get().conversations.some((conversation) => conversation.id === ownerId)) return deleteChatMessage(messageId);
     try {
       await queueSave(ownerId, async () => {
         await conversationApi.deleteConversationMessage(messageId);
@@ -204,24 +240,36 @@ export const useChatStore = create<ChatState>((set, get) => {
     if (id in get().byTab) return;
     const previous = messageLoads.get(id);
     if (previous) return previous;
-    const pendingLoad = conversationApi.listConversationMessages(id).then(records => {
-      const messages: ChatMessage[] = (records ?? []).map(record => {
-        let context: { references?: unknown; environment?: unknown; stopped?: unknown; error?: unknown; errorText?: unknown } = {};
-        try { context = JSON.parse(record.context || '{}') ?? {}; } catch { /* Ignore invalid optional context. */ }
-        return {
-          id: record.id, role: record.role === 'user' ? 'user' : 'assistant', content: record.content,
-          createdAt: record.created_at, parts: deserializeParts(record.parts), attachments: deserializeAttachments(record.attachments),
-          paneId: record.pane_id ?? undefined, references: parseReferences(JSON.stringify(context.references ?? [])),
-          environment: parseEnvironment(JSON.stringify(context.environment ?? null)),
-          stopped: context.stopped === true,
-          error: context.error === true,
-          errorText: typeof context.errorText === 'string' ? context.errorText : undefined,
-        };
-      });
-      if (get().conversations.some(conversation => conversation.id === id)) {
-        set(state => ({ byTab: { ...state.byTab, [id]: messages } }));
-      }
-    }).finally(() => messageLoads.delete(id));
+    const pendingLoad = conversationApi
+      .listConversationMessages(id)
+      .then((records) => {
+        const messages: ChatMessage[] = (records ?? []).map((record) => {
+          let context: { references?: unknown; environment?: unknown; stopped?: unknown; error?: unknown; errorText?: unknown } = {};
+          try {
+            context = JSON.parse(record.context || '{}') ?? {};
+          } catch {
+            /* Ignore invalid optional context. */
+          }
+          return {
+            id: record.id,
+            role: record.role === 'user' ? 'user' : 'assistant',
+            content: record.content,
+            createdAt: record.created_at,
+            parts: deserializeParts(record.parts),
+            attachments: deserializeAttachments(record.attachments),
+            paneId: record.pane_id ?? undefined,
+            references: parseReferences(JSON.stringify(context.references ?? [])),
+            environment: parseEnvironment(JSON.stringify(context.environment ?? null)),
+            stopped: context.stopped === true,
+            error: context.error === true,
+            errorText: typeof context.errorText === 'string' ? context.errorText : undefined,
+          };
+        });
+        if (get().conversations.some((conversation) => conversation.id === id)) {
+          set((state) => ({ byTab: { ...state.byTab, [id]: messages } }));
+        }
+      })
+      .finally(() => messageLoads.delete(id));
     messageLoads.set(id, pendingLoad);
     return pendingLoad;
   };
@@ -267,40 +315,45 @@ export const useChatStore = create<ChatState>((set, get) => {
       if (timer === null) timer = setTimeout(flush, 50);
     };
 
-    const flushOnAbort = () => { if (timer !== null) clearTimeout(timer); flush(); };
+    const flushOnAbort = () => {
+      if (timer !== null) clearTimeout(timer);
+      flush();
+    };
     controller.signal.addEventListener('abort', flushOnAbort, { once: true });
 
     let failed = false;
     let failureText = '';
     try {
-      if (!controller.signal.aborted) await (streamFn ?? defaultStream)(history, onChunk, {
-        signal: controller.signal,
-        tabId,
-        ...(get().conversations.some(conversation => conversation.id === tabId)
-          ? { paneId: all[cut]?.environment?.paneId ?? null, environment: all[cut]?.environment ?? null } : {}),
-        handlers: {
-          // Flush buffered text before applying a tool event so text and tools keep their order.
-          onToolEvent: (run) => {
-            if (!ownsTurn() || controller.signal.aborted) return;
-            if (timer !== null) {
-              clearTimeout(timer);
-              timer = null;
-            }
-            flush();
-            get().upsertToolPart(tabId, assistantId, run);
+      if (!controller.signal.aborted)
+        await (streamFn ?? defaultStream)(history, onChunk, {
+          signal: controller.signal,
+          tabId,
+          ...(get().conversations.some((conversation) => conversation.id === tabId)
+            ? { paneId: all[cut]?.environment?.paneId ?? null, environment: all[cut]?.environment ?? null }
+            : {}),
+          handlers: {
+            // Flush buffered text before applying a tool event so text and tools keep their order.
+            onToolEvent: (run) => {
+              if (!ownsTurn() || controller.signal.aborted) return;
+              if (timer !== null) {
+                clearTimeout(timer);
+                timer = null;
+              }
+              flush();
+              get().upsertToolPart(tabId, assistantId, run);
+            },
+            // Append reasoning deltas to the answer; the AI panel renders them as a collapsible block.
+            onReasoning: (chunk) => {
+              if (!ownsTurn() || controller.signal.aborted) return;
+              get().appendReasoning(tabId, assistantId, chunk);
+            },
+            // Context usage; compaction lowers it and drives the ring component.
+            onContextUsed: (used, budget) => {
+              if (!ownsTurn() || controller.signal.aborted) return;
+              get().setContextUsed(tabId, used, budget);
+            },
           },
-          // Append reasoning deltas to the answer; the AI panel renders them as a collapsible block.
-          onReasoning: (chunk) => {
-            if (!ownsTurn() || controller.signal.aborted) return;
-            get().appendReasoning(tabId, assistantId, chunk);
-          },
-          // Context usage; compaction lowers it and drives the ring component.
-          onContextUsed: (used, budget) => {
-            if (!ownsTurn() || controller.signal.aborted) return;
-            get().setContextUsed(tabId, used, budget);
-          },
-        },
-      });
+        });
     } catch (err) {
       failed = !controller.signal.aborted;
       // Keep the failure text on the message; the error row renders it in an ErrorBox.
@@ -321,7 +374,7 @@ export const useChatStore = create<ChatState>((set, get) => {
       const cur = get().byTab[tabId]?.find((m) => m.id === assistantId);
       if (controller.signal.aborted && cur && !cur.content && !(cur.parts && cur.parts.length)) {
         set((s) => ({
-          sendingTabs: s.sendingTabs.filter(id => id !== tabId),
+          sendingTabs: s.sendingTabs.filter((id) => id !== tabId),
           byTab: {
             ...s.byTab,
             [tabId]: (s.byTab[tabId] ?? []).filter((m) => m.id !== assistantId),
@@ -331,9 +384,9 @@ export const useChatStore = create<ChatState>((set, get) => {
         return;
       }
       set((s) => {
-        if (!(tabId in s.byTab)) return { sendingTabs: s.sendingTabs.filter(id => id !== tabId) };
+        if (!(tabId in s.byTab)) return { sendingTabs: s.sendingTabs.filter((id) => id !== tabId) };
         return {
-          sendingTabs: s.sendingTabs.filter(id => id !== tabId),
+          sendingTabs: s.sendingTabs.filter((id) => id !== tabId),
           byTab: {
             ...s.byTab,
             [tabId]: (s.byTab[tabId] ?? []).map((m) => {
@@ -348,9 +401,17 @@ export const useChatStore = create<ChatState>((set, get) => {
                         kind: 'tool' as const,
                         tool: {
                           ...p.tool,
-                          state: controller.signal.aborted ? 'cancelled' as const : 'error' as const,
+                          state: controller.signal.aborted ? ('cancelled' as const) : ('error' as const),
                           endedAt: p.tool.endedAt ?? Date.now(),
-                          error: p.tool.error ?? t(failed ? 'Conversation interrupted' : p.tool.toolName === 'ask_user' ? 'Question cancelled' : 'Stopped waiting; the terminal command may still be running'),
+                          error:
+                            p.tool.error ??
+                            t(
+                              failed
+                                ? 'Conversation interrupted'
+                                : p.tool.toolName === 'ask_user'
+                                  ? 'Question cancelled'
+                                  : 'Stopped waiting; the terminal command may still be running',
+                            ),
                         },
                       }
                     : p,
@@ -378,327 +439,395 @@ export const useChatStore = create<ChatState>((set, get) => {
   };
 
   return {
-  queuedSends: [], cancelQueuedSend: id => set(state => ({ queuedSends: state.queuedSends.filter(item => item.id !== id) })),
-  conversations: [], activeConversationId: '', conversationsLoaded: false, conversationsLoading: false,
-  conversationError: null, persistenceError: null,
-  ensureConversationMessages: loadMessages,
-  loadConversations: async () => {
-    if (get().conversationsLoaded || get().conversationsLoading) return;
-    set({ conversationsLoading: true, conversationError: null });
-    try {
-      const records = await conversationApi.listConversations();
-      for (const record of records ?? []) savedConversationIds.add(record.id);
-      const existing = get().conversations;
-      const restored = (records ?? []).filter(record => !existing.some(conversation => conversation.id === record.id)).map(record => ({
-        id: record.id, title: record.title.slice(0, 80) || t('New conversation'), createdAt: record.created_at,
-        updatedAt: record.updated_at, environment: parseEnvironment(record.environment),
-      }));
-      set({ conversations: [...existing, ...restored], conversationsLoaded: true });
-      const saved = safeLocalStorageGet('active-ai-conversation');
-      const active = get().activeConversationId || (get().conversations.some(conversation => conversation.id === saved) ? saved : null) || get().conversations[0]?.id;
-      if (active) await get().selectConversation(active);
-      else get().createConversation();
-    } catch (error) {
-      set({ conversationError: error instanceof Error ? error.message : String(error) });
-    } finally { set({ conversationsLoading: false }); }
-  },
-  selectConversation: async (id) => {
-    if (!get().conversations.some(conversation => conversation.id === id)) return;
-    set({ activeConversationId: id, conversationError: null });
-    safeLocalStorageSet('active-ai-conversation', id);
-    try { await loadMessages(id); }
-    catch (error) { set({ conversationError: error instanceof Error ? error.message : String(error) }); }
-  },
-  createConversation: (environment = null, options) => {
-    const id = options?.id ?? `conversation-${nextId()}`;
-    if (get().conversations.some(conversation => conversation.id === id)) return id;
-    const now = Date.now();
-    const conversation: Conversation = { id, title: t('New conversation'), createdAt: now, updatedAt: now, environment };
-    const activate = options?.activate !== false;
-    set(state => ({ conversations: [conversation, ...state.conversations], ...(activate ? { activeConversationId: id } : {}), byTab: { ...state.byTab, [id]: [] }, conversationError: null }));
-    if (activate) safeLocalStorageSet('active-ai-conversation', id);
-    void persistConversation(conversation);
-    return id;
-  },
-  restoreDraftConversations: drafts => set(state => {
-    const known = new Set(state.conversations.map(conversation => conversation.id));
-    const now = Date.now();
-    const restored: Conversation[] = [];
-    for (const draft of drafts) if (!known.has(draft.id)) {
-      known.add(draft.id);
-      restored.push({ id: draft.id, title: draft.title, createdAt: now, updatedAt: now, environment: null });
-    }
-    return restored.length ? { conversations: [...state.conversations, ...restored],
-      byTab: { ...state.byTab, ...Object.fromEntries(restored.map(conversation => [conversation.id, []])) } } : state;
-  }),
-  setEnvironment: (id, environment) => {
-    if (get().sendingTabs.includes(id) || pendingConversationDeletes.has(id)) return;
-    const current = get().conversations.find(conversation => conversation.id === id);
-    if (!current) return;
-    if (current.environment?.paneId !== environment?.paneId) clearSessionGrants(id);
-    const updated = { ...current, environment, updatedAt: Date.now() };
-    set(state => ({ conversations: state.conversations.map(conversation => conversation.id === id ? updated : conversation) }));
-    void persistConversation(updated);
-  },
-  renameConversation: (id, title) => {
-    if (pendingConversationDeletes.has(id)) return;
-    const current = get().conversations.find(conversation => conversation.id === id);
-    if (!current || !title.trim()) return;
-    const updated = { ...current, title: title.trim().slice(0, 80), updatedAt: Date.now() };
-    set(state => ({ conversations: state.conversations.map(conversation => conversation.id === id ? updated : conversation) }));
-    void persistConversation(updated);
-  },
-  deleteConversation: async (id, options) => {
-    if (get().sendingTabs.includes(id) || pendingConversationDeletes.has(id)) return;
-    pendingConversationDeletes.add(id);
-    try {
-      await queueSave(id, () => conversationApi.deleteConversation(id));
-      set(state => ({ conversations: state.conversations.filter(conversation => conversation.id !== id) }));
-      get().dropTab(id);
-      if (get().activeConversationId === id) {
-        if (options?.activateNext === false) { set({ activeConversationId: '' }); return; }
-        const next = get().conversations[0]?.id;
-        if (next) await get().selectConversation(next);
+    queuedSends: [],
+    cancelQueuedSend: (id) => set((state) => ({ queuedSends: state.queuedSends.filter((item) => item.id !== id) })),
+    conversations: [],
+    activeConversationId: '',
+    conversationsLoaded: false,
+    conversationsLoading: false,
+    conversationError: null,
+    persistenceError: null,
+    ensureConversationMessages: loadMessages,
+    loadConversations: async () => {
+      if (get().conversationsLoaded || get().conversationsLoading) return;
+      set({ conversationsLoading: true, conversationError: null });
+      try {
+        const records = await conversationApi.listConversations();
+        for (const record of records ?? []) savedConversationIds.add(record.id);
+        const existing = get().conversations;
+        const restored = (records ?? [])
+          .filter((record) => !existing.some((conversation) => conversation.id === record.id))
+          .map((record) => ({
+            id: record.id,
+            title: record.title.slice(0, 80) || t('New conversation'),
+            createdAt: record.created_at,
+            updatedAt: record.updated_at,
+            environment: parseEnvironment(record.environment),
+          }));
+        set({ conversations: [...existing, ...restored], conversationsLoaded: true });
+        const saved = safeLocalStorageGet('active-ai-conversation');
+        const active =
+          get().activeConversationId ||
+          (get().conversations.some((conversation) => conversation.id === saved) ? saved : null) ||
+          get().conversations[0]?.id;
+        if (active) await get().selectConversation(active);
         else get().createConversation();
+      } catch (error) {
+        set({ conversationError: error instanceof Error ? error.message : String(error) });
+      } finally {
+        set({ conversationsLoading: false });
       }
-    } catch (error) { set({ persistenceError: error instanceof Error ? error.message : String(error) }); }
-    finally { pendingConversationDeletes.delete(id); }
-  },
-  retryPersistence: async () => {
-    set({ persistenceError: null });
-    for (const [messageId, ownerId] of pendingMessageDeletes) {
-      if (get().conversations.some(conversation => conversation.id === ownerId)) await deleteMessage(ownerId, messageId);
-      else pendingMessageDeletes.delete(messageId);
-    }
-    for (const conversation of get().conversations) {
-      if (pendingConversationDeletes.has(conversation.id)) continue;
-      await persistConversation(conversation);
-      for (const message of get().byTab[conversation.id] ?? []) {
-        if (!message.pending) await persistMessage(conversation.id, message);
+    },
+    selectConversation: async (id) => {
+      if (!get().conversations.some((conversation) => conversation.id === id)) return;
+      set({ activeConversationId: id, conversationError: null });
+      safeLocalStorageSet('active-ai-conversation', id);
+      try {
+        await loadMessages(id);
+      } catch (error) {
+        set({ conversationError: error instanceof Error ? error.message : String(error) });
       }
-    }
-  },
-  byTab: {},
-  sendingTabs: [],
-  contextUsed: {},
-  draft: '',
-  draftTabId: null,
-  setDraft: (text) => set({ draft: text, draftTabId: text ? useWorkspaceStore.getState().activeId : null }),
-  setContextUsed: (tabId, used, budget) =>
-    set((s) => ({ contextUsed: { ...s.contextUsed, [tabId]: { used, budget } } })),
-  appendDraft: (text) => set((s) => {
-    const tabId = useWorkspaceStore.getState().activeId;
-    return { draft: s.draftTabId === tabId && s.draft ? `${s.draft} ${text}` : text, draftTabId: tabId };
-  }),
-  appendChunk: (tabId, id, chunk) =>
-    set((s) => {
-      if (!(tabId in s.byTab)) return s; // Tab closed; drop the streaming chunk.
-      return {
-        byTab: {
-          ...s.byTab,
-          [tabId]: (s.byTab[tabId] ?? []).map((m) => {
-            if (m.id !== id) return m;
-            const content = m.content + chunk;
-            if (!m.parts) return { ...m, content };
-            // Parts are materialized: append to the trailing text part, or start a new one after
-            // a tool.
-            const parts = m.parts.slice();
-            const last = parts[parts.length - 1];
-            if (last && last.kind === 'text') {
-              parts[parts.length - 1] = { kind: 'text', text: last.text + chunk };
-            } else {
-              parts.push({ kind: 'text', text: chunk });
+    },
+    createConversation: (environment = null, options) => {
+      const id = options?.id ?? `conversation-${nextId()}`;
+      if (get().conversations.some((conversation) => conversation.id === id)) return id;
+      const now = Date.now();
+      const conversation: Conversation = { id, title: t('New conversation'), createdAt: now, updatedAt: now, environment };
+      const activate = options?.activate !== false;
+      set((state) => ({
+        conversations: [conversation, ...state.conversations],
+        ...(activate ? { activeConversationId: id } : {}),
+        byTab: { ...state.byTab, [id]: [] },
+        conversationError: null,
+      }));
+      if (activate) safeLocalStorageSet('active-ai-conversation', id);
+      void persistConversation(conversation);
+      return id;
+    },
+    restoreDraftConversations: (drafts) =>
+      set((state) => {
+        const known = new Set(state.conversations.map((conversation) => conversation.id));
+        const now = Date.now();
+        const restored: Conversation[] = [];
+        for (const draft of drafts)
+          if (!known.has(draft.id)) {
+            known.add(draft.id);
+            restored.push({ id: draft.id, title: draft.title, createdAt: now, updatedAt: now, environment: null });
+          }
+        return restored.length
+          ? {
+              conversations: [...state.conversations, ...restored],
+              byTab: { ...state.byTab, ...Object.fromEntries(restored.map((conversation) => [conversation.id, []])) },
             }
-            return { ...m, content, parts };
-          }),
+          : state;
+      }),
+    setEnvironment: (id, environment) => {
+      if (get().sendingTabs.includes(id) || pendingConversationDeletes.has(id)) return;
+      const current = get().conversations.find((conversation) => conversation.id === id);
+      if (!current) return;
+      if (current.environment?.paneId !== environment?.paneId) clearSessionGrants(id);
+      const updated = { ...current, environment, updatedAt: Date.now() };
+      set((state) => ({ conversations: state.conversations.map((conversation) => (conversation.id === id ? updated : conversation)) }));
+      void persistConversation(updated);
+    },
+    renameConversation: (id, title) => {
+      if (pendingConversationDeletes.has(id)) return;
+      const current = get().conversations.find((conversation) => conversation.id === id);
+      if (!current || !title.trim()) return;
+      const updated = { ...current, title: title.trim().slice(0, 80), updatedAt: Date.now() };
+      set((state) => ({ conversations: state.conversations.map((conversation) => (conversation.id === id ? updated : conversation)) }));
+      void persistConversation(updated);
+    },
+    deleteConversation: async (id, options) => {
+      if (get().sendingTabs.includes(id) || pendingConversationDeletes.has(id)) return;
+      pendingConversationDeletes.add(id);
+      try {
+        await queueSave(id, () => conversationApi.deleteConversation(id));
+        set((state) => ({ conversations: state.conversations.filter((conversation) => conversation.id !== id) }));
+        get().dropTab(id);
+        if (get().activeConversationId === id) {
+          if (options?.activateNext === false) {
+            set({ activeConversationId: '' });
+            return;
+          }
+          const next = get().conversations[0]?.id;
+          if (next) await get().selectConversation(next);
+          else get().createConversation();
+        }
+      } catch (error) {
+        set({ persistenceError: error instanceof Error ? error.message : String(error) });
+      } finally {
+        pendingConversationDeletes.delete(id);
+      }
+    },
+    retryPersistence: async () => {
+      set({ persistenceError: null });
+      for (const [messageId, ownerId] of pendingMessageDeletes) {
+        if (get().conversations.some((conversation) => conversation.id === ownerId)) await deleteMessage(ownerId, messageId);
+        else pendingMessageDeletes.delete(messageId);
+      }
+      for (const conversation of get().conversations) {
+        if (pendingConversationDeletes.has(conversation.id)) continue;
+        await persistConversation(conversation);
+        for (const message of get().byTab[conversation.id] ?? []) {
+          if (!message.pending) await persistMessage(conversation.id, message);
+        }
+      }
+    },
+    byTab: {},
+    sendingTabs: [],
+    contextUsed: {},
+    draft: '',
+    draftTabId: null,
+    setDraft: (text) => set({ draft: text, draftTabId: text ? useWorkspaceStore.getState().activeId : null }),
+    setContextUsed: (tabId, used, budget) => set((s) => ({ contextUsed: { ...s.contextUsed, [tabId]: { used, budget } } })),
+    appendDraft: (text) =>
+      set((s) => {
+        const tabId = useWorkspaceStore.getState().activeId;
+        return { draft: s.draftTabId === tabId && s.draft ? `${s.draft} ${text}` : text, draftTabId: tabId };
+      }),
+    appendChunk: (tabId, id, chunk) =>
+      set((s) => {
+        if (!(tabId in s.byTab)) return s; // Tab closed; drop the streaming chunk.
+        return {
+          byTab: {
+            ...s.byTab,
+            [tabId]: (s.byTab[tabId] ?? []).map((m) => {
+              if (m.id !== id) return m;
+              const content = m.content + chunk;
+              if (!m.parts) return { ...m, content };
+              // Parts are materialized: append to the trailing text part, or start a new one after
+              // a tool.
+              const parts = m.parts.slice();
+              const last = parts[parts.length - 1];
+              if (last && last.kind === 'text') {
+                parts[parts.length - 1] = { kind: 'text', text: last.text + chunk };
+              } else {
+                parts.push({ kind: 'text', text: chunk });
+              }
+              return { ...m, content, parts };
+            }),
+          },
+        };
+      }),
+    appendReasoning: (tabId, id, chunk) =>
+      set((s) => {
+        if (!(tabId in s.byTab)) return s; // Tab closed; drop the reasoning stream.
+        return {
+          byTab: {
+            ...s.byTab,
+            [tabId]: (s.byTab[tabId] ?? []).map((m) => (m.id === id ? { ...m, reasoning: (m.reasoning ?? '') + chunk } : m)),
+          },
+        };
+      }),
+    upsertToolPart: (tabId, id, run) =>
+      set((s) => {
+        if (!(tabId in s.byTab)) return s; // Tab closed; drop the tool event.
+        return {
+          byTab: {
+            ...s.byTab,
+            [tabId]: (s.byTab[tabId] ?? []).map((m) => {
+              if (m.id !== id) return m;
+              // Materialize lazily: the first tool event of a plain-text answer rebuilds the first
+              // text part from the current content.
+              const parts: MessagePart[] = m.parts ?? (m.content ? [{ kind: 'text', text: m.content }] : []);
+              const idx = parts.findIndex((p) => p.kind === 'tool' && p.tool.toolCallId === run.toolCallId);
+              if (idx < 0) return { ...m, parts: [...parts, { kind: 'tool', tool: run }] };
+              const existing = parts[idx];
+              if (existing.kind !== 'tool') return m;
+              // Merge patch: overlay only defined fields, keeping existing values such as startedAt.
+              const merged: ToolRun = { ...existing.tool };
+              for (const [k, v] of Object.entries(run)) {
+                if (v !== undefined) (merged as unknown as Record<string, unknown>)[k] = v;
+              }
+              const next = parts.slice();
+              next[idx] = { kind: 'tool', tool: merged };
+              return { ...m, parts: next };
+            }),
+          },
+        };
+      }),
+    abortStream: (tabId) => {
+      const controller = abortControllers.get(tabId);
+      controller?.abort();
+      abortControllers.delete(tabId);
+      // Reject every pending approval so a tool execute cannot hang the turn.
+      denyAllPending(tabId);
+      for (const message of get().byTab[tabId] ?? [])
+        if (message.pending && !hasChatContent(message)) void deleteMessage(tabId, message.id).catch(() => {});
+      set((state) => ({
+        sendingTabs: state.sendingTabs.filter((id) => id !== tabId),
+        byTab: {
+          ...state.byTab,
+          ...(state.byTab[tabId]
+            ? {
+                [tabId]: state.byTab[tabId].flatMap((message) =>
+                  message.pending ? (hasChatContent(message) ? [stopChatMessage(message)] : []) : [message],
+                ),
+              }
+            : {}),
         },
+      }));
+      for (const message of get().byTab[tabId] ?? []) if (message.stopped) void persistMessage(tabId, message).catch(() => {});
+      terminalDebug('chat-turn-stopped', { conversationId: tabId, hadController: !!controller });
+      queueMicrotask(drainQueue);
+    },
+    send: async (text, opts) => {
+      const tabId = opts?.conversationId ?? opts?.ownerId ?? useWorkspaceStore.getState().activeId;
+      if (pendingConversationDeletes.has(tabId)) return;
+      const conversation = get().conversations.find((item) => item.id === tabId);
+      if (opts?.conversationId && (!conversation || !(tabId in get().byTab))) return;
+      const trimmed = text.trim();
+      const atts = opts?.attachments?.length ? opts.attachments : undefined;
+      // Empty text is allowed when attachments or references exist.
+      if (!trimmed && !atts && !opts?.references?.length) return;
+      if (get().sendingTabs.includes(tabId)) {
+        set((state) => ({
+          queuedSends: [
+            ...state.queuedSends,
+            {
+              id: nextId(),
+              ownerId: tabId,
+              text: trimmed,
+              options: { ...opts, ownerId: tabId, ...(conversation ? { conversationId: tabId } : {}) },
+            },
+          ],
+        }));
+        return;
+      }
+      const now = Date.now();
+      const environment = conversation?.environment
+        ? {
+            ...conversation.environment,
+            cwd: useWorkspaceStore.getState().terminalCwds[conversation.environment.paneId] ?? conversation.environment.cwd,
+          }
+        : null;
+      const base = { paneId: conversation ? environment?.paneId : opts?.paneId, createdAt: now, ...(conversation ? { environment } : {}) };
+      const userMsg: ChatMessage = {
+        id: nextId(),
+        role: 'user',
+        content: trimmed,
+        attachments: atts,
+        references: opts?.references,
+        ...base,
       };
-    }),
-  appendReasoning: (tabId, id, chunk) =>
-    set((s) => {
-      if (!(tabId in s.byTab)) return s; // Tab closed; drop the reasoning stream.
-      return {
+      const assistantMsg: ChatMessage = { id: nextId(), role: 'assistant', content: '', pending: true, ...base };
+      const controller = new AbortController();
+      abortControllers.set(tabId, controller);
+      set((s) => ({
+        byTab: { ...s.byTab, [tabId]: [...(s.byTab[tabId] ?? []), userMsg, assistantMsg] },
+        sendingTabs: [...s.sendingTabs, tabId],
+        draft: '',
+        draftTabId: null,
+        contextUsed: { ...s.contextUsed, [tabId]: null },
+      }));
+      // Persist the user message (the conversation is session state; user messages have no parts).
+      if (conversation) {
+        const updated = {
+          ...conversation,
+          environment,
+          updatedAt: now,
+          title:
+            (get().byTab[tabId]?.filter((message) => message.role === 'user').length ?? 0) === 1 &&
+            conversation.title === t('New conversation')
+              ? (trimmed || opts?.references?.[0]?.command || t('New conversation')).slice(0, 48)
+              : conversation.title,
+        };
+        set((state) => ({ conversations: state.conversations.map((item) => (item.id === tabId ? updated : item)) }));
+        await persistConversation(updated).catch(() => {});
+      } else useWorkspaceStore.getState().titleFromMessage(tabId, trimmed);
+      if (conversation) await persistMessage(tabId, userMsg).catch(() => {});
+      else void persistMessage(tabId, userMsg).catch(() => {});
+      await runAssistant(tabId, assistantMsg.id, controller, opts?.streamFn);
+    },
+    regenerate: async (tabId, userMsgId) => {
+      if (get().sendingTabs.includes(tabId) || pendingConversationDeletes.has(tabId)) return;
+      const msgs = get().byTab[tabId] ?? [];
+      const idx = msgs.findIndex((m) => m.id === userMsgId);
+      if (idx < 0 || msgs[idx].role !== 'user') return;
+      const question = msgs[idx];
+      const conversation = get().conversations.find((item) => item.id === tabId);
+      const environment = conversation ? conversation.environment : question.environment;
+      const oldAnswer = msgs[idx + 1];
+      const oldAnswerId = oldAnswer?.role === 'assistant' ? oldAnswer.id : null;
+      const assistantMsg: ChatMessage = {
+        id: conversation && oldAnswerId ? oldAnswerId : nextId(),
+        role: 'assistant',
+        content: '',
+        pending: true,
+        paneId: conversation ? environment?.paneId : question.paneId,
+        environment,
+        createdAt: oldAnswer?.role === 'assistant' ? oldAnswer.createdAt : question.createdAt,
+      };
+      const controller = new AbortController();
+      abortControllers.set(tabId, controller);
+      // Replace the old answer with the new placeholder in place; history then ends at the question.
+      set((s) => {
+        const cur = s.byTab[tabId] ?? [];
+        const i = cur.findIndex((m) => m.id === userMsgId);
+        if (i < 0) return s;
+        const next = cur.slice();
+        if (oldAnswerId) next.splice(i + 1, 1, assistantMsg);
+        else next.splice(i + 1, 0, assistantMsg);
+        return { byTab: { ...s.byTab, [tabId]: next }, sendingTabs: [...s.sendingTabs, tabId] };
+      });
+      if (oldAnswerId && oldAnswerId !== assistantMsg.id) await deleteMessage(tabId, oldAnswerId).catch(() => {});
+      if (conversation) await persistMessage(tabId, assistantMsg).catch(() => {});
+      await runAssistant(tabId, assistantMsg.id, controller);
+    },
+    deleteExchange: (tabId, userMsgId) => {
+      if (get().sendingTabs.includes(tabId) || pendingConversationDeletes.has(tabId)) return;
+      const msgs = get().byTab[tabId] ?? [];
+      const idx = msgs.findIndex((m) => m.id === userMsgId);
+      if (idx < 0 || msgs[idx].role !== 'user') return;
+      const ids = [userMsgId];
+      const answer = msgs[idx + 1];
+      if (answer?.role === 'assistant') ids.push(answer.id);
+      set((s) => ({
         byTab: {
           ...s.byTab,
-          [tabId]: (s.byTab[tabId] ?? []).map((m) =>
-            m.id === id ? { ...m, reasoning: (m.reasoning ?? '') + chunk } : m,
-          ),
+          [tabId]: (s.byTab[tabId] ?? []).filter((m) => !ids.includes(m.id)),
         },
-      };
-    }),
-  upsertToolPart: (tabId, id, run) =>
-    set((s) => {
-      if (!(tabId in s.byTab)) return s; // Tab closed; drop the tool event.
-      return {
-        byTab: {
-          ...s.byTab,
-          [tabId]: (s.byTab[tabId] ?? []).map((m) => {
-            if (m.id !== id) return m;
-            // Materialize lazily: the first tool event of a plain-text answer rebuilds the first
-            // text part from the current content.
-            const parts: MessagePart[] =
-              m.parts ?? (m.content ? [{ kind: 'text', text: m.content }] : []);
-            const idx = parts.findIndex(
-              (p) => p.kind === 'tool' && p.tool.toolCallId === run.toolCallId,
-            );
-            if (idx < 0) return { ...m, parts: [...parts, { kind: 'tool', tool: run }] };
-            const existing = parts[idx];
-            if (existing.kind !== 'tool') return m;
-            // Merge patch: overlay only defined fields, keeping existing values such as startedAt.
-            const merged: ToolRun = { ...existing.tool };
-            for (const [k, v] of Object.entries(run)) {
-              if (v !== undefined) (merged as unknown as Record<string, unknown>)[k] = v;
-            }
-            const next = parts.slice();
-            next[idx] = { kind: 'tool', tool: merged };
-            return { ...m, parts: next };
-          }),
-        },
-      };
-    }),
-  abortStream: (tabId) => {
-    const controller = abortControllers.get(tabId);
-    controller?.abort();
-    abortControllers.delete(tabId);
-    // Reject every pending approval so a tool execute cannot hang the turn.
-    denyAllPending(tabId);
-    for (const message of get().byTab[tabId] ?? []) if (message.pending && !hasChatContent(message)) void deleteMessage(tabId, message.id).catch(() => {});
-    set(state => ({ sendingTabs: state.sendingTabs.filter(id => id !== tabId),
-      byTab: { ...state.byTab, ...(state.byTab[tabId] ? { [tabId]: state.byTab[tabId].flatMap(message => message.pending
-        ? hasChatContent(message) ? [stopChatMessage(message)] : [] : [message]) } : {}) } }));
-    for (const message of get().byTab[tabId] ?? []) if (message.stopped) void persistMessage(tabId, message).catch(() => {});
-    terminalDebug('chat-turn-stopped', { conversationId: tabId, hadController: !!controller });
-    queueMicrotask(drainQueue);
-  },
-  send: async (text, opts) => {
-    const tabId = opts?.conversationId ?? opts?.ownerId ?? useWorkspaceStore.getState().activeId;
-    if (pendingConversationDeletes.has(tabId)) return;
-    const conversation = get().conversations.find(item => item.id === tabId);
-    if (opts?.conversationId && (!conversation || !(tabId in get().byTab))) return;
-    const trimmed = text.trim();
-    const atts = opts?.attachments?.length ? opts.attachments : undefined;
-    // Empty text is allowed when attachments or references exist.
-    if (!trimmed && !atts && !opts?.references?.length) return;
-    if (get().sendingTabs.includes(tabId)) {
-      set(state => ({ queuedSends: [...state.queuedSends, { id: nextId(), ownerId: tabId, text: trimmed, options: { ...opts, ownerId: tabId, ...(conversation ? { conversationId: tabId } : {}) } }] }));
-      return;
-    }
-    const now = Date.now();
-    const environment = conversation?.environment ? { ...conversation.environment,
-      cwd: useWorkspaceStore.getState().terminalCwds[conversation.environment.paneId] ?? conversation.environment.cwd } : null;
-    const base = { paneId: conversation ? environment?.paneId : opts?.paneId, createdAt: now,
-      ...(conversation ? { environment } : {}) };
-    const userMsg: ChatMessage = { id: nextId(), role: 'user', content: trimmed, attachments: atts, references: opts?.references, ...base };
-    const assistantMsg: ChatMessage = { id: nextId(), role: 'assistant', content: '', pending: true, ...base };
-    const controller = new AbortController();
-    abortControllers.set(tabId, controller);
-    set((s) => ({
-      byTab: { ...s.byTab, [tabId]: [...(s.byTab[tabId] ?? []), userMsg, assistantMsg] },
-      sendingTabs: [...s.sendingTabs, tabId],
-      draft: '',
-      draftTabId: null,
-      contextUsed: { ...s.contextUsed, [tabId]: null },
-    }));
-    // Persist the user message (the conversation is session state; user messages have no parts).
-    if (conversation) {
-      const updated = { ...conversation, environment, updatedAt: now,
-        title: (get().byTab[tabId]?.filter(message => message.role === 'user').length ?? 0) === 1
-          && conversation.title === t('New conversation') ? (trimmed || opts?.references?.[0]?.command || t('New conversation')).slice(0, 48) : conversation.title };
-      set(state => ({ conversations: state.conversations.map(item => item.id === tabId ? updated : item) }));
-      await persistConversation(updated).catch(() => {});
-    } else useWorkspaceStore.getState().titleFromMessage(tabId, trimmed);
-    if (conversation) await persistMessage(tabId, userMsg).catch(() => {});
-    else void persistMessage(tabId, userMsg).catch(() => {});
-    await runAssistant(tabId, assistantMsg.id, controller, opts?.streamFn);
-  },
-  regenerate: async (tabId, userMsgId) => {
-    if (get().sendingTabs.includes(tabId) || pendingConversationDeletes.has(tabId)) return;
-    const msgs = get().byTab[tabId] ?? [];
-    const idx = msgs.findIndex((m) => m.id === userMsgId);
-    if (idx < 0 || msgs[idx].role !== 'user') return;
-    const question = msgs[idx];
-    const conversation = get().conversations.find(item => item.id === tabId);
-    const environment = conversation ? conversation.environment : question.environment;
-    const oldAnswer = msgs[idx + 1];
-    const oldAnswerId = oldAnswer?.role === 'assistant' ? oldAnswer.id : null;
-    const assistantMsg: ChatMessage = {
-      id: conversation && oldAnswerId ? oldAnswerId : nextId(),
-      role: 'assistant',
-      content: '',
-      pending: true,
-      paneId: conversation ? environment?.paneId : question.paneId,
-      environment,
-      createdAt: oldAnswer?.role === 'assistant' ? oldAnswer.createdAt : question.createdAt,
-    };
-    const controller = new AbortController();
-    abortControllers.set(tabId, controller);
-    // Replace the old answer with the new placeholder in place; history then ends at the question.
-    set((s) => {
-      const cur = s.byTab[tabId] ?? [];
-      const i = cur.findIndex((m) => m.id === userMsgId);
-      if (i < 0) return s;
-      const next = cur.slice();
-      if (oldAnswerId) next.splice(i + 1, 1, assistantMsg);
-      else next.splice(i + 1, 0, assistantMsg);
-      return { byTab: { ...s.byTab, [tabId]: next }, sendingTabs: [...s.sendingTabs, tabId] };
-    });
-    if (oldAnswerId && oldAnswerId !== assistantMsg.id) await deleteMessage(tabId, oldAnswerId).catch(() => {});
-    if (conversation) await persistMessage(tabId, assistantMsg).catch(() => {});
-    await runAssistant(tabId, assistantMsg.id, controller);
-  },
-  deleteExchange: (tabId, userMsgId) => {
-    if (get().sendingTabs.includes(tabId) || pendingConversationDeletes.has(tabId)) return;
-    const msgs = get().byTab[tabId] ?? [];
-    const idx = msgs.findIndex((m) => m.id === userMsgId);
-    if (idx < 0 || msgs[idx].role !== 'user') return;
-    const ids = [userMsgId];
-    const answer = msgs[idx + 1];
-    if (answer?.role === 'assistant') ids.push(answer.id);
-    set((s) => ({
-      byTab: {
-        ...s.byTab,
-        [tabId]: (s.byTab[tabId] ?? []).filter((m) => !ids.includes(m.id)),
-      },
-    }));
-    for (const id of ids) void deleteMessage(tabId, id).catch(() => {});
-  },
-  editResend: (tabId, userMsgId) => {
-    if (get().sendingTabs.includes(tabId) || pendingConversationDeletes.has(tabId)) return;
-    const msgs = get().byTab[tabId] ?? [];
-    const idx = msgs.findIndex((m) => m.id === userMsgId);
-    if (idx < 0 || msgs[idx].role !== 'user') return;
-    const removed = msgs.slice(idx);
-    // Restore the entire question to its session before removing the old exchange.
-    useComposerDrafts.getState().setText(tabId, msgs[idx].content);
-    useComposerDrafts.getState().updateAttachments(tabId, () => msgs[idx].attachments ?? []);
-    if (msgs[idx].references?.length || get().conversations.some(item => item.id === tabId)) {
-      useComposerDrafts.getState().setReferences(tabId, msgs[idx].references ?? []);
-    }
-    set((s) => ({
-      byTab: { ...s.byTab, [tabId]: (s.byTab[tabId] ?? []).slice(0, idx) },
-      draft: msgs[idx].content,
-      draftTabId: tabId,
-    }));
-    for (const m of removed) void deleteMessage(tabId, m.id).catch(() => {});
-  },
-  clearTab: () => {
-    const tabId = useWorkspaceStore.getState().activeId;
-    get().abortStream(tabId);
-    set((s) => ({ byTab: { ...s.byTab, [tabId]: [] } }));
-  },
-  dropTab: (tabId) => {
-    useComposerDrafts.getState().dropTab(tabId);
-    if (get().draftTabId === tabId) set({ draft: '', draftTabId: null });
-    get().abortStream(tabId);
-    clearCompactionCache(tabId); // Drop this tab's cached context summary.
-    clearSessionGrants(tabId);
-    set((s) => {
-      if (!(tabId in s.byTab)) return s;
-      const byTab = { ...s.byTab };
-      delete byTab[tabId];
-      return { byTab };
-    });
-  },
+      }));
+      for (const id of ids) void deleteMessage(tabId, id).catch(() => {});
+    },
+    editResend: (tabId, userMsgId) => {
+      if (get().sendingTabs.includes(tabId) || pendingConversationDeletes.has(tabId)) return;
+      const msgs = get().byTab[tabId] ?? [];
+      const idx = msgs.findIndex((m) => m.id === userMsgId);
+      if (idx < 0 || msgs[idx].role !== 'user') return;
+      const removed = msgs.slice(idx);
+      // Restore the entire question to its session before removing the old exchange.
+      useComposerDrafts.getState().setText(tabId, msgs[idx].content);
+      useComposerDrafts.getState().updateAttachments(tabId, () => msgs[idx].attachments ?? []);
+      if (msgs[idx].references?.length || get().conversations.some((item) => item.id === tabId)) {
+        useComposerDrafts.getState().setReferences(tabId, msgs[idx].references ?? []);
+      }
+      set((s) => ({
+        byTab: { ...s.byTab, [tabId]: (s.byTab[tabId] ?? []).slice(0, idx) },
+        draft: msgs[idx].content,
+        draftTabId: tabId,
+      }));
+      for (const m of removed) void deleteMessage(tabId, m.id).catch(() => {});
+    },
+    clearTab: () => {
+      const tabId = useWorkspaceStore.getState().activeId;
+      get().abortStream(tabId);
+      set((s) => ({ byTab: { ...s.byTab, [tabId]: [] } }));
+    },
+    dropTab: (tabId) => {
+      useComposerDrafts.getState().dropTab(tabId);
+      if (get().draftTabId === tabId) set({ draft: '', draftTabId: null });
+      get().abortStream(tabId);
+      clearCompactionCache(tabId); // Drop this tab's cached context summary.
+      clearSessionGrants(tabId);
+      set((s) => {
+        if (!(tabId in s.byTab)) return s;
+        const byTab = { ...s.byTab };
+        delete byTab[tabId];
+        return { byTab };
+      });
+    },
   };
 });
 
@@ -715,18 +844,20 @@ export async function sendToChat(text: string, beforeStart?: () => Promise<void>
   const id = state.createConversation(null, { activate: false });
   if (beforeStart) {
     // Reserve this owner before recording the run, without blocking other conversations.
-    useChatStore.setState(current => ({ sendingTabs: [...current.sendingTabs, id] }));
-    try { await beforeStart(); }
-    catch (error) {
+    useChatStore.setState((current) => ({ sendingTabs: [...current.sendingTabs, id] }));
+    try {
+      await beforeStart();
+    } catch (error) {
       useChatStore.getState().abortStream(id);
-      useChatStore.setState(current => {
-        const byTab = { ...current.byTab }; delete byTab[id];
-        return { byTab, conversations: current.conversations.filter(conversation => conversation.id !== id) };
+      useChatStore.setState((current) => {
+        const byTab = { ...current.byTab };
+        delete byTab[id];
+        return { byTab, conversations: current.conversations.filter((conversation) => conversation.id !== id) };
       });
       throw error;
     }
     if (!useChatStore.getState().sendingTabs.includes(id)) return false;
-    useChatStore.setState(current => ({ sendingTabs: current.sendingTabs.filter(owner => owner !== id) }));
+    useChatStore.setState((current) => ({ sendingTabs: current.sendingTabs.filter((owner) => owner !== id) }));
   }
   void state.send(text.trim(), { conversationId: id });
   return true;
@@ -742,11 +873,11 @@ export function useActiveMessages(): ChatMessage[] {
 
 /** Read the owning tab's conversation regardless of which tab is active. */
 export function usePaneMessages(paneId: string): ChatMessage[] {
-  const ownerId = useWorkspaceStore((state) => state.tabs.find((tab) =>
-    tab.kind === 'session' && leaves(tab.layout).some((pane) => pane.id === paneId))?.id ?? state.activeId);
-  return useChatStore(
-    useShallow((s) => (s.byTab[ownerId] ?? EMPTY).filter((m) => m.paneId === paneId)),
+  const ownerId = useWorkspaceStore(
+    (state) =>
+      state.tabs.find((tab) => tab.kind === 'session' && leaves(tab.layout).some((pane) => pane.id === paneId))?.id ?? state.activeId,
   );
+  return useChatStore(useShallow((s) => (s.byTab[ownerId] ?? EMPTY).filter((m) => m.paneId === paneId)));
 }
 
 /** Context usage of the active tab, used by the ring component. */

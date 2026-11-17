@@ -23,12 +23,7 @@ export interface SearchResult {
 
 // ── Type-specific data ──
 export type SearchResultData =
-  | HistoryResultData
-  | BlockResultData
-  | FileResultData
-  | SettingResultData
-  | ActionResultData
-  | SessionResultData;
+  HistoryResultData | BlockResultData | FileResultData | SettingResultData | ActionResultData | SessionResultData;
 
 export interface HistoryResultData {
   command: string;

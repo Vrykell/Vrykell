@@ -21,20 +21,27 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
   const [dragging, setDragging] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [placement, setPlacement] = useState<CSSProperties>({});
-  const readGeometry = (scroll: HTMLElement) => scrollbarGeometry(
-    horizontal ? scroll.clientWidth : scroll.clientHeight,
-    horizontal ? scroll.scrollWidth : scroll.scrollHeight,
-    horizontal ? scroll.scrollLeft : scroll.scrollTop,
-    Math.max(0, (horizontal ? scroll.clientWidth : scroll.clientHeight) - TRACK_INSET * 2),
-  );
+  const readGeometry = (scroll: HTMLElement) =>
+    scrollbarGeometry(
+      horizontal ? scroll.clientWidth : scroll.clientHeight,
+      horizontal ? scroll.scrollWidth : scroll.scrollHeight,
+      horizontal ? scroll.scrollLeft : scroll.scrollTop,
+      Math.max(0, (horizontal ? scroll.clientWidth : scroll.clientHeight) - TRACK_INSET * 2),
+    );
 
   useEffect(() => {
     const scroll = scrollRef.current;
     if (!scroll) return;
     const update = () => {
       const next = readGeometry(scroll);
-      setGeometry(previous => previous.maximum === next.maximum && previous.height === next.height
-        && previous.travel === next.travel && previous.value === next.value ? previous : next);
+      setGeometry((previous) =>
+        previous.maximum === next.maximum &&
+        previous.height === next.height &&
+        previous.travel === next.travel &&
+        previous.value === next.value
+          ? previous
+          : next,
+      );
       if (floating) {
         const rect = scroll.getBoundingClientRect();
         const top = rect.top + scroll.clientTop;
@@ -63,7 +70,10 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
         // 10px left of its right edge. Both axes are clipped, otherwise a surface that scrolled out of
         // an ancestor keeps painting its track over the neighbouring panels.
         const trackSize = 10;
-        const acrossStart = Math.max(0, (horizontal ? clipTop : clipLeft) - ((horizontal ? scroll.clientHeight : scroll.clientWidth) - trackSize));
+        const acrossStart = Math.max(
+          0,
+          (horizontal ? clipTop : clipLeft) - ((horizontal ? scroll.clientHeight : scroll.clientWidth) - trackSize),
+        );
         const acrossEnd = horizontal ? clipBottom : clipRight;
         const alongStart = horizontal ? clipLeft : clipTop;
         const alongEnd = horizontal ? clipRight : clipBottom;
@@ -71,10 +81,28 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
           ? `inset(${acrossStart}px ${alongEnd}px ${acrossEnd}px ${alongStart}px)`
           : `inset(${alongStart}px ${acrossEnd}px ${alongEnd}px ${acrossStart}px)`;
         const nextPlacement: CSSProperties = horizontal
-          ? { position: 'fixed', top: top + scroll.clientHeight - trackSize, left, width: scroll.clientWidth, height: trackSize,
-            bottom: 'auto', right: 'auto', clipPath, zIndex }
-          : { position: 'fixed', top, left: left + scroll.clientWidth - trackSize, width: trackSize, height: scroll.clientHeight,
-            bottom: 'auto', right: 'auto', clipPath, zIndex };
+          ? {
+              position: 'fixed',
+              top: top + scroll.clientHeight - trackSize,
+              left,
+              width: scroll.clientWidth,
+              height: trackSize,
+              bottom: 'auto',
+              right: 'auto',
+              clipPath,
+              zIndex,
+            }
+          : {
+              position: 'fixed',
+              top,
+              left: left + scroll.clientWidth - trackSize,
+              width: trackSize,
+              height: scroll.clientHeight,
+              bottom: 'auto',
+              right: 'auto',
+              clipPath,
+              zIndex,
+            };
         if (ownedLayer) {
           // The layer lives in the host's coordinate space, which may be transformed, so map viewport pixels into it.
           const hostBounds = layerHost.getBoundingClientRect();
@@ -84,10 +112,13 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
           nextPlacement.left = (Number(nextPlacement.left) - hostBounds.left) / scaleX - layerHost.clientLeft + layerHost.scrollLeft;
           nextPlacement.top = (Number(nextPlacement.top) - hostBounds.top) / scaleY - layerHost.clientTop + layerHost.scrollTop;
         }
-        if (!scroll.getClientRects().length
-          || acrossStart + acrossEnd >= trackSize
-          || alongStart + alongEnd >= (horizontal ? scroll.clientWidth : scroll.clientHeight)) nextPlacement.display = 'none';
-        setPlacement(previous => JSON.stringify(previous) === JSON.stringify(nextPlacement) ? previous : nextPlacement);
+        if (
+          !scroll.getClientRects().length ||
+          acrossStart + acrossEnd >= trackSize ||
+          alongStart + alongEnd >= (horizontal ? scroll.clientWidth : scroll.clientHeight)
+        )
+          nextPlacement.display = 'none';
+        setPlacement((previous) => (JSON.stringify(previous) === JSON.stringify(nextPlacement) ? previous : nextPlacement));
       }
     };
     const observer = new ResizeObserver(update);
@@ -109,10 +140,13 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
     };
   }, [scrollRef, horizontal, floating, layerHost]);
 
-  const conceal = useCallback((next: EventTarget | null) => {
-    if (next instanceof Node && (scrollRef.current?.contains(next) || bar.current?.contains(next))) return;
-    setHovered(false);
-  }, [scrollRef]);
+  const conceal = useCallback(
+    (next: EventTarget | null) => {
+      if (next instanceof Node && (scrollRef.current?.contains(next) || bar.current?.contains(next))) return;
+      setHovered(false);
+    },
+    [scrollRef],
+  );
 
   useEffect(() => {
     const scroll = scrollRef.current;
@@ -153,81 +187,119 @@ export default function OverlayScrollbar({ scrollRef, controlsId, label, horizon
   };
 
   if (geometry.maximum === 0) return null;
-  return <div
-    ref={bar}
-    className="overlay-scrollbar"
-    data-horizontal={horizontal}
-    style={{ ...placement, '--scrollbar-inset': `${TRACK_INSET}px` } as CSSProperties}
-    data-no-drag
-    data-dragging={dragging}
-    data-visible={hovered || dragging ? 'true' : 'false'}
-    role="scrollbar"
-    tabIndex={floating ? -1 : 0}
-    aria-label={label}
-    aria-controls={controlsId}
-    aria-orientation={horizontal ? 'horizontal' : 'vertical'}
-    aria-valuemin={0}
-    aria-valuemax={geometry.maximum}
-    aria-valuenow={Math.round(geometry.value)}
-    onPointerDown={event => {
-      if (event.button !== 0) return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (!floating) event.currentTarget.focus({ preventScroll: true });
-      const offset = event.target === event.currentTarget ? geometry.height / 2
-        : (horizontal ? event.clientX - event.currentTarget.getBoundingClientRect().left
-          : event.clientY - event.currentTarget.getBoundingClientRect().top) - TRACK_INSET - geometry.top;
-      drag.current = { pointer: event.pointerId, offset };
-      event.currentTarget.setPointerCapture(event.pointerId);
-      setDragging(true);
-      move(event, offset);
-    }}
-    onClick={event => event.stopPropagation()}
-    onPointerMove={event => {
-      if (drag.current?.pointer === event.pointerId) move(event, drag.current.offset);
-    }}
-    onLostPointerCapture={() => { drag.current = null; setDragging(false); }}
-    onPointerUp={event => {
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    }}
-    onPointerCancel={event => {
-      if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
-    }}
-    onWheel={event => {
-      const scroll = scrollRef.current;
-      if (scroll && !event.ctrlKey) {
-        const delta = (horizontal ? event.deltaX || event.deltaY : event.deltaY)
-          * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? horizontal ? scroll.clientWidth : scroll.clientHeight : 1);
-        if (horizontal) scroll.scrollLeft += delta;
-        else scroll.scrollTop += delta;
-      }
-      event.stopPropagation();
-    }}
-    onKeyDown={event => {
-      const scroll = scrollRef.current;
-      if (!scroll) return;
-      const current = horizontal ? scroll.scrollLeft : scroll.scrollTop;
-      const viewport = horizontal ? scroll.clientWidth : scroll.clientHeight;
-      let next: number;
-      switch (event.key) {
-        case 'ArrowLeft': if (!horizontal) return; next = current - 40; break;
-        case 'ArrowRight': if (!horizontal) return; next = current + 40; break;
-        case 'ArrowUp': if (horizontal) return; next = current - 40; break;
-        case 'ArrowDown': if (horizontal) return; next = current + 40; break;
-        case 'PageUp': next = current - viewport; break;
-        case 'PageDown': next = current + viewport; break;
-        case 'Home': next = 0; break;
-        case 'End': next = geometry.maximum; break;
-        default: return;
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      if (horizontal) scroll.scrollLeft = next;
-      else scroll.scrollTop = next;
-    }}
-  >
-    <div className="overlay-scrollbar-track"><div className="overlay-scrollbar-thumb" style={horizontal
-      ? { width: geometry.height, transform: `translateX(${geometry.top}px)` }
-      : { height: geometry.height, transform: `translateY(${geometry.top}px)` }} /></div>
-  </div>;
+  return (
+    <div
+      ref={bar}
+      className="overlay-scrollbar"
+      data-horizontal={horizontal}
+      style={{ ...placement, '--scrollbar-inset': `${TRACK_INSET}px` } as CSSProperties}
+      data-no-drag
+      data-dragging={dragging}
+      data-visible={hovered || dragging ? 'true' : 'false'}
+      role="scrollbar"
+      tabIndex={floating ? -1 : 0}
+      aria-label={label}
+      aria-controls={controlsId}
+      aria-orientation={horizontal ? 'horizontal' : 'vertical'}
+      aria-valuemin={0}
+      aria-valuemax={geometry.maximum}
+      aria-valuenow={Math.round(geometry.value)}
+      onPointerDown={(event) => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.stopPropagation();
+        if (!floating) event.currentTarget.focus({ preventScroll: true });
+        const offset =
+          event.target === event.currentTarget
+            ? geometry.height / 2
+            : (horizontal
+                ? event.clientX - event.currentTarget.getBoundingClientRect().left
+                : event.clientY - event.currentTarget.getBoundingClientRect().top) -
+              TRACK_INSET -
+              geometry.top;
+        drag.current = { pointer: event.pointerId, offset };
+        event.currentTarget.setPointerCapture(event.pointerId);
+        setDragging(true);
+        move(event, offset);
+      }}
+      onClick={(event) => event.stopPropagation()}
+      onPointerMove={(event) => {
+        if (drag.current?.pointer === event.pointerId) move(event, drag.current.offset);
+      }}
+      onLostPointerCapture={() => {
+        drag.current = null;
+        setDragging(false);
+      }}
+      onPointerUp={(event) => {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      }}
+      onPointerCancel={(event) => {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+      }}
+      onWheel={(event) => {
+        const scroll = scrollRef.current;
+        if (scroll && !event.ctrlKey) {
+          const delta =
+            (horizontal ? event.deltaX || event.deltaY : event.deltaY) *
+            (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? (horizontal ? scroll.clientWidth : scroll.clientHeight) : 1);
+          if (horizontal) scroll.scrollLeft += delta;
+          else scroll.scrollTop += delta;
+        }
+        event.stopPropagation();
+      }}
+      onKeyDown={(event) => {
+        const scroll = scrollRef.current;
+        if (!scroll) return;
+        const current = horizontal ? scroll.scrollLeft : scroll.scrollTop;
+        const viewport = horizontal ? scroll.clientWidth : scroll.clientHeight;
+        let next: number;
+        switch (event.key) {
+          case 'ArrowLeft':
+            if (!horizontal) return;
+            next = current - 40;
+            break;
+          case 'ArrowRight':
+            if (!horizontal) return;
+            next = current + 40;
+            break;
+          case 'ArrowUp':
+            if (horizontal) return;
+            next = current - 40;
+            break;
+          case 'ArrowDown':
+            if (horizontal) return;
+            next = current + 40;
+            break;
+          case 'PageUp':
+            next = current - viewport;
+            break;
+          case 'PageDown':
+            next = current + viewport;
+            break;
+          case 'Home':
+            next = 0;
+            break;
+          case 'End':
+            next = geometry.maximum;
+            break;
+          default:
+            return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        if (horizontal) scroll.scrollLeft = next;
+        else scroll.scrollTop = next;
+      }}>
+      <div className="overlay-scrollbar-track">
+        <div
+          className="overlay-scrollbar-thumb"
+          style={
+            horizontal
+              ? { width: geometry.height, transform: `translateX(${geometry.top}px)` }
+              : { height: geometry.height, transform: `translateY(${geometry.top}px)` }
+          }
+        />
+      </div>
+    </div>
+  );
 }

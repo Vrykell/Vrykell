@@ -21,8 +21,13 @@ import { approvingToolContext } from '../../../test-utils/approvingToolContext';
 // every tool is set to allow and ctx stays empty.
 usePermissions.setState({
   levels: {
-    run_command: 'allow', read_file: 'allow', write_file: 'allow', edit_file: 'allow',
-    list_dir: 'allow', search_files: 'allow', web_search: 'allow',
+    run_command: 'allow',
+    read_file: 'allow',
+    write_file: 'allow',
+    edit_file: 'allow',
+    list_dir: 'allow',
+    search_files: 'allow',
+    web_search: 'allow',
   },
 });
 const CTX: ToolContext = approvingToolContext();

@@ -9,26 +9,66 @@ import { useComposerDrafts } from '../stores/composerDrafts';
 const initial = useHarnessStore.getState();
 const drafts = useComposerDrafts.getState();
 const session = (): HarnessSession => ({
-  harness: 'Example agent', sessionId: 'session', cwd: '/work', agent: null, messages: [], pending: false,
-  opening: false, error: null, note: null, plan: [], context: null, commands: [], permission: null,
-  permissionGeneration: 0, appToolsConnected: true,
+  harness: 'Example agent',
+  sessionId: 'session',
+  cwd: '/work',
+  agent: null,
+  messages: [],
+  pending: false,
+  opening: false,
+  error: null,
+  note: null,
+  plan: [],
+  context: null,
+  commands: [],
+  permission: null,
+  permissionGeneration: 0,
+  appToolsConnected: true,
   modes: { currentModeId: 'standard', availableModes: [{ id: 'standard', name: 'Standard' }] },
   models: { currentModelId: 'one', availableModels: [{ modelId: 'one', name: 'Model one' }] },
-  configOptions: [{ id: 'reasoning', name: 'Reasoning effort', type: 'select', currentValue: 'medium',
-    options: [{ value: 'medium', name: 'Medium' }, { value: 'high', name: 'High' }] }],
+  configOptions: [
+    {
+      id: 'reasoning',
+      name: 'Reasoning effort',
+      type: 'select',
+      currentValue: 'medium',
+      options: [
+        { value: 'medium', name: 'Medium' },
+        { value: 'high', name: 'High' },
+      ],
+    },
+  ],
 });
 
 function Surface({ active = true }: { active?: boolean }) {
   const [toolbar, setToolbar] = useState<HTMLDivElement | null>(null);
-  return <><div data-testid="agent-toolbar" ref={setToolbar} /><HarnessView tabId="agent" harness="Example agent" active={active} toolbarTarget={toolbar} /></>;
+  return (
+    <>
+      <div data-testid="agent-toolbar" ref={setToolbar} />
+      <HarnessView tabId="agent" harness="Example agent" active={active} toolbarTarget={toolbar} />
+    </>
+  );
 }
 
 beforeEach(() => {
-  vi.stubGlobal('ResizeObserver', class { observe() {} unobserve() {} disconnect() {} });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    },
+  );
   useHarnessStore.setState({ byTab: { agent: session() } });
   useComposerDrafts.setState({ byTab: {} });
 });
-afterEach(() => { cleanup(); useHarnessStore.setState(initial, true); useComposerDrafts.setState(drafts, true); vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  cleanup();
+  useHarnessStore.setState(initial, true);
+  useComposerDrafts.setState(drafts, true);
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+});
 
 it('keeps permission and model choices in the composer and puts other choices in persistent toolbar settings', () => {
   const view = render(<Surface />);
@@ -52,24 +92,55 @@ it('keeps permission and model choices in the composer and puts other choices in
 });
 
 it('shows the shared loading animation before any output and removes it when the turn ends', () => {
-  useHarnessStore.setState({ byTab: { agent: { ...session(), pending: true,
-    messages: [{ id: 'question', role: 'user', content: 'Check this project', createdAt: 1 }] } } });
+  useHarnessStore.setState({
+    byTab: {
+      agent: { ...session(), pending: true, messages: [{ id: 'question', role: 'user', content: 'Check this project', createdAt: 1 }] },
+    },
+  });
   render(<Surface />);
   const loading = screen.getByRole('status');
   expect(loading).toHaveTextContent(t('Working'));
   expect(loading.querySelector('.ai-pending-cursor')).not.toBeNull();
   expect(useHarnessStore.getState().byTab.agent.messages).toHaveLength(1);
-  act(() => useHarnessStore.setState(state => ({ byTab: { agent: { ...state.byTab.agent, pending: false } } })));
+  act(() => useHarnessStore.setState((state) => ({ byTab: { agent: { ...state.byTab.agent, pending: false } } })));
   expect(screen.queryByRole('status')).toBeNull();
 });
 
 it('renders a pending question above the working row', () => {
-  useHarnessStore.setState({ byTab: { agent: { ...session(), pending: true,
-    messages: [{ id: 'question', role: 'user', content: 'Check this project', createdAt: 1 }],
-    questions: [{ requestId: 'pending-question', form: { message: 'Choose the next step', fields: [
-      { key: 'choice', title: 'Choice', description: '', kind: 'string', required: false, options: [], default: '',
-        minimum: null, maximum: null, minLength: 0, maxLength: 100, minItems: 0, maxItems: 0 },
-    ] } }] } } });
+  useHarnessStore.setState({
+    byTab: {
+      agent: {
+        ...session(),
+        pending: true,
+        messages: [{ id: 'question', role: 'user', content: 'Check this project', createdAt: 1 }],
+        questions: [
+          {
+            requestId: 'pending-question',
+            form: {
+              message: 'Choose the next step',
+              fields: [
+                {
+                  key: 'choice',
+                  title: 'Choice',
+                  description: '',
+                  kind: 'string',
+                  required: false,
+                  options: [],
+                  default: '',
+                  minimum: null,
+                  maximum: null,
+                  minLength: 0,
+                  maxLength: 100,
+                  minItems: 0,
+                  maxItems: 0,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    },
+  });
   const view = render(<Surface />);
   const question = view.container.querySelector('.ai-user-question');
   const working = view.container.querySelector('.ai-block-working');
@@ -79,10 +150,21 @@ it('renders a pending question above the working row', () => {
 });
 
 it('renders a pending permission card above the working row', () => {
-  useHarnessStore.setState({ byTab: { agent: { ...session(), pending: true,
-    messages: [{ id: 'question', role: 'user', content: 'Check this project', createdAt: 1 }],
-    permission: { toolCallId: 'call', generation: 1, title: 'Run the tests',
-      options: [{ optionId: 'allow-once', name: 'Allow once' }] } } } });
+  useHarnessStore.setState({
+    byTab: {
+      agent: {
+        ...session(),
+        pending: true,
+        messages: [{ id: 'question', role: 'user', content: 'Check this project', createdAt: 1 }],
+        permission: {
+          toolCallId: 'call',
+          generation: 1,
+          title: 'Run the tests',
+          options: [{ optionId: 'allow-once', name: 'Allow once' }],
+        },
+      },
+    },
+  });
   const view = render(<Surface />);
   const card = view.container.querySelector('[data-testid="harness-permission"]');
   const working = view.container.querySelector('.ai-block-working');
@@ -114,20 +196,29 @@ it('keeps the draft when a prompt cannot be accepted', async () => {
   useHarnessStore.setState({ prompt: vi.fn(async () => false) });
   useComposerDrafts.getState().setText('agent', 'Keep this question');
   render(<Surface />);
-  await act(async () => { fireEvent.click(screen.getByTestId('harness-send')); });
+  await act(async () => {
+    fireEvent.click(screen.getByTestId('harness-send'));
+  });
   expect(screen.getByTestId('harness-composer')).toHaveValue('Keep this question');
 });
 
 it('preserves newly typed text while accepting a pending send only once', async () => {
   let finish!: (accepted: boolean) => void;
-  const prompt = vi.fn(() => new Promise<boolean>(resolve => { finish = resolve; }));
+  const prompt = vi.fn(
+    () =>
+      new Promise<boolean>((resolve) => {
+        finish = resolve;
+      }),
+  );
   useHarnessStore.setState({ prompt });
   useComposerDrafts.getState().setText('agent', 'Original question');
   render(<Surface />);
   fireEvent.click(screen.getByTestId('harness-send'));
   fireEvent.click(screen.getByTestId('harness-send'));
   fireEvent.change(screen.getByTestId('harness-composer'), { target: { value: 'Next question' } });
-  await act(async () => { finish(true); });
+  await act(async () => {
+    finish(true);
+  });
   expect(prompt).toHaveBeenCalledTimes(1);
   expect(screen.getByTestId('harness-composer')).toHaveValue('Next question');
 });

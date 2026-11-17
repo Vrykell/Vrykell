@@ -20,11 +20,12 @@ export function ThemeFilesPage() {
   const [themePath, setThemePath] = useState('');
 
   useEffect(() => {
-    getThemePath().then(setThemePath).catch((e) => console.warn('[theme] failed to read theme path:', e));
+    getThemePath()
+      .then(setThemePath)
+      .catch((e) => console.warn('[theme] failed to read theme path:', e));
   }, []);
 
-  const toast = (msg: string, type: 'info' | 'success' | 'error') =>
-    useToastStore.getState().addToast(msg, type);
+  const toast = (msg: string, type: 'info' | 'success' | 'error') => useToastStore.getState().addToast(msg, type);
 
   const doExport = async () => {
     try {
@@ -63,12 +64,12 @@ export function ThemeFilesPage() {
     <SettingsGroup title={t('Theme files')}>
       <Field title={t('Import / export theme')} description={t('Save or load a theme as JSON.')}>
         <div style={{ display: 'flex', gap: 8 }}>
-          <OutlineButton onClick={() => void doExport()} >
+          <OutlineButton onClick={() => void doExport()}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <Upload size={iconSizes.control} /> {t('Export')}
             </span>
           </OutlineButton>
-          <OutlineButton onClick={() => void doImport()} >
+          <OutlineButton onClick={() => void doImport()}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <Download size={iconSizes.control} /> {t('Import')}
             </span>
@@ -78,18 +79,24 @@ export function ThemeFilesPage() {
 
       <Field layout="stacked" title={t('Config file')} description={t('Edit theme.json to customize theme variables.')}>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <OutlineButton onClick={() => void openConfig()} >
+          <OutlineButton onClick={() => void openConfig()}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <FileText size={iconSizes.control} /> {t('Open config file')}
             </span>
           </OutlineButton>
-          <OutlineButton onClick={() => void reload.run()} disabled={reload.busy} aria-busy={reload.busy} >
+          <OutlineButton onClick={() => void reload.run()} disabled={reload.busy} aria-busy={reload.busy}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <RefreshCw size={iconSizes.control} className={reload.busy ? 'reload-spin' : undefined} /> {t('Reload')}
             </span>
           </OutlineButton>
           {themePath && (
-            <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', fontFamily: 'var(--font-ui)', wordBreak: 'break-all' }}>
+            <span
+              style={{
+                fontSize: 'calc(11px * var(--ui-font-scale))',
+                color: 'var(--text-muted)',
+                fontFamily: 'var(--font-ui)',
+                wordBreak: 'break-all',
+              }}>
               {themePath}
             </span>
           )}

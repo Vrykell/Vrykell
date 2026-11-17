@@ -14,7 +14,8 @@ function locateTarget(x: number, y: number, id: string): NavigationDropTarget | 
     if (!PANEL_DEFS[id]) return null;
     const regions = panelPlacementRegions(id);
     if (!regions) return null;
-    const contains = (rect: typeof regions.right | null) => !!rect && x >= rect.left && x <= rect.left + rect.width && y >= rect.top && y <= rect.top + rect.height;
+    const contains = (rect: typeof regions.right | null) =>
+      !!rect && x >= rect.left && x <= rect.left + rect.width && y >= rect.top && y <= rect.top + rect.height;
     const destination = contains(regions.left) ? 'left' : contains(regions.right) ? 'right' : null;
     if (!destination) return null;
     const zone = destination === 'left' ? dock.leftZone : dock.rightZone;
@@ -51,7 +52,8 @@ export function useNavigationButtonDrag() {
 
   return (event: ReactPointerEvent<HTMLElement>, id: string) => {
     if (event.button !== 0 || event.isPrimary === false) return;
-    const control = event.target instanceof Element ? event.target.closest('button, input, textarea, select, a, [role="button"], [data-no-drag]') : null;
+    const control =
+      event.target instanceof Element ? event.target.closest('button, input, textarea, select, a, [role="button"], [data-no-drag]') : null;
     if (control && control !== event.currentTarget) return;
     event.stopPropagation();
     cleanupRef.current?.();
@@ -79,7 +81,10 @@ export function useNavigationButtonDrag() {
       preview(next.clientX, next.clientY);
     };
     const suppressClick = (next: MouseEvent) => {
-      if (started) { next.preventDefault(); next.stopImmediatePropagation(); }
+      if (started) {
+        next.preventDefault();
+        next.stopImmediatePropagation();
+      }
     };
     const removeClick = () => window.removeEventListener('click', suppressClick, true);
     const clean = () => {
@@ -92,7 +97,10 @@ export function useNavigationButtonDrag() {
       if (started) useNavigationDrag.getState().end();
       // Pointerup produces a click synchronously; keep that click from toggling a panel.
       clickTimer = setTimeout(removeClick, 0);
-      cleanupRef.current = () => { clearTimeout(clickTimer); removeClick(); };
+      cleanupRef.current = () => {
+        clearTimeout(clickTimer);
+        removeClick();
+      };
     };
     const up = (next: PointerEvent) => {
       if (next.pointerId !== pointerId) return;
@@ -122,6 +130,10 @@ export function useNavigationButtonDrag() {
     window.addEventListener('keydown', key, true);
     window.addEventListener('blur', cancel);
     window.addEventListener('click', suppressClick, true);
-    cleanupRef.current = () => { clean(); clearTimeout(clickTimer); removeClick(); };
+    cleanupRef.current = () => {
+      clean();
+      clearTimeout(clickTimer);
+      removeClick();
+    };
   };
 }

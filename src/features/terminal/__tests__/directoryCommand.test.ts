@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { directoryCommand, directoryLabel } from '../model/directoryCommand';
 
-it.each(['\x15', '\x1b', '\x7f', '\x9b'])('rejects terminal controls %j', control => {
+it.each(['\x15', '\x1b', '\x7f', '\x9b'])('rejects terminal controls %j', (control) => {
   expect(() => directoryCommand(`/tmp/a${control}bad`, 'bash')).toThrow();
 });
 

@@ -14,11 +14,7 @@ interface UseTerminalInputContextOptions {
 }
 
 /** Aggregates terminal context for one pane and isolates the composer from store and runtime subscriptions. */
-export function useTerminalInputContext({
-  paneId,
-  focused,
-  isLongRunning = false,
-}: UseTerminalInputContextOptions) {
+export function useTerminalInputContext({ paneId, focused, isLongRunning = false }: UseTerminalInputContextOptions) {
   const sessions = useTerminalStore((state) => state.sessions);
   const focusedPaneId = useTerminalStore((state) => state.focusedPaneId);
   const isFocused = focused ?? paneId === focusedPaneId;
@@ -50,19 +46,17 @@ export function useTerminalInputContext({
     return null;
   });
 
-  const isAgentInControl = useSyncExternalStore(
-    agentControl.subscribe,
-    () => agentControl.isControlled(paneId),
-  );
+  const isAgentInControl = useSyncExternalStore(agentControl.subscribe, () => agentControl.isControlled(paneId));
   const altScreenActive = scene === 'altScreen';
   const visible = useMemo(
-    () => isInputBoxVisible({
-      isReadOnly: false,
-      isAltScreenActive: altScreenActive,
-      isLongRunning,
-      isAgentInControl,
-      isAgentTaggedIn: false,
-    }),
+    () =>
+      isInputBoxVisible({
+        isReadOnly: false,
+        isAltScreenActive: altScreenActive,
+        isLongRunning,
+        isAgentInControl,
+        isAgentTaggedIn: false,
+      }),
     [altScreenActive, isAgentInControl, isLongRunning],
   );
 

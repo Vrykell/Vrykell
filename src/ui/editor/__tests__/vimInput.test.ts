@@ -1,12 +1,22 @@
 import { afterEach, expect, it } from 'vitest';
 import { replayVimText, type VimKeyEvent } from '@ui/editor/code/vimInput';
 
-afterEach(() => { document.body.replaceChildren(); });
+afterEach(() => {
+  document.body.replaceChildren();
+});
 
 function keys() {
   const pressed: string[] = [];
-  const label = (event: VimKeyEvent) => event.key.startsWith("'") ? event.key.slice(1, -1) : event.key;
-  return { pressed, label, adapter: { handleKeyDown: (event: VimKeyEvent) => { pressed.push(label(event)); } } };
+  const label = (event: VimKeyEvent) => (event.key.startsWith("'") ? event.key.slice(1, -1) : event.key);
+  return {
+    pressed,
+    label,
+    adapter: {
+      handleKeyDown: (event: VimKeyEvent) => {
+        pressed.push(label(event));
+      },
+    },
+  };
 }
 
 it('replays ordinary characters and special keys through the modal key handler', () => {
@@ -20,7 +30,7 @@ it('opens the command prompt with the first key and appends the remaining text',
   const statusBar = document.createElement('div');
   document.body.append(statusBar);
   const prompt = document.createElement('input');
-  adapter.handleKeyDown = event => {
+  adapter.handleKeyDown = (event) => {
     pressed.push(event.browserEvent.key);
     if (event.browserEvent.key === ':') {
       statusBar.append(prompt);
@@ -38,8 +48,10 @@ it('submits a command when the composition ends with a newline', () => {
   document.body.append(statusBar);
   const prompt = document.createElement('input');
   let submitted = false;
-  prompt.addEventListener('keydown', event => { if (event.keyCode === 13) submitted = true; });
-  adapter.handleKeyDown = event => {
+  prompt.addEventListener('keydown', (event) => {
+    if (event.keyCode === 13) submitted = true;
+  });
+  adapter.handleKeyDown = (event) => {
     if (event.browserEvent.key === ':') {
       statusBar.append(prompt);
       prompt.focus();
@@ -58,7 +70,7 @@ it('fills a search prompt and lets its key-up handler see the committed text', (
   const seen: string[] = [];
   prompt.addEventListener('input', () => seen.push('input'));
   prompt.addEventListener('keyup', () => seen.push('keyup'));
-  adapter.handleKeyDown = event => {
+  adapter.handleKeyDown = (event) => {
     if (event.browserEvent.key === '/') {
       statusBar.append(prompt);
       prompt.focus();

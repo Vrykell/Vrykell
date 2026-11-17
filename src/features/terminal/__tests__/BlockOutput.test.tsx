@@ -7,20 +7,54 @@ import BlockOutput, { plainText } from '@features/terminal/components/BlockOutpu
 // We provide a mock Terminal with a simple ANSI parser.
 
 const SGR_FG_COLORS: Record<number, number> = {
-  30: 0, 31: 1, 32: 2, 33: 3, 34: 4, 35: 5, 36: 6, 37: 7,
-  90: 8, 91: 9, 92: 10, 93: 11, 94: 12, 95: 13, 96: 14, 97: 15,
+  30: 0,
+  31: 1,
+  32: 2,
+  33: 3,
+  34: 4,
+  35: 5,
+  36: 6,
+  37: 7,
+  90: 8,
+  91: 9,
+  92: 10,
+  93: 11,
+  94: 12,
+  95: 13,
+  96: 14,
+  97: 15,
 };
 
 interface CellData {
-  chars: string; width: number; fg: number; bg: number;
-  fgDefault: boolean; bgDefault: boolean;
-  bold: boolean; italic: boolean; underline: boolean;
-  strikethrough: boolean; dim: boolean; inverse: boolean;
+  chars: string;
+  width: number;
+  fg: number;
+  bg: number;
+  fgDefault: boolean;
+  bgDefault: boolean;
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  strikethrough: boolean;
+  dim: boolean;
+  inverse: boolean;
 }
 
 function emptyCell(): CellData {
-  return { chars: ' ', width: 1, fg: 0, bg: 0, fgDefault: true, bgDefault: true,
-    bold: false, italic: false, underline: false, strikethrough: false, dim: false, inverse: false };
+  return {
+    chars: ' ',
+    width: 1,
+    fg: 0,
+    bg: 0,
+    fgDefault: true,
+    bgDefault: true,
+    bold: false,
+    italic: false,
+    underline: false,
+    strikethrough: false,
+    dim: false,
+    inverse: false,
+  };
 }
 
 function parseAnsi(data: string): CellData[][] {
@@ -29,53 +63,114 @@ function parseAnsi(data: string): CellData[][] {
   let sgr: Partial<CellData> = { fgDefault: true, bgDefault: true };
   let i = 0;
   while (i < data.length) {
-    if (data[i] === '\x1b' && data[i+1] === '[') {
-      const end = data.indexOf('m', i+2);
-      if (end !== -1 && /^[0-9;]*$/.test(data.slice(i+2, end))) {
-        for (const p of data.slice(i+2, end).split(';').map(Number)) {
-          if (p === 0) { sgr = { fgDefault: true, bgDefault: true }; }
-          else if (p === 1) sgr.bold = true; else if (p === 2) sgr.dim = true;
-          else if (p === 3) sgr.italic = true; else if (p === 4) sgr.underline = true;
-          else if (p === 7) sgr.inverse = true; else if (p === 9) sgr.strikethrough = true;
-          else if (p === 22) { sgr.bold = false; sgr.dim = false; }
-          else if (p === 23) sgr.italic = false; else if (p === 24) sgr.underline = false;
-          else if (p === 27) sgr.inverse = false; else if (p === 29) sgr.strikethrough = false;
-          else if (p >= 30 && p <= 37) { sgr.fg = SGR_FG_COLORS[p]!; sgr.fgDefault = false; }
-          else if (p >= 40 && p <= 47) { sgr.bg = p-40; sgr.bgDefault = false; }
-          else if (p >= 90 && p <= 97) { sgr.fg = SGR_FG_COLORS[p]!; sgr.fgDefault = false; }
-          else if (p >= 100 && p <= 107) { sgr.bg = p-100+8; sgr.bgDefault = false; }
-          else if (p === 39) { sgr.fgDefault = true; sgr.fg = undefined; }
-          else if (p === 49) { sgr.bgDefault = true; sgr.bg = undefined; }
+    if (data[i] === '\x1b' && data[i + 1] === '[') {
+      const end = data.indexOf('m', i + 2);
+      if (end !== -1 && /^[0-9;]*$/.test(data.slice(i + 2, end))) {
+        for (const p of data
+          .slice(i + 2, end)
+          .split(';')
+          .map(Number)) {
+          if (p === 0) {
+            sgr = { fgDefault: true, bgDefault: true };
+          } else if (p === 1) sgr.bold = true;
+          else if (p === 2) sgr.dim = true;
+          else if (p === 3) sgr.italic = true;
+          else if (p === 4) sgr.underline = true;
+          else if (p === 7) sgr.inverse = true;
+          else if (p === 9) sgr.strikethrough = true;
+          else if (p === 22) {
+            sgr.bold = false;
+            sgr.dim = false;
+          } else if (p === 23) sgr.italic = false;
+          else if (p === 24) sgr.underline = false;
+          else if (p === 27) sgr.inverse = false;
+          else if (p === 29) sgr.strikethrough = false;
+          else if (p >= 30 && p <= 37) {
+            sgr.fg = SGR_FG_COLORS[p]!;
+            sgr.fgDefault = false;
+          } else if (p >= 40 && p <= 47) {
+            sgr.bg = p - 40;
+            sgr.bgDefault = false;
+          } else if (p >= 90 && p <= 97) {
+            sgr.fg = SGR_FG_COLORS[p]!;
+            sgr.fgDefault = false;
+          } else if (p >= 100 && p <= 107) {
+            sgr.bg = p - 100 + 8;
+            sgr.bgDefault = false;
+          } else if (p === 39) {
+            sgr.fgDefault = true;
+            sgr.fg = undefined;
+          } else if (p === 49) {
+            sgr.bgDefault = true;
+            sgr.bg = undefined;
+          }
         }
-        i = end+1; continue;
+        i = end + 1;
+        continue;
       }
     }
-    if (data[i] === '\x1b' && data[i+1] === ']') { const e = data.indexOf('\x07', i); i = e===-1 ? data.length : e+1; continue; }
-    if (data[i] === '\x1b' && data[i+1] === 'P') { const e = data.indexOf('\x1b\\', i); i = e===-1 ? data.length : e+2; continue; }
-    if (data[i] === '\x1b') { let j = i+1; if (j<data.length && data[j]==='[') { j++; while (j<data.length && data[j].charCodeAt(0)<0x40) j++; if (j<data.length) j++; } i=j; continue; }
-    if (data[i] === '\n') { lines.push([]); x=0; i++; continue; }
-    if (data[i] === '\r') { x=0; i++; continue; }
-    const line = lines[lines.length-1]!;
+    if (data[i] === '\x1b' && data[i + 1] === ']') {
+      const e = data.indexOf('\x07', i);
+      i = e === -1 ? data.length : e + 1;
+      continue;
+    }
+    if (data[i] === '\x1b' && data[i + 1] === 'P') {
+      const e = data.indexOf('\x1b\\', i);
+      i = e === -1 ? data.length : e + 2;
+      continue;
+    }
+    if (data[i] === '\x1b') {
+      let j = i + 1;
+      if (j < data.length && data[j] === '[') {
+        j++;
+        while (j < data.length && data[j].charCodeAt(0) < 0x40) j++;
+        if (j < data.length) j++;
+      }
+      i = j;
+      continue;
+    }
+    if (data[i] === '\n') {
+      lines.push([]);
+      x = 0;
+      i++;
+      continue;
+    }
+    if (data[i] === '\r') {
+      x = 0;
+      i++;
+      continue;
+    }
+    const line = lines[lines.length - 1]!;
     while (line.length < x) line.push(emptyCell());
     line[x] = { ...emptyCell(), chars: data[i]!, ...sgr };
-    x++; i++;
+    x++;
+    i++;
   }
-  while (lines.length > 0 && lines[lines.length-1]!.every(c => c.chars === ' ')) lines.pop();
+  while (lines.length > 0 && lines[lines.length - 1]!.every((c) => c.chars === ' ')) lines.pop();
   return lines;
 }
 
 function toMockCell(d: CellData) {
   return {
-    getChars: () => d.chars, getWidth: () => d.width,
-    getFgColor: () => d.fg||0, getBgColor: () => d.bg||0,
-    isFgDefault: () => d.fgDefault, isBgDefault: () => d.bgDefault,
-    isFgRGB: () => false, isBgRGB: () => false,
-    isFgPalette: () => !d.fgDefault && d.fg!==undefined,
-    isBgPalette: () => !d.bgDefault && d.bg!==undefined,
-    isBold: () => d.bold, isItalic: () => d.italic,
-    isUnderline: () => d.underline, isStrikethrough: () => d.strikethrough,
-    isDim: () => d.dim, isInverse: () => d.inverse,
-    isBlink: () => false, isInvisible: () => false, isOverline: () => false,
+    getChars: () => d.chars,
+    getWidth: () => d.width,
+    getFgColor: () => d.fg || 0,
+    getBgColor: () => d.bg || 0,
+    isFgDefault: () => d.fgDefault,
+    isBgDefault: () => d.bgDefault,
+    isFgRGB: () => false,
+    isBgRGB: () => false,
+    isFgPalette: () => !d.fgDefault && d.fg !== undefined,
+    isBgPalette: () => !d.bgDefault && d.bg !== undefined,
+    isBold: () => d.bold,
+    isItalic: () => d.italic,
+    isUnderline: () => d.underline,
+    isStrikethrough: () => d.strikethrough,
+    isDim: () => d.dim,
+    isInverse: () => d.inverse,
+    isBlink: () => false,
+    isInvisible: () => false,
+    isOverline: () => false,
   };
 }
 
@@ -87,22 +182,40 @@ var mockTextLines: string[] = [];
 vi.mock('@xterm/xterm', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const MockTerminal = function (this: any, _opts: { cols: number; rows: number }) {
-    mockLines = []; mockTextLines = [];
+    mockLines = [];
+    mockTextLines = [];
     this.buffer = {
       active: {
-        get length() { return mockLines.length; },
-        getLine(y: number) {
-          const cells = mockLines[y]; if (!cells) return null;
-          return { translateToString() { return mockTextLines[y] || ''; },
-            getCell(x: number) { if (x >= cells.length) return undefined; return toMockCell(cells[x]!); } };
+        get length() {
+          return mockLines.length;
         },
-        getNullCell() { return toMockCell(emptyCell()); },
+        getLine(y: number) {
+          const cells = mockLines[y];
+          if (!cells) return null;
+          return {
+            translateToString() {
+              return mockTextLines[y] || '';
+            },
+            getCell(x: number) {
+              if (x >= cells.length) return undefined;
+              return toMockCell(cells[x]!);
+            },
+          };
+        },
+        getNullCell() {
+          return toMockCell(emptyCell());
+        },
       },
     };
     this.open = vi.fn();
     this.write = vi.fn((data: string, cb?: () => void) => {
       mockLines = parseAnsi(data);
-      mockTextLines = mockLines.map((l) => l.map(c => c.chars).join('').replace(/ +$/, ''));
+      mockTextLines = mockLines.map((l) =>
+        l
+          .map((c) => c.chars)
+          .join('')
+          .replace(/ +$/, ''),
+      );
       if (cb) cb();
     });
     this.dispose = vi.fn();
@@ -116,13 +229,22 @@ import { captureTerminalOutput, extractSnapshotFromBuffer } from '@features/term
 describe('extractSnapshotFromBuffer wide characters', () => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mkCell = (chars: string, width: number): any => ({
-    getChars: () => chars, getWidth: () => width,
-    getFgColor: () => 0, getBgColor: () => 0,
-    isFgDefault: () => true, isBgDefault: () => true,
-    isFgRGB: () => false, isBgRGB: () => false,
-    isFgPalette: () => false, isBgPalette: () => false,
-    isBold: () => false, isItalic: () => false, isUnderline: () => false,
-    isStrikethrough: () => false, isDim: () => false, isInverse: () => false,
+    getChars: () => chars,
+    getWidth: () => width,
+    getFgColor: () => 0,
+    getBgColor: () => 0,
+    isFgDefault: () => true,
+    isBgDefault: () => true,
+    isFgRGB: () => false,
+    isBgRGB: () => false,
+    isFgPalette: () => false,
+    isBgPalette: () => false,
+    isBold: () => false,
+    isItalic: () => false,
+    isUnderline: () => false,
+    isStrikethrough: () => false,
+    isDim: () => false,
+    isInverse: () => false,
   });
 
   it('wraps CJK full-width cells in a 2ch inline-block so rendered width matches the grid', () => {
@@ -152,8 +274,6 @@ describe('extractSnapshotFromBuffer wide characters', () => {
     expect(extractSnapshotFromBuffer(buf, 2, undefined, undefined, 2).html).toBe('ok');
   });
 });
-
-
 
 // ═══════════════════════════════════════════
 // captureTerminalOutput — ANSI → HTML + plainText
@@ -245,8 +365,7 @@ describe('captureTerminalOutput ANSI handling', () => {
 
 describe('captureTerminalOutput prompt truncation', () => {
   it('removes the trailing prompt line from real ls output', async () => {
-    const input = 'Desktop\r\nDocuments\r\nDownloads\r\n' +
-      '\x1b]133;D;0\x07\x1b]133;A\x07' + 'wuzhe@wuzhedeMacBook-Pro ~ % ';
+    const input = 'Desktop\r\nDocuments\r\nDownloads\r\n' + '\x1b]133;D;0\x07\x1b]133;A\x07' + 'wuzhe@wuzhedeMacBook-Pro ~ % ';
     const { html, plainText } = await captureTerminalOutput(input, 80);
     expect(plainText).toContain('Desktop');
     expect(plainText).toContain('Documents');
@@ -256,8 +375,8 @@ describe('captureTerminalOutput prompt truncation', () => {
   });
 
   it('removes the trailing prompt line from git status output', async () => {
-    const input = 'On branch main\r\nnothing to commit, working tree clean\r\n' +
-      '\x1b]133;D;0\x07\x1b]133;A\x07' + '\x1b[32mwuzhe@host\x1b[0m ~ % ';
+    const input =
+      'On branch main\r\nnothing to commit, working tree clean\r\n' + '\x1b]133;D;0\x07\x1b]133;A\x07' + '\x1b[32mwuzhe@host\x1b[0m ~ % ';
     const { plainText } = await captureTerminalOutput(input, 80);
     expect(plainText).toContain('On branch main');
     expect(plainText).toContain('nothing to commit');
@@ -265,8 +384,7 @@ describe('captureTerminalOutput prompt truncation', () => {
   });
 
   it('keeps the progress-bar percent and removes the prompt from python output', async () => {
-    const input = 'Training: 100%|████| 100/100 [00:10<00:00]\r\nDone\r\n' +
-      '\x1b]133;D;0\x07\x1b]133;A\x07' + 'user@host ~ % ';
+    const input = 'Training: 100%|████| 100/100 [00:10<00:00]\r\nDone\r\n' + '\x1b]133;D;0\x07\x1b]133;A\x07' + 'user@host ~ % ';
     const { plainText } = await captureTerminalOutput(input, 80);
     expect(plainText).toContain('100%');
     expect(plainText).toContain('Done');
@@ -335,7 +453,7 @@ describe('BlockOutput component', () => {
 
   it('renders styled HTML in outputHtml mode when isHtml is explicit', () => {
     const { container } = render(
-      <BlockOutput isHtml text={'<span style="color:#cc0000">error</span>: <span style="font-weight:bold">failed</span>'} />
+      <BlockOutput isHtml text={'<span style="color:#cc0000">error</span>: <span style="font-weight:bold">failed</span>'} />,
     );
     expect(container.querySelector('span[style*="color:#cc0000"]')).toBeTruthy();
     expect(container.innerHTML).toContain('failed');
@@ -349,9 +467,7 @@ describe('BlockOutput component', () => {
   });
 
   it('does not sniff <span without isHtml and escapes historical output as text to prevent stored XSS', () => {
-    const { container } = render(
-      <BlockOutput text={'<span style="color:#cc0000">error</span><img src=x onerror=alert(1)>'} />
-    );
+    const { container } = render(<BlockOutput text={'<span style="color:#cc0000">error</span><img src=x onerror=alert(1)>'} />);
     // No real elements are created; everything is escaped as text.
     expect(container.querySelector('span')).toBeFalsy();
     expect(container.querySelector('img')).toBeFalsy();

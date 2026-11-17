@@ -12,8 +12,21 @@ import CommandSyntax from './CommandSyntax';
 import RunningCommandBar from './RunningCommandBar';
 
 /** A viewport title is independent of output expansion and scroll position. */
-export default function PinnedCommand({ block, paneId, remaining, insetLeft, insetRight, scrollRef, collapsed, onToggle }: {
-  block: TermBlock; paneId: string; remaining: number; insetLeft: number; insetRight: number;
+export default function PinnedCommand({
+  block,
+  paneId,
+  remaining,
+  insetLeft,
+  insetRight,
+  scrollRef,
+  collapsed,
+  onToggle,
+}: {
+  block: TermBlock;
+  paneId: string;
+  remaining: number;
+  insetLeft: number;
+  insetRight: number;
   scrollRef?: RefObject<HTMLDivElement | null>;
   collapsed: boolean;
   onToggle: () => void;
@@ -22,7 +35,7 @@ export default function PinnedCommand({ block, paneId, remaining, insetLeft, ins
   const closeMenu = useCallback(() => setAnchor(null), []);
   const [height, setHeight] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
-  const colored = useTypographyStore(state => state.commandHighlighting);
+  const colored = useTypographyStore((state) => state.commandHighlighting);
   const running = block.status === 'executing';
   useLayoutEffect(() => setAnchor(null), [block.id]);
   useEffect(() => {
@@ -33,10 +46,15 @@ export default function PinnedCommand({ block, paneId, remaining, insetLeft, ins
       event.preventDefault();
       event.stopPropagation();
       // The scroll host still owns follow-state changes while this title is above it.
-      scroll.dispatchEvent(new WheelEvent('wheel', { deltaY: event.deltaY, deltaX: event.deltaX,
-        deltaMode: event.deltaMode, cancelable: true }));
-      const unit = event.deltaMode === WheelEvent.DOM_DELTA_PAGE ? scroll.clientHeight
-        : event.deltaMode === WheelEvent.DOM_DELTA_LINE ? parseFloat(getComputedStyle(scroll).lineHeight) || 16 : 1;
+      scroll.dispatchEvent(
+        new WheelEvent('wheel', { deltaY: event.deltaY, deltaX: event.deltaX, deltaMode: event.deltaMode, cancelable: true }),
+      );
+      const unit =
+        event.deltaMode === WheelEvent.DOM_DELTA_PAGE
+          ? scroll.clientHeight
+          : event.deltaMode === WheelEvent.DOM_DELTA_LINE
+            ? parseFloat(getComputedStyle(scroll).lineHeight) || 16
+            : 1;
       scroll.scrollTop += event.deltaY * unit;
       scroll.scrollLeft += event.deltaX * unit;
     };
@@ -53,48 +71,80 @@ export default function PinnedCommand({ block, paneId, remaining, insetLeft, ins
     return () => observer.disconnect();
   }, [block.id, collapsed, running]);
   const duration = block.startedAt === null ? null : (block.endedAt ?? Date.now()) - block.startedAt;
-  return <div className="pinned-command-clip">
-    <div ref={ref} className="pinned-command command-block" data-testid="pinned-command"
-      data-pinned-block-id={block.id}
-      data-collapsed={collapsed} data-running={running} data-failed={block.exitCode !== null && block.exitCode !== 0}
-      data-menu-open={!!anchor} role="region" aria-label={t('Current command')}
-      style={{ paddingLeft: insetLeft + COMMAND_BLOCK_CONTENT_PADDING,
-        paddingRight: insetRight + COMMAND_BLOCK_CONTENT_PADDING,
-        transform: `translateY(min(0px, calc(var(--pinned-command-remaining, ${remaining}px) - ${height}px)))` }}
-      onContextMenu={event => {
-        event.preventDefault();
-        event.stopPropagation();
-        setAnchor({ kind: 'pointer', x: event.clientX, y: event.clientY });
-      }}>
-      {running ? <RunningCommandBar block={block} paneId={paneId} pinned collapsed={collapsed} /> : !collapsed && <>
-        <div data-selectable className="command-block-info">
-          {block.cwd && <span className="command-block-cwd" data-tip={block.cwd}>{block.cwd}</span>}
-          <CommandStatus exitCode={block.exitCode} duration={duration} agent={block.agent} />
-          <span className="command-block-actions">
-            <IconButton compact data-subtle aria-label={t('More actions')} data-tip={t('More actions')}
-              aria-haspopup="menu" aria-expanded={!!anchor} onClick={event => {
-                const rect = event.currentTarget.getBoundingClientRect();
-                setAnchor({ kind: 'control', left: rect.left, top: rect.bottom + 4 });
-              }}><Ellipsis size={16} /></IconButton>
-          </span>
+  return (
+    <div className="pinned-command-clip">
+      <div
+        ref={ref}
+        className="pinned-command command-block"
+        data-testid="pinned-command"
+        data-pinned-block-id={block.id}
+        data-collapsed={collapsed}
+        data-running={running}
+        data-failed={block.exitCode !== null && block.exitCode !== 0}
+        data-menu-open={!!anchor}
+        role="region"
+        aria-label={t('Current command')}
+        style={{
+          paddingLeft: insetLeft + COMMAND_BLOCK_CONTENT_PADDING,
+          paddingRight: insetRight + COMMAND_BLOCK_CONTENT_PADDING,
+          transform: `translateY(min(0px, calc(var(--pinned-command-remaining, ${remaining}px) - ${height}px)))`,
+        }}
+        onContextMenu={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setAnchor({ kind: 'pointer', x: event.clientX, y: event.clientY });
+        }}>
+        {running ? (
+          <RunningCommandBar block={block} paneId={paneId} pinned collapsed={collapsed} />
+        ) : (
+          !collapsed && (
+            <>
+              <div data-selectable className="command-block-info">
+                {block.cwd && (
+                  <span className="command-block-cwd" data-tip={block.cwd}>
+                    {block.cwd}
+                  </span>
+                )}
+                <CommandStatus exitCode={block.exitCode} duration={duration} agent={block.agent} />
+                <span className="command-block-actions">
+                  <IconButton
+                    compact
+                    data-subtle
+                    aria-label={t('More actions')}
+                    data-tip={t('More actions')}
+                    aria-haspopup="menu"
+                    aria-expanded={!!anchor}
+                    onClick={(event) => {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      setAnchor({ kind: 'control', left: rect.left, top: rect.bottom + 4 });
+                    }}>
+                    <Ellipsis size={16} />
+                  </IconButton>
+                </span>
+              </div>
+              <div data-selectable className="command-block-command" data-tip={block.command}>
+                {colored ? <CommandSyntax text={block.command} /> : block.command}
+              </div>
+            </>
+          )
+        )}
+        <div className="pinned-command-toggle-slot">
+          <IconButton
+            compact
+            data-subtle
+            className="pinned-command-toggle"
+            aria-expanded={!collapsed}
+            aria-label={t(collapsed ? 'Show command header' : 'Hide command header')}
+            data-tip={t(collapsed ? 'Show command header' : 'Hide command header')}
+            onClick={(event) => {
+              onToggle();
+              if (event.detail > 0) event.currentTarget.blur();
+            }}>
+            <ChevronDown size={14} style={{ transform: collapsed ? undefined : 'rotate(180deg)' }} />
+          </IconButton>
         </div>
-        <div data-selectable className="command-block-command" data-tip={block.command}>
-          {colored ? <CommandSyntax text={block.command} /> : block.command}
-        </div>
-      </>}
-      <div className="pinned-command-toggle-slot">
-        <IconButton compact data-subtle className="pinned-command-toggle" aria-expanded={!collapsed}
-          aria-label={t(collapsed ? 'Show command header' : 'Hide command header')}
-          data-tip={t(collapsed ? 'Show command header' : 'Hide command header')}
-          onClick={event => {
-            onToggle();
-            if (event.detail > 0) event.currentTarget.blur();
-          }}>
-          <ChevronDown size={14} style={{ transform: collapsed ? undefined : 'rotate(180deg)' }} />
-        </IconButton>
+        {anchor && <BlockMenu block={block} paneId={paneId} anchor={anchor} onClose={closeMenu} getOutputText={() => block.outputText} />}
       </div>
-      {anchor && <BlockMenu block={block} paneId={paneId} anchor={anchor}
-        onClose={closeMenu} getOutputText={() => block.outputText} />}
     </div>
-  </div>;
+  );
 }

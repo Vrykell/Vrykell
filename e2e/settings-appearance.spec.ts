@@ -4,31 +4,35 @@ import { gotoSetting, selectThemeMode } from './settings';
 
 /** Inject a bare block so the stylesheet contract can be probed without real output. */
 async function injectBlock(page: import('@playwright/test').Page, className: string, id: string) {
-  await page.evaluate(({ className: name, id: blockId }) => {
-    const element = document.createElement('div');
-    element.className = name;
-    element.id = blockId;
-    document.body.appendChild(element);
-  }, { className, id });
+  await page.evaluate(
+    ({ className: name, id: blockId }) => {
+      const element = document.createElement('div');
+      element.className = name;
+      element.id = blockId;
+      document.body.appendChild(element);
+    },
+    { className, id },
+  );
 }
 
 /**
  * Painted background and rail as [r, g, b, a]. `color-mix()` serializes as
  * `color(srgb …)` while plain colours stay `rgb()`, so both are normalized.
  */
-const readColors = (page: import('@playwright/test').Page, id: string) => page.evaluate((blockId) => {
-  const element = document.getElementById(blockId)!;
-  const parse = (value: string): [number, number, number, number] => {
-    const numbers = (value.match(/[0-9.]+/g) ?? []).map(Number);
-    const channel = (index: number, scale: number) => Math.round((numbers[index] ?? 0) * scale);
-    const srgb = value.startsWith('color(');
-    return [channel(0, srgb ? 255 : 1), channel(1, srgb ? 255 : 1), channel(2, srgb ? 255 : 1), numbers[3] ?? 1];
-  };
-  return {
-    background: parse(getComputedStyle(element).backgroundColor),
-    rail: parse(getComputedStyle(element, '::before').backgroundColor),
-  };
-}, id);
+const readColors = (page: import('@playwright/test').Page, id: string) =>
+  page.evaluate((blockId) => {
+    const element = document.getElementById(blockId)!;
+    const parse = (value: string): [number, number, number, number] => {
+      const numbers = (value.match(/[0-9.]+/g) ?? []).map(Number);
+      const channel = (index: number, scale: number) => Math.round((numbers[index] ?? 0) * scale);
+      const srgb = value.startsWith('color(');
+      return [channel(0, srgb ? 255 : 1), channel(1, srgb ? 255 : 1), channel(2, srgb ? 255 : 1), numbers[3] ?? 1];
+    };
+    return {
+      background: parse(getComputedStyle(element).backgroundColor),
+      rail: parse(getComputedStyle(element, '::before').backgroundColor),
+    };
+  }, id);
 
 const blockField = (page: import('@playwright/test').Page, title: string) =>
   page.locator('.settings-field').filter({ hasText: title }).first();
@@ -64,34 +68,41 @@ test('follow system tracks the operating system appearance', async ({ page }) =>
 });
 
 test('near-black colors persist and original dark remains available', async ({ page }, info) => {
-  await setupTauriMock(page); await page.goto('/'); await gotoSetting(page, '主题');
+  await setupTauriMock(page);
+  await page.goto('/');
+  await gotoSetting(page, '主题');
   await page.getByRole('radio', { name: 'Deep Black', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme-preset', 'deep-black');
   await expect.poll(() => themeConfig(page)).toMatchObject({ darkPreset: 'deep-black' });
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim())).toBe('#1C1C1C');
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--xterm-bg').trim())).toBe('#111111');
-  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary-action-text').trim())).toBe('#FFFFFF');
-  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--selection-bg').trim())).toBe('rgba(72, 72, 72, 1)');
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary-action-text').trim())).toBe(
+    '#FFFFFF',
+  );
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--selection-bg').trim())).toBe(
+    'rgba(72, 72, 72, 1)',
+  );
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--border').trim())).toBe('#333333');
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--border-strong').trim())).toBe('#454545');
   await expect.poll(async () => (await windowFrameCalls(page)).at(-1)?.color).toBe('#454545');
   for (const width of [760, 1240]) {
     await page.setViewportSize({ width, height: 900 });
     await expect(page.getByRole('radio', { name: '默认深色', exact: true })).toBeVisible();
-    expect(await page.locator('.settings-content').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+    expect(await page.locator('.settings-content').evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
     await page.screenshot({ path: info.outputPath(`deep-black-${width}.png`), animations: 'disabled' });
   }
   const close = page.getByTestId('window-close');
   if (await close.count()) {
     await close.hover();
-    const colors = await close.evaluate(element => ({
+    const colors = await close.evaluate((element) => ({
       background: getComputedStyle(element).backgroundColor,
       color: getComputedStyle(element).color,
     }));
     expect(colors.color).not.toBe(colors.background);
     await page.screenshot({ path: info.outputPath('deep-black-close.png'), clip: { x: 1240 - 120, y: 0, width: 120, height: 80 } });
   }
-  if (await page.getByRole('button', { name: '展开侧栏', exact: true }).isVisible()) await page.getByRole('button', { name: '展开侧栏', exact: true }).click();
+  if (await page.getByRole('button', { name: '展开侧栏', exact: true }).isVisible())
+    await page.getByRole('button', { name: '展开侧栏', exact: true }).click();
   await page.getByTestId('workspace-area-ssh').click();
   const hosts = page.getByTestId('ssh-dashboard');
   await expect(hosts.locator('.ssh-host-new-actions > button').first()).toHaveCSS('color', 'rgb(255, 255, 255)');
@@ -100,7 +111,8 @@ test('near-black colors persist and original dark remains available', async ({ p
   await expect(resources.locator('span')).toHaveCSS('background-color', 'rgb(255, 255, 255)');
   await expect(hosts.getByRole('button', { name: /连接 / }).first()).toHaveCSS('color', 'rgb(255, 255, 255)');
   await page.screenshot({ path: info.outputPath('deep-black-controls.png'), animations: 'disabled' });
-  await page.reload(); await gotoSetting(page, '主题');
+  await page.reload();
+  await gotoSetting(page, '主题');
   await expect(page.getByRole('radio', { name: 'Deep Black', exact: true })).toBeChecked();
   await page.getByRole('radio', { name: '默认深色', exact: true }).click();
   await expect(page.locator('html')).toHaveAttribute('data-theme-preset', 'default-dark');
@@ -115,13 +127,14 @@ test('light workspace tabs and toolbars remain distinct from content, panels and
   const activeTab = strip.locator('.folder-tab[data-active="true"]').first();
   await expect(strip).toHaveCSS('background-color', 'rgb(235, 238, 242)');
   await expect(activeTab).toHaveCSS('background-color', 'rgb(255, 255, 255)');
-  await expect(activeTab).not.toHaveCSS('background-color', await strip.evaluate(element => getComputedStyle(element).backgroundColor));
+  await expect(activeTab).not.toHaveCSS('background-color', await strip.evaluate((element) => getComputedStyle(element).backgroundColor));
   for (const width of [1240, 760]) {
     await page.setViewportSize({ width, height: 900 });
     await page.screenshot({ path: info.outputPath(`light-workspace-layers-${width}.png`), animations: 'disabled' });
   }
   await page.setViewportSize({ width: 1240, height: 900 });
-  if (await page.getByRole('button', { name: '展开侧栏', exact: true }).isVisible()) await page.getByRole('button', { name: '展开侧栏', exact: true }).click();
+  if (await page.getByRole('button', { name: '展开侧栏', exact: true }).isVisible())
+    await page.getByRole('button', { name: '展开侧栏', exact: true }).click();
   await page.getByTestId('workspace-area-ssh').click();
   const hosts = page.getByTestId('ssh-dashboard');
   await hosts.getByRole('button', { name: '卡片视图', exact: true }).click();
@@ -157,7 +170,7 @@ test('built-in schemes update live colors, survive reload, follow the system and
   await expect(page.locator('html')).toHaveAttribute('data-theme-preset', 'catppuccin-latte');
   await page.setViewportSize({ width: 760, height: 800 });
   await page.screenshot({ path: info.outputPath('schemes-narrow.png') });
-  expect(await page.locator('.settings-content').evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  expect(await page.locator('.settings-content').evaluate((element) => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
   await selectThemeMode(page, '深色');
   const selected = page.getByRole('radio', { name: 'Dracula', exact: true });
   await selected.focus();
@@ -195,25 +208,43 @@ test('block color choices reuse the shared palette without duplicates in one men
   for (const title of ['AI 对话块', '终端命令块', '失败命令块']) {
     const color = blockField(page, title).getByRole('combobox');
     await color.click();
-    const swatches = await page.getByRole('option').evaluateAll(elements =>
-      elements.map(element => element.querySelector<HTMLElement>('.ui-select-swatch')?.style.background ?? ''));
+    const swatches = await page
+      .getByRole('option')
+      .evaluateAll((elements) =>
+        elements.map((element) => element.querySelector<HTMLElement>('.ui-select-swatch')?.style.background ?? ''),
+      );
     expect(new Set(swatches).size).toBe(swatches.length);
     palettes.push(...swatches);
     await color.press('Escape');
   }
   expect(palettes.length).toBeGreaterThan(0);
-  expect(palettes.every(swatch => swatch.length > 0)).toBe(true);
+  expect(palettes.every((swatch) => swatch.length > 0)).toBe(true);
   const shared = await page.evaluate(() => {
-    const probe = document.createElement('span'); document.body.append(probe);
-    const values = ['--group-blue', '--group-green', '--group-violet', '--group-amber', '--group-cyan',
-      '--group-rose', '--group-orange', '--group-coral', '--cmd-flag', '--text-muted', '--text-secondary',
-      '--text-caret', '--border-strong', '--error-light'].map(name => {
+    const probe = document.createElement('span');
+    document.body.append(probe);
+    const values = [
+      '--group-blue',
+      '--group-green',
+      '--group-violet',
+      '--group-amber',
+      '--group-cyan',
+      '--group-rose',
+      '--group-orange',
+      '--group-coral',
+      '--cmd-flag',
+      '--text-muted',
+      '--text-secondary',
+      '--text-caret',
+      '--border-strong',
+      '--error-light',
+    ].map((name) => {
       probe.style.background = `var(${name})`;
       return getComputedStyle(probe).backgroundColor;
     });
-    probe.remove(); return values;
+    probe.remove();
+    return values;
   });
-  expect(palettes.every(swatch => shared.includes(swatch))).toBe(true);
+  expect(palettes.every((swatch) => shared.includes(swatch))).toBe(true);
 });
 
 test('the rail keeps the picked colour while the background stays a tint of it', async ({ page }) => {
@@ -233,7 +264,7 @@ test('the rail keeps the picked colour while the background stays a tint of it',
   await page.getByRole('option', { name: /青色/ }).click();
 
   // The shared cyan stays solid on the rail and translucent behind the content.
-  await expect.poll(() => readColors(page, 'probe-ai-block').then(colors => colors.rail)).toEqual([0, 207, 165, 1]);
+  await expect.poll(() => readColors(page, 'probe-ai-block').then((colors) => colors.rail)).toEqual([0, 207, 165, 1]);
   const painted = await readColors(page, 'probe-ai-block');
   expect(painted.background.slice(0, 3)).toEqual([0, 207, 165]);
   expect(painted.background[3]).toBeGreaterThan(0.15);
@@ -245,7 +276,8 @@ test('the rail keeps the picked colour while the background stays a tint of it',
 
   // The single group-level button restores the theme defaults for every block type.
   await reset.click();
-  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement)
-    .getPropertyValue('--ai-block-bg-enabled').trim())).toBe('1');
+  await expect
+    .poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--ai-block-bg-enabled').trim()))
+    .toBe('1');
   await expect.poll(() => readColors(page, 'probe-ai-block')).not.toEqual(hidden);
 });

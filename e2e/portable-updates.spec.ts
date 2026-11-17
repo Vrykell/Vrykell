@@ -9,9 +9,11 @@ test('portable distribution exposes its version without update controls', async 
   await gotoSetting(page, '关于');
   await expect(page.getByTestId('application-version')).toBeVisible();
   await expect(page.getByRole('button', { name: '检查更新' })).toHaveCount(0);
-  expect(await page.evaluate(async () => {
-    const path = '/src/platform/updater.ts';
-    const updater = await import(path) as typeof import('../src/platform/updater');
-    return { supported: updater.supportsAppUpdates(), update: await updater.checkApplicationUpdate() };
-  })).toEqual({ supported: false, update: null });
+  expect(
+    await page.evaluate(async () => {
+      const path = '/src/platform/updater.ts';
+      const updater = (await import(path)) as typeof import('../src/platform/updater');
+      return { supported: updater.supportsAppUpdates(), update: await updater.checkApplicationUpdate() };
+    }),
+  ).toEqual({ supported: false, update: null });
 });

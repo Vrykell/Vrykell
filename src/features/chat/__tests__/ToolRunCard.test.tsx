@@ -22,18 +22,35 @@ afterEach(() => {
 
 it('routes a review question to the provided owner instead of a native conversation draft', () => {
   const ask = vi.fn();
-  const run: ToolRun = { toolCallId: 'external-review', toolName: 'run_command', state: 'approval-pending', input: { command: 'pwd' }, startedAt: 1 };
+  const run: ToolRun = {
+    toolCallId: 'external-review',
+    toolName: 'run_command',
+    state: 'approval-pending',
+    input: { command: 'pwd' },
+    startedAt: 1,
+  };
   render(<ToolRunCard run={run} onAskAboutTool={ask} />);
   fireEvent.click(screen.getByRole('button', { name: '审批选项' }));
   fireEvent.click(screen.getByRole('menuitem', { name: '先问一下' }));
   expect(ask).toHaveBeenCalledWith(expect.stringContaining('pwd'));
 });
 
-const command: ToolRun = { toolCallId: 'command', toolName: 'run_command', input: { command: 'npm run build' },
-  state: 'done', startedAt: 1, output: JSON.stringify({ exitCode: 0, output: 'Build complete' }) };
+const command: ToolRun = {
+  toolCallId: 'command',
+  toolName: 'run_command',
+  input: { command: 'npm run build' },
+  state: 'done',
+  startedAt: 1,
+  output: JSON.stringify({ exitCode: 0, output: 'Build complete' }),
+};
 
 it('keeps restored failures in the card and never publishes a notification', () => {
-  const failed: ToolRun = { ...command, state: 'error', error: 'Exit code 3', output: JSON.stringify({ exitCode: 3, output: 'service is inactive' }) };
+  const failed: ToolRun = {
+    ...command,
+    state: 'error',
+    error: 'Exit code 3',
+    output: JSON.stringify({ exitCode: 3, output: 'service is inactive' }),
+  };
   for (let mount = 0; mount < 2; mount += 1) {
     const view = render(<ToolRunCard run={failed} framed />);
     expect(view.container.querySelector('[role="alert"]')).toBeNull();
@@ -80,8 +97,7 @@ it('shows accumulated external output and the exit code inside the expanded card
   };
   const view = render(<ToolRunCard framed run={failed} />);
   fireEvent.click(screen.getByRole('button', { name: /node --version/ }));
-  expect(view.container.querySelector('.ai-tool-verdict'))
-    .toHaveTextContent(t('Tool failed with exit code {{code}}.', { code: 9009 }));
+  expect(view.container.querySelector('.ai-tool-verdict')).toHaveTextContent(t('Tool failed with exit code {{code}}.', { code: 9009 }));
   expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
   expect(screen.getByText(/v24\.13\.0/)).toBeVisible();
 });
@@ -101,7 +117,12 @@ it('shows the command label and exit code before disclosing input and output', (
 });
 
 it('shows terminal input and a completed badge for non-command tools in both presentations', () => {
-  const run: ToolRun = { ...command, toolName: 'terminal_keys', input: { keys: 'curl -I localhost\r', wait_ms: 300 }, output: 'HTTP/1.1 200 OK' };
+  const run: ToolRun = {
+    ...command,
+    toolName: 'terminal_keys',
+    input: { keys: 'curl -I localhost\r', wait_ms: 300 },
+    output: 'HTTP/1.1 200 OK',
+  };
   const { rerender } = render(<ToolRunCard framed run={run} />);
   const summary = screen.getByRole('button', { name: /向终端输入.*curl -I localhost.*完成/ });
   fireEvent.click(summary);
@@ -123,9 +144,17 @@ it('reviews the fixed target and approves an edited command only after Run is pr
   const states: string[] = [];
   const pending = gate('run_command', { command: 'npm run build' }, 'command', {
     tabId: 'conversation',
-    setToolState: (_id, state) => { states.push(state); },
+    setToolState: (_id, state) => {
+      states.push(state);
+    },
   });
-  render(<ToolRunCard run={{ ...command, state: 'approval-pending' }} paneId="fixed-pane" environment={{ paneId: 'fixed-pane', kind: 'ssh', label: 'Production', ssh: { user: 'deploy', host: 'server.test', port: 2222 } }} />);
+  render(
+    <ToolRunCard
+      run={{ ...command, state: 'approval-pending' }}
+      paneId="fixed-pane"
+      environment={{ paneId: 'fixed-pane', kind: 'ssh', label: 'Production', ssh: { user: 'deploy', host: 'server.test', port: 2222 } }}
+    />,
+  );
   // The gate reaches its approval bridge after the backend answer; clicking earlier would drop the answer.
   await vi.waitFor(() => expect(states).toContain('approval-pending'));
   expect(screen.getByText('Production · deploy@server.test:2222')).toBeVisible();
@@ -144,7 +173,9 @@ it('rejects the pending action and preserves an existing draft when asking first
   const states: string[] = [];
   const pending = gate('run_command', command.input, 'command', {
     tabId: 'owner',
-    setToolState: (_id, state) => { states.push(state); },
+    setToolState: (_id, state) => {
+      states.push(state);
+    },
   });
   render(<ToolRunCard run={{ ...command, state: 'approval-pending' }} conversationId="owner" />);
   await vi.waitFor(() => expect(states).toContain('approval-pending'));

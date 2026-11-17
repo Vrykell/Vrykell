@@ -14,7 +14,7 @@ test('prefix cards replace the scope picker and persist on recent searches', asy
   await expect(dialog.getByTestId('search-filter-button')).toHaveCount(0);
   await expect(dialog.locator('[data-search-result]').first()).toContainText('打开设置');
   await expect(dialog.locator('.global-search-footer').getByRole('img', { name: 'Enter', exact: true })).toBeVisible();
-  expect(await dialog.locator('.global-search-header').evaluate(el => getComputedStyle(el).boxShadow)).toBe('none');
+  expect(await dialog.locator('.global-search-header').evaluate((el) => getComputedStyle(el).boxShadow)).toBe('none');
   await dialog.screenshot({ path: test.info().outputPath('scope-card.png') });
   await dialog.locator('[data-search-result]').first().click();
   await expect(dialog).toBeHidden();
@@ -33,17 +33,23 @@ test('default terminal applies to new tabs and survives reload', async ({ page }
   await page.goto('/');
   await gotoSetting(page, 'Bash');
   await page.getByRole('switch', { name: '默认配置文件', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vrykell-terminal-defaults') ?? '{}').state?.shell)).toBe('bash');
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('vrykell-terminal-defaults') ?? '{}').state?.shell))
+    .toBe('bash');
   await page.screenshot({ path: test.info().outputPath('default-terminal.png') });
   await page.keyboard.press('Escape');
   await page.keyboard.press('Meta+t');
-  await expect.poll(() => page.evaluate(async () => {
-    const path = '/src/features/workspace/stores/workspace.ts';
-    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
-    const state = useWorkspaceStore.getState();
-    const tab = state.tabs.find(tab => tab.id === state.activeId);
-    return tab?.kind === 'session' && tab.layout.type === 'leaf' ? tab.layout.terminal.shellType : '';
-  })).toBe('bash');
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const path = '/src/features/workspace/stores/workspace.ts';
+        const { useWorkspaceStore } = (await import(path)) as typeof import('../src/features/workspace/stores/workspace');
+        const state = useWorkspaceStore.getState();
+        const tab = state.tabs.find((tab) => tab.id === state.activeId);
+        return tab?.kind === 'session' && tab.layout.type === 'leaf' ? tab.layout.terminal.shellType : '';
+      }),
+    )
+    .toBe('bash');
   await expect(page.locator('[data-tab-row-id] [data-shell-mark="bash"]').first()).toHaveCSS('width', '18px');
   await page.reload();
   await page.keyboard.press('Meta+t');
@@ -75,12 +81,39 @@ test('nearby content edges preview and open the dragged panel on release', async
 test('deleted SSH profiles recover without a connecting trap and classic history omits command counts', async ({ page }) => {
   await setupTauriMock(page);
   await page.addInitScript(() => {
-    const target = window as unknown as { __TAURI_INTERNALS__: { invoke: (cmd: string, args: Record<string, unknown>) => Promise<unknown> } };
+    const target = window as unknown as {
+      __TAURI_INTERNALS__: { invoke: (cmd: string, args: Record<string, unknown>) => Promise<unknown> };
+    };
     const original = target.__TAURI_INTERNALS__.invoke;
-    const session = { id: 'deleted-profile-history', title: 'Deleted SSH profile', status: 'historical', created_at: Date.now(), closed_at: Date.now(), block_count: 9, cwd: '', group_id: null, sort_order: 1, kind: 'session', payload: JSON.stringify({ layout: { type: 'leaf', terminal: { id: 'deleted-pane', kind: 'ssh', openMode: 'classic', ssh: { connectionId: 'gone', name: 'Saved SSH', host: 'saved.example.com', user: 'dev' } } } }) };
+    const session = {
+      id: 'deleted-profile-history',
+      title: 'Deleted SSH profile',
+      status: 'historical',
+      created_at: Date.now(),
+      closed_at: Date.now(),
+      block_count: 9,
+      cwd: '',
+      group_id: null,
+      sort_order: 1,
+      kind: 'session',
+      payload: JSON.stringify({
+        layout: {
+          type: 'leaf',
+          terminal: {
+            id: 'deleted-pane',
+            kind: 'ssh',
+            openMode: 'classic',
+            ssh: { connectionId: 'gone', name: 'Saved SSH', host: 'saved.example.com', user: 'dev' },
+          },
+        },
+      }),
+    };
     target.__TAURI_INTERNALS__.invoke = async (cmd, args) => {
-      if (cmd === 'list_sessions') return [...await original(cmd, args) as unknown[], session];
-      if (cmd === 'history_page') { const result = await original(cmd, args) as { sessions: unknown[] }; return { ...result, sessions: [...result.sessions, session] }; }
+      if (cmd === 'list_sessions') return [...((await original(cmd, args)) as unknown[]), session];
+      if (cmd === 'history_page') {
+        const result = (await original(cmd, args)) as { sessions: unknown[] };
+        return { ...result, sessions: [...result.sessions, session] };
+      }
       if (cmd === 'get_session' && args.id === session.id) return session;
       return original(cmd, args);
     };
@@ -101,15 +134,15 @@ test('deleted SSH profiles recover without a connecting trap and classic history
   await expect(page.getByTestId('ssh-connection-input')).toBeVisible();
 });
 
-
 test('command menus use semantic groups and historical output shares the terminal background', async ({ page }) => {
   await setupTauriMock(page);
   await page.goto('/');
   const input = page.getByPlaceholder(/输入命令/);
-  await input.fill('ls'); await input.press('Enter');
+  await input.fill('ls');
+  await input.press('Enter');
   const block = page.locator('[data-testid^="command-block-"]').first();
   await expect(block.getByTestId('exit-code')).toBeVisible();
-  const colors = await block.evaluate(element => {
+  const colors = await block.evaluate((element) => {
     const output = [...element.querySelectorAll<HTMLElement>('[data-selectable]')].at(-1)!;
     const pane = element.closest<HTMLElement>('.terminal-pane')!;
     // A transparent surface serializes as either rgba(…, 0) or color(srgb … / 0).
@@ -118,7 +151,7 @@ test('command menus use semantic groups and historical output shares the termina
       if (slash) return Number(slash[1]);
       const parts = color.match(/rgba?\(([^)]+)\)/);
       if (!parts) return color === 'transparent' ? 0 : 1;
-      const values = parts[1].split(',').map(part => part.trim());
+      const values = parts[1].split(',').map((part) => part.trim());
       return values.length > 3 ? Number(values[3]) : 1;
     };
     let surface: HTMLElement | null = output;
@@ -132,10 +165,12 @@ test('command menus use semantic groups and historical output shares the termina
   expect(await menu.getByRole('menuitem').allTextContents()).toEqual(['重新运行', '发给 AI 分析', '复制命令', '复制输出', '清除所有块']);
   await expect(menu.getByRole('separator')).toHaveCount(2);
   const menuBox = (await menu.boundingBox())!;
-  const separatorEdges = await menu.getByRole('separator').evaluateAll(elements => elements.map(element => {
-    const rect = element.getBoundingClientRect();
-    return [rect.left, rect.right];
-  }));
+  const separatorEdges = await menu.getByRole('separator').evaluateAll((elements) =>
+    elements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      return [rect.left, rect.right];
+    }),
+  );
   for (const [left, right] of separatorEdges) {
     expect(left! - menuBox.x).toBeGreaterThan(4);
     expect(menuBox.x + menuBox.width - right!).toBeGreaterThan(4);

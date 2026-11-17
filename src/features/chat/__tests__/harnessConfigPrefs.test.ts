@@ -6,10 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useHarnessStore } from '@features/chat/stores/harness';
 import { useHarnessSessionRefs } from '@features/chat/stores/harnessSessions';
 import { useHarnessConfigPrefs } from '@features/chat/stores/harnessConfigPrefs';
-import {
-  acpOpen, acpSetConfigOption, acpSetMode, acpSetModel,
-  type AcpConfigOption, type HarnessOpenResult,
-} from '@platform/api/acp';
+import { acpOpen, acpSetConfigOption, acpSetMode, acpSetModel, type AcpConfigOption, type HarnessOpenResult } from '@platform/api/acp';
 
 vi.mock('@features/terminal/services/terminalDebug', () => ({ terminalDebug: vi.fn() }));
 
@@ -33,10 +30,27 @@ let openCount = 0;
 let agentConfig: AcpConfigOption[] | null = null;
 
 const selectable = (mode = 'standard', effort = 'medium'): AcpConfigOption[] => [
-  { id: 'mode', name: 'Permissions', type: 'select', category: 'mode', currentValue: mode,
-    options: [{ value: 'standard', name: 'Standard' }, { value: 'plan', name: 'Plan' }] },
-  { id: 'reasoning_effort', name: 'Reasoning effort', type: 'select', currentValue: effort,
-    options: [{ value: 'medium', name: 'Medium' }, { value: 'high', name: 'High' }] },
+  {
+    id: 'mode',
+    name: 'Permissions',
+    type: 'select',
+    category: 'mode',
+    currentValue: mode,
+    options: [
+      { value: 'standard', name: 'Standard' },
+      { value: 'plan', name: 'Plan' },
+    ],
+  },
+  {
+    id: 'reasoning_effort',
+    name: 'Reasoning effort',
+    type: 'select',
+    currentValue: effort,
+    options: [
+      { value: 'medium', name: 'Medium' },
+      { value: 'high', name: 'High' },
+    ],
+  },
 ];
 
 const openResult = (sessionId: string): HarnessOpenResult => ({
@@ -46,11 +60,17 @@ const openResult = (sessionId: string): HarnessOpenResult => ({
   agent: { protocolVersion: 1, agentInfo: null, agentCapabilities: null, authMethods: [] },
   modes: {
     currentModeId: 'default',
-    availableModes: [{ id: 'default', name: 'Default' }, { id: 'plan', name: 'Plan' }],
+    availableModes: [
+      { id: 'default', name: 'Default' },
+      { id: 'plan', name: 'Plan' },
+    ],
   },
   models: {
     currentModelId: 'm1',
-    availableModels: [{ modelId: 'm1', name: 'Model One' }, { modelId: 'm2', name: 'Model Two' }],
+    availableModels: [
+      { modelId: 'm1', name: 'Model One' },
+      { modelId: 'm2', name: 'Model Two' },
+    ],
   },
   configOptions: agentConfig,
   replayed: [],
@@ -69,7 +89,7 @@ beforeEach(() => {
   vi.mocked(acpSetModel).mockClear();
   vi.mocked(acpSetConfigOption).mockReset();
   vi.mocked(acpSetConfigOption).mockImplementation(async (_sessionId, configId, value) => {
-    agentConfig = (agentConfig ?? []).map(option => option.id === configId ? { ...option, currentValue: value } : option);
+    agentConfig = (agentConfig ?? []).map((option) => (option.id === configId ? { ...option, currentValue: value } : option));
     return agentConfig;
   });
   useHarnessStore.setState({ byTab: {} });
@@ -109,17 +129,23 @@ describe('harness config memory', () => {
 
     expect(acpSetConfigOption).toHaveBeenCalledWith('s2', 'mode', 'plan');
     expect(acpSetConfigOption).toHaveBeenCalledWith('s2', 'reasoning_effort', 'high');
-    expect(current(SECOND).configOptions?.map(option => [option.id, option.currentValue])).toEqual([
+    expect(current(SECOND).configOptions?.map((option) => [option.id, option.currentValue])).toEqual([
       ['mode', 'plan'],
       ['reasoning_effort', 'high'],
     ]);
 
     // The agent no longer offers the remembered mode or the extra option: its defaults win and no
     // request is sent.
-    agentConfig = [{
-      id: 'mode', name: 'Permissions', type: 'select', category: 'mode', currentValue: 'standard',
-      options: [{ value: 'standard', name: 'Standard' }],
-    }];
+    agentConfig = [
+      {
+        id: 'mode',
+        name: 'Permissions',
+        type: 'select',
+        category: 'mode',
+        currentValue: 'standard',
+        options: [{ value: 'standard', name: 'Standard' }],
+      },
+    ];
     vi.mocked(acpSetConfigOption).mockClear();
     await open(THIRD);
 

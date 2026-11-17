@@ -18,7 +18,12 @@ describe('repository transport', () => {
     vi.mocked(invoke).mockResolvedValue('private patch');
     await operateGit({ cwd: '/private' }, 'commit', { message: 'private message' });
     await getGitCommitContext({ cwd: '/private' });
-    expect(invoke).toHaveBeenCalledWith('git_operate', { target: { cwd: '/private' }, operation: 'commit', message: 'private message', remote: null });
+    expect(invoke).toHaveBeenCalledWith('git_operate', {
+      target: { cwd: '/private' },
+      operation: 'commit',
+      message: 'private message',
+      remote: null,
+    });
     expect(JSON.stringify(vi.mocked(diagnostic).mock.calls)).not.toContain('private');
   });
   it('routes remote comparisons without recording paths or file contents in diagnostics', async () => {

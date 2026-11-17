@@ -14,17 +14,19 @@ describe('useChatComposer', () => {
   };
 
   it('cycles through matching questions and restores the original prefix', () => {
-    const { result } = renderHook(() => useChatComposer({
-      questions: ['git status', 'git log'],
-      draft: '',
-      setDraft: vi.fn(),
-      send: vi.fn().mockResolvedValue(undefined),
-      sending: false,
-      isSession: true,
-      targetPane: 'pane-1',
-      attachments: [],
-      clearAttachments: vi.fn(),
-    }));
+    const { result } = renderHook(() =>
+      useChatComposer({
+        questions: ['git status', 'git log'],
+        draft: '',
+        setDraft: vi.fn(),
+        send: vi.fn().mockResolvedValue(undefined),
+        sending: false,
+        isSession: true,
+        targetPane: 'pane-1',
+        attachments: [],
+        clearAttachments: vi.fn(),
+      }),
+    );
 
     act(() => result.current.setText('git'));
     act(() => result.current.navigateHistory(1));
@@ -41,17 +43,18 @@ describe('useChatComposer', () => {
     const send = vi.fn().mockResolvedValue(undefined);
     const clearAttachments = vi.fn();
     const { result, rerender } = renderHook(
-      ({ sending }) => useChatComposer({
-        questions: [],
-        draft: '',
-        setDraft: vi.fn(),
-        send,
-        sending,
-        isSession: true,
-        targetPane: 'pane-2',
-        attachments: [attachment],
-        clearAttachments,
-      }),
+      ({ sending }) =>
+        useChatComposer({
+          questions: [],
+          draft: '',
+          setDraft: vi.fn(),
+          send,
+          sending,
+          isSession: true,
+          targetPane: 'pane-2',
+          attachments: [attachment],
+          clearAttachments,
+        }),
       { initialProps: { sending: false } },
     );
 

@@ -59,8 +59,7 @@ export function createProxyFetch(provider?: ProviderKind, sessionId?: string): t
   return (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     const signal = init?.signal ?? (input instanceof Request ? input.signal : undefined);
     if (signal?.aborted) throw new DOMException('The operation was aborted.', 'AbortError');
-    const url =
-      typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+    const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
     const method = init?.method ?? 'POST';
     const headers = normalizeHeaders(init?.headers);
     if (!headers.some(([k]) => k.toLowerCase() === 'content-type')) {
@@ -83,7 +82,10 @@ export function createProxyFetch(provider?: ProviderKind, sessionId?: string): t
     });
     let settled = false;
     let responseStarted = false;
-    const finish = () => { settled = true; signal?.removeEventListener('abort', abort); };
+    const finish = () => {
+      settled = true;
+      signal?.removeEventListener('abort', abort);
+    };
 
     channel.onmessage = (ev) => {
       if (settled) return;
@@ -104,9 +106,13 @@ export function createProxyFetch(provider?: ProviderKind, sessionId?: string): t
             finish();
             const message = ev.message ?? t('The model request failed.');
             const error = new APICallError({
-              message: !responseStarted && ev.retryable !== undefined
-                ? t('Could not connect to the model service: {{message}}', { message }) : message,
-              url, requestBodyValues: undefined, isRetryable: !responseStarted && ev.retryable === true,
+              message:
+                !responseStarted && ev.retryable !== undefined
+                  ? t('Could not connect to the model service: {{message}}', { message })
+                  : message,
+              url,
+              requestBodyValues: undefined,
+              isRetryable: !responseStarted && ev.retryable === true,
             });
             startedReject(error);
             controller.error(error);
@@ -146,20 +152,18 @@ export function createProxyFetch(provider?: ProviderKind, sessionId?: string): t
       signal.addEventListener('abort', abort, { once: true });
     }
 
-    invoke('llm_stream', { id, req: { url, method, headers, body, provider }, onEvent: channel }).catch(
-      (e) => {
-        if (settled) return;
-        finish();
-        console.error('[llmFetch] llm_stream 调用被 Rust 拒绝:', url, e);
-        const err = e instanceof Error ? e : new Error(String(e));
-        startedReject(err);
-        try {
-          controller.error(err);
-        } catch {
-          // already closed
-        }
-      },
-    );
+    invoke('llm_stream', { id, req: { url, method, headers, body, provider }, onEvent: channel }).catch((e) => {
+      if (settled) return;
+      finish();
+      console.error('[llmFetch] llm_stream 调用被 Rust 拒绝:', url, e);
+      const err = e instanceof Error ? e : new Error(String(e));
+      startedReject(err);
+      try {
+        controller.error(err);
+      } catch {
+        // already closed
+      }
+    });
 
     const { status, headers: respHeaders } = await started;
     // The Response constructor requires status ∈ [200, 599]; fall back to 502 for invalid values.

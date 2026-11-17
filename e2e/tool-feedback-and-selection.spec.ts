@@ -2,100 +2,162 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
-for (const theme of ['dark', 'light']) for (const width of [900, 1440]) {
-  test(`agent dropdown and tool feedback in ${theme} at ${width}`, async ({ page }, info) => {
-    await setupTauriMock(page);
-    await page.setViewportSize({ width, height: 800 });
-    await page.goto('/');
-    await gotoSetting(page, '主题');
-    await page.getByRole('radio', { name: theme === 'dark' ? '始终深色' : '始终浅色', exact: true }).click();
-    await page.locator('[data-dock-btn="chat"]').click();
-    const side = page.getByTestId('ai-sidebar-content');
-    await expect(side.locator('[data-chat-composer]')).toBeVisible();
-    await side.getByRole('button', { name: '会话设置', exact: true }).click();
-    const closeConversation = page.getByRole('button', { name: '关闭当前对话', exact: true });
-    await expect(closeConversation).toHaveClass(/primary-button/);
-    const closeColors = await closeConversation.evaluate(element => {
-      const probe = document.createElement('span');
-      probe.style.background = 'var(--primary-button-bg)';
-      element.append(probe);
-      const primary = getComputedStyle(probe).backgroundColor;
-      probe.remove();
-      return { primary, applied: getComputedStyle(element).backgroundColor };
+for (const theme of ['dark', 'light'])
+  for (const width of [900, 1440]) {
+    test(`agent dropdown and tool feedback in ${theme} at ${width}`, async ({ page }, info) => {
+      await setupTauriMock(page);
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto('/');
+      await gotoSetting(page, '主题');
+      await page.getByRole('radio', { name: theme === 'dark' ? '始终深色' : '始终浅色', exact: true }).click();
+      await page.locator('[data-dock-btn="chat"]').click();
+      const side = page.getByTestId('ai-sidebar-content');
+      await expect(side.locator('[data-chat-composer]')).toBeVisible();
+      await side.getByRole('button', { name: '会话设置', exact: true }).click();
+      const closeConversation = page.getByRole('button', { name: '关闭当前对话', exact: true });
+      await expect(closeConversation).toHaveClass(/primary-button/);
+      const closeColors = await closeConversation.evaluate((element) => {
+        const probe = document.createElement('span');
+        probe.style.background = 'var(--primary-button-bg)';
+        element.append(probe);
+        const primary = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return { primary, applied: getComputedStyle(element).backgroundColor };
+      });
+      expect(closeColors.applied).toBe(closeColors.primary);
+      await closeConversation.hover();
+      await expect(closeConversation).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+      await expect(closeConversation).not.toHaveAttribute('data-tone', 'danger');
+      const agent = page.getByRole('button', { name: '选择智能体', exact: true });
+      const recent = page.getByRole('combobox', { name: '侧栏对话' });
+      await expect(agent).toHaveClass('ui-select');
+      expect((await agent.boundingBox())!.width).toBeCloseTo((await recent.boundingBox())!.width, 0);
+      await agent.click();
+      await expect(agent).toHaveAttribute('aria-expanded', 'true');
+      await expect(page.getByTestId('acp-launcher-directory')).toBeVisible();
+      await expect(page.getByTestId('acp-launcher-Fake ACP')).toBeVisible();
+      await page.screenshot({ path: info.outputPath('agent-dropdown.png') });
+      await page.keyboard.press('Escape');
+      await expect(agent).toHaveAttribute('aria-expanded', 'false');
+      await page.keyboard.press('Escape');
+      await page.evaluate(async () => {
+        const path = '/src/features/chat/stores/chat.ts';
+        const { useChatStore } = (await import(path)) as typeof import('../src/features/chat/stores/chat');
+        const workspacePath = '/src/features/chat/stores/aiWorkspace.ts';
+        const { useAiWorkspace } = (await import(workspacePath)) as typeof import('../src/features/chat/stores/aiWorkspace');
+        const id = useAiWorkspace.getState().sideSelected.slice(5);
+        useChatStore.setState({
+          byTab: {
+            [id]: [
+              { id: 'question', role: 'user', content: 'Check tool results', createdAt: 1 },
+              {
+                id: 'answer',
+                role: 'assistant',
+                content: '',
+                createdAt: 2,
+                parts: [
+                  {
+                    kind: 'tool',
+                    tool: {
+                      toolCallId: 'failure',
+                      toolName: 'read_file',
+                      state: 'error',
+                      input: { path: '/missing' },
+                      error: 'Missing file',
+                      startedAt: 1,
+                    },
+                  },
+                  {
+                    kind: 'tool',
+                    tool: {
+                      toolCallId: 'refusal',
+                      toolName: 'run_command',
+                      state: 'denied',
+                      input: { command: 'blocked' },
+                      danger: 'Confirmation skipped',
+                      startedAt: 1,
+                    },
+                  },
+                  {
+                    kind: 'tool',
+                    tool: {
+                      toolCallId: 'question',
+                      toolName: 'ask_user',
+                      state: 'cancelled',
+                      input: { question: 'Continue?' },
+                      error: 'Question cancelled',
+                      startedAt: 1,
+                    },
+                  },
+                  {
+                    kind: 'tool',
+                    tool: { toolCallId: 'live', toolName: 'read_file', state: 'running', input: { path: '/live' }, startedAt: 1 },
+                  },
+                ],
+              },
+            ],
+          },
+        });
+      });
+      const failure = side.locator('[data-tool-state="error"] .ai-tool-state');
+      const refusal = side.locator('[data-tool-state="denied"] .ai-tool-state');
+      await expect(failure).toBeVisible();
+      await expect(refusal).toHaveCSS('color', await failure.evaluate((element) => getComputedStyle(element).color));
+      await expect(refusal).toHaveCSS('background-color', await failure.evaluate((element) => getComputedStyle(element).backgroundColor));
+      const cancelled = side.locator('[data-tool-state="cancelled"] .ai-tool-state');
+      await expect(cancelled).toHaveText('已取消');
+      const approval = await page.evaluate(() => {
+        const card = document.createElement('div');
+        card.className = 'ai-tool-card';
+        card.dataset.toolState = 'approval-pending';
+        const badge = document.createElement('span');
+        badge.className = 'ai-tool-state';
+        card.append(badge);
+        document.body.append(card);
+        const style = getComputedStyle(badge);
+        const colors = { color: style.color, background: style.backgroundColor };
+        card.remove();
+        return colors;
+      });
+      await expect(cancelled).toHaveCSS('color', approval.color);
+      await expect(cancelled).toHaveCSS('background-color', approval.background);
+      await expect(side.locator('.ai-tool-verdict')).toHaveCount(0);
+      const notifications = page.locator('#app-notifications [role="alert"]');
+      await expect(notifications).toHaveCount(0);
+      const refusalCard = side.locator('.ai-tool-card[data-tool-state="denied"]');
+      await refusalCard.locator('.ai-tool-summary').click();
+      await expect(refusalCard.locator('.ai-tool-verdict')).toContainText('Confirmation skipped');
+      await expect(refusalCard.locator('.ai-tool-summary')).toHaveAttribute('aria-expanded', 'true');
+      await expect(notifications).toHaveCount(0);
+      await page.evaluate(async () => {
+        const path = '/src/features/chat/stores/chat.ts';
+        const { useChatStore } = (await import(path)) as typeof import('../src/features/chat/stores/chat');
+        const workspacePath = '/src/features/chat/stores/aiWorkspace.ts';
+        const { useAiWorkspace } = (await import(workspacePath)) as typeof import('../src/features/chat/stores/aiWorkspace');
+        const id = useAiWorkspace.getState().sideSelected.slice(5);
+        useChatStore.setState((state) => ({
+          byTab: {
+            ...state.byTab,
+            [id]: state.byTab[id]!.map((message) => ({
+              ...message,
+              parts: message.parts?.map((part) =>
+                part.kind === 'tool' && part.tool.toolCallId === 'live'
+                  ? { kind: 'tool', tool: { ...part.tool, state: 'error', error: 'Live read failed' } }
+                  : part,
+              ),
+            })),
+          },
+        }));
+      });
+      await expect(notifications).toHaveCount(0);
+      const live = side.locator('.ai-tool-summary').filter({ hasText: '/live' });
+      await expect(live).toContainText('失败');
+      await live.click();
+      await expect(
+        side.locator('.ai-tool-card[data-tool-state="error"]').filter({ hasText: '/live' }).locator('.ai-tool-verdict'),
+      ).toContainText('Live read failed');
+      await expect(side.locator('[role="alert"]')).toHaveCount(0);
+      await expect(notifications).toHaveCount(0);
+      await page.screenshot({ path: info.outputPath('tool-feedback.png') });
     });
-    expect(closeColors.applied).toBe(closeColors.primary);
-    await closeConversation.hover();
-    await expect(closeConversation).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-    await expect(closeConversation).not.toHaveAttribute('data-tone', 'danger');
-    const agent = page.getByRole('button', { name: '选择智能体', exact: true });
-    const recent = page.getByRole('combobox', { name: '侧栏对话' });
-    await expect(agent).toHaveClass('ui-select');
-    expect((await agent.boundingBox())!.width).toBeCloseTo((await recent.boundingBox())!.width, 0);
-    await agent.click();
-    await expect(agent).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.getByTestId('acp-launcher-directory')).toBeVisible();
-    await expect(page.getByTestId('acp-launcher-Fake ACP')).toBeVisible();
-    await page.screenshot({ path: info.outputPath('agent-dropdown.png') });
-    await page.keyboard.press('Escape');
-    await expect(agent).toHaveAttribute('aria-expanded', 'false');
-    await page.keyboard.press('Escape');
-    await page.evaluate(async () => {
-      const path = '/src/features/chat/stores/chat.ts';
-      const { useChatStore } = await import(path) as typeof import('../src/features/chat/stores/chat');
-      const workspacePath = '/src/features/chat/stores/aiWorkspace.ts';
-      const { useAiWorkspace } = await import(workspacePath) as typeof import('../src/features/chat/stores/aiWorkspace');
-      const id = useAiWorkspace.getState().sideSelected.slice(5);
-      useChatStore.setState({ byTab: { [id]: [
-        { id: 'question', role: 'user', content: 'Check tool results', createdAt: 1 },
-        { id: 'answer', role: 'assistant', content: '', createdAt: 2, parts: [
-          { kind: 'tool', tool: { toolCallId: 'failure', toolName: 'read_file', state: 'error', input: { path: '/missing' }, error: 'Missing file', startedAt: 1 } },
-          { kind: 'tool', tool: { toolCallId: 'refusal', toolName: 'run_command', state: 'denied', input: { command: 'blocked' }, danger: 'Confirmation skipped', startedAt: 1 } },
-          { kind: 'tool', tool: { toolCallId: 'question', toolName: 'ask_user', state: 'cancelled', input: { question: 'Continue?' }, error: 'Question cancelled', startedAt: 1 } },
-          { kind: 'tool', tool: { toolCallId: 'live', toolName: 'read_file', state: 'running', input: { path: '/live' }, startedAt: 1 } },
-        ] },
-      ] } });
-    });
-    const failure = side.locator('[data-tool-state="error"] .ai-tool-state');
-    const refusal = side.locator('[data-tool-state="denied"] .ai-tool-state');
-    await expect(failure).toBeVisible();
-    await expect(refusal).toHaveCSS('color', await failure.evaluate(element => getComputedStyle(element).color));
-    await expect(refusal).toHaveCSS('background-color', await failure.evaluate(element => getComputedStyle(element).backgroundColor));
-    const cancelled = side.locator('[data-tool-state="cancelled"] .ai-tool-state');
-    await expect(cancelled).toHaveText('已取消');
-    const approval = await page.evaluate(() => {
-      const card = document.createElement('div'); card.className = 'ai-tool-card'; card.dataset.toolState = 'approval-pending';
-      const badge = document.createElement('span'); badge.className = 'ai-tool-state'; card.append(badge); document.body.append(card);
-      const style = getComputedStyle(badge); const colors = { color: style.color, background: style.backgroundColor }; card.remove(); return colors;
-    });
-    await expect(cancelled).toHaveCSS('color', approval.color);
-    await expect(cancelled).toHaveCSS('background-color', approval.background);
-    await expect(side.locator('.ai-tool-verdict')).toHaveCount(0);
-    const notifications = page.locator('#app-notifications [role="alert"]');
-    await expect(notifications).toHaveCount(0);
-    const refusalCard = side.locator('.ai-tool-card[data-tool-state="denied"]');
-    await refusalCard.locator('.ai-tool-summary').click();
-    await expect(refusalCard.locator('.ai-tool-verdict')).toContainText('Confirmation skipped');
-    await expect(refusalCard.locator('.ai-tool-summary')).toHaveAttribute('aria-expanded', 'true');
-    await expect(notifications).toHaveCount(0);
-    await page.evaluate(async () => {
-      const path = '/src/features/chat/stores/chat.ts';
-      const { useChatStore } = await import(path) as typeof import('../src/features/chat/stores/chat');
-      const workspacePath = '/src/features/chat/stores/aiWorkspace.ts';
-      const { useAiWorkspace } = await import(workspacePath) as typeof import('../src/features/chat/stores/aiWorkspace');
-      const id = useAiWorkspace.getState().sideSelected.slice(5);
-      useChatStore.setState(state => ({ byTab: { ...state.byTab, [id]: state.byTab[id]!.map(message => ({ ...message,
-        parts: message.parts?.map(part => part.kind === 'tool' && part.tool.toolCallId === 'live'
-          ? { kind: 'tool', tool: { ...part.tool, state: 'error', error: 'Live read failed' } } : part),
-      })) } }));
-    });
-    await expect(notifications).toHaveCount(0);
-    const live = side.locator('.ai-tool-summary').filter({ hasText: '/live' });
-    await expect(live).toContainText('失败');
-    await live.click();
-    await expect(side.locator('.ai-tool-card[data-tool-state="error"]').filter({ hasText: '/live' }).locator('.ai-tool-verdict'))
-      .toContainText('Live read failed');
-    await expect(side.locator('[role="alert"]')).toHaveCount(0);
-    await expect(notifications).toHaveCount(0);
-    await page.screenshot({ path: info.outputPath('tool-feedback.png') });
-  });
-}
+  }

@@ -27,8 +27,8 @@ it('splits the active comparison instead of the page first comparison', () => {
   const selection = { target: { cwd: '/repo' }, paneId: 'owner#0', path: 'file.ts', scope: 'unstaged' as const };
   useWorkspaceStore.getState().openGitDiff(selection);
   useWorkspaceStore.getState().openGitDiff({ ...selection, scope: 'staged' });
-  const page = useWorkspaceStore.getState().tabs.find(tab => tab.kind === 'git-diff');
-  const comparison = page?.kind === 'git-diff' ? page.comparisons?.find(item => item.selection.scope === 'staged') : undefined;
+  const page = useWorkspaceStore.getState().tabs.find((tab) => tab.kind === 'git-diff');
+  const comparison = page?.kind === 'git-diff' ? page.comparisons?.find((item) => item.selection.scope === 'staged') : undefined;
   useWorkspaceNavigation.getState().selectArea('code');
   requestWorkspaceSplit();
   expect(scopedPaneStores.code.getState().layout).toMatchObject({ type: 'pane', resourceId: `diff:${comparison!.id}` });
@@ -38,9 +38,18 @@ it('splits the active comparison instead of the page first comparison', () => {
 it('retains valid focus after removing a pane', () => {
   useUnifiedWorkspace.getState().reconcile([]);
   const start = useUnifiedWorkspace.getState().activeTabId;
-  useUnifiedWorkspace.setState({ layout: { type: 'split', direction: 'row', ratio: 0.5,
-    first: { type: 'pane', id: 'first', resourceId: 'terminal:one#0' },
-    second: { type: 'pane', id: 'second', resourceId: 'terminal:two#0' } }, activeTabId: start, focused: 'first', startActive: false });
+  useUnifiedWorkspace.setState({
+    layout: {
+      type: 'split',
+      direction: 'row',
+      ratio: 0.5,
+      first: { type: 'pane', id: 'first', resourceId: 'terminal:one#0' },
+      second: { type: 'pane', id: 'second', resourceId: 'terminal:two#0' },
+    },
+    activeTabId: start,
+    focused: 'first',
+    startActive: false,
+  });
   useUnifiedWorkspace.getState().removePane('first');
 
   expect(workspacePaneCells(useUnifiedWorkspace.getState().layout!)).toHaveLength(1);

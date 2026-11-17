@@ -85,14 +85,23 @@ describe('summarize', () => {
 
   it('reports zeros for an empty window', () => {
     expect(summarize([])).toEqual({
-      turns: 0, inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, reasoningTokens: 0, steps: 0, toolCalls: 0,
+      turns: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedInputTokens: 0,
+      reasoningTokens: 0,
+      steps: 0,
+      toolCalls: 0,
     });
   });
 });
 
 describe('modelBreakdown', () => {
   it('includes unused configured models without duplicate or invented usage', () => {
-    const configured = [{ provider: 'anthropic', model: 'claude-sonnet-4' }, { provider: 'local', model: 'unused' }];
+    const configured = [
+      { provider: 'anthropic', model: 'claude-sonnet-4' },
+      { provider: 'local', model: 'unused' },
+    ];
     const rows = modelBreakdown([record()], [...configured, ...configured]);
     expect(rows).toHaveLength(2);
     expect(rows[0]).toMatchObject({ model: 'claude-sonnet-4', turns: 1, totalTokens: 120 });
@@ -116,10 +125,7 @@ describe('modelBreakdown', () => {
   });
 
   it('keeps a stable order when totals tie', () => {
-    const rows = modelBreakdown([
-      record({ model: 'z-model' }),
-      record({ model: 'a-model' }),
-    ]);
+    const rows = modelBreakdown([record({ model: 'z-model' }), record({ model: 'a-model' })]);
     expect(rows.map((row) => row.model)).toEqual(['a-model', 'z-model']);
   });
 });
@@ -175,7 +181,13 @@ describe('providerBreakdown', () => {
     ]);
     expect(rows.map((row) => row.provider)).toEqual(['openai-compatible', 'anthropic']);
     expect(rows[1]).toMatchObject({
-      turns: 2, inputTokens: 150, outputTokens: 15, totalTokens: 165, cachedInputTokens: 40, steps: 3, toolCalls: 1,
+      turns: 2,
+      inputTokens: 150,
+      outputTokens: 15,
+      totalTokens: 165,
+      cachedInputTokens: 40,
+      steps: 3,
+      toolCalls: 1,
     });
   });
 });
@@ -213,11 +225,7 @@ describe('tokensSeries', () => {
   const now = new Date(2026, 9, 14, 15, 30, 0).getTime();
 
   it('buckets today by hour and drops the empty lead', () => {
-    const { buckets, unit } = tokensSeries(
-      [record({ at: now - 60_000, inputTokens: 10, outputTokens: 5 })],
-      'today',
-      now,
-    );
+    const { buckets, unit } = tokensSeries([record({ at: now - 60_000, inputTokens: 10, outputTokens: 5 })], 'today', now);
     expect(unit).toBe('hour');
     expect(buckets).toHaveLength(1);
     expect(buckets[0]).toMatchObject({ tokens: 15, turns: 1 });
@@ -226,10 +234,7 @@ describe('tokensSeries', () => {
 
   it('buckets wider ranges by day and sums the tokens of each day', () => {
     const { buckets, unit } = tokensSeries(
-      [
-        record({ at: now - 2 * DAY, inputTokens: 100, outputTokens: 0 }),
-        record({ at: now - 2 * DAY, inputTokens: 40, outputTokens: 10 }),
-      ],
+      [record({ at: now - 2 * DAY, inputTokens: 100, outputTokens: 0 }), record({ at: now - 2 * DAY, inputTokens: 40, outputTokens: 10 })],
       '7d',
       now,
     );

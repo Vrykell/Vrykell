@@ -15,7 +15,10 @@ describe('chat store (isolated per tab)', () => {
     const tabId = useWorkspaceStore.getState().activeId;
     const chunks = ['你好', '，世界', '！'];
     const fakeStream = async (_msgs: unknown, onChunk: (t: string) => void) => {
-      for (const c of chunks) { onChunk(c); await Promise.resolve(); }
+      for (const c of chunks) {
+        onChunk(c);
+        await Promise.resolve();
+      }
     };
     await useChatStore.getState().send('打个招呼', { streamFn: fakeStream });
     const msgs = useChatStore.getState().byTab[tabId]!;
@@ -26,7 +29,9 @@ describe('chat store (isolated per tab)', () => {
 
   it('keeps the error on the assistant message when streaming fails', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
-    const failStream = async () => { throw new Error('boom'); };
+    const failStream = async () => {
+      throw new Error('boom');
+    };
     await useChatStore.getState().send('hi', { streamFn: failStream });
     const msgs = useChatStore.getState().byTab[tabId]!;
     expect(msgs[1]!.content).not.toContain('出错了');
@@ -73,7 +78,9 @@ describe('chat store (isolated per tab)', () => {
     expect(typeof msgs[0]!.createdAt).toBe('number');
     expect(msgs[1]).toMatchObject({ role: 'assistant', paneId: 'pane-1', error: undefined });
 
-    const fail = async () => { throw new Error('boom'); };
+    const fail = async () => {
+      throw new Error('boom');
+    };
     await useChatStore.getState().send('会失败', { streamFn: fail });
     const after = useChatStore.getState().byTab[tabId]!;
     expect(after[after.length - 1]!.error).toBe(true);
@@ -108,11 +115,7 @@ describe('chat store v2 (parts / tool events)', () => {
 
   it('materializes parts lazily from onToolEvent and keeps text and tools in time order', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
-    const fake = async (
-      _m: unknown,
-      onChunk: (t: string) => void,
-      ctx?: { handlers?: { onToolEvent?: (run: never) => void } },
-    ) => {
+    const fake = async (_m: unknown, onChunk: (t: string) => void, ctx?: { handlers?: { onToolEvent?: (run: never) => void } }) => {
       onChunk('先看看');
       ctx?.handlers?.onToolEvent?.({
         toolCallId: 't1',
@@ -146,11 +149,7 @@ describe('chat store v2 (parts / tool events)', () => {
 
   it('moves unfinished tools to the error terminal state when streaming fails', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
-    const fail = async (
-      _m: unknown,
-      _c: (t: string) => void,
-      ctx?: { handlers?: { onToolEvent?: (run: never) => void } },
-    ) => {
+    const fail = async (_m: unknown, _c: (t: string) => void, ctx?: { handlers?: { onToolEvent?: (run: never) => void } }) => {
       ctx?.handlers?.onToolEvent?.({
         toolCallId: 't9',
         toolName: 'run_command',
@@ -170,11 +169,7 @@ describe('chat store v2 (parts / tool events)', () => {
 
   it('appends a tool summary to the assistant history so the model sees the round actions', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
-    const first = async (
-      _m: unknown,
-      _c: (t: string) => void,
-      ctx?: { handlers?: { onToolEvent?: (run: never) => void } },
-    ) => {
+    const first = async (_m: unknown, _c: (t: string) => void, ctx?: { handlers?: { onToolEvent?: (run: never) => void } }) => {
       ctx?.handlers?.onToolEvent?.({
         toolCallId: 't1',
         toolName: 'run_command',
@@ -206,7 +201,9 @@ describe('chat store M4 (stop / regenerate / edit-resend / delete)', () => {
 
   it('regenerate removes the old answer, streams a new one in place and cuts history at that question', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
-    const first = async (_m: unknown, onChunk: (t: string) => void) => { onChunk('旧答案'); };
+    const first = async (_m: unknown, onChunk: (t: string) => void) => {
+      onChunk('旧答案');
+    };
     await useChatStore.getState().send('问题一', { streamFn: first });
     const userMsgId = useChatStore.getState().byTab[tabId]![0]!.id;
     const oldAnswerId = useChatStore.getState().byTab[tabId]![1]!.id;
@@ -231,13 +228,18 @@ describe('chat store M4 (stop / regenerate / edit-resend / delete)', () => {
 
   it('regenerate takes only the history up to the target question', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
-    const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => { onChunk(answer); };
+    const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => {
+      onChunk(answer);
+    };
     await useChatStore.getState().send('问一', { streamFn: mk('答一') });
     await useChatStore.getState().send('问二', { streamFn: mk('答二') });
     const firstUserId = useChatStore.getState().byTab[tabId]![0]!.id;
 
     let seen: Array<{ role: string; content: string }> = [];
-    setDefaultStream(async (msgs, onChunk) => { seen = msgs; onChunk('重生一'); });
+    setDefaultStream(async (msgs, onChunk) => {
+      seen = msgs;
+      onChunk('重生一');
+    });
     await useChatStore.getState().regenerate(tabId, firstUserId);
 
     // Only the answer to the target question is replaced; later exchanges stay (but are not part of this history)
@@ -248,7 +250,9 @@ describe('chat store M4 (stop / regenerate / edit-resend / delete)', () => {
 
   it('deleteExchange removes the question and the answer after it, leaving other exchanges untouched', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
-    const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => { onChunk(answer); };
+    const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => {
+      onChunk(answer);
+    };
     await useChatStore.getState().send('问一', { streamFn: mk('答一') });
     await useChatStore.getState().send('问二', { streamFn: mk('答二') });
     const firstUserId = useChatStore.getState().byTab[tabId]![0]!.id;
@@ -260,7 +264,9 @@ describe('chat store M4 (stop / regenerate / edit-resend / delete)', () => {
 
   it('editResend removes that message and everything after it and refills the draft with the question', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
-    const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => { onChunk(answer); };
+    const mk = (answer: string) => async (_m: unknown, onChunk: (t: string) => void) => {
+      onChunk(answer);
+    };
     await useChatStore.getState().send('问一', { streamFn: mk('答一') });
     await useChatStore.getState().send('问二', { streamFn: mk('答二') });
     const firstUserId = useChatStore.getState().byTab[tabId]![0]!.id;
@@ -273,12 +279,10 @@ describe('chat store M4 (stop / regenerate / edit-resend / delete)', () => {
   it('stop keeps the partial content on abort without flagging an error or appending error text', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     let release!: () => void;
-    const gate = new Promise<void>((r) => { release = r; });
-    const stopStream = async (
-      _m: unknown,
-      onChunk: (t: string) => void,
-      _ctx?: unknown,
-    ) => {
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const stopStream = async (_m: unknown, onChunk: (t: string) => void, _ctx?: unknown) => {
       onChunk('半截回答');
       await gate;
       throw new Error('aborted');
@@ -301,8 +305,13 @@ describe('chat store M4 (stop / regenerate / edit-resend / delete)', () => {
   it('removes the empty shell answer when stopped immediately (no empty bubble)', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     let release!: () => void;
-    const gate = new Promise<void>((r) => { release = r; });
-    const stopStream = async () => { await gate; throw new Error('aborted'); };
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    const stopStream = async () => {
+      await gate;
+      throw new Error('aborted');
+    };
     const p = useChatStore.getState().send('还没说就停', { streamFn: stopStream });
     useChatStore.getState().abortStream(tabId);
     release();
@@ -316,7 +325,9 @@ describe('chat store M4 (stop / regenerate / edit-resend / delete)', () => {
   it('blocks edits to the owner while its stream is active', async () => {
     const tabId = useWorkspaceStore.getState().activeId;
     let release!: () => void;
-    const gate = new Promise<void>((r) => { release = r; });
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
     const slow = async (_m: unknown, onChunk: (t: string) => void) => {
       onChunk('答');
       await gate;

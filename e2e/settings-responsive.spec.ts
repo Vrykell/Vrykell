@@ -33,7 +33,8 @@ for (const theme of ['深色', '浅色']) {
 }
 
 test('settings cover the auxiliary panel and preserve the workspace layout', async ({ page }) => {
-  await setupTauriMock(page); await page.goto('/');
+  await setupTauriMock(page);
+  await page.goto('/');
   await page.locator('[data-dock-btn="chat"]').click();
   const input = page.locator('[data-terminal-input]').first();
   await input.fill('preserved draft');
@@ -41,7 +42,8 @@ test('settings cover the auxiliary panel and preserve the workspace layout', asy
   await gotoSetting(page, '模型行为');
   await expect(page.locator('.workspace-side-panel[data-visible="true"]')).toHaveCount(1);
   for (const panel of await page.locator('.workspace-side-panel[data-visible="true"]').all()) {
-    await expect(panel).toBeHidden(); await expect(panel).toHaveAttribute('inert', '');
+    await expect(panel).toBeHidden();
+    await expect(panel).toHaveAttribute('inert', '');
   }
   expect((await page.locator('.settings-screen').boundingBox())!.width).toBe(1032);
   await page.keyboard.press('Escape');

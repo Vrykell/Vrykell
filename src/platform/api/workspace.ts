@@ -14,6 +14,7 @@ export function removeWorkspace(id: number): Promise<void> {
 }
 
 export function listWorkspaces(): Promise<BackendWorkspaceEntry[]> {
-  return invoke<BackendWorkspaceEntry[]>('list_workspaces')
-    .then((entries) => entries.map((entry) => ({ ...entry, path: normPath(entry.path) })));
+  return invoke<BackendWorkspaceEntry[]>('list_workspaces').then((entries) =>
+    entries.map((entry) => ({ ...entry, path: normPath(entry.path) })),
+  );
 }

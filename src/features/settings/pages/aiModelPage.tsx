@@ -35,16 +35,15 @@ export function AiModelPage() {
   const [confirmProvider, setConfirmProvider] = useState<ProviderRow<ModelProfile> | null>(null);
   /** Bumped when the provider menu asks to edit the selected provider's key. */
   const [keyEditRequest, setKeyEditRequest] = useState(0);
-  const toast = (msg: string, type: 'info' | 'success' | 'error') =>
-    useToastStore.getState().addToast(msg, type);
+  const toast = (msg: string, type: 'info' | 'success' | 'error') => useToastStore.getState().addToast(msg, type);
 
   const models = aiCfg.models;
   const rows = useMemo(() => providerList(models), [models]);
-  const targetField = useSettingsNavigationStore(state => state.targetField);
-  const targetRequest = useSettingsNavigationStore(state => state.request);
+  const targetField = useSettingsNavigationStore((state) => state.targetField);
+  const targetRequest = useSettingsNavigationStore((state) => state.request);
   useEffect(() => {
-    if (!targetField || !MODEL_CONTEXT_FIELDS.some(field => t(field) === targetField)) return;
-    const active = rows.find(row => row.models.some(model => model.id === useAiConfigStore.getState().activeModel));
+    if (!targetField || !MODEL_CONTEXT_FIELDS.some((field) => t(field) === targetField)) return;
+    const active = rows.find((row) => row.models.some((model) => model.id === useAiConfigStore.getState().activeModel));
     if (active) selectProvider(active.id);
   }, [targetField, targetRequest, rows]);
   const selectedId = useMemo(() => {
@@ -74,12 +73,25 @@ export function AiModelPage() {
   const addCustom = async (draft: CustomProviderDraft) => {
     const id = providerId(draft.provider, draft.baseUrl);
     if (draft.key.trim()) await setProviderKey(id, draft.key);
-    const profile: ModelProfile = { id: newModelId(), name: draft.model, model: draft.model, baseUrl: draft.baseUrl, provider: draft.provider, providerName: draft.name || undefined };
-    await commitModels(current => {
-      const named = current.map(model => draft.name && providerId(model.provider, model.baseUrl) === id ? { ...model, providerName: draft.name } : model);
-      return named.some(model => providerId(model.provider, model.baseUrl) === id && model.model === draft.model) ? named : [...named, profile];
+    const profile: ModelProfile = {
+      id: newModelId(),
+      name: draft.model,
+      model: draft.model,
+      baseUrl: draft.baseUrl,
+      provider: draft.provider,
+      providerName: draft.name || undefined,
+    };
+    await commitModels((current) => {
+      const named = current.map((model) =>
+        draft.name && providerId(model.provider, model.baseUrl) === id ? { ...model, providerName: draft.name } : model,
+      );
+      return named.some((model) => providerId(model.provider, model.baseUrl) === id && model.model === draft.model)
+        ? named
+        : [...named, profile];
     });
-    const target = useAiConfigStore.getState().models.find(model => providerId(model.provider, model.baseUrl) === id && model.model === draft.model);
+    const target = useAiConfigStore
+      .getState()
+      .models.find((model) => providerId(model.provider, model.baseUrl) === id && model.model === draft.model);
     if (target) await selectModel(target.id);
     selectProvider(id);
   };
@@ -94,7 +106,7 @@ export function AiModelPage() {
 
   const editProviderKey = (rowId: string) => {
     selectProvider(rowId);
-    setKeyEditRequest(value => value + 1);
+    setKeyEditRequest((value) => value + 1);
     requestAnimationFrame(() => {
       detailRef.current?.querySelector<HTMLInputElement>('input[type="password"]')?.focus();
     });
@@ -131,8 +143,7 @@ export function AiModelPage() {
                 data-testid="provider-switch"
                 aria-haspopup="dialog"
                 aria-expanded={providerOpen}
-                onClick={() => setProviderOpen(true)}
-              >
+                onClick={() => setProviderOpen(true)}>
                 {SelectedMark && (
                   <span style={{ display: 'inline-flex', color: modelHue(selected.kind, '', selected.baseUrl) }}>
                     <SelectedMark size={16} aria-hidden="true" />
@@ -153,8 +164,7 @@ export function AiModelPage() {
                   onClick={(event) => {
                     const rect = event.currentTarget.getBoundingClientRect();
                     setMenu({ x: rect.left, y: rect.bottom + 4 });
-                  }}
-                >
+                  }}>
                   <Ellipsis size={iconSizes.control} />
                 </IconButton>
               </span>
@@ -191,12 +201,14 @@ export function AiModelPage() {
       <ConfirmDialog
         open={confirmProvider !== null}
         title={t('Delete provider')}
-        message={confirmProvider
-          ? t('Remove {{name}} and its {{count}} models?', {
-            name: confirmProvider.name || providerLabel(confirmProvider.kind),
-            count: confirmProvider.models.length,
-          })
-          : ''}
+        message={
+          confirmProvider
+            ? t('Remove {{name}} and its {{count}} models?', {
+                name: confirmProvider.name || providerLabel(confirmProvider.kind),
+                count: confirmProvider.models.length,
+              })
+            : ''
+        }
         confirmLabel={t('Delete')}
         cancelLabel={t('Cancel')}
         danger

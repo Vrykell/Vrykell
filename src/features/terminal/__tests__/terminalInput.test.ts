@@ -49,19 +49,33 @@ it('forwards an otherwise unhandled native text commit once and preserves compos
   const textarea = element.querySelector('textarea')!;
   let onData = () => {};
   const input = vi.fn(() => onData());
-  const term = { element, textarea, options: {}, input,
-    onData: (callback: () => void) => { onData = callback; } } as unknown as Terminal;
+  const term = {
+    element,
+    textarea,
+    options: {},
+    input,
+    onData: (callback: () => void) => {
+      onData = callback;
+    },
+  } as unknown as Terminal;
   configureTerminalInput(term);
   const key = () => textarea.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'i', keyCode: 73 }));
-  const commit = () => textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: 'i' }));
-  key(); commit();
-  await new Promise(resolve => setTimeout(resolve, 5));
+  const commit = () =>
+    textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: 'i' }));
+  key();
+  commit();
+  await new Promise((resolve) => setTimeout(resolve, 5));
   expect(input).toHaveBeenCalledExactlyOnceWith('i', true);
-  key(); onData(); commit();
-  await new Promise(resolve => setTimeout(resolve, 5));
+  key();
+  onData();
+  commit();
+  await new Promise((resolve) => setTimeout(resolve, 5));
   expect(input).toHaveBeenCalledTimes(1);
-  key(); textarea.dispatchEvent(new CompositionEvent('compositionstart')); commit();
-  textarea.dispatchEvent(new CompositionEvent('compositionend')); commit();
+  key();
+  textarea.dispatchEvent(new CompositionEvent('compositionstart'));
+  commit();
+  textarea.dispatchEvent(new CompositionEvent('compositionend'));
+  commit();
   expect(input).toHaveBeenCalledTimes(1);
   element.remove();
 });
@@ -73,11 +87,19 @@ it('does not duplicate a preedit that an IME switch commits right after composit
   const textarea = element.querySelector('textarea')!;
   let onData = () => {};
   const input = vi.fn(() => onData());
-  const term = { element, textarea, options: {}, input,
-    onData: (callback: () => void) => { onData = callback; } } as unknown as Terminal;
+  const term = {
+    element,
+    textarea,
+    options: {},
+    input,
+    onData: (callback: () => void) => {
+      onData = callback;
+    },
+  } as unknown as Terminal;
   configureTerminalInput(term);
   const key = () => textarea.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, keyCode: 229 }));
-  const commit = (data: string) => textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data }));
+  const commit = (data: string) =>
+    textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data }));
 
   // Type pinyin without picking a candidate, then switch the IME to English: the switch
   // commits the pending preedit and xterm forwards it once through onData.
@@ -88,7 +110,7 @@ it('does not duplicate a preedit that an IME switch commits right after composit
   // The switch keydown lands after that commit; the late native diff must not resend it.
   key();
   commit('nihao');
-  await new Promise(resolve => setTimeout(resolve, 5));
+  await new Promise((resolve) => setTimeout(resolve, 5));
   expect(input).not.toHaveBeenCalled();
   element.remove();
 });
@@ -100,18 +122,31 @@ it('lets the delayed native IME diff commit before applying an input fallback', 
   const textarea = element.querySelector('textarea')!;
   let onData = () => {};
   const input = vi.fn(() => onData());
-  const term = { element, textarea, options: {}, input,
-    onData: (callback: () => void) => { onData = callback; } } as unknown as Terminal;
+  const term = {
+    element,
+    textarea,
+    options: {},
+    input,
+    onData: (callback: () => void) => {
+      onData = callback;
+    },
+  } as unknown as Terminal;
   // The parser schedules its native textarea diff during keydown.
-  textarea.addEventListener('keydown', () => {
-    setTimeout(() => { if (textarea.value === 'x') onData(); }, 0);
-  }, { capture: true });
+  textarea.addEventListener(
+    'keydown',
+    () => {
+      setTimeout(() => {
+        if (textarea.value === 'x') onData();
+      }, 0);
+    },
+    { capture: true },
+  );
   configureTerminalInput(term);
   textarea.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, keyCode: 229 }));
   textarea.value = 'x';
   textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: 'x' }));
   expect(textarea.value).toBe('x');
-  await new Promise(resolve => setTimeout(resolve, 5));
+  await new Promise((resolve) => setTimeout(resolve, 5));
   expect(input).not.toHaveBeenCalled();
   element.remove();
 });
@@ -137,7 +172,7 @@ it('keeps candidate keys and insertText native until the composition helper comm
   textarea.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteCompositionText' }));
   terminalInput.mockClear();
   textarea.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: 'committed' }));
-  await new Promise(resolve => setTimeout(resolve, 5));
+  await new Promise((resolve) => setTimeout(resolve, 5));
   expect(terminalKey).not.toHaveBeenCalled();
   expect(terminalInput).not.toHaveBeenCalled();
   expect(input).not.toHaveBeenCalled();
@@ -154,7 +189,7 @@ it('leaves native diff keys to xterm even when their textarea update arrives lat
   textarea.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, keyCode: 229 }));
   textarea.value = 'punctuation';
   textarea.dispatchEvent(new InputEvent('input', { bubbles: true, composed: true, inputType: 'insertText', data: 'punctuation' }));
-  await new Promise(resolve => setTimeout(resolve, 5));
+  await new Promise((resolve) => setTimeout(resolve, 5));
   expect(input).not.toHaveBeenCalled();
   expect(textarea.value).toBe('punctuation');
 });

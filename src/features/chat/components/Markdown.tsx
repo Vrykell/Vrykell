@@ -24,16 +24,24 @@ const EXTERNAL_SCHEMES = /^(https?|mailto|tel):/i;
 function Link({ href, children, node: _node, ...rest }: React.ComponentPropsWithoutRef<'a'> & { node?: unknown }) {
   const url = href ?? '';
   if (!url) return <span>{children}</span>;
-  return <a {...rest} href={url} rel="noreferrer noopener" onClick={(event) => {
-    event.preventDefault();
-    if (EXTERNAL_SCHEMES.test(url)) {
-      void openUrl(url).catch(() => {
-        useToastStore.getState().addToast(t('Could not open the link.'), 'error');
-      });
-      return;
-    }
-    useToastStore.getState().addToast(t('Only http, https, mailto and tel links can be opened.'), 'info');
-  }}>{children}</a>;
+  return (
+    <a
+      {...rest}
+      href={url}
+      rel="noreferrer noopener"
+      onClick={(event) => {
+        event.preventDefault();
+        if (EXTERNAL_SCHEMES.test(url)) {
+          void openUrl(url).catch(() => {
+            useToastStore.getState().addToast(t('Could not open the link.'), 'error');
+          });
+          return;
+        }
+        useToastStore.getState().addToast(t('Only http, https, mailto and tel links can be opened.'), 'info');
+      }}>
+      {children}
+    </a>
+  );
 }
 
 interface MathNode {
@@ -49,12 +57,7 @@ interface MathNode {
 // exclusive inlineMath is upgraded to block math and KaTeX displays it in display mode.
 function remarkStandaloneMathDisplay() {
   const walk = (node: MathNode) => {
-    if (
-      node.type === 'paragraph' &&
-      Array.isArray(node.children) &&
-      node.children.length === 1 &&
-      node.children[0].type === 'inlineMath'
-    ) {
+    if (node.type === 'paragraph' && Array.isArray(node.children) && node.children.length === 1 && node.children[0].type === 'inlineMath') {
       const mathNode = node.children[0];
       node.type = 'math';
       node.value = mathNode.value;
@@ -71,34 +74,44 @@ function remarkStandaloneMathDisplay() {
 }
 
 function MathSpan({ node: _node, className, children, ...props }: ComponentPropsWithoutRef<'span'> & ExtraProps) {
-  const span = <span {...props} className={className}>{children}</span>;
-  return className?.split(' ').includes('katex-display')
-    ? <span className="md-math-scroll scroll-region" role="region" aria-label={t('Math formula')} tabIndex={0}>{span}</span>
-    : span;
+  const span = (
+    <span {...props} className={className}>
+      {children}
+    </span>
+  );
+  return className?.split(' ').includes('katex-display') ? (
+    <span className="md-math-scroll scroll-region" role="region" aria-label={t('Math formula')} tabIndex={0}>
+      {span}
+    </span>
+  ) : (
+    span
+  );
 }
 
 export default function Markdown({ content, paneId }: { content: string; paneId?: string | null }) {
   // Stable renderer identities keep streamed code blocks mounted; rebuilding the map on every
   // chunk would remount each block and drop its highlight, copy state and scroll position.
-  const components = useMemo<Components>(() => ({
-    a: Link,
-    span: MathSpan,
-    pre: (props: ComponentPropsWithoutRef<'pre'> & ExtraProps) => <CommandBlock {...props} paneId={paneId} />,
-    // Remote images remain links to avoid tracking and blocked image placeholders.
-    img: (props: ComponentPropsWithoutRef<'img'> & ExtraProps) => (
-      <Link href={props.src} data-tip={props.alt} style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
-        {props.alt || props.src}
-      </Link>
-    ),
-  }), [paneId]);
+  const components = useMemo<Components>(
+    () => ({
+      a: Link,
+      span: MathSpan,
+      pre: (props: ComponentPropsWithoutRef<'pre'> & ExtraProps) => <CommandBlock {...props} paneId={paneId} />,
+      // Remote images remain links to avoid tracking and blocked image placeholders.
+      img: (props: ComponentPropsWithoutRef<'img'> & ExtraProps) => (
+        <Link href={props.src} data-tip={props.alt} style={{ color: 'var(--accent)', textDecoration: 'underline' }}>
+          {props.alt || props.src}
+        </Link>
+      ),
+    }),
+    [paneId],
+  );
 
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfmSafe, remarkMath, remarkStandaloneMathDisplay]}
       // Incomplete or non-mathematical dollar fragments remain readable during streaming.
       rehypePlugins={[[rehypeKatex, { throwOnError: false, errorColor: 'var(--error)' }]]}
-      components={components}
-    >
+      components={components}>
       {content}
     </ReactMarkdown>
   );

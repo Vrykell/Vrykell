@@ -15,12 +15,24 @@ export { closeAiWorkspaceSession } from './aiSessionClose';
 export function availableSideConversationIds(placedIds?: readonly string[]): Set<string> {
   const ai = useAiWorkspace.getState();
   const layout = scopedPaneStores.ai.getState().layout;
-  const reserved = new Set([ai.selected, ...(placedIds ?? [
-    ...useWorkbenchStore.getState().snapshot.tabs.filter(tab => tab.scope === 'unified' || tab.scope === 'ai' && panesOf(tab).length > 1).flatMap(panesOf).map(pane => pane.resourceId),
-    ...(layout && (scopedPaneStores.ai.getState().choosingSplit || workspacePaneCells(layout).length > 1) ? workspacePaneCells(layout).map(cell => cell.resourceId) : []),
-  ])]);
-  const resources = new Set([...ai.nativeTabs.map(id => `chat:${id}`), ...useHarnessWorkspace.getState().connections.map(item => `acp:${item.id}`)]);
-  return new Set([...ai.sideSessions, ai.sideSelected].filter(id => id && resources.has(id) && !reserved.has(id)));
+  const reserved = new Set([
+    ai.selected,
+    ...(placedIds ?? [
+      ...useWorkbenchStore
+        .getState()
+        .snapshot.tabs.filter((tab) => tab.scope === 'unified' || (tab.scope === 'ai' && panesOf(tab).length > 1))
+        .flatMap(panesOf)
+        .map((pane) => pane.resourceId),
+      ...(layout && (scopedPaneStores.ai.getState().choosingSplit || workspacePaneCells(layout).length > 1)
+        ? workspacePaneCells(layout).map((cell) => cell.resourceId)
+        : []),
+    ]),
+  ]);
+  const resources = new Set([
+    ...ai.nativeTabs.map((id) => `chat:${id}`),
+    ...useHarnessWorkspace.getState().connections.map((item) => `acp:${item.id}`),
+  ]);
+  return new Set([...ai.sideSessions, ai.sideSelected].filter((id) => id && resources.has(id) && !reserved.has(id)));
 }
 
 export function moveSideConversationToMain() {
@@ -31,7 +43,8 @@ export function moveSideConversationToMain() {
     useAiWorkspace.getState().openNative(id.slice(5));
     void useChatStore.getState().selectConversation(id.slice(5));
   } else if (id.startsWith('acp:')) {
-    useAiWorkspace.getState().select(id); useHarnessWorkspace.getState().select(id.slice(4));
+    useAiWorkspace.getState().select(id);
+    useHarnessWorkspace.getState().select(id.slice(4));
   }
   presentWorkspaceResource(id);
 }
@@ -44,8 +57,13 @@ export function moveMainConversationToSide(id: string) {
     return false;
   }
   useAiWorkspace.getState().selectSide(id);
-  useWorkbenchStore.getState().update(state => {
-    const valid = new Set(state.tabs.flatMap(panesOf).map(pane => pane.resourceId).filter(resourceId => resourceId !== id));
+  useWorkbenchStore.getState().update((state) => {
+    const valid = new Set(
+      state.tabs
+        .flatMap(panesOf)
+        .map((pane) => pane.resourceId)
+        .filter((resourceId) => resourceId !== id),
+    );
     return reconcileContainers(reconcileContainers(state, 'ai', valid), 'unified', valid);
   });
   useAiWorkspace.getState().select('');

@@ -20,23 +20,24 @@ import { requestWorkspaceSplit, requestTerminalSplit } from '@features/workspace
 export function useGlobalShortcuts() {
   useEffect(() => {
     const redrawKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.altKey
-        || e.isComposing || e.keyCode === 229 || e.key.toLowerCase() !== 'r') return;
+      if (!(e.metaKey || e.ctrlKey) || !e.shiftKey || e.altKey || e.isComposing || e.keyCode === 229 || e.key.toLowerCase() !== 'r') return;
       e.preventDefault();
       e.stopImmediatePropagation();
       if (!e.repeat) redrawTerminal();
     };
     const paletteKey = (e: KeyboardEvent) => {
-      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || e.isComposing
-        || e.keyCode === 229 || e.key.toLowerCase() !== 'p') return;
+      if (!(e.metaKey || e.ctrlKey) || e.shiftKey || e.altKey || e.isComposing || e.keyCode === 229 || e.key.toLowerCase() !== 'p') return;
       e.preventDefault();
       e.stopImmediatePropagation();
       if (!e.repeat) useUiStore.getState().setPaletteOpen(true);
     };
     const preventZoomKeys = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
-      if (!['=', '+', '-', '0', 'Add', 'Subtract'].includes(e.key)
-        && !['NumpadAdd', 'NumpadSubtract', 'Numpad0', 'NumpadEqual'].includes(e.code)) return;
+      if (
+        !['=', '+', '-', '0', 'Add', 'Subtract'].includes(e.key) &&
+        !['NumpadAdd', 'NumpadSubtract', 'Numpad0', 'NumpadEqual'].includes(e.code)
+      )
+        return;
       e.preventDefault();
       e.stopImmediatePropagation();
     };
@@ -100,9 +101,7 @@ export function useGlobalShortcuts() {
           const ids = leaves(tab.layout).map((t) => t.id);
           const cur = getFocusedTerminalId();
           const idx = Math.max(0, ids.indexOf(cur));
-          const next = e.key === ']'
-            ? ids[(idx + 1) % ids.length]!
-            : ids[(idx - 1 + ids.length) % ids.length]!;
+          const next = e.key === ']' ? ids[(idx + 1) % ids.length]! : ids[(idx - 1 + ids.length) % ids.length]!;
           useTerminalStore.getState().setFocusedPane(next);
           return;
         }
@@ -129,7 +128,8 @@ export function useGlobalShortcuts() {
         e.preventDefault();
         ws.splitFocusedDirect('col');
       } else if (e.key.toLowerCase() === 'd' && ['code', 'ai', 'unified'].includes(focusedWorkspaceArea())) {
-        e.preventDefault(); requestWorkspaceSplit();
+        e.preventDefault();
+        requestWorkspaceSplit();
       } else if (e.key === 'w') {
         e.preventDefault();
         closeWorkspaceItem();

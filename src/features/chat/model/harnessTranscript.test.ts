@@ -10,9 +10,22 @@ describe('applyHarnessUpdate', () => {
   it('keeps failure text when consecutive assistant fragments are grouped', () => {
     const messages: ChatMessage[] = [
       { id: 'partial', role: 'assistant', content: 'Partial output', createdAt: 1 },
-      { id: 'error', role: 'assistant', content: '', error: true, errorSummary: 'Service unavailable', errorText: 'Provider diagnostics', createdAt: 2 },
+      {
+        id: 'error',
+        role: 'assistant',
+        content: '',
+        error: true,
+        errorSummary: 'Service unavailable',
+        errorText: 'Provider diagnostics',
+        createdAt: 2,
+      },
     ];
-    expect(groupHarnessMessages(messages)[0]).toMatchObject({ error: true, errorSummary: 'Service unavailable', errorText: 'Provider diagnostics', parts: [{ kind: 'text', text: 'Partial output' }] });
+    expect(groupHarnessMessages(messages)[0]).toMatchObject({
+      error: true,
+      errorSummary: 'Service unavailable',
+      errorText: 'Provider diagnostics',
+      parts: [{ kind: 'text', text: 'Partial output' }],
+    });
   });
 
   it('groups thoughts, multiple tools and final text into one answer per user turn', () => {
@@ -24,9 +37,10 @@ describe('applyHarnessUpdate', () => {
       { sessionUpdate: 'tool_call', toolCallId: 'second', title: 'Verify', status: 'pending' },
       { sessionUpdate: 'tool_call_update', toolCallId: 'first', status: 'completed' },
       { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Done.' } },
-    ]) messages = applyHarnessUpdate(messages, update(event));
-    expect(messages.map(message => message.role)).toEqual(['user', 'assistant']);
-    expect(messages[1]!.parts?.map(part => part.kind)).toEqual(['tool', 'text', 'tool', 'text']);
+    ])
+      messages = applyHarnessUpdate(messages, update(event));
+    expect(messages.map((message) => message.role)).toEqual(['user', 'assistant']);
+    expect(messages[1]!.parts?.map((part) => part.kind)).toEqual(['tool', 'text', 'tool', 'text']);
     expect(toExchanges(messages)).toHaveLength(1);
     messages = applyHarnessUpdate(messages, update({ sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'Next task' } }));
     messages = upsertHarnessTool(messages, { toolCallId: 'third', toolName: 'read_file', input: {}, state: 'running', startedAt: 1 });
@@ -35,38 +49,77 @@ describe('applyHarnessUpdate', () => {
   });
 
   it('leaves application MCP tool calls to the application tool card', () => {
-    expect(applyHarnessUpdate([], update({ sessionUpdate: 'tool_call', toolCallId: 'mcp-call',
-      title: 'mcp__application__ask_user', kind: 'other', status: 'pending', rawInput: { question: 'Choose' } }))).toEqual([]);
-    const other = applyHarnessUpdate([], update({ sessionUpdate: 'tool_call', toolCallId: 'other-call',
-      title: 'mcp__other__search', kind: 'other', status: 'pending', rawInput: { query: 'needle' } }));
+    expect(
+      applyHarnessUpdate(
+        [],
+        update({
+          sessionUpdate: 'tool_call',
+          toolCallId: 'mcp-call',
+          title: 'mcp__application__ask_user',
+          kind: 'other',
+          status: 'pending',
+          rawInput: { question: 'Choose' },
+        }),
+      ),
+    ).toEqual([]);
+    const other = applyHarnessUpdate(
+      [],
+      update({
+        sessionUpdate: 'tool_call',
+        toolCallId: 'other-call',
+        title: 'mcp__other__search',
+        kind: 'other',
+        status: 'pending',
+        rawInput: { query: 'needle' },
+      }),
+    );
     expect(other).toHaveLength(1);
     expect(other[0]!.parts?.[0]).toMatchObject({ kind: 'tool', tool: { toolCallId: 'other-call', toolName: 'other' } });
   });
 
-  it('groups previously fragmented replay messages without mutating them or merging user turns', () => {    const old: ChatMessage[] = [
+  it('groups previously fragmented replay messages without mutating them or merging user turns', () => {
+    const old: ChatMessage[] = [
       { id: 'q', role: 'user', content: 'Inspect', createdAt: 1 },
       { id: 'thought', role: 'assistant', content: '', reasoning: 'Checking', createdAt: 2 },
-      { id: 'tool', role: 'assistant', content: '', parts: [{ kind: 'tool', tool: { toolCallId: 'one', toolName: 'read_file', state: 'done', input: {}, startedAt: 2 } }], createdAt: 3 },
+      {
+        id: 'tool',
+        role: 'assistant',
+        content: '',
+        parts: [{ kind: 'tool', tool: { toolCallId: 'one', toolName: 'read_file', state: 'done', input: {}, startedAt: 2 } }],
+        createdAt: 3,
+      },
       { id: 'text', role: 'assistant', content: 'Done', createdAt: 4 },
       { id: 'next', role: 'user', content: 'Next task', createdAt: 5 },
     ];
     const grouped = groupHarnessMessages(old);
-    expect(grouped.map(message => message.id)).toEqual(['q', 'thought', 'next']);
-    expect(grouped[1]!.parts?.map(part => part.kind)).toEqual(['tool', 'text']);
+    expect(grouped.map((message) => message.id)).toEqual(['q', 'thought', 'next']);
+    expect(grouped[1]!.parts?.map((part) => part.kind)).toEqual(['tool', 'text']);
     expect(old).toHaveLength(5);
     expect(old[1]!.parts).toBeUndefined();
   });
   it('appends message chunks to one answer and keeps thoughts apart', () => {
     let messages: ChatMessage[] = [];
-    messages = applyHarnessUpdate(messages, update({
-      sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'weighing options' },
-    }));
-    messages = applyHarnessUpdate(messages, update({
-      sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Hello' },
-    }));
-    messages = applyHarnessUpdate(messages, update({
-      sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: ' world' },
-    }));
+    messages = applyHarnessUpdate(
+      messages,
+      update({
+        sessionUpdate: 'agent_thought_chunk',
+        content: { type: 'text', text: 'weighing options' },
+      }),
+    );
+    messages = applyHarnessUpdate(
+      messages,
+      update({
+        sessionUpdate: 'agent_message_chunk',
+        content: { type: 'text', text: 'Hello' },
+      }),
+    );
+    messages = applyHarnessUpdate(
+      messages,
+      update({
+        sessionUpdate: 'agent_message_chunk',
+        content: { type: 'text', text: ' world' },
+      }),
+    );
 
     expect(messages).toHaveLength(1);
     expect(messages[0]!.role).toBe('assistant');
@@ -76,12 +129,20 @@ describe('applyHarnessUpdate', () => {
 
   it('keeps the user turn separate from the answer', () => {
     let messages: ChatMessage[] = [];
-    messages = applyHarnessUpdate(messages, update({
-      sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'run the tests' },
-    }));
-    messages = applyHarnessUpdate(messages, update({
-      sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'on it' },
-    }));
+    messages = applyHarnessUpdate(
+      messages,
+      update({
+        sessionUpdate: 'user_message_chunk',
+        content: { type: 'text', text: 'run the tests' },
+      }),
+    );
+    messages = applyHarnessUpdate(
+      messages,
+      update({
+        sessionUpdate: 'agent_message_chunk',
+        content: { type: 'text', text: 'on it' },
+      }),
+    );
     expect(messages.map((message) => message.role)).toEqual(['user', 'assistant']);
     expect(messages[0]!.content).toBe('run the tests');
   });
@@ -89,45 +150,77 @@ describe('applyHarnessUpdate', () => {
   it('does not repeat the prompt the agent echoes back, and groups chunks by message id', () => {
     // The prompt we showed locally, then the same text coming back as a chunk: one question, not two.
     const local: ChatMessage[] = [{ id: 'q1', role: 'user', content: 'run the tests', createdAt: 1 }];
-    const echoed = applyHarnessUpdate(local, update({
-      sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'run the tests' },
-    }));
+    const echoed = applyHarnessUpdate(
+      local,
+      update({
+        sessionUpdate: 'user_message_chunk',
+        content: { type: 'text', text: 'run the tests' },
+      }),
+    );
     expect(echoed).toHaveLength(1);
 
     // A longer echo replaces ours rather than being appended to it.
-    const longer = applyHarnessUpdate(local, update({
-      sessionUpdate: 'user_message_chunk', content: { type: 'text', text: 'run the tests and report' },
-    }));
+    const longer = applyHarnessUpdate(
+      local,
+      update({
+        sessionUpdate: 'user_message_chunk',
+        content: { type: 'text', text: 'run the tests and report' },
+      }),
+    );
     expect(longer).toHaveLength(1);
     expect(longer[0]!.content).toBe('run the tests and report');
 
     // Chunks of one message (same id) continue it; a different id opens a new bubble.
     let replay: ChatMessage[] = [];
-    replay = applyHarnessUpdate(replay, update({
-      sessionUpdate: 'user_message_chunk', messageId: 'm1', content: { type: 'text', text: 'first ' },
-    }));
-    replay = applyHarnessUpdate(replay, update({
-      sessionUpdate: 'user_message_chunk', messageId: 'm1', content: { type: 'text', text: 'question' },
-    }));
+    replay = applyHarnessUpdate(
+      replay,
+      update({
+        sessionUpdate: 'user_message_chunk',
+        messageId: 'm1',
+        content: { type: 'text', text: 'first ' },
+      }),
+    );
+    replay = applyHarnessUpdate(
+      replay,
+      update({
+        sessionUpdate: 'user_message_chunk',
+        messageId: 'm1',
+        content: { type: 'text', text: 'question' },
+      }),
+    );
     expect(replay).toHaveLength(1);
     expect(replay[0]!.content).toBe('first question');
 
-    const two = applyHarnessUpdate(replay, update({
-      sessionUpdate: 'user_message_chunk', messageId: 'm2', content: { type: 'text', text: 'second' },
-    }));
+    const two = applyHarnessUpdate(
+      replay,
+      update({
+        sessionUpdate: 'user_message_chunk',
+        messageId: 'm2',
+        content: { type: 'text', text: 'second' },
+      }),
+    );
     expect(two).toHaveLength(2);
   });
 
   it('upserts a tool row and lets an update keep what it does not mention', () => {
     let messages: ChatMessage[] = [];
     const call = update({
-      sessionUpdate: 'tool_call', toolCallId: 'call_1', title: 'Run the tests', kind: 'execute', status: 'pending',
+      sessionUpdate: 'tool_call',
+      toolCallId: 'call_1',
+      title: 'Run the tests',
+      kind: 'execute',
+      status: 'pending',
     });
     messages = applyHarnessUpdate(messages, call);
-    messages = applyHarnessUpdate(messages, update({
-      sessionUpdate: 'tool_call_update', toolCallId: 'call_1', status: 'completed',
-      content: [{ type: 'content', content: { type: 'text', text: '4 passed' } }],
-    }));
+    messages = applyHarnessUpdate(
+      messages,
+      update({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'call_1',
+        status: 'completed',
+        content: [{ type: 'content', content: { type: 'text', text: '4 passed' } }],
+      }),
+    );
 
     const parts = messages[0]!.parts ?? [];
     expect(parts).toHaveLength(1);
@@ -141,13 +234,25 @@ describe('applyHarnessUpdate', () => {
   });
 
   it('reports a failed tool with its error text and ignores unknown updates', () => {
-    let messages = applyHarnessUpdate([], update({
-      sessionUpdate: 'tool_call', toolCallId: 'call_2', title: 'Deploy', kind: 'other', status: 'in_progress',
-    }));
-    messages = applyHarnessUpdate(messages, update({
-      sessionUpdate: 'tool_call_update', toolCallId: 'call_2', status: 'failed',
-      content: [{ type: 'content', content: { type: 'text', text: 'permission denied' } }],
-    }));
+    let messages = applyHarnessUpdate(
+      [],
+      update({
+        sessionUpdate: 'tool_call',
+        toolCallId: 'call_2',
+        title: 'Deploy',
+        kind: 'other',
+        status: 'in_progress',
+      }),
+    );
+    messages = applyHarnessUpdate(
+      messages,
+      update({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'call_2',
+        status: 'failed',
+        content: [{ type: 'content', content: { type: 'text', text: 'permission denied' } }],
+      }),
+    );
     const part = messages[0]!.parts?.[0];
     expect(part?.kind === 'tool' && part.tool.state).toBe('error');
     expect(part?.kind === 'tool' && part.tool.error).toBe('permission denied');
@@ -160,22 +265,42 @@ describe('applyHarnessUpdate', () => {
   });
 
   it('accumulates streamed terminal output and reports the exit code of a failed tool', () => {
-    let messages = applyHarnessUpdate([], update({
-      sessionUpdate: 'tool_call', toolCallId: 'external-exec', title: 'node --version; python --version',
-      kind: 'execute', status: 'in_progress', content: [{ type: 'terminal', terminalId: 'external-exec' }],
-    }));
-    messages = applyHarnessUpdate(messages, update({
-      sessionUpdate: 'tool_call_update', toolCallId: 'external-exec',
-      _meta: { terminal_output_delta: { data: 'v24.13.0\n', terminal_id: 'external-exec' } },
-    }));
-    messages = applyHarnessUpdate(messages, update({
-      sessionUpdate: 'tool_call_update', toolCallId: 'external-exec',
-      _meta: { terminal_output_delta: { data: 'python: not found\n', terminal_id: 'external-exec' } },
-    }));
-    messages = applyHarnessUpdate(messages, update({
-      sessionUpdate: 'tool_call_update', toolCallId: 'external-exec', status: 'failed',
-      _meta: { terminal_exit: { exit_code: 9009, signal: null, terminal_id: 'external-exec' } },
-    }));
+    let messages = applyHarnessUpdate(
+      [],
+      update({
+        sessionUpdate: 'tool_call',
+        toolCallId: 'external-exec',
+        title: 'node --version; python --version',
+        kind: 'execute',
+        status: 'in_progress',
+        content: [{ type: 'terminal', terminalId: 'external-exec' }],
+      }),
+    );
+    messages = applyHarnessUpdate(
+      messages,
+      update({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'external-exec',
+        _meta: { terminal_output_delta: { data: 'v24.13.0\n', terminal_id: 'external-exec' } },
+      }),
+    );
+    messages = applyHarnessUpdate(
+      messages,
+      update({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'external-exec',
+        _meta: { terminal_output_delta: { data: 'python: not found\n', terminal_id: 'external-exec' } },
+      }),
+    );
+    messages = applyHarnessUpdate(
+      messages,
+      update({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'external-exec',
+        status: 'failed',
+        _meta: { terminal_exit: { exit_code: 9009, signal: null, terminal_id: 'external-exec' } },
+      }),
+    );
 
     const part = messages[0]!.parts?.[0];
     expect(part?.kind === 'tool' && part.tool.state).toBe('error');
@@ -184,39 +309,72 @@ describe('applyHarnessUpdate', () => {
   });
 
   it('accumulates the alternative terminal output channel', () => {
-    let messages = applyHarnessUpdate([], update({
-      sessionUpdate: 'tool_call', toolCallId: 'whole-output', kind: 'execute', status: 'in_progress',
-    }));
-    messages = applyHarnessUpdate(messages, update({
-      sessionUpdate: 'tool_call_update', toolCallId: 'whole-output', status: 'completed',
-      _meta: { terminal_output: { data: 'whole result', terminal_id: 'whole-output' } },
-    }));
+    let messages = applyHarnessUpdate(
+      [],
+      update({
+        sessionUpdate: 'tool_call',
+        toolCallId: 'whole-output',
+        kind: 'execute',
+        status: 'in_progress',
+      }),
+    );
+    messages = applyHarnessUpdate(
+      messages,
+      update({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'whole-output',
+        status: 'completed',
+        _meta: { terminal_output: { data: 'whole result', terminal_id: 'whole-output' } },
+      }),
+    );
 
     const part = messages[0]!.parts?.[0];
     expect(part?.kind === 'tool' && part.tool.output).toBe('whole result');
   });
 
   it('reads a failed non-terminal exit code from rawOutput and keeps failure text', () => {
-    let messages = applyHarnessUpdate([], update({
-      sessionUpdate: 'tool_call', toolCallId: 'read-call', kind: 'read', status: 'in_progress',
-    }));
-    messages = applyHarnessUpdate(messages, update({
-      sessionUpdate: 'tool_call_update', toolCallId: 'read-call', status: 'failed',
-      content: [{ type: 'content', content: { type: 'text', text: 'permission denied' } }],
-      rawOutput: { exit_code: 13 },
-    }));
+    let messages = applyHarnessUpdate(
+      [],
+      update({
+        sessionUpdate: 'tool_call',
+        toolCallId: 'read-call',
+        kind: 'read',
+        status: 'in_progress',
+      }),
+    );
+    messages = applyHarnessUpdate(
+      messages,
+      update({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'read-call',
+        status: 'failed',
+        content: [{ type: 'content', content: { type: 'text', text: 'permission denied' } }],
+        rawOutput: { exit_code: 13 },
+      }),
+    );
 
     const part = messages[0]!.parts?.[0];
     expect(part?.kind === 'tool' && part.tool.error).toBe(`permission denied\n${t('Exit code {{code}}', { code: 13 })}`);
   });
 
   it('reports a failure without details when the agent sends neither output nor an exit code', () => {
-    let messages = applyHarnessUpdate([], update({
-      sessionUpdate: 'tool_call', toolCallId: 'silent-failure', kind: 'other', status: 'in_progress',
-    }));
-    messages = applyHarnessUpdate(messages, update({
-      sessionUpdate: 'tool_call_update', toolCallId: 'silent-failure', status: 'failed',
-    }));
+    let messages = applyHarnessUpdate(
+      [],
+      update({
+        sessionUpdate: 'tool_call',
+        toolCallId: 'silent-failure',
+        kind: 'other',
+        status: 'in_progress',
+      }),
+    );
+    messages = applyHarnessUpdate(
+      messages,
+      update({
+        sessionUpdate: 'tool_call_update',
+        toolCallId: 'silent-failure',
+        status: 'failed',
+      }),
+    );
 
     const part = messages[0]!.parts?.[0];
     expect(part?.kind === 'tool' && part.tool.error).toBe(t('The tool reported a failure.'));

@@ -145,7 +145,12 @@ describe('terminalClipboard', () => {
     termInstances.set('p1', term);
     readTextMock.mockResolvedValue(LONG_PASTE);
     let answer: ((confirmed: boolean) => void) | undefined;
-    requestConfirmMock.mockImplementation(() => new Promise<boolean>((resolve) => { answer = resolve; }));
+    requestConfirmMock.mockImplementation(
+      () =>
+        new Promise<boolean>((resolve) => {
+          answer = resolve;
+        }),
+    );
 
     const pasted = pasteClipboardIntoTerminal('p1');
     await vi.waitFor(() => expect(requestConfirmMock).toHaveBeenCalledWith({ reason: 'lines', lines: 7, chars: LONG_PASTE.length }));
@@ -189,20 +194,37 @@ describe('terminalClipboard', () => {
 
   it('drops a confirmed paste when the command ends without changing the terminal instance', async () => {
     useTerminalStore.setState({ sessions: { p1: 'sess-1' }, scenes: { p1: 'blockList' } });
-    const { term, paste } = pasteAwareTerm(); termInstances.set('block:p1', term);
-    useBlockStore.getState().setBlocks('p1', [{ id: 'run', command: 'application', status: 'executing', exitCode: null,
-      startedAt: 1, endedAt: null, wasLongRunning: false, outputHtml: '', outputText: '', outputRaw: '', linesTruncated: 0 }]);
+    const { term, paste } = pasteAwareTerm();
+    termInstances.set('block:p1', term);
+    useBlockStore.getState().setBlocks('p1', [
+      {
+        id: 'run',
+        command: 'application',
+        status: 'executing',
+        exitCode: null,
+        startedAt: 1,
+        endedAt: null,
+        wasLongRunning: false,
+        outputHtml: '',
+        outputText: '',
+        outputRaw: '',
+        linesTruncated: 0,
+      },
+    ]);
     requestConfirmMock.mockImplementation(async () => {
-      useBlockStore.getState().updateBlock('p1', 'run', { status: 'done' }); return true;
+      useBlockStore.getState().updateBlock('p1', 'run', { status: 'done' });
+      return true;
     });
     await expect(pasteTextIntoTerminal('p1', 'unintended command\n')).resolves.toBe(false);
-    expect(paste).not.toHaveBeenCalled(); expect(ptyWriteMock).not.toHaveBeenCalled();
+    expect(paste).not.toHaveBeenCalled();
+    expect(ptyWriteMock).not.toHaveBeenCalled();
   });
 
   it('drops clipboard results after the target changed and rejects unseen native exits', async () => {
     useTerminalStore.setState({ sessions: { p1: 'sess-1' }, scenes: { p1: 'altScreen' } });
     readTextMock.mockImplementation(async () => {
-      useTerminalStore.setState({ scenes: { p1: 'blockList' } }); return 'stale paste';
+      useTerminalStore.setState({ scenes: { p1: 'blockList' } });
+      return 'stale paste';
     });
     await expect(pasteClipboardIntoTerminal('p1')).resolves.toBe(false);
     expect(ptyWriteMock).not.toHaveBeenCalled();
@@ -273,7 +295,7 @@ describe('terminalClipboard', () => {
     expect(requestConfirmMock).not.toHaveBeenCalled();
     const chunks = ptyWriteMock.mock.calls.map((call) => call[1] as string);
     expect(chunks).toHaveLength(17);
-    expect(chunks.every(chunk => chunk.length <= 1024)).toBe(true);
+    expect(chunks.every((chunk) => chunk.length <= 1024)).toBe(true);
     expect(chunks.join('')).toBe(large);
   });
 

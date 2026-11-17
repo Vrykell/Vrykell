@@ -124,8 +124,7 @@ export function recoverTerminalSurfaces(reason: TerminalSurfaceResetReason = 'wi
 /** Rebuild the drawing surfaces of a pane without restarting its session or losing its buffer. */
 export function redrawTerminal(paneId = getFocusedTerminalId()): void {
   const activeElement = document.activeElement;
-  const focused = paneTerminals(paneId)
-    .find(term => term.element?.querySelector('.xterm-helper-textarea') === activeElement);
+  const focused = paneTerminals(paneId).find((term) => term.element?.querySelector('.xterm-helper-textarea') === activeElement);
   resetTerminalSurfaces('manual', paneId);
   focused?.focus();
 }

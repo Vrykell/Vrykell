@@ -3,9 +3,13 @@ import { filterSessions, isSshSession, sshTargetOf } from '@features/session-his
 import { sessionTerminalModes } from '../model/filter';
 import type { BackendSessionEntry } from '@platform/api/types';
 
-const pane = (over: Record<string, unknown> = {}) => ({ type: 'leaf', terminal: { id: 'pane', kind: 'local', shellType: 'bash', openMode: 'block', ...over } });
+const pane = (over: Record<string, unknown> = {}) => ({
+  type: 'leaf',
+  terminal: { id: 'pane', kind: 'local', shellType: 'bash', openMode: 'block', ...over },
+});
 const payload = (layout: unknown = pane()) => JSON.stringify({ layout });
-const sshPane = (over: Record<string, unknown> = {}) => pane({ kind: 'ssh', openMode: 'classic', ssh: { host: 'prod.example.com', user: 'root' }, ...over });
+const sshPane = (over: Record<string, unknown> = {}) =>
+  pane({ kind: 'ssh', openMode: 'classic', ssh: { host: 'prod.example.com', user: 'root' }, ...over });
 
 function mk(over: Partial<BackendSessionEntry>): BackendSessionEntry {
   return {
@@ -29,8 +33,13 @@ const HOUR = 3600 * 1000;
 it('matches annotation text without bypassing type, date or starred filters', () => {
   const local = mk({ id: 'local' });
   const remote = mk({ id: 'remote', kind: 'ssh', payload: payload(sshPane()) });
-  const annotations = new Map([['local', 'Servers'], ['remote', 'Servers']]);
-  expect(filterSessions([local, remote], 'servers', 'ssh', 'all', 'all', 'closed', null, annotations).map(item => item.id)).toEqual(['remote']);
+  const annotations = new Map([
+    ['local', 'Servers'],
+    ['remote', 'Servers'],
+  ]);
+  expect(filterSessions([local, remote], 'servers', 'ssh', 'all', 'all', 'closed', null, annotations).map((item) => item.id)).toEqual([
+    'remote',
+  ]);
   expect(filterSessions([local, { ...remote, closed_at: 0 }], 'servers', 'ssh', 'today', 'all', 'closed', null, annotations)).toEqual([]);
   expect(filterSessions([remote], 'servers', 'ssh', 'all', 'all', 'closed', new Set(['local']), annotations)).toEqual([]);
 });
@@ -38,7 +47,10 @@ it('matches annotation text without bypassing type, date or starred filters', ()
 it('filters current pane modes including mixed panes, SSH and cmd', () => {
   const block = mk({ id: 'block', payload: payload() });
   const classic = mk({ id: 'classic', payload: payload(pane({ openMode: 'classic' })) });
-  const mixed = mk({ id: 'mixed', payload: payload({ type: 'split', first: pane({ openMode: 'block' }), second: pane({ openMode: 'classic', kind: 'ssh' }) }) });
+  const mixed = mk({
+    id: 'mixed',
+    payload: payload({ type: 'split', first: pane({ openMode: 'block' }), second: pane({ openMode: 'classic', kind: 'ssh' }) }),
+  });
   expect(filterSessions([block, classic, mixed], '', 'all', 'all', 'block')).toEqual([block, mixed]);
   expect(filterSessions([block, classic, mixed], '', 'all', 'all', 'classic')).toEqual([classic, mixed]);
   expect(sessionTerminalModes(mk({ payload: payload(sshPane()) }))).toEqual(new Set(['classic']));
@@ -109,7 +121,9 @@ describe('filterSessions', () => {
 });
 
 it('finds SSH hosts in restored pane layouts with formatted JSON', () => {
-  const session = mk({ payload: JSON.stringify({ layout: { type: 'leaf', terminal: { kind: 'ssh', ssh: { host: 'saved.example', user: 'dev' } } } }, null, 2) });
+  const session = mk({
+    payload: JSON.stringify({ layout: { type: 'leaf', terminal: { kind: 'ssh', ssh: { host: 'saved.example', user: 'dev' } } } }, null, 2),
+  });
   expect(isSshSession(session)).toBe(true);
   expect(sshTargetOf(session)).toBe('dev@saved.example');
   expect(filterSessions([session], 'saved.example', 'ssh', 'all')).toEqual([session]);

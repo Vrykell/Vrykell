@@ -17,23 +17,40 @@ let dispose: ReturnType<typeof vi.fn>;
 let terminal: Terminal;
 
 beforeEach(() => {
-  vi.useFakeTimers(); vi.mocked(ptyWrite).mockReset().mockResolvedValue(undefined);
+  vi.useFakeTimers();
+  vi.mocked(ptyWrite).mockReset().mockResolvedValue(undefined);
   dispose = vi.fn();
   terminal = {
-    parser: { registerOscHandler: (_code: number, callback: typeof marker) => { marker = callback; return { dispose }; } },
+    parser: {
+      registerOscHandler: (_code: number, callback: typeof marker) => {
+        marker = callback;
+        return { dispose };
+      },
+    },
     onData: () => ({ dispose: vi.fn() }),
     registerMarker: () => ({ line: 0, isDisposed: false, dispose: vi.fn() }),
     buffer: { active: { baseY: 0, cursorY: 0, cursorX: 0, getLine: () => ({ translateToString: () => 'actual output' }) } },
   } as unknown as Terminal;
   registerTerminal(paneId, terminal);
-  useSessionStore.setState({ tabs: [{ id: 'classic', kind: 'session', title: 'Server', layout: leaf({ id: paneId, kind: 'ssh', ssh: { host: 'server', name: 'Server' } }) }] });
+  useSessionStore.setState({
+    tabs: [
+      {
+        id: 'classic',
+        kind: 'session',
+        title: 'Server',
+        layout: leaf({ id: paneId, kind: 'ssh', ssh: { host: 'server', name: 'Server' } }),
+      },
+    ],
+  });
   useTerminalStore.setState({ sessions: { [paneId]: 'pty-classic' }, scenes: { [paneId]: 'classic' } });
   useBlockStore.setState({ byTab: {} });
 });
 afterEach(() => {
   clearCompletionReadiness(paneId);
   unregisterTerminal(paneId, terminal);
-  useSessionStore.setState(workspace, true); useTerminalStore.setState(terminals, true); useBlockStore.setState(blocks, true);
+  useSessionStore.setState(workspace, true);
+  useTerminalStore.setState(terminals, true);
+  useBlockStore.setState(blocks, true);
   vi.useRealTimers();
 });
 
@@ -45,7 +62,10 @@ function complete(code = 0) {
 
 it('waits through a quiet screen until a matching shell completion marker arrives', async () => {
   let settled = false;
-  const result = runCommandAndWait('sleep 5; echo result', { paneId }).then(value => { settled = true; return value; });
+  const result = runCommandAndWait('sleep 5; echo result', { paneId }).then((value) => {
+    settled = true;
+    return value;
+  });
   await vi.advanceTimersByTimeAsync(5000);
   expect(settled).toBe(false);
   expect(marker('another-command;0')).toBe(false);
@@ -56,14 +76,16 @@ it('waits through a quiet screen until a matching shell completion marker arrive
 
 it('keeps the real nonzero exit code from a classic shell', async () => {
   const result = runCommandAndWait('false', { paneId });
-  await vi.advanceTimersByTimeAsync(1); complete(2);
+  await vi.advanceTimersByTimeAsync(1);
+  complete(2);
   expect(await result).toMatchObject({ ok: false, completed: true, exitCode: 2 });
 });
 
 it('retains completion delivered before the terminal write promise resolves', async () => {
   vi.mocked(ptyWrite).mockImplementationOnce(async (_session, data) => {
     const token = /777;([^;]+);/.exec(data)![1];
-    marker(`${token};start`); marker(`${token};0`);
+    marker(`${token};start`);
+    marker(`${token};0`);
   });
   expect(await runCommandAndWait('echo fast', { paneId })).toMatchObject({ ok: true, completed: true, exitCode: 0 });
   expect(dispose).toHaveBeenCalledOnce();
@@ -74,12 +96,18 @@ it('rejects concurrent commands before they can be queued in the same terminal',
   await vi.advanceTimersByTimeAsync(1);
   expect(await runCommandAndWait('echo queued', { paneId })).toMatchObject({ ok: false, completed: false, code: 'TERMINAL_BUSY' });
   expect(ptyWrite).toHaveBeenCalledOnce();
-  complete(); await first;
+  complete();
+  await first;
 });
 
 it('does not execute a command that was already cancelled', async () => {
-  const controller = new AbortController(); controller.abort();
-  expect(await runCommandAndWait('echo cancelled', { paneId, signal: controller.signal })).toMatchObject({ ok: false, completed: false, code: 'COMMAND_ABORTED' });
+  const controller = new AbortController();
+  controller.abort();
+  expect(await runCommandAndWait('echo cancelled', { paneId, signal: controller.signal })).toMatchObject({
+    ok: false,
+    completed: false,
+    code: 'COMMAND_ABORTED',
+  });
   expect(ptyWrite).not.toHaveBeenCalled();
 });
 

@@ -61,13 +61,7 @@ function applySessionCwd(layout: WindowLayout, cwd: string): WindowLayout {
 // ═══════════════════════════════════════════════════════════════
 
 /** Create a session (called when a tab is opened), carrying its kind discriminator and kind-specific JSON. */
-export async function create(
-  tabId: string,
-  title: string,
-  cwd?: string,
-  kind = 'session',
-  payload = '{}',
-): Promise<void> {
+export async function create(tabId: string, title: string, cwd?: string, kind = 'session', payload = '{}'): Promise<void> {
   pendingSessions.set(tabId, { title, timestamp: Date.now(), cwd, kind, payload });
 }
 
@@ -77,13 +71,22 @@ const paneTransfers = new Map<string, Promise<void>>();
 
 /** Serialize ownership changes with subsequent history writes and session closure. */
 export function transferPanes(sourceId: string, targetId: string, paneIds: string[]): Promise<void> {
-  useChatStore.setState(state => {
+  useChatStore.setState((state) => {
     const messages = state.byTab[sourceId] ?? [];
-    const moves = (paneId?: string) => paneId ? paneIds.includes(paneId) : paneIds.includes(`${sourceId}#0`) || paneIds.includes(sourceId);
-    const transferred = messages.filter(message => moves(message.paneId)).map(message => ({ ...message, paneId: message.paneId ?? paneIds[0] }));
+    const moves = (paneId?: string) =>
+      paneId ? paneIds.includes(paneId) : paneIds.includes(`${sourceId}#0`) || paneIds.includes(sourceId);
+    const transferred = messages
+      .filter((message) => moves(message.paneId))
+      .map((message) => ({ ...message, paneId: message.paneId ?? paneIds[0] }));
     if (!transferred.length) return state;
     const target = state.byTab[targetId] ?? [];
-    return { byTab: { ...state.byTab, [sourceId]: messages.filter(message => !moves(message.paneId)), [targetId]: [...target, ...transferred.filter(message => !target.some(item => item.id === message.id))] } };
+    return {
+      byTab: {
+        ...state.byTab,
+        [sourceId]: messages.filter((message) => !moves(message.paneId)),
+        [targetId]: [...target, ...transferred.filter((message) => !target.some((item) => item.id === message.id))],
+      },
+    };
   });
   const previous = Promise.all([paneTransfers.get(sourceId), paneTransfers.get(targetId)]);
   const operation = previous.then(async () => {
@@ -92,29 +95,40 @@ export function transferPanes(sourceId: string, targetId: string, paneIds: strin
     await ensureContentSession(targetId);
     await moveTerminalPanes(sourceId, targetId, paneIds);
   });
-  paneTransfers.set(sourceId, operation); paneTransfers.set(targetId, operation);
-  void operation.finally(() => {
-    if (paneTransfers.get(sourceId) === operation) paneTransfers.delete(sourceId);
-    if (paneTransfers.get(targetId) === operation) paneTransfers.delete(targetId);
-  }).catch(() => {});
+  paneTransfers.set(sourceId, operation);
+  paneTransfers.set(targetId, operation);
+  void operation
+    .finally(() => {
+      if (paneTransfers.get(sourceId) === operation) paneTransfers.delete(sourceId);
+      if (paneTransfers.get(targetId) === operation) paneTransfers.delete(targetId);
+    })
+    .catch(() => {});
   return operation;
 }
 
 export async function settlePaneTransfers(ids: readonly string[]) {
-  await Promise.all(ids.map(id => paneTransfers.get(id)));
+  await Promise.all(ids.map((id) => paneTransfers.get(id)));
 }
 /** Group draft tabs in memory without creating empty history records. */
 export async function persistedSessionIds(ids: readonly string[]): Promise<Set<string>> {
-  await Promise.all(ids.map(id => sessionWrites.get(id) ?? Promise.resolve()));
-  return new Set(ids.filter(id => !pendingSessions.has(id)));
+  await Promise.all(ids.map((id) => sessionWrites.get(id) ?? Promise.resolve()));
+  return new Set(ids.filter((id) => !pendingSessions.has(id)));
 }
 
 export function ensureContentSession(tabId: string): Promise<void> {
-  const pending = pendingSessions.get(tabId); if (!pending) return Promise.resolve();
-  const existing = sessionWrites.get(tabId); if (existing) return existing;
-  const tab = useSessionStore.getState().tabs.find(tab => tab.id === tabId);
-  const write = createSession(tabId, tab?.title ?? pending.title, pending.timestamp, pending.cwd, pending.kind,
-    tab?.kind === 'session' ? JSON.stringify({ layout: tab.layout }) : pending.payload)
+  const pending = pendingSessions.get(tabId);
+  if (!pending) return Promise.resolve();
+  const existing = sessionWrites.get(tabId);
+  if (existing) return existing;
+  const tab = useSessionStore.getState().tabs.find((tab) => tab.id === tabId);
+  const write = createSession(
+    tabId,
+    tab?.title ?? pending.title,
+    pending.timestamp,
+    pending.cwd,
+    pending.kind,
+    tab?.kind === 'session' ? JSON.stringify({ layout: tab.layout }) : pending.payload,
+  )
     .then(async () => {
       const latest = pendingSessions.get(tabId);
       if (latest && latest !== pending) {
@@ -122,11 +136,13 @@ export function ensureContentSession(tabId: string): Promise<void> {
         if (latest.cwd !== pending.cwd) await updateSessionCwd(tabId, latest.cwd ?? '');
         if (latest.payload !== pending.payload) await updateSessionPayload(tabId, latest.payload);
       }
-      const owner = useSessionStore.getState().tabs.find(item => item.id === tabId);
+      const owner = useSessionStore.getState().tabs.find((item) => item.id === tabId);
       if (owner?.kind === 'session' && owner.groupId) await sessionSetGroup(tabId, owner.groupId);
       pendingSessions.delete(tabId);
     })
-    .finally(() => { sessionWrites.delete(tabId); });
+    .finally(() => {
+      sessionWrites.delete(tabId);
+    });
   sessionWrites.set(tabId, write);
   return write;
 }
@@ -143,10 +159,15 @@ function flushLayout(tabId: string): Promise<void> {
   const layout = pendingLayouts.get(tabId);
   const previous = layoutWrites.get(tabId);
   if (!layout || previous?.layout === layout) return previous?.promise ?? Promise.resolve();
-  const write = (previous?.promise ?? Promise.resolve()).catch(() => {}).then(() =>
-    updateSessionPayload(tabId, JSON.stringify({ layout })),
-  ).then(() => { if (pendingLayouts.get(tabId) === layout) pendingLayouts.delete(tabId); })
-    .finally(() => { if (layoutWrites.get(tabId)?.promise === write) layoutWrites.delete(tabId); });
+  const write = (previous?.promise ?? Promise.resolve())
+    .catch(() => {})
+    .then(() => updateSessionPayload(tabId, JSON.stringify({ layout })))
+    .then(() => {
+      if (pendingLayouts.get(tabId) === layout) pendingLayouts.delete(tabId);
+    })
+    .finally(() => {
+      if (layoutWrites.get(tabId)?.promise === write) layoutWrites.delete(tabId);
+    });
   layoutWrites.set(tabId, { layout, promise: write });
   return write;
 }
@@ -154,7 +175,10 @@ function flushLayout(tabId: string): Promise<void> {
 /** Persist a window layout into the session payload (debounced). */
 export function saveLayout(tabId: string, layout: WindowLayout): void {
   const draft = pendingSessions.get(tabId);
-  if (draft) { pendingSessions.set(tabId, { ...draft, payload: JSON.stringify({ layout }) }); return; }
+  if (draft) {
+    pendingSessions.set(tabId, { ...draft, payload: JSON.stringify({ layout }) });
+    return;
+  }
   const pending = layoutTimers.get(tabId);
   if (pending) clearTimeout(pending);
   pendingLayouts.set(tabId, layout);
@@ -171,7 +195,10 @@ export function saveLayout(tabId: string, layout: WindowLayout): void {
 /** Update the session working directory (reported through OSC 7 after cd). */
 export async function setCwd(tabId: string, cwd: string): Promise<void> {
   const draft = pendingSessions.get(tabId);
-  if (draft) { pendingSessions.set(tabId, { ...draft, cwd }); return; }
+  if (draft) {
+    pendingSessions.set(tabId, { ...draft, cwd });
+    return;
+  }
   try {
     await updateSessionCwd(tabId, cwd);
   } catch (e) {
@@ -182,7 +209,10 @@ export async function setCwd(tabId: string, cwd: string): Promise<void> {
 /** Close a session (called when a tab is closed - marks it historical). */
 export async function close(tabId: string): Promise<void> {
   await paneTransfers.get(tabId);
-  if (pendingSessions.has(tabId) && !sessionWrites.has(tabId)) { pendingSessions.delete(tabId); return; }
+  if (pendingSessions.has(tabId) && !sessionWrites.has(tabId)) {
+    pendingSessions.delete(tabId);
+    return;
+  }
   await sessionWrites.get(tabId)?.catch(() => {});
   await flushLayout(tabId);
   try {
@@ -217,11 +247,7 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
       const rawPane = b.pane_id ?? sessionId;
       const paneId = rawPane === sessionId ? `${sessionId}#0` : rawPane;
       const status: TermBlock['status'] =
-        b.status === 'executing' || b.status === 'running'
-          ? 'executing'
-          : b.status === 'interrupted'
-            ? 'interrupted'
-            : 'done';
+        b.status === 'executing' || b.status === 'running' ? 'executing' : b.status === 'interrupted' ? 'interrupted' : 'done';
       const block: TermBlock = {
         id: b.id,
         command: b.command,
@@ -289,20 +315,27 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
   useChatStore.setState((state) => {
     const messages = state.byTab[sessionId];
     if (!messages) return state;
-    return { byTab: {
-      ...state.byTab,
-      [sessionId]: messages.map((message) => ({
-        ...message, paneId: !message.paneId || message.paneId === sessionId ? firstPaneId : message.paneId,
-      })),
-    } };
+    return {
+      byTab: {
+        ...state.byTab,
+        [sessionId]: messages.map((message) => ({
+          ...message,
+          paneId: !message.paneId || message.paneId === sessionId ? firstPaneId : message.paneId,
+        })),
+      },
+    };
   });
   const storedGroupId = info?.group_id ?? undefined;
   const hasGroupOverride = meta != null && Object.prototype.hasOwnProperty.call(meta, 'groupId');
-  if (!hasGroupOverride && storedGroupId && !useSessionStore.getState().groups.some(group => group.id === storedGroupId)) {
+  if (!hasGroupOverride && storedGroupId && !useSessionStore.getState().groups.some((group) => group.id === storedGroupId)) {
     try {
-      const group = (await groupsList()).find(item => item.id === storedGroupId);
-      if (group) useSessionStore.setState(state => ({ groups: state.groups.some(item => item.id === group.id) ? state.groups
-        : [...state.groups, { id: group.id, title: group.title, collapsed: false }] }));
+      const group = (await groupsList()).find((item) => item.id === storedGroupId);
+      if (group)
+        useSessionStore.setState((state) => ({
+          groups: state.groups.some((item) => item.id === group.id)
+            ? state.groups
+            : [...state.groups, { id: group.id, title: group.title, collapsed: false }],
+        }));
     } catch (error) {
       degraded = true;
       console.warn('sessionManager.restore: groups_list failed:', error);
@@ -310,8 +343,10 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
   }
   const knownGroupIds = new Set(useSessionStore.getState().groups.map((group) => group.id));
   const groupId = hasGroupOverride
-    ? meta.groupId ?? undefined
-    : storedGroupId && knownGroupIds.has(storedGroupId) ? storedGroupId : undefined;
+    ? (meta.groupId ?? undefined)
+    : storedGroupId && knownGroupIds.has(storedGroupId)
+      ? storedGroupId
+      : undefined;
 
   // Only an explicit move changes persisted membership. A failed group lookup must not erase it.
   if (hasGroupOverride && (storedGroupId ?? null) !== (groupId ?? null)) {
@@ -332,9 +367,9 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
 
   // Insert partial restores in the saved tab order even when history uses another sort.
   let groupOrder = new Map<string, number>();
-  if (groupId && useSessionStore.getState().tabs.some(item => item.kind === 'session' && item.groupId === groupId)) {
+  if (groupId && useSessionStore.getState().tabs.some((item) => item.kind === 'session' && item.groupId === groupId)) {
     try {
-      groupOrder = new Map((await listSessions()).filter(item => item.group_id === groupId).map(item => [item.id, item.sort_order]));
+      groupOrder = new Map((await listSessions()).filter((item) => item.group_id === groupId).map((item) => [item.id, item.sort_order]));
     } catch (error) {
       console.warn('sessionManager.restore: list_sessions failed:', error);
     }
@@ -344,13 +379,22 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
   if (!ws.tabs.some((t) => t.id === sessionId)) {
     useSessionStore.setState((state) => {
       const tabs = [...state.tabs];
-      const before = groupId ? tabs.findIndex(item => item.kind === 'session' && item.groupId === groupId
-        && (groupOrder.get(item.id) ?? -Infinity) > (info?.sort_order ?? Infinity)) : -1;
+      const before = groupId
+        ? tabs.findIndex(
+            (item) =>
+              item.kind === 'session' &&
+              item.groupId === groupId &&
+              (groupOrder.get(item.id) ?? -Infinity) > (info?.sort_order ?? Infinity),
+          )
+        : -1;
       let index = before;
       if (index < 0 && groupId) {
         for (let i = tabs.length - 1; i >= 0; i--) {
           const item = tabs[i];
-          if (item.kind === 'session' && item.groupId === groupId) { index = i + 1; break; }
+          if (item.kind === 'session' && item.groupId === groupId) {
+            index = i + 1;
+            break;
+          }
         }
       }
       tabs.splice(index < 0 ? tabs.length : index, 0, tab);
@@ -358,22 +402,25 @@ export async function restore(sessionId: string, title: string, meta?: RestoreMe
     });
   } else {
     useSessionStore.setState((s) => ({
-      tabs: s.tabs.map((existing) => existing.id === sessionId && existing.kind === 'session'
-        ? { ...existing, groupId }
-        : existing),
+      tabs: s.tabs.map((existing) => (existing.id === sessionId && existing.kind === 'session' ? { ...existing, groupId } : existing)),
     }));
     ws.activate(sessionId);
   }
 
   if (degraded) {
-    useToastStore.getState().addToast(t('Session "{{name}}" restored incompletely; some content could not be loaded.', { name: title || sessionId }), 'error');
+    useToastStore
+      .getState()
+      .addToast(t('Session "{{name}}" restored incompletely; some content could not be loaded.', { name: title || sessionId }), 'error');
   }
 }
 
 /** Rename a session. */
 export async function rename(tabId: string, title: string): Promise<void> {
   const draft = pendingSessions.get(tabId);
-  if (draft) { pendingSessions.set(tabId, { ...draft, title }); return; }
+  if (draft) {
+    pendingSessions.set(tabId, { ...draft, title });
+    return;
+  }
   try {
     await updateSessionTitle(tabId, title);
   } catch (e) {
@@ -396,12 +443,7 @@ export async function remove(sessionId: string): Promise<void> {
 // ═══════════════════════════════════════════════════════════════
 
 /** Record a block (called once on start and once on complete - the backend upserts). */
-export async function record(
-  tabId: string,
-  paneId: string,
-  block: TermBlock,
-  phase: 'start' | 'complete',
-): Promise<void> {
+export async function record(tabId: string, paneId: string, block: TermBlock, phase: 'start' | 'complete'): Promise<void> {
   if (!block.command.trim() && !block.outputText.trim() && !block.outputRaw.trim()) return;
   try {
     await paneTransfers.get(tabId);
@@ -425,4 +467,4 @@ export async function record(
   }
 }
 
-export { };
+export {};

@@ -5,9 +5,11 @@ test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
   await page.addInitScript(() => {
     localStorage.setItem('vrykell-editor-preferences', JSON.stringify({ state: { localOpenMode: 'terminal' }, version: 0 }));
-    const bridge = (window as unknown as {
-      __TAURI_INTERNALS__: { invoke: (command: string, args: Record<string, unknown>) => Promise<unknown> };
-    }).__TAURI_INTERNALS__;
+    const bridge = (
+      window as unknown as {
+        __TAURI_INTERNALS__: { invoke: (command: string, args: Record<string, unknown>) => Promise<unknown> };
+      }
+    ).__TAURI_INTERNALS__;
     const invoke = bridge.invoke;
     const root = '/home/e2e/project';
     const requests: string[] = [];
@@ -49,10 +51,11 @@ for (const method of ['double-click', 'context-menu'] as const) {
     const file = tree.getByText('nested-notes.txt', { exact: true });
     await expect(file).toBeVisible();
     await file.scrollIntoViewIfNeeded();
-    const scrollTop = await tree.evaluate(element => element.scrollTop);
+    const scrollTop = await tree.evaluate((element) => element.scrollTop);
     expect(scrollTop).toBeGreaterThan(0);
-    const requestsBefore = await page.evaluate(() =>
-      [...(window as unknown as { __FILE_BROWSER_LOADS__: string[] }).__FILE_BROWSER_LOADS__]);
+    const requestsBefore = await page.evaluate(() => [
+      ...(window as unknown as { __FILE_BROWSER_LOADS__: string[] }).__FILE_BROWSER_LOADS__,
+    ]);
 
     if (method === 'double-click') await file.dblclick();
     else {
@@ -60,15 +63,18 @@ for (const method of ['double-click', 'context-menu'] as const) {
       await page.getByRole('button', { name: '使用首选编辑器打开', exact: true }).click();
     }
     await expect.poll(() => ptyWrites(page)).toContain('vim /home/e2e/project/branch-30/nested-notes.txt\n');
-    await expect(page.locator('[data-tab-row-id]').filter({ hasText: 'nested-notes.txt' }).locator('[data-shell-mark="zsh"]')).toHaveCount(1);
+    await expect(page.locator('[data-tab-row-id]').filter({ hasText: 'nested-notes.txt' }).locator('[data-shell-mark="zsh"]')).toHaveCount(
+      1,
+    );
     // Wait for the editor terminal's delayed cwd reports as well as the initial focus switch.
     await emitPtyOutput(page, '\x1b]7;file://host/home/e2e/project/branch-30\x07');
     await expect(page.locator('.directory-picker-trigger:visible')).toHaveAttribute('data-tip', '/home/e2e/project/branch-30');
     await expect(tree).toHaveAttribute('data-path', '/home/e2e/project');
     await expect(tree.getByText('sibling.txt', { exact: true })).toBeVisible();
-    await expect.poll(() => tree.evaluate(element => element.scrollTop)).toBe(scrollTop);
-    expect(await page.evaluate(() =>
-      (window as unknown as { __FILE_BROWSER_LOADS__: string[] }).__FILE_BROWSER_LOADS__)).toEqual(requestsBefore);
+    await expect.poll(() => tree.evaluate((element) => element.scrollTop)).toBe(scrollTop);
+    expect(await page.evaluate(() => (window as unknown as { __FILE_BROWSER_LOADS__: string[] }).__FILE_BROWSER_LOADS__)).toEqual(
+      requestsBefore,
+    );
 
     // Explicit browsing still works; switching terminals cannot override the browsed directory.
     await branch.dblclick();
@@ -118,11 +124,13 @@ test('dragging onto a file row drops into that file parent folder', async ({ pag
   await page.mouse.move(to!.x + 40, to!.y + to!.height / 2, { steps: 8 });
   await page.mouse.up();
 
-  await expect.poll(async () => fsOps(page)).toContainEqual({
-    op: 'move',
-    path: '/home/e2e/project/branch-28',
-    destDir: '/home/e2e/project/branch-30',
-  });
+  await expect
+    .poll(async () => fsOps(page))
+    .toContainEqual({
+      op: 'move',
+      path: '/home/e2e/project/branch-28',
+      destDir: '/home/e2e/project/branch-30',
+    });
 });
 
 test('going back returns to the previous view, not the parent folder', async ({ page }) => {

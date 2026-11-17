@@ -113,10 +113,7 @@ describe('running wheel routing', () => {
     // Streaming output reopens a few pixels of bottom gap between follow snaps; the latch
     // keeps the rest of the gesture on the terminal instead of chasing the moving bottom.
     const latched = { boundary: WHEEL_BOUNDARY_IDLE, historyEndReached: true };
-    const result = routeRunningWheel(
-      { position: terminal(5, 20), historyScrollable: true, delta: 120, historyDelta: 120 },
-      latched,
-    );
+    const result = routeRunningWheel({ position: terminal(5, 20), historyScrollable: true, delta: 120, historyDelta: 120 }, latched);
     expect(result.route).toEqual({ surface: 'terminal' });
     expect(result.state).toEqual(latched);
   });
@@ -136,10 +133,7 @@ describe('running wheel routing', () => {
       WHEEL_GESTURE_IDLE,
     );
     expect(first.route).toEqual({ surface: 'history', delta: WHEEL_ROUTE_MARGIN_PX - 120 });
-    const second = routeRunningWheel(
-      { position: terminal(0, 20), historyScrollable: false, delta: -120, historyDelta: -120 },
-      first.state,
-    );
+    const second = routeRunningWheel({ position: terminal(0, 20), historyScrollable: false, delta: -120, historyDelta: -120 }, first.state);
     expect(second.route).toEqual({ surface: 'history', delta: -120 });
   });
 
@@ -162,10 +156,7 @@ describe('running wheel routing', () => {
 
   it('keeps a fullscreen terminal on its native path with no history to chain into', () => {
     const held = { boundary: { direction: -1, distance: WHEEL_ROUTE_MARGIN_PX }, historyEndReached: false } as const;
-    const result = routeRunningWheel(
-      { position: terminal(0, 20), historyScrollable: null, delta: -120, historyDelta: -120 },
-      held,
-    );
+    const result = routeRunningWheel({ position: terminal(0, 20), historyScrollable: null, delta: -120, historyDelta: -120 }, held);
     expect(result.route).toEqual({ surface: 'terminal' });
     expect(result.state).toEqual(held);
   });

@@ -31,15 +31,17 @@ export function ThemePage() {
   const themeUpdate = useTerminalThemeStore((s) => s.update);
   const { save } = useSettingsSave();
 
-  const toast = (msg: string, type: 'info' | 'success' | 'error') =>
-    useToastStore.getState().addToast(msg, type);
+  const toast = (msg: string, type: 'info' | 'success' | 'error') => useToastStore.getState().addToast(msg, type);
 
   const pickBackground = async () => {
     try {
-      const sel = await openDialog({ multiple: false, directory: false,
-        filters: [{ name: t('Images'), extensions: wallpaperExtensions }] });
+      const sel = await openDialog({
+        multiple: false,
+        directory: false,
+        filters: [{ name: t('Images'), extensions: wallpaperExtensions }],
+      });
       if (typeof sel === 'string') {
-        if (!await isWallpaperImage(sel)) {
+        if (!(await isWallpaperImage(sel))) {
           toast(t('Choose a valid image file.'), 'error');
           return;
         }
@@ -63,23 +65,37 @@ export function ThemePage() {
   return (
     <SettingsGroup title={t('Appearance')}>
       <Field title={t('Theme mode')} description={t('Choose a light or dark appearance.')}>
-        <SegmentedControl label={t('Theme mode')} value={preference}
-          options={THEME_PREFERENCES.map(option => ({ ...option, label: t(option.label) }))}
-          onChange={value => { void save(() => setMode(value)); }} />
+        <SegmentedControl
+          label={t('Theme mode')}
+          value={preference}
+          options={THEME_PREFERENCES.map((option) => ({ ...option, label: t(option.label) }))}
+          onChange={(value) => {
+            void save(() => setMode(value));
+          }}
+        />
       </Field>
 
-      <Field title={t(displayedMode === 'dark' ? 'Dark color scheme' : 'Light color scheme')}
-        description={t('Apply a color scheme to the interface, editor and terminal.')} layout="stacked">
-        <ThemePresetPicker mode={displayedMode} value={config[`${displayedMode}Preset`]}
-          onChange={id => { void save(() => themeUpdate({ [`${displayedMode}Preset`]: id })); }} />
+      <Field
+        title={t(displayedMode === 'dark' ? 'Dark color scheme' : 'Light color scheme')}
+        description={t('Apply a color scheme to the interface, editor and terminal.')}
+        layout="stacked">
+        <ThemePresetPicker
+          mode={displayedMode}
+          value={config[`${displayedMode}Preset`]}
+          onChange={(id) => {
+            void save(() => themeUpdate({ [`${displayedMode}Preset`]: id }));
+          }}
+        />
       </Field>
-      {Object.keys(config.vars).length > 0 && <Field title={t('Custom colors')} description={t('Your custom colors remain applied.')}>
-        <span>{t('Enabled')}</span>
-      </Field>}
+      {Object.keys(config.vars).length > 0 && (
+        <Field title={t('Custom colors')} description={t('Your custom colors remain applied.')}>
+          <span>{t('Enabled')}</span>
+        </Field>
+      )}
 
       {supportsNativeMaterial && (
         <Field title={t('Desktop material')} description={t('Use acrylic material in the left sidebar. Other regions stay opaque.')}>
-          <Toggle label={t('Desktop material')} on={config.desktopTint ?? true} onChange={desktopTint => themeUpdate({ desktopTint })} />
+          <Toggle label={t('Desktop material')} on={config.desktopTint ?? true} onChange={(desktopTint) => themeUpdate({ desktopTint })} />
         </Field>
       )}
 
@@ -91,13 +107,20 @@ export function ThemePage() {
             max={1}
             step={0.05}
             value={config.opacity}
-            onChange={(e) => { const opacity = Number(e.target.value); void save(() => themeUpdate({ opacity })); }}
+            onChange={(e) => {
+              const opacity = Number(e.target.value);
+              void save(() => themeUpdate({ opacity }));
+            }}
             style={{ flex: 1 }}
           />
-          <span style={{
-            fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-secondary)', fontFamily: 'var(--font-ui)',
-            minWidth: 40, textAlign: 'right',
-          }}>
+          <span
+            style={{
+              fontSize: 'calc(12px * var(--ui-font-scale))',
+              color: 'var(--text-secondary)',
+              fontFamily: 'var(--font-ui)',
+              minWidth: 40,
+              textAlign: 'right',
+            }}>
             {Math.round(config.opacity * 100)}%
           </span>
         </div>
@@ -105,13 +128,13 @@ export function ThemePage() {
 
       <Field title={t('Application background image')} description={t('Choose an application wallpaper.')}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-          <OutlineButton onClick={() => void pickBackground()} >
+          <OutlineButton onClick={() => void pickBackground()}>
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               <ImageIcon size={iconSizes.control} /> {t('Choose image')}
             </span>
           </OutlineButton>
           {config.backgroundImage && (
-            <OutlineButton onClick={() => void clearBackground()} >
+            <OutlineButton onClick={() => void clearBackground()}>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                 <Trash2 size={iconSizes.control} /> {t('Clear image')}
               </span>
@@ -119,10 +142,14 @@ export function ThemePage() {
           )}
         </div>
         {config.backgroundImage && (
-          <div style={{
-            marginTop: 8, fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)',
-            fontFamily: 'var(--font-ui)', wordBreak: 'break-all',
-          }}>
+          <div
+            style={{
+              marginTop: 8,
+              fontSize: 'calc(11px * var(--ui-font-scale))',
+              color: 'var(--text-muted)',
+              fontFamily: 'var(--font-ui)',
+              wordBreak: 'break-all',
+            }}>
             {config.backgroundImage}
           </div>
         )}

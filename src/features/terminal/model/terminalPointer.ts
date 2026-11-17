@@ -17,9 +17,16 @@ export function configureTerminalPointer(term: Terminal, paneId?: string): () =>
     }
   };
   const keydown = (event: KeyboardEvent) => {
-    if (event.target !== term.textarea || event.isComposing || event.ctrlKey || event.altKey || event.metaKey
-      || term.modes?.mouseTrackingMode !== 'none'
-      || !(event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete')) return;
+    if (
+      event.target !== term.textarea ||
+      event.isComposing ||
+      event.ctrlKey ||
+      event.altKey ||
+      event.metaKey ||
+      term.modes?.mouseTrackingMode !== 'none' ||
+      !(event.key.length === 1 || event.key === 'Backspace' || event.key === 'Delete')
+    )
+      return;
     if (timer !== undefined) clearTimeout(timer);
     if (!element.hasAttribute('data-terminal-typing')) element.setAttribute('data-terminal-typing', 'true');
     timer = setTimeout(restore, 300);

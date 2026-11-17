@@ -31,5 +31,7 @@ export function isLayoutResizeDragActive(): boolean {
 /** Run `listener` when the last active layout resize drag ends. Returns an unsubscribe. */
 export function onLayoutResizeDragEnd(listener: () => void): () => void {
   endListeners.add(listener);
-  return () => { endListeners.delete(listener); };
+  return () => {
+    endListeners.delete(listener);
+  };
 }

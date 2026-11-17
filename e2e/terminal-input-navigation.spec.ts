@@ -4,14 +4,24 @@ import { setupTauriMock, ptyWrites, emitPtyOutput, terminalRowHeight } from './t
 
 async function ready(page: Page) {
   await setupTauriMock(page);
-  await page.addInitScript(() => Object.defineProperty(navigator, 'userAgent', { value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/605.1.15' }));
+  await page.addInitScript(() =>
+    Object.defineProperty(navigator, 'userAgent', { value: 'Mozilla/5.0 (Macintosh; Intel Mac OS X) AppleWebKit/605.1.15' }),
+  );
   await page.goto('/');
   await page.waitForFunction(async () => {
     const path = '/src/features/terminal/stores/terminal.ts';
-    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
-    const scope = window as unknown as { __vrykellSessionRegistry?: { controllers: Map<string, import('../src/features/terminal/services/pipeline/sessionController').SessionController> } };
-    return Object.values(useTerminalStore.getState().startupStates).includes('ready')
-      && [...(scope.__vrykellSessionRegistry?.controllers.values() ?? [])].some(controller => controller.activeBlock?.status === 'pending' && !!controller.activeBlock.cwd);
+    const { useTerminalStore } = (await import(path)) as typeof import('../src/features/terminal/stores/terminal');
+    const scope = window as unknown as {
+      __vrykellSessionRegistry?: {
+        controllers: Map<string, import('../src/features/terminal/services/pipeline/sessionController').SessionController>;
+      };
+    };
+    return (
+      Object.values(useTerminalStore.getState().startupStates).includes('ready') &&
+      [...(scope.__vrykellSessionRegistry?.controllers.values() ?? [])].some(
+        (controller) => controller.activeBlock?.status === 'pending' && !!controller.activeBlock.cwd,
+      )
+    );
   });
 }
 
@@ -23,7 +33,7 @@ test('empty and repeat Enter submissions keep normal directory blocks with no ou
   await page.keyboard.up('Enter');
   const blocks = page.locator('.command-block');
   await expect(blocks).toHaveCount(6);
-  await expect.poll(async () => (await ptyWrites(page)).filter(write => write === '\n').length).toBe(6);
+  await expect.poll(async () => (await ptyWrites(page)).filter((write) => write === '\n').length).toBe(6);
   for (const block of await blocks.all()) {
     await expect(block.locator('.command-block-cwd')).toHaveText('/home/e2e/project');
     await expect(block.locator('.command-block-command')).toBeEmpty();
@@ -43,10 +53,27 @@ test('up and down recall only the commands of the current terminal', async ({ pa
     const { useHistoryStore } = await import('/src/features/terminal/stores/history.ts');
     const { useBlockStore } = await import('/src/features/terminal/stores/blocks.ts');
     useHistoryStore.setState({ entries: [{ command: 'echo app-wide', cwd: '/home/e2e/project', timestamp: 1, exitCode: 0 }] });
-    useBlockStore.setState((state) => ({ byTab: { ...state.byTab, 'other-pane': [{
-      id: 'foreign', command: 'echo other-pane', cwd: '/home/e2e/project', status: 'done', exitCode: 0,
-      startedAt: 1, endedAt: 2, wasLongRunning: false, outputHtml: '', outputText: '', outputRaw: '', linesTruncated: 0,
-    }] } }));
+    useBlockStore.setState((state) => ({
+      byTab: {
+        ...state.byTab,
+        'other-pane': [
+          {
+            id: 'foreign',
+            command: 'echo other-pane',
+            cwd: '/home/e2e/project',
+            status: 'done',
+            exitCode: 0,
+            startedAt: 1,
+            endedAt: 2,
+            wasLongRunning: false,
+            outputHtml: '',
+            outputText: '',
+            outputRaw: '',
+            linesTruncated: 0,
+          },
+        ],
+      },
+    }));
   });
   await input.focus();
   await input.press('ArrowUp');
@@ -114,9 +141,14 @@ test('AI entry shares the command control size and the outer border follows wind
   await expect(askAi.locator('svg')).toHaveCSS('width', '18px');
   const aiBounds = (await askAi.boundingBox())!;
   expect([aiBounds.width, aiBounds.height]).toEqual([commandBounds.width, commandBounds.height]);
-  const border = await page.locator('.application-window').evaluate(element => {
+  const border = await page.locator('.application-window').evaluate((element) => {
     const style = getComputedStyle(element, '::after');
-    return { radius: style.borderTopLeftRadius, hit: style.pointerEvents, width: style.borderTopWidth, platform: element.getAttribute('data-platform') };
+    return {
+      radius: style.borderTopLeftRadius,
+      hit: style.pointerEvents,
+      width: style.borderTopWidth,
+      platform: element.getAttribute('data-platform'),
+    };
   });
   const blockRadius = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--radius-block').trim());
   expect(border.radius).toBe(border.platform === 'macos' ? blockRadius : '0px');
@@ -128,10 +160,20 @@ test('AI entry shares the command control size and the outer border follows wind
 test('overflow menus retain transparent overlay tracks while dragging and clicking', async ({ page }) => {
   await ready(page);
   await page.evaluate(() => {
-    const scope = window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } };
+    const scope = window as unknown as {
+      __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> };
+    };
     const invoke = scope.__TAURI_INTERNALS__.invoke;
-    scope.__TAURI_INTERNALS__.invoke = (command, args) => command === 'fs_list'
-      ? Promise.resolve(Array.from({ length: 40 }, (_, index) => ({ name: `folder-${String(index).padStart(2, '0')}`, path: `/home/e2e/folder-${index}`, is_dir: true }))) : invoke(command, args);
+    scope.__TAURI_INTERNALS__.invoke = (command, args) =>
+      command === 'fs_list'
+        ? Promise.resolve(
+            Array.from({ length: 40 }, (_, index) => ({
+              name: `folder-${String(index).padStart(2, '0')}`,
+              path: `/home/e2e/folder-${index}`,
+              is_dir: true,
+            })),
+          )
+        : invoke(command, args);
   });
   await page.getByRole('button', { name: '切换工作目录' }).click();
   const list = page.locator('.directory-picker-list');
@@ -147,7 +189,7 @@ test('overflow menus retain transparent overlay tracks while dragging and clicki
   await page.mouse.move(thumb.x + thumb.width / 2, thumb.y + 170, { steps: 8 });
   await page.mouse.up();
   await expect(page.getByRole('dialog', { name: '选择工作目录' })).toBeVisible();
-  await expect.poll(() => list.evaluate(element => element.scrollTop)).toBeGreaterThan(200);
+  await expect.poll(() => list.evaluate((element) => element.scrollTop)).toBeGreaterThan(200);
   await expect(list.getByRole('option').first()).not.toBeInViewport();
   await expect(page.getByRole('button', { name: '上级目录' })).toBeInViewport();
   expect((await page.locator('.directory-picker').boundingBox())!.width).toBeLessThanOrEqual(280);
@@ -159,7 +201,17 @@ test('horizontal overlay tracks retain content height and support keyboard and d
   await page.evaluate(() => {
     const surface = document.createElement('div');
     surface.id = 'horizontal-fixture';
-    Object.assign(surface.style, { position: 'fixed', left: '300px', top: '120px', width: '300px', height: '70px', overflowX: 'auto', overflowY: 'hidden', zIndex: '400', background: 'var(--canvas)' });
+    Object.assign(surface.style, {
+      position: 'fixed',
+      left: '300px',
+      top: '120px',
+      width: '300px',
+      height: '70px',
+      overflowX: 'auto',
+      overflowY: 'hidden',
+      zIndex: '400',
+      background: 'var(--canvas)',
+    });
     const content = document.createElement('div');
     content.style.width = '900px';
     content.textContent = 'Wide scroll content';
@@ -171,17 +223,19 @@ test('horizontal overlay tracks retain content height and support keyboard and d
   const bar = page.locator('[role="scrollbar"][aria-controls="horizontal-fixture"]');
   await expect(bar).toHaveAttribute('aria-orientation', 'horizontal');
   await expect(bar).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  expect(await surface.evaluate(element => element.clientHeight)).toBe(70);
+  expect(await surface.evaluate((element) => element.clientHeight)).toBe(70);
   await bar.focus();
   await bar.press('End');
-  await expect.poll(() => surface.evaluate(element => element.scrollLeft)).toBe(600);
+  await expect.poll(() => surface.evaluate((element) => element.scrollLeft)).toBe(600);
   // The track is placed over the surface's right edge; a frame that still holds an older placement
   // would send the pointer somewhere else, so wait for it to line up before using its geometry.
-  await expect.poll(async () => {
-    const box = await bar.boundingBox();
-    const right = await surface.evaluate(element => element.getBoundingClientRect().right);
-    return box !== null && Math.abs(box.x + box.width - right) < 2;
-  }).toBe(true);
+  await expect
+    .poll(async () => {
+      const box = await bar.boundingBox();
+      const right = await surface.evaluate((element) => element.getBoundingClientRect().right);
+      return box !== null && Math.abs(box.x + box.width - right) < 2;
+    })
+    .toBe(true);
   // Thumbs reveal on hover (the overlay keeps its track invisible until the surface is entered).
   await surface.hover();
   await expect(bar).toHaveAttribute('data-visible', 'true');
@@ -191,25 +245,32 @@ test('horizontal overlay tracks retain content height and support keyboard and d
   await expect(bar).toHaveAttribute('data-dragging', 'true');
   await page.mouse.move(thumb.x - 80, thumb.y + thumb.height / 2, { steps: 6 });
   await page.mouse.up();
-  await expect.poll(() => surface.evaluate(element => element.scrollLeft)).toBeLessThan(400);
+  await expect.poll(() => surface.evaluate((element) => element.scrollLeft)).toBeLessThan(400);
 });
 
 test('latest-output arrow resumes following during a foreground command', async ({ page }) => {
   await ready(page);
   // Complete one user submission before injecting a foreground stream, draining startup output.
   const input = page.getByPlaceholder(/输入命令/);
-  await input.fill('echo ready'); await input.press('Enter');
-  await expect(page.locator('[data-testid^="command-block-"]').filter({ has: page.getByText('echo ready', { exact: true }) })).toBeVisible();
+  await input.fill('echo ready');
+  await input.press('Enter');
+  await expect(
+    page.locator('[data-testid^="command-block-"]').filter({ has: page.getByText('echo ready', { exact: true }) }),
+  ).toBeVisible();
   const lines = Array.from({ length: 80 }, (_, index) => `running-line-${index}`).join('\r\n');
   await emitPtyOutput(page, `\x1b]133;E;${btoa('running-demo')}\x07\x1b]133;C\x07${lines}\r\n`);
   const button = page.getByRole('button', { name: '回到最新输出' });
   await expect(button).toBeVisible();
   await expect(button).toHaveAttribute('data-tip-shortcut', 'End');
   const region = page.locator('[data-testid^="terminal-scroll-"]').first();
-  await region.evaluate(element => { element.scrollTop = 0; });
-  await expect.poll(() => region.evaluate(element => element.scrollHeight - element.clientHeight - element.scrollTop)).toBeGreaterThan(100);
+  await region.evaluate((element) => {
+    element.scrollTop = 0;
+  });
+  await expect
+    .poll(() => region.evaluate((element) => element.scrollHeight - element.clientHeight - element.scrollTop))
+    .toBeGreaterThan(100);
   await button.click();
-  await expect.poll(() => region.evaluate(element => element.scrollHeight - element.clientHeight - element.scrollTop)).toBeLessThan(32);
+  await expect.poll(() => region.evaluate((element) => element.scrollHeight - element.clientHeight - element.scrollTop)).toBeLessThan(32);
 });
 
 test('font family, weight and spacing update existing terminal history and persist', async ({ page }) => {
@@ -222,7 +283,11 @@ test('font family, weight and spacing update existing terminal history and persi
   const output = page.locator('.command-block-output [data-selectable]').first();
   await expect(output).toHaveCSS('font-weight', '400');
   await gotoSetting(page, '字体与显示');
-  for (const [name, option] of [['终端字体', 'Maple Mono NF CN'], ['终端字重', '350'], ['终端行距', '1.2×']]) {
+  for (const [name, option] of [
+    ['终端字体', 'Maple Mono NF CN'],
+    ['终端字重', '350'],
+    ['终端行距', '1.2×'],
+  ]) {
     await page.getByRole('combobox', { name, exact: true }).click();
     await page.getByRole('option', { name: option, exact: true }).click();
   }
@@ -240,23 +305,46 @@ test('font family, weight and spacing update existing terminal history and persi
   await expect(command).toHaveCSS('font-weight', '450');
   await expect(output).toHaveCSS('font-weight', '350');
   await expect(output).toHaveCSS('line-height', `${rowHeightAtOnePointTwo}px`);
-  await expect.poll(() => page.evaluate(() => {
-    const scope = window as unknown as { __vrykellTerms: Map<string, import('@xterm/xterm').Terminal> };
-    return [...scope.__vrykellTerms.values()].every(term => term.options.fontWeight === 350 && term.options.lineHeight === 1.2 && term.options.fontFamily!.includes('Maple Mono NF CN'));
-  })).toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scope = window as unknown as { __vrykellTerms: Map<string, import('@xterm/xterm').Terminal> };
+        return [...scope.__vrykellTerms.values()].every(
+          (term) =>
+            term.options.fontWeight === 350 && term.options.lineHeight === 1.2 && term.options.fontFamily!.includes('Maple Mono NF CN'),
+        );
+      }),
+    )
+    .toBe(true);
   await emitPtyOutput(page, `\x1b]133;E;${btoa('typography-live')}\x07\x1b]133;C\x07live output\r\n`);
-  await expect.poll(() => page.evaluate(() => {
-    const scope = window as unknown as { __vrykellSessionRegistry?: { controllers: Map<string, import('../src/features/terminal/services/pipeline/sessionController').SessionController> } };
-    const active = [...(scope.__vrykellSessionRegistry?.controllers.values() ?? [])][0]?.activeBlock;
-    return active?.outputTerm?.options.fontWeight;
-  })).toBe(350);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scope = window as unknown as {
+          __vrykellSessionRegistry?: {
+            controllers: Map<string, import('../src/features/terminal/services/pipeline/sessionController').SessionController>;
+          };
+        };
+        const active = [...(scope.__vrykellSessionRegistry?.controllers.values() ?? [])][0]?.activeBlock;
+        return active?.outputTerm?.options.fontWeight;
+      }),
+    )
+    .toBe(350);
   await gotoSetting(page, '字体与显示');
   await page.getByRole('combobox', { name: '终端字重', exact: true }).click();
   await page.getByRole('option', { name: '300', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => {
-    const scope = window as unknown as { __vrykellSessionRegistry?: { controllers: Map<string, import('../src/features/terminal/services/pipeline/sessionController').SessionController> } };
-    return [...(scope.__vrykellSessionRegistry?.controllers.values() ?? [])][0]?.activeBlock?.outputTerm?.options.fontWeight;
-  })).toBe(300);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const scope = window as unknown as {
+          __vrykellSessionRegistry?: {
+            controllers: Map<string, import('../src/features/terminal/services/pipeline/sessionController').SessionController>;
+          };
+        };
+        return [...(scope.__vrykellSessionRegistry?.controllers.values() ?? [])][0]?.activeBlock?.outputTerm?.options.fontWeight;
+      }),
+    )
+    .toBe(300);
   await page.getByRole('combobox', { name: '终端字重', exact: true }).click();
   await page.getByRole('option', { name: '350', exact: true }).click();
   await page.keyboard.press('Meta+1');

@@ -12,9 +12,20 @@ export function useListNavigationMode(initialKeyboard = false) {
   const onKeyDownCapture = (event: KeyboardEvent<HTMLElement>) => {
     if (!['Shift', 'Control', 'Meta', 'Alt', 'CapsLock'].includes(event.key)) setKeyboardNavigation(true);
   };
-  const onPointerLeave = () => { pointer.current = null; pointerMoved.current = false; };
+  const onPointerLeave = () => {
+    pointer.current = null;
+    pointerMoved.current = false;
+  };
   return {
-    keyboardNavigation, setKeyboardNavigation, pointerMoved,
-    props: { 'data-list-navigation': true, 'data-keyboard-navigation': keyboardNavigation, onPointerMoveCapture, onPointerLeave, onKeyDownCapture },
+    keyboardNavigation,
+    setKeyboardNavigation,
+    pointerMoved,
+    props: {
+      'data-list-navigation': true,
+      'data-keyboard-navigation': keyboardNavigation,
+      onPointerMoveCapture,
+      onPointerLeave,
+      onKeyDownCapture,
+    },
   };
 }

@@ -6,8 +6,17 @@ import type { TermBlock } from '@features/terminal/services/pipeline/termBlock';
 import { useCommandHistoryNavigation } from '@features/terminal/hooks/useCommandHistoryNavigation';
 
 const block = (id: string, command: string): TermBlock => ({
-  id, command, status: 'done', exitCode: 0, startedAt: 0, endedAt: 1, wasLongRunning: false,
-  outputHtml: '', outputText: '', outputRaw: '', linesTruncated: 0,
+  id,
+  command,
+  status: 'done',
+  exitCode: 0,
+  startedAt: 0,
+  endedAt: 1,
+  wasLongRunning: false,
+  outputHtml: '',
+  outputText: '',
+  outputRaw: '',
+  linesTruncated: 0,
 });
 
 describe('useCommandHistoryNavigation', () => {
@@ -31,16 +40,24 @@ describe('useCommandHistoryNavigation', () => {
     });
 
     let moved = false;
-    act(() => { moved = result.current.navigate(1); });
+    act(() => {
+      moved = result.current.navigate(1);
+    });
     expect(moved).toBe(true);
     expect(result.current.text).toBe('git status');
 
-    act(() => { result.current.navigate(1); });
+    act(() => {
+      result.current.navigate(1);
+    });
     expect(result.current.text).toBe('git log');
 
-    act(() => { result.current.navigate(-1); });
+    act(() => {
+      result.current.navigate(-1);
+    });
     expect(result.current.text).toBe('git status');
-    act(() => { result.current.navigate(-1); });
+    act(() => {
+      result.current.navigate(-1);
+    });
     expect(result.current.text).toBe('git');
     expect(onNavigate).toHaveBeenCalledTimes(4);
   });
@@ -59,14 +76,20 @@ describe('useCommandHistoryNavigation', () => {
     });
 
     let moved = false;
-    act(() => { moved = result.current.navigate(1); });
+    act(() => {
+      moved = result.current.navigate(1);
+    });
     expect(moved).toBe(true);
     expect(result.current.text).toBe('pwd');
 
-    act(() => { result.current.navigate(1); });
+    act(() => {
+      result.current.navigate(1);
+    });
     expect(result.current.text).toBe('ls -la');
 
-    act(() => { moved = result.current.navigate(1); });
+    act(() => {
+      moved = result.current.navigate(1);
+    });
     expect(moved).toBe(false);
     expect(result.current.text).toBe('ls -la');
   });
@@ -80,7 +103,9 @@ describe('useCommandHistoryNavigation', () => {
     });
 
     let moved = false;
-    act(() => { moved = result.current.navigate(1); });
+    act(() => {
+      moved = result.current.navigate(1);
+    });
     expect(moved).toBe(false);
     expect(result.current.text).toBe('npm');
   });

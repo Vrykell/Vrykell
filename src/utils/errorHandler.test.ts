@@ -16,11 +16,15 @@ describe('safeJsonParse / safeLocalStorage', () => {
     expect(safeLocalStorageGet('k')).toBe('v');
     // returns the default when localStorage throws (for example, when disabled)
     const orig = Storage.prototype.setItem;
-    Storage.prototype.setItem = vi.fn(() => { throw new Error('denied'); });
+    Storage.prototype.setItem = vi.fn(() => {
+      throw new Error('denied');
+    });
     expect(safeLocalStorageSet('k', 'v')).toBe(false);
     Storage.prototype.setItem = orig;
     const origGet = Storage.prototype.getItem;
-    Storage.prototype.getItem = vi.fn(() => { throw new Error('denied'); });
+    Storage.prototype.getItem = vi.fn(() => {
+      throw new Error('denied');
+    });
     expect(safeLocalStorageGet('k')).toBeNull();
     Storage.prototype.getItem = origGet;
   });

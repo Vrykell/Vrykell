@@ -1,9 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 
-const LANGUAGES: Record<string, string> = { js: 'javascript', jsx: 'javascript', ts: 'typescript', tsx: 'typescript', sh: 'shell', bash: 'shell', zsh: 'shell', py: 'python', rs: 'rust', yml: 'yaml', toml: 'ini' };
+const LANGUAGES: Record<string, string> = {
+  js: 'javascript',
+  jsx: 'javascript',
+  ts: 'typescript',
+  tsx: 'typescript',
+  sh: 'shell',
+  bash: 'shell',
+  zsh: 'shell',
+  py: 'python',
+  rs: 'rust',
+  yml: 'yaml',
+  toml: 'ini',
+};
 const MAX_HIGHLIGHT_LENGTH = 200_000;
 
-type EditorApi = typeof import('@ui/editor/code/runtime')['editorApi'];
+type EditorApi = (typeof import('@ui/editor/code/runtime'))['editorApi'];
 
 /** The editor runtime is large: load it once for every code block in the transcript. */
 let runtimePromise: Promise<EditorApi> | null = null;
@@ -15,7 +27,7 @@ const languageLoads = new Map<string, Promise<void>>();
 function loadRuntime(): Promise<EditorApi> {
   if (resolvedRuntime) return Promise.resolve(resolvedRuntime);
   runtimePromise ??= import('@ui/editor/code/runtime')
-    .then(module => {
+    .then((module) => {
       resolvedRuntime = module.editorApi;
       return resolvedRuntime;
     })
@@ -28,7 +40,7 @@ function loadRuntime(): Promise<EditorApi> {
 
 function resolveLanguage(api: EditorApi, language: string): string | null {
   const resolved = LANGUAGES[language.toLowerCase()] ?? language.toLowerCase();
-  return api.languages.getLanguages().some(item => item.id === resolved) ? resolved : null;
+  return api.languages.getLanguages().some((item) => item.id === resolved) ? resolved : null;
 }
 
 /**
@@ -38,9 +50,14 @@ function resolveLanguage(api: EditorApi, language: string): string | null {
 function ensureLanguage(api: EditorApi, language: string): Promise<void> {
   const pending = languageLoads.get(language);
   if (pending) return pending;
-  const load = api.editor.colorize('', language, {})
-    .then(() => { readyLanguages.add(language); })
-    .finally(() => { languageLoads.delete(language); });
+  const load = api.editor
+    .colorize('', language, {})
+    .then(() => {
+      readyLanguages.add(language);
+    })
+    .finally(() => {
+      languageLoads.delete(language);
+    });
   languageLoads.set(language, load);
   return load;
 }
@@ -61,8 +78,14 @@ export default function CodeSyntax({ text, language }: { text: string; language:
   useEffect(() => {
     if (api || !language) return;
     let cancelled = false;
-    void loadRuntime().then(loaded => { if (!cancelled) setApi(loaded); }).catch(() => {});
-    return () => { cancelled = true; };
+    void loadRuntime()
+      .then((loaded) => {
+        if (!cancelled) setApi(loaded);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
   }, [api, language]);
 
   const resolved = api && language ? resolveLanguage(api, language) : null;
@@ -71,9 +94,13 @@ export default function CodeSyntax({ text, language }: { text: string; language:
     if (!api || !resolved || readyLanguages.has(resolved)) return;
     let cancelled = false;
     void ensureLanguage(api, resolved)
-      .then(() => { if (!cancelled) setReadyVersion(version => version + 1); })
+      .then(() => {
+        if (!cancelled) setReadyVersion((version) => version + 1);
+      })
       .catch(() => {});
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [api, resolved]);
 
   // Once the language is ready tokenization is synchronous, so a streamed chunk keeps the colors
@@ -84,9 +111,20 @@ export default function CodeSyntax({ text, language }: { text: string; language:
   }, [api, resolved, text, readyVersion]);
 
   const lines = text.split('\n');
-  return <code className={language ? `language-${language}` : undefined}>{tokensByLine ? lines.map((line, lineIndex) => <span key={lineIndex}>
-    {(tokensByLine[lineIndex] ?? [{ offset: 0, type: '' }]).map((token, index, tokens) => (
-      <span key={index} data-code-token={token.type || undefined} style={{ color: `var(${tokenColor(token.type)})` }}>{line.slice(token.offset, tokens[index + 1]?.offset)}</span>
-    ))}{lineIndex < lines.length - 1 ? '\n' : ''}
-  </span>) : text}</code>;
+  return (
+    <code className={language ? `language-${language}` : undefined}>
+      {tokensByLine
+        ? lines.map((line, lineIndex) => (
+            <span key={lineIndex}>
+              {(tokensByLine[lineIndex] ?? [{ offset: 0, type: '' }]).map((token, index, tokens) => (
+                <span key={index} data-code-token={token.type || undefined} style={{ color: `var(${tokenColor(token.type)})` }}>
+                  {line.slice(token.offset, tokens[index + 1]?.offset)}
+                </span>
+              ))}
+              {lineIndex < lines.length - 1 ? '\n' : ''}
+            </span>
+          ))
+        : text}
+    </code>
+  );
 }

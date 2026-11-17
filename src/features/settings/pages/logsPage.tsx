@@ -3,7 +3,13 @@ import { t } from '@i18n';
 import { useState } from 'react';
 import { save } from '@tauri-apps/plugin-dialog';
 import { openPath } from '@tauri-apps/plugin-opener';
-import { diagnosticsLogDirectory, exportDiagnostics, setDiagnosticAutoSave, setDiagnosticInputTrace, useDiagnosticSettings } from '@platform/diagnostics';
+import {
+  diagnosticsLogDirectory,
+  exportDiagnostics,
+  setDiagnosticAutoSave,
+  setDiagnosticInputTrace,
+  useDiagnosticSettings,
+} from '@platform/diagnostics';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import { SettingsGroup, Field, Toggle } from '../components/ui';
 
@@ -16,26 +22,68 @@ export function LogsPage() {
     setExporting(true);
     setMessage(null);
     try {
-      const path = await save({ title: t('Export detailed diagnostics log'), defaultPath: `vrykell-diagnostics-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`, filters: [{ name: t('Diagnostics log'), extensions: ['jsonl'] }] });
-      if (path) { await exportDiagnostics(path); setMessage({ text: t('Exported to {{path}}', { path }), tone: 'success' }); }
-    } catch (cause) { setMessage({ text: t('Export failed: {{error}}', { error: String(cause) }), tone: 'error' }); }
-    finally { setExporting(false); }
+      const path = await save({
+        title: t('Export detailed diagnostics log'),
+        defaultPath: `vrykell-diagnostics-${new Date().toISOString().replace(/[:.]/g, '-')}.jsonl`,
+        filters: [{ name: t('Diagnostics log'), extensions: ['jsonl'] }],
+      });
+      if (path) {
+        await exportDiagnostics(path);
+        setMessage({ text: t('Exported to {{path}}', { path }), tone: 'success' });
+      }
+    } catch (cause) {
+      setMessage({ text: t('Export failed: {{error}}', { error: String(cause) }), tone: 'error' });
+    } finally {
+      setExporting(false);
+    }
   };
-  return <SettingsGroup title={t('Diagnostics')}>
-    <Field title={t('Save logs automatically')} description={t('Save diagnostics on this device across restarts.')}>
-      <Toggle on={autoSave} label={t('Save logs automatically')} disabled={saving} onChange={setDiagnosticAutoSave} />
-      {error && <ErrorBox compact testId="logs-error" style={{ marginTop: 8 }}>{error}</ErrorBox>}
-    </Field>
-    <Field title={t('Trace terminal input')} description={t('Record every key and cursor repaint in the diagnostics log. Turn this on only while investigating input latency.')}>
-      <Toggle on={inputTrace} label={t('Trace terminal input')} onChange={setDiagnosticInputTrace} />
-    </Field>
-    <Field title={t('Export logs')} description={t('Export recent diagnostics. Passwords, keys and terminal or conversation content are excluded.')}>
-      <OutlineButton disabled={exporting} onClick={() => { void exportLog(); }}>{exporting ? t('Exporting…') : t('Export detailed log')}</OutlineButton>
-      {message && <ErrorBox compact tone={message.tone} testId="logs-export-status" style={{ marginTop: 8 }}>{message.text}</ErrorBox>}
-    </Field>
-    <Field title={t('Log storage')} description={t('Files rotate at 5 MB. Keep the current file and two backups.')}>
-      <OutlineButton onClick={() => { void diagnosticsLogDirectory().then(async path => { setDirectory(path); await openPath(path); }).catch(cause => setMessage({ text: t('Could not open the log folder: {{error}}', { error: String(cause) }), tone: 'error' })); }}>{t('Open log folder')}</OutlineButton>
-      {directory && <p style={{ color: 'var(--text-muted)', overflowWrap: 'anywhere' }}>{directory}</p>}
-    </Field>
-  </SettingsGroup>;
+  return (
+    <SettingsGroup title={t('Diagnostics')}>
+      <Field title={t('Save logs automatically')} description={t('Save diagnostics on this device across restarts.')}>
+        <Toggle on={autoSave} label={t('Save logs automatically')} disabled={saving} onChange={setDiagnosticAutoSave} />
+        {error && (
+          <ErrorBox compact testId="logs-error" style={{ marginTop: 8 }}>
+            {error}
+          </ErrorBox>
+        )}
+      </Field>
+      <Field
+        title={t('Trace terminal input')}
+        description={t('Record every key and cursor repaint in the diagnostics log. Turn this on only while investigating input latency.')}>
+        <Toggle on={inputTrace} label={t('Trace terminal input')} onChange={setDiagnosticInputTrace} />
+      </Field>
+      <Field
+        title={t('Export logs')}
+        description={t('Export recent diagnostics. Passwords, keys and terminal or conversation content are excluded.')}>
+        <OutlineButton
+          disabled={exporting}
+          onClick={() => {
+            void exportLog();
+          }}>
+          {exporting ? t('Exporting…') : t('Export detailed log')}
+        </OutlineButton>
+        {message && (
+          <ErrorBox compact tone={message.tone} testId="logs-export-status" style={{ marginTop: 8 }}>
+            {message.text}
+          </ErrorBox>
+        )}
+      </Field>
+      <Field title={t('Log storage')} description={t('Files rotate at 5 MB. Keep the current file and two backups.')}>
+        <OutlineButton
+          onClick={() => {
+            void diagnosticsLogDirectory()
+              .then(async (path) => {
+                setDirectory(path);
+                await openPath(path);
+              })
+              .catch((cause) =>
+                setMessage({ text: t('Could not open the log folder: {{error}}', { error: String(cause) }), tone: 'error' }),
+              );
+          }}>
+          {t('Open log folder')}
+        </OutlineButton>
+        {directory && <p style={{ color: 'var(--text-muted)', overflowWrap: 'anywhere' }}>{directory}</p>}
+      </Field>
+    </SettingsGroup>
+  );
 }

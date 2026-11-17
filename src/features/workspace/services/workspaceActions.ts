@@ -26,7 +26,9 @@ export async function pickWorkspaceFile() {
   try {
     const [path] = await pickPath('file');
     return path ? { path } : null;
-  } catch (reason) { useToastStore.getState().addToast(t('Could not open file: {{error}}', { error: String(reason) }), 'error'); }
+  } catch (reason) {
+    useToastStore.getState().addToast(t('Could not open file: {{error}}', { error: String(reason) }), 'error');
+  }
   return null;
 }
 
@@ -45,14 +47,19 @@ export function organizeMemoryWithAssistant() {
   useAiWorkspace.getState().openNative(id);
   useWorkspaceNavigation.getState().selectArea('ai');
   useWorkspaceStore.getState().openHarnessTab();
-  void chat.send(t('Review my saved memories, including pending and expired records, using the memory tool. Organize duplicates and outdated facts, and ask me before activating facts that cannot be verified. Do not assume old records are still correct.'), { conversationId: id });
+  void chat.send(
+    t(
+      'Review my saved memories, including pending and expired records, using the memory tool. Organize duplicates and outdated facts, and ask me before activating facts that cannot be verified. Do not assume old records are still correct.',
+    ),
+    { conversationId: id },
+  );
 }
 
 export function newWorkspaceItem() {
   const area = focusedWorkspaceArea();
   if (area === 'unified') {
     const state = useUnifiedWorkspace.getState();
-    const id = state.layout && workspacePaneCells(state.layout).find(cell => cell.id === state.focused)?.resourceId;
+    const id = state.layout && workspacePaneCells(state.layout).find((cell) => cell.id === state.focused)?.resourceId;
     if (id?.startsWith('chat:') || id?.startsWith('acp:')) createUnifiedResource('conversation');
     else if (id?.startsWith('terminal:') || !id) createUnifiedTerminal();
     else createUnifiedResource('document');
@@ -75,27 +82,50 @@ export function activateWorkspaceInstance(index: number): boolean {
   if (!sideAiHasFocus() && (area === 'terminal' || area === 'code' || area === 'ai' || area === 'unified')) {
     synchronizeWorkbench();
     const state = useWorkbenchStore.getState().snapshot;
-    const tabs = state.tabs.filter(tab => tab.scope === area && tab.layout);
-    const pages = area === 'ai' && useWorkspaceNavigation.getState().aiPlacement === 'side' ? [] : useWorkspaceStore.getState().tabs.filter(tab => workspaceAreaForKind(tab.kind) === area && ['history', 'ai-history', 'usage', 'start', 'start-code', 'start-ai'].includes(tab.kind));
-    const utilityId = (id: string) => area === 'ai' ? `page:${id}` : id;
-    const ordered = workspaceStripEntities(state, area, pages.map(page => utilityId(page.id))).flatMap(entity => entity.startsWith('group:') ? tabs.filter(tab => tab.groupId === entity.slice(6)).map(tab => tab.id) : [entity.slice(4)]);
+    const tabs = state.tabs.filter((tab) => tab.scope === area && tab.layout);
+    const pages =
+      area === 'ai' && useWorkspaceNavigation.getState().aiPlacement === 'side'
+        ? []
+        : useWorkspaceStore
+            .getState()
+            .tabs.filter(
+              (tab) =>
+                workspaceAreaForKind(tab.kind) === area &&
+                ['history', 'ai-history', 'usage', 'start', 'start-code', 'start-ai'].includes(tab.kind),
+            );
+    const utilityId = (id: string) => (area === 'ai' ? `page:${id}` : id);
+    const ordered = workspaceStripEntities(
+      state,
+      area,
+      pages.map((page) => utilityId(page.id)),
+    ).flatMap((entity) =>
+      entity.startsWith('group:') ? tabs.filter((tab) => tab.groupId === entity.slice(6)).map((tab) => tab.id) : [entity.slice(4)],
+    );
     const id = ordered[index];
-    const tab = tabs.find(tab => tab.id === id);
-    if (tab) { activateContainer(tab.id); return true; }
-    const page = pages.find(page => utilityId(page.id) === id);
-    if (page) { useWorkspaceStore.getState().activate(page.id); return true; }
+    const tab = tabs.find((tab) => tab.id === id);
+    if (tab) {
+      activateContainer(tab.id);
+      return true;
+    }
+    const page = pages.find((page) => utilityId(page.id) === id);
+    if (page) {
+      useWorkspaceStore.getState().activate(page.id);
+      return true;
+    }
     return false;
   }
   if (area !== 'ai') return false;
   const ai = useAiWorkspace.getState();
   const available = availableSideConversationIds();
   const ids = [...available];
-  const id = ids[index]; if (!id) return false;
+  const id = ids[index];
+  if (!id) return false;
   ai.selectSide(id);
   requestAnimationFrame(() => {
     if (useAiWorkspace.getState().sideSelected !== id) return;
     [...document.querySelectorAll<HTMLTextAreaElement>('[data-testid="ai-surface-side"] [data-chat-composer]')]
-      .find(element => element.getClientRects().length > 0 && !element.closest('[inert]'))?.focus({ preventScroll: true });
+      .find((element) => element.getClientRects().length > 0 && !element.closest('[inert]'))
+      ?.focus({ preventScroll: true });
   });
   return true;
 }

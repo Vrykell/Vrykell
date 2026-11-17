@@ -20,7 +20,10 @@
 export function normPath(p: string): string {
   // Handle a leading slash plus drive (/C:/Users, /C:/, /C:) before trimming trailing
   // slashes, so the drive form is not broken early
-  let s = p.replace(/\\/g, '/').replace(/^\/\/\?\/UNC\//i, '//').replace(/^\/\/\?\/([a-zA-Z]:\/)/, '$1')
+  let s = p
+    .replace(/\\/g, '/')
+    .replace(/^\/\/\?\/UNC\//i, '//')
+    .replace(/^\/\/\?\/([a-zA-Z]:\/)/, '$1')
     .replace(/^\/([a-zA-Z]):(\/|$)/, '$1:/');
   s = s.replace(/\/+$/, '');
   if (s === '') return '/'; // root path

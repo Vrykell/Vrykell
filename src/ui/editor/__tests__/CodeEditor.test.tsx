@@ -5,18 +5,47 @@ import { useEditorPreferences } from '@config/editor';
 import { useTypographyStore } from '@config/typography';
 import { act } from '@testing-library/react';
 
-const mocks = vi.hoisted(() => ({ create: vi.fn(), update: vi.fn(), dispose: vi.fn(), modelDispose: vi.fn(), trigger: vi.fn(), command: vi.fn(), vim: vi.fn(), vimDispose: vi.fn(), vimOn: vi.fn(), defineEx: vi.fn(), theme: vi.fn(), diagnostic: vi.fn(), modelValue: '', changeListener: null as null | (() => void) }));
+const mocks = vi.hoisted(() => ({
+  create: vi.fn(),
+  update: vi.fn(),
+  dispose: vi.fn(),
+  modelDispose: vi.fn(),
+  trigger: vi.fn(),
+  command: vi.fn(),
+  vim: vi.fn(),
+  vimDispose: vi.fn(),
+  vimOn: vi.fn(),
+  defineEx: vi.fn(),
+  theme: vi.fn(),
+  diagnostic: vi.fn(),
+  modelValue: '',
+  changeListener: null as null | (() => void),
+}));
 vi.mock('@platform/diagnostics', () => ({ diagnostic: mocks.diagnostic }));
 vi.mock('@ui/editor/code/runtime', () => ({
-  applyCodeTheme: mocks.theme, languageForFile: () => 'plaintext',
-  editorApi: { KeyMod: { CtrlCmd: 2048 }, KeyCode: { KeyS: 49 }, editor: {
-    create: mocks.create, ShowLightbulbIconMode: { Off: 'off' },
-    createModel: (initial: string) => {
-      mocks.modelValue = initial;
-      return { getValue: () => mocks.modelValue, setValue: (next: string) => { mocks.modelValue = next; },
-        onDidChangeContent: (listener: () => void) => { mocks.changeListener = listener; }, dispose: mocks.modelDispose };
+  applyCodeTheme: mocks.theme,
+  languageForFile: () => 'plaintext',
+  editorApi: {
+    KeyMod: { CtrlCmd: 2048 },
+    KeyCode: { KeyS: 49 },
+    editor: {
+      create: mocks.create,
+      ShowLightbulbIconMode: { Off: 'off' },
+      createModel: (initial: string) => {
+        mocks.modelValue = initial;
+        return {
+          getValue: () => mocks.modelValue,
+          setValue: (next: string) => {
+            mocks.modelValue = next;
+          },
+          onDidChangeContent: (listener: () => void) => {
+            mocks.changeListener = listener;
+          },
+          dispose: mocks.modelDispose,
+        };
+      },
     },
-  } },
+  },
 }));
 vi.mock('monaco-vim', () => ({ default: { initVimMode: mocks.vim, VimMode: { Vim: { defineEx: mocks.defineEx } } } }));
 beforeEach(() => {
@@ -24,29 +53,68 @@ beforeEach(() => {
   mocks.changeListener = null;
   useEditorPreferences.setState({ lineNumbers: true });
   useTypographyStore.getState().reset();
-  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  mocks.create.mockImplementation(() => ({ updateOptions: mocks.update, dispose: mocks.dispose, layout: vi.fn(), focus: vi.fn(), addCommand: mocks.command, onDidChangeCursorPosition: vi.fn(), trigger: mocks.trigger }));
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  mocks.create.mockImplementation(() => ({
+    updateOptions: mocks.update,
+    dispose: mocks.dispose,
+    layout: vi.fn(),
+    focus: vi.fn(),
+    addCommand: mocks.command,
+    onDidChangeCursorPosition: vi.fn(),
+    trigger: mocks.trigger,
+  }));
   mocks.vim.mockReturnValue({ dispose: mocks.vimDispose, on: mocks.vimOn });
 });
 
 it('uses restrained text-editor defaults and exposes common edit commands without remounting', async () => {
   let handle: CodeEditorHandle | null = null;
-  const props = { path: 'note.txt', value: 'first line', onChange: vi.fn(), onSave: vi.fn(), onReady: (next: CodeEditorHandle | null) => { handle = next; } };
+  const props = {
+    path: 'note.txt',
+    value: 'first line',
+    onChange: vi.fn(),
+    onSave: vi.fn(),
+    onReady: (next: CodeEditorHandle | null) => {
+      handle = next;
+    },
+  };
   const { rerender, unmount } = render(<CodeEditor {...props} />);
   await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1));
-  expect(mocks.create.mock.calls[0][1]).toMatchObject({ minimap: { enabled: false }, lineNumbers: 'on', lineDecorationsWidth: 16, folding: false, quickSuggestions: false, suggestOnTriggerCharacters: false });
+  expect(mocks.create.mock.calls[0][1]).toMatchObject({
+    minimap: { enabled: false },
+    lineNumbers: 'on',
+    lineDecorationsWidth: 16,
+    folding: false,
+    quickSuggestions: false,
+    suggestOnTriggerCharacters: false,
+  });
   expect(screen.getByRole('status')).toHaveTextContent('第 1 行，第 1 列');
   expect(screen.getByRole('status')).toHaveTextContent('UTF-8');
-  (handle as CodeEditorHandle | null)?.run('actions.find'); expect(mocks.trigger).toHaveBeenCalledWith('document-toolbar', 'actions.find', null);
+  (handle as CodeEditorHandle | null)?.run('actions.find');
+  expect(mocks.trigger).toHaveBeenCalledWith('document-toolbar', 'actions.find', null);
   rerender(<CodeEditor {...props} wordWrap />);
   await waitFor(() => expect(mocks.update).toHaveBeenCalledWith({ wordWrap: 'on' }));
   expect(mocks.create).toHaveBeenCalledTimes(1);
-  act(() => { useEditorPreferences.getState().update({ lineNumbers: false }); useTypographyStore.getState().update({ editorFontSize: 18, editorFontWeight: 550, editorLineHeight: 1.8, editorFontPreset: 'Maple Mono' }); });
+  act(() => {
+    useEditorPreferences.getState().update({ lineNumbers: false });
+    useTypographyStore
+      .getState()
+      .update({ editorFontSize: 18, editorFontWeight: 550, editorLineHeight: 1.8, editorFontPreset: 'Maple Mono' });
+  });
   expect(mocks.update).toHaveBeenCalledWith({ lineNumbers: 'off' });
   expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ fontSize: 18, fontWeight: '550', lineHeight: 32.4 }));
   expect(mocks.create).toHaveBeenCalledTimes(1);
-  const save = mocks.command.mock.calls[0][1] as () => void; save(); expect(props.onSave).toHaveBeenCalledTimes(1);
-  unmount(); expect(mocks.dispose).toHaveBeenCalledTimes(1); expect(mocks.modelDispose).toHaveBeenCalledTimes(1);
+  const save = mocks.command.mock.calls[0][1] as () => void;
+  save();
+  expect(props.onSave).toHaveBeenCalledTimes(1);
+  unmount();
+  expect(mocks.dispose).toHaveBeenCalledTimes(1);
+  expect(mocks.modelDispose).toHaveBeenCalledTimes(1);
   expect(handle).toBeNull();
 });
 
@@ -56,16 +124,25 @@ it('coalesces held keys into one document update and flushes before saving', asy
   await waitFor(() => expect(mocks.changeListener).not.toBeNull());
   vi.useFakeTimers();
   try {
-    mocks.modelValue = 'a'; mocks.changeListener!();
-    mocks.modelValue = 'ab'; mocks.changeListener!();
+    mocks.modelValue = 'a';
+    mocks.changeListener!();
+    mocks.modelValue = 'ab';
+    mocks.changeListener!();
     expect(props.onChange).not.toHaveBeenCalled();
-    act(() => { vi.advanceTimersByTime(120); });
+    act(() => {
+      vi.advanceTimersByTime(120);
+    });
     expect(props.onChange).toHaveBeenCalledExactlyOnceWith('ab');
-    mocks.modelValue = 'abc'; mocks.changeListener!();
-    act(() => { (mocks.command.mock.calls[0]![1] as () => void)(); });
+    mocks.modelValue = 'abc';
+    mocks.changeListener!();
+    act(() => {
+      (mocks.command.mock.calls[0]![1] as () => void)();
+    });
     expect(props.onChange).toHaveBeenLastCalledWith('abc');
     expect(props.onSave).toHaveBeenCalledTimes(1);
-  } finally { vi.useRealTimers(); }
+  } finally {
+    vi.useRealTimers();
+  }
 });
 
 it('adds optional modal bindings and disposes them when disabled without replacing the editor', async () => {
@@ -75,14 +152,18 @@ it('adds optional modal bindings and disposes them when disabled without replaci
   expect(mocks.defineEx).toHaveBeenCalledWith('write', 'w', expect.any(Function));
   expect(mocks.vimOn).toHaveBeenCalledWith('vim-mode-change', expect.any(Function));
   const write = mocks.defineEx.mock.calls[0][2] as (adapter: { editor: unknown }) => void;
-  write({ editor: mocks.create.mock.results[0].value }); await waitFor(() => expect(props.onSave).toHaveBeenCalledTimes(1));
+  write({ editor: mocks.create.mock.results[0].value });
+  await waitFor(() => expect(props.onSave).toHaveBeenCalledTimes(1));
   rerender(<CodeEditor {...props} vimMode={false} />);
-  expect(mocks.vimDispose).toHaveBeenCalledTimes(1); expect(mocks.create).toHaveBeenCalledTimes(1);
+  expect(mocks.vimDispose).toHaveBeenCalledTimes(1);
+  expect(mocks.create).toHaveBeenCalledTimes(1);
 });
 
 it('reports initialization failures inline and records the runtime error for diagnostics', async () => {
   const error = new Error('Assertion failed (There is already an extension with this id)');
-  mocks.theme.mockImplementationOnce(() => { throw error; });
+  mocks.theme.mockImplementationOnce(() => {
+    throw error;
+  });
   render(<CodeEditor path="note.txt" value="private note" onChange={vi.fn()} onSave={vi.fn()} />);
   await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('无法加载编辑器'));
   fireEvent.click(screen.getByRole('button', { name: /^技术详情$/ }));
@@ -97,5 +178,6 @@ it('rebinds modal editing after a draft is saved at a new path', async () => {
   await waitFor(() => expect(mocks.vim).toHaveBeenCalledTimes(1));
   rerender(<CodeEditor {...props} path="/notes/saved.txt" />);
   await waitFor(() => expect(mocks.vim).toHaveBeenCalledTimes(2));
-  expect(mocks.vimDispose).toHaveBeenCalledTimes(1); expect(mocks.create).toHaveBeenCalledTimes(2);
+  expect(mocks.vimDispose).toHaveBeenCalledTimes(1);
+  expect(mocks.create).toHaveBeenCalledTimes(2);
 });

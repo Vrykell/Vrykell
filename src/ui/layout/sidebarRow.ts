@@ -4,15 +4,26 @@ import { iconSizes } from '@ui/icons';
 export const sidebarRowSpacing: CSSProperties = { padding: '2px 6px', cursor: 'pointer' };
 export const compactSidebarRowContent: CSSProperties = { minHeight: 28, padding: '2px 10px' };
 export const sidebarRowContent: CSSProperties = {
-  display: 'flex', alignItems: 'center', gap: 8,
-  padding: '8px 10px', minHeight: 40, borderRadius: 'var(--radius-inner)',
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '8px 10px',
+  minHeight: 40,
+  borderRadius: 'var(--radius-inner)',
   transition: 'background 0.12s ease',
 };
 export const sidebarRowIcon: CSSProperties = {
-  width: iconSizes.row, height: iconSizes.row, flexShrink: 0,
-  display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+  width: iconSizes.row,
+  height: iconSizes.row,
+  flexShrink: 0,
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 };
 export const sidebarRowTitle: CSSProperties = {
-  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-  fontSize: 'var(--fs-label)', lineHeight: '18px',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+  fontSize: 'var(--fs-label)',
+  lineHeight: '18px',
 };

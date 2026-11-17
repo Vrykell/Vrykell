@@ -17,16 +17,33 @@ async function seedSessions(page: Page) {
       { id: 'alpha', title: 'Deploy Alpha', cwd: '/srv/app' },
       { id: 'beta', title: 'Deploy Beta', cwd: '/srv/app' },
       { id: 'hidden', title: 'Unrelated history', cwd: '/other' },
-    ].map((item, index) => ({ ...item, kind: 'local', status: 'historical', created_at: now, closed_at: now - index * 1000,
-      payload: JSON.stringify({ layout: { type: 'leaf', terminal: { id: `${item.id}#0`, kind: 'local', shellType: 'bash', cwd: item.cwd } } }), block_count: 0, sort_order: index, group_id: null }));
+    ].map((item, index) => ({
+      ...item,
+      kind: 'local',
+      status: 'historical',
+      created_at: now,
+      closed_at: now - index * 1000,
+      payload: JSON.stringify({
+        layout: { type: 'leaf', terminal: { id: `${item.id}#0`, kind: 'local', shellType: 'bash', cwd: item.cwd } },
+      }),
+      block_count: 0,
+      sort_order: index,
+      group_id: null,
+    }));
     probe.__HISTORY_CALLS__ = [];
     probe.__TAURI_INTERNALS__.invoke = async (command, args) => {
       if (command === 'list_sessions') return [...items];
-      if (command === 'history_page') return { ...await original(command, args) as Record<string, unknown>, sessions: (args.request as { source: string }).source === 'conversation' ? [] : items.filter(item => item.status === 'historical'), nextCursor: null };
-      if (command === 'get_session' && items.some(item => item.id === args.id)) return items.find(item => item.id === args.id);
+      if (command === 'history_page')
+        return {
+          ...((await original(command, args)) as Record<string, unknown>),
+          sessions:
+            (args.request as { source: string }).source === 'conversation' ? [] : items.filter((item) => item.status === 'historical'),
+          nextCursor: null,
+        };
+      if (command === 'get_session' && items.some((item) => item.id === args.id)) return items.find((item) => item.id === args.id);
       if (command === 'delete_session' || command === 'restore_session') {
         probe.__HISTORY_CALLS__.push({ command, id: String(args.id) });
-        const index = items.findIndex(item => item.id === args.id);
+        const index = items.findIndex((item) => item.id === args.id);
         if (index >= 0) {
           if (command === 'delete_session') items.splice(index, 1);
           else items[index].status = 'active';
@@ -50,7 +67,7 @@ async function groupSessionsByDirectory(page: Page) {
 }
 
 async function openAiHistory(page: Page) {
-  if (!await page.locator('[data-chat-composer]:visible').isVisible()) await page.locator('[data-dock-btn="chat"]').click();
+  if (!(await page.locator('[data-chat-composer]:visible').isVisible())) await page.locator('[data-dock-btn="chat"]').click();
   await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
   await expect(page.getByTestId('unified-history-page')).toBeVisible();
 }
@@ -69,7 +86,9 @@ test('group names, notes, colors and collapse choices survive reload without cha
   const viewport = page.viewportSize()!;
   expect(bounds.x).toBeGreaterThanOrEqual(8);
   expect(bounds.y + bounds.height).toBeLessThanOrEqual(viewport.height - 8);
-  expect(await menu.locator('button').evaluateAll(buttons => buttons.every(button => button.scrollWidth <= button.clientWidth))).toBe(true);
+  expect(await menu.locator('button').evaluateAll((buttons) => buttons.every((button) => button.scrollWidth <= button.clientWidth))).toBe(
+    true,
+  );
   await page.screenshot({ path: testInfo.outputPath('history-group-menu.png'), animations: 'disabled' });
   await menu.getByRole('menuitem', { name: '重命名分组…' }).click();
   const title = page.getByRole('textbox', { name: '分组名称' });
@@ -111,7 +130,7 @@ test('group names, notes, colors and collapse choices survive reload without cha
   await page.screenshot({ path: testInfo.outputPath('history-group-details.png'), animations: 'disabled' });
   await page.evaluate(async () => {
     const path = '/src/config/typography.ts';
-    const { useTypographyStore } = await import(path) as typeof import('../src/config/typography');
+    const { useTypographyStore } = (await import(path)) as typeof import('../src/config/typography');
     useTypographyStore.getState().update({ uiFontSize: 18 });
   });
   await card.getByRole('button', { name: '分组操作' }).click();
@@ -119,7 +138,9 @@ test('group names, notes, colors and collapse choices survive reload without cha
   const largeBounds = (await largeMenu.boundingBox())!;
   expect(largeBounds.x + largeBounds.width).toBeLessThanOrEqual(viewport.width - 8);
   expect(largeBounds.y + largeBounds.height).toBeLessThanOrEqual(viewport.height - 8);
-  expect(await largeMenu.locator('button').evaluateAll(buttons => buttons.every(button => button.scrollWidth <= button.clientWidth))).toBe(true);
+  expect(
+    await largeMenu.locator('button').evaluateAll((buttons) => buttons.every((button) => button.scrollWidth <= button.clientWidth)),
+  ).toBe(true);
   await page.screenshot({ path: testInfo.outputPath('history-group-menu-large-font.png'), animations: 'disabled' });
 });
 
@@ -150,9 +171,12 @@ test('filtered group deletion protects locked records across regrouping and rest
   expect(await page.evaluate(() => (window as Probe).__HISTORY_CALLS__)).toEqual([{ command: 'delete_session', id: 'beta' }]);
   await card.getByRole('button', { name: '分组操作' }).click();
   await page.getByRole('menuitem', { name: '打开匹配记录', exact: true }).click();
-  await expect.poll(() => page.evaluate(() => (window as Probe).__HISTORY_CALLS__)).toEqual([
-    { command: 'delete_session', id: 'beta' }, { command: 'restore_session', id: 'alpha' },
-  ]);
+  await expect
+    .poll(() => page.evaluate(() => (window as Probe).__HISTORY_CALLS__))
+    .toEqual([
+      { command: 'delete_session', id: 'beta' },
+      { command: 'restore_session', id: 'alpha' },
+    ]);
 });
 
 test('AI group copy and deletion use the filtered set while retaining locked and unrelated conversations', async ({ page }) => {
@@ -161,9 +185,16 @@ test('AI group copy and deletion use the filtered set while retaining locked and
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.evaluate(() => {
     const now = Date.now();
-    localStorage.setItem('e2e-conversations', JSON.stringify([
-      { id: 'alpha', title: 'Deploy Alpha' }, { id: 'beta', title: 'Deploy Beta' }, { id: 'hidden', title: 'Unrelated discussion' },
-    ].map(item => ({ ...item, created_at: now, updated_at: now, environment: 'null' }))));
+    localStorage.setItem(
+      'e2e-conversations',
+      JSON.stringify(
+        [
+          { id: 'alpha', title: 'Deploy Alpha' },
+          { id: 'beta', title: 'Deploy Beta' },
+          { id: 'hidden', title: 'Unrelated discussion' },
+        ].map((item) => ({ ...item, created_at: now, updated_at: now, environment: 'null' })),
+      ),
+    );
   });
   await page.reload();
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
@@ -185,5 +216,8 @@ test('AI group copy and deletion use the filtered set while retaining locked and
   await expect(page.getByTestId('unified-history-conversation:alpha')).toBeVisible();
   await fillHistorySearch(page, 'unified-history-search', '');
   await expect(page.getByTestId('unified-history-conversation:hidden')).toBeVisible();
-  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('e2e-conversations')!).map((item: { id: string }) => item.id))).toEqual(['alpha', 'hidden']);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('e2e-conversations')!).map((item: { id: string }) => item.id))).toEqual([
+    'alpha',
+    'hidden',
+  ]);
 });

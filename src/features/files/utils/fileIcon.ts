@@ -3,21 +3,38 @@
  * File panels and search results use the same mapping.
  */
 
-import {
-  File,
-  FileArchive,
-  FileCode,
-  FileCog,
-  FileImage,
-  FileText,
-  Folder,
-  type AppIcon,
-} from '@ui/icons';
+import { File, FileArchive, FileCode, FileCog, FileImage, FileText, Folder, type AppIcon } from '@ui/icons';
 
 const CODE = new Set([
-  'ts', 'tsx', 'js', 'jsx', 'mjs', 'cjs', 'rs', 'go', 'py', 'rb', 'java',
-  'c', 'cpp', 'h', 'hpp', 'cs', 'swift', 'kt', 'vue', 'svelte',
-  'html', 'css', 'scss', 'less', 'sql', 'sh', 'bash', 'zsh', 'fish',
+  'ts',
+  'tsx',
+  'js',
+  'jsx',
+  'mjs',
+  'cjs',
+  'rs',
+  'go',
+  'py',
+  'rb',
+  'java',
+  'c',
+  'cpp',
+  'h',
+  'hpp',
+  'cs',
+  'swift',
+  'kt',
+  'vue',
+  'svelte',
+  'html',
+  'css',
+  'scss',
+  'less',
+  'sql',
+  'sh',
+  'bash',
+  'zsh',
+  'fish',
 ]);
 
 const TEXT = new Set(['md', 'txt', 'log', 'pdf']);

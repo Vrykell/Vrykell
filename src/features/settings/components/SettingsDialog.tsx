@@ -11,7 +11,18 @@ import { IconButton } from '@ui/actions/IconButton';
 import { ArrowLeft, X } from '@ui/icons';
 import { useDialogKeyboard } from '@ui/hooks/useDialogKeyboard';
 
-export default function SettingsDialog({ open, title, icon, width = 440, initialFocus, onBack, onClose, children, footer, testId }: {
+export default function SettingsDialog({
+  open,
+  title,
+  icon,
+  width = 440,
+  initialFocus,
+  onBack,
+  onClose,
+  children,
+  footer,
+  testId,
+}: {
   open: boolean;
   title: string;
   icon?: ReactNode;
@@ -32,13 +43,17 @@ export default function SettingsDialog({ open, title, icon, width = 440, initial
   return (
     <div
       style={{
-        position: 'fixed', inset: 0, zIndex: 9997,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--overlay)', animation: 'overlayIn 0.18s var(--ease)',
+        position: 'fixed',
+        inset: 0,
+        zIndex: 9997,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--overlay)',
+        animation: 'overlayIn 0.18s var(--ease)',
       }}
       onClick={onClose}
-      data-testid={testId}
-    >
+      data-testid={testId}>
       <div
         ref={dialog}
         tabIndex={-1}
@@ -47,12 +62,17 @@ export default function SettingsDialog({ open, title, icon, width = 440, initial
         aria-modal="true"
         aria-label={title}
         style={{
-          width, maxWidth: 'calc(100vw - 40px)', maxHeight: 'calc(100vh - 80px)', overflowY: 'auto',
-          padding: 16, display: 'flex', flexDirection: 'column', gap: 12,
+          width,
+          maxWidth: 'calc(100vw - 40px)',
+          maxHeight: 'calc(100vh - 80px)',
+          overflowY: 'auto',
+          padding: 16,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
           animation: 'modalIn 0.22s var(--ease-out)',
         }}
-        onClick={(event) => event.stopPropagation()}
-      >
+        onClick={(event) => event.stopPropagation()}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {onBack && (
             <IconButton compact data-testid="dialog-back" aria-label={t('Back')} data-tip={t('Back')} onClick={onBack}>
@@ -60,11 +80,16 @@ export default function SettingsDialog({ open, title, icon, width = 440, initial
             </IconButton>
           )}
           {icon}
-          <span style={{
-            fontSize: 'calc(13px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)',
-            color: 'var(--text-primary)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          }}>
+          <span
+            style={{
+              fontSize: 'calc(13px * var(--ui-font-scale))',
+              fontWeight: 'var(--fw-semibold)',
+              color: 'var(--text-primary)',
+              minWidth: 0,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}>
             {title}
           </span>
           <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 4, flexShrink: 0 }}>

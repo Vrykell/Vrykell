@@ -50,7 +50,7 @@ afterEach(() => {
   vi.useRealTimers();
   window.getSelection()?.removeAllRanges();
   pane.remove();
-  document.querySelectorAll('body > p').forEach(element => element.remove());
+  document.querySelectorAll('body > p').forEach((element) => element.remove());
 });
 
 describe('useTerminalFocus', () => {
@@ -108,10 +108,9 @@ describe('useTerminalFocus', () => {
   });
 
   it('rechecks idle focus when a running command becomes long-running', () => {
-    const { rerender, unmount } = renderHook(
-      ({ recheck }) => useTerminalFocus(true, 'pane-1', recheck),
-      { initialProps: { recheck: false } },
-    );
+    const { rerender, unmount } = renderHook(({ recheck }) => useTerminalFocus(true, 'pane-1', recheck), {
+      initialProps: { recheck: false },
+    });
     expect(mocks.focus).toHaveBeenCalledTimes(1);
 
     mocks.focus.mockClear();

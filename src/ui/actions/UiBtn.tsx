@@ -16,12 +16,18 @@ interface HBtnProps {
 
 export function HBtn({ title, onClick, children }: HBtnProps) {
   return (
-    <TextButton data-tip={title} onClick={onClick}>{children}</TextButton>
+    <TextButton data-tip={title} onClick={onClick}>
+      {children}
+    </TextButton>
   );
 }
 
 export function InputBtn({ title, onClick, children }: HBtnProps) {
-  return <HBtn title={title} onClick={onClick}>{children}</HBtn>;
+  return (
+    <HBtn title={title} onClick={onClick}>
+      {children}
+    </HBtn>
+  );
 }
 
 // Shared dropdown and context menu rows.
@@ -44,7 +50,21 @@ interface MenuItemProps {
   onKeyDown?: (event: KeyboardEvent<HTMLButtonElement>) => void;
 }
 
-export function MenuItem({ label, tip, onClick, danger, shortcut, role, disabled, checked, submenu, expanded, controls, onPointerEnter, onKeyDown }: MenuItemProps) {
+export function MenuItem({
+  label,
+  tip,
+  onClick,
+  danger,
+  shortcut,
+  role,
+  disabled,
+  checked,
+  submenu,
+  expanded,
+  controls,
+  onPointerEnter,
+  onKeyDown,
+}: MenuItemProps) {
   const style: CSSProperties = { ...menuItemStyle, display: 'flex', alignItems: 'center', gap: 16 };
   return (
     <button
@@ -61,26 +81,41 @@ export function MenuItem({ label, tip, onClick, danger, shortcut, role, disabled
       data-tip={tip}
       data-subtle
       className="workspace-floating-row"
-      style={danger ? { ...style, color: 'var(--control-danger-color)' } : style}
-    >
-      <span data-menu-label style={{ flex: 1, minWidth: 0, ...(tip ? { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const : {}) }}>{label}</span>
+      style={danger ? { ...style, color: 'var(--control-danger-color)' } : style}>
+      <span
+        data-menu-label
+        style={{ flex: 1, minWidth: 0, ...(tip ? ({ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' } as const) : {}) }}>
+        {label}
+      </span>
       {shortcut && <KeyHint shortcut={shortcut} />}
-      {checked === true && <span aria-hidden="true" data-check-slot style={checkSlotStyle}><Check size={12} /></span>}
+      {checked === true && (
+        <span aria-hidden="true" data-check-slot style={checkSlotStyle}>
+          <Check size={12} />
+        </span>
+      )}
       {submenu && <ChevronRight size={14} aria-hidden="true" style={{ flexShrink: 0 }} />}
     </button>
   );
 }
 
 const menuItemStyle: CSSProperties = {
-  display: 'block', width: '100%', textAlign: 'left' as const,
-  padding: '6px 12px', border: 'none',
-  color: 'var(--text-primary)', cursor: 'pointer', fontSize: 'calc(12px * var(--ui-font-scale))',
+  display: 'block',
+  width: '100%',
+  textAlign: 'left' as const,
+  padding: '6px 12px',
+  border: 'none',
+  color: 'var(--text-primary)',
+  cursor: 'pointer',
+  fontSize: 'calc(12px * var(--ui-font-scale))',
 };
 
 /** Selection marks trail the label without reserving a leading column. */
 const checkSlotStyle: CSSProperties = {
-  width: 12, display: 'inline-flex', justifyContent: 'center',
-  color: 'var(--accent)', flexShrink: 0,
+  width: 12,
+  display: 'inline-flex',
+  justifyContent: 'center',
+  color: 'var(--accent)',
+  flexShrink: 0,
 };
 
 // Shared sidebar icon controls keep a comfortable pointer target.
@@ -94,8 +129,11 @@ interface IconBtnProps {
 }
 
 export function IconBtn({ title, onClick, disabled, children, ...rest }: IconBtnProps) {
-  return <IconButton data-subtle data-tip={title} aria-label={title} onClick={onClick}
-    disabled={disabled} {...rest}>{children}</IconButton>;
+  return (
+    <IconButton data-subtle data-tip={title} aria-label={title} onClick={onClick} disabled={disabled} {...rest}>
+      {children}
+    </IconButton>
+  );
 }
 
 // Toolbar controls use the same pointer target as sidebar controls.
@@ -111,8 +149,18 @@ interface ToolbarBtnProps {
 
 export function ToolbarBtn({ title, active, onClick, children, attrs }: ToolbarBtnProps) {
   const { className, ...attributes } = attrs ?? {};
-  return <IconButton data-subtle className={`toolbar-icon-button ${typeof className === 'string' ? className : ''}`} data-active={active}
-    data-tip={title} aria-label={title} onClick={onClick} {...attributes}>{children}</IconButton>;
+  return (
+    <IconButton
+      data-subtle
+      className={`toolbar-icon-button ${typeof className === 'string' ? className : ''}`}
+      data-active={active}
+      data-tip={title}
+      aria-label={title}
+      onClick={onClick}
+      {...attributes}>
+      {children}
+    </IconButton>
+  );
 }
 
 // Duration and size formatting

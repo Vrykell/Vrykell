@@ -19,9 +19,13 @@ import { t } from '@i18n';
 export function workspacePaneResource(resource: WorkspaceResource): PaneResource {
   return {
     resource,
-    capabilities: { split: resource.kind !== 'page', rename: resource.kind === 'terminal' || resource.kind === 'conversation', persist: resource.kind !== 'page' },
+    capabilities: {
+      split: resource.kind !== 'page',
+      rename: resource.kind === 'terminal' || resource.kind === 'conversation',
+      persist: resource.kind !== 'page',
+    },
     activate: () => activateWorkspaceResource(resource),
-    requestClose: force => closeWorkspaceResource(resource, force),
+    requestClose: (force) => closeWorkspaceResource(resource, force),
     delete: () => deleteWorkspaceResource(resource),
     serialize: () => workspaceHistoryMember(resource),
   };
@@ -35,13 +39,15 @@ export async function deleteWorkspaceResource(resource: WorkspaceResource) {
     if (resource.paneId) await deleteTerminalPanes(resource.tabId, [resource.paneId]);
     else await deleteSession(resource.tabId);
     closeWorkspaceResource(resource, true);
-    if (!useWorkspaceStore.getState().tabs.some(tab => tab.id === resource.tabId && tab.kind === 'session')) await deleteSession(resource.tabId);
+    if (!useWorkspaceStore.getState().tabs.some((tab) => tab.id === resource.tabId && tab.kind === 'session'))
+      await deleteSession(resource.tabId);
     return;
   }
   closeWorkspaceResource(resource, true);
   if (resource.kind === 'conversation') {
     await useChatStore.getState().deleteConversation(resource.sessionId, { activateNext: false });
-    if (useChatStore.getState().conversations.some(item => item.id === resource.sessionId)) throw new Error(useChatStore.getState().persistenceError ?? t('The conversation could not be deleted.'));
+    if (useChatStore.getState().conversations.some((item) => item.id === resource.sessionId))
+      throw new Error(useChatStore.getState().persistenceError ?? t('The conversation could not be deleted.'));
   }
   if (resource.kind === 'agent') {
     if (member && remote) {
@@ -54,8 +60,12 @@ export async function deleteWorkspaceResource(resource: WorkspaceResource) {
 }
 
 export function currentWorkspaceResources() {
-  return workspaceResources(useWorkspaceStore.getState().tabs, useAiWorkspace.getState().nativeTabs,
-    useChatStore.getState().conversations, useHarnessWorkspace.getState().connections);
+  return workspaceResources(
+    useWorkspaceStore.getState().tabs,
+    useAiWorkspace.getState().nativeTabs,
+    useChatStore.getState().conversations,
+    useHarnessWorkspace.getState().connections,
+  );
 }
 
 export function activateWorkspaceResource(resource: WorkspaceResource) {
@@ -73,8 +83,16 @@ export function activateWorkspaceResource(resource: WorkspaceResource) {
     if (resource.kind === 'conversation') void useChatStore.getState().selectConversation(resource.sessionId);
     else useHarnessWorkspace.getState().select(resource.sessionId);
   }
-  if (resource.kind !== 'page') useWorkbenchStore.getState().update(state => focusContainerResource(state,
-    resource.kind === 'terminal' ? 'terminal' : resource.kind === 'document' || resource.kind === 'comparison' ? 'code' : 'ai', resource.id));
+  if (resource.kind !== 'page')
+    useWorkbenchStore
+      .getState()
+      .update((state) =>
+        focusContainerResource(
+          state,
+          resource.kind === 'terminal' ? 'terminal' : resource.kind === 'document' || resource.kind === 'comparison' ? 'code' : 'ai',
+          resource.id,
+        ),
+      );
 }
 
 export function closeWorkspaceResource(resource: WorkspaceResource, force = false) {

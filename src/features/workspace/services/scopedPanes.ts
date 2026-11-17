@@ -6,11 +6,19 @@ import { useWorkspaceStore } from '../stores/workspace';
 import { currentWorkspaceResources } from './workspaceResources';
 import { editorFileKey, type EditorFile } from '@core/editor';
 
-export function createScopedResource(addition: { create: 'document' | 'conversation' } | { harness: string; cwd?: string } | { file: EditorFile }) {
-  if ('file' in addition) { useWorkspaceStore.getState().openEditorFile(addition.file); return `file:${editorFileKey(addition.file)}`; }
+export function createScopedResource(
+  addition: { create: 'document' | 'conversation' } | { harness: string; cwd?: string } | { file: EditorFile },
+) {
+  if ('file' in addition) {
+    useWorkspaceStore.getState().openEditorFile(addition.file);
+    return `file:${editorFileKey(addition.file)}`;
+  }
   if ('harness' in addition) return `acp:${useHarnessWorkspace.getState().connect(addition.harness, addition.cwd, true)}`;
-  const before = new Set(currentWorkspaceResources().map(resource => resource.id));
+  const before = new Set(currentWorkspaceResources().map((resource) => resource.id));
   if (addition.create === 'document') newEditorFile();
-  else { useAiWorkspace.getState().openNative(useChatStore.getState().createConversation()); useWorkspaceStore.getState().openHarnessTab(); }
-  return currentWorkspaceResources().find(resource => !before.has(resource.id))?.id;
+  else {
+    useAiWorkspace.getState().openNative(useChatStore.getState().createConversation());
+    useWorkspaceStore.getState().openHarnessTab();
+  }
+  return currentWorkspaceResources().find((resource) => !before.has(resource.id))?.id;
 }

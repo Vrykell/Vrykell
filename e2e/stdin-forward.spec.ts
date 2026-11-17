@@ -20,11 +20,7 @@ async function startRunningBlock(page: import('@playwright/test').Page) {
 
 /** Wait until focus settles on the hidden xterm's textarea */
 async function expectXtermFocused(page: import('@playwright/test').Page) {
-  await expect
-    .poll(() =>
-      page.evaluate(() => document.activeElement?.classList.contains('xterm-helper-textarea')),
-    )
-    .toBe(true);
+  await expect.poll(() => page.evaluate(() => document.activeElement?.classList.contains('xterm-helper-textarea'))).toBe(true);
 }
 
 test('running block: keys reach the PTY through the native xterm path (backspace included, End reserved)', async ({ page }) => {

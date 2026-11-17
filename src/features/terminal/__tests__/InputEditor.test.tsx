@@ -14,9 +14,17 @@ vi.mock('../hooks/useInputEditorController', () => ({
     const inputRef = useRef<HTMLTextAreaElement>(null);
     controller.setText = setText;
     return {
-      inputRef, panelRef: useRef(null), text, aiMode: false,
-      visible: true, isFocused: true, hasSession: true, terminalLabel: 'Bash',
-      tabCwd: '/work', recentGitBranch: 'dev', ghost: '',
+      inputRef,
+      panelRef: useRef(null),
+      text,
+      aiMode: false,
+      visible: true,
+      isFocused: true,
+      hasSession: true,
+      terminalLabel: 'Bash',
+      tabCwd: '/work',
+      recentGitBranch: 'dev',
+      ghost: '',
       handleChange: (event: { target: { value: string } }) => setText(event.target.value),
     };
   },
@@ -52,7 +60,11 @@ it('separates shell, directory and branch chips with spacing instead of dots', (
 
 it('renders directory and branch chips as interactive buttons', () => {
   useTerminalStore.setState({ sessions: { pane: 'pty' } });
-  useSessionStore.setState({ tabs: [{ id: 'tab', kind: 'session', title: 'Shell', layout: { type: 'leaf', terminal: { id: 'pane', kind: 'local', shellType: 'bash' } } }] });
+  useSessionStore.setState({
+    tabs: [
+      { id: 'tab', kind: 'session', title: 'Shell', layout: { type: 'leaf', terminal: { id: 'pane', kind: 'local', shellType: 'bash' } } },
+    ],
+  });
   const { container } = render(<InputEditor paneId="pane" onSessionStatusClick={() => {}} />);
   const entry = screen.getByTestId('ssh-status-toggle');
   expect(entry.tagName).toBe('BUTTON');

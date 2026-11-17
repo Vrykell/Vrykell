@@ -3,13 +3,24 @@ import { setupTauriMock } from './tauri-mock';
 
 const button = (page: Page, id: string) => page.locator(`[data-dock-btn="${id}"]`);
 const zone = (page: Page) => page.locator('[data-dock-zone="right"]');
-const order = (page: Page) => zone(page).locator('[data-dock-btn]').evaluateAll(elements => elements.map(element => element.getAttribute('data-dock-btn')));
+const order = (page: Page) =>
+  zone(page)
+    .locator('[data-dock-btn]')
+    .evaluateAll((elements) => elements.map((element) => element.getAttribute('data-dock-btn')));
 const panel = (page: Page) => page.locator('.workspace-side-panel[data-side="right"]:visible');
 
 test.beforeEach(async ({ page }) => {
   await setupTauriMock(page);
   await page.addInitScript(() => {
-    for (const type of ['dragstart', 'dragover', 'drop']) document.addEventListener(type, event => { event.preventDefault(); event.stopImmediatePropagation(); }, true);
+    for (const type of ['dragstart', 'dragover', 'drop'])
+      document.addEventListener(
+        type,
+        (event) => {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        },
+        true,
+      );
   });
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
@@ -33,8 +44,10 @@ test('reordering and hiding the assistant keep its conversation draft and right 
   await button(page, 'chat').dragTo(button(page, 'files'), { targetPosition: { x: 4, y: 16 } });
   expect((await order(page))[0]).toBe('chat');
   await expect(panel(page).locator('[data-chat-composer]')).toHaveValue('Preserve this draft');
-  await button(page, 'chat').click(); await expect(composer).toBeHidden();
-  await button(page, 'chat').click(); await expect(composer).toHaveValue('Preserve this draft');
+  await button(page, 'chat').click();
+  await expect(composer).toBeHidden();
+  await button(page, 'chat').click();
+  await expect(composer).toHaveValue('Preserve this draft');
   await page.reload();
   await expect(panel(page).locator('[data-chat-composer]')).toBeVisible();
   expect((await order(page))[0]).toBe('chat');
@@ -64,25 +77,31 @@ test('narrow windows keep all fixed and auxiliary controls inside the applicatio
 
 test('Escape cancels the preview without toggling or saving a panel', async ({ page }) => {
   const saved = await page.evaluate(() => localStorage.getItem('dock-layout-v6'));
-  const source = (await button(page, 'files').boundingBox())!, target = (await button(page, 'chat').boundingBox())!;
-  await page.mouse.move(source.x + 16, source.y + 16); await page.mouse.down();
+  const source = (await button(page, 'files').boundingBox())!,
+    target = (await button(page, 'chat').boundingBox())!;
+  await page.mouse.move(source.x + 16, source.y + 16);
+  await page.mouse.down();
   await page.mouse.move(target.x + 12, target.y + 16, { steps: 8 });
   await expect(zone(page)).toHaveAttribute('data-drop-active', 'true');
-  await page.keyboard.press('Escape'); await page.mouse.up();
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
   expect(await order(page)).toEqual(['files', 'git', 'command-history', 'chat']);
   expect(await page.evaluate(() => localStorage.getItem('dock-layout-v6'))).toBe(saved);
   await expect(panel(page)).toHaveCount(0);
-  await button(page, 'files').click(); await expect(panel(page).getByText('notes.txt')).toBeVisible();
+  await button(page, 'files').click();
+  await expect(panel(page).getByText('notes.txt')).toBeVisible();
 });
 
 test('search stays centered within the whole application and never overlaps actions', async ({ page }) => {
   for (const width of [1550, 1240, 900, 720]) {
     await page.setViewportSize({ width, height: 600 });
-    await expect.poll(async () => {
-      const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
-      const header = (await page.locator('.application-window').boundingBox())!;
-      return Math.abs(search.x + search.width / 2 - header.x - header.width / 2);
-    }).toBeLessThan(1);
+    await expect
+      .poll(async () => {
+        const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
+        const header = (await page.locator('.application-window').boundingBox())!;
+        return Math.abs(search.x + search.width / 2 - header.x - header.width / 2);
+      })
+      .toBeLessThan(1);
     const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
     const actions = (await page.locator('.workspace-title-actions').boundingBox())!;
     expect(search.x + search.width).toBeLessThanOrEqual(actions.x - 4);
@@ -93,9 +112,11 @@ test('search stays centered within the whole application and never overlaps acti
 test('settings is fixed at the foot of the full-height sidebar and remains keyboard accessible', async ({ page }) => {
   const settings = button(page, 'settings');
   await expect(settings).toHaveAttribute('data-dock-fixed', 'true');
-  const box = (await settings.boundingBox())!, last = (await button(page, 'ssh').boundingBox())!;
+  const box = (await settings.boundingBox())!,
+    last = (await button(page, 'ssh').boundingBox())!;
   expect(box.y).toBeGreaterThan(last.y + last.height);
-  await settings.focus(); await settings.press('Enter');
+  await settings.focus();
+  await settings.press('Enter');
   await expect(page.locator('.settings-screen')).toBeVisible();
   await expect(settings).toHaveAttribute('aria-pressed', 'true');
   await settings.press('Enter');
@@ -103,27 +124,32 @@ test('settings is fixed at the foot of the full-height sidebar and remains keybo
 });
 
 test('a toolbar drag reserves a stable shared insertion gap before saving', async ({ page }) => {
-  const source = (await button(page, 'chat').boundingBox())!, target = (await button(page, 'files').boundingBox())!;
+  const source = (await button(page, 'chat').boundingBox())!,
+    target = (await button(page, 'files').boundingBox())!;
   const saved = await page.evaluate(() => localStorage.getItem('dock-layout-v6'));
-  await page.mouse.move(source.x + 16, source.y + 16); await page.mouse.down();
+  await page.mouse.move(source.x + 16, source.y + 16);
+  await page.mouse.down();
   await page.mouse.move(target.x + 4, target.y + 16, { steps: 8 });
-  const gap = zone(page).locator('[data-dock-placeholder="0"]'); await expect(gap).toBeVisible();
+  const gap = zone(page).locator('[data-dock-placeholder="0"]');
+  await expect(gap).toBeVisible();
   await expect(gap).toHaveCSS('border-width', '0px');
   const bounds = (await gap.boundingBox())!;
-  expect(bounds.width).toBe(32); expect(bounds.height).toBe(32);
+  expect(bounds.width).toBe(32);
+  expect(bounds.height).toBe(32);
   for (const delta of [-1, 0, 1]) {
     await page.mouse.move(bounds.x + bounds.width / 2 + delta, bounds.y + bounds.height / 2);
     expect((await gap.boundingBox())!.x).toBe(bounds.x);
   }
   expect(await page.evaluate(() => localStorage.getItem('dock-layout-v6'))).toBe(saved);
-  await page.mouse.up(); expect((await order(page))[0]).toBe('chat');
+  await page.mouse.up();
+  expect((await order(page))[0]).toBe('chat');
   await expect(page.locator('[data-dock-placeholder]')).toHaveCount(0);
 });
 
 for (const theme of ['dark', 'light'] as const) {
   for (const width of [1240, 720]) {
     test(`drag insertion slots have no edge borders in ${theme} at ${width}px`, async ({ page }, info) => {
-      await page.addInitScript(mode => localStorage.setItem('vrykell-theme-mode', mode), theme);
+      await page.addInitScript((mode) => localStorage.setItem('vrykell-theme-mode', mode), theme);
       await page.setViewportSize({ width, height: 800 });
       await page.reload();
       await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
@@ -183,7 +209,8 @@ test('crossing sides previews the real panel surface and moving a left panel bac
   // Dragging the left panel's heading back to the right dock previews the real right surface.
   const heading = (await page.getByTestId('panel-drag-handle-files').boundingBox())!;
   const rightTarget = (await button(page, 'command-history').boundingBox())!;
-  await page.mouse.move(heading.x + 24, heading.y + heading.height / 2); await page.mouse.down();
+  await page.mouse.move(heading.x + 24, heading.y + heading.height / 2);
+  await page.mouse.down();
   await page.mouse.move(rightTarget.x + rightTarget.width / 2, rightTarget.y + rightTarget.height / 2, { steps: 8 });
   const preview = page.getByTestId('panel-drop-preview');
   await expect(preview).toHaveAttribute('data-side', 'right');
@@ -205,8 +232,10 @@ test('workspace navigation rows reorder vertically and retain their order', asyn
   await expect(page.locator('[data-reorder-preview]')).toBeVisible();
   await expect(page.locator('[data-reorder-placeholder]')).toHaveCSS('border-width', '0px');
   await page.mouse.up();
-  const order = () => page.locator('[data-testid^="workspace-area-"]').evaluateAll(rows =>
-    rows.map(row => row.getAttribute('data-testid')?.replace('workspace-area-', '')));
+  const order = () =>
+    page
+      .locator('[data-testid^="workspace-area-"]')
+      .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-testid')?.replace('workspace-area-', '')));
   await expect.poll(order).toEqual(['ssh', 'terminal', 'code', 'ai', 'unified']);
   await page.reload();
   await expect.poll(order).toEqual(['ssh', 'terminal', 'code', 'ai', 'unified']);
@@ -228,8 +257,10 @@ test('navigation keeps the end slot and the docked panel stable while dragging b
     useDockStore.getState().openPanel('files');
   });
   await expect(page.getByTestId('panel-drag-handle-files')).toBeVisible();
-  const order = () => page.locator('[data-testid^="workspace-area-"]').evaluateAll(rows =>
-    rows.map(row => row.getAttribute('data-testid')?.replace('workspace-area-', '')));
+  const order = () =>
+    page
+      .locator('[data-testid^="workspace-area-"]')
+      .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-testid')?.replace('workspace-area-', '')));
   const nav = (await page.locator('.workspace-area-navigation').boundingBox())!;
   const tools = page.getByTestId('workspace-left-dock');
   const toolsTop = (await tools.boundingBox())!.y;
@@ -255,11 +286,14 @@ test('navigation keeps the end slot and the docked panel stable while dragging b
 test('panel headings retain their appearance and offer the left middle and right edge', async ({ page }, info) => {
   await button(page, 'files').click();
   const heading = page.getByTestId('panel-drag-handle-files');
-  const background = await heading.evaluate(element => getComputedStyle(element).backgroundColor);
-  await heading.hover(); await expect(heading).toHaveCSS('cursor', 'grab');
-  expect(await heading.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(background);
-  const start = (await heading.boundingBox())!, body = (await page.locator('.workspace-body').boundingBox())!;
-  await page.mouse.move(start.x + 24, start.y + start.height / 2); await page.mouse.down();
+  const background = await heading.evaluate((element) => getComputedStyle(element).backgroundColor);
+  await heading.hover();
+  await expect(heading).toHaveCSS('cursor', 'grab');
+  expect(await heading.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(background);
+  const start = (await heading.boundingBox())!,
+    body = (await page.locator('.workspace-body').boundingBox())!;
+  await page.mouse.move(start.x + 24, start.y + start.height / 2);
+  await page.mouse.down();
   const left = (await page.getByTestId('workspace-left-dock').boundingBox())!;
   await page.mouse.move(left.x + 50, left.y + 100, { steps: 8 });
   await expect(page.getByTestId('panel-drop-preview')).toHaveAttribute('data-side', 'left');
@@ -278,7 +312,9 @@ test('panel headings retain their appearance and offer the left middle and right
   await page.mouse.move(body.x + body.width - 24, body.y + 200, { steps: 8 });
   await expect(page.getByTestId('panel-drop-preview')).toHaveAttribute('data-side', 'right');
   await page.screenshot({ path: info.outputPath('right-panel-placement.png') });
-  await page.keyboard.press('Escape'); await page.mouse.up();
+  await page.keyboard.press('Escape');
+  await page.mouse.up();
   await expect(panel(page).getByText('notes.txt')).toBeVisible();
-  await heading.getByRole('button').click(); await expect(panel(page)).toHaveCount(0);
+  await heading.getByRole('button').click();
+  await expect(panel(page)).toHaveCount(0);
 });

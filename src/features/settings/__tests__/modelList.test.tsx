@@ -63,7 +63,9 @@ describe('model list', () => {
   it('does not repeat the identifier when the name is the identifier', () => {
     const synced: ProviderRow<ModelProfile> = {
       ...row,
-      models: [{ id: 's1', name: 'gpt-4o-mini', provider: 'openai-compatible', baseUrl: 'https://api.example.com/v1', model: 'gpt-4o-mini' }],
+      models: [
+        { id: 's1', name: 'gpt-4o-mini', provider: 'openai-compatible', baseUrl: 'https://api.example.com/v1', model: 'gpt-4o-mini' },
+      ],
     };
     useAiConfigStore.setState({ models: synced.models, activeModel: 's1' });
     render(<ProviderModelList row={synced} toast={() => {}} />);
@@ -116,14 +118,20 @@ describe('model list', () => {
 
   it('stays quiet about switching when the save fails', async () => {
     const toast = vi.fn();
-    invokeMock.mockImplementation((command: string) => command === 'set_active_model'
-      ? Promise.reject(new Error('offline'))
-      : Promise.resolve(null));
-    render(<SettingsSaveProvider><ProviderModelList row={row} toast={toast} /></SettingsSaveProvider>);
+    invokeMock.mockImplementation((command: string) =>
+      command === 'set_active_model' ? Promise.reject(new Error('offline')) : Promise.resolve(null),
+    );
+    render(
+      <SettingsSaveProvider>
+        <ProviderModelList row={row} toast={toast} />
+      </SettingsSaveProvider>,
+    );
     fireEvent.click(within(screen.getAllByTestId('model-row')[1]!).getByTestId('model-actions'));
     fireEvent.click(within(screen.getByRole('menu')).getByText('设为当前'));
     await waitFor(() => expect(invokeMock).toHaveBeenCalledWith('set_active_model', { id: 'm2' }));
-    await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
     expect(useAiConfigStore.getState().activeModel).toBe('m1');
     expect(toast).not.toHaveBeenCalledWith('已切换到 Reasoner', 'success');
   });
@@ -214,7 +222,13 @@ describe('model list', () => {
   });
 
   it('keeps the active model inside its provider when the active row is deleted', async () => {
-    const other = { id: 'a1', name: 'Other vendor', provider: 'anthropic' as const, baseUrl: 'https://api.anthropic.com/v1', model: 'claude-sonnet-4' };
+    const other = {
+      id: 'a1',
+      name: 'Other vendor',
+      provider: 'anthropic' as const,
+      baseUrl: 'https://api.anthropic.com/v1',
+      model: 'claude-sonnet-4',
+    };
     const models = [other, row.models[0]!, row.models[1]!];
     useAiConfigStore.setState({ models, activeModel: 'm1' });
     const view = render(<ProviderModelList row={{ ...row, models: [row.models[0]!, row.models[1]!] }} toast={() => {}} />);
@@ -223,7 +237,7 @@ describe('model list', () => {
     fireEvent.click(within(screen.getByRole('menu')).getByText('删除模型'));
     fireEvent.click(within(await screen.findByTestId('confirm-dialog')).getByTestId('confirm-ok'));
 
-    await waitFor(() => expect(useAiConfigStore.getState().models.map(model => model.id)).toEqual(['a1', 'm2']));
+    await waitFor(() => expect(useAiConfigStore.getState().models.map((model) => model.id)).toEqual(['a1', 'm2']));
     expect(useAiConfigStore.getState().activeModel).toBe('m2');
     // The provider page re-reads the store row, so the deleted row leaves the list.
     view.rerender(<ProviderModelList row={{ ...row, models: [row.models[1]!] }} toast={() => {}} />);
@@ -238,7 +252,7 @@ describe('model list', () => {
     fireEvent.click(within(screen.getByRole('menu')).getByText('删除模型'));
     fireEvent.click(within(await screen.findByTestId('confirm-dialog')).getByTestId('confirm-ok'));
 
-    await waitFor(() => expect(useAiConfigStore.getState().models.map(model => model.id)).toEqual(['m1', 'm3']));
+    await waitFor(() => expect(useAiConfigStore.getState().models.map((model) => model.id)).toEqual(['m1', 'm3']));
     expect(useAiConfigStore.getState().activeModel).toBe('m1');
   });
 });

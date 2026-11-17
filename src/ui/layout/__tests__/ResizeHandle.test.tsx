@@ -27,7 +27,9 @@ describe('ResizeHandle', () => {
     fireEvent.mouseDown(handle, { clientX: 200, clientY: 50 });
     fireEvent.mouseLeave(handle);
     fireEvent.mouseMove(document, { clientX: 240, clientY: 70 });
-    await act(async () => { await new Promise<void>(resolve => requestAnimationFrame(() => resolve())); });
+    await act(async () => {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    });
     expect(line.style.backgroundColor).toBe('var(--border-strong)');
     expect(onDelta).toHaveBeenCalledWith(40);
     fireEvent.mouseUp(document);
@@ -39,7 +41,9 @@ describe('ResizeHandle', () => {
   });
 
   it('provides keyboard resizing and reset for a labelled separator', () => {
-    const onDelta = vi.fn(); const onUp = vi.fn(); const onReset = vi.fn();
+    const onDelta = vi.fn();
+    const onUp = vi.fn();
+    const onReset = vi.fn();
     const { getByRole } = render(<ResizeHandle axis="y" label="Resize details" onDelta={onDelta} onUp={onUp} onReset={onReset} />);
     const handle = getByRole('separator', { name: 'Resize details' });
     expect(handle).toHaveAttribute('aria-orientation', 'horizontal');
@@ -54,7 +58,10 @@ describe('ResizeHandle', () => {
 
   it('coalesces pointer updates per frame and flushes the last delta before committing', () => {
     const frames: FrameRequestCallback[] = [];
-    const request = vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => { frames.push(callback); return frames.length; });
+    const request = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
+      frames.push(callback);
+      return frames.length;
+    });
     const cancel = vi.spyOn(window, 'cancelAnimationFrame').mockImplementation(() => {});
     const onDelta = vi.fn();
     const onUp = vi.fn(() => expect(onDelta).toHaveBeenLastCalledWith(7));
@@ -71,6 +78,7 @@ describe('ResizeHandle', () => {
     expect(onDelta.mock.calls).toEqual([[30], [7]]);
     expect(onUp).toHaveBeenCalledOnce();
     expect(cancel).toHaveBeenCalledWith(2);
-    request.mockRestore(); cancel.mockRestore();
+    request.mockRestore();
+    cancel.mockRestore();
   });
 });

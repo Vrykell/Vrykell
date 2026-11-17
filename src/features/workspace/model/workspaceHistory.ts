@@ -29,17 +29,20 @@ export interface WorkspaceHistorySnapshot {
   group?: { id: string; title: string; collapsed: boolean };
 }
 
-export interface WorkspaceHistoryIdentity { id: string; createdAt: number }
+export interface WorkspaceHistoryIdentity {
+  id: string;
+  createdAt: number;
+}
 
 /** Session history excludes file references; live restoration keeps its complete snapshot. */
 export function sessionHistorySnapshot(snapshot: WorkspaceHistorySnapshot | null): WorkspaceHistorySnapshot | null {
   if (!snapshot) return null;
-  const members = snapshot.members.filter(member => member.kind !== 'document' && member.kind !== 'comparison');
+  const members = snapshot.members.filter((member) => member.kind !== 'document' && member.kind !== 'comparison');
   if (members.length === snapshot.members.length) return snapshot;
-  const layout = pruneWorkspacePanes(snapshot.layout, new Set(members.map(member => member.id)));
+  const layout = pruneWorkspacePanes(snapshot.layout, new Set(members.map((member) => member.id)));
   if (!layout) return null;
   const cells = workspacePaneCells(layout);
-  return { ...snapshot, layout, members, focused: cells.some(cell => cell.id === snapshot.focused) ? snapshot.focused : cells[0]!.id };
+  return { ...snapshot, layout, members, focused: cells.some((cell) => cell.id === snapshot.focused) ? snapshot.focused : cells[0]!.id };
 }
 
 const kinds = new Set(['terminal', 'conversation', 'agent', 'document', 'comparison']);
@@ -51,37 +54,71 @@ export function parseWorkspaceHistory(payload: string): WorkspaceHistorySnapshot
     const value: unknown = JSON.parse(payload);
     if (!value || typeof value !== 'object') return null;
     const snapshot = value as Record<string, unknown>;
-    if (snapshot.workspaceScope !== undefined && !['terminal', 'code', 'ai', 'unified'].includes(String(snapshot.workspaceScope))) return null;
+    if (snapshot.workspaceScope !== undefined && !['terminal', 'code', 'ai', 'unified'].includes(String(snapshot.workspaceScope)))
+      return null;
     if (snapshot.group !== undefined) {
       if (!snapshot.group || typeof snapshot.group !== 'object') return null;
       const group = snapshot.group as Record<string, unknown>;
-      if (typeof group.id !== 'string' || !group.id || group.id.length > 256 || typeof group.title !== 'string' || !group.title || group.title.length > 320 || typeof group.collapsed !== 'boolean') return null;
+      if (
+        typeof group.id !== 'string' ||
+        !group.id ||
+        group.id.length > 256 ||
+        typeof group.title !== 'string' ||
+        !group.title ||
+        group.title.length > 320 ||
+        typeof group.collapsed !== 'boolean'
+      )
+        return null;
     }
     const layout = parseWorkspacePaneLayout(snapshot.layout);
     if (snapshot.version !== 1 || !layout || typeof snapshot.focused !== 'string' || !Array.isArray(snapshot.members)) return null;
     const cells = workspacePaneCells(layout);
-    if (cells.length !== snapshot.members.length || cells.length < 1 || !cells.some(cell => cell.id === snapshot.focused)) return null;
+    if (cells.length !== snapshot.members.length || cells.length < 1 || !cells.some((cell) => cell.id === snapshot.focused)) return null;
     const ids = new Set<string>();
     for (const entry of snapshot.members) {
       if (!entry || typeof entry !== 'object') return null;
       const member = entry as Record<string, unknown>;
-      if (typeof member.id !== 'string' || ids.has(member.id) || !cells.some(cell => cell.resourceId === member.id)
-        || typeof member.title !== 'string' || member.title.length > 320 || typeof member.reference !== 'string' || member.reference.length > 8192
-        || typeof member.kind !== 'string' || !kinds.has(member.kind) || typeof member.local !== 'boolean' || typeof member.ssh !== 'boolean'
-        || !Number.isInteger(member.paneCount) || Number(member.paneCount) < 1 || Number(member.paneCount) > 4) return null;
+      if (
+        typeof member.id !== 'string' ||
+        ids.has(member.id) ||
+        !cells.some((cell) => cell.resourceId === member.id) ||
+        typeof member.title !== 'string' ||
+        member.title.length > 320 ||
+        typeof member.reference !== 'string' ||
+        member.reference.length > 8192 ||
+        typeof member.kind !== 'string' ||
+        !kinds.has(member.kind) ||
+        typeof member.local !== 'boolean' ||
+        typeof member.ssh !== 'boolean' ||
+        !Number.isInteger(member.paneCount) ||
+        Number(member.paneCount) < 1 ||
+        Number(member.paneCount) > 4
+      )
+        return null;
       for (const field of ['cwd', 'connectionId', 'draftId', 'remoteId', 'paneId']) {
         if (member[field] !== undefined && (typeof member[field] !== 'string' || member[field].length > 4096)) return null;
       }
       if (member.shellType !== undefined && (typeof member.shellType !== 'string' || member.shellType.length > 64)) return null;
       if (member.empty !== undefined && typeof member.empty !== 'boolean') return null;
       if (member.kind === 'comparison' && (typeof member.scope !== 'string' || !scopes.has(member.scope))) return null;
-      if (member.modes !== undefined && (!Array.isArray(member.modes) || member.modes.some(mode => mode !== 'block' && mode !== 'classic'))) return null;
+      if (
+        member.modes !== undefined &&
+        (!Array.isArray(member.modes) || member.modes.some((mode) => mode !== 'block' && mode !== 'classic'))
+      )
+        return null;
       ids.add(member.id);
     }
-    return { version: 1, layout, focused: snapshot.focused, members: snapshot.members as WorkspaceHistoryMember[],
+    return {
+      version: 1,
+      layout,
+      focused: snapshot.focused,
+      members: snapshot.members as WorkspaceHistoryMember[],
       ...(snapshot.workspaceScope ? { workspaceScope: snapshot.workspaceScope as WorkspaceHistorySnapshot['workspaceScope'] } : {}),
-      ...(snapshot.group ? { group: snapshot.group as WorkspaceHistorySnapshot['group'] } : {}) };
-  } catch { return null; }
+      ...(snapshot.group ? { group: snapshot.group as WorkspaceHistorySnapshot['group'] } : {}),
+    };
+  } catch {
+    return null;
+  }
 }
 
 export function remapWorkspaceHistory(snapshot: WorkspaceHistorySnapshot, references: ReadonlyMap<string, string>): WorkspacePaneLayout {

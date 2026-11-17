@@ -31,11 +31,9 @@ export const useBlockStore = create<BlockState>((set) => ({
       };
     }),
 
-  setBlocks: (tabId, blocks) =>
-    set((s) => ({ byTab: { ...s.byTab, [tabId]: blocks } })),
+  setBlocks: (tabId, blocks) => set((s) => ({ byTab: { ...s.byTab, [tabId]: blocks } })),
 
-  clearBlocks: (tabId) =>
-    set((s) => ({ byTab: { ...s.byTab, [tabId]: [] } })),
+  clearBlocks: (tabId) => set((s) => ({ byTab: { ...s.byTab, [tabId]: [] } })),
 
   dropTab: (tabId) =>
     set((s) => {

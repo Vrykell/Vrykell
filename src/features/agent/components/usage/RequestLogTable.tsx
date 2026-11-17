@@ -47,28 +47,33 @@ export default function RequestLogTable({ rows }: { rows: UsageRecord[] }) {
                   {t('No usage was recorded in this range.')}
                 </td>
               </tr>
-            ) : paged.rows.map((record) => (
-              <tr key={record.id} style={usageTable.row} data-testid="usage-log-row" data-model={record.model}>
-                <td style={{ ...usageTable.td, ...usageTable.mono }} title={formatLogFullTime(record.at)}>
-                  {formatLogTime(record.at)}
-                </td>
-                <td style={usageTable.td} title={record.provider}>{record.provider}</td>
-                <td style={{ ...usageTable.td, ...usageTable.mono, ...usageTable.primary }} title={record.model}>
-                  <VendorDot provider={record.provider} model={record.model} />{record.model}
-                </td>
-                <td style={usageTable.td} title={formatTokens(freshInputTokens(record))}>
-                  {formatCompact(freshInputTokens(record))}
-                </td>
-                <td style={usageTable.td} title={formatTokens(record.outputTokens)}>
-                  {formatCompact(record.outputTokens)}
-                </td>
-                <td style={usageTable.td} title={formatTokens(record.cachedInputTokens)}>
-                  {formatCompact(record.cachedInputTokens)}
-                </td>
-                <td style={usageTable.td}>{record.steps}</td>
-                <td style={usageTable.td}>{record.toolCalls}</td>
-              </tr>
-            ))}
+            ) : (
+              paged.rows.map((record) => (
+                <tr key={record.id} style={usageTable.row} data-testid="usage-log-row" data-model={record.model}>
+                  <td style={{ ...usageTable.td, ...usageTable.mono }} title={formatLogFullTime(record.at)}>
+                    {formatLogTime(record.at)}
+                  </td>
+                  <td style={usageTable.td} title={record.provider}>
+                    {record.provider}
+                  </td>
+                  <td style={{ ...usageTable.td, ...usageTable.mono, ...usageTable.primary }} title={record.model}>
+                    <VendorDot provider={record.provider} model={record.model} />
+                    {record.model}
+                  </td>
+                  <td style={usageTable.td} title={formatTokens(freshInputTokens(record))}>
+                    {formatCompact(freshInputTokens(record))}
+                  </td>
+                  <td style={usageTable.td} title={formatTokens(record.outputTokens)}>
+                    {formatCompact(record.outputTokens)}
+                  </td>
+                  <td style={usageTable.td} title={formatTokens(record.cachedInputTokens)}>
+                    {formatCompact(record.cachedInputTokens)}
+                  </td>
+                  <td style={usageTable.td}>{record.steps}</td>
+                  <td style={usageTable.td}>{record.toolCalls}</td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
       </div>

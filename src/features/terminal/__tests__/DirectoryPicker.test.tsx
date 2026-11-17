@@ -11,21 +11,31 @@ vi.mock('@platform/pty', () => ({ ptyWrite: mocks.write }));
 vi.mock('../hooks/useTerminalSession', () => ({ setPendingTerminalCommand: mocks.pending }));
 vi.mock('../hooks/useFollowBottom', () => ({ engageFollow: mocks.follow }));
 const snapshots = [useSessionStore.getState(), useTerminalStore.getState(), useInputStore.getState(), useBlockStore.getState()] as const;
-const folders: FileListResult = { base: null, entries: [
-  { name: 'Documents', path: '/work/Documents', is_dir: true },
-  { name: "it's a folder", path: "/work/it's a folder", is_dir: true },
-  { name: 'notes.txt', path: '/work/notes.txt', is_dir: false },
-] };
+const folders: FileListResult = {
+  base: null,
+  entries: [
+    { name: 'Documents', path: '/work/Documents', is_dir: true },
+    { name: "it's a folder", path: "/work/it's a folder", is_dir: true },
+    { name: 'notes.txt', path: '/work/notes.txt', is_dir: false },
+  ],
+};
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.list.mockResolvedValue(folders);
   mocks.write.mockResolvedValue(undefined);
   mocks.pending.mockReturnValue(true);
-  mocks.factory.mockReturnValue({ list: mocks.list, parentOf: (path: string) => path === '/' ? null : path.slice(0, path.lastIndexOf('/')) || '/' });
+  mocks.factory.mockReturnValue({
+    list: mocks.list,
+    parentOf: (path: string) => (path === '/' ? null : path.slice(0, path.lastIndexOf('/')) || '/'),
+  });
   useTerminalStore.setState({ sessions: { pane: 'pty' } });
   useBlockStore.setState({ byTab: {} });
   useInputStore.setState({ byPane: { pane: { text: 'my draft', aiMode: false } } });
-  useSessionStore.setState({ tabs: [{ id: 'tab', kind: 'session', title: 'Shell', layout: { type: 'leaf', terminal: { id: 'pane', kind: 'local', shellType: 'bash' } } }] });
+  useSessionStore.setState({
+    tabs: [
+      { id: 'tab', kind: 'session', title: 'Shell', layout: { type: 'leaf', terminal: { id: 'pane', kind: 'local', shellType: 'bash' } } },
+    ],
+  });
 });
 afterEach(() => {
   cleanup();
@@ -77,8 +87,21 @@ it('uses the live shell instead of a missing or outdated layout preference', asy
 });
 it('uses the remote file interface and ignores a stale listing after the directory changes', async () => {
   let resolve!: (result: FileListResult) => void;
-  mocks.list.mockReturnValueOnce(new Promise<FileListResult>(done => { resolve = done; }));
-  useSessionStore.setState({ tabs: [{ id: 'tab', kind: 'session', title: 'Remote', layout: { type: 'leaf', terminal: { id: 'pane', kind: 'ssh', ssh: { name: 'host', host: 'host', connectionId: 'remote' } } } }] });
+  mocks.list.mockReturnValueOnce(
+    new Promise<FileListResult>((done) => {
+      resolve = done;
+    }),
+  );
+  useSessionStore.setState({
+    tabs: [
+      {
+        id: 'tab',
+        kind: 'session',
+        title: 'Remote',
+        layout: { type: 'leaf', terminal: { id: 'pane', kind: 'ssh', ssh: { name: 'host', host: 'host', connectionId: 'remote' } } },
+      },
+    ],
+  });
   const view = render(<DirectoryPicker paneId="pane" dir="/work" />);
   fireEvent.click(screen.getByRole('button', { name: '切换工作目录' }));
   expect(mocks.factory).toHaveBeenCalledWith({ kind: 'ssh', connectionId: 'remote' });
@@ -97,7 +120,16 @@ it('disables navigation without a live session or a known directory', () => {
   expect(screen.getByRole('button', { name: '切换工作目录' })).toBeDisabled();
 });
 it('keeps a disconnected remote pane from browsing the local filesystem', () => {
-  useSessionStore.setState({ tabs: [{ id: 'tab', kind: 'session', title: 'Remote', layout: { type: 'leaf', terminal: { id: 'pane', kind: 'ssh', ssh: { name: 'host', host: 'host' } } } }] });
+  useSessionStore.setState({
+    tabs: [
+      {
+        id: 'tab',
+        kind: 'session',
+        title: 'Remote',
+        layout: { type: 'leaf', terminal: { id: 'pane', kind: 'ssh', ssh: { name: 'host', host: 'host' } } },
+      },
+    ],
+  });
   render(<DirectoryPicker paneId="pane" dir="/work" />);
   const trigger = screen.getByRole('button', { name: '切换工作目录' });
   expect(trigger).toBeDisabled();

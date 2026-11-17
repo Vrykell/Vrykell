@@ -8,19 +8,29 @@ test('large command history stays readable and input reaches the terminal prompt
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   const history = await page.evaluate(async () => {
     const path = '/src/features/terminal/stores/blocks.ts';
-    const { useBlockStore } = await import(path) as typeof import('../src/features/terminal/stores/blocks');
-    const scope = window as unknown as { __vrykellSessionRegistry: { controllers: Map<string, { seed(blocks: import('../src/features/terminal/services/pipeline/termBlock').TermBlock[]): void }> } };
+    const { useBlockStore } = (await import(path)) as typeof import('../src/features/terminal/stores/blocks');
+    const scope = window as unknown as {
+      __vrykellSessionRegistry: {
+        controllers: Map<string, { seed(blocks: import('../src/features/terminal/services/pipeline/termBlock').TermBlock[]): void }>;
+      };
+    };
     const paneId = [...scope.__vrykellSessionRegistry.controllers.keys()][0]!;
     const blocks = Array.from({ length: 200 }, (_, i) => ({
-      id: `performance-${i}`, command: `history-${i}`, status: 'done' as const, exitCode: 0,
-      startedAt: i + 1, endedAt: i + 2, wasLongRunning: false, linesTruncated: 0,
+      id: `performance-${i}`,
+      command: `history-${i}`,
+      status: 'done' as const,
+      exitCode: 0,
+      startedAt: i + 1,
+      endedAt: i + 2,
+      wasLongRunning: false,
+      linesTruncated: 0,
       outputText: Array.from({ length: 150 }, (_, row) => `row-${i}-${row}`).join('\n'),
       outputHtml: Array.from({ length: 150 }, (_, row) => `<span style="color:var(--success)">row-${i}-${row}</span>`).join('<br>'),
       outputRaw: '',
     }));
     const started = performance.now();
     scope.__vrykellSessionRegistry.controllers.get(paneId)!.seed(blocks);
-    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     return { mountMs: performance.now() - started, blocks: useBlockStore.getState().byTab[paneId]?.length };
   });
   await expect(page.locator('[data-testid^="command-block-"]')).toHaveCount(200);
@@ -31,7 +41,7 @@ test('large command history stays readable and input reaches the terminal prompt
   for (let i = 0; i < 12; i++) {
     const started = Date.now();
     await page.getByPlaceholder(/输入命令/).press('a');
-    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => resolve())));
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
     latencies.push(Date.now() - started);
   }
   await page.getByPlaceholder(/输入命令/).fill('');
@@ -40,8 +50,10 @@ test('large command history stays readable and input reaches the terminal prompt
   await expect(page.locator('[data-testid^="command-block-"]').last()).toContainText('new-output');
   const appendMs = Date.now() - started;
   const scroll = page.locator('[data-testid^="terminal-scroll-"]').first();
-  const scrollHeight = await scroll.evaluate(element => element.scrollHeight);
-  await scroll.evaluate(element => { element.scrollTop = 0; });
+  const scrollHeight = await scroll.evaluate((element) => element.scrollHeight);
+  await scroll.evaluate((element) => {
+    element.scrollTop = 0;
+  });
   await expect(page.getByTestId('command-block-performance-1')).toContainText('row-1-0');
   await emitPtyOutput(page, '\x1b]133;E;c3RyZWFt\x07\x1b]133;C\x07');
   await expect(page.getByTestId('running-term')).toBeVisible();
@@ -63,12 +75,17 @@ test('large command history stays readable and input reaches the terminal prompt
       const start = performance.now();
       scope.__TAURI_INTERNALS__.emitPtyOutput('live output\r\n'.repeat(20));
       history.scrollTop += frame < 45 ? 800 : -800;
-      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       const elapsed = performance.now() - start;
-      const currentBlock = history.parentElement?.querySelector<HTMLElement>(':scope > .pinned-command-clip > [data-pinned-block-id]')?.dataset.pinnedBlockId ?? '';
+      const currentBlock =
+        history.parentElement?.querySelector<HTMLElement>(':scope > .pinned-command-clip > [data-pinned-block-id]')?.dataset
+          .pinnedBlockId ?? '';
       if (currentBlock !== previousBlock) boundaryFrames = 2;
       previousBlock = currentBlock;
-      if (boundaryFrames > 0) { boundaries.push(elapsed); boundaryFrames--; }
+      if (boundaryFrames > 0) {
+        boundaries.push(elapsed);
+        boundaryFrames--;
+      }
       frames.push(elapsed);
     }
     return { frames: frames.sort((a, b) => a - b), boundaries };
@@ -77,13 +94,36 @@ test('large command history stays readable and input reaches the terminal prompt
   if (profiler && beforeProfile) {
     const afterProfile = await profiler.send('Performance.getMetrics');
     const { profile } = await profiler.send('Profiler.stop');
-    console.log('SCROLL-COST', afterProfile.metrics.filter(item => /Duration/.test(item.name)).map(item => ({ name: item.name, delta: item.value - (beforeProfile.metrics.find(previous => previous.name === item.name)?.value ?? 0) })));
-    console.log('SCROLL-HOTSPOTS', profile.nodes.filter(item => item.hitCount).sort((a, b) => (b.hitCount ?? 0) - (a.hitCount ?? 0)).slice(0, 18).map(item => ({ name: item.callFrame.functionName, url: item.callFrame.url, line: item.callFrame.lineNumber, hits: item.hitCount })));
+    console.log(
+      'SCROLL-COST',
+      afterProfile.metrics
+        .filter((item) => /Duration/.test(item.name))
+        .map((item) => ({
+          name: item.name,
+          delta: item.value - (beforeProfile.metrics.find((previous) => previous.name === item.name)?.value ?? 0),
+        })),
+    );
+    console.log(
+      'SCROLL-HOTSPOTS',
+      profile.nodes
+        .filter((item) => item.hitCount)
+        .sort((a, b) => (b.hitCount ?? 0) - (a.hitCount ?? 0))
+        .slice(0, 18)
+        .map((item) => ({
+          name: item.callFrame.functionName,
+          url: item.callFrame.url,
+          line: item.callFrame.lineNumber,
+          hits: item.hitCount,
+        })),
+    );
     await profiler.detach();
   }
   const scrollWorstMs = scrollFrames.frames.at(-1)!;
   const boundaryWorstMs = Math.max(...scrollFrames.boundaries);
-  console.log('TERMINAL-SCROLL-PERFORMANCE', JSON.stringify({ scrollP95Ms, scrollWorstMs, boundaryFrames: scrollFrames.boundaries.length, boundaryWorstMs }));
+  console.log(
+    'TERMINAL-SCROLL-PERFORMANCE',
+    JSON.stringify({ scrollP95Ms, scrollWorstMs, boundaryFrames: scrollFrames.boundaries.length, boundaryWorstMs }),
+  );
   expect(scrollFrames.boundaries.length).toBeGreaterThan(4);
   expect(boundaryWorstMs).toBeLessThan(100);
   expect(scrollP95Ms).toBeLessThan(40);
@@ -101,9 +141,18 @@ test('large command history stays readable and input reaches the terminal prompt
 
 test('continuous classic output does not extract HTML frames or delay native keyboard input', async ({ page }) => {
   await setupTauriMock(page, { integration: false });
-  await page.addInitScript(() => localStorage.setItem('vrykell-agent-settings', JSON.stringify({
-    version: 8, state: { global: { openModeByShell: { zsh: 'classic', bash: 'classic', powershell: 'classic', pwsh: 'classic', cmd: 'classic' } }, overrides: {} },
-  })));
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'vrykell-agent-settings',
+      JSON.stringify({
+        version: 8,
+        state: {
+          global: { openModeByShell: { zsh: 'classic', bash: 'classic', powershell: 'classic', pwsh: 'classic', cmd: 'classic' } },
+          overrides: {},
+        },
+      }),
+    ),
+  );
   await page.goto('/');
   await expect(page.locator('.xterm').first()).toBeVisible();
   await expect(page.getByPlaceholder(/输入命令/)).toHaveCount(0);
@@ -113,10 +162,16 @@ test('continuous classic output does not extract HTML frames or delay native key
   });
   const timings = await page.evaluate(async () => {
     const path = '/src/platform/diagnostics.ts';
-    const { useDiagnosticSettings, flushDiagnostics } = await import(path) as typeof import('../src/platform/diagnostics');
+    const { useDiagnosticSettings, flushDiagnostics } = (await import(path)) as typeof import('../src/platform/diagnostics');
     useDiagnosticSettings.setState({ autoSave: true });
     const scope = window as unknown as {
-      __vrykellTerms: Map<string, { input(data: string, wasUserInput: boolean): void; buffer: { active: { getLine(row: number): { translateToString(): string } | undefined; length: number } } }>;
+      __vrykellTerms: Map<
+        string,
+        {
+          input(data: string, wasUserInput: boolean): void;
+          buffer: { active: { getLine(row: number): { translateToString(): string } | undefined; length: number } };
+        }
+      >;
       __PTY_WRITES__: string[];
       __TAURI_INTERNALS__: { emitPtyOutput(data: string): void };
     };
@@ -128,11 +183,15 @@ test('continuous classic output does not extract HTML frames or delay native key
     for (let index = 0; index < 12; index++) {
       const before = performance.now();
       term.input('z', true);
-      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
       samples.push(performance.now() - before);
     }
     await flushDiagnostics();
-    return { elapsedMs: performance.now() - started, maximumInputFrameMs: Math.max(...samples), keys: scope.__PTY_WRITES__.filter(data => data === 'z').length };
+    return {
+      elapsedMs: performance.now() - started,
+      maximumInputFrameMs: Math.max(...samples),
+      keys: scope.__PTY_WRITES__.filter((data) => data === 'z').length,
+    };
   });
   console.log('TERMINAL-STREAM-PERFORMANCE', JSON.stringify(timings));
   expect(timings.keys).toBe(12);
@@ -141,8 +200,10 @@ test('continuous classic output does not extract HTML frames or delay native key
   // One second of the data path is one aggregated record: a burst of 100 output batches must not
   // write hundreds of them (it did before the window: five records per batch).
   await page.waitForTimeout(1100);
-  const log = await page.evaluate(() => (window as unknown as { __DIAGNOSTIC_RECORDS__: { event: string; detail: Record<string, unknown> }[] }).__DIAGNOSTIC_RECORDS__);
-  const pipeline = log.filter(record => record.event === 'terminal-io');
+  const log = await page.evaluate(
+    () => (window as unknown as { __DIAGNOSTIC_RECORDS__: { event: string; detail: Record<string, unknown> }[] }).__DIAGNOSTIC_RECORDS__,
+  );
+  const pipeline = log.filter((record) => record.event === 'terminal-io');
   expect(pipeline.length).toBeGreaterThan(0);
   expect(pipeline.length).toBeLessThan(5);
   expect(pipeline.reduce((sum, record) => sum + Number(record.detail.rxBatches), 0)).toBeGreaterThanOrEqual(100);

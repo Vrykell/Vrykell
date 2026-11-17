@@ -32,8 +32,12 @@ describe('SidebarItem', () => {
   it('keeps shared trailing controls independent from single and double row activation', () => {
     const activate = vi.fn();
     const copy = vi.fn();
-    renderItem({ variant: 'command', active: true, onDoubleClick: activate,
-      trailingActions: [{ label: 'Copy', control: <button onClick={copy}>Copy</button> }] });
+    renderItem({
+      variant: 'command',
+      active: true,
+      onDoubleClick: activate,
+      trailingActions: [{ label: 'Copy', control: <button onClick={copy}>Copy</button> }],
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
     fireEvent.doubleClick(screen.getByRole('button', { name: 'Copy' }));
     expect(copy).toHaveBeenCalledOnce();
@@ -41,8 +45,14 @@ describe('SidebarItem', () => {
   });
   it('renders compact commands without an icon or metadata line and exposes actions on keyboard focus', () => {
     const run = vi.fn();
-    const { onClick } = renderItem({ variant: 'command', icon: undefined, title: 'git status --short', testId: 'command-row', tabIndex: 0,
-      trailingActions: [{ icon: <span />, label: 'Run command', onClick: run }] });
+    const { onClick } = renderItem({
+      variant: 'command',
+      icon: undefined,
+      title: 'git status --short',
+      testId: 'command-row',
+      tabIndex: 0,
+      trailingActions: [{ icon: <span />, label: 'Run command', onClick: run }],
+    });
     const row = screen.getByTestId('command-row');
     expect(row.querySelector('.sidebar-row-icon')).toBeNull();
     expect(row.querySelector('.sidebar-row-subtitle')).toBeNull();
@@ -59,10 +69,15 @@ describe('SidebarItem', () => {
   it('keeps quick actions separate from row activation and honors disabled actions', () => {
     const remove = vi.fn();
     const restore = vi.fn();
-    const { onClick } = renderItem({ variant: 'history', compact: true, testId: 'record', leadingActions: [
-      { icon: <span />, label: 'Delete record', onClick: remove, disabled: true },
-      { icon: <span />, label: 'Restore record', onClick: restore },
-    ] });
+    const { onClick } = renderItem({
+      variant: 'history',
+      compact: true,
+      testId: 'record',
+      leadingActions: [
+        { icon: <span />, label: 'Delete record', onClick: remove, disabled: true },
+        { icon: <span />, label: 'Restore record', onClick: restore },
+      ],
+    });
     const actions = screen.getByRole('button', { name: 'Restore record' }).parentElement!;
     expect(actions).toHaveAttribute('data-visible', 'false');
     fireEvent.mouseOver(screen.getByTestId('record'));
@@ -143,7 +158,7 @@ describe('SidebarItem', () => {
     expect(row).toHaveAttribute('data-tip', '会话提示');
   });
 
-  it.each(['default', 'history'] as const)('preserves the standard row height and text sizing for %s two-line records', variant => {
+  it.each(['default', 'history'] as const)('preserves the standard row height and text sizing for %s two-line records', (variant) => {
     renderItem({ variant, subtitle: 'Closed', testId: 'standard-row' });
     const row = screen.getByTestId('standard-row');
     expect(row).toHaveStyle({ padding: '2px 6px' });
@@ -169,7 +184,13 @@ describe('SidebarItem', () => {
   });
 
   it('shows basic history metadata without hover and retains the complete accessible description', () => {
-    renderItem({ variant: 'history', compact: true, title: 'Project review', subtitle: 'Closed · /home/project', testId: 'compact-history-row' });
+    renderItem({
+      variant: 'history',
+      compact: true,
+      title: 'Project review',
+      subtitle: 'Closed · /home/project',
+      testId: 'compact-history-row',
+    });
     const row = screen.getByTestId('compact-history-row');
     expect(screen.getByText('Closed · /home/project')).toBeVisible();
     expect(row).toHaveAccessibleDescription('Closed · /home/project');

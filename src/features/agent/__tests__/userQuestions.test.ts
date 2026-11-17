@@ -2,7 +2,9 @@ import { afterEach, expect, it, vi } from 'vitest';
 import { answerUserQuestion, questionKey, requestUserAnswer, useUserQuestions } from '../services/userQuestions';
 import { buildAskUserTool } from '../tools/askUser';
 
-afterEach(() => { vi.useRealTimers(); });
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 it('returns a user answer to its owning call once and removes the live request', async () => {
   const key = questionKey('owner', 'question');
@@ -40,7 +42,10 @@ it('exposes a pending tool card and feeds the response back without granting per
   expect(state).toHaveBeenCalledWith('tool', 'input-pending');
   answerUserQuestion(questionKey('owner', 'tool'), 'No');
   expect(await pending).toEqual({ ok: true, answered: true, answer: 'No' });
-  expect(await ask.execute!({ question: 'Are you sure?' }, { toolCallId: 'repeat', messages: [], context: {} })).toMatchObject({ ok: false, answered: false });
+  expect(await ask.execute!({ question: 'Are you sure?' }, { toolCallId: 'repeat', messages: [], context: {} })).toMatchObject({
+    ok: false,
+    answered: false,
+  });
   expect(state).toHaveBeenCalledTimes(1);
   expect(useUserQuestions.getState().pending).toEqual({});
 });

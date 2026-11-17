@@ -18,19 +18,22 @@ interface CursorModes {
 }
 
 function cursorModes(term: Terminal): CursorModes | null {
-  const modes = (term as unknown as {
-    _core?: { coreService?: { decPrivateModes?: CursorModes } };
-  })._core?.coreService?.decPrivateModes;
+  const modes = (
+    term as unknown as {
+      _core?: { coreService?: { decPrivateModes?: CursorModes } };
+    }
+  )._core?.coreService?.decPrivateModes;
   return modes ?? null;
 }
 
 /** Smooth short cursor hides while painting every output frame immediately. */
 export function smoothTerminalCursorRepaints(term: Terminal, paneId?: string): () => void {
   // Keep renderer-version access here, after the terminal has been opened.
-  const core = (term as unknown as {
-    _core?: { coreService?: { isCursorHidden: boolean };
-      _renderService?: { _renderRows: (start: number, end: number) => void } };
-  })._core;
+  const core = (
+    term as unknown as {
+      _core?: { coreService?: { isCursorHidden: boolean }; _renderService?: { _renderRows: (start: number, end: number) => void } };
+    }
+  )._core;
   const service = core?._renderService;
   const cursor = core?.coreService;
   if (!service || !cursor || typeof service._renderRows !== 'function') return () => {};
@@ -59,8 +62,7 @@ export function smoothTerminalCursorRepaints(term: Terminal, paneId?: string): (
     }
   };
   const wrappedRender = (start: number, end: number) => {
-    if (timer !== undefined && cursor.isCursorHidden && term.buffer.active.type === 'normal'
-      && cols === term.cols && rows === term.rows) {
+    if (timer !== undefined && cursor.isCursorHidden && term.buffer.active.type === 'normal' && cols === term.cols && rows === term.rows) {
       smoothed = true;
       const buffer = term.buffer.active;
       paintedRow = Math.max(0, Math.min(term.rows - 1, buffer.cursorY + buffer.baseY - buffer.viewportY));
@@ -78,12 +80,15 @@ export function smoothTerminalCursorRepaints(term: Terminal, paneId?: string): (
       // A reset, buffer switch or resize must repaint even without a show sequence.
       const full = smoothed;
       release('surface-change');
-      if (full) { start = 0; end = term.rows - 1; }
+      if (full) {
+        start = 0;
+        end = term.rows - 1;
+      }
     }
     renderRows.call(service, start, end);
   };
   service._renderRows = wrappedRender;
-  const hide = term.parser.registerCsiHandler({ prefix: '?', final: 'l' }, params => {
+  const hide = term.parser.registerCsiHandler({ prefix: '?', final: 'l' }, (params) => {
     if (params.includes(25) && !cursor.isCursorHidden && timer === undefined && term.buffer.active.type === 'normal') {
       cols = term.cols;
       rows = term.rows;
@@ -92,7 +97,7 @@ export function smoothTerminalCursorRepaints(term: Terminal, paneId?: string): (
     }
     return false;
   });
-  const show = term.parser.registerCsiHandler({ prefix: '?', final: 'h' }, params => {
+  const show = term.parser.registerCsiHandler({ prefix: '?', final: 'h' }, (params) => {
     if (params.includes(25)) release('show');
     return false;
   });
@@ -119,7 +124,7 @@ export function smoothTerminalCursorRepaints(term: Terminal, paneId?: string): (
 export function applyTerminalCursorPreference(term: Terminal, paneId?: string): void {
   let visibilityChanged = false;
   for (const final of ['h', 'l']) {
-    term.parser.registerCsiHandler({ prefix: '?', final }, params => {
+    term.parser.registerCsiHandler({ prefix: '?', final }, (params) => {
       if (params.includes(25)) {
         visibilityChanged = true;
         if (isTerminalInputTraceEnabled()) {
@@ -134,15 +139,23 @@ export function applyTerminalCursorPreference(term: Terminal, paneId?: string): 
     if (!visibilityChanged) return;
     visibilityChanged = false;
     if (!isTerminalInputTraceEnabled()) return;
-    const core = (term as unknown as {
-      _core?: { coreService?: { isCursorHidden?: boolean } };
-    })._core?.coreService;
+    const core = (
+      term as unknown as {
+        _core?: { coreService?: { isCursorHidden?: boolean } };
+      }
+    )._core?.coreService;
     const modes = cursorModes(term);
-    terminalDebug('terminal-cursor-visibility-render', { paneId, hidden: core?.isCursorHidden,
-      blink: modes?.cursorBlink ?? term.options.cursorBlink, shape: modes?.cursorStyle ?? term.options.cursorStyle,
-      buffer: term.buffer.active.type, column: term.buffer.active.cursorX, row: term.buffer.active.cursorY });
+    terminalDebug('terminal-cursor-visibility-render', {
+      paneId,
+      hidden: core?.isCursorHidden,
+      blink: modes?.cursorBlink ?? term.options.cursorBlink,
+      shape: modes?.cursorStyle ?? term.options.cursorStyle,
+      buffer: term.buffer.active.type,
+      column: term.buffer.active.cursorX,
+      row: term.buffer.active.cursorY,
+    });
   });
-  term.parser.registerCsiHandler({ intermediates: ' ', final: 'q' }, params => {
+  term.parser.registerCsiHandler({ intermediates: ' ', final: 'q' }, (params) => {
     const first = params[0];
     const value = (typeof first === 'number' ? first : first?.[0]) ?? 1;
     const shape = CURSOR_SHAPES[value];

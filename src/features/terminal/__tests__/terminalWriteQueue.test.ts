@@ -20,9 +20,12 @@ interface PendingWrite {
 /** Hand each write back to the test so it can watch the queue while a write is in flight. */
 function deferredWrites(): PendingWrite[] {
   const pending: PendingWrite[] = [];
-  ptyWriteMock.mockImplementation((_id: string, data: string) => new Promise<void>((resolve, reject) => {
-    pending.push({ data, settle: resolve, fail: reject });
-  }));
+  ptyWriteMock.mockImplementation(
+    (_id: string, data: string) =>
+      new Promise<void>((resolve, reject) => {
+        pending.push({ data, settle: resolve, fail: reject });
+      }),
+  );
   return pending;
 }
 
@@ -33,7 +36,9 @@ describe('terminalWriteQueue', () => {
     const pending = deferredWrites();
     const earlier = writeTerminalInput('cancel-owner', 'earlier');
     const controller = new AbortController();
-    const cancelled = expect(writeTerminalInput('cancel-owner', 'cancelled', controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    const cancelled = expect(writeTerminalInput('cancel-owner', 'cancelled', controller.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    });
     const human = writeTerminalInput('cancel-owner', 'human');
     controller.abort();
     await cancelled;
@@ -46,24 +51,31 @@ describe('terminalWriteQueue', () => {
   it('drops the unsent tail of an aborted command while allowing later input', async () => {
     const pending = deferredWrites();
     const controller = new AbortController();
-    const cancelled = expect(writeTerminalInput('cancel-tail', 'x'.repeat(TERMINAL_INPUT_CHUNK_UNITS + 50), controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
+    const cancelled = expect(
+      writeTerminalInput('cancel-tail', 'x'.repeat(TERMINAL_INPUT_CHUNK_UNITS + 50), controller.signal),
+    ).rejects.toMatchObject({ name: 'AbortError' });
     controller.abort();
     await cancelled;
     const human = writeTerminalInput('cancel-tail', 'human');
     pending[0].settle();
     await vi.waitFor(() => expect(callData()).toEqual(['x'.repeat(TERMINAL_INPUT_CHUNK_UNITS), 'human']));
-    pending[1].settle(); await human;
+    pending[1].settle();
+    await human;
   });
 
   it('keeps later input queued when a cancelled in-flight write reports an error', async () => {
     const pending = deferredWrites();
     const controller = new AbortController();
-    const cancelled = expect(writeTerminalInput('cancel-error', 'command', controller.signal)).rejects.toMatchObject({ name: 'AbortError' });
-    controller.abort(); await cancelled;
+    const cancelled = expect(writeTerminalInput('cancel-error', 'command', controller.signal)).rejects.toMatchObject({
+      name: 'AbortError',
+    });
+    controller.abort();
+    await cancelled;
     const human = writeTerminalInput('cancel-error', 'human');
     pending[0].fail(new Error('late write failure'));
     await vi.waitFor(() => expect(callData()).toEqual(['command', 'human']));
-    pending[1].settle(); await human;
+    pending[1].settle();
+    await human;
   });
 
   beforeEach(() => {
@@ -88,8 +100,7 @@ describe('terminalWriteQueue', () => {
     await writeTerminalInput('long', payload);
     const chunks = callData();
     expect(chunks).toHaveLength(3);
-    expect(chunks.map((chunk) => chunk.length))
-      .toEqual([TERMINAL_INPUT_CHUNK_UNITS, TERMINAL_INPUT_CHUNK_UNITS, 7]);
+    expect(chunks.map((chunk) => chunk.length)).toEqual([TERMINAL_INPUT_CHUNK_UNITS, TERMINAL_INPUT_CHUNK_UNITS, 7]);
     expect(chunks.join('')).toBe(payload);
   });
 
@@ -226,17 +237,22 @@ describe('terminalWriteQueue', () => {
   });
 
   it('drops a paste tail when its owner exits while the first chunk is in flight', async () => {
-    const pending = deferredWrites(); let current = true;
+    const pending = deferredWrites();
+    let current = true;
     const paste = writeTerminalPaste('owner', { epoch: 3, isCurrent: () => current }, () => {
       void writeTerminalInput('owner', `${'x'.repeat(4096)}\runintended command\r`);
     });
     const stopped = expect(paste).rejects.toThrow('terminal input target changed');
     expect(pending[0]!.data).toHaveLength(1024);
     expect(ptyWriteMock).toHaveBeenCalledExactlyOnceWith('owner', pending[0]!.data, 3);
-    current = false; pending[0]!.settle(); await stopped;
+    current = false;
+    pending[0]!.settle();
+    await stopped;
     expect(pending).toHaveLength(1);
     const keyboard = writeTerminalInput('owner', 'intentional input');
-    await vi.waitFor(() => expect(pending).toHaveLength(2)); pending[1]!.settle(); await keyboard;
+    await vi.waitFor(() => expect(pending).toHaveLength(2));
+    pending[1]!.settle();
+    await keyboard;
     expect(pending[1]!.data).toBe('intentional input');
   });
 });

@@ -20,8 +20,15 @@ describe('terminal resizing', () => {
   it('repaints resized pixels before presenting the frame and ignores unchanged dimensions', () => {
     const calls: string[] = [];
     const renderer = { _renderRows: vi.fn(() => calls.push('paint')) };
-    const term = { cols: 80, rows: 24, _core: { _renderService: renderer },
-      resize(cols: number, rows: number) { calls.push('resize'); this.cols = cols; this.rows = rows; },
+    const term = {
+      cols: 80,
+      rows: 24,
+      _core: { _renderService: renderer },
+      resize(cols: number, rows: number) {
+        calls.push('resize');
+        this.cols = cols;
+        this.rows = rows;
+      },
     };
     const fit = { proposeDimensions: () => ({ cols: 100, rows: 30 }) };
     fitTerminal(term as unknown as Terminal, fit as FitAddon);
@@ -33,7 +40,7 @@ describe('terminal resizing', () => {
 
   it('preserves immediate response while coalescing sizes behind a slow PTY', async () => {
     const complete: Array<() => void> = [];
-    const send = vi.fn(() => new Promise<void>(resolve => complete.push(resolve)));
+    const send = vi.fn(() => new Promise<void>((resolve) => complete.push(resolve)));
     const queue = createResizeQueue(send);
     queue.request(80, 24);
     expect(send).toHaveBeenCalledWith(80, 24);
@@ -56,7 +63,12 @@ describe('terminal resizing', () => {
 
   it('does not retain a stale intermediate size when the host returns to its original width', async () => {
     let finish = () => {};
-    const send = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+    const send = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
     const queue = createResizeQueue(send);
     queue.request(80, 24);
     queue.request(79, 24);

@@ -8,8 +8,13 @@ describe('useAutoSave', () => {
 
   it('normalizes a saved draft without overwriting edits made during the write', async () => {
     let finish: () => void = () => {};
-    const save = vi.fn().mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
-    const { result } = renderHook(() => useAutoSave<string>('old', save, undefined, undefined, value => value.trim()));
+    const save = vi.fn().mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const { result } = renderHook(() => useAutoSave<string>('old', save, undefined, undefined, (value) => value.trim()));
     act(() => result.current.setValue(' first ', true));
     await act(async () => {});
     act(() => result.current.setValue(' latest '));
@@ -38,7 +43,12 @@ describe('useAutoSave', () => {
 
   it('serializes edits arriving during an in-flight save and keeps the latest draft', async () => {
     let finish: () => void = () => {};
-    const save = vi.fn().mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    const save = vi.fn().mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
     const { result, rerender } = renderHook(({ value }) => useAutoSave(value, save), { initialProps: { value: 'initial' } });
     act(() => result.current.setValue('first', true));
     await act(async () => {});
@@ -73,7 +83,10 @@ describe('useAutoSave', () => {
     await act(async () => {});
     expect(save).toHaveBeenCalledExactlyOnceWith('new');
     const second = renderHook(() => useAutoSave<string>('old', save));
-    act(() => { second.result.current.setValue('deleted'); second.result.current.cancel(); });
+    act(() => {
+      second.result.current.setValue('deleted');
+      second.result.current.cancel();
+    });
     second.unmount();
     await act(() => vi.advanceTimersByTimeAsync(1000));
     expect(save).toHaveBeenCalledTimes(1);
@@ -81,7 +94,7 @@ describe('useAutoSave', () => {
 
   it('blocks invalid drafts and saves a valid correction', async () => {
     const save = vi.fn();
-    const { result } = renderHook(() => useAutoSave<string>('old', save, value => value.trim() ? undefined : '请填写名称'));
+    const { result } = renderHook(() => useAutoSave<string>('old', save, (value) => (value.trim() ? undefined : '请填写名称')));
     act(() => result.current.setValue(''));
     await act(() => vi.advanceTimersByTimeAsync(600));
     expect(save).not.toHaveBeenCalled();
@@ -94,11 +107,18 @@ describe('useAutoSave', () => {
 
   it('returns to idle when an in-flight save finishes after cancellation', async () => {
     let finish: () => void = () => {};
-    const save = vi.fn(() => new Promise<void>(resolve => { finish = resolve; }));
+    const save = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        }),
+    );
     const { result } = renderHook(() => useAutoSave<string>('old', save));
     act(() => result.current.setValue('new', true));
     await act(async () => {});
-    act(() => { void result.current.cancel(); });
+    act(() => {
+      void result.current.cancel();
+    });
     await act(async () => finish());
     expect(result.current.status).toBe('idle');
     expect(result.current.hasPending()).toBe(false);

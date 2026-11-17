@@ -12,10 +12,19 @@ afterEach(() => {
 
 describe('model picker controls', () => {
   it('shows only supported capability badges with accessible labels', () => {
-    useAiConfigStore.setState({ activeModel: 'sample', models: [{
-      id: 'sample', name: 'Sample', model: 'sample', provider: 'openai-compatible', baseUrl: '',
-      capabilities: { reasoning: false, vision: true, tools: true, search: false },
-    }] });
+    useAiConfigStore.setState({
+      activeModel: 'sample',
+      models: [
+        {
+          id: 'sample',
+          name: 'Sample',
+          model: 'sample',
+          provider: 'openai-compatible',
+          baseUrl: '',
+          capabilities: { reasoning: false, vision: true, tools: true, search: false },
+        },
+      ],
+    });
     render(<ModelPicker open onClose={vi.fn()} />);
     const row = screen.getByTestId('model-pick-sample');
     expect(within(row).getAllByRole('img')).toHaveLength(2);
@@ -33,10 +42,19 @@ describe('model picker controls', () => {
   });
 
   it('uses the themed selector without selecting the model or closing the dialog', () => {
-    useAiConfigStore.setState({ activeModel: 'other', models: [{
-      id: 'reasoning', name: '推理模型', model: 'reasoning', provider: 'anthropic', baseUrl: '',
-      capabilities: { reasoning: true, vision: true, tools: true, search: true },
-    }] });
+    useAiConfigStore.setState({
+      activeModel: 'other',
+      models: [
+        {
+          id: 'reasoning',
+          name: '推理模型',
+          model: 'reasoning',
+          provider: 'anthropic',
+          baseUrl: '',
+          capabilities: { reasoning: true, vision: true, tools: true, search: true },
+        },
+      ],
+    });
     useAgentSettings.setState({ overrides: {} });
     const close = vi.fn();
     render(<ModelPicker open onClose={close} />);

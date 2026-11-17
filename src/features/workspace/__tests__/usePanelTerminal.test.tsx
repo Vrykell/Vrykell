@@ -41,7 +41,7 @@ describe('usePanelTerminal', () => {
   it('follows the focused terminal until a live terminal is explicitly bound', () => {
     const { result } = renderHook(() => usePanelTerminal('files'));
 
-    expect(result.current.options.map(option => option.paneId)).toEqual(['a#0', 'b#0']);
+    expect(result.current.options.map((option) => option.paneId)).toEqual(['a#0', 'b#0']);
     expect(result.current).toMatchObject({ isBound: false, paneId: 'a#0', cwd: '/a' });
 
     act(() => result.current.bind('b#0'));
@@ -59,7 +59,7 @@ describe('usePanelTerminal', () => {
       useTerminalStore.setState({ focusedPaneId: 'b#0' });
       useSessionStore.setState({ activeId: 'a' });
       useTerminalStore.setState({ focusedPaneId: 'a#0' });
-      useSessionStore.setState(state => ({ terminalCwds: { ...state.terminalCwds, 'b#0': '/b/next' } }));
+      useSessionStore.setState((state) => ({ terminalCwds: { ...state.terminalCwds, 'b#0': '/b/next' } }));
     });
 
     expect(result.current).toMatchObject({ isBound: true, paneId: 'b#0', cwd: '/b/next' });
@@ -85,6 +85,6 @@ describe('usePanelTerminal', () => {
   it('lists only terminals with a live session', () => {
     useTerminalStore.setState({ sessions: { 'a#0': 'session-a' } });
     const { result } = renderHook(() => usePanelTerminal('command-history'));
-    expect(result.current.options.map(option => option.paneId)).toEqual(['a#0']);
+    expect(result.current.options.map((option) => option.paneId)).toEqual(['a#0']);
   });
 });

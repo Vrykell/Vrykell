@@ -3,14 +3,19 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import ReloadButton from '../ReloadButton';
 
 beforeEach(() => vi.useFakeTimers());
-afterEach(() => { cleanup(); vi.useRealTimers(); });
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 it('keeps keyboard focus during reload feedback and refuses repeated activation', async () => {
   const reload = vi.fn();
   render(<ReloadButton label="Reload" onReload={reload} />);
   const button = screen.getByRole('button', { name: 'Reload' });
   button.focus();
-  await act(async () => { fireEvent.click(button); });
+  await act(async () => {
+    fireEvent.click(button);
+  });
   expect(button).toHaveFocus();
   expect(button).toHaveAttribute('aria-disabled', 'true');
   expect(button).not.toBeDisabled();
@@ -36,11 +41,17 @@ it('honors external disabled and busy states without invoking the action', () =>
 it('supports visible labeled and icon-only outline actions with shared reload feedback', async () => {
   const reload = vi.fn();
   const parent = vi.fn();
-  const { rerender } = render(<div onClick={parent}><ReloadButton label="Retry status" text="Retry" variant="outline" onReload={reload} /></div>);
+  const { rerender } = render(
+    <div onClick={parent}>
+      <ReloadButton label="Retry status" text="Retry" variant="outline" onReload={reload} />
+    </div>,
+  );
   const button = screen.getByRole('button', { name: 'Retry status' });
   expect(button).toHaveClass('outline-button');
   expect(button).toHaveTextContent('Retry');
-  await act(async () => { fireEvent.click(button); });
+  await act(async () => {
+    fireEvent.click(button);
+  });
   expect(reload).toHaveBeenCalledOnce();
   expect(parent).not.toHaveBeenCalled();
   expect(button).toHaveAttribute('aria-busy', 'true');

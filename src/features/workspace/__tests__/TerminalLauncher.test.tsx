@@ -5,19 +5,30 @@ import { useSessionStore } from '../model/session/store';
 import { useSshStore } from '@features/ssh';
 import { useUiStore } from '../stores/ui';
 
-vi.mock('@platform/shells', async original => ({ ...await original<typeof import('@platform/shells')>(), getAvailableShells: vi.fn().mockResolvedValue([
-  { id: 'zsh', label: 'Zsh', default: true }, { id: 'bash', label: 'Bash', default: false },
-]) }));
+vi.mock('@platform/shells', async (original) => ({
+  ...(await original<typeof import('@platform/shells')>()),
+  getAvailableShells: vi.fn().mockResolvedValue([
+    { id: 'zsh', label: 'Zsh', default: true },
+    { id: 'bash', label: 'Bash', default: false },
+  ]),
+}));
 
 const workspace = useSessionStore.getState();
 const ssh = useSshStore.getState();
 const ui = useUiStore.getState();
 beforeEach(() => {
   useSessionStore.setState({ tabs: [], activeId: '' });
-  useSshStore.setState({ loaded: true, connections: [{ id: 'prod', name: 'Production', host: 'prod.test', user: 'root', port: 2222, authMethod: 'password' }], touch: vi.fn().mockResolvedValue(undefined) });
+  useSshStore.setState({
+    loaded: true,
+    connections: [{ id: 'prod', name: 'Production', host: 'prod.test', user: 'root', port: 2222, authMethod: 'password' }],
+    touch: vi.fn().mockResolvedValue(undefined),
+  });
 });
 afterEach(() => {
-  cleanup(); useSessionStore.setState(workspace, true); useSshStore.setState(ssh, true); useUiStore.setState(ui, true);
+  cleanup();
+  useSessionStore.setState(workspace, true);
+  useSshStore.setState(ssh, true);
+  useUiStore.setState(ui, true);
 });
 
 it('rests on one simple page instead of listing every profile and host', () => {
@@ -33,7 +44,7 @@ it('rests on one simple page instead of listing every profile and host', () => {
 it('starts a terminal and opens the shared picker for profile selection', () => {
   render(<TerminalLauncher />);
   fireEvent.click(screen.getByTestId('terminal-start-new'));
-  const local = useSessionStore.getState().tabs.find(tab => tab.kind === 'session');
+  const local = useSessionStore.getState().tabs.find((tab) => tab.kind === 'session');
   expect(local?.layout).toMatchObject({ type: 'leaf', terminal: { kind: 'local' } });
   fireEvent.click(screen.getByTestId('terminal-start-picker'));
   expect(screen.getByRole('dialog', { name: '新建标签页' })).toBeVisible();

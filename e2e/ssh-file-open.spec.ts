@@ -8,7 +8,8 @@ test('unsupported remote files open as downloaded copies in the system applicati
       { name: 'report.pdf', path: '/home/root/report.pdf', is_dir: false },
     ];
   });
-  await page.goto('/'); await page.locator('[data-dock-btn="ssh"]').click();
+  await page.goto('/');
+  await page.locator('[data-dock-btn="ssh"]').click();
   await page.getByTestId('ssh-row-ssh-1').dblclick();
   await page.getByRole('button', { name: '断开连接', exact: true }).waitFor();
   await page.locator('[data-dock-btn="files"]').click();
@@ -21,13 +22,16 @@ test('unsupported remote files open as downloaded copies in the system applicati
 test('remote read permission failures keep the editor informative instead of blank', async ({ page }) => {
   await setupTauriMock(page, { sshHost: 'known' });
   await page.addInitScript(() => {
-    const internals = (window as unknown as {
-      __TAURI_INTERNALS__: { invoke: (cmd: string, args: Record<string, unknown>) => Promise<unknown> };
-    }).__TAURI_INTERNALS__;
+    const internals = (
+      window as unknown as {
+        __TAURI_INTERNALS__: { invoke: (cmd: string, args: Record<string, unknown>) => Promise<unknown> };
+      }
+    ).__TAURI_INTERNALS__;
     const invoke = internals.invoke;
-    internals.invoke = async (cmd, args) => cmd === 'editor_read_file'
-      ? { kind: 'text', text: '', revision: '', readOnly: true, permissionDenied: true, encoding: 'utf8' }
-      : invoke(cmd, args);
+    internals.invoke = async (cmd, args) =>
+      cmd === 'editor_read_file'
+        ? { kind: 'text', text: '', revision: '', readOnly: true, permissionDenied: true, encoding: 'utf8' }
+        : invoke(cmd, args);
   });
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
@@ -54,8 +58,8 @@ test('remote file double click opens and saves in the embedded editor', async ({
   const state = await page.evaluate(async () => {
     const workspacePath = '/src/features/workspace/stores/workspace.ts';
     const terminalPath = '/src/features/terminal/stores/terminal.ts';
-    const { useWorkspaceStore } = await import(workspacePath) as typeof import('../src/features/workspace/stores/workspace');
-    const { useTerminalStore } = await import(terminalPath) as typeof import('../src/features/terminal/stores/terminal');
+    const { useWorkspaceStore } = (await import(workspacePath)) as typeof import('../src/features/workspace/stores/workspace');
+    const { useTerminalStore } = (await import(terminalPath)) as typeof import('../src/features/terminal/stores/terminal');
     const activeId = useWorkspaceStore.getState().activeId;
     const terminal = useTerminalStore.getState();
     return { activeId, sessions: terminal.sessions };
@@ -69,7 +73,9 @@ test('remote file double click opens and saves in the embedded editor', async ({
   await page.keyboard.press('Control+a');
   await page.keyboard.insertText('remote saved text');
   await page.keyboard.press('Control+s');
-  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('mock-editor-files') ?? '{}')['["ssh-1","/home/root/app.log"]'])).toBe('remote saved text');
+  await expect
+    .poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('mock-editor-files') ?? '{}')['["ssh-1","/home/root/app.log"]']))
+    .toBe('remote saved text');
   await expect(page.getByTestId('remote-file-tree')).toHaveAttribute('data-path', '/home/root');
   expect(await ptyWrites(page)).not.toContain("vim '/home/root/app.log'\n");
   await expect(page.getByText('SSH 会话未就绪', { exact: true })).toHaveCount(0);
@@ -93,7 +99,9 @@ test('remote file row menu opens with the preferred editor', async ({ page }) =>
 
 test('remote path bar respects the terminal editor preference and preserves the directory', async ({ page }) => {
   await setupTauriMock(page, { sshHost: 'known' });
-  await page.addInitScript(() => localStorage.setItem('vrykell-editor-preferences', JSON.stringify({ state: { remoteOpenMode: 'terminal' }, version: 0 })));
+  await page.addInitScript(() =>
+    localStorage.setItem('vrykell-editor-preferences', JSON.stringify({ state: { remoteOpenMode: 'terminal' }, version: 0 })),
+  );
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
   await page.getByTestId('ssh-row-ssh-1').dblclick();

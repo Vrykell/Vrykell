@@ -12,7 +12,9 @@ import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { useWorkbenchStore } from '../stores/workbench';
 
 const session = (id: string, title: string) => ({
-  id, title, kind: 'session' as const,
+  id,
+  title,
+  kind: 'session' as const,
   layout: leaf({ id: `${id}#0`, kind: 'local' as const, shellType: 'bash' as const }),
 });
 
@@ -75,7 +77,7 @@ it('opens an unplaced resource in its own tab and preserves the current layout',
   const active = useUnifiedWorkspace.getState();
   expect(compositionTabs()).toHaveLength(before + 1);
   expect(workspacePaneIds(active.layout!)).toEqual(['terminal:two#0']);
-  expect(compositionTabs().find(tab => tab.id === active.activeTabId)?.layout).toBe(active.layout);
+  expect(compositionTabs().find((tab) => tab.id === active.activeTabId)?.layout).toBe(active.layout);
   expect(useWorkbenchStore.getState().snapshot.selected.unified).toBe(active.activeTabId);
   expect(useWorkspaceStore.getState().activeId).toBe('two');
   expect(useWorkspaceNavigation.getState().area).toBe('unified');

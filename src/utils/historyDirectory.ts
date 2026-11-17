@@ -13,9 +13,7 @@ export function historyDirectory(target: HistoryDirectoryTarget, unknownLabel: s
   const stripped = (windows ? raw.replace(/\\/g, '/') : raw).replace(/\/+$/, '');
   const path = windows && /^[a-z]:$/i.test(stripped) ? `${stripped}/` : stripped || (raw.startsWith('/') ? '/' : '');
   const key = windows ? path.toLowerCase() : path;
-  if (target.kind === 'local') return path
-    ? { id: `cwd:${key}`, title: path }
-    : { id: 'cwd:unknown', title: unknownLabel };
+  if (target.kind === 'local') return path ? { id: `cwd:${key}`, title: path } : { id: 'cwd:unknown', title: unknownLabel };
 
   const host = target.ssh?.host?.trim().toLowerCase() ?? '';
   const user = target.ssh?.user?.trim() ?? '';

@@ -13,7 +13,12 @@ import { captureConnectionFrame, type TerminalFrame } from '../model/terminalFra
 import { projectBlocks } from '../model/blockProjection';
 import { COMMAND_BLOCK_CONTENT_PADDING } from '../model/commandBlockLayout';
 import { Terminal } from '@xterm/xterm';
-import { applyTerminalRenderer, hasWebglRenderer, loadWebglRenderer, releaseTerminalRenderer } from '@features/terminal/model/xtermRenderer';
+import {
+  applyTerminalRenderer,
+  hasWebglRenderer,
+  loadWebglRenderer,
+  releaseTerminalRenderer,
+} from '@features/terminal/model/xtermRenderer';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
 import { ptySpawn, ptyWrite, ptyResize, ptyClose, onPtyOutput, onPtyExit, type PtySpawnOptions } from '@platform/pty';
@@ -33,7 +38,12 @@ import { defaultOpenModeForShell } from '@features/agent/stores/agentSettings';
 import { t } from '@i18n';
 import { SessionController } from '@features/terminal/services/pipeline/sessionController';
 import { blockTerminalFor, recoverTerminalSurfaces } from '@features/terminal/services/terminalRepaint';
-import { captureTerminalPaste, copyTerminalSelection, hasCopyableSelection, pasteClipboardIntoTerminal } from '@features/terminal/services/terminalClipboard';
+import {
+  captureTerminalPaste,
+  copyTerminalSelection,
+  hasCopyableSelection,
+  pasteClipboardIntoTerminal,
+} from '@features/terminal/services/terminalClipboard';
 import { cancelTerminalInput, writeTerminalInput } from '@features/terminal/services/terminalWriteQueue';
 import { setPendingCommandRegistrar } from '@features/terminal/services/pendingCommandRegistry';
 import { querySequences } from '@features/terminal/model/terminalQueries';
@@ -60,11 +70,11 @@ interface SessionRegistry {
 
 // Preserve live controller references when the renderer reloads a module during development.
 const registryScope = globalThis as typeof globalThis & { __vrykellSessionRegistry?: SessionRegistry };
-const sessionRegistry = registryScope.__vrykellSessionRegistry ??= {
+const sessionRegistry = (registryScope.__vrykellSessionRegistry ??= {
   controllers: new Map<string, SessionController>(),
   pendingUiCommands: new Map<string, { command: string; wireCommand?: string; stagedAt: number }>(),
   widthSyncs: new Map<string, () => void>(),
-};
+});
 const sessionControllers = sessionRegistry.controllers;
 const pendingUiCommands = sessionRegistry.pendingUiCommands;
 const widthSyncs = sessionRegistry.widthSyncs;
@@ -150,7 +160,11 @@ export function useTerminalSession(
   const [frame, setFrame] = useState<TerminalFrame | null>(null);
   const closeSessionRef = useRef<() => Promise<void>>(async () => {});
   const closeSession = useCallback(() => closeSessionRef.current(), []);
-  const [retry, setRetry] = useState<{ phase: 'idle' | 'waiting' | 'connecting' | 'exhausted' | 'stopped'; attempt: number; seconds: number }>({ phase: 'idle', attempt: 0, seconds: 0 });
+  const [retry, setRetry] = useState<{
+    phase: 'idle' | 'waiting' | 'connecting' | 'exhausted' | 'stopped';
+    attempt: number;
+    seconds: number;
+  }>({ phase: 'idle', attempt: 0, seconds: 0 });
   const retryDeadline = useRef(0);
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptsRef = useRef(0);
@@ -164,15 +178,18 @@ export function useTerminalSession(
     await closeSessionRef.current();
     setFrame(null);
     setRetry({ phase: 'idle', attempt: 0, seconds: 0 });
-    setAttempt(value => value + 1);
+    setAttempt((value) => value + 1);
   }, []);
   const stopReconnect = useCallback(async () => {
     await closeSessionRef.current();
-    setRetry(previous => ({ ...previous, phase: 'stopped', seconds: 0 }));
+    setRetry((previous) => ({ ...previous, phase: 'stopped', seconds: 0 }));
   }, []);
   useEffect(() => {
     if (retry.phase !== 'waiting') return;
-    const timer = setInterval(() => setRetry(previous => ({ ...previous, seconds: Math.max(0, Math.ceil((retryDeadline.current - Date.now()) / 1000)) })), 250);
+    const timer = setInterval(
+      () => setRetry((previous) => ({ ...previous, seconds: Math.max(0, Math.ceil((retryDeadline.current - Date.now()) / 1000)) })),
+      250,
+    );
     return () => clearInterval(timer);
   }, [retry.phase]);
 
@@ -231,11 +248,18 @@ export function useTerminalSession(
       if (spec?.kind !== 'ssh' || frameRaf) return;
       frameRaf = requestAnimationFrame(() => {
         frameRaf = 0;
-        setFrame(previous => {
+        setFrame((previous) => {
           const next = captureConnectionFrame(term, previous, stopped || connectionFailed);
           if (isTerminalDebugEnabled()) {
-            terminalDebug('ssh-frame-capture', { paneId, reason, cols: term.cols, rows: term.rows,
-              previousCols: previous?.cols ?? null, previousRows: previous?.rows ?? null, reused: next === previous });
+            terminalDebug('ssh-frame-capture', {
+              paneId,
+              reason,
+              cols: term.cols,
+              rows: term.rows,
+              previousCols: previous?.cols ?? null,
+              previousRows: previous?.rows ?? null,
+              reused: next === previous,
+            });
           }
           return next;
         });
@@ -257,7 +281,7 @@ export function useTerminalSession(
     useTerminalStore.getState().setDims(paneId, term.cols, term.rows);
 
     let sessionId: string | null = null;
-    const resizeQueue = createResizeQueue((cols, rows) => sessionId ? ptyResize(sessionId, cols, rows) : Promise.resolve(), 120);
+    const resizeQueue = createResizeQueue((cols, rows) => (sessionId ? ptyResize(sessionId, cols, rows) : Promise.resolve()), 120);
     let disposed = false;
     let stopped = false;
     let connectionFailed = false;
@@ -268,7 +292,7 @@ export function useTerminalSession(
     const pendingUnlisteners: Promise<UnlistenFn>[] = [];
     let focusTimer: ReturnType<typeof setTimeout> | null = null;
     const close = async () => {
-      setRetry(previous => previous.phase === 'idle' ? previous : { ...previous, phase: 'stopped', seconds: 0 });
+      setRetry((previous) => (previous.phase === 'idle' ? previous : { ...previous, phase: 'stopped', seconds: 0 }));
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
@@ -289,7 +313,7 @@ export function useTerminalSession(
       sessionId = null;
       preSession = [];
       useTerminalStore.getState().clearSession(paneId, id ?? undefined);
-      if (spec?.kind === 'ssh') setFrame(previous => captureConnectionFrame(term, previous, true));
+      if (spec?.kind === 'ssh') setFrame((previous) => captureConnectionFrame(term, previous, true));
       setStatus('closed');
     };
     closeSessionRef.current = close;
@@ -298,9 +322,7 @@ export function useTerminalSession(
 
     // Read this terminal's open mode from the window layout (paneId is the terminal id).
     const tab = useSessionStore.getState().tabs.find((t) => t.id === ownerTab.current);
-    const spec = tab && tab.kind === 'session'
-      ? layoutLeaves(tab.layout).find((t) => t.id === paneId)
-      : undefined;
+    const spec = tab && tab.kind === 'session' ? layoutLeaves(tab.layout).find((t) => t.id === paneId) : undefined;
     const autoReconnect = spec?.kind === 'ssh' && spec.ssh?.autoReconnect === true;
     let automaticForwardingStarted = false;
 
@@ -312,7 +334,8 @@ export function useTerminalSession(
     const scheduleAutoReconnect = (code: number | null) => {
       if (!autoReconnect || disposed || (code !== 255 && code !== null)) return;
       if (reconnectAttemptsRef.current >= SSH_RECONNECT_MAX_ATTEMPTS) {
-        setRetry({ phase: 'exhausted', attempt: SSH_RECONNECT_MAX_ATTEMPTS, seconds: 0 }); return;
+        setRetry({ phase: 'exhausted', attempt: SSH_RECONNECT_MAX_ATTEMPTS, seconds: 0 });
+        return;
       }
       const delay = Math.min(SSH_RECONNECT_BASE_MS * 2 ** reconnectAttemptsRef.current, SSH_RECONNECT_MAX_MS);
       reconnectAttemptsRef.current += 1;
@@ -323,16 +346,22 @@ export function useTerminalSession(
       }
       reconnectTimerRef.current = setTimeout(() => {
         reconnectTimerRef.current = null;
-        if (!disposed) { setRetry(previous => ({ ...previous, phase: 'connecting', seconds: 0 })); setAttempt(value => value + 1); }
+        if (!disposed) {
+          setRetry((previous) => ({ ...previous, phase: 'connecting', seconds: 0 }));
+          setAttempt((value) => value + 1);
+        }
       }, delay);
     };
 
     // Disabled integration and unsupported local shells use classic rendering. Otherwise the
     // saved opening mode wins, with classic rendering as the remote restoration default.
     const integrationDisabled = spec?.kind === 'ssh' && spec.ssh?.shellIntegration === false;
-    const openMode = integrationDisabled || spec?.kind === 'local' && spec.shellType === 'cmd' ? 'classic'
-      : spec?.openMode ?? (spec?.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(spec?.shellType));
-    if (integrationDisabled && spec?.openMode === 'block') terminalDebug('terminal-open-mode-fallback', { paneId, reason: 'integration-disabled' });
+    const openMode =
+      integrationDisabled || (spec?.kind === 'local' && spec.shellType === 'cmd')
+        ? 'classic'
+        : (spec?.openMode ?? (spec?.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(spec?.shellType)));
+    if (integrationDisabled && spec?.openMode === 'block')
+      terminalDebug('terminal-open-mode-fallback', { paneId, reason: 'integration-disabled' });
     const blockEnabled = openMode === 'block';
     // Block mode injects shell integration, which reports the command line through OSC 133;E.
     // Waiting for that marker keeps the visible command authoritative and prevents a late prompt
@@ -364,99 +393,126 @@ export function useTerminalSession(
         }
       });
     };
-    const controller = new SessionController(paneId, term.cols, {      writeMain,
-      onTerminalData: data => {
-        if (!sessionId || disposed || stopped) return;
-        if (isTerminalInputTraceEnabled()) {
-          terminalDebug('block-terminal-data', { paneId, sessionId, chars: data.length, scene: currentScene });
-        }
-        void writeTerminalInput(sessionId, data).catch(error => {
-          if (isTerminalDebugEnabled()) {
-            terminalDebug('pty-write-error', { paneId, sessionId, source: 'block-xterm', errorType: error instanceof Error ? error.name : typeof error });
+    const controller = new SessionController(
+      paneId,
+      term.cols,
+      {
+        writeMain,
+        onTerminalData: (data) => {
+          if (!sessionId || disposed || stopped) return;
+          if (isTerminalInputTraceEnabled()) {
+            terminalDebug('block-terminal-data', { paneId, sessionId, chars: data.length, scene: currentScene });
           }
-        });
-      },
-      onBlocksChanged: () => {
-        const prev = useBlockStore.getState().byTab[paneId] ?? [];
-        const next = projectBlocks(controller.blocks, prev, id => agentControl.hasBlock(id));
-        if (next !== prev) useBlockStore.getState().setBlocks(paneId, next);
-      },
-      onSceneChanged: (scene) => {
-        if (focusTimer) clearTimeout(focusTimer);
-        currentScene = scene;
-        useTerminalStore.getState().setScene(paneId, scene);
-        // Controller transitions reclaim this pane's surface from manual presentation. A real
-        // alternate buffer must never sit behind a stale overlay of the running block terminal.
-        if (useTerminalStore.getState().manualFullscreen[paneId]) {
-          useTerminalStore.getState().setManualFullscreen(paneId, false);
-          if (isTerminalDebugEnabled()) {
-            terminalDebug('manual-fullscreen-cancelled', { paneId, reason: scene });
-          }
-        }
-        if (useSessionStore.getState().activeId !== ownerTab.current || !['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) || useUiStore.getState().settingsOpen) return;
-        if (scene === 'blockList') {
-          term.reset(); // Drop classic-scene residue.
-          useTerminalStore.getState().setKeyboardTarget('input');
-        } else {
-          useTerminalStore.getState().setKeyboardTarget('terminal');
-          focusTimer = setTimeout(() => {
-            if (disposed || currentScene !== scene || useSessionStore.getState().activeId !== ownerTab.current || !['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) || useUiStore.getState().settingsOpen || document.activeElement?.closest('.ai-workspace-surface')) return;
-            term.focus();
-            const textarea = term.element?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
+          void writeTerminalInput(sessionId, data).catch((error) => {
             if (isTerminalDebugEnabled()) {
-              terminalDebug('terminal-scene-focus', {
+              terminalDebug('pty-write-error', {
                 paneId,
-                scene,
-                focused: Boolean(textarea && document.activeElement === textarea),
-                mounted: Boolean(term.element),
+                sessionId,
+                source: 'block-xterm',
+                errorType: error instanceof Error ? error.name : typeof error,
               });
             }
-          }, 50);
-        }
-        // Recheck the PTY width when switching between full-width and block-list scenes.
-        applyWidth();
-      },
-      onCwd: (path) => {
-        useSessionStore.getState().setTerminalCwd(paneId, path);
-      },
-      onProgramTitle: (title) => {
-        useSessionStore.getState().setProgramTitle(paneId, title);
-      },
-      onBlockStart: (block) => {
-        if (spec) captureHistoryCommand(spec, paneId, block);
-        sessionManager.record(ownerTab.current, paneId, block, 'start');
-        // The first command of the focused terminal names the tab until the user renames it.
-        if (block.command && paneId === useTerminalStore.getState().focusedPaneId) {
-          useSessionStore.getState().titleFromCommand(ownerTab.current, block.command);
-        }
-      },
-      onBlockComplete: (block) => {
-        if (spec) captureHistoryCommand(spec, paneId, block);
-        useHistoryStore.getState().record(block.command, block.cwd ?? '', block.exitCode);
-        sessionManager.record(ownerTab.current, paneId, block, 'complete');
-        // Return a manually fullscreened running block to the block list when it ends.
-        const ts = useTerminalStore.getState();
-        if (ts.manualFullscreen[paneId]) {
-          ts.setScene(paneId, 'blockList');
-          ts.setManualFullscreen(paneId, false);
-        }
-      },
-      takePendingUiCommand: () => {
-        const pending = pendingUiCommands.get(paneId);
-        if (!pending) return null;
-        pendingUiCommands.delete(paneId);
-        if (Date.now() - pending.stagedAt > PENDING_COMMAND_TTL_MS) {
-          if (isTerminalDebugEnabled()) {
-            terminalDebug('command-pending-expired', { paneId, chars: pending.command.length });
+          });
+        },
+        onBlocksChanged: () => {
+          const prev = useBlockStore.getState().byTab[paneId] ?? [];
+          const next = projectBlocks(controller.blocks, prev, (id) => agentControl.hasBlock(id));
+          if (next !== prev) useBlockStore.getState().setBlocks(paneId, next);
+        },
+        onSceneChanged: (scene) => {
+          if (focusTimer) clearTimeout(focusTimer);
+          currentScene = scene;
+          useTerminalStore.getState().setScene(paneId, scene);
+          // Controller transitions reclaim this pane's surface from manual presentation. A real
+          // alternate buffer must never sit behind a stale overlay of the running block terminal.
+          if (useTerminalStore.getState().manualFullscreen[paneId]) {
+            useTerminalStore.getState().setManualFullscreen(paneId, false);
+            if (isTerminalDebugEnabled()) {
+              terminalDebug('manual-fullscreen-cancelled', { paneId, reason: scene });
+            }
           }
-          return null;
-        }
-        return { command: pending.command, wireCommand: pending.wireCommand };
+          if (
+            useSessionStore.getState().activeId !== ownerTab.current ||
+            !['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) ||
+            useUiStore.getState().settingsOpen
+          )
+            return;
+          if (scene === 'blockList') {
+            term.reset(); // Drop classic-scene residue.
+            useTerminalStore.getState().setKeyboardTarget('input');
+          } else {
+            useTerminalStore.getState().setKeyboardTarget('terminal');
+            focusTimer = setTimeout(() => {
+              if (
+                disposed ||
+                currentScene !== scene ||
+                useSessionStore.getState().activeId !== ownerTab.current ||
+                !['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) ||
+                useUiStore.getState().settingsOpen ||
+                document.activeElement?.closest('.ai-workspace-surface')
+              )
+                return;
+              term.focus();
+              const textarea = term.element?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea');
+              if (isTerminalDebugEnabled()) {
+                terminalDebug('terminal-scene-focus', {
+                  paneId,
+                  scene,
+                  focused: Boolean(textarea && document.activeElement === textarea),
+                  mounted: Boolean(term.element),
+                });
+              }
+            }, 50);
+          }
+          // Recheck the PTY width when switching between full-width and block-list scenes.
+          applyWidth();
+        },
+        onCwd: (path) => {
+          useSessionStore.getState().setTerminalCwd(paneId, path);
+        },
+        onProgramTitle: (title) => {
+          useSessionStore.getState().setProgramTitle(paneId, title);
+        },
+        onBlockStart: (block) => {
+          if (spec) captureHistoryCommand(spec, paneId, block);
+          sessionManager.record(ownerTab.current, paneId, block, 'start');
+          // The first command of the focused terminal names the tab until the user renames it.
+          if (block.command && paneId === useTerminalStore.getState().focusedPaneId) {
+            useSessionStore.getState().titleFromCommand(ownerTab.current, block.command);
+          }
+        },
+        onBlockComplete: (block) => {
+          if (spec) captureHistoryCommand(spec, paneId, block);
+          useHistoryStore.getState().record(block.command, block.cwd ?? '', block.exitCode);
+          sessionManager.record(ownerTab.current, paneId, block, 'complete');
+          // Return a manually fullscreened running block to the block list when it ends.
+          const ts = useTerminalStore.getState();
+          if (ts.manualFullscreen[paneId]) {
+            ts.setScene(paneId, 'blockList');
+            ts.setManualFullscreen(paneId, false);
+          }
+        },
+        takePendingUiCommand: () => {
+          const pending = pendingUiCommands.get(paneId);
+          if (!pending) return null;
+          pendingUiCommands.delete(paneId);
+          if (Date.now() - pending.stagedAt > PENDING_COMMAND_TTL_MS) {
+            if (isTerminalDebugEnabled()) {
+              terminalDebug('command-pending-expired', { paneId, chars: pending.command.length });
+            }
+            return null;
+          }
+          return { command: pending.command, wireCommand: pending.wireCommand };
+        },
+        clearPendingUiCommand: () => {
+          pendingUiCommands.delete(paneId);
+        },
       },
-      clearPendingUiCommand: () => {
-        pendingUiCommands.delete(paneId);
-      },
-    }, term.rows, initialScene, blockEnabled, deferBlockUntilPreexec);
+      term.rows,
+      initialScene,
+      blockEnabled,
+      deferBlockUntilPreexec,
+    );
     sessionControllers.set(paneId, controller);
     setPendingCommandRegistrar((targetPane, command, payload) => {
       if (!sessionControllers.has(targetPane) || !setPendingTerminalCommand(targetPane, command, payload)) return;
@@ -466,7 +522,13 @@ export function useTerminalSession(
       };
     });
     if (isTerminalDebugEnabled()) {
-      terminalDebug('session-controller-register', { paneId, tabId: ownerTab.current, scene: initialScene, blockEnabled, deferBlockUntilPreexec });
+      terminalDebug('session-controller-register', {
+        paneId,
+        tabId: ownerTab.current,
+        scene: initialScene,
+        blockEnabled,
+        deferBlockUntilPreexec,
+      });
     }
     // Place the initial scene without an OSC 133 trigger: the block list clears classic residue
     // and focuses the input bar; classic focuses the xterm for direct typing.
@@ -511,9 +573,13 @@ export function useTerminalSession(
       clearTimeout(startupTimer);
       clearTimeout(idleFallbackTimer);
       startupComplete = true;
-      traceStartup('input-ready', { sessionId, integrated, reason: readinessWait,
-        timerLagMs: Math.round(Math.max(0, performance.now() - readinessDueAt)) });
-      setRetry(previous => ({ ...previous, phase: 'idle', seconds: 0 }));
+      traceStartup('input-ready', {
+        sessionId,
+        integrated,
+        reason: readinessWait,
+        timerLagMs: Math.round(Math.max(0, performance.now() - readinessDueAt)),
+      });
+      setRetry((previous) => ({ ...previous, phase: 'idle', seconds: 0 }));
       // Only a shell integration marker proves that SSH authentication completed. Output
       // silence can also be an authentication prompt and must not renew the retry budget.
       if (spec?.kind !== 'ssh') reconnectAttemptsRef.current = 0;
@@ -525,8 +591,15 @@ export function useTerminalSession(
         firstOutput = false;
         traceStartup('first-output', { sessionId, eventCount: events.length });
       }
-      if (sessionId && events.some(event => event.kind === 'altExit' || event.kind === 'altEnter'
-        || event.kind === 'osc' && ['133;A', '133;C', '133;D'].includes(event.code))) {
+      if (
+        sessionId &&
+        events.some(
+          (event) =>
+            event.kind === 'altExit' ||
+            event.kind === 'altEnter' ||
+            (event.kind === 'osc' && ['133;A', '133;C', '133;D'].includes(event.code)),
+        )
+      ) {
         cancelTerminalInput(sessionId);
       }
       controller.handleEvents(events);
@@ -538,26 +611,26 @@ export function useTerminalSession(
           .join('');
         const time = Date.now();
         const lines = output ? connectionLogLines(output).filter(isSshClientNotice) : [];
-        if (lines.length) setSshLog(entries => lines.reduce((log, line) => appendLogEntry(log, { time, text: line }), entries));
+        if (lines.length) setSshLog((entries) => lines.reduce((log, line) => appendLogEntry(log, { time, text: line }), entries));
       }
       // A real prompt marker also renews the budget after an earlier idle-readiness fallback.
-      if (events.some(event => event.kind === 'osc' && event.code === '133;B')) {
+      if (events.some((event) => event.kind === 'osc' && event.code === '133;B')) {
         if (!promptReady) traceStartup('prompt-marker', { sessionId, afterInputReady: startupComplete });
         promptReady = true;
         if (spec?.kind === 'ssh') setSshAuthenticated(true);
         if (spec?.kind === 'ssh' && spec.ssh?.connectionId && !automaticForwardingStarted) {
           automaticForwardingStarted = true;
-          void startAutomaticForwarding(spec.ssh.connectionId).catch(reason => {
+          void startAutomaticForwarding(spec.ssh.connectionId).catch((reason) => {
             useToastStore.getState().addToast(`${t('Port forwarding failed')}: ${String(reason)}`, 'error');
           });
         }
         if (spec?.kind === 'ssh') reconnectAttemptsRef.current = 0;
-        if (spec?.kind === 'ssh') setSshLog(entries => appendLogEntry(entries, { time: Date.now(), text: t('Shell ready') }));
+        if (spec?.kind === 'ssh') setSshLog((entries) => appendLogEntry(entries, { time: Date.now(), text: t('Shell ready') }));
       }
       if (startupComplete) return;
       // Non-integrated command shells have no OSC readiness marker.
-      const plainShellOutput = spec?.kind === 'local' && spec.shellType === 'cmd'
-        && events.some(event => event.kind === 'data' && event.text.length > 0);
+      const plainShellOutput =
+        spec?.kind === 'local' && spec.shellType === 'cmd' && events.some((event) => event.kind === 'data' && event.text.length > 0);
       if (promptReady || plainShellOutput) {
         clearTimeout(startupTimer);
         clearTimeout(idleFallbackTimer);
@@ -623,8 +696,14 @@ export function useTerminalSession(
           useTerminalStore.getState().clearSession(paneId, id);
           setStatus('closed');
           writeMain(`\r\n\x1b[31m${t('terminal.processExited')}\x1b[0m\r\n`);
-          if (spec?.kind === 'ssh') setSshLog(entries => appendLogEntry(entries, { time: Date.now(), text: code == null ? t('Connection ended') : t('Connection ended (exit code {{code}})', { code }) }));
-          if (code !== 255 && code !== null) setRetry(previous => ({ ...previous, phase: 'idle', seconds: 0 }));
+          if (spec?.kind === 'ssh')
+            setSshLog((entries) =>
+              appendLogEntry(entries, {
+                time: Date.now(),
+                text: code == null ? t('Connection ended') : t('Connection ended (exit code {{code}})', { code }),
+              }),
+            );
+          if (code !== 255 && code !== null) setRetry((previous) => ({ ...previous, phase: 'idle', seconds: 0 }));
           scheduleAutoReconnect(code);
         }
       }),
@@ -634,15 +713,30 @@ export function useTerminalSession(
 
     // The type and cwd were resolved into the spec before the controller was created.
     let tabCwd = spec?.cwd;
-    const spawnOpts: PtySpawnOptions | undefined = spec?.kind === 'ssh'
-      ? { ssh: { host: spec.ssh?.host ?? '', user: spec.ssh?.user, port: spec.ssh?.port,
-        identityFile: spec.ssh?.identityFile, jumpHost: spec.ssh?.jumpHost, jumpConnectionId: spec.ssh?.jumpConnectionId,
-        serverAliveInterval: spec.ssh?.serverAliveInterval, shellIntegration: spec.ssh?.shellIntegration,
-        localForwards: spec.ssh?.localForwards, remoteForwards: spec.ssh?.remoteForwards,
-        dynamicForwards: spec.ssh?.dynamicForwards, proxyId: spec.ssh?.proxyId, environment: spec.ssh?.environment, authenticationMode: spec.ssh?.authenticationMode }, openMode }
-      : spec?.kind === 'local'
-        ? { shell: spec.shellType, openMode }
-        : undefined;
+    const spawnOpts: PtySpawnOptions | undefined =
+      spec?.kind === 'ssh'
+        ? {
+            ssh: {
+              host: spec.ssh?.host ?? '',
+              user: spec.ssh?.user,
+              port: spec.ssh?.port,
+              identityFile: spec.ssh?.identityFile,
+              jumpHost: spec.ssh?.jumpHost,
+              jumpConnectionId: spec.ssh?.jumpConnectionId,
+              serverAliveInterval: spec.ssh?.serverAliveInterval,
+              shellIntegration: spec.ssh?.shellIntegration,
+              localForwards: spec.ssh?.localForwards,
+              remoteForwards: spec.ssh?.remoteForwards,
+              dynamicForwards: spec.ssh?.dynamicForwards,
+              proxyId: spec.ssh?.proxyId,
+              environment: spec.ssh?.environment,
+              authenticationMode: spec.ssh?.authenticationMode,
+            },
+            openMode,
+          }
+        : spec?.kind === 'local'
+          ? { shell: spec.shellType, openMode }
+          : undefined;
     // A split pane may mount before its container is laid out, in which case fit measures 0x0
     // or a transient single-digit grid. Start with fallback dimensions and re-fit to the real
     // size from the ResizeObserver so the PTY never starts at an unusable size.
@@ -656,11 +750,15 @@ export function useTerminalSession(
         traceStartup('shell-detection-start');
         const shells = await getAvailableShells();
         traceStartup('shell-detection-complete', { shellCount: shells.length, cancelled: disposed || stopped });
-        spawnOpts.shell = preferredShell(spec.shellType as ShellType ?? 'system', shells);
+        spawnOpts.shell = preferredShell((spec.shellType as ShellType) ?? 'system', shells);
         const profile = spawnOpts.shell ? useShellProfiles.getState().profiles[spawnOpts.shell as ShellType] : undefined;
         if (spec.useProfileDirectory !== false) tabCwd ??= profile?.cwd || undefined;
       }
-      if (spawnOpts?.ssh && !spawnOpts.ssh.jumpConnectionId && (!spawnOpts.ssh.jumpHost || spawnOpts.ssh.jumpHost.toLowerCase() === 'none')) {
+      if (
+        spawnOpts?.ssh &&
+        !spawnOpts.ssh.jumpConnectionId &&
+        (!spawnOpts.ssh.jumpHost || spawnOpts.ssh.jumpHost.toLowerCase() === 'none')
+      ) {
         try {
           const info = await prepareSshHost(spawnOpts.ssh.host, spawnOpts.ssh.port, startupAbort.signal, spawnOpts.ssh);
           spawnOpts.ssh.hostKeyType = info.keyType;
@@ -668,7 +766,14 @@ export function useTerminalSession(
           const message = String((error as Error)?.message ?? error);
           const name = (error as Error)?.name;
           // Stop when the user cancelled or a recorded host key changed (possible interception).
-          if (name === 'SshHostTrustCancelledError' || name === 'SshHostKeyMismatchError' || message.includes('已取消') || message.includes('cancelled') || message.includes('主机密钥不匹配')) throw error;
+          if (
+            name === 'SshHostTrustCancelledError' ||
+            name === 'SshHostKeyMismatchError' ||
+            message.includes('已取消') ||
+            message.includes('cancelled') ||
+            message.includes('主机密钥不匹配')
+          )
+            throw error;
           // Preflight only inspects the fingerprint early. Its failure (for example an old server
           // that cannot negotiate an algorithm with the preflight library) must not prevent a
           // usable SSH session: let SSH validate and ask about unknown fingerprints in-terminal.
@@ -690,7 +795,7 @@ export function useTerminalSession(
         sessionId = id;
         if (spec?.kind === 'local' && spawnOpts?.shell) {
           const shell = spawnOpts.shell;
-          useTerminalStore.setState(state => ({ shellTypes: { ...state.shellTypes, [paneId]: shell } }));
+          useTerminalStore.setState((state) => ({ shellTypes: { ...state.shellTypes, [paneId]: shell } }));
         }
         if (isTerminalDebugEnabled()) terminalDebug('pty-spawn-ready', { paneId, id });
         // Replay initial output buffered before spawn returned (the shell prompt).
@@ -702,7 +807,14 @@ export function useTerminalSession(
         preSession = [];
         onReadyRef.current(id);
         setStatus('ready');
-        if (currentScene === 'classic' && useSessionStore.getState().activeId === ownerTab.current && ['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) && !useUiStore.getState().settingsOpen && !document.activeElement?.closest('.ai-workspace-surface') && !(spec?.kind === 'ssh' && blockEnabled && connectionOutputRef.current)) {
+        if (
+          currentScene === 'classic' &&
+          useSessionStore.getState().activeId === ownerTab.current &&
+          ['terminal', 'unified'].includes(useWorkspaceNavigation.getState().area) &&
+          !useUiStore.getState().settingsOpen &&
+          !document.activeElement?.closest('.ai-workspace-surface') &&
+          !(spec?.kind === 'ssh' && blockEnabled && connectionOutputRef.current)
+        ) {
           term.focus();
         }
         // Re-fit to the real layout once the PTY is ready.
@@ -717,7 +829,7 @@ export function useTerminalSession(
       .catch((e) => {
         traceStartup('startup-rejected', { cancelled: disposed || stopped, errorType: e instanceof Error ? e.name : typeof e });
         if (!disposed && !stopped) {
-          setRetry(previous => ({ ...previous, phase: 'stopped', seconds: 0 }));
+          setRetry((previous) => ({ ...previous, phase: 'stopped', seconds: 0 }));
           connectionFailed = true;
           useTerminalStore.getState().setStartupState(paneId, 'failed');
           setStatus('error');
@@ -725,9 +837,13 @@ export function useTerminalSession(
             terminalDebug('pty-spawn-error', { paneId, errorType: e instanceof Error ? e.name : typeof e });
           }
           console.error('[useTerminalSession] PTY spawn failed:', e);
-          writeMain(`\r\n\x1b[31m[${spec?.kind === 'ssh'
-            ? t('SSH connection failed: {{error}}', { error: String(e) })
-            : t('Could not start the shell: {{error}}', { error: String(e) })}]\x1b[0m\r\n`);
+          writeMain(
+            `\r\n\x1b[31m[${
+              spec?.kind === 'ssh'
+                ? t('SSH connection failed: {{error}}', { error: String(e) })
+                : t('Could not start the shell: {{error}}', { error: String(e) })
+            }]\x1b[0m\r\n`,
+          );
         }
       });
 
@@ -809,16 +925,23 @@ export function useTerminalSession(
           });
         }
         const started = performance.now();
-        writeTerminalInput(sessionId, data).then(() => {
-          if (!disposed) controller.ioLog.inputWrite(performance.now() - started);
-          if (isTerminalInputTraceEnabled()) {
-            terminalDebug('terminal-input-write-complete', { paneId, sessionId, chars: data.length });
-          }
-        }).catch((error) => {
-          if (isTerminalDebugEnabled()) {
-            terminalDebug('pty-write-error', { paneId, sessionId, source: 'main-xterm', errorType: error instanceof Error ? error.name : typeof error });
-          }
-        });
+        writeTerminalInput(sessionId, data)
+          .then(() => {
+            if (!disposed) controller.ioLog.inputWrite(performance.now() - started);
+            if (isTerminalInputTraceEnabled()) {
+              terminalDebug('terminal-input-write-complete', { paneId, sessionId, chars: data.length });
+            }
+          })
+          .catch((error) => {
+            if (isTerminalDebugEnabled()) {
+              terminalDebug('pty-write-error', {
+                paneId,
+                sessionId,
+                source: 'main-xterm',
+                errorType: error instanceof Error ? error.name : typeof error,
+              });
+            }
+          });
       }
     });
 
@@ -837,8 +960,10 @@ export function useTerminalSession(
       const fsHost = document.querySelector<HTMLElement>(`[data-testid="tui-fullscreen"][data-pane-id="${paneId}"]`);
       if (!fsHost) return null;
       const style = getComputedStyle(fsHost);
-      return { w: fsHost.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0),
-        h: fsHost.clientHeight - (parseFloat(style.paddingTop) || 0) - (parseFloat(style.paddingBottom) || 0) };
+      return {
+        w: fsHost.clientWidth - (parseFloat(style.paddingLeft) || 0) - (parseFloat(style.paddingRight) || 0),
+        h: fsHost.clientHeight - (parseFloat(style.paddingTop) || 0) - (parseFloat(style.paddingBottom) || 0),
+      };
     };
 
     let cachedDomCellWidth = 0;
@@ -867,9 +992,10 @@ export function useTerminalSession(
       const list = pane?.querySelector<HTMLElement>(`[data-testid="terminal-scroll-${paneId}"]`);
       const screenPx = host
         ? host.clientWidth
-        : (list?.clientWidth || el.offsetWidth) - (list
-          ? parseFloat(getComputedStyle(list).getPropertyValue('--command-content-inset')) || BLOCK_CONTENT_INSET_PX
-          : BLOCK_CONTENT_INSET_PX);
+        : (list?.clientWidth || el.offsetWidth) -
+          (list
+            ? parseFloat(getComputedStyle(list).getPropertyValue('--command-content-inset')) || BLOCK_CONTENT_INSET_PX
+            : BLOCK_CONTENT_INSET_PX);
       // A hidden or not-yet-laid-out host has no measurable width; retry after mount.
       if (screenPx <= 0) return term.cols;
       // The visible block owns its grid. The hidden main terminal can retain a smaller
@@ -896,7 +1022,10 @@ export function useTerminalSession(
     // Running programs receive coalesced sizes during the drag so they can reflow immediately.
     const requestPtySize = (cols: number, rows: number) => {
       if (!sessionId) return;
-      if (isLayoutResizeDragActive() && !controller.executingTerm) { deferredPtySize = { cols, rows }; return; }
+      if (isLayoutResizeDragActive() && !controller.executingTerm) {
+        deferredPtySize = { cols, rows };
+        return;
+      }
       deferredPtySize = null;
       resizeQueue.request(cols, rows);
     };
@@ -915,10 +1044,20 @@ export function useTerminalSession(
         if (isTerminalDebugEnabled() && sizeChanged) {
           const screen = term.element?.querySelector('.xterm-screen')?.getBoundingClientRect();
           const host = el.getBoundingClientRect();
-          terminalDebug('terminal-resize-frame', { paneId, scene: currentScene, previousCols, previousRows,
-            cols: term.cols, rows: term.rows, hostWidth: host.width, hostHeight: host.height,
-            screenOffsetX: screen ? screen.left - host.left : null, screenWidth: screen?.width,
-            cellWidth: getCellMetrics(term).width, devicePixelRatio: window.devicePixelRatio });
+          terminalDebug('terminal-resize-frame', {
+            paneId,
+            scene: currentScene,
+            previousCols,
+            previousRows,
+            cols: term.cols,
+            rows: term.rows,
+            hostWidth: host.width,
+            hostHeight: host.height,
+            screenOffsetX: screen ? screen.left - host.left : null,
+            screenWidth: screen?.width,
+            cellWidth: getCellMetrics(term).width,
+            devicePixelRatio: window.devicePixelRatio,
+          });
         }
         const scene = useTerminalStore.getState().scenes[paneId] ?? currentScene;
         const manualRequested = !!useTerminalStore.getState().manualFullscreen[paneId];
@@ -934,18 +1073,29 @@ export function useTerminalSession(
         const rows = effectiveRows();
         if (cols <= 0 || rows <= 0) return;
         if (manual) useTerminalStore.getState().setDims(paneId, cols, rows);
-        if (useTerminalStore.getState().manualFullscreen[paneId] && controller.executingTerm
-          && (controller.executingTerm.term.cols !== cols || controller.executingTerm.term.rows !== rows)) {
+        if (
+          useTerminalStore.getState().manualFullscreen[paneId] &&
+          controller.executingTerm &&
+          (controller.executingTerm.term.cols !== cols || controller.executingTerm.term.rows !== rows)
+        ) {
           terminalDebug('manual-fullscreen-resize', { paneId, cols, rows });
         }
         requestPtySize(cols, rows);
         controller.resize(cols, rows);
         if (isTerminalDebugEnabled()) {
           const output = controller.executingTerm;
-          if (output) terminalDebug('running-terminal-width', { paneId, cols, rows, mainCols: term.cols,
-            mainHostWidth: el.clientWidth, mainHostHeight: el.clientHeight,
-            blockCols: output.term.cols, cellWidth: getCellMetrics(output.term).width,
-            screenWidth: output.el.querySelector('.xterm-screen')?.getBoundingClientRect().width });
+          if (output)
+            terminalDebug('running-terminal-width', {
+              paneId,
+              cols,
+              rows,
+              mainCols: term.cols,
+              mainHostWidth: el.clientWidth,
+              mainHostHeight: el.clientHeight,
+              blockCols: output.term.cols,
+              cellWidth: getCellMetrics(output.term).width,
+              screenWidth: output.el.querySelector('.xterm-screen')?.getBoundingClientRect().width,
+            });
         }
       });
     };
@@ -976,10 +1126,11 @@ export function useTerminalSession(
       void document.fonts.ready.then(() => {
         if (disposed) return;
         const wanted = getTerminalFontOptions();
-        const changed = term.options.fontSize !== wanted.fontSize
-          || term.options.fontFamily !== wanted.fontFamily
-          || term.options.fontWeight !== wanted.fontWeight
-          || term.options.letterSpacing !== wanted.letterSpacing;
+        const changed =
+          term.options.fontSize !== wanted.fontSize ||
+          term.options.fontFamily !== wanted.fontFamily ||
+          term.options.fontWeight !== wanted.fontWeight ||
+          term.options.letterSpacing !== wanted.letterSpacing;
         if (!changed) return;
         Object.assign(term.options, wanted);
         cachedDomCellWidth = 0;
@@ -1012,7 +1163,10 @@ export function useTerminalSession(
       // The store changes before React reveals the pane. Repaint after layout even
       // when a rapid tab switch never produces a zero-size ResizeObserver entry.
       cancelAnimationFrame(restoreRaf);
-      restoreRaf = requestAnimationFrame(() => { restoreSurface(); applyWidth(); });
+      restoreRaf = requestAnimationFrame(() => {
+        restoreSurface();
+        applyWidth();
+      });
     });
     let paneWasHidden = false;
     const ro = new ResizeObserver(() => {
@@ -1030,14 +1184,18 @@ export function useTerminalSession(
     // Coming back from a backgrounded window is a shared-atlas reset: the renderer reset and the
     // repaint cover every live terminal, because a single terminal must never clear the glyph
     // atlas that the others hold texture coordinates into.
-    const onVisibilityChange = () => { if (!document.hidden) recoverTerminalSurfaces(); };
+    const onVisibilityChange = () => {
+      if (!document.hidden) recoverTerminalSurfaces();
+    };
     document.addEventListener('visibilitychange', onVisibilityChange);
     // The platform does not always deliver a visibility change when the window leaves and comes
     // back, so the return is also observed through focus. The record carries how long the app was
     // away and which renderer each surface came back with, which makes a silent step down to the
     // DOM renderer visible.
     let blurredAt: number | null = null;
-    const onWindowBlur = () => { blurredAt = performance.now(); };
+    const onWindowBlur = () => {
+      blurredAt = performance.now();
+    };
     const onWindowFocus = () => {
       if (disposed) return;
       const awayMs = blurredAt === null ? null : Math.round(performance.now() - blurredAt);
@@ -1072,7 +1230,13 @@ export function useTerminalSession(
       if (closeSessionRef.current === close) closeSessionRef.current = async () => {};
       startupAbort.abort();
       if (isTerminalDebugEnabled()) {
-        terminalDebug('session-controller-dispose', { paneId, tabId: ownerTab.current, attempt, kind: spec?.kind ?? 'none', hasSession: Boolean(sessionId) });
+        terminalDebug('session-controller-dispose', {
+          paneId,
+          tabId: ownerTab.current,
+          attempt,
+          kind: spec?.kind ?? 'none',
+          hasSession: Boolean(sessionId),
+        });
       }
       if (focusTimer) {
         clearTimeout(focusTimer);

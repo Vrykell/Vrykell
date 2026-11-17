@@ -13,17 +13,21 @@ const initialTerm = useTerminalStore.getState();
 const instances: Terminal[] = [];
 afterEach(() => {
   clearCompletionReadiness('completion-test');
-  for (const terminal of instances.splice(0)) { unregisterTerminal('completion-test', terminal); terminal.dispose(); }
+  for (const terminal of instances.splice(0)) {
+    unregisterTerminal('completion-test', terminal);
+    terminal.dispose();
+  }
   useTerminalStore.setState(initialTerm, true);
 });
 
 function setup(scrollback = 1000, cols = 80) {
   const terminal = new Terminal({ cols, rows: 5, scrollback });
-  instances.push(terminal); registerTerminal('completion-test', terminal);
+  instances.push(terminal);
+  registerTerminal('completion-test', terminal);
   const completion = watchShellCommandCompletion('completion-test')!;
   const command = completion.wrap("printf '%s' 'a quote: it\'s here'");
   const token = /777;([^;]+);/.exec(command)![1];
-  const write = (data: string) => new Promise<void>(resolve => terminal.write(data, resolve));
+  const write = (data: string) => new Promise<void>((resolve) => terminal.write(data, resolve));
   return { terminal, completion, command, token, write };
 }
 
@@ -121,6 +125,7 @@ it('forgets retained readiness when the pane receives a new terminal', async () 
   expect(completionRecoveryReady('completion-test')).toBe(true);
 
   const replacement = new Terminal({ cols: 80, rows: 5, scrollback: 100 });
-  instances.push(replacement); registerTerminal('completion-test', replacement);
+  instances.push(replacement);
+  registerTerminal('completion-test', replacement);
   expect(completionRecoveryReady('completion-test')).toBe(false);
 });

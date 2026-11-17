@@ -48,7 +48,7 @@ describe('Select', () => {
     fireEvent.keyDown(trigger, { key: 'ArrowDown' });
     expect(screen.getByRole('option', { name: '低' })).toHaveAttribute('data-active', 'true');
     fireEvent(screen.getByRole('option', { name: '中' }), new MouseEvent('pointermove', { bubbles: true, clientX: 10, clientY: 20 }));
-    expect(screen.getAllByRole('option').every(option => option.getAttribute('data-active') === 'false')).toBe(true);
+    expect(screen.getAllByRole('option').every((option) => option.getAttribute('data-active') === 'false')).toBe(true);
     const footer = screen.getByRole('button', { name: 'Add' });
     fireEvent(footer, new MouseEvent('pointermove', { bubbles: true, clientX: 10, clientY: 30 }));
     expect(footer).toHaveAttribute('data-active', 'false');
@@ -57,8 +57,14 @@ describe('Select', () => {
   });
 
   it('uses a concise trigger label while keeping full context in the menu', () => {
-    render(<Select aria-label="Target" value="server" onChange={vi.fn()}
-      options={[{ value: 'server', label: 'Production server · 10.21.76.61 · /srv/app', triggerLabel: '10.21.76.61' }]} />);
+    render(
+      <Select
+        aria-label="Target"
+        value="server"
+        onChange={vi.fn()}
+        options={[{ value: 'server', label: 'Production server · 10.21.76.61 · /srv/app', triggerLabel: '10.21.76.61' }]}
+      />,
+    );
     expect(screen.getByRole('combobox', { name: 'Target' })).toHaveTextContent('10.21.76.61');
     expect(screen.getByRole('combobox', { name: 'Target' })).not.toHaveTextContent('/srv/app');
     fireEvent.click(screen.getByRole('combobox', { name: 'Target' }));
@@ -68,7 +74,17 @@ describe('Select', () => {
     const onChange = vi.fn();
     function Example() {
       const [value, setValue] = useState('low');
-      return <Select aria-label="思考强度" value={value} options={options} onChange={next => { setValue(next); onChange(next); }} />;
+      return (
+        <Select
+          aria-label="思考强度"
+          value={value}
+          options={options}
+          onChange={(next) => {
+            setValue(next);
+            onChange(next);
+          }}
+        />
+      );
     }
     render(<Example />);
     const user = userEvent.setup();
@@ -103,7 +119,17 @@ describe('Select', () => {
 
   it('supports numeric values, space selection and label search', async () => {
     const onChange = vi.fn();
-    render(<Select aria-label="字号" value={12} options={[{ value: 12, label: '12px' }, { value: 16, label: '16px' }]} onChange={onChange} />);
+    render(
+      <Select
+        aria-label="字号"
+        value={12}
+        options={[
+          { value: 12, label: '12px' },
+          { value: 16, label: '16px' },
+        ]}
+        onChange={onChange}
+      />,
+    );
     const user = userEvent.setup();
     screen.getByRole('combobox').focus();
     await user.keyboard(' {End} ');
@@ -114,7 +140,12 @@ describe('Select', () => {
   });
 
   it('closes on outside interaction and Tab without trapping focus', async () => {
-    render(<><Select aria-label="强度" value="low" options={options} onChange={vi.fn()} /><button>下一个</button></>);
+    render(
+      <>
+        <Select aria-label="强度" value="low" options={options} onChange={vi.fn()} />
+        <button>下一个</button>
+      </>,
+    );
     const user = userEvent.setup();
     await user.click(screen.getByRole('combobox'));
     await user.tab();
@@ -128,7 +159,9 @@ describe('Select', () => {
 
   it('handles disabled controls, empty options and unmatched values', async () => {
     const onChange = vi.fn();
-    const { rerender } = render(<Select aria-label="仓库" value="custom" options={options} onChange={onChange} placeholder="自定义…" disabled />);
+    const { rerender } = render(
+      <Select aria-label="仓库" value="custom" options={options} onChange={onChange} placeholder="自定义…" disabled />,
+    );
     const user = userEvent.setup();
     expect(screen.getByRole('combobox')).toBeDisabled();
     await user.click(screen.getByRole('combobox'));
@@ -147,7 +180,17 @@ describe('Select', () => {
   it('flips the portal above a trigger near the viewport bottom', async () => {
     render(<Select aria-label="强度" value="low" options={options} onChange={vi.fn()} />);
     const trigger = screen.getByRole('combobox');
-    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({ x: 950, y: 720, top: 720, bottom: 750, left: 950, right: 1060, width: 110, height: 30, toJSON: () => ({}) });
+    vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({
+      x: 950,
+      y: 720,
+      top: 720,
+      bottom: 750,
+      left: 950,
+      right: 1060,
+      width: 110,
+      height: 30,
+      toJSON: () => ({}),
+    });
     await userEvent.setup().click(trigger);
     const menu = screen.getByRole('listbox').parentElement!;
     expect(menu.parentElement).toBe(document.body);
@@ -157,7 +200,8 @@ describe('Select', () => {
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
   });
 
-  it('marks the selected option with a non-character check icon', async () => {    render(<Select aria-label="强度" value="low" options={options} onChange={vi.fn()} />);
+  it('marks the selected option with a non-character check icon', async () => {
+    render(<Select aria-label="强度" value="low" options={options} onChange={vi.fn()} />);
     await userEvent.setup().click(screen.getByRole('combobox'));
     const selected = screen.getByRole('option', { name: '低' });
     const check = selected.querySelector('svg.ui-select-check');
@@ -167,8 +211,17 @@ describe('Select', () => {
   });
 
   it('renders a colour swatch in the trigger and in the option rows', async () => {
-    render(<Select aria-label="颜色" value="blue" onChange={vi.fn()}
-      options={[{ value: 'blue', label: '蓝色', swatch: '#0A84FF' }, { value: 'green', label: '绿色', swatch: '#6CE6A6' }]} />);
+    render(
+      <Select
+        aria-label="颜色"
+        value="blue"
+        onChange={vi.fn()}
+        options={[
+          { value: 'blue', label: '蓝色', swatch: '#0A84FF' },
+          { value: 'green', label: '绿色', swatch: '#6CE6A6' },
+        ]}
+      />,
+    );
     const trigger = screen.getByRole('combobox', { name: '颜色' });
     expect(trigger.querySelector('span.ui-select-swatch')).toHaveStyle({ background: '#0A84FF' });
     await userEvent.setup().click(trigger);

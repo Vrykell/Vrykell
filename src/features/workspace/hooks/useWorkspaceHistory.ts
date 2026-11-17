@@ -16,9 +16,20 @@ import { useBlockStore } from '@features/terminal/stores/blocks';
 /** Every scope saves the same tab snapshot through one serialized history writer. */
 export function useWorkspaceHistory(resources: WorkspaceResource[], store = useUnifiedWorkspace) {
   const scope = (Object.entries(workspaceAreaStores).find(([, value]) => value === store)?.[0] ?? 'unified') as WorkspaceScope;
-  const agentRevision = useHarnessStore(state => JSON.stringify(Object.entries(state.byTab).map(([id, session]) => [id, session.sessionId, session.messages.some(hasChatContent)])));
-  const chatRevision = useChatStore(state => JSON.stringify(Object.entries(state.byTab).map(([id, messages]) => [id, messages.some(hasChatContent)])));
-  const terminalRevision = useBlockStore(state => JSON.stringify(Object.entries(state.byTab).map(([id, blocks]) => [id, blocks.some(block => block.command.trim() || block.outputText.trim() || block.outputRaw.trim())])));
+  const agentRevision = useHarnessStore((state) =>
+    JSON.stringify(Object.entries(state.byTab).map(([id, session]) => [id, session.sessionId, session.messages.some(hasChatContent)])),
+  );
+  const chatRevision = useChatStore((state) =>
+    JSON.stringify(Object.entries(state.byTab).map(([id, messages]) => [id, messages.some(hasChatContent)])),
+  );
+  const terminalRevision = useBlockStore((state) =>
+    JSON.stringify(
+      Object.entries(state.byTab).map(([id, blocks]) => [
+        id,
+        blocks.some((block) => block.command.trim() || block.outputText.trim() || block.outputRaw.trim()),
+      ]),
+    ),
+  );
   useEffect(() => {
     const timers = new Map<string, ReturnType<typeof setTimeout>>();
     const save = (tab: WorkspaceContainer) => {
@@ -32,24 +43,35 @@ export function useWorkspaceHistory(resources: WorkspaceResource[], store = useU
       const retry = () => {
         const operation = persistContainerHistory(target, snapshot);
         target = { ...target, historyIdentity: containerHistoryIdentity(target) };
-        void operation.catch(error => reportWorkbenchFailure(error, retry));
+        void operation.catch((error) => reportWorkbenchFailure(error, retry));
       };
       retry();
     };
     for (const tab of useWorkbenchStore.getState().snapshot.tabs) save(tab);
     const unsubscribe = useWorkbenchStore.subscribe((state, previous) => {
       if (state.snapshot === previous.snapshot) return;
-      const previousTabs = new Map(previous.snapshot.tabs.map(tab => [tab.id, tab]));
-      const currentIds = new Set(state.snapshot.tabs.map(tab => tab.id));
+      const previousTabs = new Map(previous.snapshot.tabs.map((tab) => [tab.id, tab]));
+      const currentIds = new Set(state.snapshot.tabs.map((tab) => tab.id));
       for (const tab of state.snapshot.tabs) {
         if (tab.scope !== scope || previousTabs.get(tab.id) === tab) continue;
         clearTimeout(timers.get(tab.id));
-        timers.set(tab.id, setTimeout(() => { save(tab); timers.delete(tab.id); }, 200));
+        timers.set(
+          tab.id,
+          setTimeout(() => {
+            save(tab);
+            timers.delete(tab.id);
+          }, 200),
+        );
       }
-      for (const tab of previous.snapshot.tabs) if (!currentIds.has(tab.id)) {
-        clearTimeout(timers.get(tab.id)); timers.delete(tab.id);
-      }
+      for (const tab of previous.snapshot.tabs)
+        if (!currentIds.has(tab.id)) {
+          clearTimeout(timers.get(tab.id));
+          timers.delete(tab.id);
+        }
     });
-    return () => { unsubscribe(); for (const timer of timers.values()) clearTimeout(timer); };
-  }, [scope, resources.map(resource => resource.id).join('|'), agentRevision, chatRevision, terminalRevision]);
+    return () => {
+      unsubscribe();
+      for (const timer of timers.values()) clearTimeout(timer);
+    };
+  }, [scope, resources.map((resource) => resource.id).join('|'), agentRevision, chatRevision, terminalRevision]);
 }

@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { MODEL_PRESETS, applyModelPreset, type ModelPreset } from '@config/modelPresets';
 
 const preset = (patch: Partial<ModelPreset> = {}): ModelPreset => ({
-  name: 'DeepSeek', provider: 'openai-compatible', baseUrl: 'https://api.deepseek.com/v1',
-  model: 'deepseek-chat', hint: 'Official endpoint: paste a key from the vendor console.', ...patch,
+  name: 'DeepSeek',
+  provider: 'openai-compatible',
+  baseUrl: 'https://api.deepseek.com/v1',
+  model: 'deepseek-chat',
+  hint: 'Official endpoint: paste a key from the vendor console.',
+  ...patch,
 });
 
 describe('MODEL_PRESETS', () => {
@@ -26,7 +30,9 @@ describe('MODEL_PRESETS', () => {
 describe('applyModelPreset', () => {
   it('appends the preset and returns the id it should activate', () => {
     const result = applyModelPreset<{ id: string; name: string; provider: string; baseUrl: string; model: string }>(
-      [], preset(), () => 'new-id',
+      [],
+      preset(),
+      () => 'new-id',
     );
 
     expect(result.id).toBe('new-id');

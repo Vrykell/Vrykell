@@ -11,8 +11,7 @@ test.beforeEach(async ({ page }) => {
   await gotoSetting(page, '模型行为');
 });
 
-const settingsJson = (page: import('@playwright/test').Page) =>
-  page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
+const settingsJson = (page: import('@playwright/test').Page) => page.evaluate(() => localStorage.getItem('vrykell-agent-settings') ?? '');
 
 test.describe('model behavior page', () => {
   test('Agent mode persists after toggling, and deep thinking moves to the model configuration', async ({ page }) => {
@@ -32,7 +31,13 @@ test.describe('model behavior page', () => {
     await expect(thinking.getByText('已关闭')).toHaveCount(0);
     await expect(page.getByTestId('model-context-settings').getByText('已开启')).toHaveCount(0);
     await expect(page.getByTestId('model-context-settings').getByText('已关闭')).toHaveCount(0);
-    expect(await page.getByTestId('model-context-settings').locator('input[type="number"]').first().evaluate(input => getComputedStyle(input).appearance)).toBe('textfield');
+    expect(
+      await page
+        .getByTestId('model-context-settings')
+        .locator('input[type="number"]')
+        .first()
+        .evaluate((input) => getComputedStyle(input).appearance),
+    ).toBe('textfield');
     const thinkSwitch = thinking.getByRole('switch');
     await thinkSwitch.click();
     await expect(thinkSwitch).toHaveAttribute('aria-checked', 'true');
@@ -60,12 +65,19 @@ test.describe('model behavior page', () => {
     await expect(defaultContext.locator('.settings-field').nth(1)).toHaveCSS('border-top-width', '1px');
     await expect(defaultContext.getByText('已开启')).toHaveCount(0);
     await expect(defaultContext.getByText('已关闭')).toHaveCount(0);
-    expect(await defaultContext.locator('input[type="number"]').first().evaluate(input => getComputedStyle(input).appearance)).toBe('textfield');
+    expect(
+      await defaultContext
+        .locator('input[type="number"]')
+        .first()
+        .evaluate((input) => getComputedStyle(input).appearance),
+    ).toBe('textfield');
     await strategy.getByRole('combobox', { name: '上下文策略' }).click();
     await page.getByRole('option', { name: '窗口', exact: true }).click();
     let saved = await settingsJson(page);
     expect(saved).toContain('"contextStrategy":"window"');
-    let state = JSON.parse(saved) as { state: { global: { contextStrategy: string }; overrides: Record<string, { contextStrategy?: string }> } };
+    let state = JSON.parse(saved) as {
+      state: { global: { contextStrategy: string }; overrides: Record<string, { contextStrategy?: string }> };
+    };
     expect(state.state.global.contextStrategy).toBe('window');
     expect(state.state.overrides['m-main']).toBeUndefined();
 
@@ -78,7 +90,9 @@ test.describe('model behavior page', () => {
     await modelStrategy.getByRole('combobox', { name: '上下文策略' }).click();
     await page.getByRole('option', { name: '汇总', exact: true }).click();
     saved = await settingsJson(page);
-    state = JSON.parse(saved) as { state: { global: { contextStrategy: string }; overrides: Record<string, { contextStrategy?: string }> } };
+    state = JSON.parse(saved) as {
+      state: { global: { contextStrategy: string }; overrides: Record<string, { contextStrategy?: string }> };
+    };
     expect(state.state.global.contextStrategy).toBe('window');
     expect(state.state.overrides['m-main'].contextStrategy).toBe('compact');
   });

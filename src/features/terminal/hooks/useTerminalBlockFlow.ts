@@ -12,9 +12,7 @@ export interface BlockMenuState {
   anchor: BlockMenuAnchor;
 }
 
-export type BlockMenuAnchor =
-  | { kind: 'pointer'; x: number; y: number }
-  | { kind: 'control'; left: number; top: number };
+export type BlockMenuAnchor = { kind: 'pointer'; x: number; y: number } | { kind: 'control'; left: number; top: number };
 
 /** Aggregates the display flow, interleaved AI content and menu state needed by the block list. */
 export function useTerminalBlockFlow(tabId: string) {
@@ -24,24 +22,22 @@ export function useTerminalBlockFlow(tabId: string) {
   const [menuBlock, setMenuBlock] = useState<BlockMenuState | null>(null);
 
   const completed = useMemo(
-    () => blocks.filter((block) =>
-      (block.status === 'done' || block.status === 'interrupted') && !block.snapshotPending && hasVisibleContent(block),
-    ),
+    () =>
+      blocks.filter(
+        (block) => (block.status === 'done' || block.status === 'interrupted') && !block.snapshotPending && hasVisibleContent(block),
+      ),
     [blocks],
   );
   const running = useMemo(() => blocks.filter((block) => block.status === 'executing' || block.snapshotPending), [blocks]);
-  const exchanges = useMemo(
-    () => toExchanges(aiMessages),
-    [aiMessages],
-  );
-  const standalone = useMemo(
-    () => {
-      const embedded = new Set(aiMessages.flatMap(message => (message.parts ?? []).flatMap(part =>
-        part.kind === 'tool' ? [agentControl.blockForToolCall(part.tool.toolCallId)] : [])));
-      return completed.filter(block => !embedded.has(block.id));
-    },
-    [aiMessages, completed],
-  );
+  const exchanges = useMemo(() => toExchanges(aiMessages), [aiMessages]);
+  const standalone = useMemo(() => {
+    const embedded = new Set(
+      aiMessages.flatMap((message) =>
+        (message.parts ?? []).flatMap((part) => (part.kind === 'tool' ? [agentControl.blockForToolCall(part.tool.toolCallId)] : [])),
+      ),
+    );
+    return completed.filter((block) => !embedded.has(block.id));
+  }, [aiMessages, completed]);
   const flow = useMemo(() => mergeFlow(standalone, exchanges), [exchanges, standalone]);
   const openMenu = useCallback((block: TermBlock, anchor: BlockMenuAnchor) => {
     setMenuBlock({ block, anchor });

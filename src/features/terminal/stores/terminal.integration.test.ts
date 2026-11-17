@@ -10,9 +10,16 @@ function makeLine(text: string) {
   return { translateToString: () => text };
 }
 
-function fakeTerm(lines: string[], opts: {
-  viewportY?: number; cursorY?: number; cursorX?: number; cols?: number; rows?: number;
-} = {}) {
+function fakeTerm(
+  lines: string[],
+  opts: {
+    viewportY?: number;
+    cursorY?: number;
+    cursorX?: number;
+    cols?: number;
+    rows?: number;
+  } = {},
+) {
   const { viewportY = 0, cursorY = 0, cursorX = 0, cols = 80, rows = 24 } = opts;
   return {
     cols,
@@ -45,9 +52,13 @@ describe('getTerminalScreen', () => {
 
   it('viewportY offset: reads only the currently visible window lines', () => {
     useTerminalStore.setState({ scenes: { p1: 'classic' } });
-    registerTerminal('p1', fakeTerm(['l0', 'l1', 'l2', 'l3', 'l4', 'l5'], {
-      viewportY: 2, rows: 3,
-    }));
+    registerTerminal(
+      'p1',
+      fakeTerm(['l0', 'l1', 'l2', 'l3', 'l4', 'l5'], {
+        viewportY: 2,
+        rows: 3,
+      }),
+    );
 
     const s = getTerminalScreen('p1')!;
     expect(s.content).toBe(' 1│l2\n 2│l3\n 3│l4');

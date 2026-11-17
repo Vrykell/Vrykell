@@ -39,7 +39,15 @@ const TAB_LABELS: Array<{ id: UsageTab; label: I18nKey }> = [
   { id: 'acp', label: 'ACP' },
 ];
 
-function FilterSelect({ label, tip, value, options, onChange, testId, width }: {
+function FilterSelect({
+  label,
+  tip,
+  value,
+  options,
+  onChange,
+  testId,
+  width,
+}: {
   label: string;
   /** Full current value for the hover tip, since the narrow trigger truncates long names. */
   tip?: string;
@@ -50,8 +58,15 @@ function FilterSelect({ label, tip, value, options, onChange, testId, width }: {
   width: number;
 }) {
   return (
-    <Select aria-label={label} data-testid={testId} value={value} options={options} onChange={onChange}
-      data-tip={tip} style={{ width, maxWidth: 168 }} />
+    <Select
+      aria-label={label}
+      data-testid={testId}
+      value={value}
+      options={options}
+      onChange={onChange}
+      data-tip={tip}
+      style={{ width, maxWidth: 168 }}
+    />
   );
 }
 
@@ -74,76 +89,130 @@ export default function UsageView() {
   };
 
   return (
-    <div data-testid="usage-page" className="usage-page scroll-region" style={{
-      flex: 1, minHeight: 0, overflowY: 'auto', padding: '18px 22px 24px',
-      background: 'var(--canvas)', userSelect: 'none', display: 'flex', flexDirection: 'column', gap: 14,
-    }}>
+    <div
+      data-testid="usage-page"
+      className="usage-page scroll-region"
+      style={{
+        flex: 1,
+        minHeight: 0,
+        overflowY: 'auto',
+        padding: '18px 22px 24px',
+        background: 'var(--canvas)',
+        userSelect: 'none',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 14,
+      }}>
       <header style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
         <DataUsage size={iconSizes.row} style={{ color: 'var(--text-secondary)', flexShrink: 0 }} />
-        <strong data-tip={t('Usage statistics')}
+        <strong
+          data-tip={t('Usage statistics')}
           data-tip-description={t('Requests and token usage the provider reported on this machine.')}
           style={{ color: 'var(--text-primary)', fontSize: 'var(--fs-subtitle)', fontWeight: 'var(--fw-semibold)' }}>
           {t('Usage statistics')}
         </strong>
-        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8, color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
+        <span
+          style={{
+            marginLeft: 'auto',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 8,
+            color: 'var(--text-muted)',
+            fontSize: 'var(--fs-caption)',
+          }}>
           <span data-testid="usage-record-count">{t('{{count}} records', { count: stats.records.length })}</span>
           {stats.latestAt > 0 && <span>· {t('Latest {{time}}', { time: formatLogTime(stats.latestAt) })}</span>}
           {stats.refreshedAt > 0 && (
             <span data-testid="usage-refreshed-at">· {t('Refreshed at {{time}}', { time: formatLogTime(stats.refreshedAt) })}</span>
           )}
-          <IconButton compact data-testid="usage-refresh" aria-label={t('Refresh usage')} data-tip={t('Refresh usage')}
+          <IconButton
+            compact
+            data-testid="usage-refresh"
+            aria-label={t('Refresh usage')}
+            data-tip={t('Refresh usage')}
             onClick={refreshUsage}>
-            <RefreshCw size={iconSizes.compact}
-              style={{ transform: spinning ? 'rotate(360deg)' : 'none', transition: 'transform 0.3s var(--ease)' }} />
+            <RefreshCw
+              size={iconSizes.compact}
+              style={{ transform: spinning ? 'rotate(360deg)' : 'none', transition: 'transform 0.3s var(--ease)' }}
+            />
           </IconButton>
-          <IconButton compact tone="danger" data-testid="usage-clear" disabled={stats.records.length === 0 && !stats.hasAcp}
-            aria-label={t('Clear usage data')} data-tip={t('Clear usage data')} onClick={clearUsage}>
+          <IconButton
+            compact
+            tone="danger"
+            data-testid="usage-clear"
+            disabled={stats.records.length === 0 && !stats.hasAcp}
+            aria-label={t('Clear usage data')}
+            data-tip={t('Clear usage data')}
+            onClick={clearUsage}>
             <Trash2 size={iconSizes.compact} />
           </IconButton>
         </span>
       </header>
 
-      {stats.sourcesError && <ErrorBox title={t('Could not load usage sources')} details={stats.sourcesError}
-        actions={<OutlineButton onClick={() => void stats.refresh()}>{t('Retry')}</OutlineButton>} />}
+      {stats.sourcesError && (
+        <ErrorBox
+          title={t('Could not load usage sources')}
+          details={stats.sourcesError}
+          actions={<OutlineButton onClick={() => void stats.refresh()}>{t('Retry')}</OutlineButton>}
+        />
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <ModelFilter value={stats.model} options={stats.modelOptions} onChange={stats.setModel} />
-          <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            <FilterSelect label={t('Provider')} testId="usage-filter-provider" width={132}
-              value={stats.provider} tip={stats.provider || t('All')}
-              options={[{ value: ALL_FILTER, label: t('All') }, ...stats.providerOptions.map((option) => ({ value: option, label: option }))]}
-              onChange={stats.setProvider} />
-            <FilterSelect label={t('Usage range')} testId="usage-range" width={104} value={stats.range}
-              options={RANGE_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))}
-              onChange={(next) => stats.setRange(next as UsageRange)} />
-          </span>
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <FilterSelect
+            label={t('Provider')}
+            testId="usage-filter-provider"
+            width={132}
+            value={stats.provider}
+            tip={stats.provider || t('All')}
+            options={[{ value: ALL_FILTER, label: t('All') }, ...stats.providerOptions.map((option) => ({ value: option, label: option }))]}
+            onChange={stats.setProvider}
+          />
+          <FilterSelect
+            label={t('Usage range')}
+            testId="usage-range"
+            width={104}
+            value={stats.range}
+            options={RANGE_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))}
+            onChange={(next) => stats.setRange(next as UsageRange)}
+          />
+        </span>
       </div>
 
-          <MetricsRow totals={stats.totals} />
+      <MetricsRow totals={stats.totals} />
 
-          <TrendChart buckets={stats.series.buckets} unit={stats.series.unit} rangeLabel={rangeLabel} />
+      <TrendChart buckets={stats.series.buckets} unit={stats.series.unit} rangeLabel={rangeLabel} />
 
-          <section className="usage-card" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-            <div role="tablist" aria-label={t('Usage details')} style={{ display: 'flex', gap: 4, paddingBottom: 8 }}>
-              {TAB_LABELS.map(({ id, label }) => (
-                <button key={id} type="button" role="tab" aria-selected={tab === id} data-subtle
-                  data-testid={`usage-tab-${id}`} onClick={() => setTab(id)}
-                  style={{
-                    padding: '4px 10px', border: 0, borderRadius: 'var(--radius-inner)',
-                    background: tab === id ? 'var(--hover)' : 'transparent',
-                    color: tab === id ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    font: `${tab === id ? 'var(--fw-medium)' : 'var(--fw-regular)'} var(--fs-label) var(--font-ui)`,
-                    cursor: 'pointer',
-                    transition: 'background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease)',
-                  }}>
-                  {t(label)}
-                </button>
-              ))}
-            </div>
-            {tab === 'logs' && <RequestLogTable rows={stats.logRows} />}
-            {tab === 'providers' && <ProviderStatsTable rows={stats.providerRows} />}
-            {tab === 'models' && <ModelStatsTable rows={stats.modelRows} />}
-            {tab === 'acp' && <AcpSessionsTable rows={stats.acpRows} />}
-          </section>
+      <section className="usage-card" style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        <div role="tablist" aria-label={t('Usage details')} style={{ display: 'flex', gap: 4, paddingBottom: 8 }}>
+          {TAB_LABELS.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={tab === id}
+              data-subtle
+              data-testid={`usage-tab-${id}`}
+              onClick={() => setTab(id)}
+              style={{
+                padding: '4px 10px',
+                border: 0,
+                borderRadius: 'var(--radius-inner)',
+                background: tab === id ? 'var(--hover)' : 'transparent',
+                color: tab === id ? 'var(--text-primary)' : 'var(--text-secondary)',
+                font: `${tab === id ? 'var(--fw-medium)' : 'var(--fw-regular)'} var(--fs-label) var(--font-ui)`,
+                cursor: 'pointer',
+                transition: 'background var(--dur-fast) var(--ease), color var(--dur-fast) var(--ease)',
+              }}>
+              {t(label)}
+            </button>
+          ))}
+        </div>
+        {tab === 'logs' && <RequestLogTable rows={stats.logRows} />}
+        {tab === 'providers' && <ProviderStatsTable rows={stats.providerRows} />}
+        {tab === 'models' && <ModelStatsTable rows={stats.modelRows} />}
+        {tab === 'acp' && <AcpSessionsTable rows={stats.acpRows} />}
+      </section>
     </div>
   );
 }

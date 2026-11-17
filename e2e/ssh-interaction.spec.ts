@@ -5,14 +5,15 @@ test('quick connection completes interactive authentication, navigation and reco
   await setupTauriMock(page, { integration: false });
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
-  await page.getByTestId('ssh-host-actions').click(); await page.getByRole('button', { name: '快速连接', exact: true }).click();
+  await page.getByTestId('ssh-host-actions').click();
+  await page.getByRole('button', { name: '快速连接', exact: true }).click();
   await page.getByTestId('ssh-form-host').fill('chat.example.com');
   await page.getByTestId('ssh-form-port').fill('2222');
   await page.getByTestId('ssh-form-user').fill('tester');
   await page.getByTestId('ssh-connect-btn').click();
   const screen = page.getByTestId('ssh-terminal-screen');
   await expect(screen).toBeVisible();
-  await emitPtyOutput(page, '\x1b[2J\x1b[Htester@chat.example.com\'s password:');
+  await emitPtyOutput(page, "\x1b[2J\x1b[Htester@chat.example.com's password:");
   await page.getByRole('textbox', { name: 'SSH 认证响应' }).fill('disposable-test-password');
   await page.getByRole('button', { name: '发送', exact: true }).click();
   await emitPtyOutput(page, '\x1b[2J\x1b[H测试验证响应：12345678\r\nEnter:ok Esc:quit');
@@ -36,7 +37,7 @@ test('quick connection completes interactive authentication, navigation and reco
   await expect(page.getByRole('button', { name: /^(取消连接|断开连接)$/ })).toBeEnabled();
   const state = await page.evaluate(() => {
     const w = window as unknown as { __PTY_WRITES__: string[]; __PTY_SPAWNS__: { ssh?: { host: string; shellIntegration: boolean } }[] };
-    return { writes: w.__PTY_WRITES__, spawns: w.__PTY_SPAWNS__.filter(item => item.ssh) };
+    return { writes: w.__PTY_WRITES__, spawns: w.__PTY_SPAWNS__.filter((item) => item.ssh) };
   });
   expect(state.writes).toContain('disposable-test-password\r');
   expect(state.writes).toContain('\x1b[B');
@@ -66,11 +67,25 @@ test('advanced saved options are retained when editing and passed to the termina
   await page.getByTestId('ssh-form-keepalive').fill('45');
   await page.getByTestId('ssh-save-btn').click();
   const row = page.locator('[data-testid^="ssh-row-"]', { hasText: '跳板连接' });
-  await row.click({ button: 'right' }); await page.getByRole('button', { name: '编辑连接', exact: true }).click();
+  await row.click({ button: 'right' });
+  await page.getByRole('button', { name: '编辑连接', exact: true }).click();
   await expect(page.getByTestId('ssh-form-identity')).toHaveValue('C:/Keys/private key');
   await expect(page.getByTestId('ssh-form-jump')).toHaveValue('user@jump.example.com:2222');
   await expect(page.getByTestId('ssh-form-keepalive')).toHaveValue('45');
   await page.getByRole('button', { name: '取消', exact: true }).click();
   await row.dblclick();
-  await expect.poll(async () => page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: { ssh?: unknown }[] }).__PTY_SPAWNS__.filter(item => item.ssh))).toContainEqual(expect.objectContaining({ ssh: expect.objectContaining({ identityFile: 'C:/Keys/private key', jumpHost: 'user@jump.example.com:2222', serverAliveInterval: 45, shellIntegration: false }) }));
+  await expect
+    .poll(async () =>
+      page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: { ssh?: unknown }[] }).__PTY_SPAWNS__.filter((item) => item.ssh)),
+    )
+    .toContainEqual(
+      expect.objectContaining({
+        ssh: expect.objectContaining({
+          identityFile: 'C:/Keys/private key',
+          jumpHost: 'user@jump.example.com:2222',
+          serverAliveInterval: 45,
+          shellIntegration: false,
+        }),
+      }),
+    );
 });

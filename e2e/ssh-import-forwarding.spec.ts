@@ -3,7 +3,8 @@ import { setupTauriMock, emitPtyOutput } from './tauri-mock';
 
 async function textForwarding(page: Page, panel: Page | Locator = page) {
   if (await panel.getByTestId('ssh-section-tab-forwarding').count()) await panel.getByTestId('ssh-section-tab-forwarding').click();
-  else if (await panel.locator('.ssh-editor-advanced:not([open]) > summary').count()) await panel.locator('.ssh-editor-advanced > summary').click();
+  else if (await panel.locator('.ssh-editor-advanced:not([open]) > summary').count())
+    await panel.locator('.ssh-editor-advanced > summary').click();
   await panel.getByRole('combobox', { name: '转发编辑模式' }).click();
   await page.getByRole('option', { name: '文本模式' }).click();
 }
@@ -67,12 +68,12 @@ test('an invalid port forward is rejected on save', async ({ page }) => {
   await expect(page.getByRole('button', { name: '编辑「坏转发」', exact: true })).toHaveCount(0);
 });
 
-
 test('SSH forwards reach the terminal, drops retry and remote exits stay closed', async ({ page }) => {
   await setupTauriMock(page, { sshHost: 'known', integration: false });
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
-  await page.getByTestId('ssh-host-actions').click(); await page.getByRole('button', { name: '快速连接', exact: true }).click();
+  await page.getByTestId('ssh-host-actions').click();
+  await page.getByRole('button', { name: '快速连接', exact: true }).click();
   await page.getByTestId('ssh-form-host').fill('tunnel.example.com');
   await textForwarding(page);
   await page.getByTestId('ssh-form-local-forward').fill('8080:localhost:80');
@@ -81,11 +82,15 @@ test('SSH forwards reach the terminal, drops retry and remote exits stay closed'
   if (await page.getByTestId('ssh-section-tab-advanced').count()) await page.getByTestId('ssh-section-tab-advanced').click();
   await page.getByTestId('ssh-form-auto-reconnect').check();
   await page.getByTestId('ssh-connect-btn').click();
-  const spawns = () => page.evaluate(() =>
-    (window as unknown as { __PTY_SPAWNS__: { ssh?: Record<string, unknown> }[] }).__PTY_SPAWNS__.filter(spawn => spawn.ssh));
+  const spawns = () =>
+    page.evaluate(() =>
+      (window as unknown as { __PTY_SPAWNS__: { ssh?: Record<string, unknown> }[] }).__PTY_SPAWNS__.filter((spawn) => spawn.ssh),
+    );
   await expect.poll(async () => (await spawns()).length).toBe(1);
   expect((await spawns())[0].ssh).toMatchObject({
-    localForwards: ['8080:localhost:80'], remoteForwards: ['9000:localhost:9000'], dynamicForwards: ['1080'],
+    localForwards: ['8080:localhost:80'],
+    remoteForwards: ['9000:localhost:9000'],
+    dynamicForwards: ['1080'],
   });
   await page.evaluate(() => {
     (window as unknown as { __TAURI_INTERNALS__: { emitPtyExit: (code: number) => void } }).__TAURI_INTERNALS__.emitPtyExit(255);
@@ -104,7 +109,8 @@ test('SSH multiline paste honours the active bracketed paste mode', async ({ pag
   await setupTauriMock(page, { sshHost: 'known', integration: false });
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
-  await page.getByTestId('ssh-host-actions').click(); await page.getByRole('button', { name: '快速连接', exact: true }).click();
+  await page.getByTestId('ssh-host-actions').click();
+  await page.getByRole('button', { name: '快速连接', exact: true }).click();
   await page.getByTestId('ssh-form-host').fill('tunnel.example.com');
   await page.getByTestId('ssh-connect-btn').click();
   const input = page.getByRole('textbox', { name: 'SSH 交互终端' });
@@ -112,23 +118,31 @@ test('SSH multiline paste honours the active bracketed paste mode', async ({ pag
   await emitPtyOutput(page, '\x1b[?2004h');
   // xterm parses writes asynchronously; wait until the bracketed-paste mode is
   // actually applied, or the paste is sent as plain text without the wrapper.
-  await expect.poll(() => page.evaluate(() => {
-    const terms = (window as unknown as { __vrykellTerms: Map<string, { modes?: { bracketedPasteMode?: boolean } }> }).__vrykellTerms;
-    return [...terms.values()].some(term => term.modes?.bracketedPasteMode === true);
-  })).toBe(true);
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const terms = (window as unknown as { __vrykellTerms: Map<string, { modes?: { bracketedPasteMode?: boolean } }> }).__vrykellTerms;
+        return [...terms.values()].some((term) => term.modes?.bracketedPasteMode === true);
+      }),
+    )
+    .toBe(true);
   await page.evaluate(() => {
     (window as unknown as { __CLIPBOARD_TEXT__: string }).__CLIPBOARD_TEXT__ = 'line one\nline two';
   });
   await input.press('Control+v');
-  await expect.poll(() => page.evaluate(() =>
-    (window as unknown as { __PTY_WRITES__: string[] }).__PTY_WRITES__))
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __PTY_WRITES__: string[] }).__PTY_WRITES__))
     .toContain('\x1b[200~line one\rline two\x1b[201~');
 });
 
-
 test('running SSH blocks paste with their own bracketed mode', async ({ page }) => {
   await setupTauriMock(page, { sshHost: 'known' });
-  await page.addInitScript(() => localStorage.setItem('vrykell-agent-settings', JSON.stringify({ version: 8, state: { global: { sshOpenMode: 'block' }, overrides: {} } })));
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'vrykell-agent-settings',
+      JSON.stringify({ version: 8, state: { global: { sshOpenMode: 'block' }, overrides: {} } }),
+    ),
+  );
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
   await page.getByTestId('ssh-row-ssh-1').dblclick();
@@ -146,11 +160,10 @@ test('running SSH blocks paste with their own bracketed mode', async ({ page }) 
     (window as unknown as { __CLIPBOARD_TEXT__: string }).__CLIPBOARD_TEXT__ = 'line one\nline two';
   });
   await host.locator('.xterm-helper-textarea').press('Control+v');
-  await expect.poll(() => page.evaluate(() =>
-    (window as unknown as { __PTY_WRITES__: string[] }).__PTY_WRITES__))
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __PTY_WRITES__: string[] }).__PTY_WRITES__))
     .toContain('\x1b[200~line one\rline two\x1b[201~');
 });
-
 
 test('an explicitly disabled jump remains direct after saving and connecting', async ({ page }) => {
   await setupTauriMock(page, { sshHost: 'known' });
@@ -168,7 +181,13 @@ test('an explicitly disabled jump remains direct after saving and connecting', a
   await expect(page.getByTestId('ssh-host-editor').getByText(/认证成功/)).toBeVisible();
   await page.getByRole('button', { name: '取消', exact: true }).click();
   await page.locator('[data-testid^="ssh-row-"]').filter({ hasText: 'direct' }).dblclick();
-  await expect.poll(() => page.evaluate(() =>
-    (window as unknown as { __PTY_SPAWNS__: { ssh?: { jumpHost?: string } }[] }).__PTY_SPAWNS__.filter(spawn => spawn.ssh).map(spawn => spawn.ssh?.jumpHost)))
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (window as unknown as { __PTY_SPAWNS__: { ssh?: { jumpHost?: string } }[] }).__PTY_SPAWNS__
+          .filter((spawn) => spawn.ssh)
+          .map((spawn) => spawn.ssh?.jumpHost),
+      ),
+    )
     .toEqual(['none']);
 });

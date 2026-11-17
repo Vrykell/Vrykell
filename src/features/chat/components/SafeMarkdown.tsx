@@ -13,7 +13,10 @@ import { t } from '@i18n';
  * (monospace, selectable) and the error plus a content excerpt are logged to the
  * console for diagnosis.
  */
-export default class SafeMarkdown extends Component<{ content: string; paneId?: string | null }, { error: boolean; errorMessage: string; content: string }> {
+export default class SafeMarkdown extends Component<
+  { content: string; paneId?: string | null },
+  { error: boolean; errorMessage: string; content: string }
+> {
   state = { error: false, errorMessage: '', content: this.props.content };
 
   static getDerivedStateFromError(error: unknown) {
@@ -27,8 +30,10 @@ export default class SafeMarkdown extends Component<{ content: string; paneId?: 
     console.error(
       '[SafeMarkdown] 渲染失败:',
       error,
-      '\n内容摘要:', JSON.stringify(this.props.content.slice(0, 300)),
-      '\n组件栈:', info.componentStack ?? '(无)',
+      '\n内容摘要:',
+      JSON.stringify(this.props.content.slice(0, 300)),
+      '\n组件栈:',
+      info.componentStack ?? '(无)',
     );
   }
 
@@ -36,9 +41,7 @@ export default class SafeMarkdown extends Component<{ content: string; paneId?: 
   // expression); reset the error whenever content changes, otherwise one transient
   // failure would degrade that message permanently.
   static getDerivedStateFromProps(props: { content: string }, state: { content: string }) {
-    return props.content !== state.content
-      ? { error: false, errorMessage: '', content: props.content }
-      : null;
+    return props.content !== state.content ? { error: false, errorMessage: '', content: props.content } : null;
   }
 
   // While streaming the parent re-renders on every chunk; comparing only content keeps

@@ -16,8 +16,10 @@ for (const theme of ['深色', '浅色']) {
     await row.click({ button: 'right' });
     const menu = page.getByRole('menu', { name: '标签页操作' });
     const close = menu.getByRole('button', { name: '关闭标签', exact: true });
-    const danger = await close.evaluate(element => getComputedStyle(element).color);
-    expect(danger).not.toBe(await menu.getByRole('button', { name: '复制会话', exact: true }).evaluate(element => getComputedStyle(element).color));
+    const danger = await close.evaluate((element) => getComputedStyle(element).color);
+    expect(danger).not.toBe(
+      await menu.getByRole('button', { name: '复制会话', exact: true }).evaluate((element) => getComputedStyle(element).color),
+    );
     await expect(menu.getByRole('group', { name: '图标颜色' })).toHaveCount(0);
     await expect(menu.getByRole('menuitem', { name: '图标颜色', exact: true })).toHaveCount(0);
     await page.screenshot({ path: testInfo.outputPath('tab-color-footer.png') });
@@ -41,19 +43,23 @@ for (const theme of ['深色', '浅色']) {
     await navigation.getByRole('button', { name: '模型行为', exact: true }).click();
     const prompt = page.getByPlaceholder('留空使用内置默认提示词');
     await expect(prompt).toHaveCSS('font-family', 'Arial, sans-serif');
-    expect(await prompt.evaluate(element => getComputedStyle(element, '::placeholder').fontFamily)).toBe('Arial, sans-serif');
+    expect(await prompt.evaluate((element) => getComputedStyle(element, '::placeholder').fontFamily)).toBe('Arial, sans-serif');
     await page.mouse.move(0, 0);
     await navigation.getByRole('button', { name: '模型行为', exact: true }).hover();
     await expect(page.getByTestId('app-tooltip')).toHaveCSS('font-family', 'Arial, sans-serif');
     for (const name of ['模型配置', '联网搜索', 'MCP 服务器', '记忆', '本地文件打开方式', '远程文件打开方式']) {
       await navigation.getByRole('button', { name, exact: true }).click();
-      const wrong = await page.locator('.settings-content input:not([type="checkbox"]), .settings-content textarea').evaluateAll(elements => elements
-        // A URL field is deliberately monospace; the rule is about UI text.
-        .filter(element => {
-          const family = getComputedStyle(element).fontFamily;
-          return family !== 'Arial, sans-serif' && !/mono/i.test(family);
-        })
-        .map(element => element.getAttribute('placeholder')));
+      const wrong = await page
+        .locator('.settings-content input:not([type="checkbox"]), .settings-content textarea')
+        .evaluateAll((elements) =>
+          elements
+            // A URL field is deliberately monospace; the rule is about UI text.
+            .filter((element) => {
+              const family = getComputedStyle(element).fontFamily;
+              return family !== 'Arial, sans-serif' && !/mono/i.test(family);
+            })
+            .map((element) => element.getAttribute('placeholder')),
+        );
       expect(wrong).toEqual([]);
     }
     // The API address keeps its monospace face on purpose.
@@ -65,7 +71,9 @@ for (const theme of ['深色', '浅色']) {
     await expect(page.locator('.settings-navigation-toggle')).toHaveCount(0);
     await navigation.getByRole('button', { name: '模型配置', exact: true }).click();
     await expect(navigation).toBeVisible();
-    await content.evaluate(element => { element.scrollTop = 0; });
+    await content.evaluate((element) => {
+      element.scrollTop = 0;
+    });
     await page.screenshot({ path: testInfo.outputPath('collapsed-settings-navigation.png'), animations: 'disabled' });
     await page.getByTestId('global-search-trigger').click();
     const palette = page.locator('.global-search-dialog');

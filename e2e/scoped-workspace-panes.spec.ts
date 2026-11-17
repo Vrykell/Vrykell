@@ -3,7 +3,8 @@ import { setupTauriMock } from './tauri-mock';
 import { pickPlacementZone } from './placement';
 
 test('splits files inside the editor workspace and preserves independent buffers', async ({ page }) => {
-  await setupTauriMock(page, {}); await page.goto('/');
+  await setupTauriMock(page, {});
+  await page.goto('/');
   await page.getByTestId('workspace-area-code').click();
   await page.getByTestId('code-start-page-content').getByRole('button', { name: '新建文件', exact: true }).click();
   const bar = page.getByTestId('workspace-instance-bar');
@@ -21,13 +22,17 @@ test('splits files inside the editor workspace and preserves independent buffers
   await page.getByTestId('workspace-area-unified').click();
   await page.getByTestId('workspace-area-code').click();
   await expect(workspace.locator('.monaco-editor')).toHaveCount(2);
-  await workspace.locator('.monaco-editor').last().click({ button: 'right', position: { x: 80, y: 50 } });
+  await workspace
+    .locator('.monaco-editor')
+    .last()
+    .click({ button: 'right', position: { x: 80, y: 50 } });
   await page.getByRole('menu', { name: '窗格操作', exact: true }).getByRole('menuitem', { name: '移除此分屏', exact: true }).click();
   await expect(page.locator('.monaco-editor:visible')).toHaveCount(1);
 });
 
 test('repositions a file pane through the shared pane menu', async ({ page }) => {
-  await setupTauriMock(page, {}); await page.goto('/');
+  await setupTauriMock(page, {});
+  await page.goto('/');
   await page.getByTestId('workspace-area-code').click();
   await page.getByTestId('code-start-page-content').getByRole('button', { name: '新建文件', exact: true }).click();
   const bar = page.getByTestId('workspace-instance-bar');
@@ -49,10 +54,13 @@ test('repositions a file pane through the shared pane menu', async ({ page }) =>
 });
 
 test('opens an existing file as a split only after choosing its position', async ({ page }) => {
-  await setupTauriMock(page, {}); await page.goto('/');
+  await setupTauriMock(page, {});
+  await page.goto('/');
   await page.getByTestId('workspace-area-code').click();
   await page.getByTestId('code-start-page-content').getByRole('button', { name: '新建文件', exact: true }).click();
-  await page.evaluate(() => { (window as unknown as { __PICK_PATHS__: string[] }).__PICK_PATHS__ = ['/home/e2e/project/chosen.txt']; });
+  await page.evaluate(() => {
+    (window as unknown as { __PICK_PATHS__: string[] }).__PICK_PATHS__ = ['/home/e2e/project/chosen.txt'];
+  });
   await page.keyboard.press('Control+d');
   await page.getByRole('menuitem', { name: '打开文件', exact: true }).click();
   const workspace = page.getByTestId('pane-workspace-code');
@@ -65,7 +73,8 @@ test('opens an existing file as a split only after choosing its position', async
 });
 
 test('selects an ACP working directory before opening its session', async ({ page }) => {
-  await setupTauriMock(page, {}); await page.goto('/');
+  await setupTauriMock(page, {});
+  await page.goto('/');
   await page.getByTestId('workspace-area-ai').click();
   await page.getByTestId('harness-add-session').click();
   await page.locator('[data-testid="acp-launcher-directory"]:visible').fill('C:/work/project');
@@ -75,7 +84,8 @@ test('selects an ACP working directory before opening its session', async ({ pag
 });
 
 test('keeps terminal splitting native and badges the original terminal icon', async ({ page }, info) => {
-  await setupTauriMock(page, {}); await page.goto('/');
+  await setupTauriMock(page, {});
+  await page.goto('/');
   await expect(page.locator('.terminal-pane:visible')).toHaveCount(1);
   await page.keyboard.press('Control+d');
   await pickPlacementZone(page, page.locator('.terminal-pane:visible').first(), 'right');
@@ -84,7 +94,7 @@ test('keeps terminal splitting native and badges the original terminal icon', as
   const badge = page.getByTestId('workspace-instance-bar').locator('[data-icon-count="2"]');
   await expect(badge.locator('[data-shell-mark]')).toBeVisible();
   await expect(badge.locator('.icon-count-badge-dot')).toHaveText('2');
-  const glyphCenter = await badge.locator('.icon-count-badge-dot').evaluate(element => {
+  const glyphCenter = await badge.locator('.icon-count-badge-dot').evaluate((element) => {
     const box = element.getBoundingClientRect();
     const range = document.createRange();
     range.selectNodeContents(element);
@@ -96,12 +106,13 @@ test('keeps terminal splitting native and badges the original terminal icon', as
   });
   expect(glyphCenter.dx).toBeLessThan(1);
   expect(glyphCenter.dy).toBeLessThan(1);
-  expect(await badge.evaluate(element => getComputedStyle(element).overflow)).toBe('visible');
+  expect(await badge.evaluate((element) => getComputedStyle(element).overflow)).toBe('visible');
   await page.screenshot({ path: info.outputPath('native-terminal-count-badge.png') });
 });
 
 test('keeps a saved new file in its split pane instead of exiting the editor', async ({ page }) => {
-  await setupTauriMock(page, {}); await page.goto('/');
+  await setupTauriMock(page, {});
+  await page.goto('/');
   await page.getByTestId('workspace-area-code').click();
   await page.getByTestId('code-start-page-content').getByRole('button', { name: '新建文件', exact: true }).click();
   const bar = page.getByTestId('workspace-instance-bar');
@@ -111,7 +122,8 @@ test('keeps a saved new file in its split pane instead of exiting the editor', a
   await pickPlacementZone(page, workspace.locator('.unified-pane').first(), 'right');
   await expect(workspace.locator('.monaco-editor')).toHaveCount(2);
   const first = workspace.locator('.unified-pane').first();
-  await first.locator('textarea.inputarea').focus(); await page.keyboard.insertText('split draft');
+  await first.locator('textarea.inputarea').focus();
+  await page.keyboard.insertText('split draft');
   await page.evaluate(() => {
     (window as unknown as { __PICK_PATHS__: string[] }).__PICK_PATHS__ = ['/home/e2e/notes/split.txt'];
     localStorage.setItem('mock-editor-missing', JSON.stringify(['/home/e2e/notes/split.txt']));
@@ -119,13 +131,16 @@ test('keeps a saved new file in its split pane instead of exiting the editor', a
   await page.keyboard.press('Control+s');
   await expect(first.locator('.folder-path')).toContainText('/home/e2e/notes/split.txt');
   await expect(workspace.locator('.monaco-editor')).toHaveCount(2);
-  await first.locator('textarea.inputarea').focus(); await page.keyboard.press('Control+End'); await page.keyboard.insertText(' more');
+  await first.locator('textarea.inputarea').focus();
+  await page.keyboard.press('Control+End');
+  await page.keyboard.insertText(' more');
   await expect(first.locator('.view-lines')).toHaveText('split draft more');
   await expect(page.locator('.workspace-layout')).toHaveAttribute('data-area', 'code');
 });
 
 test('keeps split conversation tools in the existing tab strip, not extra pane headers', async ({ page }, info) => {
-  await setupTauriMock(page, {}); await page.goto('/');
+  await setupTauriMock(page, {});
+  await page.goto('/');
   await page.getByTestId('workspace-area-ai').click();
   await page.getByTestId('ai-new-conversation').click();
   const bar = page.getByTestId('workspace-instance-bar');

@@ -7,17 +7,29 @@ export type SessionModeFilter = 'all' | 'block' | 'classic';
 
 /** Use the saved pane modes and their current defaults. */
 export function sessionTerminalModes(session: BackendSessionEntry): Set<Exclude<SessionModeFilter, 'all'>> {
-  return new Set(sessionHistoryTerminals(session).map(terminal => terminal.shellType === 'cmd' ? 'classic'
-    : terminal.openMode ?? (terminal.kind === 'ssh' ? 'classic' : 'block')));
+  return new Set(
+    sessionHistoryTerminals(session).map((terminal) =>
+      terminal.shellType === 'cmd' ? 'classic' : (terminal.openMode ?? (terminal.kind === 'ssh' ? 'classic' : 'block')),
+    ),
+  );
 }
 
 export function isSshSession(session: BackendSessionEntry): boolean {
-  return session.kind === 'ssh' || sessionHistoryTerminals(session).some(terminal => terminal.kind === 'ssh');
+  return session.kind === 'ssh' || sessionHistoryTerminals(session).some((terminal) => terminal.kind === 'ssh');
 }
 
 export function sshTargetOf(session: BackendSessionEntry): string | null {
-  const targets = sessionHistoryTerminals(session).flatMap(terminal => terminal.ssh?.host ? [terminal.ssh] : []);
-  return targets.length ? [...new Set(targets.map(target => `${target.user ? `${target.user}@` : ''}${target.host}${target.port && target.port !== 22 ? `:${target.port}` : ''}`))].join(', ') : null;
+  const targets = sessionHistoryTerminals(session).flatMap((terminal) => (terminal.ssh?.host ? [terminal.ssh] : []));
+  return targets.length
+    ? [
+        ...new Set(
+          targets.map(
+            (target) =>
+              `${target.user ? `${target.user}@` : ''}${target.host}${target.port && target.port !== 22 ? `:${target.port}` : ''}`,
+          ),
+        ),
+      ].join(', ')
+    : null;
 }
 
 const DATE_MS: Record<Exclude<SessionDateFilter, 'all' | 'today'>, number> = {
@@ -28,7 +40,7 @@ const DATE_MS: Record<Exclude<SessionDateFilter, 'all' | 'today'>, number> = {
 
 function matchesDate(session: BackendSessionEntry, range: SessionDateFilter, dateField: 'created' | 'closed'): boolean {
   if (range === 'all') return true;
-  const timestamp = dateField === 'created' ? session.created_at : session.closed_at ?? session.created_at;
+  const timestamp = dateField === 'created' ? session.created_at : (session.closed_at ?? session.created_at);
   if (range === 'today') {
     const dayStart = new Date();
     dayStart.setHours(0, 0, 0, 0);
@@ -52,11 +64,18 @@ export function filterSessions(
   return sessions.filter((session) => {
     if (starredIds && !starredIds.has(session.id)) return false;
     const terminals = sessionHistoryTerminals(session);
-    if (type !== 'all' && !terminals.some(terminal => terminal.kind === type)) return false;
+    if (type !== 'all' && !terminals.some((terminal) => terminal.kind === type)) return false;
     if (mode !== 'all' && !sessionTerminalModes(session).has(mode)) return false;
     if (!matchesDate(session, range, dateField)) return false;
     if (!normalizedQuery) return true;
-    const haystack = [session.title, sshTargetOf(session) ?? '', searchAnnotations?.get(session.id) ?? '', ...terminals.map(terminal => terminal.cwd ?? '')].join(' ').toLowerCase();
+    const haystack = [
+      session.title,
+      sshTargetOf(session) ?? '',
+      searchAnnotations?.get(session.id) ?? '',
+      ...terminals.map((terminal) => terminal.cwd ?? ''),
+    ]
+      .join(' ')
+      .toLowerCase();
     return haystack.includes(normalizedQuery);
   });
 }

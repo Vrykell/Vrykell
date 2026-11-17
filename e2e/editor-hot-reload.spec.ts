@@ -14,18 +14,20 @@ test.beforeAll(async () => {
   await server.listen();
 });
 
-test.afterAll(async () => { await server?.close(); });
+test.afterAll(async () => {
+  await server?.close();
+});
 
 test('localization hot updates retain editor registrations, buffers and modal bindings', async ({ page }) => {
   test.setTimeout(90_000);
   const errors: string[] = [];
-  page.on('pageerror', error => errors.push(error.message));
+  page.on('pageerror', (error) => errors.push(error.message));
   await setupTauriMock(page.context(), {});
   await page.goto(server.resolvedUrls!.local[0], { waitUntil: 'domcontentloaded' });
   await expect(page.locator('[data-terminal-input]')).toBeVisible();
   await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/navigation.ts';
-    const { useWorkspaceNavigation } = await import(path) as typeof import('../src/features/workspace/stores/navigation');
+    const { useWorkspaceNavigation } = (await import(path)) as typeof import('../src/features/workspace/stores/navigation');
     useWorkspaceNavigation.getState().selectArea('code');
   });
   await page.getByTestId('code-start-page-content').getByRole('button', { name: '新建文件', exact: true }).click();
@@ -38,7 +40,9 @@ test('localization hot updates retain editor registrations, buffers and modal bi
   await expect(editor.locator('.code-editor-vim-status')).toContainText('NORMAL');
   await page.evaluate(async () => {
     const path = '/@vite/client';
-    const { createHotContext } = await import(path) as { createHotContext: (path: string) => { on: (event: string, callback: () => void) => void } };
+    const { createHotContext } = (await import(path)) as {
+      createHotContext: (path: string) => { on: (event: string, callback: () => void) => void };
+    };
     createHotContext('/editor-update-probe').on('vite:afterUpdate', () => {
       document.documentElement.dataset.editorHotUpdated = 'true';
     });

@@ -8,9 +8,13 @@ export default function SettingsScreen() {
   useLayoutEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     ref.current?.querySelector<HTMLElement>('[aria-current="page"]')?.focus();
-    return () => { if (previous?.isConnected) previous.focus(); };
+    return () => {
+      if (previous?.isConnected) previous.focus();
+    };
   }, []);
-  return <div ref={ref} role="region" aria-label={t('Settings')} tabIndex={-1} className="settings-screen">
-    <SettingsView />
-  </div>;
+  return (
+    <div ref={ref} role="region" aria-label={t('Settings')} tabIndex={-1} className="settings-screen">
+      <SettingsView />
+    </div>
+  );
 }

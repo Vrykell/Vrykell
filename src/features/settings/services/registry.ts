@@ -28,116 +28,302 @@ export interface SettingDef {
 
 const settings: SettingDef[] = [];
 export function registerSetting(setting: SettingDef): void {
-  if (!settings.some(item => item.id === setting.id)) settings.push(setting);
+  if (!settings.some((item) => item.id === setting.id)) settings.push(setting);
 }
-export function getSettings(): SettingDef[] { return settings.filter(setting => isSettingsPageAvailable(setting.page)).map(setting => ({ ...setting, label: localizeLabel(setting.label)!, desc: localizeLabel(setting.desc)! })); }
+export function getSettings(): SettingDef[] {
+  return settings
+    .filter((setting) => isSettingsPageAvailable(setting.page))
+    .map((setting) => ({ ...setting, label: localizeLabel(setting.label)!, desc: localizeLabel(setting.desc)! }));
+}
 export function searchSettings(query: string): SettingDef[] {
   const words = query.trim().toLowerCase().split(/\s+/);
-  return getSettings().filter(setting => words.every(word => `${setting.label} ${setting.desc} ${(setting.keywords ?? []).join(" ")}`.toLowerCase().includes(word)));
+  return getSettings().filter((setting) =>
+    words.every((word) => `${setting.label} ${setting.desc} ${(setting.keywords ?? []).join(' ')}`.toLowerCase().includes(word)),
+  );
 }
 
-function registerField(id: string, page: PageId, label: string, description: string, value: () => string = () => '', target = label, control?: string | (() => string), aliases: string[] = []): void {
-  registerSetting({ id, page, get label() { return t(label); }, get desc() { return t(description); }, keywords: [label, description, ...aliases, ...aliases.map(alias => t(alias))], getValue: value, onSelect: () => {
-    useSettingsNavigationStore.getState().openField(page, t(target), typeof control === 'function' ? control() : control);
-    useSessionStore.getState().openSettings();
-    terminalDebug('settings-navigation', { page, settingId: id });
-  } });
+function registerField(
+  id: string,
+  page: PageId,
+  label: string,
+  description: string,
+  value: () => string = () => '',
+  target = label,
+  control?: string | (() => string),
+  aliases: string[] = [],
+): void {
+  registerSetting({
+    id,
+    page,
+    get label() {
+      return t(label);
+    },
+    get desc() {
+      return t(description);
+    },
+    keywords: [label, description, ...aliases, ...aliases.map((alias) => t(alias))],
+    getValue: value,
+    onSelect: () => {
+      useSettingsNavigationStore.getState().openField(page, t(target), typeof control === 'function' ? control() : control);
+      useSessionStore.getState().openSettings();
+      terminalDebug('settings-navigation', { page, settingId: id });
+    },
+  });
 }
 
 registerField('local-file-undo', 'file-operations', 'Local file undo', 'File operations');
-registerField('application-language', 'application-language', 'Application language', 'Choose the interface language. Changes apply immediately.', () => useLanguagePreferences.getState().preference);
+registerField(
+  'application-language',
+  'application-language',
+  'Application language',
+  'Choose the interface language. Changes apply immediately.',
+  () => useLanguagePreferences.getState().preference,
+);
 registerField('application-version', 'about', 'Version', 'About');
 registerField('application-updates', 'about', 'Stable releases', 'Check for updates');
 registerField('remote-file-undo', 'file-operations', 'Remote file undo', 'File operations');
-registerField('preferred-file-editor', 'editor-local', 'Preferred file editor', 'Opening files', () => useEditorPreferences.getState().localOpenMode);
-registerField('editor-vim-mode', 'editor-preferences', 'Vim mode', 'Use modal keybindings in the built-in editor. This applies to local and remote files.', () => String(useEditorPreferences.getState().vimMode));
-registerField('editor-line-numbers', 'editor-preferences', 'Show line numbers', 'Show line numbers in the built-in editor.', () => String(useEditorPreferences.getState().lineNumbers));
-registerField('editor-word-wrap', 'editor-preferences', 'Word wrap', 'Editor preferences', () => String(useEditorPreferences.getState().wordWrap));
-registerField("startup", "startup", "Restore history at startup", "Applies next launch. Restored sessions reconnect without restarting their commands.", () => useStartupSettings.getState().mode);
-registerField('history-run-target', 'command-history', 'Command execution target', 'Choose where commands run from the history panel.', () => useCommandHistorySettings.getState().runIn);
-registerField('history-double-click', 'command-history', 'Double-click command', 'Double-click inserts the command by default. Execution follows the selected target.', () => useCommandHistorySettings.getState().doubleClick);
-registerField('command-highlighting', 'appearance-typography', 'Command syntax highlighting', 'Color commands, arguments and shell operators.', () => String(useTypographyStore.getState().commandHighlighting));
-registerField('terminal-cursor-blink', 'appearance-typography', 'Terminal cursor blinking', 'Blink the classic terminal cursor. Turn off to keep it steady while typing.', () => String(useTypographyStore.getState().terminalCursorBlink));
-registerField('composition-cursor-blink', 'appearance-typography', 'Composition cursor blinking', 'Blink the simulated cursor while composing text with an input method.', () => String(useTypographyStore.getState().compositionCursorBlink));
-registerField("logs", "logs", "Save diagnostic logs automatically", "Diagnostic logging and errors");
+registerField(
+  'preferred-file-editor',
+  'editor-local',
+  'Preferred file editor',
+  'Opening files',
+  () => useEditorPreferences.getState().localOpenMode,
+);
+registerField(
+  'editor-vim-mode',
+  'editor-preferences',
+  'Vim mode',
+  'Use modal keybindings in the built-in editor. This applies to local and remote files.',
+  () => String(useEditorPreferences.getState().vimMode),
+);
+registerField('editor-line-numbers', 'editor-preferences', 'Show line numbers', 'Show line numbers in the built-in editor.', () =>
+  String(useEditorPreferences.getState().lineNumbers),
+);
+registerField('editor-word-wrap', 'editor-preferences', 'Word wrap', 'Editor preferences', () =>
+  String(useEditorPreferences.getState().wordWrap),
+);
+registerField(
+  'startup',
+  'startup',
+  'Restore history at startup',
+  'Applies next launch. Restored sessions reconnect without restarting their commands.',
+  () => useStartupSettings.getState().mode,
+);
+registerField(
+  'history-run-target',
+  'command-history',
+  'Command execution target',
+  'Choose where commands run from the history panel.',
+  () => useCommandHistorySettings.getState().runIn,
+);
+registerField(
+  'history-double-click',
+  'command-history',
+  'Double-click command',
+  'Double-click inserts the command by default. Execution follows the selected target.',
+  () => useCommandHistorySettings.getState().doubleClick,
+);
+registerField(
+  'command-highlighting',
+  'appearance-typography',
+  'Command syntax highlighting',
+  'Color commands, arguments and shell operators.',
+  () => String(useTypographyStore.getState().commandHighlighting),
+);
+registerField(
+  'terminal-cursor-blink',
+  'appearance-typography',
+  'Terminal cursor blinking',
+  'Blink the classic terminal cursor. Turn off to keep it steady while typing.',
+  () => String(useTypographyStore.getState().terminalCursorBlink),
+);
+registerField(
+  'composition-cursor-blink',
+  'appearance-typography',
+  'Composition cursor blinking',
+  'Blink the simulated cursor while composing text with an input method.',
+  () => String(useTypographyStore.getState().compositionCursorBlink),
+);
+registerField('logs', 'logs', 'Save diagnostic logs automatically', 'Diagnostic logging and errors');
 registerField('input-trace', 'logs', 'Trace terminal input', 'Diagnostic logging and errors');
 registerField('context-menu', 'context-menu', 'Windows context menu', 'Open in Vrykell', undefined, 'Open in Vrykell');
-registerField("export-logs", "logs", "Export logs", "Diagnostic archive");
-registerField("api-key", "ai-model", "Provider API Key", "Credentials for the current model provider", () => isApiKeyConfigured() ? t('Configured') : t('Not configured'));
-registerField("model", "ai-model", "Model list", "Provider, base URL and model ID", getModel);
-registerField("scope", "ai-behavior", "Configuration scope", "Global or per-model behavior");
-registerField("system-prompt", "ai-behavior", "System prompt", "AI role and instructions", () => globalValue("systemPrompt"));
-registerField("agent-mode", "ai-behavior", "Agent mode", "Enable tool calls", () => globalValue("agentMode"));
-registerField("max-steps", "ai-behavior", "Maximum iterations", "Maximum tool execution rounds", () => globalValue("maxSteps"));
-registerField("context-strategy", "ai-model", "Context strategy", "Full history, window or summary");
-registerField("context-budget", "ai-model", "Context token budget", "Limit context size");
-registerField("summary-limit", "ai-model", "Summary length limit", "Summary token budget");
-registerField("tool-truncation", "ai-model", "Tool output truncation", "Limit tool result length");
-registerField("reply-limit", "ai-model", "Reply token limit", "Maximum response tokens");
-registerField("temperature", "ai-model", "Sampling temperature", "Response randomness");
-registerField("smart-title", "ai-behavior", "Smart session titles", "Automatic title generation", () => globalValue("autoTitle"));
-registerField("title-model", "ai-behavior", "Title model", "Model for title generation", () => globalValue("titleModel"));
-registerField("completion", "ai-behavior", "Command completion", "Terminal suggestions", () => globalValue("completeEnabled"));
-registerField("completion-delay", "ai-behavior", "Completion debounce", "Delay before suggestions", () => globalValue("completeDebounceMs"));
-registerField("completion-model", "ai-behavior", "Completion model", "Model for command completion", () => globalValue("completeModel"));
-registerField("permissions", "ai-perms", "Tool permissions", "Allow, ask or deny tools");
-registerField("approval-timeout", "ai-perms", "Approval timeout", "Deny an approval nobody answers", () => `${usePermissions.getState().approvalTimeoutSeconds}`);
-registerField("session-grants", "ai-perms", "Session grants", "Clear temporary permissions");
-registerField("mcp", "ai-mcp", "MCP servers", "External tool connections");
-registerField("file-open", "editor-local", "Default editing command", "Local terminal editor command", () => loadConfig().defaultEditor, "Default editing command", undefined, ["File open-with"]);
-registerField("file-extensions", "editor-local", "Open by extension", "Local file extension commands", () => Object.keys(loadConfig().templates).join(", "));
-registerField("remote-editor", "editor-remote", "Default remote editing command", "SSH terminal editor");
-registerField("remote-extensions", "editor-remote", "Remote extension commands", "Remote file extension commands");
-registerField("theme", "appearance-theme", "Theme", "Dark and light appearance", () => document.documentElement.dataset.theme ?? "dark");
-registerField("opacity", "appearance-theme", "Application opacity", "Background transparency");
-registerField("wallpaper", "appearance-theme", "Application background image", "Wallpaper");
-registerField("theme-import", "appearance-files", "Import / export theme", "Theme JSON");
-registerField("ui-font", "appearance-typography", "settings.font.pageTitle", "settings.font.pageTitle", () => String(useTypographyStore.getState().uiFontSize));
-registerField('ui-font-family', 'appearance-typography', 'Interface font family', 'Typography', () => useTypographyStore.getState().uiFontPreset);
-registerField("terminal-font", "appearance-typography", "settings.font.terminalTitle", "settings.font.terminalTitle", () => String(useTypographyStore.getState().terminalFontSize));
-registerField('chat-font', 'appearance-typography', 'AI chat font size', 'Adjust text size in the AI chat panel. Changes are saved and applied immediately.', () => String(useTypographyStore.getState().chatFontSize));
-registerField('terminal-font-family', 'appearance-typography', 'Terminal font family', 'Typography', () => useTypographyStore.getState().terminalFontPreset);
-registerField('terminal-font-weight', 'appearance-typography', 'Terminal font weight', 'Variable fonts support fine weight adjustments; static fonts use the nearest installed weight.', () => String(useTypographyStore.getState().terminalFontWeight));
-registerField('terminal-line-spacing', 'appearance-typography', 'Terminal line spacing', 'Adjust line spacing for terminal input, live output and command history.', () => String(useTypographyStore.getState().terminalLineHeight));
-registerField('editor-font-family', 'appearance-typography', 'Editor font family', 'Editor typography', () => useTypographyStore.getState().editorFontPreset);
-registerField('editor-font-size', 'appearance-typography', 'Editor font size', 'Editor typography', () => String(useTypographyStore.getState().editorFontSize));
-registerField('editor-font-weight', 'appearance-typography', 'Editor font weight', 'Editor typography', () => String(useTypographyStore.getState().editorFontWeight));
-registerField('editor-line-spacing', 'appearance-typography', 'Editor line spacing', 'Adjust the editor independently of terminal and chat typography.', () => String(useTypographyStore.getState().editorLineHeight));
-registerField("terminal-renderer", "appearance-typography", "settings.font.rendererTitle", "settings.font.rendererTitle", () => String(useTypographyStore.getState().terminalRenderer));
+registerField('export-logs', 'logs', 'Export logs', 'Diagnostic archive');
+registerField('api-key', 'ai-model', 'Provider API Key', 'Credentials for the current model provider', () =>
+  isApiKeyConfigured() ? t('Configured') : t('Not configured'),
+);
+registerField('model', 'ai-model', 'Model list', 'Provider, base URL and model ID', getModel);
+registerField('scope', 'ai-behavior', 'Configuration scope', 'Global or per-model behavior');
+registerField('system-prompt', 'ai-behavior', 'System prompt', 'AI role and instructions', () => globalValue('systemPrompt'));
+registerField('agent-mode', 'ai-behavior', 'Agent mode', 'Enable tool calls', () => globalValue('agentMode'));
+registerField('max-steps', 'ai-behavior', 'Maximum iterations', 'Maximum tool execution rounds', () => globalValue('maxSteps'));
+registerField('context-strategy', 'ai-model', 'Context strategy', 'Full history, window or summary');
+registerField('context-budget', 'ai-model', 'Context token budget', 'Limit context size');
+registerField('summary-limit', 'ai-model', 'Summary length limit', 'Summary token budget');
+registerField('tool-truncation', 'ai-model', 'Tool output truncation', 'Limit tool result length');
+registerField('reply-limit', 'ai-model', 'Reply token limit', 'Maximum response tokens');
+registerField('temperature', 'ai-model', 'Sampling temperature', 'Response randomness');
+registerField('smart-title', 'ai-behavior', 'Smart session titles', 'Automatic title generation', () => globalValue('autoTitle'));
+registerField('title-model', 'ai-behavior', 'Title model', 'Model for title generation', () => globalValue('titleModel'));
+registerField('completion', 'ai-behavior', 'Command completion', 'Terminal suggestions', () => globalValue('completeEnabled'));
+registerField('completion-delay', 'ai-behavior', 'Completion debounce', 'Delay before suggestions', () =>
+  globalValue('completeDebounceMs'),
+);
+registerField('completion-model', 'ai-behavior', 'Completion model', 'Model for command completion', () => globalValue('completeModel'));
+registerField('permissions', 'ai-perms', 'Tool permissions', 'Allow, ask or deny tools');
+registerField(
+  'approval-timeout',
+  'ai-perms',
+  'Approval timeout',
+  'Deny an approval nobody answers',
+  () => `${usePermissions.getState().approvalTimeoutSeconds}`,
+);
+registerField('session-grants', 'ai-perms', 'Session grants', 'Clear temporary permissions');
+registerField('mcp', 'ai-mcp', 'MCP servers', 'External tool connections');
+registerField(
+  'file-open',
+  'editor-local',
+  'Default editing command',
+  'Local terminal editor command',
+  () => loadConfig().defaultEditor,
+  'Default editing command',
+  undefined,
+  ['File open-with'],
+);
+registerField('file-extensions', 'editor-local', 'Open by extension', 'Local file extension commands', () =>
+  Object.keys(loadConfig().templates).join(', '),
+);
+registerField('remote-editor', 'editor-remote', 'Default remote editing command', 'SSH terminal editor');
+registerField('remote-extensions', 'editor-remote', 'Remote extension commands', 'Remote file extension commands');
+registerField('theme', 'appearance-theme', 'Theme', 'Dark and light appearance', () => document.documentElement.dataset.theme ?? 'dark');
+registerField('opacity', 'appearance-theme', 'Application opacity', 'Background transparency');
+registerField('wallpaper', 'appearance-theme', 'Application background image', 'Wallpaper');
+registerField('theme-import', 'appearance-files', 'Import / export theme', 'Theme JSON');
+registerField('ui-font', 'appearance-typography', 'settings.font.pageTitle', 'settings.font.pageTitle', () =>
+  String(useTypographyStore.getState().uiFontSize),
+);
+registerField(
+  'ui-font-family',
+  'appearance-typography',
+  'Interface font family',
+  'Typography',
+  () => useTypographyStore.getState().uiFontPreset,
+);
+registerField('terminal-font', 'appearance-typography', 'settings.font.terminalTitle', 'settings.font.terminalTitle', () =>
+  String(useTypographyStore.getState().terminalFontSize),
+);
+registerField(
+  'chat-font',
+  'appearance-typography',
+  'AI chat font size',
+  'Adjust text size in the AI chat panel. Changes are saved and applied immediately.',
+  () => String(useTypographyStore.getState().chatFontSize),
+);
+registerField(
+  'terminal-font-family',
+  'appearance-typography',
+  'Terminal font family',
+  'Typography',
+  () => useTypographyStore.getState().terminalFontPreset,
+);
+registerField(
+  'terminal-font-weight',
+  'appearance-typography',
+  'Terminal font weight',
+  'Variable fonts support fine weight adjustments; static fonts use the nearest installed weight.',
+  () => String(useTypographyStore.getState().terminalFontWeight),
+);
+registerField(
+  'terminal-line-spacing',
+  'appearance-typography',
+  'Terminal line spacing',
+  'Adjust line spacing for terminal input, live output and command history.',
+  () => String(useTypographyStore.getState().terminalLineHeight),
+);
+registerField(
+  'editor-font-family',
+  'appearance-typography',
+  'Editor font family',
+  'Editor typography',
+  () => useTypographyStore.getState().editorFontPreset,
+);
+registerField('editor-font-size', 'appearance-typography', 'Editor font size', 'Editor typography', () =>
+  String(useTypographyStore.getState().editorFontSize),
+);
+registerField('editor-font-weight', 'appearance-typography', 'Editor font weight', 'Editor typography', () =>
+  String(useTypographyStore.getState().editorFontWeight),
+);
+registerField(
+  'editor-line-spacing',
+  'appearance-typography',
+  'Editor line spacing',
+  'Adjust the editor independently of terminal and chat typography.',
+  () => String(useTypographyStore.getState().editorLineHeight),
+);
+registerField('terminal-renderer', 'appearance-typography', 'settings.font.rendererTitle', 'settings.font.rendererTitle', () =>
+  String(useTypographyStore.getState().terminalRenderer),
+);
 
 function globalValue(key: keyof AgentSettings): string {
   const value = useAgentSettings.getState().global[key];
   return typeof value === 'boolean' ? t(value ? 'Enabled' : 'Disabled') : String(value ?? '');
 }
 for (const shell of SHELL_TYPES) {
-  registerField(`default-profile-${shell}`, `profile:${shell}`, 'Default profile', shellTypeLabel(shell), () => String(useTerminalDefaults.getState().shell === shell));
-  registerField(`profile-name-${shell}`, `profile:${shell}`, 'Profile name', shellTypeLabel(shell), () => useShellProfiles.getState().profiles[shell]?.name ?? '');
-  registerField(`profile-directory-${shell}`, `profile:${shell}`, 'Starting directory', shellTypeLabel(shell), () => useShellProfiles.getState().profiles[shell]?.cwd ?? '');
-  registerField(`open-mode-${shell}`, `profile:${shell}`, t('Open mode for {{shell}}', { shell: shellTypeLabel(shell) }), 'settings.openMode.description',
-    () => useAgentSettings.getState().global.openModeByShell[shell], 'Opening mode', 'Opening mode');
+  registerField(`default-profile-${shell}`, `profile:${shell}`, 'Default profile', shellTypeLabel(shell), () =>
+    String(useTerminalDefaults.getState().shell === shell),
+  );
+  registerField(
+    `profile-name-${shell}`,
+    `profile:${shell}`,
+    'Profile name',
+    shellTypeLabel(shell),
+    () => useShellProfiles.getState().profiles[shell]?.name ?? '',
+  );
+  registerField(
+    `profile-directory-${shell}`,
+    `profile:${shell}`,
+    'Starting directory',
+    shellTypeLabel(shell),
+    () => useShellProfiles.getState().profiles[shell]?.cwd ?? '',
+  );
+  registerField(
+    `open-mode-${shell}`,
+    `profile:${shell}`,
+    t('Open mode for {{shell}}', { shell: shellTypeLabel(shell) }),
+    'settings.openMode.description',
+    () => useAgentSettings.getState().global.openModeByShell[shell],
+    'Opening mode',
+    'Opening mode',
+  );
 }
 
 const permissionLabels: Record<ToolName, string> = {
-  "run_command": "Run terminal command",
-  "read_file": "Read file",
-  "write_file": "Write file",
-  "edit_file": "Edit file",
-  "list_dir": "List directory",
-  "search_files": "Search files",
-  "web_search": "Web search",
-  "web_fetch": "Fetch web page",
-  "web_crawl": "Crawl web pages",
-  "read_terminal": "Read terminal screen",
-  "terminal_keys": "Send terminal keys",
-  "use_skill": "Use skill",
-  "install_skill": "Install skill",
-  "mcp": "MCP server tools",
-  "memory": "Memory access"
+  run_command: 'Run terminal command',
+  read_file: 'Read file',
+  write_file: 'Write file',
+  edit_file: 'Edit file',
+  list_dir: 'List directory',
+  search_files: 'Search files',
+  web_search: 'Web search',
+  web_fetch: 'Fetch web page',
+  web_crawl: 'Crawl web pages',
+  read_terminal: 'Read terminal screen',
+  terminal_keys: 'Send terminal keys',
+  use_skill: 'Use skill',
+  install_skill: 'Install skill',
+  mcp: 'MCP server tools',
+  memory: 'Memory access',
 };
 for (const tool of TOOL_NAMES) {
   const label = permissionLabels[tool];
-  registerField(`permission-${tool}`, 'ai-perms', label, 'Tool permissions',
-    () => usePermissions.getState().levels[tool] ?? 'ask', 'Tool permissions', () => t('Permissions for {{tool}}', { tool: t(label) }));
+  registerField(
+    `permission-${tool}`,
+    'ai-perms',
+    label,
+    'Tool permissions',
+    () => usePermissions.getState().levels[tool] ?? 'ask',
+    'Tool permissions',
+    () => t('Permissions for {{tool}}', { tool: t(label) }),
+  );
 }
 
 // Token usage opens the side panel instead of a settings page, so the entry carries its

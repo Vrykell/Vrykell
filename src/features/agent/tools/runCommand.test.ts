@@ -61,7 +61,12 @@ describe('runCommandAndWait', () => {
   it('does not write a queued command after its turn was cancelled', async () => {
     const paneId = setupPane();
     let release!: () => void;
-    vi.mocked(ptyWrite).mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+    vi.mocked(ptyWrite).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          release = resolve;
+        }),
+    );
     const earlier = writeTerminalInput('pty-1', 'earlier input');
     const controller = new AbortController();
     const clearPending = vi.fn();
@@ -93,7 +98,7 @@ describe('runCommandAndWait', () => {
     expect(result).toMatchObject({ ok: false, completed: false, code: 'TERMINAL_DISCONNECTED', requiresUserAction: true });
   });
 
-  it.each(['closed', 'replacement'])('settles immediately when the execution target becomes %s', async state => {
+  it.each(['closed', 'replacement'])('settles immediately when the execution target becomes %s', async (state) => {
     const paneId = setupPane();
     const pending = runCommandAndWait('echo test', { paneId });
     await tick();
@@ -177,7 +182,8 @@ describe('runCommandAndWait', () => {
     expect(agentControl.hasBlock('mine')).toBe(true);
   });
 
-  it('block mode: one failing step among several -> ok:false with that step exit code', async () => {    const paneId = setupPane();
+  it('block mode: one failing step among several -> ok:false with that step exit code', async () => {
+    const paneId = setupPane();
     const promise = runCommandAndWait('step one\nstep two');
     await tick();
     useBlockStore.getState().addBlock(paneId, mkBlock({ id: 'b1', command: 'step one' }));
@@ -215,7 +221,8 @@ describe('runCommandAndWait', () => {
     expect(r.output.length).toBeLessThan(8300);
   });
 
-  it('block mode: nonzero exit code -> ok:false with an error description', async () => {    const paneId = setupPane();
+  it('block mode: nonzero exit code -> ok:false with an error description', async () => {
+    const paneId = setupPane();
     const promise = runCommandAndWait('ls');
     await tick();
     useBlockStore.getState().addBlock(paneId, mkBlock({}));
@@ -270,10 +277,13 @@ describe('runCommandAndWait', () => {
       expect(await runCommandAndWait('sleep 999', { paneId, timeoutMs: 20 })).toMatchObject({ code: 'COMMAND_TIMEOUT' });
       expect(terminalCommandReady(paneId)).toBe(false);
 
-      const payload = vi.mocked(ptyWrite).mock.calls.map(([, data]) => data).join('');
+      const payload = vi
+        .mocked(ptyWrite)
+        .mock.calls.map(([, data]) => data)
+        .join('');
       const token = /777;(command-[^;]+);/.exec(payload)?.[1];
       expect(token).toBeTruthy();
-      await new Promise<void>(resolve => terminal.write(`\x1b]777;${token};0\x07`, resolve));
+      await new Promise<void>((resolve) => terminal.write(`\x1b]777;${token};0\x07`, resolve));
       expect(terminalCommandReady(paneId)).toBe(true);
     } finally {
       clearCompletionReadiness(paneId);
@@ -317,10 +327,7 @@ describe('runCommandAndWait', () => {
   it('regression: an existing pending prompt block is claimed after it turns executing (real lifecycle)', async () => {
     const paneId = setupPane();
     // empty pending block created when the prompt is drawn (133;A) - the future home of this command
-    useBlockStore.getState().addBlock(
-      paneId,
-      mkBlock({ id: 'prompt', command: '', status: 'pending', startedAt: null }),
-    );
+    useBlockStore.getState().addBlock(paneId, mkBlock({ id: 'prompt', command: '', status: 'pending', startedAt: null }));
     const promise = runCommandAndWait('ls');
     await tick();
     // after the write: 133;E/C arrives, the same block turns executing and receives the command
@@ -346,10 +353,7 @@ describe('runCommandAndWait', () => {
     vi.useFakeTimers();
     const paneId = setupPane();
     // the user ran ls by hand an hour ago - it must not be mistaken for our block
-    useBlockStore.getState().addBlock(
-      paneId,
-      mkBlock({ id: 'old', status: 'done', exitCode: 0, startedAt: 1, outputText: 'stale' }),
-    );
+    useBlockStore.getState().addBlock(paneId, mkBlock({ id: 'old', status: 'done', exitCode: 0, startedAt: 1, outputText: 'stale' }));
     const promise = runCommandAndWait('ls');
     await vi.advanceTimersByTimeAsync(3000);
     const r = await promise;

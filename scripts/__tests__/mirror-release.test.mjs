@@ -10,7 +10,10 @@ test('creates both mirror releases, uploads binaries and verifies attachment mem
   try {
     await fs.mkdir(path.join(directory, 'release-assets'));
     await fs.writeFile(path.join(directory, 'release-assets', 'portable.zip'), 'archive');
-    await fs.writeFile(path.join(directory, 'release.json'), JSON.stringify({ tagName: 'v0.1.9', name: 'Release', body: 'Changes', targetCommitish: 'abc', assets: [{ name: 'portable.zip' }] }));
+    await fs.writeFile(
+      path.join(directory, 'release.json'),
+      JSON.stringify({ tagName: 'v0.1.9', name: 'Release', body: 'Changes', targetCommitish: 'abc', assets: [{ name: 'portable.zip' }] }),
+    );
     process.chdir(directory);
     process.env.MIRROR_TOKEN = 'fixture-token';
     for (const host of ['gitee', 'atomgit']) {
@@ -57,8 +60,12 @@ test('creates both mirror releases, uploads binaries and verifies attachment mem
   } finally {
     process.chdir(original.cwd);
     globalThis.fetch = original.fetch;
-    for (const [name, value] of [['MIRROR_HOST', original.host], ['MIRROR_TOKEN', original.token]]) {
-      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    for (const [name, value] of [
+      ['MIRROR_HOST', original.host],
+      ['MIRROR_TOKEN', original.token],
+    ]) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
     }
     await fs.rm(directory, { recursive: true, force: true });
   }
@@ -71,13 +78,19 @@ test('omits attachments above the host limit instead of stranding the rest of th
     await fs.mkdir(path.join(directory, 'release-assets'));
     await fs.writeFile(path.join(directory, 'release-assets', 'small.zip'), 'archive');
     // Gitee refuses single attachments above 100 MB; the oversized image must not block the rest.
-    await fs.writeFile(path.join(directory, 'release.json'), JSON.stringify({
-      tagName: 'v0.1.10', name: 'Release', body: 'Changes', targetCommitish: 'abc',
-      assets: [
-        { name: 'huge.AppImage', size: 120 * 1024 * 1024 },
-        { name: 'small.zip', size: 1024 },
-      ],
-    }));
+    await fs.writeFile(
+      path.join(directory, 'release.json'),
+      JSON.stringify({
+        tagName: 'v0.1.10',
+        name: 'Release',
+        body: 'Changes',
+        targetCommitish: 'abc',
+        assets: [
+          { name: 'huge.AppImage', size: 120 * 1024 * 1024 },
+          { name: 'small.zip', size: 1024 },
+        ],
+      }),
+    );
     process.chdir(directory);
     process.env.MIRROR_TOKEN = 'fixture-token';
     process.env.MIRROR_HOST = 'gitee';
@@ -106,8 +119,12 @@ test('omits attachments above the host limit instead of stranding the rest of th
   } finally {
     process.chdir(original.cwd);
     globalThis.fetch = original.fetch;
-    for (const [name, value] of [['MIRROR_HOST', original.host], ['MIRROR_TOKEN', original.token]]) {
-      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    for (const [name, value] of [
+      ['MIRROR_HOST', original.host],
+      ['MIRROR_TOKEN', original.token],
+    ]) {
+      if (value === undefined) delete process.env[name];
+      else process.env[name] = value;
     }
     await fs.rm(directory, { recursive: true, force: true });
   }

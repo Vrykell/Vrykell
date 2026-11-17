@@ -27,31 +27,34 @@ export function useExternalFileDrop({ resolveTarget, onHover, onDrop }: UseExter
     let unlisten: (() => void) | undefined;
     const scale = () => window.devicePixelRatio || 1;
 
-    getCurrentWindow().onDragDropEvent((event) => {
-      if (disposed) return;
-      const payload = event.payload as {
-        type: string;
-        position?: { x: number; y: number };
-        paths?: string[];
-      };
-      if (payload.type === 'leave') {
-        latest.current.onHover(null);
-        return;
-      }
-      if (!payload.position) return;
-      const x = payload.position.x / scale();
-      const y = payload.position.y / scale();
-      const target = latest.current.resolveTarget(x, y);
-      if (payload.type === 'drop') {
-        latest.current.onHover(null);
-        if (target && payload.paths && payload.paths.length > 0) latest.current.onDrop(payload.paths, target);
-        return;
-      }
-      latest.current.onHover(target);
-    }).then((fn) => {
-      if (disposed) fn();
-      else unlisten = fn;
-    }).catch(() => {});
+    getCurrentWindow()
+      .onDragDropEvent((event) => {
+        if (disposed) return;
+        const payload = event.payload as {
+          type: string;
+          position?: { x: number; y: number };
+          paths?: string[];
+        };
+        if (payload.type === 'leave') {
+          latest.current.onHover(null);
+          return;
+        }
+        if (!payload.position) return;
+        const x = payload.position.x / scale();
+        const y = payload.position.y / scale();
+        const target = latest.current.resolveTarget(x, y);
+        if (payload.type === 'drop') {
+          latest.current.onHover(null);
+          if (target && payload.paths && payload.paths.length > 0) latest.current.onDrop(payload.paths, target);
+          return;
+        }
+        latest.current.onHover(target);
+      })
+      .then((fn) => {
+        if (disposed) fn();
+        else unlisten = fn;
+      })
+      .catch(() => {});
 
     return () => {
       disposed = true;

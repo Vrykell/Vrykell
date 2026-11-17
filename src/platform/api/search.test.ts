@@ -6,22 +6,27 @@ import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
-import {
-  searchFiles, searchHistory, recordHistory,
-  clearHistory, searchBlocks, searchSessions,
-} from '@platform/api/search';
+import { searchFiles, searchHistory, recordHistory, clearHistory, searchBlocks, searchSessions } from '@platform/api/search';
 
 describe('api/search', () => {
   it('searchFiles: default arguments and explicit roots/root', async () => {
     invokeMock.mockResolvedValueOnce([]);
     await searchFiles('q');
     expect(invokeMock).toHaveBeenLastCalledWith('search_files', {
-      query: 'q', maxResults: 50, searchContent: false, root: null, roots: null,
+      query: 'q',
+      maxResults: 50,
+      searchContent: false,
+      root: null,
+      roots: null,
     });
     invokeMock.mockResolvedValueOnce([]);
     await searchFiles('q', 10, true, '/a', ['/b', '/c']);
     expect(invokeMock).toHaveBeenLastCalledWith('search_files', {
-      query: 'q', maxResults: 10, searchContent: true, root: '/a', roots: ['/b', '/c'],
+      query: 'q',
+      maxResults: 10,
+      searchContent: true,
+      root: '/a',
+      roots: ['/b', '/c'],
     });
   });
 
@@ -29,12 +34,20 @@ describe('api/search', () => {
     invokeMock.mockResolvedValueOnce([]);
     await searchHistory('q');
     expect(invokeMock).toHaveBeenLastCalledWith('search_history', {
-      query: 'q', maxResults: 30, filterExitCode: null, since: null, cwd: null,
+      query: 'q',
+      maxResults: 30,
+      filterExitCode: null,
+      since: null,
+      cwd: null,
     });
     invokeMock.mockResolvedValueOnce([]);
     await searchHistory('q', 5, 1, 1000, '/w');
     expect(invokeMock).toHaveBeenLastCalledWith('search_history', {
-      query: 'q', maxResults: 5, filterExitCode: 1, since: 1000, cwd: '/w',
+      query: 'q',
+      maxResults: 5,
+      filterExitCode: 1,
+      since: 1000,
+      cwd: '/w',
     });
   });
 

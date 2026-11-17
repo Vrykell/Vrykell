@@ -1,7 +1,14 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { acceptsCompletionKey, completionShortcut, useCompletionPreferences, validCustomCompletionShortcut } from '../completion';
 
-const key = (value: string, modifiers = {}) => ({ key: value, shiftKey: false, ctrlKey: false, altKey: false, metaKey: false, ...modifiers });
+const key = (value: string, modifiers = {}) => ({
+  key: value,
+  shiftKey: false,
+  ctrlKey: false,
+  altKey: false,
+  metaKey: false,
+  ...modifiers,
+});
 
 describe('completion acceptance keys', () => {
   const snapshot = useCompletionPreferences.getState();
@@ -28,8 +35,11 @@ describe('completion acceptance keys', () => {
 
   it('persists multiple enabled keys and replaces a custom binding without losing preset choices', async () => {
     const prefs = useCompletionPreferences.getState();
-    prefs.toggle('Tab'); prefs.toggle('Shift+ArrowRight'); prefs.setCustom('Control+J');
-    prefs.setCustom('Control+K'); prefs.setCustom('Enter');
+    prefs.toggle('Tab');
+    prefs.toggle('Shift+ArrowRight');
+    prefs.setCustom('Control+J');
+    prefs.setCustom('Control+K');
+    prefs.setCustom('Enter');
     expect(useCompletionPreferences.getState().shortcuts).toEqual(['ArrowRight', 'Shift+ArrowRight', 'Control+K']);
     expect(JSON.parse(localStorage.getItem('vrykell-completion')!).state.customShortcut).toBe('Control+K');
     await useCompletionPreferences.persist.rehydrate();
@@ -37,7 +47,10 @@ describe('completion acceptance keys', () => {
   });
 
   it('rejects invalid saved bindings and always keeps an acceptance key', async () => {
-    localStorage.setItem('vrykell-completion', JSON.stringify({ state: { shortcuts: ['Enter', null], customShortcut: 'Enter' }, version: 0 }));
+    localStorage.setItem(
+      'vrykell-completion',
+      JSON.stringify({ state: { shortcuts: ['Enter', null], customShortcut: 'Enter' }, version: 0 }),
+    );
     await useCompletionPreferences.persist.rehydrate();
     expect(useCompletionPreferences.getState().shortcuts).toEqual(['ArrowRight', 'Tab']);
     useCompletionPreferences.getState().toggle('Tab');

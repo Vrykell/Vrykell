@@ -12,7 +12,10 @@ it('serializes saves and waits for pending changes before a remounted panel read
   let saves = 0;
   invoke.mockImplementation(async (command: string, args: { payload: HistoryCommandPreferences }) => {
     if (command === 'command_history_save_preferences') {
-      if (++saves === 1) await new Promise<void>(resolve => { release = resolve; });
+      if (++saves === 1)
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
       stored = args.payload;
       return;
     }
@@ -36,7 +39,12 @@ it('reports malformed saved preferences instead of rendering corrupt command lis
 it('accepts old preferences and validates optional command groups and colors', async () => {
   invoke.mockResolvedValue(preferences());
   expect(await getHistoryPreferences('old')).toEqual(preferences());
-  const grouped = { ...preferences(), groups: [{ id: 'build', name: 'Build', commandKeys: ['key'] }], groupColors: { build: 'blue' }, historyOrder: ['key'] };
+  const grouped = {
+    ...preferences(),
+    groups: [{ id: 'build', name: 'Build', commandKeys: ['key'] }],
+    groupColors: { build: 'blue' },
+    historyOrder: ['key'],
+  };
   invoke.mockResolvedValue(grouped);
   expect(await getHistoryPreferences('groups')).toEqual(grouped);
   invoke.mockResolvedValue({ ...grouped, groups: [{ id: 'bad', name: 'Bad', commandKeys: null }] });

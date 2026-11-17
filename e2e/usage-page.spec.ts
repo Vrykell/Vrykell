@@ -122,7 +122,7 @@ test.describe('usage statistics page', () => {
     await waitForWorkbench(page);
     await page.evaluate(async () => {
       const path = '/src/features/workspace/stores/workspace.ts';
-      const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+      const { useWorkspaceStore } = (await import(path)) as typeof import('../src/features/workspace/stores/workspace');
       useWorkspaceStore.getState().openUsageTab();
     });
     await expect(page.getByTestId('usage-total-tokens')).toHaveText('15');
@@ -145,12 +145,24 @@ test.describe('usage statistics page', () => {
     await page.getByTestId('acp-launcher-Fake ACP').click();
     await expect(page.getByTestId('harness-send')).toBeVisible({ timeout: 10000 });
     const session = 'sess_e2e';
-    await emitAcpSession(page, acpUpdate(session, {
-      sessionUpdate: 'tool_call', toolCallId: 'call_1', title: 'Run the tests', status: 'pending',
-    }));
-    await emitAcpSession(page, acpUpdate(session, {
-      sessionUpdate: 'usage_update', used: 12_000, size: 200_000, cost: { amount: 0.0042, currency: 'USD' },
-    }));
+    await emitAcpSession(
+      page,
+      acpUpdate(session, {
+        sessionUpdate: 'tool_call',
+        toolCallId: 'call_1',
+        title: 'Run the tests',
+        status: 'pending',
+      }),
+    );
+    await emitAcpSession(
+      page,
+      acpUpdate(session, {
+        sessionUpdate: 'usage_update',
+        used: 12_000,
+        size: 200_000,
+        cost: { amount: 0.0042, currency: 'USD' },
+      }),
+    );
     await emitAcpSession(page, { sessionId: session, kind: 'stop', payload: { stopReason: 'end_turn' } });
 
     await openUsagePage(page);
@@ -165,7 +177,7 @@ test.describe('usage statistics page', () => {
     await waitForWorkbench(page);
     await page.evaluate(async () => {
       const path = '/src/features/workspace/stores/workspace.ts';
-      const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+      const { useWorkspaceStore } = (await import(path)) as typeof import('../src/features/workspace/stores/workspace');
       useWorkspaceStore.getState().openUsageTab();
     });
     await expect(page.getByTestId('usage-model-filter')).toContainText('全部');

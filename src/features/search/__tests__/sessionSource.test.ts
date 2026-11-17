@@ -8,8 +8,16 @@ vi.mock('@platform/api/search', () => ({ searchSessions: vi.fn() }));
 
 it('omits meaningless classic counts in global session results while retaining block counts', async () => {
   const session = (mode: 'classic' | 'block'): BackendSessionEntry => ({
-    id: mode, title: mode, kind: 'session', status: 'historical',
-    created_at: 1, closed_at: 2, block_count: 3, cwd: '', group_id: null, sort_order: 0,
+    id: mode,
+    title: mode,
+    kind: 'session',
+    status: 'historical',
+    created_at: 1,
+    closed_at: 2,
+    block_count: 3,
+    cwd: '',
+    group_id: null,
+    sort_order: 0,
     payload: JSON.stringify({ layout: { type: 'leaf', terminal: { kind: 'local', openMode: mode } } }),
   });
   vi.mocked(searchSessions).mockResolvedValue([session('classic'), session('block')]);

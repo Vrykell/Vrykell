@@ -39,7 +39,18 @@ export interface CheckboxMenuProps<Id extends string = string> {
   anchored?: boolean;
 }
 
-export default function CheckboxMenu<Id extends string>({ title, options, onToggle, onClose, style, compact = false, checkmark = false, footer, triggerRef, anchored = false }: CheckboxMenuProps<Id>) {
+export default function CheckboxMenu<Id extends string>({
+  title,
+  options,
+  onToggle,
+  onClose,
+  style,
+  compact = false,
+  checkmark = false,
+  footer,
+  triggerRef,
+  anchored = false,
+}: CheckboxMenuProps<Id>) {
   const menuRef = useRef<HTMLDivElement>(null);
   const close = useRef(onClose);
   close.current = onClose;
@@ -54,12 +65,22 @@ export default function CheckboxMenu<Id extends string>({ title, options, onTogg
       if (!trigger || !menu) return;
       const height = Math.min(menu.scrollHeight, window.innerHeight - 16);
       const below = window.innerHeight - trigger.bottom - 8;
-      setPosition({ position: 'fixed', left: Math.max(8, Math.min(trigger.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 8)), top: below >= height ? trigger.bottom + 4 : Math.max(8, trigger.top - height - 4), maxWidth: window.innerWidth - 16, maxHeight: window.innerHeight - 16, overflowY: 'auto' });
+      setPosition({
+        position: 'fixed',
+        left: Math.max(8, Math.min(trigger.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 8)),
+        top: below >= height ? trigger.bottom + 4 : Math.max(8, trigger.top - height - 4),
+        maxWidth: window.innerWidth - 16,
+        maxHeight: window.innerHeight - 16,
+        overflowY: 'auto',
+      });
     };
     place();
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
-    return () => { window.removeEventListener('resize', place); window.removeEventListener('scroll', place, true); };
+    return () => {
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
   }, [anchored, triggerRef]);
 
   useEffect(() => {
@@ -85,25 +106,37 @@ export default function CheckboxMenu<Id extends string>({ title, options, onTogg
       aria-label={title}
       className={`workspace-floating${compact ? ' checkbox-menu-compact' : ''}`}
       style={{ position: 'absolute', padding: 4, zIndex: 200, minWidth: 180, ...style, ...position }}
-      onKeyDown={event => {
-        if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); onClose(); return; }
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          onClose();
+          return;
+        }
         if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
-        event.preventDefault(); event.stopPropagation();
+        event.preventDefault();
+        event.stopPropagation();
         const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)'));
         const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
-        const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1
-          : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
+        const next =
+          event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? buttons.length - 1
+              : (index + (event.key === 'ArrowDown' ? 1 : -1) + buttons.length) % buttons.length;
         buttons[next]?.focus();
-      }}
-    >
-      {!compact && <div style={{
-        padding: '6px 12px',
-        fontSize: 'calc(11px * var(--ui-font-scale))',
-        color: 'var(--text-muted)',
-        fontWeight: 'var(--fw-semibold)',
       }}>
-        {title}
-      </div>}
+      {!compact && (
+        <div
+          style={{
+            padding: '6px 12px',
+            fontSize: 'calc(11px * var(--ui-font-scale))',
+            color: 'var(--text-muted)',
+            fontWeight: 'var(--fw-semibold)',
+          }}>
+          {title}
+        </div>
+      )}
       {options.map((option) => (
         <button
           key={option.id}
@@ -113,26 +146,39 @@ export default function CheckboxMenu<Id extends string>({ title, options, onTogg
           aria-label={option.label}
           aria-checked={option.checked}
           className="workspace-floating-row"
-          onClick={event => { event.currentTarget.focus(); onToggle(option.id); }}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left',
-            padding: '6px 12px', border: 'none',
-            color: option.checked ? 'var(--text-primary)' : 'var(--text-muted)',
-            cursor: 'pointer', fontSize: 'calc(12px * var(--ui-font-scale))', fontFamily: 'var(--font-ui)',
+          onClick={(event) => {
+            event.currentTarget.focus();
+            onToggle(option.id);
           }}
-        >
-          {!checkmark && !compact && <Checkbox checked={option.checked} readOnly tabIndex={-1} aria-hidden="true" style={{ pointerEvents: 'none' }} />}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            width: '100%',
+            textAlign: 'left',
+            padding: '6px 12px',
+            border: 'none',
+            color: option.checked ? 'var(--text-primary)' : 'var(--text-muted)',
+            cursor: 'pointer',
+            fontSize: 'calc(12px * var(--ui-font-scale))',
+            fontFamily: 'var(--font-ui)',
+          }}>
+          {!checkmark && !compact && (
+            <Checkbox checked={option.checked} readOnly tabIndex={-1} aria-hidden="true" style={{ pointerEvents: 'none' }} />
+          )}
           <span style={{ flex: 1, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-            {option.icon}{option.displayLabel ?? option.label}
+            {option.icon}
+            {option.displayLabel ?? option.label}
           </span>
           {option.count !== undefined && option.count > 0 && (
-            <span style={{
-              fontSize: 'calc(10px * var(--ui-font-scale))',
-              color: 'var(--text-muted)',
-              background: 'var(--hover)',
-              padding: '0 6px',
-              borderRadius: 999,
-            }}>
+            <span
+              style={{
+                fontSize: 'calc(10px * var(--ui-font-scale))',
+                color: 'var(--text-muted)',
+                background: 'var(--hover)',
+                padding: '0 6px',
+                borderRadius: 999,
+              }}>
               {option.count}
             </span>
           )}

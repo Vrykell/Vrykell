@@ -11,14 +11,20 @@ export const SHELL_TYPES: ShellType[] = ['zsh', 'bash', 'powershell', 'pwsh', 'c
 /** Map a shell type to its display name, used for default tab titles. */
 export function shellTypeLabel(shell: string): string {
   switch (shell) {
-    case 'zsh': return 'Zsh';
-    case 'bash': return 'Bash';
+    case 'zsh':
+      return 'Zsh';
+    case 'bash':
+      return 'Bash';
     // The OS-bundled Windows PowerShell and the standalone pwsh build are different
     // executables with their own open mode; identical labels would show two look-alike rows.
-    case 'powershell': return 'Windows PowerShell';
-    case 'pwsh': return 'PowerShell 7';
-    case 'cmd': return 'CMD';
-    default: return shell || translate('Terminal');
+    case 'powershell':
+      return 'Windows PowerShell';
+    case 'pwsh':
+      return 'PowerShell 7';
+    case 'cmd':
+      return 'CMD';
+    default:
+      return shell || translate('Terminal');
   }
 }
 

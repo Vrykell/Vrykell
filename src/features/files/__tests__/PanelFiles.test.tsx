@@ -6,9 +6,16 @@ import { ptyWrite } from '@platform/pty';
 import { useLocalPathStore } from '@features/files/services/localPath';
 import { useEditorPreferences } from '@config/editor';
 
-vi.mock('@features/workspace/hooks/useActiveWorkspace', () => ({ useActiveWorkspace: () => ({ focusedSpec: null, focusedPaneId: '', activeCwd: '/tmp', sessions: {} }) }));
+vi.mock('@features/workspace/hooks/useActiveWorkspace', () => ({
+  useActiveWorkspace: () => ({ focusedSpec: null, focusedPaneId: '', activeCwd: '/tmp', sessions: {} }),
+}));
 vi.mock('@features/files/components/FilePanel', () => ({
-  default: ({ initialPath, initialResolved, onPathChange, openEntry }: {
+  default: ({
+    initialPath,
+    initialResolved,
+    onPathChange,
+    openEntry,
+  }: {
     initialPath: string | null;
     initialResolved: boolean;
     onPathChange?: (path: string | null) => void;
@@ -21,13 +28,30 @@ vi.mock('@features/files/components/FilePanel', () => ({
     </>
   ),
 }));
-vi.mock('@features/files/services/fileOpen', () => ({ openFile: async (_path: string, execute: (command: string) => void) => { execute('vim /tmp/config.ini'); return { via: 'terminal', editor: 'vim' }; } }));
+vi.mock('@features/files/services/fileOpen', () => ({
+  openFile: async (_path: string, execute: (command: string) => void) => {
+    execute('vim /tmp/config.ini');
+    return { via: 'terminal', editor: 'vim' };
+  },
+}));
 vi.mock('@features/terminal/services/terminalStartup', () => ({ waitForTerminalStartup: async () => 'file-session' }));
-vi.mock('@platform/shells', () => ({ getAvailableShells: async () => [{ id: 'zsh', default: false }, { id: 'bash', default: true }] }));
+vi.mock('@platform/shells', () => ({
+  getAvailableShells: async () => [
+    { id: 'zsh', default: false },
+    { id: 'bash', default: true },
+  ],
+}));
 vi.mock('@platform/pty', () => ({ ptyWrite: vi.fn(async () => {}) }));
-vi.mock('@features/ssh', () => ({ ensureSshLoaded: vi.fn(), useSshStore: (select: (state: { connections: never[]; loaded: boolean }) => unknown) => select({ connections: [], loaded: true }) }));
+vi.mock('@features/ssh', () => ({
+  ensureSshLoaded: vi.fn(),
+  useSshStore: (select: (state: { connections: never[]; loaded: boolean }) => unknown) => select({ connections: [], loaded: true }),
+}));
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); useLocalPathStore.setState({ remembered: null }); });
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  useLocalPathStore.setState({ remembered: null });
+});
 
 it('opens files in the real default shell and retains that shell on the new tab', async () => {
   useEditorPreferences.setState({ localOpenMode: 'terminal' });
@@ -41,7 +65,8 @@ it('opens files in the real default shell and retains that shell on the new tab'
 it('opens a file in the built-in editor by default without sending terminal input', () => {
   useEditorPreferences.setState({ localOpenMode: 'editor' });
   const open = vi.spyOn(useSessionStore.getState(), 'openEditorFile').mockReturnValue('editor');
-  render(<PanelFiles />); fireEvent.click(screen.getByRole('button', { name: 'Open file' }));
+  render(<PanelFiles />);
+  fireEvent.click(screen.getByRole('button', { name: 'Open file' }));
   expect(open).toHaveBeenCalledWith({ path: '/tmp/config.ini' });
 });
 

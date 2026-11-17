@@ -15,7 +15,9 @@ test('locks page scale and suppresses the native WebView context menu', async ({
     const contextTarget = document.createElement('div');
     document.body.append(contextTarget);
     let applicationHandlerReceived = false;
-    contextTarget.addEventListener('contextmenu', () => { applicationHandlerReceived = true; });
+    contextTarget.addEventListener('contextmenu', () => {
+      applicationHandlerReceived = true;
+    });
     const context = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
     window.dispatchEvent(key);
     window.dispatchEvent(wheel);

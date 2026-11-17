@@ -11,9 +11,12 @@ const partial: FileSearchResult = { entries: [hit], truncated: false, skipped: 0
 it('renders partial results while traversal is pending and ignores a superseded search', async () => {
   const requests: { signal: AbortSignal; progress: (result: FileSearchResult) => void; finish: (result: FileSearchResult) => void }[] = [];
   const ops = createLocalFileOps();
-  ops.search = vi.fn<NonNullable<FileOps['search']>>((_root, _query, signal, progress) => new Promise<FileSearchResult>(resolve => {
-    requests.push({ signal, progress: progress!, finish: resolve });
-  }));
+  ops.search = vi.fn<NonNullable<FileOps['search']>>(
+    (_root, _query, signal, progress) =>
+      new Promise<FileSearchResult>((resolve) => {
+        requests.push({ signal, progress: progress!, finish: resolve });
+      }),
+  );
   render(<FileSearchMenu ops={ops} root="/project" returnFocus={null} onChoose={vi.fn()} onClose={vi.fn()} />);
   expect(screen.getByText('搜索文件')).toBeVisible();
   const close = screen.getByRole('button', { name: '关闭搜索' });
@@ -27,7 +30,10 @@ it('renders partial results while traversal is pending and ignores a superseded 
   fireEvent.change(screen.getByRole('textbox'), { target: { value: 'new' } });
   expect(requests[0].signal.aborted).toBe(true);
   await waitFor(() => expect(requests).toHaveLength(2));
-  await act(async () => { requests[0].progress(partial); requests[0].finish(partial); });
+  await act(async () => {
+    requests[0].progress(partial);
+    requests[0].finish(partial);
+  });
   expect(screen.queryByRole('button', { name: /early.log/ })).not.toBeInTheDocument();
   await act(async () => requests[1].finish({ entries: [], truncated: false, skipped: 0 }));
   expect(screen.getByText('没有匹配的文件')).toBeVisible();
@@ -35,10 +41,16 @@ it('renders partial results while traversal is pending and ignores a superseded 
 });
 
 it('publishes local matches before waiting for a deeper directory', async () => {
-  let finish!: (value: { base: null; entries: typeof hit[] }) => void;
+  let finish!: (value: { base: null; entries: (typeof hit)[] }) => void;
   const progress = vi.fn();
-  const list = vi.fn().mockResolvedValueOnce({ base: null, entries: [hit, { name: 'nested', path: '/project/nested', is_dir: true }] })
-    .mockReturnValue(new Promise(resolve => { finish = resolve; }));
+  const list = vi
+    .fn()
+    .mockResolvedValueOnce({ base: null, entries: [hit, { name: 'nested', path: '/project/nested', is_dir: true }] })
+    .mockReturnValue(
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+    );
   const controller = new AbortController();
   const search = searchFiles({ list }, '/project', 'log', controller.signal, progress);
   await waitFor(() => expect(list).toHaveBeenCalledTimes(2));

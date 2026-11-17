@@ -13,7 +13,10 @@ describe('input store (independent input state per pane)', () => {
     store.setText('a', 'explain this');
     store.stageText('a', 'echo one\necho two');
     expect(selectPaneInput('a')(useInputStore.getState())).toMatchObject({
-      aiMode: false, text: 'echo existing\necho one\necho two', aiDraft: 'explain this', focusRequest: 1,
+      aiMode: false,
+      text: 'echo existing\necho one\necho two',
+      aiDraft: 'explain this',
+      focusRequest: 1,
     });
     expect(useInputStore.getState().byPane.b).toBeUndefined();
     store.stageText('a', 'echo three');

@@ -48,7 +48,10 @@ export class SshHostTrustCancelledError extends Error {
 }
 
 function hostKeyMismatchMessage(host: string, port?: number): string {
-  return t('The host key presented by {{host}}:{{port}} does not match the saved record. This may indicate a man-in-the-middle attack. Nothing was overwritten; verify the server before continuing.', { host, port: port ?? 22 });
+  return t(
+    'The host key presented by {{host}}:{{port}} does not match the saved record. This may indicate a man-in-the-middle attack. Nothing was overwritten; verify the server before continuing.',
+    { host, port: port ?? 22 },
+  );
 }
 
 function failureText(reason: unknown): string {
@@ -56,10 +59,23 @@ function failureText(reason: unknown): string {
 }
 
 /** Translate a changed-key failure and never swallow other errors. */
-function throwHostKeyMismatch(reason: unknown, host: string, port: number | undefined, options?: SshOptions, details: { keyType?: string; fingerprint?: string } = {}): never {
+function throwHostKeyMismatch(
+  reason: unknown,
+  host: string,
+  port: number | undefined,
+  options?: SshOptions,
+  details: { keyType?: string; fingerprint?: string } = {},
+): never {
   const message = failureText(reason);
   if (!message.includes('HOST_KEY_MISMATCH')) throw reason;
-  throw new SshHostKeyMismatchError({ host, port: port ?? 22, keyType: details.keyType, fingerprint: details.fingerprint, rawMessage: message, options });
+  throw new SshHostKeyMismatchError({
+    host,
+    port: port ?? 22,
+    keyType: details.keyType,
+    fingerprint: details.fingerprint,
+    rawMessage: message,
+    options,
+  });
 }
 
 /** Confirm each saved hop before querying the destination through its route. */
@@ -70,8 +86,14 @@ export async function prepareSshJumpHosts(options: SshOptions, connections: SshC
     } catch (reason) {
       // Keep the warning attached to the hop that actually failed, not the destination.
       if (reason instanceof SshHostKeyMismatchError) {
-        throw new SshHostKeyMismatchError({ host: hop.host, port: hop.port ?? 22, keyType: reason.keyType,
-          fingerprint: reason.fingerprint, rawMessage: reason.rawMessage, options: sshConnectionOptions(hop) });
+        throw new SshHostKeyMismatchError({
+          host: hop.host,
+          port: hop.port ?? 22,
+          keyType: reason.keyType,
+          fingerprint: reason.fingerprint,
+          rawMessage: reason.rawMessage,
+          options: sshConnectionOptions(hop),
+        });
       }
       throw reason;
     }
@@ -88,13 +110,25 @@ export async function prepareSshHost(host: string, port?: number, signal?: Abort
   }
   signal?.throwIfAborted();
   if (info.mismatch) {
-    throw new SshHostKeyMismatchError({ host, port: port ?? 22, keyType: info.keyType, fingerprint: info.fingerprint, options: safeOptions });
+    throw new SshHostKeyMismatchError({
+      host,
+      port: port ?? 22,
+      keyType: info.keyType,
+      fingerprint: info.fingerprint,
+      options: safeOptions,
+    });
   }
   if (info.known) return info;
   const confirmed = await ask(
-    t('First connection to {{host}}:{{port}}\nKey type: {{keyType}}\nHost fingerprint: {{fingerprint}}\n\nVerify the remote host fingerprint before trusting it.', {
-      host, port: port ?? 22, keyType: info.keyType, fingerprint: info.fingerprint,
-    }),
+    t(
+      'First connection to {{host}}:{{port}}\nKey type: {{keyType}}\nHost fingerprint: {{fingerprint}}\n\nVerify the remote host fingerprint before trusting it.',
+      {
+        host,
+        port: port ?? 22,
+        keyType: info.keyType,
+        fingerprint: info.fingerprint,
+      },
+    ),
     { title: t('Confirm the SSH host fingerprint'), kind: 'warning', okLabel: t('Trust and connect'), cancelLabel: t('Cancel connection') },
   );
   signal?.throwIfAborted();

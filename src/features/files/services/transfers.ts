@@ -23,7 +23,7 @@ export const transfersControl = (id: string, action: 'pause' | 'resume' | 'cance
 export const transfersDelete = (id: string) => invoke<void>('transfers_delete', { id });
 
 export function transferPercent(job: Pick<TransferJob, 'bytes' | 'total' | 'status'>): number {
-  return job.status === 'completed' ? 100 : job.total > 0 ? Math.min(100, Math.max(0, job.bytes / job.total * 100)) : 0;
+  return job.status === 'completed' ? 100 : job.total > 0 ? Math.min(100, Math.max(0, (job.bytes / job.total) * 100)) : 0;
 }
 
 export const transfersClear = (direction: 'upload' | 'download') => invoke<void>('transfers_clear', { direction });

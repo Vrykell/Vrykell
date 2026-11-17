@@ -15,12 +15,12 @@ vi.mock('@features/ssh', () => ({
 
 vi.mock('@features/ssh/services/proxies', () => ({ getProxies: vi.fn().mockResolvedValue({ profiles: [], defaultId: null }) }));
 
-vi.mock('../services/api', async importOriginal => {
+vi.mock('../services/api', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/api')>();
   return { ...actual, sshTest: vi.fn(), sshTrustHostKey: vi.fn(), sshHostKeyInfo: vi.fn() };
 });
 
-vi.mock('../services/hostTrust', async importOriginal => {
+vi.mock('../services/hostTrust', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../services/hostTrust')>();
   return { ...actual, prepareSshJumpHosts: vi.fn() };
 });
@@ -29,7 +29,14 @@ import { sshHostKeyInfo, sshTest, sshTrustHostKey } from '../services/api';
 import { prepareSshJumpHosts } from '../services/hostTrust';
 
 const success: SshTestResult = { status: 'success', host: 'fresh.example.com', port: 22, message: 'Connection succeeded.' };
-const unknown: SshTestResult = { status: 'unknown_host_key', host: 'fresh.example.com', port: 22, keyType: 'ed25519', fingerprint: 'SHA256:fresh-key', message: 'The host key is not trusted yet.' };
+const unknown: SshTestResult = {
+  status: 'unknown_host_key',
+  host: 'fresh.example.com',
+  port: 22,
+  keyType: 'ed25519',
+  fingerprint: 'SHA256:fresh-key',
+  message: 'The host key is not trusted yet.',
+};
 
 function renderForm({ initial = null, onClose = vi.fn() }: { initial?: SshConnection | null; onClose?: () => void } = {}) {
   return render(<SshFormModal open initial={initial} onClose={onClose} />);
@@ -79,9 +86,14 @@ describe('SSH connection test host key states', () => {
 
     fireEvent.click(screen.getByTestId('ssh-host-key-accept'));
 
-    await waitFor(() => expect(sshTrustHostKey).toHaveBeenCalledWith(
-      'fresh.example.com', 22, 'SHA256:fresh-key', expect.objectContaining({ proxyId: undefined }),
-    ));
+    await waitFor(() =>
+      expect(sshTrustHostKey).toHaveBeenCalledWith(
+        'fresh.example.com',
+        22,
+        'SHA256:fresh-key',
+        expect.objectContaining({ proxyId: undefined }),
+      ),
+    );
     expect(vi.mocked(sshTrustHostKey).mock.calls[0][3]).not.toHaveProperty('password');
     expect(await screen.findByTestId('ssh-test-result')).toHaveTextContent('认证成功');
     expect(screen.queryByTestId('ssh-host-key-prompt')).toBeNull();
@@ -104,8 +116,14 @@ describe('SSH connection test host key states', () => {
   });
 
   it('warns about a changed host key without offering to trust it', async () => {
-    vi.mocked(sshTest).mockResolvedValue({ status: 'host_key_mismatch', host: 'changed.example.com', port: 22,
-      keyType: 'ed25519', fingerprint: 'SHA256:changed-key', message: 'The host key does not match the saved record.' });
+    vi.mocked(sshTest).mockResolvedValue({
+      status: 'host_key_mismatch',
+      host: 'changed.example.com',
+      port: 22,
+      keyType: 'ed25519',
+      fingerprint: 'SHA256:changed-key',
+      message: 'The host key does not match the saved record.',
+    });
     renderForm();
     fillHost('changed.example.com');
     await testConnection();
@@ -120,10 +138,24 @@ describe('SSH connection test host key states', () => {
 
   it('names the failing jump hop instead of the destination after a changed key', async () => {
     store.connections = [{ id: 'gateway', name: 'Gateway', host: 'gateway.test', port: 2222, user: 'jump-user', authMethod: 'password' }];
-    const initial: SshConnection = { id: 'destination', name: 'Destination', host: 'destination.test', user: 'deploy', authMethod: 'password', jumpConnectionId: 'gateway' };
-    vi.mocked(prepareSshJumpHosts).mockRejectedValueOnce(Object.assign(new Error('HOST_KEY_MISMATCH: recorded key changed'), {
-      name: 'SshHostKeyMismatchError', host: 'gateway.test', port: 2222, keyType: 'rsa', fingerprint: 'SHA256:hop-key', rawMessage: 'HOST_KEY_MISMATCH: recorded key changed',
-    }));
+    const initial: SshConnection = {
+      id: 'destination',
+      name: 'Destination',
+      host: 'destination.test',
+      user: 'deploy',
+      authMethod: 'password',
+      jumpConnectionId: 'gateway',
+    };
+    vi.mocked(prepareSshJumpHosts).mockRejectedValueOnce(
+      Object.assign(new Error('HOST_KEY_MISMATCH: recorded key changed'), {
+        name: 'SshHostKeyMismatchError',
+        host: 'gateway.test',
+        port: 2222,
+        keyType: 'rsa',
+        fingerprint: 'SHA256:hop-key',
+        rawMessage: 'HOST_KEY_MISMATCH: recorded key changed',
+      }),
+    );
     renderForm({ initial });
     await testConnection();
 
@@ -169,7 +201,12 @@ describe('SSH connection test host key states', () => {
   });
 
   it('keeps authentication and network failures as ordinary test feedback', async () => {
-    vi.mocked(sshTest).mockResolvedValueOnce({ status: 'auth_failed', host: 'server.example.com', port: 22, message: 'SSH_AUTH_FAILED: rejected' });
+    vi.mocked(sshTest).mockResolvedValueOnce({
+      status: 'auth_failed',
+      host: 'server.example.com',
+      port: 22,
+      message: 'SSH_AUTH_FAILED: rejected',
+    });
     renderForm();
     fillHost('server.example.com');
     await testConnection();
@@ -182,7 +219,8 @@ describe('SSH connection test host key states', () => {
   });
 
   it('keeps raw backend text in the details of an unexpected failure', async () => {
-    const raw = 'SSH_CONNECTION_FAILED:{"connectionId":"","host":"server.example.com","port":22,"stage":"host-trust","cause":"known_hosts unavailable"}';
+    const raw =
+      'SSH_CONNECTION_FAILED:{"connectionId":"","host":"server.example.com","port":22,"stage":"host-trust","cause":"known_hosts unavailable"}';
     vi.mocked(sshTest).mockResolvedValue({ status: 'other_error', host: 'server.example.com', port: 22, message: raw });
     renderForm();
     fillHost('server.example.com');
@@ -207,7 +245,9 @@ describe('SSH connection test host key states', () => {
   });
 
   it('binds the result to the tested target and retests that target', async () => {
-    vi.mocked(sshTest).mockResolvedValueOnce({ ...unknown, port: 2222 }).mockResolvedValueOnce(success);
+    vi.mocked(sshTest)
+      .mockResolvedValueOnce({ ...unknown, port: 2222 })
+      .mockResolvedValueOnce(success);
     renderForm();
     fillHost('other.example.com');
     await testConnection();

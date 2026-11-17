@@ -8,7 +8,9 @@ if (import.meta.hot) {
 }
 
 function format(message: string, values: readonly unknown[]): string {
-  return message.replace(/\{(\d+)\}/g, (placeholder: string, index: string) => Number(index) < values.length ? String(values[Number(index)]) : placeholder);
+  return message.replace(/\{(\d+)\}/g, (placeholder: string, index: string) =>
+    Number(index) < values.length ? String(values[Number(index)]) : placeholder,
+  );
 }
 
 /** Route embedded control messages through the same catalog as the surrounding application. */

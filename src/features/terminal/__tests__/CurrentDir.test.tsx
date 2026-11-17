@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { CurrentDir } from '@features/terminal/components/InputEditor';
 
 describe('CurrentDir', () => {
-  it.each(['C:\\projects\\app', '/home/user/app', '\\\\server\\share', '~/project'])('preserves the path prefix for %s', dir => {
+  it.each(['C:\\projects\\app', '/home/user/app', '\\\\server\\share', '~/project'])('preserves the path prefix for %s', (dir) => {
     render(<CurrentDir dir={dir} />);
     expect(screen.getByText(dir).getAttribute('data-tip')).toBe(dir);
   });

@@ -17,26 +17,66 @@ import { useHostSystems } from '@config/hostSystems';
 
 function profileIcon(mark: string, Mark: ComponentType<SVGProps<SVGSVGElement>>, color = 'var(--text-primary)', viewBox?: string): AppIcon {
   return forwardRef<SVGSVGElement, AppIconProps>(function ProfileIcon({ size = iconSizes.row, style, className }, ref) {
-    return <Mark ref={ref} width={size} height={size} className={className}
-      {...(viewBox ? { viewBox } : {})}
-      data-shell-mark={mark} aria-hidden="true" style={{ flexShrink: 0, color, ...style }} />;
+    return (
+      <Mark
+        ref={ref}
+        width={size}
+        height={size}
+        className={className}
+        {...(viewBox ? { viewBox } : {})}
+        data-shell-mark={mark}
+        aria-hidden="true"
+        style={{ flexShrink: 0, color, ...style }}
+      />
+    );
   }) as AppIcon;
 }
 
 export const TerminalIcon = profileIcon('terminal', TerminalPrompt);
-export const PowerShellIcon = forwardRef<SVGSVGElement, AppIconProps>(function PowerShellIcon({ size = iconSizes.row, style, className }, ref) {
-  return <svg ref={ref} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" data-shell-mark="powershell" className={className}
-    style={{ color: 'var(--shell-powershell-accent)', flexShrink: 0, ...style }}>
-    <path d="M6 3.5h15a1.5 1.5 0 0 1 1.45 1.9l-4 14a1.5 1.5 0 0 1-1.45 1.1H2a1.5 1.5 0 0 1-1.45-1.9l4-14A1.5 1.5 0 0 1 6 3.5Z" fill="currentColor" />
-    <path d="m8 7 4 4-6 5m5 0h4" fill="none" stroke="var(--shell-mark-ink)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>;
+export const PowerShellIcon = forwardRef<SVGSVGElement, AppIconProps>(function PowerShellIcon(
+  { size = iconSizes.row, style, className },
+  ref,
+) {
+  return (
+    <svg
+      ref={ref}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      data-shell-mark="powershell"
+      className={className}
+      style={{ color: 'var(--shell-powershell-accent)', flexShrink: 0, ...style }}>
+      <path
+        d="M6 3.5h15a1.5 1.5 0 0 1 1.45 1.9l-4 14a1.5 1.5 0 0 1-1.45 1.1H2a1.5 1.5 0 0 1-1.45-1.9l4-14A1.5 1.5 0 0 1 6 3.5Z"
+        fill="currentColor"
+      />
+      <path
+        d="m8 7 4 4-6 5m5 0h4"
+        fill="none"
+        stroke="var(--shell-mark-ink)"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 });
 export const ZshIcon = forwardRef<SVGSVGElement, AppIconProps>(function ZshIcon({ size = iconSizes.row, style, className }, ref) {
-  return <svg ref={ref} width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" data-shell-mark="zsh" className={className}
-    style={{ color: 'var(--shell-zsh-accent)', flexShrink: 0, ...style }}>
-    <rect x="1" y="2" width="22" height="20" rx="4" fill="currentColor" />
-    <path d="M7 7h10L7 17h10" fill="none" stroke="var(--shell-mark-ink)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>;
+  return (
+    <svg
+      ref={ref}
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      data-shell-mark="zsh"
+      className={className}
+      style={{ color: 'var(--shell-zsh-accent)', flexShrink: 0, ...style }}>
+      <rect x="1" y="2" width="22" height="20" rx="4" fill="currentColor" />
+      <path d="M7 7h10L7 17h10" fill="none" stroke="var(--shell-mark-ink)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 });
 const BashOutline = forwardRef<SVGSVGElement, SVGProps<SVGSVGElement>>(function BashOutline(props, ref) {
   return <BashMark {...props} ref={ref} stroke="currentColor" strokeWidth={2} strokeLinejoin="round" />;
@@ -57,15 +97,26 @@ const FishIcon = profileIcon('fish', FishMark);
 
 export function shellIconFor(shellType: string | null | undefined): AppIcon {
   switch (shellType?.toLowerCase()) {
-    case 'powershell': case 'pwsh': return PowerShellIcon;
-    case 'zsh': return ZshIcon;
-    case 'bash': return BashIcon;
-    case 'cmd': return CmdIcon;
-    case 'fish': return FishIcon;
-    case 'git-bash': return GitIcon;
-    case 'python': return PythonIcon;
-    case 'node': case 'nodejs': return NodeIcon;
-    default: return TerminalIcon;
+    case 'powershell':
+    case 'pwsh':
+      return PowerShellIcon;
+    case 'zsh':
+      return ZshIcon;
+    case 'bash':
+      return BashIcon;
+    case 'cmd':
+      return CmdIcon;
+    case 'fish':
+      return FishIcon;
+    case 'git-bash':
+      return GitIcon;
+    case 'python':
+      return PythonIcon;
+    case 'node':
+    case 'nodejs':
+      return NodeIcon;
+    default:
+      return TerminalIcon;
   }
 }
 
@@ -81,10 +132,24 @@ export function hostIconFor(system: string | undefined): AppIcon {
   return SshIcon;
 }
 
-export function TerminalProfileIcon({ kind, shellType, connectionId, size = iconSizes.row, colored = true }: {
-  kind?: string; shellType?: string; connectionId?: string; size?: number; colored?: boolean;
+export function TerminalProfileIcon({
+  kind,
+  shellType,
+  connectionId,
+  size = iconSizes.row,
+  colored = true,
+}: {
+  kind?: string;
+  shellType?: string;
+  connectionId?: string;
+  size?: number;
+  colored?: boolean;
 }) {
-  const system = useHostSystems(state => connectionId ? state.systems[connectionId] : undefined);
+  const system = useHostSystems((state) => (connectionId ? state.systems[connectionId] : undefined));
   const Icon = kind === 'ssh' ? hostIconFor(system) : shellIconFor(shellType);
-  return <span className="identity-icon" data-colored={colored}><Icon size={size} /></span>;
+  return (
+    <span className="identity-icon" data-colored={colored}>
+      <Icon size={size} />
+    </span>
+  );
 }

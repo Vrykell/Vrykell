@@ -16,9 +16,7 @@ import { useHarnessWorkspace } from '@features/chat/stores/harnessWorkspace';
 import { useAiWorkspace } from '@features/chat/stores/aiWorkspace';
 import { interceptHarnessClose } from '@core/harness';
 import * as sessionManager from '@features/workspace/services/sessionManager';
-import {
-  groupsList, sessionSetGroup,
-} from '@platform/api/group';
+import { groupsList, sessionSetGroup } from '@platform/api/group';
 import type { BackendGroupEntry } from '@platform/api/types';
 import { useBlockStore } from '@features/terminal/stores/blocks';
 import { useInputStore } from '@features/terminal/stores/input';
@@ -30,18 +28,32 @@ import type { ShellType } from '@platform/shells';
 import { shellTypeLabel } from '@platform/shells';
 import { diagnostic } from '@platform/diagnostics';
 import {
-  leaf, leaves as layoutLeaves, firstLeaf, findLeaf, splitLeaf, replaceLeaf, removeLeaf, countLeaves, mapTerminals,
-  type WindowLayout, type TerminalSpec, type SplitDir,
+  leaf,
+  leaves as layoutLeaves,
+  firstLeaf,
+  findLeaf,
+  splitLeaf,
+  replaceLeaf,
+  removeLeaf,
+  countLeaves,
+  mapTerminals,
+  type WindowLayout,
+  type TerminalSpec,
+  type SplitDir,
 } from '@features/workspace/model/windowLayout';
 import {
-  COMMAND_TITLE_LEN, MESSAGE_TITLE_LEN, canApplyTitle, normalizeCommandForTitle, truncateTitle,
+  COMMAND_TITLE_LEN,
+  MESSAGE_TITLE_LEN,
+  canApplyTitle,
+  normalizeCommandForTitle,
+  truncateTitle,
   type TitleSource,
 } from '@features/workspace/model/sessionTitle';
 
 export type { TitleSource };
 
-export type TabKind = 'session' | 'history' | 'ai-history' | 'git-diff' | 'editor' | 'usage' | 'harness'
-  | 'start' | 'start-code' | 'start-ai';
+export type TabKind =
+  'session' | 'history' | 'ai-history' | 'git-diff' | 'editor' | 'usage' | 'harness' | 'start' | 'start-code' | 'start-ai';
 
 /** SSH target for a session whose terminal type is SSH. */
 export interface SshTabTarget extends SshOptions {
@@ -140,7 +152,7 @@ export function nextTerminalId(windowId: string, layout: WindowLayout): string {
 /** Clone resource identities through the shared tree mapper. */
 function cloneLayout(layout: WindowLayout, newWindowId: string): WindowLayout {
   let n = 0;
-  return mapTerminals(layout, terminal => ({ ...terminal, id: `${newWindowId}#${n++}` }));
+  return mapTerminals(layout, (terminal) => ({ ...terminal, id: `${newWindowId}#${n++}` }));
 }
 
 // Tab ids stay unique across restarts (timestamp prefix plus counter) so a restored tab cannot
@@ -234,12 +246,22 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   lastLocalPaneId: null,
   addTab: (opts) => {
     const o = opts ?? {};
-    const current = get().tabs.find(tab => tab.id === get().activeId);
-    const focused = current && isSessionTab(current) ? findLeaf(current.layout, useTerminalStore.getState().focusedPaneId ?? '') ?? firstLeaf(current.layout) : null;
+    const current = get().tabs.find((tab) => tab.id === get().activeId);
+    const focused =
+      current && isSessionTab(current)
+        ? (findLeaf(current.layout, useTerminalStore.getState().focusedPaneId ?? '') ?? firstLeaf(current.layout))
+        : null;
     if (focused?.kind === 'local') set({ lastLocalPaneId: focused.id });
-    if (o.kind === 'history' || o.kind === 'ai-history' || o.kind === 'usage' || o.kind === 'harness'
-      || o.kind === 'start' || o.kind === 'start-code' || o.kind === 'start-ai') {
-      const existing = get().tabs.find(tab => tab.kind === o.kind);
+    if (
+      o.kind === 'history' ||
+      o.kind === 'ai-history' ||
+      o.kind === 'usage' ||
+      o.kind === 'harness' ||
+      o.kind === 'start' ||
+      o.kind === 'start-code' ||
+      o.kind === 'start-ai'
+    ) {
+      const existing = get().tabs.find((tab) => tab.kind === o.kind);
       if (existing) {
         get().activate(existing.id);
         return existing.id;
@@ -281,7 +303,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       const shellType = o.shellType ?? (preference === 'system' ? undefined : preference);
       const profile = shellType ? useShellProfiles.getState().profiles[shellType as ShellType] : undefined;
       const term: TerminalSpec = {
-        id: `${id}#0`, kind: 'local', cwd: o.cwd ?? (o.useProfileDirectory === false ? undefined : profile?.cwd || undefined), shellType,
+        id: `${id}#0`,
+        kind: 'local',
+        cwd: o.cwd ?? (o.useProfileDirectory === false ? undefined : profile?.cwd || undefined),
+        shellType,
         useProfileDirectory: o.useProfileDirectory,
         openMode: defaultOpenModeForShell(shellType),
       };
@@ -295,17 +320,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       };
     }
 
-    if (isSessionTab(tab)) diagnostic('terminal-create-request', {
-      tabId: id, paneId: firstLeaf(tab.layout).id, kind: firstLeaf(tab.layout).kind,
-    });
+    if (isSessionTab(tab))
+      diagnostic('terminal-create-request', {
+        tabId: id,
+        paneId: firstLeaf(tab.layout).id,
+        kind: firstLeaf(tab.layout).kind,
+      });
     set((s) => ({ tabs: [...s.tabs, tab], activeId: id }));
     if (isSessionTab(tab)) {
       const ser = serializeSession(tab)!;
       const created = sessionManager.create(id, tab.title, undefined, ser.kind, ser.payload);
       if (tab.groupId) {
-        created.then(() => sessionSetGroup(id, tab.groupId ?? null)).catch((e) =>
-          console.warn('[workspace] failed to persist the group of a new tab:', e),
-        );
+        created
+          .then(() => sessionSetGroup(id, tab.groupId ?? null))
+          .catch((e) => console.warn('[workspace] failed to persist the group of a new tab:', e));
       }
       // A new terminal is not placed in the layout by default; the user drags it into a slot.
       useTerminalStore.getState().setFocusedPane(firstLeaf(tab.layout).id);
@@ -316,14 +344,20 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   openHistoryTab: () => {
     const navigation = useWorkspaceNavigation.getState();
-    if (navigation.area === 'unified') { navigation.selectHistory('terminal'); return; }
+    if (navigation.area === 'unified') {
+      navigation.selectHistory('terminal');
+      return;
+    }
     useWorkspaceNavigation.setState({ historyDestination: 'native' });
     const existing = get().tabs.find((t) => t.kind === 'history');
     get().activate(existing ? existing.id : get().addTab({ kind: 'history' }));
   },
   openAiHistoryTab: () => {
     const navigation = useWorkspaceNavigation.getState();
-    if (navigation.area === 'unified') { navigation.selectHistory('conversation'); return; }
+    if (navigation.area === 'unified') {
+      navigation.selectHistory('conversation');
+      return;
+    }
     useWorkspaceNavigation.setState({ historyDestination: 'native' });
     useWorkspaceNavigation.getState().setAiPlacement('main');
     const existing = get().tabs.find((t) => t.kind === 'ai-history');
@@ -344,122 +378,185 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (useWorkspaceNavigation.getState().area !== 'unified') useWorkspaceNavigation.getState().selectArea('ai');
     get().addTab({ kind: 'harness' });
   },
-  openEditorFile: file => {
+  openEditorFile: (file) => {
     get().configureEditorTabs();
-    const existing = get().tabs.find(tab => tab.kind === 'editor');
+    const existing = get().tabs.find((tab) => tab.kind === 'editor');
     if (existing?.kind === 'editor') {
-      const selected = existing.files.find(item => editorFileKey(item) === editorFileKey(file)) ?? file;
-      set(state => ({ tabs: state.tabs.map(tab => tab.id === existing.id ? { ...existing, files: existing.files.includes(selected) ? existing.files : [...existing.files, selected], selected } : tab) }));
-      get().activate(existing.id); return existing.id;
+      const selected = existing.files.find((item) => editorFileKey(item) === editorFileKey(file)) ?? file;
+      set((state) => ({
+        tabs: state.tabs.map((tab) =>
+          tab.id === existing.id
+            ? { ...existing, files: existing.files.includes(selected) ? existing.files : [...existing.files, selected], selected }
+            : tab,
+        ),
+      }));
+      get().activate(existing.id);
+      return existing.id;
     }
     const id = nextTabId();
-    set(state => ({ tabs: [...state.tabs, { id, kind: 'editor', title: t('File editor'), files: [file], selected: file }] }));
-    get().activate(id); return id;
+    set((state) => ({ tabs: [...state.tabs, { id, kind: 'editor', title: t('File editor'), files: [file], selected: file }] }));
+    get().activate(id);
+    return id;
   },
   replaceEditorFile: (file, target) => {
     const key = editorFileKey(file);
-    set(state => ({ tabs: state.tabs.map(tab => tab.kind === 'editor' ? { ...tab,
-      files: tab.files.map(item => editorFileKey(item) === key ? target : item),
-      selected: editorFileKey(tab.selected) === key ? target : tab.selected,
-    } : tab) }));
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.kind === 'editor'
+          ? {
+              ...tab,
+              files: tab.files.map((item) => (editorFileKey(item) === key ? target : item)),
+              selected: editorFileKey(tab.selected) === key ? target : tab.selected,
+            }
+          : tab,
+      ),
+    }));
   },
   closeEditorFile: (file, force = false) => {
     if (!force && interceptEditorClose([file], () => get().closeEditorFile(file, true))) return;
     const key = editorFileKey(file);
-    const page = get().tabs.find(tab => tab.kind === 'editor' && tab.files.some(item => editorFileKey(item) === key));
+    const page = get().tabs.find((tab) => tab.kind === 'editor' && tab.files.some((item) => editorFileKey(item) === key));
     if (page?.kind !== 'editor') return;
-    const index = page.files.findIndex(item => editorFileKey(item) === key);
-    const files = page.files.filter(item => editorFileKey(item) !== key);
-    if (!files.length) { get().closeTab(page.id, true); return; }
-    set(state => ({ tabs: state.tabs.map(tab => tab.id === page.id ? { ...page, files, selected: editorFileKey(page.selected) === key ? files[Math.min(index, files.length - 1)]! : page.selected } : tab),
-      lastClosed: { ...page, files: [file], selected: file } }));
+    const index = page.files.findIndex((item) => editorFileKey(item) === key);
+    const files = page.files.filter((item) => editorFileKey(item) !== key);
+    if (!files.length) {
+      get().closeTab(page.id, true);
+      return;
+    }
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.id === page.id
+          ? { ...page, files, selected: editorFileKey(page.selected) === key ? files[Math.min(index, files.length - 1)]! : page.selected }
+          : tab,
+      ),
+      lastClosed: { ...page, files: [file], selected: file },
+    }));
   },
   moveEditorFile: (key, over, after) => {
     if (key === over) return;
-    set(state => ({ tabs: state.tabs.map(tab => {
-      if (tab.kind !== 'editor') return tab;
-      const item = tab.files.find(file => editorFileKey(file) === key);
-      if (!item || !tab.files.some(file => editorFileKey(file) === over)) return tab;
-      const files = tab.files.filter(file => editorFileKey(file) !== key);
-      files.splice(files.findIndex(file => editorFileKey(file) === over) + (after ? 1 : 0), 0, item);
-      return { ...tab, files };
-    }) }));
+    set((state) => ({
+      tabs: state.tabs.map((tab) => {
+        if (tab.kind !== 'editor') return tab;
+        const item = tab.files.find((file) => editorFileKey(file) === key);
+        if (!item || !tab.files.some((file) => editorFileKey(file) === over)) return tab;
+        const files = tab.files.filter((file) => editorFileKey(file) !== key);
+        files.splice(files.findIndex((file) => editorFileKey(file) === over) + (after ? 1 : 0), 0, item);
+        return { ...tab, files };
+      }),
+    }));
   },
   moveGitComparison: (id, over, after) => {
     if (id === over) return;
-    set(state => ({ tabs: state.tabs.map(tab => {
-      if (tab.kind !== 'git-diff' || !tab.comparisons) return tab;
-      const item = tab.comparisons.find(comparison => comparison.id === id);
-      if (!item || !tab.comparisons.some(comparison => comparison.id === over)) return tab;
-      const comparisons = tab.comparisons.filter(comparison => comparison.id !== id);
-      comparisons.splice(comparisons.findIndex(comparison => comparison.id === over) + (after ? 1 : 0), 0, item);
-      return { ...tab, comparisons };
-    }) }));
+    set((state) => ({
+      tabs: state.tabs.map((tab) => {
+        if (tab.kind !== 'git-diff' || !tab.comparisons) return tab;
+        const item = tab.comparisons.find((comparison) => comparison.id === id);
+        if (!item || !tab.comparisons.some((comparison) => comparison.id === over)) return tab;
+        const comparisons = tab.comparisons.filter((comparison) => comparison.id !== id);
+        comparisons.splice(comparisons.findIndex((comparison) => comparison.id === over) + (after ? 1 : 0), 0, item);
+        return { ...tab, comparisons };
+      }),
+    }));
   },
   configureEditorTabs: () => {
-    const state = get(); const pages = state.tabs.filter(tab => tab.kind === 'editor');
+    const state = get();
+    const pages = state.tabs.filter((tab) => tab.kind === 'editor');
     if (!pages.length || (pages.length === 1 && pages[0]!.title === t('File editor'))) return;
-    const selected = pages.find(tab => tab.id === state.activeId)?.selected ?? pages[0]!.selected;
-    const files = [...new Map(pages.flatMap(tab => tab.files).map(file => [editorFileKey(file), file])).values()];
+    const selected = pages.find((tab) => tab.id === state.activeId)?.selected ?? pages[0]!.selected;
+    const files = [...new Map(pages.flatMap((tab) => tab.files).map((file) => [editorFileKey(file), file])).values()];
     const page = { ...pages[0]!, files, selected, title: t('File editor') };
-    const owners = new Set(pages.map(tab => tab.id));
-    const retarget = (selection: GitSelection): GitSelection => selection.paneId && owners.has(selection.paneId)
-      ? { ...selection, paneId: page.id } : selection;
-    const retargetReview = (tab: Tab): Tab => tab.kind === 'git-diff' ? { ...tab, selection: retarget(tab.selection),
-      comparisons: tab.comparisons?.map(item => {
-        const selection = retarget(item.selection);
-        return selection === item.selection ? item : { ...item, selection };
-      }) } : tab;
-    set({ tabs: state.tabs.flatMap<Tab>(tab => tab.id === page.id ? [page] : tab.kind === 'editor' ? [] : [retargetReview(tab)]),
-      activeId: pages.some(tab => tab.id === state.activeId) ? page.id : state.activeId,
-      lastClosed: state.lastClosed ? retargetReview(state.lastClosed) : null });
+    const owners = new Set(pages.map((tab) => tab.id));
+    const retarget = (selection: GitSelection): GitSelection =>
+      selection.paneId && owners.has(selection.paneId) ? { ...selection, paneId: page.id } : selection;
+    const retargetReview = (tab: Tab): Tab =>
+      tab.kind === 'git-diff'
+        ? {
+            ...tab,
+            selection: retarget(tab.selection),
+            comparisons: tab.comparisons?.map((item) => {
+              const selection = retarget(item.selection);
+              return selection === item.selection ? item : { ...item, selection };
+            }),
+          }
+        : tab;
+    set({
+      tabs: state.tabs.flatMap<Tab>((tab) => (tab.id === page.id ? [page] : tab.kind === 'editor' ? [] : [retargetReview(tab)])),
+      activeId: pages.some((tab) => tab.id === state.activeId) ? page.id : state.activeId,
+      lastClosed: state.lastClosed ? retargetReview(state.lastClosed) : null,
+    });
   },
   openGitDiff: (selection) => {
     get().configureGitDiffTabs();
-    const singleton = get().tabs.find(tab => tab.kind === 'git-diff' && tab.comparisons);
+    const singleton = get().tabs.find((tab) => tab.kind === 'git-diff' && tab.comparisons);
     if (singleton?.kind === 'git-diff' && singleton.comparisons) {
-      const existing = singleton.comparisons.find(item => gitComparisonKey(item.selection) === gitComparisonKey(selection));
+      const existing = singleton.comparisons.find((item) => gitComparisonKey(item.selection) === gitComparisonKey(selection));
       const comparisons = existing ? singleton.comparisons : [...singleton.comparisons, { id: nextTabId(), selection }];
-      set(state => ({ tabs: state.tabs.map(tab => tab.id === singleton.id ? { ...singleton, selection: existing?.selection ?? selection, comparisons } : tab) }));
+      set((state) => ({
+        tabs: state.tabs.map((tab) =>
+          tab.id === singleton.id ? { ...singleton, selection: existing?.selection ?? selection, comparisons } : tab,
+        ),
+      }));
       get().activate(singleton.id);
       return singleton.id;
     }
     const id = nextTabId();
-    set(state => ({ tabs: [...state.tabs, { id, title: t('File comparisons'), kind: 'git-diff', selection,
-      comparisons: [{ id, selection }] }], activeId: id }));
+    set((state) => ({
+      tabs: [...state.tabs, { id, title: t('File comparisons'), kind: 'git-diff', selection, comparisons: [{ id, selection }] }],
+      activeId: id,
+    }));
     return id;
   },
-  activateGitComparison: id => {
-    const page = get().tabs.find(tab => tab.kind === 'git-diff' && tab.comparisons?.some(item => item.id === id));
-    if (page?.kind !== 'git-diff') { get().activate(id); return; }
-    const selection = page.comparisons!.find(item => item.id === id)!.selection;
-    set(state => ({ tabs: state.tabs.map(tab => tab.id === page.id ? { ...page, selection } : tab) }));
+  activateGitComparison: (id) => {
+    const page = get().tabs.find((tab) => tab.kind === 'git-diff' && tab.comparisons?.some((item) => item.id === id));
+    if (page?.kind !== 'git-diff') {
+      get().activate(id);
+      return;
+    }
+    const selection = page.comparisons!.find((item) => item.id === id)!.selection;
+    set((state) => ({ tabs: state.tabs.map((tab) => (tab.id === page.id ? { ...page, selection } : tab)) }));
     get().activate(page.id);
   },
-  closeGitComparison: id => {
-    const page = get().tabs.find(tab => tab.kind === 'git-diff' && tab.comparisons?.some(item => item.id === id));
-    if (page?.kind !== 'git-diff' || !page.comparisons) { get().closeTab(id); return; }
-    const index = page.comparisons.findIndex(item => item.id === id);
+  closeGitComparison: (id) => {
+    const page = get().tabs.find((tab) => tab.kind === 'git-diff' && tab.comparisons?.some((item) => item.id === id));
+    if (page?.kind !== 'git-diff' || !page.comparisons) {
+      get().closeTab(id);
+      return;
+    }
+    const index = page.comparisons.findIndex((item) => item.id === id);
     const closed = page.comparisons[index]!;
-    const comparisons = page.comparisons.filter(item => item.id !== id);
-    if (!comparisons.length) { get().closeTab(page.id); return; }
-    const selection = gitComparisonKey(page.selection) === gitComparisonKey(closed.selection)
-      ? comparisons[Math.min(index, comparisons.length - 1)]!.selection : page.selection;
-    set(state => ({ tabs: state.tabs.map(tab => tab.id === page.id ? { ...page, comparisons, selection } : tab),
-      lastClosed: { ...page, id: closed.id, selection: closed.selection, comparisons: undefined } }));
+    const comparisons = page.comparisons.filter((item) => item.id !== id);
+    if (!comparisons.length) {
+      get().closeTab(page.id);
+      return;
+    }
+    const selection =
+      gitComparisonKey(page.selection) === gitComparisonKey(closed.selection)
+        ? comparisons[Math.min(index, comparisons.length - 1)]!.selection
+        : page.selection;
+    set((state) => ({
+      tabs: state.tabs.map((tab) => (tab.id === page.id ? { ...page, comparisons, selection } : tab)),
+      lastClosed: { ...page, id: closed.id, selection: closed.selection, comparisons: undefined },
+    }));
   },
   configureGitDiffTabs: () => {
     const state = get();
-    const pages = state.tabs.filter(tab => tab.kind === 'git-diff');
+    const pages = state.tabs.filter((tab) => tab.kind === 'git-diff');
     if (!pages.length || (pages.length === 1 && !!pages[0]!.comparisons)) return;
-    const comparisons = [...new Map(pages.flatMap(tab => tab.comparisons ?? [{ id: tab.id, selection: tab.selection }])
-      .map(item => [gitComparisonKey(item.selection), item])).values()];
-    const selectedPage = pages.find(tab => tab.id === state.activeId) ?? pages[0]!;
-    const selected = comparisons.find(item => gitComparisonKey(item.selection) === gitComparisonKey(selectedPage.selection))!;
+    const comparisons = [
+      ...new Map(
+        pages
+          .flatMap((tab) => tab.comparisons ?? [{ id: tab.id, selection: tab.selection }])
+          .map((item) => [gitComparisonKey(item.selection), item]),
+      ).values(),
+    ];
+    const selectedPage = pages.find((tab) => tab.id === state.activeId) ?? pages[0]!;
+    const selected = comparisons.find((item) => gitComparisonKey(item.selection) === gitComparisonKey(selectedPage.selection))!;
     const replacements: Tab[] = [{ ...pages[0]!, title: t('File comparisons'), comparisons, selection: selected.selection }];
     const firstId = pages[0]!.id;
-    set({ tabs: state.tabs.flatMap(tab => tab.id === firstId ? replacements : tab.kind === 'git-diff' ? [] : [tab]),
-      activeId: pages.some(tab => tab.id === state.activeId) ? firstId : state.activeId });
+    set({
+      tabs: state.tabs.flatMap((tab) => (tab.id === firstId ? replacements : tab.kind === 'git-diff' ? [] : [tab])),
+      activeId: pages.some((tab) => tab.id === state.activeId) ? firstId : state.activeId,
+    });
   },
   openSettings: () => {
     useUiStore.getState().setSettingsOpen(true);
@@ -469,14 +566,23 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const idx = tabs.findIndex((t) => t.id === id);
     if (idx === -1) return;
     const closed = tabs[idx]!;
-    if (closed.kind === 'harness' && !force && interceptHarnessClose(useHarnessWorkspace.getState().connections.map(item => item.id), () => get().closeTab(id, true))) {
+    if (
+      closed.kind === 'harness' &&
+      !force &&
+      interceptHarnessClose(
+        useHarnessWorkspace.getState().connections.map((item) => item.id),
+        () => get().closeTab(id, true),
+      )
+    ) {
       get().activate(id);
       return;
     }
     if (closed.kind === 'editor' && !force && interceptEditorClose(closed.files, () => get().closeTab(id, true))) return;
     const next = tabs.filter((t) => t.id !== id);
-    const neighbor = [...tabs.slice(0, idx).reverse(), ...tabs.slice(idx + 1)].find(tab => workspaceAreaForKind(tab.kind) === workspaceAreaForKind(closed.kind));
-    const nextActiveId = activeId === id ? neighbor?.id ?? '' : activeId;
+    const neighbor = [...tabs.slice(0, idx).reverse(), ...tabs.slice(idx + 1)].find(
+      (tab) => workspaceAreaForKind(tab.kind) === workspaceAreaForKind(closed.kind),
+    );
+    const nextActiveId = activeId === id ? (neighbor?.id ?? '') : activeId;
     // System pages are singletons that never enter the reopen history.
     const reopenable = closed.kind !== 'history' && closed.kind !== 'ai-history' && closed.kind !== 'usage' && !isStartTab(closed);
     set({
@@ -503,19 +609,23 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     }
     // Workspace pages have no backend session to archive.
     if (isSessionTab(closed)) {
-      const retry = () => { void sessionManager.close(id).catch(error => reportWorkbenchFailure(error, retry)); };
+      const retry = () => {
+        void sessionManager.close(id).catch((error) => reportWorkbenchFailure(error, retry));
+      };
       retry();
     }
-    if (closed.kind === 'harness') useHarnessWorkspace.getState().close(useHarnessWorkspace.getState().connections.map(item => item.id));
+    if (closed.kind === 'harness') useHarnessWorkspace.getState().close(useHarnessWorkspace.getState().connections.map((item) => item.id));
     // Historical members still belong to their original group after its last tab closes.
     get().ensureStartPages();
     get().pruneEmptyGroups();
   },
   undoCloseTab: () => {
     if (useWorkbenchStore.getState().lastClosed) {
-      void import('../services/workbench').then(module => module.undoCloseContainer()).catch(error => {
-        useToastStore.getState().addToast(t('Could not restore workspace: {{error}}', { error: String(error) }), 'error');
-      });
+      void import('../services/workbench')
+        .then((module) => module.undoCloseContainer())
+        .catch((error) => {
+          useToastStore.getState().addToast(t('Could not restore workspace: {{error}}', { error: String(error) }), 'error');
+        });
       return;
     }
     const closed = get().lastClosed;
@@ -532,12 +642,15 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       get().openEditorFile(closed.selected);
     } else {
       // Keep a failed undo available for retry and report success only after restoration.
-      void sessionManager.restore(closed.id, closed.title).then(() => {
-        useToastStore.getState().addToast(t('toast.tabRestored'), 'success');
-      }).catch((error: unknown) => {
-        set(state => ({ lastClosed: state.lastClosed ?? closed }));
-        useToastStore.getState().addToast(t('Could not restore session: {{error}}', { error: String(error) }), 'error');
-      });
+      void sessionManager
+        .restore(closed.id, closed.title)
+        .then(() => {
+          useToastStore.getState().addToast(t('toast.tabRestored'), 'success');
+        })
+        .catch((error: unknown) => {
+          set((state) => ({ lastClosed: state.lastClosed ?? closed }));
+          useToastStore.getState().addToast(t('Could not restore session: {{error}}', { error: String(error) }), 'error');
+        });
       return;
     }
     useToastStore.getState().addToast(t('toast.tabRestored'), 'success');
@@ -545,8 +658,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   activate: (id) => {
     const prev = get().activeId;
-    const previous = get().tabs.find(tab => tab.id === prev);
-    const focused = previous && isSessionTab(previous) ? findLeaf(previous.layout, useTerminalStore.getState().focusedPaneId ?? '') ?? firstLeaf(previous.layout) : null;
+    const previous = get().tabs.find((tab) => tab.id === prev);
+    const focused =
+      previous && isSessionTab(previous)
+        ? (findLeaf(previous.layout, useTerminalStore.getState().focusedPaneId ?? '') ?? firstLeaf(previous.layout))
+        : null;
     if (focused?.kind === 'local') set({ lastLocalPaneId: focused.id });
     useUiStore.getState().setSettingsOpen(false);
     set({ activeId: id });
@@ -560,7 +676,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       }
     }
     const terminal = useTerminalStore.getState();
-    const pane = tab && isSessionTab(tab) ? layoutLeaves(tab.layout).find(item => terminal.manualFullscreen[item.id]) ?? firstLeaf(tab.layout) : null;
+    const pane =
+      tab && isSessionTab(tab)
+        ? (layoutLeaves(tab.layout).find((item) => terminal.manualFullscreen[item.id]) ?? firstLeaf(tab.layout))
+        : null;
     terminal.setFocusedPane(pane?.id ?? id);
     get().ensureStartPages();
   },
@@ -569,7 +688,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     const currentArea = useWorkspaceNavigation.getState().area;
     const ai = useAiWorkspace.getState();
     const sideIds = new Set([...ai.sideSessions, ai.sideSelected]);
-    const conversations = new Set(useChatStore.getState().conversations.map(conversation => conversation.id));
+    const conversations = new Set(useChatStore.getState().conversations.map((conversation) => conversation.id));
     // Conversations and ACP sessions live in the AI stores, so they count as strip entries too.
     const connections = useHarnessWorkspace.getState().connections;
     const startKinds = { terminal: 'start', code: 'start-code', ai: 'start-ai' } as const;
@@ -578,26 +697,28 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     let changed = false;
     for (const area of ['terminal', 'code', 'ai'] as const) {
       const kind = startKinds[area];
-      const start = tabs.find(tab => isStartTab(tab) && tab.kind === kind);
+      const start = tabs.find((tab) => isStartTab(tab) && tab.kind === kind);
       // Inactive areas are seeded when they become active; stale placeholders are always cleaned.
       if (area !== currentArea && !start) continue;
-      const work = area === 'ai'
-        ? ai.nativeTabs.filter(id => conversations.has(id) && !sideIds.has(`chat:${id}`)).length
-          + connections.filter(connection => !sideIds.has(`acp:${connection.id}`)).length
-          + tabs.filter(tab => tab.kind === 'ai-history' || tab.kind === 'usage').length
-        : tabs.filter(tab => workspaceAreaForKind(tab.kind) === area && !isStartTab(tab)).length;
+      const work =
+        area === 'ai'
+          ? ai.nativeTabs.filter((id) => conversations.has(id) && !sideIds.has(`chat:${id}`)).length +
+            connections.filter((connection) => !sideIds.has(`acp:${connection.id}`)).length +
+            tabs.filter((tab) => tab.kind === 'ai-history' || tab.kind === 'usage').length
+          : tabs.filter((tab) => workspaceAreaForKind(tab.kind) === area && !isStartTab(tab)).length;
       if (!work && !start) {
         const id = nextTabId();
         tabs = [...tabs, { id, title: START_TITLE, kind, titleSource: 'manual' }];
         changed = true;
         if (currentArea === area) activeId = id;
       } else if (work && start) {
-        tabs = tabs.filter(tab => tab.id !== start.id);
+        tabs = tabs.filter((tab) => tab.id !== start.id);
         changed = true;
         if (activeId === start.id) {
-          activeId = area === 'ai'
-            ? tabs.find(tab => tab.kind === 'harness')?.id ?? ''
-            : tabs.find(tab => workspaceAreaForKind(tab.kind) === area && !isStartTab(tab))?.id ?? '';
+          activeId =
+            area === 'ai'
+              ? (tabs.find((tab) => tab.kind === 'harness')?.id ?? '')
+              : (tabs.find((tab) => workspaceAreaForKind(tab.kind) === area && !isStartTab(tab))?.id ?? '');
         }
       } else if (!work && start && currentArea === area && activeId !== start.id) {
         // Empty areas select their existing placeholder even when focus belongs to another area.
@@ -644,7 +765,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       tabs: s.tabs.map((t) => (t.id === id ? { ...t, title: title || defaultTitle(), titleSource: 'manual' } : t)),
     }));
     if (title) useToastStore.getState().addToast(t('toast.renamed', { title }), 'success');
-    if (get().tabs.find(tab => tab.id === id)?.kind === 'session') sessionManager.rename(id, title);
+    if (get().tabs.find((tab) => tab.id === id)?.kind === 'session') sessionManager.rename(id, title);
   },
   setTerminalCwd: (terminalId, cwd) => {
     set((s) => ({ terminalCwds: { ...s.terminalCwds, [terminalId]: cwd } }));
@@ -653,7 +774,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
 
     const terminal = findLeaf(owner.layout, terminalId)!;
     const layout = replaceLeaf(owner.layout, terminalId, { ...terminal, cwd });
-    set((s) => ({ tabs: s.tabs.map((tab) => tab.id === owner.id && isSessionTab(tab) ? { ...tab, layout } : tab) }));
+    set((s) => ({ tabs: s.tabs.map((tab) => (tab.id === owner.id && isSessionTab(tab) ? { ...tab, layout } : tab)) }));
     sessionManager.saveLayout(owner.id, layout);
     if (firstLeaf(layout).id === terminalId) void sessionManager.setCwd(owner.id, cwd);
   },
@@ -686,27 +807,35 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   detachTerminalPane: (paneId) => {
     const { tabs } = get();
-    const owner = tabs.find((tab): tab is Extract<Tab, { kind: 'session' }> =>
-      isSessionTab(tab) && layoutLeaves(tab.layout).some(terminal => terminal.id === paneId));
+    const owner = tabs.find(
+      (tab): tab is Extract<Tab, { kind: 'session' }> =>
+        isSessionTab(tab) && layoutLeaves(tab.layout).some((terminal) => terminal.id === paneId),
+    );
     if (!owner || countLeaves(owner.layout) < 2) return;
     const id = nextTabId();
-    const snapshot = putContainer(useWorkbenchStore.getState().snapshot, { id: owner.id, scope: 'terminal', layout: terminalWorkspaceLayout(owner.layout), focused: paneId, groupId: owner.groupId });
+    const snapshot = putContainer(useWorkbenchStore.getState().snapshot, {
+      id: owner.id,
+      scope: 'terminal',
+      layout: terminalWorkspaceLayout(owner.layout),
+      focused: paneId,
+      groupId: owner.groupId,
+    });
     const detached = detachContainerPane(snapshot, owner.id, paneId, id);
     const specs = layoutLeaves(owner.layout);
-    const layout = terminalResourceLayout(detached.tabs.find(tab => tab.id === owner.id)!.layout, specs)!;
-    const moved = terminalResourceLayout(detached.tabs.find(tab => tab.id === id)!.layout, specs)!;
+    const layout = terminalResourceLayout(detached.tabs.find((tab) => tab.id === owner.id)!.layout, specs)!;
+    const moved = terminalResourceLayout(detached.tabs.find((tab) => tab.id === id)!.layout, specs)!;
     const created: Tab = { id, title: owner.title, kind: 'session', groupId: owner.groupId, layout: moved };
     set((s) => {
-      const tabs = s.tabs.flatMap(tab => tab.id === owner.id
-        ? [{ ...owner, layout }, created]
-        : [tab]);
+      const tabs = s.tabs.flatMap((tab) => (tab.id === owner.id ? [{ ...owner, layout }, created] : [tab]));
       return { tabs, activeId: id };
     });
     useWorkbenchStore.getState().update(() => detached);
     sessionManager.saveLayout(owner.id, layout);
     const payload = serializeSession(created);
     if (payload) sessionManager.create(id, created.title, undefined, payload.kind, payload.payload);
-    const transfer = () => { void sessionManager.transferPanes(owner.id, id, [paneId]).catch(error => reportWorkbenchFailure(error, transfer)); };
+    const transfer = () => {
+      void sessionManager.transferPanes(owner.id, id, [paneId]).catch((error) => reportWorkbenchFailure(error, transfer));
+    };
     transfer();
     useTerminalStore.getState().setFocusedPane(paneId);
   },
@@ -723,8 +852,11 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     if (!src) return;
     const newId = nextTerminalId(tab.id, tab.layout);
     const spec: TerminalSpec = {
-      id: newId, kind: src.kind, shellType: src.shellType,
-      ssh: src.ssh ? { ...src.ssh } : undefined, cwd: src.cwd,
+      id: newId,
+      kind: src.kind,
+      shellType: src.shellType,
+      ssh: src.ssh ? { ...src.ssh } : undefined,
+      cwd: src.cwd,
       // Inherit the source mode; a source without one falls back to classic for SSH and to the
       // shell default for local terminals.
       openMode: src.openMode ?? (src.kind === 'ssh' ? 'classic' : defaultOpenModeForShell(src.shellType)),
@@ -735,7 +867,7 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
   },
   closeTerminal: (terminalId) => {
     const ws = get();
-    const tab = ws.tabs.find(tab => isSessionTab(tab) && layoutLeaves(tab.layout).some(terminal => terminal.id === terminalId));
+    const tab = ws.tabs.find((tab) => isSessionTab(tab) && layoutLeaves(tab.layout).some((terminal) => terminal.id === terminalId));
     if (!tab || !isSessionTab(tab)) return;
     if (!layoutLeaves(tab.layout).some((t) => t.id === terminalId)) return;
     if (countLeaves(tab.layout) <= 1) {
@@ -765,7 +897,10 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
       set({
         // Load only unarchived groups with active sessions; empty groups stay out of the strip.
         groups: list
-          .filter((g: BackendGroupEntry) => !g.archived && g.session_count > 0 && (!g.id.startsWith('group:') || g.id.startsWith('group:terminal:')))
+          .filter(
+            (g: BackendGroupEntry) =>
+              !g.archived && g.session_count > 0 && (!g.id.startsWith('group:') || g.id.startsWith('group:terminal:')),
+          )
           .map((g: BackendGroupEntry) => ({ id: g.id, title: g.title, collapsed: g.collapsed })),
       });
     } catch {
@@ -792,31 +927,31 @@ export const useWorkspaceStore = create<WorkspaceState>((set, get) => ({
     set((s) => ({ tabs: [...s.tabs, newTab], activeId: newId }));
     const ser = serializeSession(newTab)!;
     sessionManager.create(newId, newTab.title, undefined, ser.kind, ser.payload);
-    if (newTab.groupId) sessionSetGroup(newId, newTab.groupId).catch((e) =>
-      console.warn('[workspace] failed to persist the group of a duplicated tab:', e),
-    );
+    if (newTab.groupId)
+      sessionSetGroup(newId, newTab.groupId).catch((e) => console.warn('[workspace] failed to persist the group of a duplicated tab:', e));
     useTerminalStore.getState().setFocusedPane(firstLeaf(layout).id);
   },
 
   pruneEmptyGroups: () => {
     const { groups, tabs } = get();
-    const emptyIds = groups
-      .filter((g) => !tabs.some((t) => isSessionTab(t) && t.groupId === g.id))
-      .map((g) => g.id);
+    const emptyIds = groups.filter((g) => !tabs.some((t) => isSessionTab(t) && t.groupId === g.id)).map((g) => g.id);
     if (emptyIds.length === 0) return;
     set((s) => ({ groups: s.groups.filter((g) => !emptyIds.includes(g.id)) }));
-    const removed: WorkspaceGroup[] = groups.filter(group => emptyIds.includes(group.id)).map(group => ({ ...group, scope: 'terminal' }));
+    const removed: WorkspaceGroup[] = groups
+      .filter((group) => emptyIds.includes(group.id))
+      .map((group) => ({ ...group, scope: 'terminal' }));
     const retry = () => {
-      void import('../services/workbench').then(module => module.pruneEmptyWorkspaceGroups(removed)).catch(error => reportWorkbenchFailure(error, retry));
+      void import('../services/workbench')
+        .then((module) => module.pruneEmptyWorkspaceGroups(removed))
+        .catch((error) => reportWorkbenchFailure(error, retry));
     };
     retry();
   },
-
 }));
 
 useWorkspaceStore.subscribe((state, previous) => {
   if (state.activeId === previous.activeId) return;
-  const tab = state.tabs.find(item => item.id === state.activeId);
+  const tab = state.tabs.find((item) => item.id === state.activeId);
   if (!tab) return;
   const area = workspaceAreaForKind(tab.kind);
   // Mixed panes activate native owners without replacing the native workspace's reading tab.
@@ -825,6 +960,8 @@ useWorkspaceStore.subscribe((state, previous) => {
     useWorkspaceNavigation.getState().rememberTab(area, tab.id);
   }
   const terminal = useTerminalStore.getState();
-  const pane = isSessionTab(tab) ? layoutLeaves(tab.layout).find(item => terminal.manualFullscreen[item.id]) ?? firstLeaf(tab.layout) : null;
+  const pane = isSessionTab(tab)
+    ? (layoutLeaves(tab.layout).find((item) => terminal.manualFullscreen[item.id]) ?? firstLeaf(tab.layout))
+    : null;
   terminal.setFocusedPane(pane?.id ?? tab.id);
 });

@@ -6,7 +6,10 @@ describe('toast store', () => {
     useToastStore.setState({ toasts: [], timers: {}, background: false });
     vi.useFakeTimers();
   });
-  afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
 
   it('adds and auto-removes toast after duration (leaving → remove)', () => {
     useToastStore.getState().addToast('测试消息');
@@ -66,7 +69,7 @@ describe('toast store', () => {
   it('uses semantic timeouts and gives longer messages bounded reading time', () => {
     for (const type of ['success', 'info', 'warning', 'error'] as const) useToastStore.getState().addToast('Message', type);
     useToastStore.getState().addToast('Long message '.repeat(50));
-    expect(useToastStore.getState().toasts.map(item => item.duration)).toEqual([3000, 4000, 6000, 8000, 12000]);
+    expect(useToastStore.getState().toasts.map((item) => item.duration)).toEqual([3000, 4000, 6000, 8000, 12000]);
   });
 
   it('retains elapsed reading time across overlapping pointer and keyboard pauses', () => {
@@ -97,7 +100,7 @@ describe('toast store', () => {
     expect(useToastStore.getState().toasts).toHaveLength(2);
     useToastStore.getState().setBackground(false);
     vi.advanceTimersByTime(950);
-    expect(useToastStore.getState().toasts.map(item => item.message)).toEqual(['Second']);
+    expect(useToastStore.getState().toasts.map((item) => item.message)).toEqual(['Second']);
     vi.advanceTimersByTime(250);
     expect(useToastStore.getState().toasts).toHaveLength(0);
   });

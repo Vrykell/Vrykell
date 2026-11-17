@@ -60,7 +60,10 @@ describe('recordTurn', () => {
   it('appends in order and drops the oldest record past the cap', () => {
     for (let i = 0; i < MAX_USAGE_RECORDS + 3; i += 1) {
       useUsageStore.getState().recordTurn({
-        provider: 'openai-compatible', model: 'gpt-4o-mini', inputTokens: 10, at: i,
+        provider: 'openai-compatible',
+        model: 'gpt-4o-mini',
+        inputTokens: 10,
+        at: i,
       });
     }
     const records = useUsageStore.getState().records;
@@ -82,7 +85,15 @@ describe('clear', () => {
 describe('persistence', () => {
   it('restores token records and protocol totals from saved storage', async () => {
     const usage = useUsageStore.getState();
-    usage.recordTurn({ provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 123, outputTokens: 45, cachedInputTokens: 12, steps: 2, toolCalls: 3 });
+    usage.recordTurn({
+      provider: 'anthropic',
+      model: 'claude-sonnet-4',
+      inputTokens: 123,
+      outputTokens: 45,
+      cachedInputTokens: 12,
+      steps: 2,
+      toolCalls: 3,
+    });
     usage.acpUsage('Saved agent', { used: 12000, size: 200000, cost: 0.0042, currency: 'USD' });
     usage.acpTurn('Saved agent');
     usage.acpToolCall('Saved agent');
@@ -111,23 +122,38 @@ describe('source', () => {
   it('records this app unless the caller names a harness', () => {
     useUsageStore.getState().recordTurn({ provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 10 });
     useUsageStore.getState().recordTurn({
-      source: 'opencode', provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 10,
+      source: 'opencode',
+      provider: 'anthropic',
+      model: 'claude-sonnet-4',
+      inputTokens: 10,
     });
-    expect(useUsageStore.getState().records.map((record) => record.source))
-      .toEqual([DEFAULT_USAGE_SOURCE, 'opencode']);
+    expect(useUsageStore.getState().records.map((record) => record.source)).toEqual([DEFAULT_USAGE_SOURCE, 'opencode']);
   });
 
   it('reads rows written before the source field existed as this app', async () => {
     // Payloads written by older versions have no source: merging fills in this app's source instead of filing them under an unknown source
-    localStorage.setItem('vrykell-usage', JSON.stringify({
-      version: 2,
-      state: {
-        records: [{
-          id: 'old', at: 1, provider: 'anthropic', model: 'claude-sonnet-4', inputTokens: 10, outputTokens: 1,
-          cachedInputTokens: 0, reasoningTokens: 0, steps: 1, toolCalls: 0,
-        }],
-      },
-    }));
+    localStorage.setItem(
+      'vrykell-usage',
+      JSON.stringify({
+        version: 2,
+        state: {
+          records: [
+            {
+              id: 'old',
+              at: 1,
+              provider: 'anthropic',
+              model: 'claude-sonnet-4',
+              inputTokens: 10,
+              outputTokens: 1,
+              cachedInputTokens: 0,
+              reasoningTokens: 0,
+              steps: 1,
+              toolCalls: 0,
+            },
+          ],
+        },
+      }),
+    );
     await useUsageStore.persist.rehydrate();
     expect(useUsageStore.getState().records[0]!.source).toBe(DEFAULT_USAGE_SOURCE);
   });

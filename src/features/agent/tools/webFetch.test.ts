@@ -61,7 +61,11 @@ describe('web_fetch tool', () => {
   it('full response: title/source/body/truncation marker/in-page links (capped at 10)', async () => {
     const links = Array.from({ length: 15 }, (_, i) => ({ text: `L${i}`, url: `https://l/${i}` }));
     invokeMock.mockResolvedValue({
-      title: '文档', url: 'https://doc', text: '正文', truncated: true, links,
+      title: '文档',
+      url: 'https://doc',
+      text: '正文',
+      truncated: true,
+      links,
     });
     const r = (await execOf(buildWebFetchTool(CTX))({ url: 'https://doc' })) as string;
     expect(invokeMock).toHaveBeenCalledWith('web_fetch', { url: 'https://doc' });
@@ -94,7 +98,10 @@ describe('web_crawl tool', () => {
     });
     const r = (await execOf(buildWebCrawlTool(CTX))({ start_url: 'https://s' })) as string;
     expect(invokeMock).toHaveBeenCalledWith('web_crawl', {
-      startUrl: 'https://s', maxPages: null, maxDepth: null, sameDomain: true,
+      startUrl: 'https://s',
+      maxPages: null,
+      maxDepth: null,
+      sameDomain: true,
     });
     expect(r).toContain('[1/2] 标题：首页');
     expect(r).toContain('URL：https://s/p2');
@@ -108,7 +115,10 @@ describe('web_crawl tool', () => {
     invokeMock.mockResolvedValueOnce({ pages: [{ title: 'p' }] });
     await execOf(buildWebCrawlTool(CTX))({ start_url: 'https://s', max_pages: 3, max_depth: 1, same_domain: false });
     expect(invokeMock).toHaveBeenLastCalledWith('web_crawl', {
-      startUrl: 'https://s', maxPages: 3, maxDepth: 1, sameDomain: false,
+      startUrl: 'https://s',
+      maxPages: 3,
+      maxDepth: 1,
+      sameDomain: false,
     });
     invokeMock.mockRejectedValueOnce(new Error('SSRF 拦截'));
     const fail = await execOf(buildWebCrawlTool(CTX))({ start_url: 'https://s' });

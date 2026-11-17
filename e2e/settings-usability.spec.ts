@@ -23,9 +23,9 @@ test('saved custom Anthropic address is used by the next chat request', async ({
   await page.locator('[data-chat-composer]:visible').fill('验证地址');
   await page.locator('[data-chat-composer]:visible').press('Enter');
   await expect(page.getByText('地址设置已生效', { exact: true }).first()).toBeVisible();
-  const calls = (await searchCalls(page)).slice(previousCalls).filter(call => call.cmd === 'llm_stream');
+  const calls = (await searchCalls(page)).slice(previousCalls).filter((call) => call.cmd === 'llm_stream');
   expect(calls.length).toBeGreaterThan(0);
-  expect(calls.map(call => call.args.url)).toEqual(calls.map(() => 'https://gateway.example/v1/messages'));
+  expect(calls.map((call) => call.args.url)).toEqual(calls.map(() => 'https://gateway.example/v1/messages'));
 });
 
 test('typography settings apply globally and are absent from other settings pages', async ({ page }) => {
@@ -122,11 +122,15 @@ test('chat mode dropdown persists per model and replaces the two header toggles'
 test('CMD stored in legacy block mode opens an interactive classic terminal', async ({ page }) => {
   await setupTauriMock(page, { integration: false });
   await page.addInitScript(() => {
-    const bridge = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__;
+    const bridge = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } })
+      .__TAURI_INTERNALS__;
     const original = bridge.invoke;
-    bridge.invoke = (command, args) => command === 'list_shells'
-      ? Promise.resolve([{ id: 'cmd', label: 'CMD', default: true }]) : original(command, args);
-    localStorage.setItem('vrykell-agent-settings', JSON.stringify({ version: 8, state: { global: { openModeByShell: { cmd: 'block' } }, overrides: {} } }));
+    bridge.invoke = (command, args) =>
+      command === 'list_shells' ? Promise.resolve([{ id: 'cmd', label: 'CMD', default: true }]) : original(command, args);
+    localStorage.setItem(
+      'vrykell-agent-settings',
+      JSON.stringify({ version: 8, state: { global: { openModeByShell: { cmd: 'block' } }, overrides: {} } }),
+    );
   });
   await page.goto('/');
   await page.getByTestId('tab-new-btn').click();
@@ -139,5 +143,5 @@ test('CMD stored in legacy block mode opens an interactive classic terminal', as
   await input.press('Enter');
   expect(await ptyWrites(page)).toContain('a');
   const spawns = await page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: { shell: string; openMode: string }[] }).__PTY_SPAWNS__);
-  expect(spawns.some(spawn => spawn.shell === 'cmd' && spawn.openMode === 'classic')).toBe(true);
+  expect(spawns.some((spawn) => spawn.shell === 'cmd' && spawn.openMode === 'classic')).toBe(true);
 });

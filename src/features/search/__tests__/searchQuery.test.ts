@@ -17,9 +17,14 @@ describe('search query scopes', () => {
     expect(canSearchQuery('  ')).toBe(false);
   });
   it.each([
-    ['> reload', 'action', 'reload'], ['@字号', 'setting', '字号'], ['/config', 'file', 'config'],
-    ['!npm', 'history', 'npm'], ['#error', 'block', 'error'], ['%server', 'session', 'server'],
-    [' FILE: readme', 'file', 'readme'], ['setting:font', 'setting', 'font'],
+    ['> reload', 'action', 'reload'],
+    ['@字号', 'setting', '字号'],
+    ['/config', 'file', 'config'],
+    ['!npm', 'history', 'npm'],
+    ['#error', 'block', 'error'],
+    ['%server', 'session', 'server'],
+    [' FILE: readme', 'file', 'readme'],
+    ['setting:font', 'setting', 'font'],
   ])('parses %s without passing the operator to the source', (input, source, term) => {
     expect(parseSearchQuery(input)).toMatchObject({ source, term });
   });

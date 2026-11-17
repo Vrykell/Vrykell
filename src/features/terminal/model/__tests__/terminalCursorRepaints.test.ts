@@ -8,31 +8,45 @@ const cleanups: Array<() => void> = [];
 
 function setup() {
   const term = new Terminal({ cols: 20, rows: 3, cursorBlink: false });
-  const core = (term as unknown as {
-    _core: { coreService: { isCursorHidden: boolean }; _renderService?: unknown };
-  })._core;
+  const core = (
+    term as unknown as {
+      _core: { coreService: { isCursorHidden: boolean }; _renderService?: unknown };
+    }
+  )._core;
   const frames: boolean[] = [];
-  const render = vi.fn(() => { frames.push(core.coreService.isCursorHidden); });
-  const service = { _renderRows: (_start: number, _end: number) => { render(); },
-    refreshRows() {}, handleCursorMove() {} };
+  const render = vi.fn(() => {
+    frames.push(core.coreService.isCursorHidden);
+  });
+  const service = {
+    _renderRows: (_start: number, _end: number) => {
+      render();
+    },
+    refreshRows() {},
+    handleCursorMove() {},
+  };
   const original = service._renderRows;
   core._renderService = service;
   vi.spyOn(term, 'refresh').mockImplementation((start, end) => {
     void Promise.resolve().then(() => service._renderRows(start, end));
   });
   const dispose = smoothTerminalCursorRepaints(term, 'pane-test');
-  cleanups.push(() => { dispose(); term.dispose(); });
+  cleanups.push(() => {
+    dispose();
+    term.dispose();
+  });
   const write = async (data: string) => {
-    const parsed = new Promise<void>(resolve => term.write(data, resolve));
+    const parsed = new Promise<void>((resolve) => term.write(data, resolve));
     await vi.advanceTimersByTimeAsync(0);
     await parsed;
   };
   return { term, service, original, render, frames, dispose, write };
 }
 
-beforeEach(() => { vi.useFakeTimers(); });
+beforeEach(() => {
+  vi.useFakeTimers();
+});
 afterEach(() => {
-  cleanups.splice(0).forEach(cleanup => cleanup());
+  cleanups.splice(0).forEach((cleanup) => cleanup());
   vi.useRealTimers();
 });
 
@@ -40,7 +54,7 @@ describe('cursor repaint smoothing', () => {
   it('keeps a split echo repaint on screen until the cursor returns while mode queries stay accurate', async () => {
     const { term, service, render, frames, write } = setup();
     const replies: string[] = [];
-    term.onData(data => replies.push(data));
+    term.onData((data) => replies.push(data));
     await write('\x1b[?25ltyped');
     service._renderRows(1, 1);
     await vi.advanceTimersByTimeAsync(40);

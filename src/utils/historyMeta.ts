@@ -78,7 +78,10 @@ export function historySearchAnnotations(
   for (const group of groups) {
     const key = historyGroupKey(scope, groupBy, group.id);
     for (const id of group.recordIds) {
-      text.set(id, [group.title, meta.groupTitles[key], meta.groupNotes[key], meta.notes[historyRecordKey(scope, id)]].filter(Boolean).join(' '));
+      text.set(
+        id,
+        [group.title, meta.groupTitles[key], meta.groupNotes[key], meta.notes[historyRecordKey(scope, id)]].filter(Boolean).join(' '),
+      );
     }
   }
   return text;
@@ -115,7 +118,7 @@ function omitKeys<T>(values: Record<string, T>, keys: readonly string[]): Record
 }
 
 function flagRecord(value: unknown): Flags {
-  const source = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
   const next: Flags = {};
   for (const [key, entry] of Object.entries(source)) {
     if (entry === true) next[key] = true;
@@ -124,7 +127,7 @@ function flagRecord(value: unknown): Flags {
 }
 
 function stringRecord(value: unknown): Record<string, string> {
-  const source = value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
   const next: Record<string, string> = {};
   for (const [key, entry] of Object.entries(source)) {
     if (typeof entry === 'string' && entry.trim()) next[key] = entry;
@@ -134,7 +137,7 @@ function stringRecord(value: unknown): Record<string, string> {
 
 /** Corrupt or outdated payloads degrade to an empty annotation set instead of failing hydration. */
 function sanitize(raw: unknown): HistoryMetaState {
-  const source = raw && typeof raw === 'object' ? raw as Record<string, unknown> : {};
+  const source = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
   return {
     starred: flagRecord(source.starred),
     notes: stringRecord(source.notes),
@@ -147,43 +150,47 @@ function sanitize(raw: unknown): HistoryMetaState {
   };
 }
 
-export const useHistoryMetaStore = create<HistoryMetaStore>()(persist(
-  (set) => ({
-    starred: {},
-    notes: {},
-    pinnedGroups: {},
-    groupColors: {},
-    lockedRecords: {},
-    groupTitles: {},
-    groupNotes: {},
-    collapsedGroups: {},
-    toggleStar: (key) => set((state) => ({ starred: toggleFlag(state.starred, key) })),
-    setNote: (key, note) => set((state) => ({ notes: setString(state.notes, key, note) })),
-    togglePinnedGroup: (key) => set((state) => ({ pinnedGroups: toggleFlag(state.pinnedGroups, key) })),
-    setGroupColor: (key, color) => set((state) => ({ groupColors: setString(state.groupColors, key, color) })),
-    setStarred: (keys, value) => set(state => ({ starred: setFlags(state.starred, keys, value) })),
-    setLocked: (keys, value) => set(state => ({ lockedRecords: setFlags(state.lockedRecords, keys, value) })),
-    setGroupTitle: (key, value) => set(state => ({ groupTitles: setString(state.groupTitles, key, value) })),
-    setGroupNote: (key, value) => set(state => ({ groupNotes: setString(state.groupNotes, key, value) })),
-    setGroupsCollapsed: (keys, value) => set(state => ({ collapsedGroups: setFlags(state.collapsedGroups, keys, value) })),
-    removeRecords: keys => set(state => ({
-      starred: omitKeys(state.starred, keys), notes: omitKeys(state.notes, keys),
-      lockedRecords: omitKeys(state.lockedRecords, keys),
-    })),
-  }),
-  {
-    name: HISTORY_META_STORAGE_KEY,
-    version: 1,
-    partialize: (state) => ({
-      starred: state.starred,
-      notes: state.notes,
-      pinnedGroups: state.pinnedGroups,
-      groupColors: state.groupColors,
-      lockedRecords: state.lockedRecords,
-      groupTitles: state.groupTitles,
-      groupNotes: state.groupNotes,
-      collapsedGroups: state.collapsedGroups,
+export const useHistoryMetaStore = create<HistoryMetaStore>()(
+  persist(
+    (set) => ({
+      starred: {},
+      notes: {},
+      pinnedGroups: {},
+      groupColors: {},
+      lockedRecords: {},
+      groupTitles: {},
+      groupNotes: {},
+      collapsedGroups: {},
+      toggleStar: (key) => set((state) => ({ starred: toggleFlag(state.starred, key) })),
+      setNote: (key, note) => set((state) => ({ notes: setString(state.notes, key, note) })),
+      togglePinnedGroup: (key) => set((state) => ({ pinnedGroups: toggleFlag(state.pinnedGroups, key) })),
+      setGroupColor: (key, color) => set((state) => ({ groupColors: setString(state.groupColors, key, color) })),
+      setStarred: (keys, value) => set((state) => ({ starred: setFlags(state.starred, keys, value) })),
+      setLocked: (keys, value) => set((state) => ({ lockedRecords: setFlags(state.lockedRecords, keys, value) })),
+      setGroupTitle: (key, value) => set((state) => ({ groupTitles: setString(state.groupTitles, key, value) })),
+      setGroupNote: (key, value) => set((state) => ({ groupNotes: setString(state.groupNotes, key, value) })),
+      setGroupsCollapsed: (keys, value) => set((state) => ({ collapsedGroups: setFlags(state.collapsedGroups, keys, value) })),
+      removeRecords: (keys) =>
+        set((state) => ({
+          starred: omitKeys(state.starred, keys),
+          notes: omitKeys(state.notes, keys),
+          lockedRecords: omitKeys(state.lockedRecords, keys),
+        })),
     }),
-    merge: (persisted, current) => ({ ...current, ...sanitize(persisted) }),
-  },
-));
+    {
+      name: HISTORY_META_STORAGE_KEY,
+      version: 1,
+      partialize: (state) => ({
+        starred: state.starred,
+        notes: state.notes,
+        pinnedGroups: state.pinnedGroups,
+        groupColors: state.groupColors,
+        lockedRecords: state.lockedRecords,
+        groupTitles: state.groupTitles,
+        groupNotes: state.groupNotes,
+        collapsedGroups: state.collapsedGroups,
+      }),
+      merge: (persisted, current) => ({ ...current, ...sanitize(persisted) }),
+    },
+  ),
+);

@@ -113,7 +113,8 @@ describe('terminalIoLog', () => {
     });
   });
 
-  it('stays silent while detailed logging is off', async () => {    useDiagnosticSettings.setState({ autoSave: false });
+  it('stays silent while detailed logging is off', async () => {
+    useDiagnosticSettings.setState({ autoSave: false });
     const before = ioRecords().length;
     const log = new TerminalIoLog('pane-3');
     log.received([data('x')]);

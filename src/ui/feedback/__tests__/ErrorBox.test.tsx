@@ -15,14 +15,25 @@ describe('ErrorBox', () => {
   it('shows an explicitly placed informational notification outside the panel and expires it', () => {
     vi.useFakeTimers();
     try {
-      const { container } = render(<ErrorBox tone="info" placement="notification" title="Repository unavailable" details="Read failed" actions={<button>Retry</button>} autoDismissMs={1000} />);
+      const { container } = render(
+        <ErrorBox
+          tone="info"
+          placement="notification"
+          title="Repository unavailable"
+          details="Read failed"
+          actions={<button>Retry</button>}
+          autoDismissMs={1000}
+        />,
+      );
       expect(container.querySelector('[role="status"]')).toBeNull();
       expect(document.querySelector('#app-notifications [role="status"]')).toHaveAttribute('data-tone', 'info');
       expect(screen.getByRole('button', { name: 'Retry' })).toBeVisible();
       expect(screen.queryByRole('alert')).toBeNull();
       act(() => vi.advanceTimersByTime(1000));
       expect(screen.queryByRole('status')).toBeNull();
-    } finally { vi.useRealTimers(); }
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it('pauses ordinary notification expiry while the page is hidden', () => {
     vi.useFakeTimers();
@@ -40,7 +51,10 @@ describe('ErrorBox', () => {
       expect(screen.getByRole('alert')).toBeVisible();
       act(() => vi.advanceTimersByTime(1));
       expect(screen.queryByRole('alert')).toBeNull();
-    } finally { hidden.mockRestore(); vi.useRealTimers(); }
+    } finally {
+      hidden.mockRestore();
+      vi.useRealTimers();
+    }
   });
   it('retains remaining time while hovered or focused before automatically dismissing an ordinary error', () => {
     vi.useFakeTimers();
@@ -62,7 +76,9 @@ describe('ErrorBox', () => {
       act(() => vi.advanceTimersByTime(1));
       expect(screen.queryByRole('alert')).toBeNull();
       expect(dismiss).toHaveBeenCalledOnce();
-    } finally { vi.useRealTimers(); }
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it('keeps expanded details available until the user finishes reading', () => {
     vi.useFakeTimers();
@@ -74,7 +90,9 @@ describe('ErrorBox', () => {
       fireEvent.click(screen.getByRole('button', { name: '技术详情' }));
       act(() => vi.advanceTimersByTime(1000));
       expect(screen.queryByRole('alert')).toBeNull();
-    } finally { vi.useRealTimers(); }
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it('keeps persistent failures until dismissed and gives a new failure its own time budget', () => {
     vi.useFakeTimers();
@@ -89,10 +107,20 @@ describe('ErrorBox', () => {
       expect(screen.getByRole('alert')).toHaveTextContent('Second failure');
       act(() => vi.advanceTimersByTime(1));
       expect(screen.queryByRole('alert')).toBeNull();
-    } finally { vi.useRealTimers(); }
+    } finally {
+      vi.useRealTimers();
+    }
   });
   it('supports persistent transcript failures inline without a notification portal', () => {
-    const { container } = render(<ErrorBox placement="inline" dismissible={false} title="Tool failed" details="Diagnostic output" actions={<button>Retry tool</button>} />);
+    const { container } = render(
+      <ErrorBox
+        placement="inline"
+        dismissible={false}
+        title="Tool failed"
+        details="Diagnostic output"
+        actions={<button>Retry tool</button>}
+      />,
+    );
     expect(container.querySelector('[role="alert"]')).not.toBeNull();
     expect(document.querySelector('#app-notifications [role="alert"]')).toBeNull();
     expect(screen.queryByRole('button', { name: '关闭错误提示' })).toBeNull();
@@ -103,18 +131,31 @@ describe('ErrorBox', () => {
     function Dialog() {
       const ref = useRef<HTMLDivElement>(null);
       useDialogKeyboard(ref, true, { onClose: close });
-      return <div role="dialog" aria-label="Dialog" ref={ref}><button onClick={close}>Owner</button><ErrorBox title="Failed" /></div>;
+      return (
+        <div role="dialog" aria-label="Dialog" ref={ref}>
+          <button onClick={close}>Owner</button>
+          <ErrorBox title="Failed" />
+        </div>
+      );
     }
     render(<Dialog />);
     const dismiss = screen.getByRole('button', { name: '关闭错误提示' });
-    dismiss.focus(); fireEvent.keyDown(dismiss, { key: 'Tab' });
+    dismiss.focus();
+    fireEvent.keyDown(dismiss, { key: 'Tab' });
     expect(screen.getByRole('button', { name: 'Owner' })).toHaveFocus();
-    dismiss.focus(); fireEvent.keyDown(dismiss, { key: 'Escape' });
-    expect(screen.queryByRole('alert')).toBeNull(); expect(close).not.toHaveBeenCalled();
+    dismiss.focus();
+    fireEvent.keyDown(dismiss, { key: 'Escape' });
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(close).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Owner' })).toHaveFocus();
   });
   it('stacks errors in one shared notification region outside the owning layout', () => {
-    const { container, unmount } = render(<div><ErrorBox title="First" /><ErrorBox title="Second" /></div>);
+    const { container, unmount } = render(
+      <div>
+        <ErrorBox title="First" />
+        <ErrorBox title="Second" />
+      </div>,
+    );
     expect(container.querySelector('[role="alert"]')).toBeNull();
     expect(document.querySelector('#app-notifications')?.querySelectorAll('[role="alert"]')).toHaveLength(2);
     unmount();
@@ -122,11 +163,23 @@ describe('ErrorBox', () => {
   });
 
   it('hides errors belonging to a background pane and restores them with their owner', async () => {
-    const { rerender } = render(<div hidden><ErrorBox title="Hidden pane" /></div>);
+    const { rerender } = render(
+      <div hidden>
+        <ErrorBox title="Hidden pane" />
+      </div>,
+    );
     expect(screen.queryByRole('alert')).toBeNull();
-    rerender(<div><ErrorBox title="Hidden pane" /></div>);
+    rerender(
+      <div>
+        <ErrorBox title="Hidden pane" />
+      </div>,
+    );
     await screen.findByRole('alert');
-    rerender(<div hidden><ErrorBox title="Hidden pane" /></div>);
+    rerender(
+      <div hidden>
+        <ErrorBox title="Hidden pane" />
+      </div>,
+    );
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
   });
   beforeEach(() => {
@@ -198,7 +251,8 @@ describe('ErrorBox', () => {
     const dismiss = vi.fn();
     const { rerender } = render(<ErrorBox title="Failed" details="First failure" onDismiss={dismiss} />);
     fireEvent.click(screen.getByRole('button', { name: '关闭错误提示' }));
-    expect(screen.queryByRole('alert')).toBeNull(); expect(dismiss).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(dismiss).toHaveBeenCalledOnce();
     rerender(<ErrorBox title="Failed" details="Second failure" />);
     expect(screen.getByRole('alert')).toBeVisible();
   });

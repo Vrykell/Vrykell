@@ -7,7 +7,9 @@ const theme = vi.hoisted(() => ({ mode: 'dark', preference: 'system', setMode: v
 const platform = vi.hoisted(() => ({ nativeMaterial: true }));
 vi.mock('@app/providers/ThemeProvider', () => ({ useTheme: () => theme }));
 vi.mock('@platform/runtime', () => ({
-  get supportsNativeMaterial() { return platform.nativeMaterial; },
+  get supportsNativeMaterial() {
+    return platform.nativeMaterial;
+  },
   isMacOS: false,
   isWindows: false,
   isLinux: true,

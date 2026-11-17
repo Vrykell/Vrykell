@@ -11,7 +11,10 @@ export function useHorizontalWheel(ref: RefObject<HTMLElement | null>, visible: 
     const wheel = (event: WheelEvent) => {
       const delta = horizontalWheelDelta(event, element.clientWidth);
       const next = Math.max(0, Math.min(element.scrollWidth - element.clientWidth, element.scrollLeft + delta));
-      if (delta && next !== element.scrollLeft) { event.preventDefault(); element.scrollLeft = next; }
+      if (delta && next !== element.scrollLeft) {
+        event.preventDefault();
+        element.scrollLeft = next;
+      }
     };
     element.addEventListener('wheel', wheel, { passive: false });
     return () => element.removeEventListener('wheel', wheel);

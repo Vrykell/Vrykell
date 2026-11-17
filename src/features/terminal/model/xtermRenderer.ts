@@ -68,24 +68,42 @@ export function loadWebglRenderer(term: Terminal, preference: TerminalRenderer =
     // buffer and use the DOM renderer when those dimensions disagree beyond pixel rounding.
     let renderSub: { dispose(): void } | undefined;
     const watchGeometry = () => {
-      const renderer = (addon as unknown as { _renderer?: { _canvas?: HTMLCanvasElement;
-        dimensions?: { device: { canvas: { width: number; height: number } } } } })._renderer;
+      const renderer = (
+        addon as unknown as {
+          _renderer?: { _canvas?: HTMLCanvasElement; dimensions?: { device: { canvas: { width: number; height: number } } } };
+        }
+      )._renderer;
       const canvas = renderer?._canvas;
       if (!canvas) return;
       renderSub?.dispose();
       const validate = () => {
         const expected = renderer?.dimensions?.device.canvas;
-        if (!canvas.isConnected || !expected || expected.width <= 0 || expected.height <= 0
-          || (Math.abs(canvas.width - expected.width) <= 1 && Math.abs(canvas.height - expected.height) <= 1)) return;
+        if (
+          !canvas.isConnected ||
+          !expected ||
+          expected.width <= 0 ||
+          expected.height <= 0 ||
+          (Math.abs(canvas.width - expected.width) <= 1 && Math.abs(canvas.height - expected.height) <= 1)
+        )
+          return;
         incompatibleDensity.set(term, window.devicePixelRatio);
-        terminalDebug('terminal-renderer-fallback', { reason: 'backing-size', density: window.devicePixelRatio,
-          width: canvas.width, height: canvas.height, expectedWidth: expected.width, expectedHeight: expected.height });
+        terminalDebug('terminal-renderer-fallback', {
+          reason: 'backing-size',
+          density: window.devicePixelRatio,
+          width: canvas.width,
+          height: canvas.height,
+          expectedWidth: expected.width,
+          expectedHeight: expected.height,
+        });
         disposeWebglRenderer(term, addon);
         term.refresh(0, term.rows - 1);
       };
       const observer = new MutationObserver(validate);
       observer.observe(canvas, { attributes: true, attributeFilter: ['width', 'height'] });
-      geometryStops.set(addon, () => { renderSub?.dispose(); observer.disconnect(); });
+      geometryStops.set(addon, () => {
+        renderSub?.dispose();
+        observer.disconnect();
+      });
       validate();
     };
     // A plugin loaded before open activates later, so install the check on its first render too.

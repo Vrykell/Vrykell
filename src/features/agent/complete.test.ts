@@ -38,12 +38,14 @@ const entry = (command: string) => ({ command, cwd: '/tmp', timestamp: 1, exitCo
 describe('local tier (works without AI)', () => {
   it('includes failed and interrupted commands in local candidates and completion context', async () => {
     reset();
-    useHistoryStore.setState({ entries: [
-      { ...entry('git broken'), exitCode: 127 },
-      { ...entry('git interrupted'), exitCode: 130 },
-      entry('git status'),
-      { ...entry('git legacy'), exitCode: null },
-    ] });
+    useHistoryStore.setState({
+      entries: [
+        { ...entry('git broken'), exitCode: 127 },
+        { ...entry('git interrupted'), exitCode: 130 },
+        entry('git status'),
+        { ...entry('git legacy'), exitCode: null },
+      ],
+    });
     expect(localComplete('git ')).toBe('broken');
     expect(localCompleteCandidates('git ')).toEqual(['broken', 'interrupted', 'status', 'legacy']);
     expect(useHistoryStore.getState().search('broken')).toHaveLength(1);

@@ -45,7 +45,9 @@ it('wires the command queue readiness check to the captured terminal', async () 
 
   expect(await execute({ command: 'first' }, { toolCallId: 'first' })).toMatchObject({ code: 'COMMAND_TIMEOUT' });
   expect(await execute({ command: 'blocked' }, { toolCallId: 'blocked' })).toMatchObject({
-    ok: false, completed: false, code: 'PREVIOUS_COMMAND_UNCONFIRMED',
+    ok: false,
+    completed: false,
+    code: 'PREVIOUS_COMMAND_UNCONFIRMED',
   });
   expect(runCommandAndWait).toHaveBeenCalledOnce();
 

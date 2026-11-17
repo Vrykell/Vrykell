@@ -23,8 +23,12 @@ describe('harnessProblems', () => {
     expect(harnessProblems([{ name: 'a', command: 'x' }])).toEqual([]);
     expect(harnessProblems([{ name: ' ', command: 'x' }])).toEqual(['#1: no name']);
     expect(harnessProblems([{ name: 'a', command: '  ' }])).toEqual(['#1: no command']);
-    expect(harnessProblems([{ name: 'a', command: 'x' }, { name: ' a ', command: 'y' }]))
-      .toEqual(['#2: duplicate name']);
+    expect(
+      harnessProblems([
+        { name: 'a', command: 'x' },
+        { name: ' a ', command: 'y' },
+      ]),
+    ).toEqual(['#2: duplicate name']);
   });
 });
 

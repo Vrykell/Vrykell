@@ -10,12 +10,7 @@ function lineCount(value: string): number {
 }
 
 /** Recompute text and placeholder wrapping after content, width or typography changes. */
-export function useAutoSizeTextarea(
-  ref: RefObject<HTMLTextAreaElement | null>,
-  value: string,
-  maxHeight = 120,
-  enabled = true,
-) {
+export function useAutoSizeTextarea(ref: RefObject<HTMLTextAreaElement | null>, value: string, maxHeight = 120, enabled = true) {
   const frame = useRef(0);
   const lines = useRef<number | null>(null);
   const active = useRef(enabled);
@@ -27,9 +22,11 @@ export function useAutoSizeTextarea(
     element.style.height = 'auto';
     const css = getComputedStyle(element);
     const pixels = (value: string) => Number.parseFloat(value) || 0;
-    const height = element.scrollHeight + (css.boxSizing === 'border-box'
-      ? pixels(css.borderTopWidth) + pixels(css.borderBottomWidth)
-      : -pixels(css.paddingTop) - pixels(css.paddingBottom));
+    const height =
+      element.scrollHeight +
+      (css.boxSizing === 'border-box'
+        ? pixels(css.borderTopWidth) + pixels(css.borderBottomWidth)
+        : -pixels(css.paddingTop) - pixels(css.paddingBottom));
     const limit = css.maxHeight.endsWith('px') ? Math.min(maxHeight, pixels(css.maxHeight)) : maxHeight;
     element.style.height = `${Math.min(height, limit)}px`;
     element.style.overflowY = height > limit ? 'auto' : 'hidden';
@@ -42,7 +39,10 @@ export function useAutoSizeTextarea(
       // A new line changes the box immediately; a plain keystroke measures once per frame instead
       // of inside the key event, so holding a key never queues a synchronous layout per character.
       lines.current = nextLines;
-      if (frame.current) { cancelAnimationFrame(frame.current); frame.current = 0; }
+      if (frame.current) {
+        cancelAnimationFrame(frame.current);
+        frame.current = 0;
+      }
       resize();
       return;
     }
@@ -53,22 +53,33 @@ export function useAutoSizeTextarea(
     });
   }, [resize, value, enabled]);
 
-  useEffect(() => () => { if (frame.current) cancelAnimationFrame(frame.current); }, []);
+  useEffect(
+    () => () => {
+      if (frame.current) cancelAnimationFrame(frame.current);
+    },
+    [],
+  );
 
   useLayoutEffect(() => {
     const element = ref.current;
     if (!enabled || !element) return;
     let width = element.clientWidth;
-    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(() => {
-      if (element.clientWidth === width) return;
-      resize();
-      // Height and scrollbar changes must not create a resize feedback loop.
-      width = element.clientWidth;
-    });
+    const observer =
+      typeof ResizeObserver === 'undefined'
+        ? null
+        : new ResizeObserver(() => {
+            if (element.clientWidth === width) return;
+            resize();
+            // Height and scrollbar changes must not create a resize feedback loop.
+            width = element.clientWidth;
+          });
     observer?.observe(element);
     const mutations = new MutationObserver(resize);
     mutations.observe(element, { attributes: true, attributeFilter: ['placeholder'] });
     mutations.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'class'] });
-    return () => { observer?.disconnect(); mutations.disconnect(); };
+    return () => {
+      observer?.disconnect();
+      mutations.disconnect();
+    };
   }, [ref, resize, enabled]);
 }

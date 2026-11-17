@@ -126,7 +126,16 @@ export function modelBreakdown(records: UsageRecord[], configured: Pick<UsageRec
   const rows = new Map<string, ModelUsageRow>();
   for (const profile of configured) {
     const key = `${profile.provider}:${profile.model}`;
-    rows.set(key, { key, provider: profile.provider, model: profile.model, turns: 0, inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, totalTokens: 0 });
+    rows.set(key, {
+      key,
+      provider: profile.provider,
+      model: profile.model,
+      turns: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedInputTokens: 0,
+      totalTokens: 0,
+    });
   }
   for (const record of records) {
     const key = `${record.provider}:${record.model}`;
@@ -147,9 +156,7 @@ export function modelBreakdown(records: UsageRecord[], configured: Pick<UsageRec
     row.totalTokens = row.inputTokens + row.outputTokens;
     rows.set(key, row);
   }
-  return [...rows.values()].sort(
-    (a, b) => b.totalTokens - a.totalTokens || a.model.localeCompare(b.model),
-  );
+  return [...rows.values()].sort((a, b) => b.totalTokens - a.totalTokens || a.model.localeCompare(b.model));
 }
 
 export interface UsageBucket {
@@ -169,11 +176,7 @@ export const MAX_USAGE_BUCKETS = 60;
  * The window is capped at `MAX_USAGE_BUCKETS` so a long history still renders: the chart shows
  * the most recent buckets of the selected range.
  */
-export function tokensSeries(
-  records: UsageRecord[],
-  range: UsageRange,
-  now: number,
-): { buckets: UsageBucket[]; unit: 'hour' | 'day' } {
+export function tokensSeries(records: UsageRecord[], range: UsageRange, now: number): { buckets: UsageBucket[]; unit: 'hour' | 'day' } {
   const hourly = range === 'today';
   const inRange = recordsInRange(records, range, now);
   const size = hourly ? 60 * 60 * 1000 : DAY_MS;
@@ -185,9 +188,7 @@ export function tokensSeries(
     const date = new Date(start);
     buckets.push({
       start,
-      label: hourly
-        ? `${String(date.getHours()).padStart(2, '0')}:00`
-        : `${date.getMonth() + 1}/${date.getDate()}`,
+      label: hourly ? `${String(date.getHours()).padStart(2, '0')}:00` : `${date.getMonth() + 1}/${date.getDate()}`,
       tokens: 0,
       turns: 0,
     });
@@ -240,7 +241,17 @@ export interface ProviderUsageRow {
 /** Per-provider split, heaviest first; ties keep a stable name order. */
 export function providerBreakdown(records: UsageRecord[], configured: string[] = []): ProviderUsageRow[] {
   const rows = new Map<string, ProviderUsageRow>();
-  for (const provider of configured) rows.set(provider, { provider, turns: 0, inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, totalTokens: 0, steps: 0, toolCalls: 0 });
+  for (const provider of configured)
+    rows.set(provider, {
+      provider,
+      turns: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      cachedInputTokens: 0,
+      totalTokens: 0,
+      steps: 0,
+      toolCalls: 0,
+    });
   for (const record of records) {
     const row = rows.get(record.provider) ?? {
       provider: record.provider,
@@ -261,9 +272,7 @@ export function providerBreakdown(records: UsageRecord[], configured: string[] =
     row.toolCalls += record.toolCalls;
     rows.set(record.provider, row);
   }
-  return [...rows.values()].sort(
-    (a, b) => b.totalTokens - a.totalTokens || a.provider.localeCompare(b.provider),
-  );
+  return [...rows.values()].sort((a, b) => b.totalTokens - a.totalTokens || a.provider.localeCompare(b.provider));
 }
 
 /** Rows per table page; matches the request log's page size. */
@@ -320,9 +329,7 @@ export function formatLogTime(at: number, now: number = Date.now()): string {
   const clock = `${pad2(date.getHours())}:${pad2(date.getMinutes())}`;
   const sameDay = new Date(now);
   const isToday =
-    date.getFullYear() === sameDay.getFullYear() &&
-    date.getMonth() === sameDay.getMonth() &&
-    date.getDate() === sameDay.getDate();
+    date.getFullYear() === sameDay.getFullYear() && date.getMonth() === sameDay.getMonth() && date.getDate() === sameDay.getDate();
   return isToday ? `${clock}:${pad2(date.getSeconds())}` : `${pad2(date.getMonth() + 1)}-${pad2(date.getDate())} ${clock}`;
 }
 

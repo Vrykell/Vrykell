@@ -25,7 +25,11 @@ const execOf = (t: unknown): Exec => {
 describe('use_skill tool', () => {
   it('hit: returns the body + directory + auxiliary file list', async () => {
     invokeMock.mockResolvedValue({
-      name: '写单测', description: 'd', prompt: '第一步', dir: '/s/a', files: ['scripts/x.py'],
+      name: '写单测',
+      description: 'd',
+      prompt: '第一步',
+      dir: '/s/a',
+      files: ['scripts/x.py'],
     });
     const r = await execOf(buildSkillTool(CTX).use_skill)({ name: '写单测' });
     expect(invokeMock).toHaveBeenLastCalledWith('get_skill', { name: '写单测' });

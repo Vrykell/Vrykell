@@ -1,7 +1,9 @@
 import { createContext, useContext, useLayoutEffect, useMemo, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
-const HeaderTarget = createContext<{ target: HTMLElement | null; setTarget: (element: HTMLDivElement | null) => void } | undefined>(undefined);
+const HeaderTarget = createContext<{ target: HTMLElement | null; setTarget: (element: HTMLDivElement | null) => void } | undefined>(
+  undefined,
+);
 
 /** Feature headers keep their existing actions while occupying one shared instance strip. */
 export function WorkspaceHeaderProvider({ children }: { children: ReactNode }) {
@@ -12,12 +14,19 @@ export function WorkspaceHeaderProvider({ children }: { children: ReactNode }) {
 
 export function WorkspaceHeaderSlot({ visible = true }: { visible?: boolean }) {
   const context = useContext(HeaderTarget);
-  return <div className="workspace-instance-bar" data-testid="workspace-instance-bar" style={{ display: visible ? undefined : 'none' }} ref={context?.setTarget} />;
+  return (
+    <div
+      className="workspace-instance-bar"
+      data-testid="workspace-instance-bar"
+      style={{ display: visible ? undefined : 'none' }}
+      ref={context?.setTarget}
+    />
+  );
 }
 
 export function WorkspaceHeaderScope({ enabled, target, children }: { enabled: boolean; target: HTMLElement | null; children: ReactNode }) {
   const parent = useContext(HeaderTarget);
-  const value = useMemo(() => enabled ? { target, setTarget: () => {} } : parent, [enabled, parent, target]);
+  const value = useMemo(() => (enabled ? { target, setTarget: () => {} } : parent), [enabled, parent, target]);
   return <HeaderTarget.Provider value={value}>{children}</HeaderTarget.Provider>;
 }
 
@@ -25,13 +34,24 @@ export default function WorkspaceHeader({ active = true, children }: { active?: 
   const context = useContext(HeaderTarget);
   const target = context?.target;
   const [parking, setParking] = useState<HTMLDivElement | null>(null);
-  const [host] = useState(() => { const element = document.createElement('div'); element.className = 'workspace-header-surface'; return element; });
+  const [host] = useState(() => {
+    const element = document.createElement('div');
+    element.className = 'workspace-header-surface';
+    return element;
+  });
   useLayoutEffect(() => {
     if (target === undefined) return;
     const container = active && target ? target : parking;
     if (container) container.appendChild(host);
-    return () => { host.remove(); };
+    return () => {
+      host.remove();
+    };
   }, [active, host, parking, target]);
   if (target === undefined) return children;
-  return <><div hidden ref={setParking} />{createPortal(children, host)}</>;
+  return (
+    <>
+      <div hidden ref={setParking} />
+      {createPortal(children, host)}
+    </>
+  );
 }

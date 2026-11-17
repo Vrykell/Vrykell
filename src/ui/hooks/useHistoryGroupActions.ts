@@ -11,18 +11,25 @@ export function useHistoryGroupActions(scope: 'session' | 'conversation', groupB
   const keyOf = (id: string) => historyGroupKey(scope, groupBy, id);
   const forGroup = (id: string, title: string, recordIds: readonly string[]) => {
     const key = keyOf(id);
-    const keys = recordIds.map(recordId => historyRecordKey(scope, recordId));
-    const allStarred = keys.length > 0 && keys.every(recordKey => meta.starred[recordKey]);
-    const lockedCount = keys.filter(recordKey => meta.lockedRecords[recordKey]).length;
+    const keys = recordIds.map((recordId) => historyRecordKey(scope, recordId));
+    const allStarred = keys.length > 0 && keys.every((recordKey) => meta.starred[recordKey]);
+    const lockedCount = keys.filter((recordKey) => meta.lockedRecords[recordKey]).length;
     const allLocked = keys.length > 0 && lockedCount === keys.length;
     const color = meta.groupColors[key];
     const recordActions: ContextMenuItem[] = [
-      { label: t(allStarred ? 'Unstar matching records' : 'Star matching records'), group: 'view', disabled: !keys.length,
-        onClick: () => meta.setStarred(keys, !allStarred) },
-      { label: t('Lock matching records'), group: 'organize', disabled: !keys.length || allLocked,
-        onClick: () => meta.setLocked(keys, true) },
-      { label: t('Unlock matching records'), group: 'organize', disabled: !lockedCount,
-        onClick: () => meta.setLocked(keys, false) },
+      {
+        label: t(allStarred ? 'Unstar matching records' : 'Star matching records'),
+        group: 'view',
+        disabled: !keys.length,
+        onClick: () => meta.setStarred(keys, !allStarred),
+      },
+      {
+        label: t('Lock matching records'),
+        group: 'organize',
+        disabled: !keys.length || allLocked,
+        onClick: () => meta.setLocked(keys, true),
+      },
+      { label: t('Unlock matching records'), group: 'organize', disabled: !lockedCount, onClick: () => meta.setLocked(keys, false) },
     ];
     return {
       title: meta.groupTitles[key] ?? title,
@@ -43,10 +50,18 @@ export function useHistoryGroupActions(scope: 'session' | 'conversation', groupB
   const pageItems = (groupIds: readonly string[], additionalKeys: readonly string[] = []): ContextMenuItem[] => {
     const keys = [...groupIds.map(keyOf), ...additionalKeys];
     return [
-      { label: t('Expand all groups'), group: 'view', disabled: !keys.some(key => meta.collapsedGroups[key]),
-        onClick: () => meta.setGroupsCollapsed(keys, false) },
-      { label: t('Collapse all groups'), group: 'view', disabled: !keys.some(key => !meta.collapsedGroups[key]),
-        onClick: () => meta.setGroupsCollapsed(keys, true) },
+      {
+        label: t('Expand all groups'),
+        group: 'view',
+        disabled: !keys.some((key) => meta.collapsedGroups[key]),
+        onClick: () => meta.setGroupsCollapsed(keys, false),
+      },
+      {
+        label: t('Collapse all groups'),
+        group: 'view',
+        disabled: !keys.some((key) => !meta.collapsedGroups[key]),
+        onClick: () => meta.setGroupsCollapsed(keys, true),
+      },
     ];
   };
   return { meta, pinnedIds, forGroup, pageItems };

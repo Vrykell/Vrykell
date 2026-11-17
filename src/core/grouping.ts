@@ -1,1 +1,5 @@
-export interface TabGroupAssignment { id: string; title: string; itemIds: string[] }
+export interface TabGroupAssignment {
+  id: string;
+  title: string;
+  itemIds: string[];
+}

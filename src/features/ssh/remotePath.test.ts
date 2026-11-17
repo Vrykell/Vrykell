@@ -21,7 +21,7 @@ describe('parentOfRemote', () => {
 });
 
 describe('shellQuote', () => {
-  it.each(['\x15', '\r', '\n', '\x1b', '\x7f', '\x9b'])('rejects terminal control character %j', control => {
+  it.each(['\x15', '\r', '\n', '\x1b', '\x7f', '\x9b'])('rejects terminal control character %j', (control) => {
     expect(() => shellQuote(`/tmp/a${control}echo unsafe`)).toThrow();
   });
   it('wraps an ordinary path in single quotes', () => {

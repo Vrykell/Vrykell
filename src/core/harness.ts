@@ -3,7 +3,9 @@ let closeGuard: CloseGuard | undefined;
 
 export function registerHarnessCloseGuard(guard: CloseGuard) {
   closeGuard = guard;
-  return () => { if (closeGuard === guard) closeGuard = undefined; };
+  return () => {
+    if (closeGuard === guard) closeGuard = undefined;
+  };
 }
 
 export function interceptHarnessClose(sessions: string[], complete: () => void) {

@@ -2,8 +2,7 @@ import { test, expect } from '@playwright/test';
 import { setupTauriMock, ensureTabsOpen } from './tauri-mock';
 
 const tabIds = (page: import('@playwright/test').Page) =>
-  page.locator('[data-tab-row-id]')
-    .evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.tabRowId!));
+  page.locator('[data-tab-row-id]').evaluateAll((els) => els.map((el) => (el as HTMLElement).dataset.tabRowId!));
 
 test('collapsed group drops its colored edge and shows the tab surface only while active, hovered or dragged', async ({ page }, info) => {
   await setupTauriMock(page);
@@ -34,22 +33,25 @@ test('collapsed group drops its colored edge and shows the tab surface only whil
   const beforeCollapse = (await header.boundingBox())!;
   // Expanded keeps the colored edge (an overlay, so it never shortens the tabs) and the plain header.
   await expect(card).toHaveCSS('border-bottom-width', '0px');
-  expect(await card.evaluate(element => getComputedStyle(element, '::after').height)).toBe('2px');
+  expect(await card.evaluate((element) => getComputedStyle(element, '::after').height)).toBe('2px');
   await expect(header).not.toHaveAttribute('data-tab-surface');
 
   await header.click();
   await expect(page.getByTestId(/^group-count-/)).toHaveCount(0);
   // Make the grouped tab the active one: the collapsed group merges with the body without the edge.
-  await page.evaluate(async (groupId) => {
-    const path = '/src/features/workspace/stores/workspace.ts';
-    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
-    const state = useWorkspaceStore.getState();
-    const grouped = state.tabs.find(tab => tab.kind === 'session' && tab.groupId === groupId);
-    if (grouped) useWorkspaceStore.setState({ activeId: grouped.id });
-  }, await group.getAttribute('data-group-id'));
+  await page.evaluate(
+    async (groupId) => {
+      const path = '/src/features/workspace/stores/workspace.ts';
+      const { useWorkspaceStore } = (await import(path)) as typeof import('../src/features/workspace/stores/workspace');
+      const state = useWorkspaceStore.getState();
+      const grouped = state.tabs.find((tab) => tab.kind === 'session' && tab.groupId === groupId);
+      if (grouped) useWorkspaceStore.setState({ activeId: grouped.id });
+    },
+    await group.getAttribute('data-group-id'),
+  );
   await page.mouse.move(700, 300);
   await expect(card).toHaveCSS('border-bottom-width', '0px');
-  expect(await card.evaluate(element => getComputedStyle(element, '::after').display)).toBe('none');
+  expect(await card.evaluate((element) => getComputedStyle(element, '::after').display)).toBe('none');
   await expect(header).toHaveAttribute('data-tab-surface', 'true');
   await expect(header).toHaveCSS('background-color', xtermBg);
   expect(Math.abs((await header.boundingBox())!.x - beforeCollapse.x)).toBeLessThan(1);
@@ -71,7 +73,7 @@ test('collapsed group drops its colored edge and shows the tab surface only whil
 
   await header.click();
   await expect(card).toHaveCSS('border-bottom-width', '0px');
-  expect(await card.evaluate(element => getComputedStyle(element, '::after').height)).toBe('2px');
+  expect(await card.evaluate((element) => getComputedStyle(element, '::after').height)).toBe('2px');
   await expect(header).not.toHaveAttribute('data-tab-surface');
   expect(Math.abs((await header.boundingBox())!.x - beforeCollapse.x)).toBeLessThan(1);
 });

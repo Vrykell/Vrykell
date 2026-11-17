@@ -4,7 +4,9 @@ import { terminalTabHandle } from '../model/terminalTabHandle';
 import type { Tab } from '../stores/workspace';
 
 const session: Tab = {
-  id: 'session', title: 'Project', kind: 'session',
+  id: 'session',
+  title: 'Project',
+  kind: 'session',
   layout: { type: 'leaf', terminal: { id: 'session#0', kind: 'local', shellType: 'bash' } },
 };
 
@@ -35,7 +37,12 @@ it('projects pages from the terminal strip without inferring area from the row',
 });
 
 it('fills an unspecified session shell from the machine default', () => {
-  const restored: Tab = { id: 'restored', title: 'Restored', kind: 'session', layout: { type: 'leaf', terminal: { id: 'restored#0', kind: 'local' } } };
+  const restored: Tab = {
+    id: 'restored',
+    title: 'Restored',
+    kind: 'session',
+    layout: { type: 'leaf', terminal: { id: 'restored#0', kind: 'local' } },
+  };
   const handle = terminalTabHandle(restored, 'Restored', 'zsh');
   const badge = handle.icon as ReactElement<{ children: ReactElement<{ shellType?: string }> }>;
   expect(isValidElement(badge)).toBe(true);

@@ -135,14 +135,15 @@ export const useAgentSettings = create<AgentSettingsState>()(
           delete overrides[modelId];
           return { overrides };
         }),
-      resetModelFields: (modelId, fields) => set(state => {
-        const next = { ...state.overrides[modelId] };
-        for (const field of fields) delete next[field];
-        const overrides = { ...state.overrides };
-        if (Object.keys(next).length) overrides[modelId] = next;
-        else delete overrides[modelId];
-        return { overrides };
-      }),
+      resetModelFields: (modelId, fields) =>
+        set((state) => {
+          const next = { ...state.overrides[modelId] };
+          for (const field of fields) delete next[field];
+          const overrides = { ...state.overrides };
+          if (Object.keys(next).length) overrides[modelId] = next;
+          else delete overrides[modelId];
+          return { overrides };
+        }),
       resolve: (modelId) => {
         const s = get();
         const ov = modelId ? s.overrides[modelId] : undefined;

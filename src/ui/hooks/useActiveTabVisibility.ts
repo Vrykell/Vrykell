@@ -8,8 +8,10 @@ export function useActiveTabVisibility(ref: RefObject<HTMLElement | null>, selec
     if (!strip) return;
     const reveal = () => {
       const reorder = useListReorder.getState();
-      if (reorder.pendingScroll && reorder.pendingScroll.listId === strip.dataset.reorderList) strip.scrollLeft = reorder.pendingScroll.scrollLeft;
-      if (strip.clientWidth > 0 && !reorder.drag && !reorder.pending) strip.querySelector(selector)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+      if (reorder.pendingScroll && reorder.pendingScroll.listId === strip.dataset.reorderList)
+        strip.scrollLeft = reorder.pendingScroll.scrollLeft;
+      if (strip.clientWidth > 0 && !reorder.drag && !reorder.pending)
+        strip.querySelector(selector)?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
     };
     reveal();
     if (typeof ResizeObserver === 'undefined') return;

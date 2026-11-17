@@ -125,10 +125,18 @@ describe('historyMeta store', () => {
 
   it('rehydrates valid persisted values', async () => {
     const key = historyGroupKey('session', 'type', 'type:ssh');
-    localStorage.setItem(HISTORY_META_STORAGE_KEY, JSON.stringify({
-      version: 1,
-      state: { starred: { 'session:a': true }, notes: { 'session:a': 'note' }, pinnedGroups: { [key]: true }, groupColors: { [key]: 'rose' } },
-    }));
+    localStorage.setItem(
+      HISTORY_META_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        state: {
+          starred: { 'session:a': true },
+          notes: { 'session:a': 'note' },
+          pinnedGroups: { [key]: true },
+          groupColors: { [key]: 'rose' },
+        },
+      }),
+    );
     await useHistoryMetaStore.persist.rehydrate();
     expect(useHistoryMetaStore.getState().starred['session:a']).toBe(true);
     expect(useHistoryMetaStore.getState().notes['session:a']).toBe('note');
@@ -137,10 +145,13 @@ describe('historyMeta store', () => {
   });
 
   it('degrades corrupt payloads to an empty annotation set', async () => {
-    localStorage.setItem(HISTORY_META_STORAGE_KEY, JSON.stringify({
-      version: 1,
-      state: { starred: 'nope', notes: 5, pinnedGroups: [1, 2], groupColors: { good: 'blue', bad: 3 } },
-    }));
+    localStorage.setItem(
+      HISTORY_META_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        state: { starred: 'nope', notes: 5, pinnedGroups: [1, 2], groupColors: { good: 'blue', bad: 3 } },
+      }),
+    );
     await useHistoryMetaStore.persist.rehydrate();
     expect(useHistoryMetaStore.getState().starred).toEqual({});
     expect(useHistoryMetaStore.getState().notes).toEqual({});

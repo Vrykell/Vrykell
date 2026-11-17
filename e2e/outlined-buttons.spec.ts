@@ -3,7 +3,7 @@ import { ensureChatSettingsOpen, ensureTabsOpen, setupTauriMock, useWindowsPlatf
 import { gotoSetting } from './settings';
 
 async function themeColor(page: Page, variable: string) {
-  return page.evaluate(variable => {
+  return page.evaluate((variable) => {
     const probe = document.createElement('span');
     probe.style.backgroundColor = `var(${variable})`;
     document.body.appendChild(probe);
@@ -15,7 +15,7 @@ async function themeColor(page: Page, variable: string) {
 
 async function checkFeedback(page: Page, button: Locator, gray: string) {
   const resting = await themeColor(page, '--action-button-bg');
-  await button.evaluate(element => (element as HTMLButtonElement).blur());
+  await button.evaluate((element) => (element as HTMLButtonElement).blur());
   await page.mouse.move(2, 2);
   await expect(button).toHaveCSS('background-color', resting);
   await button.hover();
@@ -24,7 +24,7 @@ async function checkFeedback(page: Page, button: Locator, gray: string) {
   await button.focus();
   await expect(button).toBeFocused();
   await expect(button).toHaveCSS('background-color', gray);
-  await button.evaluate(element => (element as HTMLButtonElement).blur());
+  await button.evaluate((element) => (element as HTMLButtonElement).blur());
   await expect(button).toHaveCSS('background-color', resting);
 }
 
@@ -91,8 +91,8 @@ for (const theme of ['dark', 'light'] as const) {
     const tools = picker.getByRole('button', { name: '工具', exact: true });
     await tools.click();
     await expect(tools).toHaveAttribute('aria-pressed', 'true');
-    const selected = await tools.evaluate(async element => {
-      await Promise.all(element.getAnimations().map(animation => animation.finished));
+    const selected = await tools.evaluate(async (element) => {
+      await Promise.all(element.getAnimations().map((animation) => animation.finished));
       return getComputedStyle(element).backgroundColor;
     });
     expect(selected).not.toBe(gray);
@@ -107,7 +107,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(dialog.getByTestId('ssh-import-web')).toBeChecked();
     report['SSH 导入'] = await auditOutlinedActions(page, dialog, gray);
     const primary = dialog.getByTestId('ssh-import-confirm');
-    const primaryColor = await primary.evaluate(element => getComputedStyle(element).backgroundColor);
+    const primaryColor = await primary.evaluate((element) => getComputedStyle(element).backgroundColor);
     await primary.focus();
     expect(primaryColor).toBe(await themeColor(page, '--primary-button-bg'));
     await expect(primary).toHaveCSS('background-color', await themeColor(page, '--primary-button-hover-bg'));
