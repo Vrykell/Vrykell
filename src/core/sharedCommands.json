@@ -2,7 +2,7 @@
   "pty_spawn", "pty_write", "pty_close", "pty_kill_foreground", "editor_read_file", "editor_save_file",
   "fs_list", "fs_rename", "fs_create_file", "fs_create_dir", "fs_copy", "fs_move",
   "fs_stage_delete", "fs_restore_staged", "fs_purge_staged",
-  "save_memory", "set_skill_state", "remove_skill", "install_skill_md", "import_skills_from_path", "market_github_install",
+  "save_memory", "set_skill_state", "remove_skill", "install_skill_md", "import_skills_from_path",
   "mcp_save_server", "mcp_remove_server", "mcp_toggle_server", "mcp_connect", "mcp_disconnect", "mcp_call_tool",
   "tool_policy_set_level", "tool_policy_clear_session_grants",
   "set_ai_key", "clear_ai_key", "set_ai_base_url", "set_ai_model", "set_ai_provider", "set_ai_models", "set_active_model",

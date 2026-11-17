@@ -33,6 +33,9 @@ it('offers a near-black palette with darker surfaces and readable secondary text
   expect(palette.dangerActionText).toBe('#FFFFFF');
   expect(contrast(palette.accent, palette.fieldBg)).toBeGreaterThanOrEqual(4.5);
   expect(contrast(palette.primaryActionText, palette.primaryAction)).toBeGreaterThanOrEqual(4.5);
+  expect(palette.border).toBe('#333333');
+  expect(palette.borderStrong).toBe('#454545');
+  expect(contrast(palette.errorText, palette.error)).toBeGreaterThanOrEqual(4.5);
 });
 
 it('maps each scheme across application, editor and terminal with readable controls', () => {
@@ -46,6 +49,7 @@ it('maps each scheme across application, editor and terminal with readable contr
     expect(contrast(palette.primaryActionText, palette.primaryAction)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(palette.primaryActionText, palette.primaryActionHover)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(palette.dangerActionText, palette.dangerAction)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(palette.errorText, palette.error)).toBeGreaterThanOrEqual(4.5);
     expect(contrast(palette.segmentedText, palette.segmentedThumb)).toBeGreaterThanOrEqual(4.5);
     const divider = palette.resizeDivider.match(/[\d.]+/g)!.map(Number);
     const background = [1, 3, 5].map(index => parseInt(palette.canvas.slice(index, index + 2), 16));

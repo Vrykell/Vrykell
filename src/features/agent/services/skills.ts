@@ -44,13 +44,6 @@ export interface SkillTrustInfo {
   enabled: boolean;
 }
 
-/** Remote repository marketplace search result. */
-export interface MarketSkill {
-  name: string;
-  description: string;
-  /** Path of the skill directory relative to the repository. */
-  dir: string;
-}
 
 export const listSkills = () => invoke<SkillMeta[]>('list_skills');
 export const getSkill = (name: string) => invoke<SkillDetail>('get_skill', { name });
@@ -68,11 +61,6 @@ export const fetchRemoteSkills = (url: string) =>
 export const findSkillReference = (text: string) =>
   invoke<SkillTrustInfo | null>('find_skill_reference', { text });
 
-/** Remote repository marketplace: list the skills inside a repository. */
-export const marketGithubList = (repo: string) => invoke<MarketSkill[]>('market_github_list', { repo });
-/** Remote repository marketplace: install a skill from one directory in a repository. */
-export const marketGithubInstall = (repo: string, dir: string) =>
-  invoke<SkillMeta>('market_github_install', { repo, dir });
 
 /** If the text or path references an untrusted skill, return its name; otherwise null. */
 export async function untrustedSkillFor(text: string): Promise<string | null> {

@@ -7,6 +7,8 @@ interface Seed {
   selectionOpacity?: number;
   selectionColor?: string;
   actionText?: string;
+  border?: string;
+  borderStrong?: string;
   foreground: string;
   colors: Colors;
   orange: string;
@@ -39,6 +41,7 @@ export const themePresets: readonly ThemePreset[] = [
   } },
   { id: 'deep-black', name: 'Deep Black', mode: 'dark', seed: {
     background: '#1C1C1C', terminalBackground: '#111111', selectionColor: '#484848', selectionOpacity: 1, actionText: '#FFFFFF', foreground: '#E2E2E2', orange: '#F3AA70',
+    border: '#333333', borderStrong: '#454545',
     colors: ['#353535', '#F47C7C', '#59D69A', '#E9C46A', '#168BFF', '#C3A6FF', '#64D8DF', '#E2E2E2'],
   } },
   { id: 'default-light', name: 'Default light', mode: 'light' },
@@ -100,7 +103,8 @@ export function presetPalette(base: ThemePalette, preset: ThemePreset): ThemePal
   const surface = blend(bg, fg, light ? 0.09 : 0.035);
   const raised = light ? blend(bg, '#FFFFFF', 0.85) : blend(bg, fg, 0.075);
   const hover = blend(bg, fg, light ? 0.18 : 0.12);
-  const border = blend(bg, fg, light ? 0.32 : 0.19);
+  const border = preset.seed.border ?? blend(bg, fg, light ? 0.32 : 0.19);
+  const borderStrong = preset.seed.borderStrong ?? blend(bg, fg, light ? 0.46 : 0.35);
   const readable = (color: string) => fitContrast(color, light ? hover : raised, fg);
   const muted = light ? readable(blend(bg, fg, 0.76)) : blend(bg, fg, 0.76);
   const terminal = light ? c.map(color => fitContrast(color, terminalBg, fg)) : c;
@@ -109,6 +113,7 @@ export function presetPalette(base: ThemePalette, preset: ThemePreset): ThemePal
   const decorative = (color: string) => light ? fitContrast(color, surface, fg, 2.2) : fitContrast(color, raised, fg);
   const onAccent = preset.seed.actionText ?? (contrast(bg, blue) > contrast(fg, blue) ? bg : fg);
   const onDanger = preset.seed.actionText ?? (contrast(bg, red) > contrast(fg, red) ? bg : fg);
+  const onError = contrast(bg, red) > contrast(fg, red) ? bg : fg;
   const action = preset.seed.actionText ? fitContrast(blue, onAccent, bg) : blue;
   const danger = preset.seed.actionText ? fitContrast(red, onDanger, bg) : red;
   const selection = alpha(preset.seed.selectionColor ?? blue, preset.seed.selectionOpacity ?? 0.25);
@@ -125,7 +130,7 @@ export function presetPalette(base: ThemePalette, preset: ThemePreset): ThemePal
     segmentedText: preset.mode === 'dark' ? base.xtermBrightWhite : fg,
     canvas: bg, surface, cardBg: surface,
     fieldBg: raised, composerBg: raised, block: bg, elevated: raised, hover, buttonHover: hover,
-    border, borderStrong: blend(bg, fg, light ? 0.46 : 0.35),
+    border, borderStrong,
     resizeDivider: alpha(fg, light ? 0.08 : 0.06), inputBorder: border,
     textPrimary: fg, textSecondary: light ? readable(blend(bg, fg, 0.9)) : blend(bg, fg, 0.9), textMuted: muted,
     accent: blue, accentDim: dim(blue), accentText: onAccent,
@@ -133,7 +138,7 @@ export function presetPalette(base: ThemePalette, preset: ThemePreset): ThemePal
     accentWarm: yellow, accentWarmDim: dim(yellow), accentUser: violet, accentUserDim: dim(violet),
     primaryAction: action, primaryActionText: onAccent,
     primaryActionHover: blend(action, contrast(onAccent, '#FFFFFF') > contrast(onAccent, '#000000') ? '#FFFFFF' : '#000000', 0.12),
-    success: green, successDim: dim(green), error: red, errorText: red,
+    success: green, successDim: dim(green), error: red, errorText: onError,
     dangerAction: danger, dangerActionText: onDanger, errorDim: dim(red), errorLight: red, warning: yellow,
     blockCmdText: fg, blockCmdFailed: red, blockDivider: border,
     cmdProgram: green, cmdArgument: fg, cmdNumber: readable(orange), cmdVariable: violet,

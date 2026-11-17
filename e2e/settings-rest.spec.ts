@@ -58,7 +58,7 @@ test.describe('Theme file settings page', () => {
     await gotoSetting(page, '主题文件');
     await expect(page.getByText('/home/e2e/.vrykell/theme.json')).toBeVisible();
     await page.getByRole('button', { name: /重新加载/ }).click();
-    await page.getByRole('button', { name: /导出主题/ }).click();
+    await page.getByRole('button', { name: /导出/ }).click();
   });
 });
 
@@ -111,6 +111,13 @@ test.describe('Keyboard shortcuts page', () => {
     const mod = await page.evaluate(() => /Mac/.test(navigator.userAgent) ? 'Meta' : 'Control');
     await expect(page.getByLabel(`${mod}+T`, { exact: true })).toBeVisible();
     await expect(page.locator('.settings-screen').getByLabel(`${mod}+F`, { exact: true })).toBeVisible();
+    // Rules between shortcut rows run edge to edge inside the card.
+    const card = page.locator('.settings-group-panel').first();
+    const rows = card.locator('.settings-shortcut-row');
+    await expect(rows.nth(1)).toHaveCSS('border-top-width', '1px');
+    const cardBox = (await card.boundingBox())!;
+    const rowBox = (await rows.first().boundingBox())!;
+    expect(Math.abs(rowBox.width - cardBox.width)).toBeLessThanOrEqual(2);
   });
 });
 

@@ -17,15 +17,9 @@
 //!      through the agent permission gate and is never bypassed.
 
 use serde::{Deserialize, Serialize};
-use futures_util::{stream, StreamExt};
 use sha2::{Digest, Sha256};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-
-use crate::agent::web::{fetch_public_unchecked, http_client_trusted, read_body_capped};
-
-/// Maximum size in bytes for fetching a marketplace SKILL.md.
-const MARKET_MD_CAP: usize = 1024 * 1024;
 
 // ── Public types ──
 
@@ -771,192 +765,6 @@ pub async fn find_skill_reference(text: String) -> Option<SkillTrustInfo> {
     None
 }
 
-// ── GitHub skill marketplace ──
-
-/// Marketplace search result: one skill inside a GitHub repository.
-#[derive(Serialize, Clone)]
-#[serde(rename_all = "camelCase")]
-pub struct MarketSkill {
-    pub name: String,
-    pub description: String,
-    /// Relative path of the skill directory inside the repository (used for install)
-    pub dir: String,
-}
-
-/// Parse a GitHub repository address into (owner, repo).
-/// Accepts full URLs (https://github.com/owner/repo[/tree/branch...]) and the owner/repo shorthand.
-fn parse_github_repo(input: &str) -> Result<(String, String), String> {
-    let s = input.trim().trim_end_matches('/');
-    if s.is_empty() {
-        return Err("请输入 GitHub 仓库 URL（如 https://github.com/anthropics/skills）".to_string());
-    }
-
-    // Full URL: use the standard parser so branch paths or query parameters are not mistaken for repository segments
-    if s.starts_with("http://") || s.starts_with("https://") {
-        let url = url::Url::parse(s).map_err(|_| "URL 格式无效".to_string())?;
-        let host = url.host_str().unwrap_or("").to_lowercase();
-        if host != "github.com" {
-            return Err(format!("仅支持 github.com 仓库，当前地址：{host}"));
-        }
-        let segs: Vec<&str> = url
-            .path_segments()
-            .map(|it| it.filter(|x| !x.is_empty()).collect())
-            .unwrap_or_default();
-        if segs.len() < 2 {
-            return Err("URL 需包含 owner/repo，如 https://github.com/owner/repo".to_string());
-        }
-        let owner = segs[0].to_string();
-        let repo = segs[1].trim_end_matches(".git").to_string();
-        if owner.is_empty() || repo.is_empty() {
-            return Err("无法识别仓库，格式应为 owner/repo".to_string());
-        }
-        return Ok((owner, repo));
-    }
-
-    // Fallback: owner/repo shorthand (with an optional .git suffix)
-    let segs: Vec<&str> = s.split('/').filter(|x| !x.is_empty()).collect();
-    if segs.len() >= 2 {
-        let owner = segs[segs.len() - 2].to_string();
-        let repo = segs[segs.len() - 1].trim_end_matches(".git").to_string();
-        if !owner.is_empty() && !repo.is_empty() {
-            return Ok((owner, repo));
-        }
-    }
-    Err("无法识别仓库，格式应为 https://github.com/owner/repo".to_string())
-}
-
-const GITHUB_API: &str = "https://api.github.com/repos";
-const GITHUB_RAW: &str = "https://raw.githubusercontent.com";
-
-async fn github_tree(owner: &str, repo: &str, client: &reqwest::Client) -> Result<serde_json::Value, String> {
-    let url = format!("{GITHUB_API}/{owner}/{repo}/git/trees/HEAD?recursive=1");
-    // The host is hardcoded to api.github.com (user input only reaches path segments), so no SSRF check is needed
-    let resp = fetch_public_unchecked(client, &url).await?;
-    if !resp.status().is_success() {
-        return Err(format!("GitHub 返回 {}（仓库可能不存在）", resp.status()));
-    }
-    let (body, over) = read_body_capped(resp, 8 * 1024 * 1024).await?;
-    if over { return Err("The repository index exceeds the size limit".to_string()); }
-    serde_json::from_slice(&body).map_err(|e| format!("Could not parse repository index: {e}"))
-}
-
-fn market_skill_paths(json: &serde_json::Value) -> Vec<(String, String)> {
-    let mut seen = HashSet::new();
-    json.get("tree").and_then(|value| value.as_array()).into_iter().flatten()
-        .filter(|entry| entry.get("type").and_then(|value| value.as_str()) == Some("blob"))
-        .filter_map(|entry| {
-            let path = entry.get("path")?.as_str()?;
-            let (dir, filename) = path.rsplit_once('/')?;
-            if dir.is_empty() || !filename.eq_ignore_ascii_case("SKILL.md")
-                || path.split('/').any(|segment| segment.is_empty() || segment == ".." || segment.starts_with('.'))
-                || !seen.insert(dir.to_string()) { return None; }
-            Some((dir.to_string(), path.to_string()))
-        }).take(30).collect()
-}
-
-fn market_raw_url(owner: &str, repo: &str, revision: &str, path: &str) -> Result<String, String> {
-    let mut url = url::Url::parse(GITHUB_RAW).map_err(|error| error.to_string())?;
-    url.path_segments_mut().map_err(|_| "Invalid repository URL".to_string())?
-        .extend([owner, repo, revision]).extend(path.split('/'));
-    Ok(url.to_string())
-}
-
-#[tauri::command]
-pub async fn market_github_list(repo: String) -> Result<Vec<MarketSkill>, String> {
-    let (owner, name) = parse_github_repo(&repo)?;
-    let client = http_client_trusted()?;
-    let json = github_tree(&owner, &name, &client).await?;
-    let paths = market_skill_paths(&json);
-    if paths.is_empty() { return Ok(Vec::new()); }
-    let revision = json.get("sha").and_then(|value| value.as_str()).unwrap_or("HEAD");
-    let fetch = stream::iter(paths.into_iter().enumerate().map(|(index, (dir, path))| {
-        let client = &client;
-        let owner = &owner;
-        let name = &name;
-        async move {
-            let raw_url = market_raw_url(owner, name, revision, &path)?;
-            let resp = fetch_public_unchecked(client, &raw_url).await?;
-            if !resp.status().is_success() { return Err(format!("Could not read skill: {}", resp.status())); }
-            let (bytes, over) = read_body_capped(resp, MARKET_MD_CAP).await?;
-            if over { return Err("Skill description exceeds the size limit".to_string()); }
-            let text = String::from_utf8_lossy(&bytes);
-            let (skill_name, description, _, _) = parse_skill_md(&text);
-            let fallback = dir.rsplit('/').next().unwrap_or(&dir).to_string();
-            Ok((index, MarketSkill { name: if skill_name.trim().is_empty() { fallback } else { skill_name.trim().to_string() }, description, dir }))
-        }
-    })).buffer_unordered(6).collect::<Vec<Result<(usize, MarketSkill), String>>>();
-    let results = tokio::time::timeout(std::time::Duration::from_secs(35), fetch).await
-        .map_err(|_| "Skill loading timed out. Check the system proxy and retry.".to_string())?;
-    let mut loaded = Vec::new();
-    let mut failure = None;
-    for result in results { match result { Ok(skill) => loaded.push(skill), Err(error) => { failure.get_or_insert(error); } } }
-    if loaded.is_empty() { return Err(failure.unwrap_or_else(|| "Could not read skill descriptions".to_string())); }
-    loaded.sort_by_key(|(index, _)| *index);
-    Ok(loaded.into_iter().map(|(_, skill)| skill).collect())
-}
-
-/// Install the skill in a repository directory: fetch its files into the skill directory (untrusted by default).
-#[tauri::command]
-pub async fn market_github_install(repo: String, dir: String) -> Result<SkillMeta, String> {
-    let (owner, name) = parse_github_repo(&repo)?;
-    let dir = dir.trim().trim_matches('/').to_string();
-    if dir.is_empty() {
-        return Err("技能目录不能为空".to_string());
-    }
-    let client = http_client_trusted()?;
-    let json = github_tree(&owner, &name, &client).await?;
-    let prefix = format!("{dir}/");
-    let mut files: Vec<String> = Vec::new();
-    if let Some(entries) = json.get("tree").and_then(|t| t.as_array()) {
-        for e in entries {
-            let path = e.get("path").and_then(|p| p.as_str()).unwrap_or("");
-            let is_dir = e.get("type").and_then(|t| t.as_str()) == Some("tree");
-            if !is_dir && path.starts_with(&prefix) {
-                let rel = path[prefix.len()..].to_string();
-                let base = rel.rsplit('/').next().unwrap_or("").to_string();
-                if !base.starts_with('.') {
-                    files.push(rel);
-                }
-            }
-        }
-    }
-    files.sort();
-    if files.len() > 40 {
-        files.truncate(40);
-    }
-    // Skill name = directory name
-    let skill_name = sanitize_name(dir.rsplit('/').next().unwrap_or("skill"));
-    let dst = skills_dir().join(&skill_name);
-    std::fs::create_dir_all(&dst).map_err(|e| format!("创建技能目录失败：{e}"))?;
-    let mut wrote = 0usize;
-    for rel in &files {
-        let raw_url = format!("{GITHUB_RAW}/{owner}/{name}/HEAD/{dir}/{rel}");
-        // The host is hardcoded to raw.githubusercontent.com, so no SSRF check is needed
-        let Ok(resp) = fetch_public_unchecked(&client, &raw_url).await else { continue };
-        // Stream with a 2MB truncation limit instead of reading a large file fully into memory first
-        let Ok((bytes, over)) = read_body_capped(resp, 2 * 1024 * 1024).await else { continue };
-        if over {
-            continue;
-        }
-        let out_path = dst.join(rel);
-        if let Some(parent) = out_path.parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-        if std::fs::write(&out_path, &bytes).is_ok() {
-            wrote += 1;
-        }
-    }
-    if wrote == 0 {
-        return Err("技能文件拉取失败".to_string());
-    }
-    upsert_record(&skill_name, |_| SkillRecord {
-        source: format!("GitHub · {owner}/{name}"),
-        trusted: false,
-        enabled: true,
-        content_hash: compute_dir_hash(&dst),
-    });
-    read_skill_meta(&dst).ok_or_else(|| "安装后读取技能失败".to_string())
-}
 
 #[cfg(test)]
 mod tests {
@@ -1055,31 +863,6 @@ mod tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 
-    #[test]
-    fn market_paths_require_exact_descriptor_files_and_safe_directories() {
-        let json = serde_json::json!({"tree": [
-            {"path": "skills/sample/SKILL.md", "type": "blob"},
-            {"path": "skills/sample/skill.md", "type": "blob"},
-            {"path": "skills/false/not-a-skill.md", "type": "blob"},
-            {"path": "skills/folder/SKILL.md", "type": "tree"},
-            {"path": "../hidden/SKILL.md", "type": "blob"},
-            {"path": "skills/with space/skill.md", "type": "blob"}
-        ]});
-        assert_eq!(market_skill_paths(&json), vec![
-            ("skills/sample".to_string(), "skills/sample/SKILL.md".to_string()),
-            ("skills/with space".to_string(), "skills/with space/skill.md".to_string())
-        ]);
-        assert_eq!(market_raw_url("owner", "repo", "commit", "skills/with space/SKILL.md").unwrap(),
-            "https://raw.githubusercontent.com/owner/repo/commit/skills/with%20space/SKILL.md");
-    }
-
-    #[tokio::test]
-    #[ignore = "Requires access to the public repository service"]
-    async fn market_live_read_only_probe() {
-        let skills = market_github_list("anthropics/skills".to_string()).await.unwrap();
-        assert!(!skills.is_empty());
-        assert!(skills.iter().any(|skill| skill.dir.ends_with("/pdf")));
-    }
 
     #[test]
     fn split_frontmatter_works() {
@@ -1113,31 +896,5 @@ mod tests {
         assert!(!is_script_path("assets/template.txt"));
     }
 
-    #[test]
-    fn parse_github_repo_accepts_repo_and_url() {
-        assert_eq!(parse_github_repo("anthropics/skills").unwrap(), ("anthropics".to_string(), "skills".to_string()));
-        assert_eq!(
-            parse_github_repo("https://github.com/agentskills/agentskills").unwrap(),
-            ("agentskills".to_string(), "agentskills".to_string())
-        );
-        // Full URL with a branch path: only owner/repo should be taken, ignoring later segments such as /tree/main
-        assert_eq!(
-            parse_github_repo("https://github.com/anthropics/skills/tree/main/docs").unwrap(),
-            ("anthropics".to_string(), "skills".to_string())
-        );
-        // Trailing slash and .git suffix
-        assert_eq!(
-            parse_github_repo("https://github.com/anthropics/skills.git/").unwrap(),
-            ("anthropics".to_string(), "skills".to_string())
-        );
-        assert_eq!(
-            parse_github_repo("anthropics/skills.git").unwrap(),
-            ("anthropics".to_string(), "skills".to_string())
-        );
-        // Reject hosts other than github.com
-        assert!(parse_github_repo("https://gitlab.com/anthropics/skills").is_err());
-        // Invalid input
-        assert!(parse_github_repo("   ").is_err());
-        assert!(parse_github_repo("not-a-repo").is_err());
-    }
+
 }

@@ -1,5 +1,5 @@
 /**
- * Skills system e2e: list / trust / enable / details / delete / marketplace / URL import.
+ * Skills system e2e: list / trust / enable / details / delete / URL import.
  */
 import { test, expect } from '@playwright/test';
 import { setupTauriMock, skillOps } from './tauri-mock';
@@ -21,6 +21,7 @@ test.describe('Skills settings page', () => {
   test('Skill list keeps identity, description and enable control compact', async ({ page }) => {
     await expect(page.getByText('写单测')).toBeVisible();
     await expect(page.getByText('旧脚本技能')).toBeVisible();
+    await expect(page.getByRole('button', { name: '技能市场', exact: true })).toHaveCount(0);
     const row = rowOf('旧脚本技能')(page);
     await expect(row.getByText('未信任', { exact: true })).toBeVisible();
     await expect(row.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
@@ -78,29 +79,6 @@ test.describe('Skills settings page', () => {
     expect(ops).toContainEqual(expect.objectContaining({ op: 'remove', name: '写单测' }));
   });
 
-  test('Skill marketplace: browse repository → install → installed marker', async ({ page }) => {
-    await page.getByRole('button', { name: /技能市场/ }).click();
-    await expect(page.getByText('技能市场', { exact: true }).last()).toBeVisible();
-    // Pick the preset repository and browse
-    await page.getByRole('combobox', { name: '技能仓库' }).click();
-    await page.getByRole('option', { name: 'anthropics/skills', exact: true }).click();
-    await page.getByRole('button', { name: '浏览' }).click();
-    await expect(page.getByText('github-skill-1')).toBeVisible({ timeout: 5000 });
-    await expect(page.getByText('github-skill-2')).toBeVisible();
-    // Install the first one
-    // The install button of the first list item belongs to github-skill-1 (list order matches the mock)
-    const installBtn = page.locator('section').getByRole('button', { name: '安装' }).first();
-    await installBtn.click();
-    await expect(page.getByText('已安装 github-skill-1')).toBeVisible();
-    await expect(page.locator('section').getByText('已安装', { exact: true }).first()).toBeVisible();
-    const ops = await skillOps(page);
-    expect(ops).toContainEqual(expect.objectContaining({ op: 'market_install', name: 'github-skill-1' }));
-    // Search filtering inside the marketplace (wait for the install toast to disappear so its text does not interfere)
-    await expect(page.getByText('已安装 github-skill-1')).toHaveCount(0, { timeout: 5000 });
-    await page.getByPlaceholder('搜索技能…').first().fill('skill-2');
-    await expect(page.getByText('GitHub 操作技能', { exact: true })).toHaveCount(0);
-    await expect(page.getByText('第二个仓库技能', { exact: true })).toBeVisible();
-  });
 
   test('URL import: install remote skills in bulk', async ({ page }) => {
     await page.getByRole('button', { name: '导入技能', exact: true }).click();

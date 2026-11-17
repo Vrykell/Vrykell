@@ -16,7 +16,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.getByRole('radio', { name: theme === 'dark' ? '始终深色' : '始终浅色', exact: true }).click();
     await page.locator('aside').getByRole('button', { name: '字体与显示', exact: true }).click();
     const settingsCard = page.locator('.settings-group-panel').first();
-    await expect(settingsCard).toHaveCSS('border-top-width', '0px');
+    await expect(settingsCard).toHaveCSS('border-top-width', '1px');
     expect(await settingsCard.evaluate(element => getComputedStyle(element).boxShadow)).toBe('none');
     const font = page.getByRole('combobox', { name: '页面字号' });
     await expect(font).toHaveCSS('border-top-width', '0px');

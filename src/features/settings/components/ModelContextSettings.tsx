@@ -33,7 +33,7 @@ export default function ModelContextSettings({ modelId, global = false, focusTar
     {
       title: t('Context strategy'),
       description: t('Keep all messages, recent messages or a summary of older messages.'),
-      control: <Select aria-label={t('Context strategy')} value={effective.contextStrategy} style={{ width: '100%' }}
+      control: <Select aria-label={t('Context strategy')} value={effective.contextStrategy} style={{ width: global ? 120 : '100%' }}
         options={[{ value: 'off', label: t('All messages') }, { value: 'window', label: t('Window') }, { value: 'compact', label: t('Summary') }]}
         onChange={value => { void save(() => update({ contextStrategy: value })); }} />,
     },

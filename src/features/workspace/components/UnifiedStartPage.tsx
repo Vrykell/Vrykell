@@ -25,8 +25,8 @@ export default function UnifiedStartPage({ onNew, onOpen, onConnect, onAgent }: 
         <OutlineButton className="primary-button" onClick={() => onNew('terminal')}>{t('New terminal')}</OutlineButton>
         <OutlineButton onClick={() => onNew('document')}>{t('New file')}</OutlineButton>
         <OutlineButton onClick={onOpen}>{t('Open file')}</OutlineButton>
-        <OutlineButton onClick={() => onNew('conversation')}>{t('New conversation')}</OutlineButton>
-        <OutlineButton onClick={event => openUnderTrigger(event, onConnect)}>{t('Connect a server')}</OutlineButton>
+        <OutlineButton aria-label={t('New conversation')} onClick={() => onNew('conversation')}>{t('New chat')}</OutlineButton>
+        <OutlineButton aria-label={t('Connect a server')} onClick={event => openUnderTrigger(event, onConnect)}>{t('Connect')}</OutlineButton>
         <OutlineButton onClick={event => openUnderTrigger(event, onAgent)}>{t('ACP agents')}</OutlineButton>
       </>} />
   </div>;

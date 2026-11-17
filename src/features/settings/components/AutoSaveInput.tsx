@@ -53,7 +53,7 @@ export default function AutoSaveInput({ value, onCommit, placeholder, style, mul
     // The shared field class supplies the compact single-line floor; multiline editors keep their own minimum.
     style: { ...inputStyle, ...controlStyle, width: '100%', ...(minHeight !== undefined ? { minHeight } : {}) },
   };
-  return <div className="autosave-input" style={{ minWidth: minWidth ?? 0, flex, flexShrink, width, marginTop, marginBottom }}>
+  return <div className="autosave-input" data-multiline={multiline ? 'true' : undefined} style={{ minWidth: minWidth ?? 0, flex, flexShrink, width, marginTop, marginBottom }}>
     {multiline ? <ConfigTextArea {...props} rows={rows} /> : <TextInput {...props} type={type} min={min} max={max} step={step} variant="field" />}
     <SaveStatus inline status={save.status} error={save.error} onRetry={() => { void save.flush(); }} />
     {onClear && <button type="button" onClick={() => { void feedback.save(async () => {
