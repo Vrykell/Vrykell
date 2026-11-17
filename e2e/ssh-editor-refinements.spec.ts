@@ -62,15 +62,33 @@ test('quick connection reuses the connection form cards without a native disclos
   await setupTauriMock(page, {}); await page.goto('/'); await page.getByTestId('workspace-area-ssh').click();
   await page.getByTestId('ssh-host-actions').click(); await page.getByRole('button', { name: '快速连接', exact: true }).click();
   const form = page.getByRole('dialog', { name: 'SSH 连接' });
+  await page.setViewportSize({ width: 1240, height: 800 });
   await expect(form.locator('.ssh-editor-advanced > summary')).toBeHidden();
   await expect(form.locator('#ssh-section-connection .ssh-form-section-fields')).toHaveCSS('border-radius', '12px');
   await expect(form.getByTestId('ssh-forward-add')).toHaveCSS('border-radius', '8px');
+  const quickCard = (await form.locator('#ssh-section-connection .ssh-form-section-fields').boundingBox())!;
+  const quickGap = await form.evaluate(element => {
+    const sections = [...element.querySelectorAll<HTMLElement>('.ssh-form-section:not([hidden])')];
+    return sections[1]!.getBoundingClientRect().top - sections[0]!.getBoundingClientRect().bottom;
+  });
   for (const width of [1240, 640]) {
     await page.setViewportSize({ width, height: 800 });
     await expect(form.getByTestId('ssh-form-host')).toBeVisible();
     const bounds = (await form.boundingBox())!;
-    expect(bounds.width).toBeLessThanOrEqual(Math.min(640, width - 32));
+    expect(bounds.width).toBeLessThanOrEqual(Math.min(760, width - 32));
     expect(Math.abs(bounds.x + bounds.width / 2 - width / 2)).toBeLessThan(2);
     await page.screenshot({ path: info.outputPath(`quick-connection-${width}.png`), animations: 'disabled' });
   }
+  // The dialog matches the host editor page: same form column and the same section rhythm.
+  await page.setViewportSize({ width: 1240, height: 800 });
+  await page.keyboard.press('Escape');
+  await page.getByTestId('ssh-new-btn').click();
+  const editor = page.getByTestId('ssh-host-editor');
+  const pageCard = (await editor.locator('#ssh-section-connection .ssh-form-section-fields').boundingBox())!;
+  const pageGap = await editor.evaluate(element => {
+    const sections = [...element.querySelectorAll<HTMLElement>('.ssh-form-section:not([hidden])')];
+    return sections[1]!.getBoundingClientRect().top - sections[0]!.getBoundingClientRect().bottom;
+  });
+  expect(Math.abs(quickCard.width - pageCard.width)).toBeLessThan(2);
+  expect(Math.abs(quickGap - pageGap)).toBeLessThan(2);
 });

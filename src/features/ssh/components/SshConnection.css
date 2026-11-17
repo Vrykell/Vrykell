@@ -56,7 +56,8 @@
 }
 .ssh-form-dialog.ssh-auth-dialog { width: min(440px, calc(100vw - 32px)); min-height: 0; }
 .ssh-host-editor { container: host-editor / inline-size; display: flex; flex: 1; flex-direction: column; min-height: 0; min-width: 0; background: var(--canvas); color: var(--text-primary); }
-.ssh-quick-connect { flex: 0 1 auto; width: min(640px, calc(100vw - 32px)); max-height: min(620px, calc(100dvh - 32px)); }
+/* The quick dialog mirrors the host editor page: the 720px form column plus the 20px body inset. */
+.ssh-quick-connect { flex: 0 1 auto; width: min(760px, calc(100vw - 32px)); max-height: min(620px, calc(100dvh - 32px)); }
 .ssh-host-editor > .ssh-form-header { flex-shrink: 0; gap: 10px; padding: 12px 24px; }
 .ssh-editor-breadcrumb { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; color: var(--text-muted); font-size: var(--fs-label); }
 .ssh-editor-breadcrumb strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); }
@@ -74,9 +75,11 @@
 .ssh-host-editor #ssh-section-connection .ssh-form-fields label { color: var(--text-primary); font-size: var(--fs-caption); }
 .ssh-form-footer .ssh-editor-delete { color: var(--control-danger-color); }
 .ssh-form-dialog .ssh-form-section + .ssh-form-section:not([hidden]) { margin-top: 16px; }
+/* Quick connect uses the page's single section rhythm instead of the older stacked dialog gap. */
+.ssh-quick-connect .ssh-form-section + .ssh-form-section:not([hidden]) { margin-top: 0; }
 .ssh-host-editor textarea, .ssh-form-dialog textarea { resize: none; }
 .ssh-host-editor .ssh-form-footer { padding: 12px 0 0; border: 0; }
-.ssh-quick-connect > .ssh-form-footer { padding: 12px 16px; border-top: 1px solid var(--border); }
+.ssh-quick-connect > .ssh-form-footer { padding: 12px 24px; border-top: 1px solid var(--border); }
 .ssh-host-editor .ssh-inline-error { padding: 0; margin-bottom: 12px; max-height: none; }
 .ssh-host-editor .ssh-form-section-fields > p { padding: 10px 16px; }
 .ssh-editor-section-hint { margin: -16px 0 24px; color: var(--text-muted); font-size: var(--fs-caption); line-height: 1.5; }
