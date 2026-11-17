@@ -134,7 +134,6 @@ const zh: Record<string, string> = {
   'All workspace tabs': '全部工作区标签',
   'Close notification': '关闭通知',
   'Open file': '打开文件',
-  'Skill marketplace': '技能市场',
   'Open folder': '打开文件夹',
   'Trust': '信任',
   'Untrust': '取消信任',

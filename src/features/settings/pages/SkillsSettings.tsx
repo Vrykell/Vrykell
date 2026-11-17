@@ -10,17 +10,15 @@ import { TextInput } from '@ui/fields/TextInput';
  */
 
 import { useState } from 'react';
-import { ArrowLeft, ChevronRight, Download, FileText, Folder, ShieldAlert, Store, X, Plus, Search } from '@ui/icons';
+import { ChevronRight, Download, FileText, Folder, ShieldAlert, X, Plus, Search } from '@ui/icons';
 import { fileOpenWith } from '@platform/api/fs';
 import {
   setSkillState, removeSkill,
-  type SkillMeta, type SkillDetail,
+  type SkillDetail,
 } from '@features/agent/services/skills';
 import { useToastStore } from '@ui/feedback/Toast';
-import Select from '@ui/fields/Select';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import { useSkillsSettings } from '@features/settings/hooks/useSkillsSettings';
-import { useSkillMarketplace } from '@features/settings/hooks/useSkillMarketplace';
 import { useSkillFileBrowser } from '@features/settings/hooks/useSkillFileBrowser';
 import type { FileNode } from '@features/settings/model/skillFileTree';
 import { SettingsGroup } from '../components/ui';
@@ -34,20 +32,9 @@ import PageBreadcrumb from '@ui/layout/PageBreadcrumb';
 const toast = (msg: string, type: 'info' | 'success' | 'error') =>
   useToastStore.getState().addToast(msg, type);
 
-/** Preset skill marketplaces (repository URLs of common skill libraries containing SKILL.md) */
-const MARKETPLACES: { name: string; repo: string }[] = [
-  { name: 'anthropics/skills', repo: 'https://github.com/anthropics/skills' },
-  { name: 'magnus919/agent-skills', repo: 'https://github.com/magnus919/agent-skills' },
-];
-
-
-// ── Styles ──
-
 const btn: React.CSSProperties = {
   padding: '4px 10px',
 };
-
-const input: React.CSSProperties = { ...inputStyle, width: 'auto', flex: 1 };
 
 function Badge({ text, tone }: { text: string; tone: 'warn' | 'muted' | 'ok' | 'danger' }) {
   const color =
@@ -202,95 +189,6 @@ function SkillDetailPanel({ skill, onClose, onChanged }: {
   );
 }
 
-// ── Skill marketplace (overlay page) ──
-
-function SkillMarketplacePanel({ metas, onClose, onInstalled }: {
-  metas: SkillMeta[];
-  onClose: () => void;
-  onInstalled: () => void;
-}) {
-  const { repo, remote, browsing, error, changeRepo, browse, install, isInstalling } = useSkillMarketplace(MARKETPLACES[0].repo, onInstalled);
-  const [query, setQuery] = useState('');
-
-  const q = query.trim().toLowerCase();
-  const visible = q ? remote.filter((r) => r.name.toLowerCase().includes(q) || (r.description ?? '').toLowerCase().includes(q)) : remote;
-
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', minHeight: 'min(600px, 70vh)',
-    }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-        <OutlineButton onClick={onClose}><ArrowLeft size={16} aria-hidden="true" />{t('Back')}</OutlineButton>
-        <span style={{ fontSize: 'calc(14px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)' }}>{t('Skill marketplace')}</span>
-        <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)' }}>{t('Third-party skills are untrusted until you review and trust them.')}</span>
-      </div>
-
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 8 }}>
-        <Select aria-label={t('Skill repository')} value={MARKETPLACES.some(item => item.repo === repo) ? repo : ''}
-          options={[{ value: '', label: t('Custom…') }, ...MARKETPLACES.map(item => ({ value: item.repo, label: item.name }))]}
-          onChange={value => { changeRepo(value); if (value) void browse(value); }}
-          placeholder={t('Custom…')} style={{ flexShrink: 0, width: 190 }} />
-        <TextInput
-          variant="field"
-          value={repo}
-          aria-label={t('Repository URL')}
-          placeholder={t('Repository URL')}
-          onChange={(e) => changeRepo(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') void browse(); }}
-          style={input}
-        />
-        <OutlineButton onClick={() => void browse()} disabled={browsing} style={{ ...btn, flexShrink: 0 }}>
-          {t(browsing ? 'Loading…' : 'Browse')}
-        </OutlineButton>
-      </div>
-
-      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
-        <TextInput
-          variant="field"
-          value={query}
-          placeholder={t('Search skills…')}
-          onChange={(e) => setQuery(e.target.value)}
-          style={input}
-        />
-        <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-muted)', alignSelf: 'center', flexShrink: 0 }}>
-          {remote.length > 0 ? t('{{count}} skills', { count: remote.length }) : ''}
-        </span>
-      </div>
-
-      {error && <ErrorBox title={t('Could not load skills')} details={error} actions={<OutlineButton onClick={() => void browse()}>{t('Retry')}</OutlineButton>} />}
-      <div aria-busy={browsing} style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {remote.length === 0 && !browsing && (
-          <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', padding: '8px 0' }}>
-            {t(error ? 'Choose another repository or retry loading.' : 'No skills found. Choose a repository and browse its skills.')}
-          </div>
-        )}
-        {visible.map((r) => {
-          const installed = metas.some((m) => m.name === r.name);
-          return (
-            <div key={r.dir} style={{ borderRadius: 'var(--radius-inner)', padding: '8px 12px', background: 'var(--surface)', display: 'flex', alignItems: 'center', gap: 10 }}>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)' }}>
-                  {r.name}
-                  <span style={{ color: 'var(--text-muted)', fontSize: 'calc(11px * var(--ui-font-scale))' }}> · {r.dir}</span>
-                </div>
-                <div style={{ fontSize: 'calc(11px * var(--ui-font-scale))', color: 'var(--text-secondary)', marginTop: 2 }}>{r.description || t('No description')}</div>
-              </div>
-              {installed ? (
-                <span style={{ fontSize: 'calc(11px * var(--ui-font-scale))', padding: '2px 10px', borderRadius: 4, color: 'var(--success)', background: 'var(--success-bg)', flexShrink: 0 }}>{t('Installed')}</span>
-              ) : (
-                <OutlineButton onClick={() => void install(r)} disabled={isInstalling(r)} style={{ ...btn, flexShrink: 0 }}>
-                  {t(isInstalling(r) ? 'Installing…' : 'Install')}
-                </OutlineButton>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // ── Main page ──
 
 export default function SkillsSettings() {
@@ -301,10 +199,8 @@ export default function SkillsSettings() {
     importUrl,
     importing,
     warnDismissed,
-    market,
     setImportUrl,
     setWarnDismissed,
-    setMarket,
     setDetail,
     refresh,
     openDetail,
@@ -319,7 +215,6 @@ export default function SkillsSettings() {
   const importFromPath = async (directory: boolean) => { await doImportPath(directory); setImportOpen(false); };
 
   if (detail) return <SkillDetailPanel key={detail.name} skill={detail} onClose={() => setDetail(null)} onChanged={deleted => { refresh(); if (!deleted) void openDetail(detail.name); }} />;
-  if (market) return <SkillMarketplacePanel metas={metas} onClose={() => setMarket(false)} onInstalled={refresh} />;
 
   return (
     <div style={{ position: 'relative' }}>
@@ -368,7 +263,6 @@ export default function SkillsSettings() {
 
       <div className="resource-library-toolbar">
         <div className="resource-actions">
-          <OutlineButton onClick={() => setMarket(true)}><Store size={16} />{t('Skill marketplace')}</OutlineButton>
           <OutlineButton aria-expanded={importOpen} onClick={() => setImportOpen(true)}><Plus size={16} />{t('Import skills')}</OutlineButton>
         </div>
         <div className="resource-search"><Search size={16} aria-hidden="true" /><TextInput variant="field" aria-label={t('Search skills…')} placeholder={t('Search skills…')} value={query} onChange={event => setQuery(event.target.value)} /></div>
