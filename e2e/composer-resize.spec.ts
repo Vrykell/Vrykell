@@ -11,7 +11,7 @@ async function resizeChat(page: Page, width: number) {
   await page.mouse.down();
   await page.mouse.move(x + bounds.width - width, y, { steps: 8 });
   await page.mouse.up();
-  await expect.poll(() => panel.evaluate(element => element.clientWidth)).toBe(width);
+  await expect.poll(() => panel.evaluate((element) => element.clientWidth)).toBe(width);
 }
 
 test('AI composer recovers its compact height after narrowing, widening and reopening', async ({ page }) => {
@@ -24,13 +24,13 @@ test('AI composer recovers its compact height after narrowing, widening and reop
   await resizeChat(page, 480);
   for (const value of ['', '测试布局恢复后的输入区域尺寸。'.repeat(3)]) {
     await input.fill(value);
-    const height = await input.evaluate(element => element.clientHeight);
-    const cardHeight = await composer.evaluate(element => element.clientHeight);
+    const height = await input.evaluate((element) => element.clientHeight);
+    const cardHeight = await composer.evaluate((element) => element.clientHeight);
     await resizeChat(page, 180);
-    await expect.poll(() => input.evaluate(element => element.clientHeight)).toBeGreaterThan(height);
+    await expect.poll(() => input.evaluate((element) => element.clientHeight)).toBeGreaterThan(height);
     await resizeChat(page, 480);
-    await expect.poll(() => input.evaluate(element => element.clientHeight)).toBe(height);
-    await expect.poll(() => composer.evaluate(element => element.clientHeight)).toBe(cardHeight);
+    await expect.poll(() => input.evaluate((element) => element.clientHeight)).toBe(height);
+    await expect.poll(() => composer.evaluate((element) => element.clientHeight)).toBe(cardHeight);
     await expect(input).toHaveValue(value);
   }
   await page.locator('[data-dock-btn="chat"]').click();
@@ -39,7 +39,7 @@ test('AI composer recovers its compact height after narrowing, widening and reop
   await input.press('Escape');
   await expect(input).toHaveValue('');
   // The compact composer row is line-height 22px plus 8px padding.
-  await expect.poll(() => input.evaluate(element => element.clientHeight)).toBeLessThanOrEqual(30);
+  await expect.poll(() => input.evaluate((element) => element.clientHeight)).toBeLessThanOrEqual(30);
 });
 
 test('terminal composer restores its height when the window width returns', async ({ page }) => {
@@ -48,10 +48,10 @@ test('terminal composer restores its height when the window width returns', asyn
   const input = page.getByPlaceholder(/输入命令/);
   const value = 'echo '.repeat(30);
   await input.fill(value);
-  const height = await input.evaluate(element => element.clientHeight);
+  const height = await input.evaluate((element) => element.clientHeight);
   await page.setViewportSize({ width: 650, height: 800 });
-  await expect.poll(() => input.evaluate(element => element.clientHeight)).toBeGreaterThan(height);
+  await expect.poll(() => input.evaluate((element) => element.clientHeight)).toBeGreaterThan(height);
   await page.setViewportSize({ width: 1240, height: 800 });
-  await expect.poll(() => input.evaluate(element => element.clientHeight)).toBe(height);
+  await expect.poll(() => input.evaluate((element) => element.clientHeight)).toBe(height);
   await expect(input).toHaveValue(value);
 });

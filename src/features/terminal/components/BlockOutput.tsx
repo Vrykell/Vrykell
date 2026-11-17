@@ -83,8 +83,7 @@ export default memo(function BlockOutput({ text, maxHeight, flush = false, highl
         whiteSpace: 'pre-wrap',
         wordBreak: 'break-all',
         overflowWrap: 'anywhere',
-      }}
-    >
+      }}>
       <div dangerouslySetInnerHTML={{ __html: content }} />
     </div>
   );

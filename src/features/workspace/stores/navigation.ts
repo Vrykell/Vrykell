@@ -3,7 +3,15 @@ import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/
 import { isHistoryGroupColor, type HistoryGroupColor } from '@ui/history/historyGroupColor';
 
 export type WorkspaceArea = 'terminal' | 'code' | 'ai' | 'ssh' | 'forwarding' | 'history' | 'unified';
-export const WORKSPACE_AREA_LABELS = { terminal: 'workspace.nav.terminals', code: 'workspace.nav.files', ai: 'workspace.nav.conversations', ssh: 'workspace.nav.hosts', forwarding: 'Port forwarding', history: 'All history', unified: 'Unified workspace' } as const;
+export const WORKSPACE_AREA_LABELS = {
+  terminal: 'workspace.nav.terminals',
+  code: 'workspace.nav.files',
+  ai: 'workspace.nav.conversations',
+  ssh: 'workspace.nav.hosts',
+  forwarding: 'Port forwarding',
+  history: 'All history',
+  unified: 'Unified workspace',
+} as const;
 export type HistoryTypePreset = 'all' | 'terminal' | 'conversation';
 export const WORKSPACE_SIDEBAR_WIDTH = 208;
 export const WORKSPACE_SIDEBAR_MIN_WIDTH = 160;
@@ -82,27 +90,53 @@ export function pushAreaHistory(history: WorkspaceArea[], index: number, area: W
 let historySuspended = 0;
 export function runWithoutAreaHistory<T>(operation: () => T): T {
   historySuspended += 1;
-  try { return operation(); }
-  finally { historySuspended -= 1; }
+  try {
+    return operation();
+  } finally {
+    historySuspended -= 1;
+  }
 }
 
 /** Navigation owns presentation preferences; session and document stores retain their data. */
 export const useWorkspaceNavigation = create<NavigationState>((set, get) => ({
-  area: 'terminal', previousArea: 'terminal', collapsed: saved?.collapsed === true || window.innerWidth <= WORKSPACE_COMPACT_BREAKPOINT,
-  sidebarWidth: normalizeSidebarWidth(saved?.sidebarWidth), sidebarDragWidth: null, sidebarOverlay: false,
-  lastTabs: {}, groupColors, workspaceOrder, aiPlacement: 'main',
-  areaHistory: ['terminal'], areaHistoryIndex: 0,
-  historyPreset: 'all', historyPresetRevision: 0, historyLoading: false, historyDestination: 'native',
-  selectArea: (area, recordHistory = true) => set(state => ({
-    area, previousArea: state.area !== 'ai' ? state.area : state.previousArea,
-    ...(recordHistory && !historySuspended && area !== state.area ? pushAreaHistory(state.areaHistory, state.areaHistoryIndex, area) : {}),
-    ...(state.sidebarOverlay && area !== state.area ? { collapsed: true, sidebarOverlay: false, sidebarDragWidth: null } : {}) })),
-  selectHistory: (preset, recordHistory = true) => set(state => ({ area: 'history', previousArea: state.area !== 'ai' ? state.area : state.previousArea,
-    ...(recordHistory && !historySuspended && state.area !== 'history' ? pushAreaHistory(state.areaHistory, state.areaHistoryIndex, 'history') : {}),
-    historyDestination: state.area === 'history' ? state.historyDestination : state.area === 'unified' ? 'unified' : 'native',
-    historyPreset: preset, historyPresetRevision: state.historyPresetRevision + 1,
-    ...(state.sidebarOverlay && state.area !== 'history' ? { collapsed: true, sidebarOverlay: false, sidebarDragWidth: null } : {}) })),
-  stepAreaHistory: direction => {
+  area: 'terminal',
+  previousArea: 'terminal',
+  collapsed: saved?.collapsed === true || window.innerWidth <= WORKSPACE_COMPACT_BREAKPOINT,
+  sidebarWidth: normalizeSidebarWidth(saved?.sidebarWidth),
+  sidebarDragWidth: null,
+  sidebarOverlay: false,
+  lastTabs: {},
+  groupColors,
+  workspaceOrder,
+  aiPlacement: 'main',
+  areaHistory: ['terminal'],
+  areaHistoryIndex: 0,
+  historyPreset: 'all',
+  historyPresetRevision: 0,
+  historyLoading: false,
+  historyDestination: 'native',
+  selectArea: (area, recordHistory = true) =>
+    set((state) => ({
+      area,
+      previousArea: state.area !== 'ai' ? state.area : state.previousArea,
+      ...(recordHistory && !historySuspended && area !== state.area
+        ? pushAreaHistory(state.areaHistory, state.areaHistoryIndex, area)
+        : {}),
+      ...(state.sidebarOverlay && area !== state.area ? { collapsed: true, sidebarOverlay: false, sidebarDragWidth: null } : {}),
+    })),
+  selectHistory: (preset, recordHistory = true) =>
+    set((state) => ({
+      area: 'history',
+      previousArea: state.area !== 'ai' ? state.area : state.previousArea,
+      ...(recordHistory && !historySuspended && state.area !== 'history'
+        ? pushAreaHistory(state.areaHistory, state.areaHistoryIndex, 'history')
+        : {}),
+      historyDestination: state.area === 'history' ? state.historyDestination : state.area === 'unified' ? 'unified' : 'native',
+      historyPreset: preset,
+      historyPresetRevision: state.historyPresetRevision + 1,
+      ...(state.sidebarOverlay && state.area !== 'history' ? { collapsed: true, sidebarOverlay: false, sidebarDragWidth: null } : {}),
+    })),
+  stepAreaHistory: (direction) => {
     const state = get();
     const index = state.areaHistoryIndex + direction;
     const target = state.areaHistory[index];
@@ -112,52 +146,72 @@ export const useWorkspaceNavigation = create<NavigationState>((set, get) => ({
     // remembered tabs and settings state resolve exactly as they do for a direct visit.
     return target;
   },
-  setHistoryLoading: historyLoading => set({ historyLoading }),
-  rememberTab: (area, id) => set(state => state.lastTabs[area] === id ? state : ({ lastTabs: { ...state.lastTabs, [area]: id } })),
-  setCollapsed: collapsed => set({ collapsed, sidebarDragWidth: null, sidebarOverlay: false }),
-  openSidebar: sidebarOverlay => set({ collapsed: false, sidebarDragWidth: null, sidebarOverlay }),
-  resizeSidebar: (delta, maxWidth) => set(state => {
-    if (!Number.isFinite(delta) || !Number.isFinite(maxWidth)) return state;
-    const current = state.sidebarDragWidth ?? Math.min(state.sidebarWidth, maxWidth);
-    const next = Math.max(0, Math.min(WORKSPACE_SIDEBAR_MAX_WIDTH, maxWidth, Math.round(current + delta)));
-    const collapsed = next < WORKSPACE_SIDEBAR_MIN_WIDTH;
-    return { sidebarDragWidth: next, collapsed };
-  }),
-  commitSidebarWidth: () => set(state => ({ sidebarDragWidth: null,
-    sidebarOverlay: !state.collapsed && state.sidebarOverlay,
-    sidebarWidth: !state.collapsed && state.sidebarDragWidth !== null ? state.sidebarDragWidth : state.sidebarWidth })),
+  setHistoryLoading: (historyLoading) => set({ historyLoading }),
+  rememberTab: (area, id) => set((state) => (state.lastTabs[area] === id ? state : { lastTabs: { ...state.lastTabs, [area]: id } })),
+  setCollapsed: (collapsed) => set({ collapsed, sidebarDragWidth: null, sidebarOverlay: false }),
+  openSidebar: (sidebarOverlay) => set({ collapsed: false, sidebarDragWidth: null, sidebarOverlay }),
+  resizeSidebar: (delta, maxWidth) =>
+    set((state) => {
+      if (!Number.isFinite(delta) || !Number.isFinite(maxWidth)) return state;
+      const current = state.sidebarDragWidth ?? Math.min(state.sidebarWidth, maxWidth);
+      const next = Math.max(0, Math.min(WORKSPACE_SIDEBAR_MAX_WIDTH, maxWidth, Math.round(current + delta)));
+      const collapsed = next < WORKSPACE_SIDEBAR_MIN_WIDTH;
+      return { sidebarDragWidth: next, collapsed };
+    }),
+  commitSidebarWidth: () =>
+    set((state) => ({
+      sidebarDragWidth: null,
+      sidebarOverlay: !state.collapsed && state.sidebarOverlay,
+      sidebarWidth: !state.collapsed && state.sidebarDragWidth !== null ? state.sidebarDragWidth : state.sidebarWidth,
+    })),
   resetSidebarWidth: () => set({ sidebarWidth: WORKSPACE_SIDEBAR_WIDTH, sidebarDragWidth: null, collapsed: false }),
-  setGroupColor: (id, color) => set(state => {
-    const colors = { ...state.groupColors };
-    if (color) colors[id] = color; else delete colors[id];
-    return { groupColors: colors };
-  }),
-  moveWorkspaceArea: (id, over, after) => set(state => {
-    if (id === over) return state;
-    const order = state.workspaceOrder.filter(item => item !== id);
-    const index = order.indexOf(over);
-    if (index < 0) return state;
-    order.splice(index + (after ? 1 : 0), 0, id);
-    return { workspaceOrder: order };
-  }),
-  setAiPlacement: aiPlacement => set({ aiPlacement }),
+  setGroupColor: (id, color) =>
+    set((state) => {
+      const colors = { ...state.groupColors };
+      if (color) colors[id] = color;
+      else delete colors[id];
+      return { groupColors: colors };
+    }),
+  moveWorkspaceArea: (id, over, after) =>
+    set((state) => {
+      if (id === over) return state;
+      const order = state.workspaceOrder.filter((item) => item !== id);
+      const index = order.indexOf(over);
+      if (index < 0) return state;
+      order.splice(index + (after ? 1 : 0), 0, id);
+      return { workspaceOrder: order };
+    }),
+  setAiPlacement: (aiPlacement) => set({ aiPlacement }),
 }));
 
 useWorkspaceNavigation.subscribe((state, previous) => {
-  if (state.collapsed !== previous.collapsed || state.sidebarOverlay !== previous.sidebarOverlay || state.groupColors !== previous.groupColors
-    || state.sidebarWidth !== previous.sidebarWidth
-    || state.workspaceOrder !== previous.workspaceOrder) {
-    safeLocalStorageSet(STORAGE_KEY, JSON.stringify({ collapsed: state.collapsed || state.sidebarOverlay, groupColors: state.groupColors,
-      sidebarWidth: state.sidebarWidth, workspaceOrder: state.workspaceOrder }));
+  if (
+    state.collapsed !== previous.collapsed ||
+    state.sidebarOverlay !== previous.sidebarOverlay ||
+    state.groupColors !== previous.groupColors ||
+    state.sidebarWidth !== previous.sidebarWidth ||
+    state.workspaceOrder !== previous.workspaceOrder
+  ) {
+    safeLocalStorageSet(
+      STORAGE_KEY,
+      JSON.stringify({
+        collapsed: state.collapsed || state.sidebarOverlay,
+        groupColors: state.groupColors,
+        sidebarWidth: state.sidebarWidth,
+        workspaceOrder: state.workspaceOrder,
+      }),
+    );
   }
 });
 
 export function workspaceSidebarWidth(width = window.innerWidth, mainWidth = 360): number {
   const state = useWorkspaceNavigation.getState();
   const available = Math.min(WORKSPACE_SIDEBAR_MAX_WIDTH, width - mainWidth);
-  return state.collapsed || state.sidebarOverlay || available < WORKSPACE_SIDEBAR_MIN_WIDTH ? 0 : Math.min(state.sidebarDragWidth ?? state.sidebarWidth, available);
+  return state.collapsed || state.sidebarOverlay || available < WORKSPACE_SIDEBAR_MIN_WIDTH
+    ? 0
+    : Math.min(state.sidebarDragWidth ?? state.sidebarWidth, available);
 }
 
 export function orderedWorkspaceIds(ids: string[], savedOrder: string[]): string[] {
-  return [...savedOrder.filter(id => ids.includes(id)), ...ids.filter(id => !savedOrder.includes(id))];
+  return [...savedOrder.filter((id) => ids.includes(id)), ...ids.filter((id) => !savedOrder.includes(id))];
 }

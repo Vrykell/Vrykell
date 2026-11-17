@@ -25,13 +25,25 @@ export interface ConversationHistoryFilter {
 }
 
 export const DEFAULT_CONVERSATION_HISTORY_FILTER: ConversationHistoryFilter = {
-  query: '', type: 'all', date: 'all', sort: 'updated-desc', groupBy: 'day', dateField: 'updated', starredOnly: false,
+  query: '',
+  type: 'all',
+  date: 'all',
+  sort: 'updated-desc',
+  groupBy: 'day',
+  dateField: 'updated',
+  starredOnly: false,
 };
 
-export function updateConversationHistoryFilter(previous: ConversationHistoryFilter, patch: Partial<ConversationHistoryFilter>): ConversationHistoryFilter {
+export function updateConversationHistoryFilter(
+  previous: ConversationHistoryFilter,
+  patch: Partial<ConversationHistoryFilter>,
+): ConversationHistoryFilter {
   let sort = patch.sort ?? previous.sort;
-  const dateField = patch.dateField ?? (patch.sort && !patch.sort.startsWith('title')
-    ? conversationHistoryDateField(patch.sort) : previous.dateField ?? conversationHistoryDateField(previous.sort));
+  const dateField =
+    patch.dateField ??
+    (patch.sort && !patch.sort.startsWith('title')
+      ? conversationHistoryDateField(patch.sort)
+      : (previous.dateField ?? conversationHistoryDateField(previous.sort)));
   if (patch.dateField && !sort.startsWith('title')) sort = `${dateField}-${sort.endsWith('asc') ? 'asc' : 'desc'}`;
   return { ...previous, ...patch, dateField, sort };
 }
@@ -56,11 +68,20 @@ export function conversationHistoryDateField(sort: ConversationHistorySort): 'cr
   return sort.startsWith('created') ? 'created' : 'updated';
 }
 
-export function conversationHistoryTimestamp(conversation: Conversation, sort: ConversationHistorySort, dateField = conversationHistoryDateField(sort)): number {
+export function conversationHistoryTimestamp(
+  conversation: Conversation,
+  sort: ConversationHistorySort,
+  dateField = conversationHistoryDateField(sort),
+): number {
   return dateField === 'created' ? conversation.createdAt : conversation.updatedAt;
 }
 
-function matchesDate(conversation: Conversation, range: ConversationDateFilter, sort: ConversationHistorySort, dateField = conversationHistoryDateField(sort)): boolean {
+function matchesDate(
+  conversation: Conversation,
+  range: ConversationDateFilter,
+  sort: ConversationHistorySort,
+  dateField = conversationHistoryDateField(sort),
+): boolean {
   if (range === 'all') return true;
   if (range === 'today') {
     const dayStart = new Date();
@@ -79,21 +100,32 @@ export function filterConversations(
   searchAnnotations: ReadonlyMap<string, string> | null = null,
 ): Conversation[] {
   const normalizedQuery = filter.query.trim().toLocaleLowerCase();
-  const filtered = conversations.filter(conversation => {
+  const filtered = conversations.filter((conversation) => {
     if (starredIds && !starredIds.has(conversation.id)) return false;
     if (filter.type === 'discussion' && conversation.environment) return false;
     if ((filter.type === 'local' || filter.type === 'ssh') && conversation.environment?.kind !== filter.type) return false;
     if (!matchesDate(conversation, filter.date, filter.sort, filter.dateField)) return false;
     if (!normalizedQuery) return true;
     const target = conversation.environment?.ssh;
-    const haystack = [conversation.title, conversation.environment?.label ?? '', conversation.environment?.cwd ?? '', target?.host ?? '', target?.user ?? '', searchAnnotations?.get(conversation.id) ?? '']
-      .join(' ').toLocaleLowerCase();
+    const haystack = [
+      conversation.title,
+      conversation.environment?.label ?? '',
+      conversation.environment?.cwd ?? '',
+      target?.host ?? '',
+      target?.user ?? '',
+      searchAnnotations?.get(conversation.id) ?? '',
+    ]
+      .join(' ')
+      .toLocaleLowerCase();
     return haystack.includes(normalizedQuery);
   });
 
   const compare = (left: Conversation, right: Conversation) => {
     if (filter.sort === 'title-asc' || filter.sort === 'title-desc') {
-      return left.title.localeCompare(right.title, undefined, { numeric: true }) * (filter.sort === 'title-asc' ? 1 : -1) || left.id.localeCompare(right.id);
+      return (
+        left.title.localeCompare(right.title, undefined, { numeric: true }) * (filter.sort === 'title-asc' ? 1 : -1) ||
+        left.id.localeCompare(right.id)
+      );
     }
     const field = filter.sort.startsWith('created') ? 'createdAt' : 'updatedAt';
     return (left[field] - right[field]) * (filter.sort.endsWith('asc') ? 1 : -1) || left.id.localeCompare(right.id);
@@ -125,10 +157,16 @@ function dateTitle(timestamp: number, groupBy: Extract<ConversationHistoryGroupB
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'long' });
 }
 
-function conversationGroup(conversation: Conversation, groupBy: ConversationHistoryGroupBy, sort: ConversationHistorySort, dateField: 'created' | 'updated'): { id: string; title: string } {
+function conversationGroup(
+  conversation: Conversation,
+  groupBy: ConversationHistoryGroupBy,
+  sort: ConversationHistorySort,
+  dateField: 'created' | 'updated',
+): { id: string; title: string } {
   const timestamp = conversationHistoryTimestamp(conversation, sort, dateField);
   const date = new Date(timestamp);
-  if (groupBy === 'day') return { id: `day:${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`, title: dateTitle(timestamp, groupBy) };
+  if (groupBy === 'day')
+    return { id: `day:${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`, title: dateTitle(timestamp, groupBy) };
   if (groupBy === 'week') {
     const start = startOfWeek(date);
     return { id: `week:${start.getFullYear()}-${start.getMonth()}-${start.getDate()}`, title: dateTitle(timestamp, groupBy) };
@@ -136,8 +174,10 @@ function conversationGroup(conversation: Conversation, groupBy: ConversationHist
   if (groupBy === 'month') return { id: `month:${date.getFullYear()}-${date.getMonth()}`, title: dateTitle(timestamp, groupBy) };
   if (groupBy === 'cwd') {
     if (!conversation.environment) return { id: 'cwd:discussion', title: t('Discussion only') };
-    return historyDirectory({ ...conversation.environment, remoteId: conversation.environment.paneId, remoteLabel: conversation.environment.label },
-      t(conversation.environment.kind === 'ssh' ? 'Working directory not recorded' : 'No working directory'));
+    return historyDirectory(
+      { ...conversation.environment, remoteId: conversation.environment.paneId, remoteLabel: conversation.environment.label },
+      t(conversation.environment.kind === 'ssh' ? 'Working directory not recorded' : 'No working directory'),
+    );
   }
   if (groupBy === 'type') {
     const type = conversation.environment?.kind ?? 'discussion';
@@ -146,8 +186,17 @@ function conversationGroup(conversation: Conversation, groupBy: ConversationHist
   if (groupBy === 'terminal') {
     const environment = conversation.environment;
     const type = !environment ? 'discussion' : environment.kind === 'ssh' ? 'ssh' : environment.shellType || 'default';
-    return { id: `terminal:${type}`, title: type === 'discussion' ? t('Discussion only')
-      : type === 'default' ? t('Default terminal') : type === 'ssh' ? 'SSH' : shellTypeLabel(type) };
+    return {
+      id: `terminal:${type}`,
+      title:
+        type === 'discussion'
+          ? t('Discussion only')
+          : type === 'default'
+            ? t('Default terminal')
+            : type === 'ssh'
+              ? 'SSH'
+              : shellTypeLabel(type),
+    };
   }
   return { id: 'all', title: t('All conversations') };
 }
@@ -169,9 +218,12 @@ export function groupConversations(
     groups.set(id, group);
   }
   const timeGrouped = groupBy === 'day' || groupBy === 'week' || groupBy === 'month';
-  const ordered = [...groups.values()].sort((left, right) => timeGrouped
-    ? (conversationHistoryTimestamp(left.items[0], sort, dateField) - conversationHistoryTimestamp(right.items[0], sort, dateField)) * (sort.endsWith('asc') && !sort.startsWith('title') ? 1 : -1)
-    : left.title.localeCompare(right.title, undefined, { numeric: true }) || left.id.localeCompare(right.id));
+  const ordered = [...groups.values()].sort((left, right) =>
+    timeGrouped
+      ? (conversationHistoryTimestamp(left.items[0], sort, dateField) - conversationHistoryTimestamp(right.items[0], sort, dateField)) *
+        (sort.endsWith('asc') && !sort.startsWith('title') ? 1 : -1)
+      : left.title.localeCompare(right.title, undefined, { numeric: true }) || left.id.localeCompare(right.id),
+  );
   if (!pinnedIds?.size) return ordered;
   return [...ordered.filter((group) => pinnedIds.has(group.id)), ...ordered.filter((group) => !pinnedIds.has(group.id))];
 }
@@ -181,7 +233,10 @@ export function conversationMarkdown(conversation: Conversation, messages: Array
   const environment = conversation.environment;
   const lines = [`# ${conversation.title}`, ''];
   if (environment) lines.push(`Environment: ${environment.label}${environment.cwd ? ` · ${environment.cwd}` : ''}`, '');
-  lines.push(`Created: ${new Date(conversation.createdAt).toLocaleString()}`, `Updated: ${new Date(conversation.updatedAt).toLocaleString()}`);
+  lines.push(
+    `Created: ${new Date(conversation.createdAt).toLocaleString()}`,
+    `Updated: ${new Date(conversation.updatedAt).toLocaleString()}`,
+  );
   for (const message of messages) {
     lines.push('', message.role === 'assistant' ? '## Assistant' : '## User', '', message.content);
   }

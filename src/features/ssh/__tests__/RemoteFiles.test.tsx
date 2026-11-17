@@ -3,7 +3,17 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import type { ComponentProps } from 'react';
 import type FilePanel from '@features/files/components/FilePanel';
 
-const mocks = vi.hoisted(() => ({ write: vi.fn(), toast: vi.fn(), focus: vi.fn(), debug: vi.fn(), upload: vi.fn(), download: vi.fn(), open: vi.fn(), retry: vi.fn(), fileError: '' }));
+const mocks = vi.hoisted(() => ({
+  write: vi.fn(),
+  toast: vi.fn(),
+  focus: vi.fn(),
+  debug: vi.fn(),
+  upload: vi.fn(),
+  download: vi.fn(),
+  open: vi.fn(),
+  retry: vi.fn(),
+  fileError: '',
+}));
 vi.mock('@tauri-apps/plugin-dialog', () => ({ open: mocks.open }));
 vi.mock('@platform/pty', () => ({ ptyWrite: mocks.write }));
 vi.mock('@ui/feedback/Toast', () => ({ useToastStore: { getState: () => ({ addToast: mocks.toast }) } }));
@@ -11,18 +21,30 @@ vi.mock('@features/terminal/services/terminalDebug', () => ({ terminalDebug: moc
 vi.mock('@features/terminal/services/terminalClipboard', () => ({ getPaneTerminal: (id: string) => ({ focus: () => mocks.focus(id) }) }));
 vi.mock('@features/files/model/fileOps', () => ({ fileOpsFor: () => ({ upload: mocks.upload, download: mocks.download }) }));
 vi.mock('@features/files/components/FilePanel', () => ({
-  default: (props: ComponentProps<typeof FilePanel>) => <>
-    {mocks.fileError && props.renderError?.(mocks.fileError, mocks.retry)}
-    <button onClick={() => props.openEntry?.({ name: 'config.txt', path: '/home/test/config.txt', is_dir: false })}>Open remote file</button>
-    <button onClick={() => props.handlers?.onOpenEditor?.({ name: 'config.txt', path: '/home/test/config.txt', is_dir: false })}>Open remote file from menu</button>
-    <button onClick={() => props.onSyncToTerminal?.('/home/test')}>Sync directory</button>
-    <button onClick={() => props.onExternalDrop?.(['/local/item.zip'], { rowPath: null, dir: '/home/test' })}>Drop upload</button>
-    <button onClick={() => props.handlers?.onUpload?.('file')}>Upload files</button>
-    <button onClick={() => props.handlers?.onUpload?.('dir')}>Upload folder</button>
-    <button onClick={() => props.handlers?.onDownload?.([{ name: 'item.zip', path: '/home/test/item.zip', is_dir: false }])}>Download item</button>
-    <button onClick={() => props.handlers?.onDownload?.([{ name: 'folder', path: '/home/test/folder', is_dir: true }])}>Download folder</button>
-    <button onClick={() => void props.prepareNativeDrag?.([{ name: 'drag.zip', path: '/home/test/drag.zip', is_dir: false }])}>Drag download</button>
-  </>,
+  default: (props: ComponentProps<typeof FilePanel>) => (
+    <>
+      {mocks.fileError && props.renderError?.(mocks.fileError, mocks.retry)}
+      <button onClick={() => props.openEntry?.({ name: 'config.txt', path: '/home/test/config.txt', is_dir: false })}>
+        Open remote file
+      </button>
+      <button onClick={() => props.handlers?.onOpenEditor?.({ name: 'config.txt', path: '/home/test/config.txt', is_dir: false })}>
+        Open remote file from menu
+      </button>
+      <button onClick={() => props.onSyncToTerminal?.('/home/test')}>Sync directory</button>
+      <button onClick={() => props.onExternalDrop?.(['/local/item.zip'], { rowPath: null, dir: '/home/test' })}>Drop upload</button>
+      <button onClick={() => props.handlers?.onUpload?.('file')}>Upload files</button>
+      <button onClick={() => props.handlers?.onUpload?.('dir')}>Upload folder</button>
+      <button onClick={() => props.handlers?.onDownload?.([{ name: 'item.zip', path: '/home/test/item.zip', is_dir: false }])}>
+        Download item
+      </button>
+      <button onClick={() => props.handlers?.onDownload?.([{ name: 'folder', path: '/home/test/folder', is_dir: true }])}>
+        Download folder
+      </button>
+      <button onClick={() => void props.prepareNativeDrag?.([{ name: 'drag.zip', path: '/home/test/drag.zip', is_dir: false }])}>
+        Drag download
+      </button>
+    </>
+  ),
 }));
 
 import RemoteFiles from '@features/ssh/components/RemoteFiles';
@@ -39,7 +61,8 @@ const sshPane = (id: string, connectionId = 'ssh-1') => leaf({ id, kind: 'ssh', 
 it('opens remote text with the built-in editor when selected', () => {
   useEditorPreferences.setState({ remoteOpenMode: 'editor' });
   const open = vi.spyOn(useSessionStore.getState(), 'openEditorFile').mockReturnValue('editor');
-  render(<RemoteFiles conn={conn} />); fireEvent.click(screen.getByRole('button', { name: 'Open remote file' }));
+  render(<RemoteFiles conn={conn} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Open remote file' }));
   expect(open).toHaveBeenCalledWith({ path: '/home/test/config.txt', connectionId: conn.id });
   expect(mocks.write).not.toHaveBeenCalled();
 });
@@ -47,7 +70,8 @@ it('opens remote text with the built-in editor when selected', () => {
 it('routes the row menu open action through the same preferred editor', () => {
   useEditorPreferences.setState({ remoteOpenMode: 'editor' });
   const open = vi.spyOn(useSessionStore.getState(), 'openEditorFile').mockReturnValue('editor');
-  render(<RemoteFiles conn={conn} />); fireEvent.click(screen.getByRole('button', { name: 'Open remote file from menu' }));
+  render(<RemoteFiles conn={conn} />);
+  fireEvent.click(screen.getByRole('button', { name: 'Open remote file from menu' }));
   expect(open).toHaveBeenCalledWith({ path: '/home/test/config.txt', connectionId: conn.id });
   expect(mocks.write).not.toHaveBeenCalled();
 });
@@ -91,7 +115,7 @@ describe('remote file terminal routing', () => {
     expect(mocks.upload).toHaveBeenCalledExactlyOnceWith('/home/test', '/local/item.zip');
   });
 
-  it.each(['file', 'dir'] as const)('uploads each selected %s once through the picker', async kind => {
+  it.each(['file', 'dir'] as const)('uploads each selected %s once through the picker', async (kind) => {
     const paths = kind === 'dir' ? ['/local/folder'] : ['/local/first.txt', '/local/second.txt'];
     mocks.open.mockResolvedValue(kind === 'dir' ? paths[0] : paths);
     render(<RemoteFiles conn={conn} />);
@@ -101,11 +125,13 @@ describe('remote file terminal routing', () => {
     expect(mocks.open).toHaveBeenCalledOnce();
   });
 
-  it.each(['Download item', 'Download folder', 'Drag download'])('downloads once for %s', async action => {
+  it.each(['Download item', 'Download folder', 'Drag download'])('downloads once for %s', async (action) => {
     render(<RemoteFiles conn={conn} />);
     fireEvent.click(screen.getByRole('button', { name: action }));
     await waitFor(() => expect(mocks.download).toHaveBeenCalledOnce());
-    expect(mocks.download).toHaveBeenCalledWith(action === 'Download folder' ? '/home/test/folder' : action === 'Drag download' ? '/home/test/drag.zip' : '/home/test/item.zip');
+    expect(mocks.download).toHaveBeenCalledWith(
+      action === 'Download folder' ? '/home/test/folder' : action === 'Drag download' ? '/home/test/drag.zip' : '/home/test/item.zip',
+    );
   });
 
   it('opens the download manager for menu and native drag downloads', async () => {
@@ -125,26 +151,47 @@ describe('remote file terminal routing', () => {
     await waitFor(() => expect(mocks.write).toHaveBeenCalledWith('ssh-session', expect.stringContaining("'/home/test/config.txt'")));
     expect(mocks.toast).not.toHaveBeenCalled();
     expect(mocks.focus).toHaveBeenCalledWith('tab#0');
-    expect(mocks.debug).toHaveBeenCalledWith('remote-file-terminal-action', { action: 'edit', paneId: 'tab#0', tabId: 'tab', hasSession: true, bound: false });
+    expect(mocks.debug).toHaveBeenCalledWith('remote-file-terminal-action', {
+      action: 'edit',
+      paneId: 'tab#0',
+      tabId: 'tab',
+      hasSession: true,
+      bound: false,
+    });
   });
 
   it('writes to the bound pane instead of the focused pane', async () => {
-    useSessionStore.setState({ tabs: [
-      { id: 'tab', kind: 'session', title: 'SSH', layout: sshPane('tab#0') },
-      { id: 'other', kind: 'session', title: 'Other', layout: sshPane('other#0') },
-    ] });
+    useSessionStore.setState({
+      tabs: [
+        { id: 'tab', kind: 'session', title: 'SSH', layout: sshPane('tab#0') },
+        { id: 'other', kind: 'session', title: 'Other', layout: sshPane('other#0') },
+      ],
+    });
     useTerminalStore.setState({ focusedPaneId: 'tab#0', sessions: { 'tab#0': 'ssh-session', 'other#0': 'bound-session' } });
     const terminal = { isBound: true, paneId: 'other#0', cwd: '/home/other' } as import('@features/workspace').PanelTerminalState;
     render(<RemoteFiles conn={conn} terminal={terminal} />);
     fireEvent.click(screen.getByRole('button', { name: 'Open remote file' }));
     await waitFor(() => expect(mocks.write).toHaveBeenCalledWith('bound-session', expect.stringContaining("'/home/test/config.txt'")));
     expect(mocks.debug).toHaveBeenCalledWith('remote-file-terminal-action', {
-      action: 'edit', paneId: 'other#0', tabId: 'tab', hasSession: true, bound: true,
+      action: 'edit',
+      paneId: 'other#0',
+      tabId: 'tab',
+      hasSession: true,
+      bound: true,
     });
   });
 
   it('uses the focused matching split pane for file opening and directory sync', async () => {
-    useSessionStore.setState({ tabs: [{ id: 'tab', kind: 'session', title: 'SSH', layout: { type: 'split', dir: 'row', ratio: 0.5, first: sshPane('tab#0'), second: sshPane('tab#1') } }] });
+    useSessionStore.setState({
+      tabs: [
+        {
+          id: 'tab',
+          kind: 'session',
+          title: 'SSH',
+          layout: { type: 'split', dir: 'row', ratio: 0.5, first: sshPane('tab#0'), second: sshPane('tab#1') },
+        },
+      ],
+    });
     useTerminalStore.setState({ focusedPaneId: 'tab#1', sessions: { 'tab#0': 'first', 'tab#1': 'second', tab: 'wrong-tab-session' } });
     render(<RemoteFiles conn={conn} />);
     fireEvent.click(screen.getByRole('button', { name: 'Open remote file' }));

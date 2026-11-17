@@ -11,7 +11,9 @@ const native = vi.hoisted(() => ({
 }));
 
 vi.mock('@platform/runtime', () => ({
-  get isMacOS() { return native.macOS; },
+  get isMacOS() {
+    return native.macOS;
+  },
   usesCustomWindowControls: false,
 }));
 vi.mock('@tauri-apps/api/window', () => ({
@@ -36,24 +38,41 @@ beforeEach(() => {
   native.resize = undefined;
   native.isFullscreen.mockReset().mockImplementation(() => Promise.resolve(native.fullscreen));
   native.stop.mockClear();
-  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
   useSessionStore.setState({ tabs: [], activeId: undefined });
   useDockStore.setState({ rightZone: ['chat'], rightPanels: [] });
   useUiStore.setState({ globalSearchOpen: false });
 });
-afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe('desktop titlebar', () => {
   it('keeps resources out of the titlebar and opens them from the focused terminal action', () => {
     useWorkspaceNavigation.setState({ area: 'terminal' });
     useUiStore.setState({ settingsOpen: false });
     useSessionStore.getState().addTab({ kind: 'ssh', ssh: { connectionId: 'host', name: 'Host', host: 'test.local', user: 'ops' } });
-    const { container } = render(<><TopDock /><SshResourcesAction /></>);
+    const { container } = render(
+      <>
+        <TopDock />
+        <SshResourcesAction />
+      </>,
+    );
     const control = screen.getByRole('button', { name: 'SSH 资源面板' });
     expect(container.querySelector('.workspace-titlebar')?.contains(control)).toBe(false);
     fireEvent.click(control);
     expect(useAuxiliarySidebarStore.getState().requestedPane).toBeDefined();
-    act(() => { useSessionStore.getState().addTab({ kind: 'local' }); useTerminalStore.setState({ focusedPaneId: undefined }); });
+    act(() => {
+      useSessionStore.getState().addTab({ kind: 'local' });
+      useTerminalStore.setState({ focusedPaneId: undefined });
+    });
     expect(screen.queryByRole('button', { name: 'SSH 资源面板' })).toBeNull();
   });
   it('never adds a connection-panel action to the titlebar', () => {
@@ -82,7 +101,9 @@ describe('desktop titlebar', () => {
     act(() => fireEvent.click(forward));
     expect(useWorkspaceNavigation.getState().area).toBe('ssh');
     expect(forward).toBeDisabled();
-    act(() => useWorkspaceNavigation.setState({ area: 'terminal', previousArea: 'terminal', areaHistory: ['terminal'], areaHistoryIndex: 0 }));
+    act(() =>
+      useWorkspaceNavigation.setState({ area: 'terminal', previousArea: 'terminal', areaHistory: ['terminal'], areaHistoryIndex: 0 }),
+    );
   });
   it('uses the native-control layout and keeps search clickable', async () => {
     const { container } = render(<TopDock />);
@@ -102,10 +123,14 @@ describe('desktop titlebar', () => {
     const header = container.querySelector('header');
     await waitFor(() => expect(native.resize).toBeDefined());
     native.fullscreen = true;
-    await act(async () => { native.resize?.(); });
+    await act(async () => {
+      native.resize?.();
+    });
     expect(header).toHaveAttribute('data-fullscreen', 'true');
     native.fullscreen = false;
-    await act(async () => { native.resize?.(); });
+    await act(async () => {
+      native.resize?.();
+    });
     expect(header).toHaveAttribute('data-fullscreen', 'false');
     unmount();
     expect(native.stop).toHaveBeenCalledOnce();

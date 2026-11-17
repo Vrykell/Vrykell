@@ -39,7 +39,20 @@ const LINE_THICKNESS = 1;
  * document-level listeners must keep working until the button is released so the user
  * can drag back out of the collapse.
  */
-export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, testId, label, valueNow, valueMin, valueMax, onReset, lineThickness = LINE_THICKNESS, showRestingLine = true }: ResizeHandleProps) {
+export default function ResizeHandle({
+  axis,
+  edge = 'right',
+  onDelta,
+  onUp,
+  testId,
+  label,
+  valueNow,
+  valueMin,
+  valueMax,
+  onReset,
+  lineThickness = LINE_THICKNESS,
+  showRestingLine = true,
+}: ResizeHandleProps) {
   const startRef = useRef<{ clientX: number; clientY: number } | null>(null);
   const cleanupRef = useRef<() => void>(() => {});
   const lineRef = useRef<HTMLDivElement>(null);
@@ -64,16 +77,24 @@ export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, test
       aria-valuenow={valueNow}
       aria-valuemin={valueMin}
       aria-valuemax={valueMax}
-      aria-orientation={label ? isX ? 'vertical' : 'horizontal' : undefined}
+      aria-orientation={label ? (isX ? 'vertical' : 'horizontal') : undefined}
       tabIndex={label ? 0 : undefined}
       data-tip={label}
       onDoubleClick={onReset}
-      onKeyDown={event => {
+      onKeyDown={(event) => {
         if (!label) return;
-        if (event.key === 'Home' && onReset) { event.preventDefault(); onReset(); return; }
+        if (event.key === 'Home' && onReset) {
+          event.preventDefault();
+          onReset();
+          return;
+        }
         const negative = isX ? 'ArrowLeft' : 'ArrowUp';
         const positive = isX ? 'ArrowRight' : 'ArrowDown';
-        if (event.key === negative || event.key === positive) { event.preventDefault(); onDelta(event.key === negative ? -16 : 16); onUp?.(); }
+        if (event.key === negative || event.key === positive) {
+          event.preventDefault();
+          onDelta(event.key === negative ? -16 : 16);
+          onUp?.();
+        }
       }}
       onMouseDown={(e) => {
         e.preventDefault();
@@ -137,8 +158,7 @@ export default function ResizeHandle({ axis, edge = 'right', onDelta, onUp, test
         ...(isX
           ? { [edge === 'right' ? 'right' : 'left']: -HANDLE_THICKNESS / 2, top: 0, bottom: 0, width: HANDLE_THICKNESS }
           : { left: 0, right: 0, top: -HANDLE_THICKNESS / 2, height: HANDLE_THICKNESS }),
-      }}
-    >
+      }}>
       <div
         data-resize-line
         ref={lineRef}

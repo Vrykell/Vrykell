@@ -16,7 +16,7 @@ test('restores the saved directory of a legacy local terminal session', async ({
   });
 
   await page.goto('/', { waitUntil: 'domcontentloaded' });
-  await expect.poll(() => page.evaluate(() =>
-    (window as unknown as { __PTY_SPAWNS__: { cwd?: string }[] }).__PTY_SPAWNS__.map((spawn) => spawn.cwd),
-  )).toContain('/saved/project');
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: { cwd?: string }[] }).__PTY_SPAWNS__.map((spawn) => spawn.cwd)))
+    .toContain('/saved/project');
 });

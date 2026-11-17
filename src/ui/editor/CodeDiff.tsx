@@ -13,17 +13,39 @@ import '@ui/editor/CodeDiff.css';
 type Runtime = typeof import('@ui/editor/code/runtime');
 
 /** Lazily load the comparison surface and keep its models local to this instance. */
-export default function CodeDiff({ original, modified, path, sideBySide, originalLabel, modifiedLabel, onLayoutChange, toolbar, notice }: {
-  original: string; modified: string; path: string; sideBySide: boolean; originalLabel: string; modifiedLabel: string; onLayoutChange?: (split: boolean) => void;
-  toolbar?: (navigation: ReactNode, navigate: (direction: 'previous' | 'next') => void) => ReactNode; notice?: ReactNode;
+export default function CodeDiff({
+  original,
+  modified,
+  path,
+  sideBySide,
+  originalLabel,
+  modifiedLabel,
+  onLayoutChange,
+  toolbar,
+  notice,
+}: {
+  original: string;
+  modified: string;
+  path: string;
+  sideBySide: boolean;
+  originalLabel: string;
+  modifiedLabel: string;
+  onLayoutChange?: (split: boolean) => void;
+  toolbar?: (navigation: ReactNode, navigate: (direction: 'previous' | 'next') => void) => ReactNode;
+  notice?: ReactNode;
 }) {
-  const fontPreset = useTypographyStore(state => state.editorFontPreset);
-  const fontSize = useTypographyStore(state => state.editorFontSize);
-  const fontWeight = useTypographyStore(state => state.editorFontWeight);
-  const lineHeight = useTypographyStore(state => state.editorLineHeight);
-  const lineNumbers = useEditorPreferences(state => state.lineNumbers);
+  const fontPreset = useTypographyStore((state) => state.editorFontPreset);
+  const fontSize = useTypographyStore((state) => state.editorFontSize);
+  const fontWeight = useTypographyStore((state) => state.editorFontWeight);
+  const lineHeight = useTypographyStore((state) => state.editorLineHeight);
+  const lineNumbers = useEditorPreferences((state) => state.lineNumbers);
   const host = useRef<HTMLDivElement>(null);
-  const instance = useRef<{ view: editor.IStandaloneDiffEditor; original: editor.ITextModel; modified: editor.ITextModel; runtime: Runtime } | null>(null);
+  const instance = useRef<{
+    view: editor.IStandaloneDiffEditor;
+    original: editor.ITextModel;
+    modified: editor.ITextModel;
+    runtime: Runtime;
+  } | null>(null);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
   const [attempt, setAttempt] = useState(0);
@@ -52,48 +74,80 @@ export default function CodeDiff({ original, modified, path, sideBySide, origina
     let frame = 0;
     setError('');
     diagnostic('code-diff-load', { stage: 'start' });
-    void import('@ui/editor/code/runtime').then(runtime => {
-      if (disposed || !host.current) return;
-      runtime.applyCodeTheme();
-      const typography = useTypographyStore.getState();
-      const view = runtime.editorApi.editor.createDiffEditor(host.current, {
-        automaticLayout: false, readOnly: true, originalEditable: false, ignoreTrimWhitespace: false,
-        minimap: { enabled: false }, scrollBeyondLastLine: false, renderOverviewRuler: false,
-        overviewRulerLanes: 0, overviewRulerBorder: false, hideCursorInOverviewRuler: true,
-        renderSideBySide: false, useInlineViewWhenSpaceIsLimited: false,
-        enableSplitViewResizing: true, contextmenu: false,
-        scrollbar: { useShadows: false }, renderMarginRevertIcon: false,
-        fontFamily: terminalFontFamily(typography.editorFontPreset), fontSize: typography.editorFontSize,
-        fontWeight: String(typography.editorFontWeight), lineHeight: typography.editorFontSize * typography.editorLineHeight,
-        lineNumbers: useEditorPreferences.getState().lineNumbers ? 'on' : 'off', lineNumbersMinChars: 3, lineDecorationsWidth: 16,
-        theme: 'workspace-code', hideUnchangedRegions: { enabled: true },
-        accessibilityVerbose: false, padding: { top: 8 },
+    void import('@ui/editor/code/runtime')
+      .then((runtime) => {
+        if (disposed || !host.current) return;
+        runtime.applyCodeTheme();
+        const typography = useTypographyStore.getState();
+        const view = runtime.editorApi.editor.createDiffEditor(host.current, {
+          automaticLayout: false,
+          readOnly: true,
+          originalEditable: false,
+          ignoreTrimWhitespace: false,
+          minimap: { enabled: false },
+          scrollBeyondLastLine: false,
+          renderOverviewRuler: false,
+          overviewRulerLanes: 0,
+          overviewRulerBorder: false,
+          hideCursorInOverviewRuler: true,
+          renderSideBySide: false,
+          useInlineViewWhenSpaceIsLimited: false,
+          enableSplitViewResizing: true,
+          contextmenu: false,
+          scrollbar: { useShadows: false },
+          renderMarginRevertIcon: false,
+          fontFamily: terminalFontFamily(typography.editorFontPreset),
+          fontSize: typography.editorFontSize,
+          fontWeight: String(typography.editorFontWeight),
+          lineHeight: typography.editorFontSize * typography.editorLineHeight,
+          lineNumbers: useEditorPreferences.getState().lineNumbers ? 'on' : 'off',
+          lineNumbersMinChars: 3,
+          lineDecorationsWidth: 16,
+          theme: 'workspace-code',
+          hideUnchangedRegions: { enabled: true },
+          accessibilityVerbose: false,
+          padding: { top: 8 },
+        });
+        const originalModel = runtime.editorApi.editor.createModel('');
+        const modifiedModel = runtime.editorApi.editor.createModel('');
+        view.setModel({ original: originalModel, modified: modifiedModel });
+        instance.current = { view, original: originalModel, modified: modifiedModel, runtime };
+        const bounds = host.current.getBoundingClientRect();
+        if (bounds.width > 0 && bounds.height > 0) view.layout({ width: bounds.width, height: bounds.height });
+        observer = new MutationObserver(() => {
+          cancelAnimationFrame(frame);
+          frame = requestAnimationFrame(() => runtime.applyCodeTheme());
+        });
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'data-theme'] });
+        setReady(true);
+        diagnostic('code-diff-load', { stage: 'complete' });
+      })
+      .catch((reason) => {
+        if (!disposed) {
+          setError(String(reason));
+          diagnostic('code-diff-load', { stage: 'error' }, 'error');
+        }
       });
-      const originalModel = runtime.editorApi.editor.createModel('');
-      const modifiedModel = runtime.editorApi.editor.createModel('');
-      view.setModel({ original: originalModel, modified: modifiedModel });
-      instance.current = { view, original: originalModel, modified: modifiedModel, runtime };
-      const bounds = host.current.getBoundingClientRect();
-      if (bounds.width > 0 && bounds.height > 0) view.layout({ width: bounds.width, height: bounds.height });
-      observer = new MutationObserver(() => {
-        cancelAnimationFrame(frame);
-        frame = requestAnimationFrame(() => runtime.applyCodeTheme());
-      });
-      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['style', 'data-theme'] });
-      setReady(true);
-      diagnostic('code-diff-load', { stage: 'complete' });
-    }).catch(reason => {
-      if (!disposed) { setError(String(reason)); diagnostic('code-diff-load', { stage: 'error' }, 'error'); }
-    });
     return () => {
       disposed = true;
-      observer?.disconnect(); cancelAnimationFrame(frame);
+      observer?.disconnect();
+      cancelAnimationFrame(frame);
       const current = instance.current;
       instance.current = null;
-      current?.view.dispose(); current?.original.dispose(); current?.modified.dispose();
+      current?.view.dispose();
+      current?.original.dispose();
+      current?.modified.dispose();
     };
   }, [attempt]);
-  useEffect(() => { instance.current?.view.updateOptions({ fontFamily: terminalFontFamily(fontPreset), fontSize, fontWeight: String(fontWeight), lineHeight: fontSize * lineHeight, lineNumbers: lineNumbers ? 'on' : 'off' }); }, [ready, fontPreset, fontSize, fontWeight, lineHeight, lineNumbers]);
+  useEffect(() => {
+    instance.current?.view.updateOptions({
+      fontFamily: terminalFontFamily(fontPreset),
+      fontSize,
+      fontWeight: String(fontWeight),
+      lineHeight: fontSize * lineHeight,
+      lineNumbers: lineNumbers ? 'on' : 'off',
+    });
+  }, [ready, fontPreset, fontSize, fontWeight, lineHeight, lineNumbers]);
   useEffect(() => {
     const current = instance.current;
     if (!ready || !current) return;
@@ -108,18 +162,70 @@ export default function CodeDiff({ original, modified, path, sideBySide, origina
     current.view.getModifiedEditor().updateOptions({ ariaLabel: modifiedLabel });
     if (state) current.view.restoreViewState(state);
   }, [ready, original, modified, path, split, originalLabel, modifiedLabel]);
-  const navigation = <>
-      <IconButton compact aria-label={t('Previous change')} data-tip={t('Previous change')} disabled={!ready}
-        onClick={() => instance.current?.view.goToDiff('previous')}><ArrowUp size={iconSizes.compact} /></IconButton>
-      <IconButton compact aria-label={t('Next change')} data-tip={t('Next change')} disabled={!ready}
-        onClick={() => instance.current?.view.goToDiff('next')}><ArrowDown size={iconSizes.compact} /></IconButton>
-  </>;
-  return <div className="code-diff" data-testid="code-diff" data-layout={split ? 'split' : 'inline'}>
-    {toolbar ? toolbar(navigation, direction => instance.current?.view.goToDiff(direction)) : <div className="code-diff-labels"><span>{originalLabel}{!split && <> → {modifiedLabel}</>}</span>{split && <span>{modifiedLabel}</span>}{navigation}</div>}
-    {notice}
-    {toolbar && split && <div className="code-diff-labels code-diff-side-labels"><span>{originalLabel}</span><span>{modifiedLabel}</span></div>}
-    {!ready && !error && <div className="code-diff-status" role="status">{t('Loading comparison…')}</div>}
-    {error && <ErrorBox title={t('Could not load comparison')} details={error} actions={<TextButton onClick={() => { setReady(false); setAttempt(value => value + 1); }}>{t('Retry')}</TextButton>} />}
-    <div className="code-diff-frame"><div ref={host} className="code-diff-host" style={{ visibility: ready ? 'visible' : 'hidden' }} /></div>
-  </div>;
+  const navigation = (
+    <>
+      <IconButton
+        compact
+        aria-label={t('Previous change')}
+        data-tip={t('Previous change')}
+        disabled={!ready}
+        onClick={() => instance.current?.view.goToDiff('previous')}>
+        <ArrowUp size={iconSizes.compact} />
+      </IconButton>
+      <IconButton
+        compact
+        aria-label={t('Next change')}
+        data-tip={t('Next change')}
+        disabled={!ready}
+        onClick={() => instance.current?.view.goToDiff('next')}>
+        <ArrowDown size={iconSizes.compact} />
+      </IconButton>
+    </>
+  );
+  return (
+    <div className="code-diff" data-testid="code-diff" data-layout={split ? 'split' : 'inline'}>
+      {toolbar ? (
+        toolbar(navigation, (direction) => instance.current?.view.goToDiff(direction))
+      ) : (
+        <div className="code-diff-labels">
+          <span>
+            {originalLabel}
+            {!split && <> → {modifiedLabel}</>}
+          </span>
+          {split && <span>{modifiedLabel}</span>}
+          {navigation}
+        </div>
+      )}
+      {notice}
+      {toolbar && split && (
+        <div className="code-diff-labels code-diff-side-labels">
+          <span>{originalLabel}</span>
+          <span>{modifiedLabel}</span>
+        </div>
+      )}
+      {!ready && !error && (
+        <div className="code-diff-status" role="status">
+          {t('Loading comparison…')}
+        </div>
+      )}
+      {error && (
+        <ErrorBox
+          title={t('Could not load comparison')}
+          details={error}
+          actions={
+            <TextButton
+              onClick={() => {
+                setReady(false);
+                setAttempt((value) => value + 1);
+              }}>
+              {t('Retry')}
+            </TextButton>
+          }
+        />
+      )}
+      <div className="code-diff-frame">
+        <div ref={host} className="code-diff-host" style={{ visibility: ready ? 'visible' : 'hidden' }} />
+      </div>
+    </div>
+  );
 }

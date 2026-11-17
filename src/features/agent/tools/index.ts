@@ -38,10 +38,7 @@ export type { ToolContext } from '@features/agent/stores/permissions';
  * Windows rule (a permanent `Remove-Item -Force` sailed through with no approval reason).
  * SSH panes always run a POSIX shell on the remote host.
  */
-export function shellFamilyForPane(
-  pane: { kind?: string; shellType?: string | null } | undefined,
-  windows: boolean = isWindows,
-): string {
+export function shellFamilyForPane(pane: { kind?: string; shellType?: string | null } | undefined, windows: boolean = isWindows): string {
   if (pane?.shellType) return pane.shellType;
   if (pane?.kind === 'ssh') return 'posix';
   return windows ? 'powershell' : 'posix';
@@ -60,15 +57,16 @@ export function buildTools(ctx: ToolContext) {
       inputSchema: z.object({
         command: z.string().describe('Complete shell command'),
       }),
-      execute: (input, { abortSignal, toolCallId }) => queueCommand(async () => {
-        const g = await gate('run_command', input, toolCallId, ctx);
-        if (!g.proceed) return g.result;
-        const command = g.command ?? input.command;
-        const t = await ensureSkillAccess(command, toolCallId, ctx);
-        if (!t.proceed) return { ok: false, denied: true, error: t.error };
-        const result = await runCommandAndWait(command, { signal: abortSignal ?? ctx.signal, toolCallId, paneId: ctx.paneId });
-        return g.command === undefined ? result : { ...result, command };
-      }, abortSignal ?? ctx.signal),
+      execute: (input, { abortSignal, toolCallId }) =>
+        queueCommand(async () => {
+          const g = await gate('run_command', input, toolCallId, ctx);
+          if (!g.proceed) return g.result;
+          const command = g.command ?? input.command;
+          const t = await ensureSkillAccess(command, toolCallId, ctx);
+          if (!t.proceed) return { ok: false, denied: true, error: t.error };
+          const result = await runCommandAndWait(command, { signal: abortSignal ?? ctx.signal, toolCallId, paneId: ctx.paneId });
+          return g.command === undefined ? result : { ...result, command };
+        }, abortSignal ?? ctx.signal),
     }),
     ...buildFileTools(ctx),
     ...buildSearchTools(ctx),

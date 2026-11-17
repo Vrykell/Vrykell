@@ -20,7 +20,8 @@ test.beforeEach(async ({ page }) => {
 test.describe('Model configuration page', () => {
   test('supported capability badges use distinct theme colors', async ({ page }, testInfo) => {
     await page.evaluate(async () => {
-      const { setAiModels, useAiConfigStore } = await import('/src/features/agent/stores/aiConfig.ts') as typeof import('../src/features/agent/stores/aiConfig');
+      const { setAiModels, useAiConfigStore } =
+        (await import('/src/features/agent/stores/aiConfig.ts')) as typeof import('../src/features/agent/stores/aiConfig');
       const { models, activeModel } = useAiConfigStore.getState();
       await setAiModels([...models, { ...models[0]!, id: 'main-extra', name: 'Second model' }], activeModel);
     });
@@ -30,16 +31,21 @@ test.describe('Model configuration page', () => {
       await gotoSetting(page, '模型配置');
       const badges = page.getByTestId('model-row').first().locator('.model-cap-chip');
       await expect(badges).toHaveCount(4);
-      const colors = await badges.evaluateAll(elements => elements.map(element => {
-        const style = getComputedStyle(element);
-        return { foreground: style.color, background: style.backgroundColor, radius: style.borderRadius };
-      }));
-      expect(new Set(colors.map(color => color.foreground)).size).toBe(4);
+      const colors = await badges.evaluateAll((elements) =>
+        elements.map((element) => {
+          const style = getComputedStyle(element);
+          return { foreground: style.color, background: style.backgroundColor, radius: style.borderRadius };
+        }),
+      );
+      expect(new Set(colors.map((color) => color.foreground)).size).toBe(4);
       for (const color of colors) {
         expect(color.background).not.toBe('rgba(0, 0, 0, 0)');
         expect(color.radius).toBe('999px');
       }
-      await page.locator('.settings-model-group').first().screenshot({ path: testInfo.outputPath(`capability-colors-${theme}.png`) });
+      await page
+        .locator('.settings-model-group')
+        .first()
+        .screenshot({ path: testInfo.outputPath(`capability-colors-${theme}.png`) });
     }
   });
 
@@ -53,16 +59,19 @@ test.describe('Model configuration page', () => {
     const vision = dialog.getByRole('button', { name: '视觉', exact: true });
     const reasoning = dialog.getByRole('button', { name: '推理', exact: true });
     await expect(vision).toHaveAttribute('aria-pressed', 'false');
-    await vision.click(); await reasoning.click();
+    await vision.click();
+    await reasoning.click();
     await expect(vision).toHaveAttribute('aria-pressed', 'true');
     await expect(reasoning).toHaveAttribute('aria-pressed', 'true');
-    await expect.poll(async () => {
-      const [visionColor, reasoningColor] = await Promise.all([
-        vision.evaluate(element => getComputedStyle(element).backgroundColor),
-        reasoning.evaluate(element => getComputedStyle(element).backgroundColor),
-      ]);
-      return visionColor === reasoningColor;
-    }).toBe(true);
+    await expect
+      .poll(async () => {
+        const [visionColor, reasoningColor] = await Promise.all([
+          vision.evaluate((element) => getComputedStyle(element).backgroundColor),
+          reasoning.evaluate((element) => getComputedStyle(element).backgroundColor),
+        ]);
+        return visionColor === reasoningColor;
+      })
+      .toBe(true);
     const thinking = await dialog.getByText('深度思考', { exact: true }).boundingBox();
     const preferences = (await dialog.locator('.model-dialog-capabilities').boundingBox())!;
     expect(thinking!.y).toBeGreaterThanOrEqual(preferences.y);
@@ -75,7 +84,7 @@ test.describe('Model configuration page', () => {
     for (const width of [760, 1240]) {
       await page.setViewportSize({ width, height: 800 });
       await expect(dialog.locator('.model-capability-toggle')).toHaveCount(4);
-      expect(await dialog.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+      expect(await dialog.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
       const providerBox = (await dialog.getByRole('combobox', { name: '本地模型 提供方', exact: true }).boundingBox())!;
       const modelIdBox = (await dialog.getByTestId('model-id-input').boundingBox())!;
       expect(Math.abs(providerBox.y + providerBox.height / 2 - modelIdBox.y - modelIdBox.height / 2)).toBeLessThanOrEqual(1);
@@ -85,13 +94,14 @@ test.describe('Model configuration page', () => {
     await expect(row.getByTestId('model-cap-vision')).toHaveAttribute('data-supported', 'true');
     await expect(row.getByTestId('model-cap-reasoning')).toHaveAttribute('data-supported', 'true');
     await page.evaluate(async () => {
-      const { refreshAiConfig } = await import('/src/features/agent/stores/aiConfig.ts') as typeof import('../src/features/agent/stores/aiConfig');
+      const { refreshAiConfig } =
+        (await import('/src/features/agent/stores/aiConfig.ts')) as typeof import('../src/features/agent/stores/aiConfig');
       await refreshAiConfig();
     });
     await expect(row.getByTestId('model-cap-vision')).toHaveAttribute('data-supported', 'true');
     await row.getByTestId('model-settings').click();
     const reset = dialog.getByRole('button', { name: '重置', exact: true });
-    const footer = await dialog.evaluate(element => {
+    const footer = await dialog.evaluate((element) => {
       const done = element.querySelector('[data-testid="model-settings-done"]')!.getBoundingClientRect();
       const reset = element.querySelector('[data-testid="model-capabilities-reset"]')!.getBoundingClientRect();
       return { doneX: done.x, resetX: reset.x, difference: Math.abs(reset.y + reset.height / 2 - done.y - done.height / 2) };
@@ -104,7 +114,8 @@ test.describe('Model configuration page', () => {
     await expect(dialog.getByRole('button', { name: '工具', exact: true })).toHaveAttribute('aria-pressed', 'true');
     await dialog.getByTestId('model-settings-done').click();
     await page.evaluate(async () => {
-      const { refreshAiConfig } = await import('/src/features/agent/stores/aiConfig.ts') as typeof import('../src/features/agent/stores/aiConfig');
+      const { refreshAiConfig } =
+        (await import('/src/features/agent/stores/aiConfig.ts')) as typeof import('../src/features/agent/stores/aiConfig');
       await refreshAiConfig();
     });
     await expect(row.getByTestId('model-cap-vision')).toHaveCount(0);
@@ -239,7 +250,7 @@ test.describe('Model configuration page', () => {
       await page.setViewportSize({ width, height: 800 });
       await expect(localRow.getByTestId('model-settings')).toBeVisible();
       await expect(localRow.getByTestId('model-actions')).toBeVisible();
-      expect(await localRow.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+      expect(await localRow.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
       await page.getByTestId('model-list').screenshot({ path: testInfo.outputPath(`model-list-${width}.png`) });
     }
     // The destructive action is not always visible: it lives in the row menu.

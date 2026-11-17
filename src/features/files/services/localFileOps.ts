@@ -1,7 +1,17 @@
 import { useFileUndoSettings } from '@config/fileUndo';
 import {
-  fsList, fsDisks, fsHome, fsRename, fsCreateFile, fsCreateDir,
-  fsCopy, fsMove, fsStageDelete, fsRestoreStaged, fsPurgeStaged, fsStat,
+  fsList,
+  fsDisks,
+  fsHome,
+  fsRename,
+  fsCreateFile,
+  fsCreateDir,
+  fsCopy,
+  fsMove,
+  fsStageDelete,
+  fsRestoreStaged,
+  fsPurgeStaged,
+  fsStat,
 } from '@platform/api/fs';
 import { parentOf, pathSegments, segmentsToPath } from '@platform/path';
 import { writeClipboardFiles } from '@platform/clipboard';
@@ -23,7 +33,7 @@ export function createLocalFileOps(): FileOps {
     rename: (path, newName) => fsRename(path, newName),
     move: (paths, destDir) => fsMove(paths, destDir),
     copy: (paths, destDir) => fsCopy(paths, destDir),
-    stageDelete: (paths) => useFileUndoSettings.getState().local ? fsStageDelete(paths) : fsStageDelete(paths, false),
+    stageDelete: (paths) => (useFileUndoSettings.getState().local ? fsStageDelete(paths) : fsStageDelete(paths, false)),
     restoreStaged: (pairs) => fsRestoreStaged(pairs),
     purgeStaged: (paths) => fsPurgeStaged(paths),
     home: () => fsHome(),

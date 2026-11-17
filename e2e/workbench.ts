@@ -14,8 +14,10 @@ export async function openWorkspaceResource(page: Page, title?: string): Promise
 export async function openWorkspaceActions(page: Page): Promise<void> {
   const track = page.getByTestId('workspace-instance-bar').locator('.folder-tab-list:visible').first();
   const bounds = (await track.boundingBox())!;
-  await track.evaluate((element, point) => element.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, ...point })),
-    { clientX: bounds.x + 8, clientY: bounds.y + bounds.height });
+  await track.evaluate(
+    (element, point) => element.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, ...point })),
+    { clientX: bounds.x + 8, clientY: bounds.y + bounds.height },
+  );
 }
 
 export async function chooseSplitType(page: Page, label: string): Promise<void> {

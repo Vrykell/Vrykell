@@ -49,7 +49,10 @@ it('opens every directory that arrived before the window could listen', async ()
   expect(mock.subscribe).toHaveBeenCalledWith(expect.any(Function));
   expect(mock.addTab.mock.calls).toEqual([[{ cwd: 'C:\\early' }], [{ cwd: 'C:\\also' }]]);
   expect(mock.selectArea.mock.calls).toEqual([['terminal'], ['terminal']]);
-  expect(mock.rememberTab.mock.calls).toEqual([['terminal', 'opened'], ['terminal', 'opened']]);
+  expect(mock.rememberTab.mock.calls).toEqual([
+    ['terminal', 'opened'],
+    ['terminal', 'opened'],
+  ]);
   expect(mock.closeSettings.mock.calls).toEqual([[false], [false]]);
   expect(mock.activate.mock.calls).toEqual([['opened'], ['opened']]);
   expect(onError).not.toHaveBeenCalled();

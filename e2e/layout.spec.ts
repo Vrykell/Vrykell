@@ -34,10 +34,12 @@ test.describe('Application layout', () => {
         const rect = await button.boundingBox();
         expect(rect!.y).toBe(0);
         expect(rect!.height).toBe(titlebar!.height);
-        expect(await button.evaluate(el => {
-          const bounds = el.getBoundingClientRect();
-          return el.contains(document.elementFromPoint(bounds.x + bounds.width / 2, 0));
-        })).toBe(true);
+        expect(
+          await button.evaluate((el) => {
+            const bounds = el.getBoundingClientRect();
+            return el.contains(document.elementFromPoint(bounds.x + bounds.width / 2, 0));
+          }),
+        ).toBe(true);
       }
     }
     await expect(page.getByText('Vrykell', { exact: true })).toHaveCount(0);
@@ -45,16 +47,17 @@ test.describe('Application layout', () => {
     const minimize = controls.locator('[data-testid="window-minimize"]');
     const close = controls.locator('[data-testid="window-close"]');
     await minimize.hover();
-    await expect.poll(() => minimize.evaluate((element) => getComputedStyle(element).backgroundColor))
-      .not.toBe('rgba(0, 0, 0, 0)');
+    await expect.poll(() => minimize.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
     const neutralHover = await minimize.evaluate((element) => getComputedStyle(element).backgroundColor);
     await close.hover();
-    await expect.poll(() => close.evaluate((element) => getComputedStyle(element).backgroundColor))
-      .not.toBe('rgba(0, 0, 0, 0)');
+    await expect.poll(() => close.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe('rgba(0, 0, 0, 0)');
     const dangerHover = await close.evaluate((element) => getComputedStyle(element).backgroundColor);
     expect(dangerHover).not.toBe(neutralHover);
-    expect(await close.evaluate(element => element.contains(document.elementFromPoint(window.innerWidth - 1, 0)))).toBe(true);
-    await page.screenshot({ path: test.info().outputPath('window-controls-flush.png'), clip: { x: page.viewportSize()!.width - 180, y: 0, width: 180, height: 70 } });
+    expect(await close.evaluate((element) => element.contains(document.elementFromPoint(window.innerWidth - 1, 0)))).toBe(true);
+    await page.screenshot({
+      path: test.info().outputPath('window-controls-flush.png'),
+      clip: { x: page.viewportSize()!.width - 180, y: 0, width: 180, height: 70 },
+    });
 
     await controls.locator('[data-testid="window-minimize"]').click();
     await controls.locator('[data-testid="window-maximize"]').click();
@@ -97,13 +100,14 @@ test.describe('Application layout', () => {
   });
 
   test('document scrolling is locked: html/body overflow clips', async ({ page }) => {
-    const check = () => page.evaluate(() => ({
-      scrollHeight: document.documentElement.scrollHeight,
-      innerHeight: window.innerHeight,
-      scrollY: window.scrollY,
-      bodyOverflow: getComputedStyle(document.body).overflow,
-      htmlOverflow: getComputedStyle(document.documentElement).overflow,
-    }));
+    const check = () =>
+      page.evaluate(() => ({
+        scrollHeight: document.documentElement.scrollHeight,
+        innerHeight: window.innerHeight,
+        scrollY: window.scrollY,
+        bodyOverflow: getComputedStyle(document.body).overflow,
+        htmlOverflow: getComputedStyle(document.documentElement).overflow,
+      }));
 
     // html/body overflow should be hidden.
     let s = await check();

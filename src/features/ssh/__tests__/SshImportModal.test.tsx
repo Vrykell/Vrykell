@@ -14,10 +14,9 @@ vi.mock('@features/ssh/services/api', () => ({
   validateSshConnection: () => null,
 }));
 vi.mock('@features/ssh', () => ({
-  useSshStore: Object.assign(
-    (selector: (state: { save: () => Promise<void> }) => unknown) => selector({ save: mocks.save }),
-    { getState: () => ({ connections: mocks.connections }) },
-  ),
+  useSshStore: Object.assign((selector: (state: { save: () => Promise<void> }) => unknown) => selector({ save: mocks.save }), {
+    getState: () => ({ connections: mocks.connections }),
+  }),
 }));
 vi.mock('@ui/feedback/Toast', () => ({
   useToastStore: {
@@ -60,13 +59,23 @@ describe('SSH config import', () => {
     fireEvent.click(screen.getByTestId('ssh-import-confirm'));
 
     await waitFor(() => expect(mocks.save).toHaveBeenCalledTimes(2));
-    expect(mocks.save).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'web', host: '10.0.0.5', user: 'deploy', port: 2222,
-      identityFile: '/keys/web', authMethod: 'key',
-    }));
-    expect(mocks.save).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'db', host: 'db.internal', authMethod: 'password',
-    }));
+    expect(mocks.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'web',
+        host: '10.0.0.5',
+        user: 'deploy',
+        port: 2222,
+        identityFile: '/keys/web',
+        authMethod: 'key',
+      }),
+    );
+    expect(mocks.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'db',
+        host: 'db.internal',
+        authMethod: 'password',
+      }),
+    );
     await waitFor(() => expect(mocks.toasts[mocks.toasts.length - 1]).toEqual({ message: '已导入 2 个连接', kind: 'success' }));
     expect(onClose).toHaveBeenCalled();
   });

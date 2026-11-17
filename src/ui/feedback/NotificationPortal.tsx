@@ -21,21 +21,48 @@ export default function NotificationPortal({ children, followOwner = true }: { c
   const [visible, setVisible] = useState(true);
   const [modalOwner, setModalOwner] = useState(false);
   useLayoutEffect(() => {
-    const region = notificationRegion(); setTarget(region);
+    const region = notificationRegion();
+    setTarget(region);
     setModalOwner(Boolean(anchor.current?.closest('[role="dialog"][aria-modal="true"]')));
     const ancestors: HTMLElement[] = [];
     for (let element = anchor.current?.parentElement; element; element = element.parentElement) ancestors.push(element);
-    const update = () => setVisible(!followOwner || ancestors.every(element => !element.hidden && element.getAttribute('aria-hidden') !== 'true'
-      && getComputedStyle(element).display !== 'none' && getComputedStyle(element).visibility !== 'hidden'));
+    const update = () =>
+      setVisible(
+        !followOwner ||
+          ancestors.every(
+            (element) =>
+              !element.hidden &&
+              element.getAttribute('aria-hidden') !== 'true' &&
+              getComputedStyle(element).display !== 'none' &&
+              getComputedStyle(element).visibility !== 'hidden',
+          ),
+      );
     update();
     const observer = new MutationObserver(update);
-    if (followOwner) for (const element of ancestors) observer.observe(element, { attributes: true, attributeFilter: ['style', 'hidden', 'aria-hidden', 'class'] });
+    if (followOwner)
+      for (const element of ancestors)
+        observer.observe(element, { attributes: true, attributeFilter: ['style', 'hidden', 'aria-hidden', 'class'] });
     return () => {
       observer.disconnect();
-      queueMicrotask(() => { if (!region.childElementCount) region.remove(); });
+      queueMicrotask(() => {
+        if (!region.childElementCount) region.remove();
+      });
     };
   }, [followOwner]);
-  return <><span ref={anchor} data-notification-source={sourceId} hidden aria-hidden="true" />{target && visible && createPortal(
-    <div className="notification-slot" data-notification-source-id={sourceId} data-notification-modal={followOwner ? modalOwner : undefined}>{children}</div>, target,
-  )}</>;
+  return (
+    <>
+      <span ref={anchor} data-notification-source={sourceId} hidden aria-hidden="true" />
+      {target &&
+        visible &&
+        createPortal(
+          <div
+            className="notification-slot"
+            data-notification-source-id={sourceId}
+            data-notification-modal={followOwner ? modalOwner : undefined}>
+            {children}
+          </div>,
+          target,
+        )}
+    </>
+  );
 }

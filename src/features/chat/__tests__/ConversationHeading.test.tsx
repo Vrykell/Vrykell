@@ -5,10 +5,24 @@ import ConversationHeading from '../components/ConversationHeading';
 afterEach(cleanup);
 
 it('shows the conversation title with history, settings and new in a stable order', () => {
-  const rename = vi.fn(); const create = vi.fn();
-  render(<ConversationHeading title="Build investigation" onRename={rename} onHistory={() => {}} onNew={create} settings={<button>Settings</button>} />);
+  const rename = vi.fn();
+  const create = vi.fn();
+  render(
+    <ConversationHeading
+      title="Build investigation"
+      onRename={rename}
+      onHistory={() => {}}
+      onNew={create}
+      settings={<button>Settings</button>}
+    />,
+  );
   expect(screen.queryByRole('combobox')).toBeNull();
-  expect(screen.getAllByRole('button').map(button => button.getAttribute('aria-label') ?? button.textContent)).toEqual(['重命名对话', 'AI 对话历史', 'Settings', '新对话']);
+  expect(screen.getAllByRole('button').map((button) => button.getAttribute('aria-label') ?? button.textContent)).toEqual([
+    '重命名对话',
+    'AI 对话历史',
+    'Settings',
+    '新对话',
+  ]);
   fireEvent.click(screen.getByRole('button', { name: '重命名对话' }));
   fireEvent.change(screen.getByRole('textbox', { name: '对话标题' }), { target: { value: 'New title' } });
   fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });

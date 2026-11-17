@@ -26,9 +26,7 @@ export interface CompleteOptions {
 
 /** Local history prefix match (synchronous, entries are already newest-first); returns the suffix or null. */
 export function localComplete(prefix: string): string | null {
-  const hit = useHistoryStore
-    .getState()
-    .entries.find((e) => e.command.length > prefix.length && e.command.startsWith(prefix));
+  const hit = useHistoryStore.getState().entries.find((e) => e.command.length > prefix.length && e.command.startsWith(prefix));
   return hit ? hit.command.slice(prefix.length) : null;
 }
 
@@ -50,13 +48,7 @@ export function localCompleteCandidates(prefix: string): string[] {
 
 /** Whether the last token looks like a path (absolute, ./, ../, ~ or contains a slash). */
 export function looksLikePath(token: string): boolean {
-  return (
-    token.startsWith('/') ||
-    token.startsWith('./') ||
-    token.startsWith('../') ||
-    token.startsWith('~/') ||
-    token.includes('/')
-  );
+  return token.startsWith('/') || token.startsWith('./') || token.startsWith('../') || token.startsWith('~/') || token.includes('/');
 }
 
 function lastToken(prefix: string): string {
@@ -74,11 +66,7 @@ interface FsEntry {
  * joined with cwd, ~ not expanded and gives up), then take the first name-prefix match from
  * fs_list. Returns the suffix (directories get a trailing /) or null.
  */
-export async function pathComplete(
-  prefix: string,
-  cwd: string | undefined,
-  signal?: AbortSignal,
-): Promise<string | null> {
+export async function pathComplete(prefix: string, cwd: string | undefined, signal?: AbortSignal): Promise<string | null> {
   const token = lastToken(prefix);
   if (!looksLikePath(token)) return null;
   if (token.startsWith('~')) return null; // The frontend does not know the home directory, so ~ is left to the shell.
@@ -95,9 +83,7 @@ export async function pathComplete(
   try {
     const entries = await invoke<FsEntry[]>('fs_list', { path: dirAbs });
     if (signal?.aborted) return null;
-    const hit = entries.find(
-      (e) => e.name.startsWith(base) && e.name !== base && (base.startsWith('.') || !e.name.startsWith('.')),
-    );
+    const hit = entries.find((e) => e.name.startsWith(base) && e.name !== base && (base.startsWith('.') || !e.name.startsWith('.')));
     if (!hit) return null;
     return hit.name.slice(base.length) + (hit.is_dir ? '/' : '');
   } catch {
@@ -106,15 +92,14 @@ export async function pathComplete(
 }
 
 /** AI-enhanced completion: only when the local tier found nothing and a key is configured; the model must return a full command starting with the prefix. */
-export async function aiComplete(
-  prefix: string,
-  opts: CompleteOptions,
-  signal?: AbortSignal,
-): Promise<string | null> {
+export async function aiComplete(prefix: string, opts: CompleteOptions, signal?: AbortSignal): Promise<string | null> {
   if (!isApiKeyConfigured()) return null;
   const settings = useAgentSettings.getState().resolve();
   const active = activeModelProfile();
-  const recent = useHistoryStore.getState().entries.slice(0, 5).map((e) => e.command);
+  const recent = useHistoryStore
+    .getState()
+    .entries.slice(0, 5)
+    .map((e) => e.command);
   try {
     const model = createChatModel({
       provider: active.provider,
@@ -143,11 +128,7 @@ export async function aiComplete(
 }
 
 /** Full chain: local history → path → AI enhancement; returns the suffix or null. */
-export async function completeCommand(
-  prefix: string,
-  opts: CompleteOptions,
-  signal?: AbortSignal,
-): Promise<string | null> {
+export async function completeCommand(prefix: string, opts: CompleteOptions, signal?: AbortSignal): Promise<string | null> {
   const local = localComplete(prefix);
   if (local) return local;
   const path = await pathComplete(prefix, opts.cwd, signal);

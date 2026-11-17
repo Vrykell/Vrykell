@@ -20,7 +20,10 @@ export function AiBehaviorPage() {
   const model = models.find((m) => m.id === scope) ?? null;
   const eff = agentSettings.resolve(isGlobal ? undefined : scope);
   const behaviorFields: (keyof ModelBehaviorSettings)[] = ['systemPrompt', 'agentMode', 'maxSteps'];
-  const overrideKeys = !isGlobal && model ? Object.keys(agentSettings.overrides[model.id] ?? {}).filter(key => behaviorFields.includes(key as keyof ModelBehaviorSettings)) : [];
+  const overrideKeys =
+    !isGlobal && model
+      ? Object.keys(agentSettings.overrides[model.id] ?? {}).filter((key) => behaviorFields.includes(key as keyof ModelBehaviorSettings))
+      : [];
   const hasOverride = overrideKeys.length > 0;
 
   const update = (patch: Partial<AgentSettings>) => {
@@ -31,10 +34,7 @@ export function AiBehaviorPage() {
   return (
     <>
       <SettingsGroup title={t('Instructions')}>
-        <Field
-          title={t('Configuration scope')}
-          description={t('Use the default configuration, or override one model.')}
-        >
+        <Field title={t('Configuration scope')} description={t('Use the default configuration, or override one model.')}>
           <ModelScopeBar
             options={models.map((m) => ({ value: m.id, label: m.name || m.model }))}
             value={scope === 'global' ? '' : scope}
@@ -43,27 +43,31 @@ export function AiBehaviorPage() {
         </Field>
 
         {!isGlobal && model && (
-          <div style={{
-            display: 'flex', alignItems: 'center', gap: 8,
-            padding: '6px 10px', marginBottom: 8, borderRadius: 'var(--radius-inner)',
-            background: hasOverride ? 'var(--accent-warm-dim)' : 'var(--hover)',
-            fontSize: 'calc(11px * var(--ui-font-scale))', color: hasOverride ? 'var(--accent-warm)' : 'var(--text-muted)',
-          }}>
-            <span>{hasOverride ? t('Overrides {{count}} settings', { count: overrideKeys.length }) : t('Uses the default configuration')}</span>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '6px 10px',
+              marginBottom: 8,
+              borderRadius: 'var(--radius-inner)',
+              background: hasOverride ? 'var(--accent-warm-dim)' : 'var(--hover)',
+              fontSize: 'calc(11px * var(--ui-font-scale))',
+              color: hasOverride ? 'var(--accent-warm)' : 'var(--text-muted)',
+            }}>
+            <span>
+              {hasOverride ? t('Overrides {{count}} settings', { count: overrideKeys.length }) : t('Uses the default configuration')}
+            </span>
             <div style={{ flex: 1 }} />
             {hasOverride && (
-              <OutlineButton data-subtle onClick={() => agentSettings.resetModelFields(model.id, behaviorFields)} >
+              <OutlineButton data-subtle onClick={() => agentSettings.resetModelFields(model.id, behaviorFields)}>
                 {t('Reset to default configuration')}
               </OutlineButton>
             )}
           </div>
         )}
 
-        <Field
-          layout="stacked"
-          title={t('System prompt')}
-          description={t('AI instructions. Leave empty for the default.')}
-        >
+        <Field layout="stacked" title={t('System prompt')} description={t('AI instructions. Leave empty for the default.')}>
           <AutoSaveInput
             key={`prompt-${scope}`}
             multiline
@@ -71,7 +75,7 @@ export function AiBehaviorPage() {
             trim={false}
             value={eff.systemPrompt ?? ''}
             placeholder={t('Leave empty for the built-in prompt')}
-            onCommit={systemPrompt => update({ systemPrompt })}
+            onCommit={(systemPrompt) => update({ systemPrompt })}
             rows={8}
             style={{
               ...inputStyle,
@@ -81,7 +85,6 @@ export function AiBehaviorPage() {
             }}
           />
         </Field>
-
       </SettingsGroup>
       {isGlobal && (
         <SettingsGroup title={t('Default configuration')} testId="default-configuration">
@@ -89,10 +92,10 @@ export function AiBehaviorPage() {
         </SettingsGroup>
       )}
       <SettingsGroup title={t('Tools')}>
-        <Field title={t('Agent mode')} description={t("Allow AI to use tools.")}>
+        <Field title={t('Agent mode')} description={t('Allow AI to use tools.')}>
           <Toggle on={eff.agentMode} onChange={(v) => update({ agentMode: v })} />
         </Field>
-        <Field title={t('Maximum iterations')} description={t("Maximum tool rounds per response, from 1 to 100.")}>
+        <Field title={t('Maximum iterations')} description={t('Maximum tool rounds per response, from 1 to 100.')}>
           <NumberInput key={scope} value={eff.maxSteps} min={1} max={100} onChange={(v) => update({ maxSteps: v })} />
         </Field>
       </SettingsGroup>
@@ -102,27 +105,45 @@ export function AiBehaviorPage() {
             <Field title={t('Automatic session titles')} description={t('Generate titles without replacing custom names.')}>
               <Toggle on={eff.autoTitle} onChange={(v) => update({ autoTitle: v })} />
             </Field>
-            <Field title={t('Title model')} description={t("Model for titles. Leave empty to use the chat model.")}>
+            <Field title={t('Title model')} description={t('Model for titles. Leave empty to use the chat model.')}>
               <AutoSaveInput
                 value={eff.titleModel}
                 placeholder={t('Use the chat model')}
-                onCommit={titleModel => update({ titleModel })}
+                onCommit={(titleModel) => update({ titleModel })}
                 style={inputStyle}
               />
             </Field>
           </SettingsGroup>
           <SettingsGroup title={t('Completion preferences')}>
-            <Field title={t('Command completion')} description={<>{t('Suggest completions while typing commands.')}<span className="composer-key-hints settings-completion-keys"><KeyHint shortcut="Tab" />{t('Accept')}<KeyHint shortcut="Escape" />{t('Dismiss')}</span></>}>
+            <Field
+              title={t('Command completion')}
+              description={
+                <>
+                  {t('Suggest completions while typing commands.')}
+                  <span className="composer-key-hints settings-completion-keys">
+                    <KeyHint shortcut="Tab" />
+                    {t('Accept')}
+                    <KeyHint shortcut="Escape" />
+                    {t('Dismiss')}
+                  </span>
+                </>
+              }>
               <Toggle on={eff.completeEnabled} onChange={(v) => update({ completeEnabled: v })} />
             </Field>
             <Field title={t('Completion debounce')} description={t('Wait 100–2000 ms before suggesting completions.')}>
-              <NumberInput key={scope} value={eff.completeDebounceMs} min={100} max={2000} onChange={(v) => update({ completeDebounceMs: v })} />
+              <NumberInput
+                key={scope}
+                value={eff.completeDebounceMs}
+                min={100}
+                max={2000}
+                onChange={(v) => update({ completeDebounceMs: v })}
+              />
             </Field>
-            <Field title={t('Completion model')} description={t("Model for completion. Leave empty to use the chat model.")}>
+            <Field title={t('Completion model')} description={t('Model for completion. Leave empty to use the chat model.')}>
               <AutoSaveInput
                 value={eff.completeModel}
                 placeholder={t('Use the chat model')}
-                onCommit={completeModel => update({ completeModel })}
+                onCommit={(completeModel) => update({ completeModel })}
                 style={inputStyle}
               />
             </Field>

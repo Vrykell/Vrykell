@@ -59,7 +59,11 @@ export interface ToolContext {
   /** Conversation id (= workspace tabId) that anchors the approval card. */
   tabId?: string;
   /** Approval state callback (agentStream upserts the ToolRun from it); shape marks an "allow this kind for this session" choice, input carries the edited command. */
-  setToolState?: (toolCallId: string, state: ToolRunState, extra?: { danger?: string; shape?: string; input?: Record<string, unknown> }) => void;
+  setToolState?: (
+    toolCallId: string,
+    state: ToolRunState,
+    extra?: { danger?: string; shape?: string; input?: Record<string, unknown> },
+  ) => void;
 }
 
 /** Every managed tool (the settings table renders from this list; add new tools here). */
@@ -135,12 +139,10 @@ export const usePermissions = create<PermissionsState>()(
         });
       },
       setMode: (mode) => set({ mode }),
-      setApprovalTimeout: (seconds) => set({
-        approvalTimeoutSeconds: Math.min(
-          MAX_APPROVAL_TIMEOUT_SECONDS,
-          Math.max(MIN_APPROVAL_TIMEOUT_SECONDS, Math.round(seconds)),
-        ),
-      }),
+      setApprovalTimeout: (seconds) =>
+        set({
+          approvalTimeoutSeconds: Math.min(MAX_APPROVAL_TIMEOUT_SECONDS, Math.max(MIN_APPROVAL_TIMEOUT_SECONDS, Math.round(seconds))),
+        }),
       applyPolicy: (levels) => set((s) => ({ levels: { ...s.levels, ...levels } })),
     }),
     {
@@ -207,11 +209,14 @@ function requestApproval(toolCallId: string, signal?: AbortSignal, owner?: strin
       signal?.removeEventListener('abort', cancel);
       resolve({ decision: 'timeout' });
     }, approvalTimeoutMs());
-    pending.set(toolCallId, { owner, resolve: (result) => {
-      window.clearTimeout(timer);
-      signal?.removeEventListener('abort', cancel);
-      resolve(result);
-    } });
+    pending.set(toolCallId, {
+      owner,
+      resolve: (result) => {
+        window.clearTimeout(timer);
+        signal?.removeEventListener('abort', cancel);
+        resolve(result);
+      },
+    });
     signal?.addEventListener('abort', cancel, { once: true });
     if (signal?.aborted) cancel();
   });
@@ -330,9 +335,7 @@ export function setToolApprover(next: ToolApprover | null) {
   approver = next ?? backendApprover;
 }
 
-export type GateOutcome =
-  | { proceed: true; lease?: string; command?: string }
-  | { proceed: false; result: GateResult };
+export type GateOutcome = { proceed: true; lease?: string; command?: string } | { proceed: false; result: GateResult };
 
 function denied(reason: string | undefined, fallback: string): GateOutcome {
   return { proceed: false, result: { ok: false, denied: true, error: reason ?? fallback } };
@@ -409,9 +412,8 @@ export async function gate(
   // The card may edit a command before running it: the edited text is re-authorized (a dangerous
   // edit still gets the native confirmation), bound into the lease as the approved arguments, and
   // executed instead of the original.
-  const edited = toolName === 'run_command' && choice.command !== undefined && choice.command !== input.command
-    ? choice.command
-    : undefined;
+  const edited =
+    toolName === 'run_command' && choice.command !== undefined && choice.command !== input.command ? choice.command : undefined;
   if (edited !== undefined && !edited.trim()) {
     ctx.setToolState(toolCallId, 'denied');
     return denied(undefined, t('Enter a command before running it.'));

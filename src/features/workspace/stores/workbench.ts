@@ -13,15 +13,19 @@ export interface WorkbenchState {
 /** All scopes persist the same versioned reference-only snapshot. */
 export function createWorkbenchStore(key = WORKBENCH_STORAGE_KEY, ready = true) {
   const saved = safeJsonParse<unknown>(safeLocalStorageGet(key) ?? 'null');
-  const store = create<WorkbenchState>(set => ({
-    snapshot: parseWorkbench(saved) ?? emptyWorkbench(), ready, lastClosed: null,
-    update: apply => set(state => {
-      const snapshot = apply(state.snapshot);
-      return snapshot === state.snapshot ? state : { snapshot };
-    }),
+  const store = create<WorkbenchState>((set) => ({
+    snapshot: parseWorkbench(saved) ?? emptyWorkbench(),
+    ready,
+    lastClosed: null,
+    update: (apply) =>
+      set((state) => {
+        const snapshot = apply(state.snapshot);
+        return snapshot === state.snapshot ? state : { snapshot };
+      }),
   }));
   store.subscribe((state, previous) => {
-    if (state.ready && (state.snapshot !== previous.snapshot || state.ready !== previous.ready)) safeLocalStorageSet(key, JSON.stringify(state.snapshot));
+    if (state.ready && (state.snapshot !== previous.snapshot || state.ready !== previous.ready))
+      safeLocalStorageSet(key, JSON.stringify(state.snapshot));
   });
   return store;
 }

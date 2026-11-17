@@ -4,15 +4,25 @@ import type { ModelProfile } from '@features/agent';
 const state = vi.hoisted(() => ({ models: [] as ModelProfile[], activeModel: 'one' }));
 vi.mock('@features/agent', () => ({
   useAiConfigStore: { getState: () => state },
-  setAiModels: async (models: ModelProfile[]) => { state.models = models; },
+  setAiModels: async (models: ModelProfile[]) => {
+    state.models = models;
+  },
   setActiveModel: vi.fn(),
 }));
 
 import { updateModel, updateModelCapability, resetModelCapabilities } from './modelWrites';
 
 beforeEach(() => {
-  state.models = [{ id: 'one', name: 'One', provider: 'openai-compatible', baseUrl: '', model: 'sample',
-    capabilities: { vision: false, reasoning: false, tools: true, search: false } }];
+  state.models = [
+    {
+      id: 'one',
+      name: 'One',
+      provider: 'openai-compatible',
+      baseUrl: '',
+      model: 'sample',
+      capabilities: { vision: false, reasoning: false, tools: true, search: false },
+    },
+  ];
 });
 
 it('merges queued capability changes and retains unrelated flags', async () => {

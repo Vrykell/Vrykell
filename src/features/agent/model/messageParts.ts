@@ -55,7 +55,7 @@ function discussionTarget(run: ToolRun): string {
  * providers reject that history, so discussion history keeps the evidence but not the schema.
  */
 export function partsToDiscussionText(content: string, parts?: MessagePart[]): string {
-  if (!parts?.some(part => part.kind === 'tool')) return content;
+  if (!parts?.some((part) => part.kind === 'tool')) return content;
   const blocks: string[] = [];
   let hasText = false;
   for (const part of parts) {
@@ -77,7 +77,7 @@ export function partsToDiscussionText(content: string, parts?: MessagePart[]): s
 
 /** Recreate standard call/result pairs in transcript order; history never executes a tool. */
 export function partsToModelMessages(content: string, parts?: MessagePart[]): ModelMessage[] {
-  if (!parts?.some(part => part.kind === 'tool')) return [{ role: 'assistant', content }];
+  if (!parts?.some((part) => part.kind === 'tool')) return [{ role: 'assistant', content }];
   const messages: ModelMessage[] = [];
   const ids = new Set<string>();
   for (const part of parts) {
@@ -89,10 +89,29 @@ export function partsToModelMessages(content: string, parts?: MessagePart[]): Mo
     if (!run.toolCallId || !run.toolName || ids.has(run.toolCallId)) continue;
     ids.add(run.toolCallId);
     const value = run.modelOutput ?? run.output ?? run.error ?? 'This call was interrupted. No completed result is available.';
-    messages.push({ role: 'assistant', content: [{ type: 'tool-call', toolCallId: run.toolCallId,
-      toolName: run.toolName, input: run.input, ...(run.providerExecuted ? { providerExecuted: true } : {}) }] });
-    messages.push({ role: 'tool', content: [{ type: 'tool-result', toolCallId: run.toolCallId, toolName: run.toolName,
-      output: { type: run.state === 'error' ? 'error-text' : 'text', value } }] });
+    messages.push({
+      role: 'assistant',
+      content: [
+        {
+          type: 'tool-call',
+          toolCallId: run.toolCallId,
+          toolName: run.toolName,
+          input: run.input,
+          ...(run.providerExecuted ? { providerExecuted: true } : {}),
+        },
+      ],
+    });
+    messages.push({
+      role: 'tool',
+      content: [
+        {
+          type: 'tool-result',
+          toolCallId: run.toolCallId,
+          toolName: run.toolName,
+          output: { type: run.state === 'error' ? 'error-text' : 'text', value },
+        },
+      ],
+    });
   }
   return messages;
 }
@@ -113,10 +132,17 @@ export function deserializeParts(raw: string): MessagePart[] | undefined {
       if (part.kind === 'text') return 'text' in part && typeof part.text === 'string';
       if (part.kind !== 'tool' || !('tool' in part) || !part.tool || typeof part.tool !== 'object') return false;
       const run = part.tool as Record<string, unknown>;
-      return typeof run.toolCallId === 'string' && typeof run.toolName === 'string' && typeof run.startedAt === 'number'
-        && typeof run.state === 'string' && ['approval-pending', 'input-pending', 'running', 'done', 'error', 'denied', 'cancelled'].includes(run.state)
-        && !!run.input && typeof run.input === 'object' && !Array.isArray(run.input)
-        && ['output', 'modelOutput', 'error', 'danger', 'shape'].every(key => run[key] === undefined || typeof run[key] === 'string');
+      return (
+        typeof run.toolCallId === 'string' &&
+        typeof run.toolName === 'string' &&
+        typeof run.startedAt === 'number' &&
+        typeof run.state === 'string' &&
+        ['approval-pending', 'input-pending', 'running', 'done', 'error', 'denied', 'cancelled'].includes(run.state) &&
+        !!run.input &&
+        typeof run.input === 'object' &&
+        !Array.isArray(run.input) &&
+        ['output', 'modelOutput', 'error', 'danger', 'shape'].every((key) => run[key] === undefined || typeof run[key] === 'string')
+      );
     });
     if (!valid) return undefined;
     return v as MessagePart[];
@@ -166,8 +192,11 @@ export function partsToHistoryText(parts?: MessagePart[]): string {
       lines.push(`[${t('Ask the user')}: ${String(p.tool.input.question ?? '').slice(0, 2000)} → ${t(STATE_LABEL[p.tool.state])}]`);
       try {
         const result: unknown = JSON.parse(p.tool.output ?? '{}');
-        if (result && typeof result === 'object' && 'answer' in result && typeof result.answer === 'string') lines.push(`${t('Your answer')}: ${result.answer.slice(0, 4000)}`);
-      } catch { continue; }
+        if (result && typeof result === 'object' && 'answer' in result && typeof result.answer === 'string')
+          lines.push(`${t('Your answer')}: ${result.answer.slice(0, 4000)}`);
+      } catch {
+        continue;
+      }
       continue;
     }
     const target =
@@ -178,9 +207,7 @@ export function partsToHistoryText(parts?: MessagePart[]): string {
           : typeof p.tool.input.query === 'string'
             ? p.tool.input.query
             : '';
-    lines.push(
-      `[${label}${target ? `: ${target}` : ''} → ${t(STATE_LABEL[p.tool.state])}]`,
-    );
+    lines.push(`[${label}${target ? `: ${target}` : ''} → ${t(STATE_LABEL[p.tool.state])}]`);
   }
   return lines.length > 0 ? '\n' + lines.join('\n') : '';
 }

@@ -22,9 +22,7 @@ function endpointHost(url: string): string {
 /** Display name: the preset this endpoint matches, else its host, else an empty string. */
 export function providerName(kind: ProviderKind, baseUrl: string): string {
   const effective = effectiveBaseUrl(kind, baseUrl);
-  const preset = MODEL_PRESETS.find(
-    (entry) => entry.provider === kind && effectiveBaseUrl(entry.provider, entry.baseUrl) === effective,
-  );
+  const preset = MODEL_PRESETS.find((entry) => entry.provider === kind && effectiveBaseUrl(entry.provider, entry.baseUrl) === effective);
   return preset?.name ?? endpointHost(effective);
 }
 

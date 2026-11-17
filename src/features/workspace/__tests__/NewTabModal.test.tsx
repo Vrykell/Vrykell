@@ -14,7 +14,7 @@ import { useSettingsNavigationStore } from '@features/settings';
 
 vi.mock('@platform/appWindows', () => ({ openAppWindow: vi.fn() }));
 
-vi.mock('@platform/shells', async importOriginal => ({
+vi.mock('@platform/shells', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@platform/shells')>()),
   getAvailableShells: vi.fn().mockResolvedValue([
     { id: 'zsh', label: 'Zsh', default: true },
@@ -23,12 +23,18 @@ vi.mock('@platform/shells', async importOriginal => ({
   ]),
 }));
 
-vi.mock('@platform/api/fs', async importOriginal => ({
-  ...(await importOriginal<typeof import('@platform/api/fs')>()), pickPath: vi.fn().mockResolvedValue([]),
+vi.mock('@platform/api/fs', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@platform/api/fs')>()),
+  pickPath: vi.fn().mockResolvedValue([]),
 }));
 
 const connection: SshConnection = {
-  id: 'ssh-1', name: 'Prod', host: 'prod.example.com', port: 22, user: 'root', authMethod: 'password',
+  id: 'ssh-1',
+  name: 'Prod',
+  host: 'prod.example.com',
+  port: 22,
+  user: 'root',
+  authMethod: 'password',
 };
 
 it('keeps server selection separate from local profiles, including its primary keyboard action', async () => {
@@ -41,7 +47,9 @@ it('keeps server selection separate from local profiles, including its primary k
   expect(screen.queryByText('打开位置')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: '添加连接' })).toBeEnabled();
   fireEvent.keyDown(dialog, { key: 'Enter', ctrlKey: true });
-  expect(pick).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ kind: 'ssh', ssh: expect.objectContaining({ connectionId: 'ssh-1' }) }));
+  expect(pick).toHaveBeenCalledExactlyOnceWith(
+    expect.objectContaining({ kind: 'ssh', ssh: expect.objectContaining({ connectionId: 'ssh-1' }) }),
+  );
 });
 const save = vi.fn(async () => {});
 const remove = vi.fn(async () => {});

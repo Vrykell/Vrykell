@@ -44,44 +44,71 @@ export default function ErrorDetails({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div data-testid={testId} style={{
-      background: 'var(--surface)', border: '1px solid var(--border)',
-      borderRadius: 'var(--radius-inner)', overflow: 'hidden',
-      ...style,
-    }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
-        padding: '2px 3px 2px 2px', background: 'var(--field-bg)',
-        borderBottom: open ? '1px solid var(--border)' : 'none',
+    <div
+      data-testid={testId}
+      style={{
+        background: 'var(--surface)',
+        border: '1px solid var(--border)',
+        borderRadius: 'var(--radius-inner)',
+        overflow: 'hidden',
+        ...style,
       }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 6,
+          padding: '2px 3px 2px 2px',
+          background: 'var(--field-bg)',
+          borderBottom: open ? '1px solid var(--border)' : 'none',
+        }}>
         <button
           data-subtle
           type="button"
           aria-expanded={open}
           data-tip={t(open ? 'Collapse {{name}}' : 'Expand {{name}}', { name: title })}
-          onClick={() => { setOpen(!open); onOpenChange?.(!open); }}
+          onClick={() => {
+            setOpen(!open);
+            onOpenChange?.(!open);
+          }}
           {...subtleHover}
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 4, minWidth: 0,
-            fontFamily: 'var(--font-ui)', fontSize: 'calc(11px * var(--ui-font-scale))',
-            padding: '3px 6px', border: 'none', borderRadius: 'var(--radius-inner)',
-            background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer',
-          }}
-        >
-          <ChevronRight size={11} style={{
-            transition: 'transform 0.12s ease',
-            transform: open ? 'rotate(90deg)' : 'none',
-          }} />
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 4,
+            minWidth: 0,
+            fontFamily: 'var(--font-ui)',
+            fontSize: 'calc(11px * var(--ui-font-scale))',
+            padding: '3px 6px',
+            border: 'none',
+            borderRadius: 'var(--radius-inner)',
+            background: 'transparent',
+            color: 'var(--text-muted)',
+            cursor: 'pointer',
+          }}>
+          <ChevronRight
+            size={11}
+            style={{
+              transition: 'transform 0.12s ease',
+              transform: open ? 'rotate(90deg)' : 'none',
+            }}
+          />
           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{title}</span>
         </button>
         <CopyButton text={text} label={t('Copy {{name}}', { name: title })} testId={copyTestId} />
       </div>
       {open && (
-        <pre data-selectable style={{
-          margin: 0, padding: 12, overflow: 'auto',
-          whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          ...preStyle,
-        }}>
+        <pre
+          data-selectable
+          style={{
+            margin: 0,
+            padding: 12,
+            overflow: 'auto',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            ...preStyle,
+          }}>
           {text}
         </pre>
       )}

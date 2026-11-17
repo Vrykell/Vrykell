@@ -21,9 +21,7 @@ export function commitModels(
   const write = modelWrites.then(() => {
     const current = useAiConfigStore.getState();
     const next = transform(current.models);
-    const active = next.some(model => model.id === current.activeModel)
-      ? current.activeModel
-      : activeFallback?.(next) ?? next[0]!.id;
+    const active = next.some((model) => model.id === current.activeModel) ? current.activeModel : (activeFallback?.(next) ?? next[0]!.id);
     return setAiModels(next, active);
   });
   modelWrites = write.catch(() => {});
@@ -32,26 +30,42 @@ export function commitModels(
 
 /** Patch one model row; a provider or identifier change recalculates its capabilities. */
 export function updateModel(id: string, patch: Partial<ModelProfile>) {
-  return commitModels(current => current.map(model => {
-    if (model.id !== id) return model;
-    const next = { ...model, ...patch };
-    if (patch.model !== undefined || patch.provider !== undefined) {
-      next.capabilities = detectCapabilities(next.provider, next.model);
-    }
-    return next;
-  }));
+  return commitModels((current) =>
+    current.map((model) => {
+      if (model.id !== id) return model;
+      const next = { ...model, ...patch };
+      if (patch.model !== undefined || patch.provider !== undefined) {
+        next.capabilities = detectCapabilities(next.provider, next.model);
+      }
+      return next;
+    }),
+  );
 }
 
 export function updateModelCapability(id: string, capability: ModelCapability, supported: boolean) {
-  return commitModels(current => current.map(model => model.id !== id ? model : {
-    ...model, capabilities: { ...(model.capabilities ?? detectCapabilities(model.provider, model.model)), [capability]: supported },
-  }));
+  return commitModels((current) =>
+    current.map((model) =>
+      model.id !== id
+        ? model
+        : {
+            ...model,
+            capabilities: { ...(model.capabilities ?? detectCapabilities(model.provider, model.model)), [capability]: supported },
+          },
+    ),
+  );
 }
 
 export function resetModelCapabilities(id: string) {
-  return commitModels(current => current.map(model => model.id !== id ? model : {
-    ...model, capabilities: detectCapabilities(model.provider, model.model),
-  }));
+  return commitModels((current) =>
+    current.map((model) =>
+      model.id !== id
+        ? model
+        : {
+            ...model,
+            capabilities: detectCapabilities(model.provider, model.model),
+          },
+    ),
+  );
 }
 
 export function selectModel(id: string) {

@@ -29,7 +29,8 @@ rl.on('line', (line) => {
 
   if (method === 'initialize') {
     return send({
-      jsonrpc: '2.0', id,
+      jsonrpc: '2.0',
+      id,
       result: {
         protocolVersion: 1,
         agentCapabilities: { loadSession: false },
@@ -59,13 +60,19 @@ rl.on('line', (line) => {
     update({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: `thinking about "${text}"` } });
     update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: 'Got it. ' } });
     update({
-      sessionUpdate: 'tool_call', toolCallId: 'call_fake', title: 'Read the project file', kind: 'read', status: 'pending',
+      sessionUpdate: 'tool_call',
+      toolCallId: 'call_fake',
+      title: 'Read the project file',
+      kind: 'read',
+      status: 'pending',
     });
 
     // Ask for permission the way a real agent would; a client that is not wired to an approval card
     // refuses, and the turn still has to end cleanly.
     send({
-      jsonrpc: '2.0', id: 4242, method: 'session/request_permission',
+      jsonrpc: '2.0',
+      id: 4242,
+      method: 'session/request_permission',
       params: {
         sessionId,
         toolCall: { toolCallId: 'call_fake', title: 'Read the project file' },
@@ -77,7 +84,9 @@ rl.on('line', (line) => {
     });
 
     update({
-      sessionUpdate: 'tool_call_update', toolCallId: 'call_fake', status: 'completed',
+      sessionUpdate: 'tool_call_update',
+      toolCallId: 'call_fake',
+      status: 'completed',
       content: [{ type: 'content', content: { type: 'text', text: 'read 12 lines' } }],
     });
     update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: `You said: ${text}` } });

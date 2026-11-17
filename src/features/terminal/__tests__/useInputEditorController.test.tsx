@@ -53,8 +53,7 @@ vi.mock('@features/terminal/hooks/useCommandHistoryNavigation', () => ({
   useCommandHistoryNavigation: () => ({ reset: mocks.resetHistory, navigate: mocks.navigateHistory }),
 }));
 vi.mock('@features/agent', () => ({
-  usePermissions: (selector: (state: { mode: string; setMode: () => void }) => unknown) =>
-    selector({ mode: 'standard', setMode: vi.fn() }),
+  usePermissions: (selector: (state: { mode: string; setMode: () => void }) => unknown) => selector({ mode: 'standard', setMode: vi.fn() }),
   useAttachmentComposer: () => ({
     attachments: [],
     previewId: null,
@@ -72,9 +71,13 @@ describe('useInputEditorController', () => {
   it('submits repeat Enter events using the current cleared draft', async () => {
     const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
     const execute = result.current.execute;
-    await act(async () => { execute(); execute(); execute(); });
+    await act(async () => {
+      execute();
+      execute();
+      execute();
+    });
     // Queued blank submissions may share one write; the shell still receives every newline in order.
-    expect(mocks.ptyWrite.mock.calls.map(call => call[1]).join('')).toBe('git status\n\n\n');
+    expect(mocks.ptyWrite.mock.calls.map((call) => call[1]).join('')).toBe('git status\n\n\n');
   });
   it('preserves a draft consisting of standalone newline characters', () => {
     useInputStore.setState({ byPane: { 'pane-1': { text: '\n\n', aiMode: false } } });
@@ -171,23 +174,38 @@ describe('useInputEditorController', () => {
     const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
     const preventDefault = vi.fn();
 
-    act(() => result.current.handleKeyDown({
-      key: 'Enter', shiftKey: false, preventDefault,
-      nativeEvent: { isComposing: false },
-    } as unknown as React.KeyboardEvent<HTMLTextAreaElement>));
+    act(() =>
+      result.current.handleKeyDown({
+        key: 'Enter',
+        shiftKey: false,
+        preventDefault,
+        nativeEvent: { isComposing: false },
+      } as unknown as React.KeyboardEvent<HTMLTextAreaElement>),
+    );
 
     expect(preventDefault).toHaveBeenCalledOnce();
     expect(mocks.ptyWrite).toHaveBeenCalledWith('pty-1', 'git status\n');
   });
 
   it('keeps an accepted command cycle from being reinterpreted as filesystem completion', () => {
-    mocks.isCyclingCompletion.mockReturnValue(true); mocks.acceptCompletion.mockReturnValue(true);
+    mocks.isCyclingCompletion.mockReturnValue(true);
+    mocks.acceptCompletion.mockReturnValue(true);
     const { result } = renderHook(() => useInputEditorController({ paneId: 'pane-1' }));
-    const preventDefault = vi.fn(); const stopPropagation = vi.fn();
-    act(() => result.current.handleKeyDown({ key: 'Tab', shiftKey: true, preventDefault, stopPropagation,
-      nativeEvent: { isComposing: false } } as unknown as React.KeyboardEvent<HTMLTextAreaElement>));
-    expect(mocks.acceptCompletion).toHaveBeenCalledWith(true); expect(preventDefault).toHaveBeenCalledOnce();
-    expect(mocks.clearGhost).not.toHaveBeenCalled(); expect(mocks.ptyWrite).not.toHaveBeenCalled();
+    const preventDefault = vi.fn();
+    const stopPropagation = vi.fn();
+    act(() =>
+      result.current.handleKeyDown({
+        key: 'Tab',
+        shiftKey: true,
+        preventDefault,
+        stopPropagation,
+        nativeEvent: { isComposing: false },
+      } as unknown as React.KeyboardEvent<HTMLTextAreaElement>),
+    );
+    expect(mocks.acceptCompletion).toHaveBeenCalledWith(true);
+    expect(preventDefault).toHaveBeenCalledOnce();
+    expect(mocks.clearGhost).not.toHaveBeenCalled();
+    expect(mocks.ptyWrite).not.toHaveBeenCalled();
   });
 
   it('keeps an AI draft out of the PTY when the chat panel opens', () => {

@@ -7,10 +7,19 @@ import { useGitOperations } from '../stores/operations';
 vi.mock('../services/operations', () => ({ runGitOperation: vi.fn(), preferredGitRemote: () => 'origin' }));
 vi.mock('@features/workspace', () => ({ useSessionStore: { getState: () => ({}) } }));
 const target = { cwd: '/repo' };
-beforeEach(() => { vi.resetAllMocks(); useGitOperations.setState({ drafts: {}, busy: {}, errors: {} }); });
+beforeEach(() => {
+  vi.resetAllMocks();
+  useGitOperations.setState({ drafts: {}, busy: {}, errors: {} });
+});
 
 it('exposes remote operations only after opening the shared more menu', async () => {
-  render(<GitRepositoryActions target={target} snapshot={{ root: '/repo', branch: 'main', entries: [], remotes: ['origin'], behind: 2 }} refresh={() => {}} />);
+  render(
+    <GitRepositoryActions
+      target={target}
+      snapshot={{ root: '/repo', branch: 'main', entries: [], remotes: ['origin'], behind: 2 }}
+      refresh={() => {}}
+    />,
+  );
   expect(screen.queryByRole('button', { name: '获取' })).toBeNull();
   fireEvent.click(screen.getByRole('button', { name: '更多版本控制操作' }));
   fireEvent.click(screen.getByRole('button', { name: '拉取（2 个传入提交）' }));
@@ -20,8 +29,14 @@ it('exposes remote operations only after opening the shared more menu', async ()
 
 it('exposes terminal binding as a checked submenu even without a repository snapshot', () => {
   const select = vi.fn();
-  render(<GitRepositoryActions target={target} snapshot={null} refresh={() => {}}
-    terminalMenu={{ value: null, options: [{ id: 'pane-b', label: 'Server', live: true }], onSelect: select }} />);
+  render(
+    <GitRepositoryActions
+      target={target}
+      snapshot={null}
+      refresh={() => {}}
+      terminalMenu={{ value: null, options: [{ id: 'pane-b', label: 'Server', live: true }], onSelect: select }}
+    />,
+  );
 
   fireEvent.click(screen.getByRole('button', { name: '更多版本控制操作' }));
   const bind = screen.getByRole('menuitem', { name: '绑定终端' });
@@ -33,7 +48,13 @@ it('exposes terminal binding as a checked submenu even without a repository snap
 });
 
 it('chooses a remote through a submenu when several are configured', async () => {
-  render(<GitRepositoryActions target={target} snapshot={{ root: '/repo', branch: 'main', entries: [], remotes: ['origin', 'upstream'] }} refresh={() => {}} />);
+  render(
+    <GitRepositoryActions
+      target={target}
+      snapshot={{ root: '/repo', branch: 'main', entries: [], remotes: ['origin', 'upstream'] }}
+      refresh={() => {}}
+    />,
+  );
   fireEvent.click(screen.getByRole('button', { name: '更多版本控制操作' }));
   fireEvent.click(screen.getByRole('menuitem', { name: '推送' }));
   fireEvent.click(screen.getByRole('button', { name: 'upstream' }));

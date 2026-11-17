@@ -5,7 +5,19 @@ import { describe, it, expect, vi } from 'vitest';
 const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 import {
-  fsList, fsDisks, fsHome, fsRename, fsCreateFile, fsCreateDir, fsCopy, fsMove, fsStageDelete, fsRestoreStaged, fsPurgeStaged, fsStat, fileOpenWith,
+  fsList,
+  fsDisks,
+  fsHome,
+  fsRename,
+  fsCreateFile,
+  fsCreateDir,
+  fsCopy,
+  fsMove,
+  fsStageDelete,
+  fsRestoreStaged,
+  fsPurgeStaged,
+  fsStat,
+  fileOpenWith,
 } from '@platform/api/fs';
 
 describe('api/fs wrappers', () => {
@@ -44,10 +56,7 @@ describe('api/fs wrappers', () => {
       { name: '.android', path: 'C:\\Users\\37863\\.android', is_dir: true },
       { name: 'notes.txt', path: '/home/e2e/notes.txt', is_dir: false },
     ]);
-    await expect(fsList('C:\\Users\\37863')).resolves.toMatchObject([
-      { path: 'C:/Users/37863/.android' },
-      { path: '/home/e2e/notes.txt' },
-    ]);
+    await expect(fsList('C:\\Users\\37863')).resolves.toMatchObject([{ path: 'C:/Users/37863/.android' }, { path: '/home/e2e/notes.txt' }]);
     expect(invokeMock).toHaveBeenLastCalledWith('fs_list', { path: 'C:/Users/37863' });
 
     invokeMock.mockResolvedValueOnce([{ name: 'C:', path: 'C:\\', total_bytes: 1, free_bytes: 1 }]);
@@ -78,10 +87,16 @@ describe('api/fs wrappers', () => {
   });
 
   it('undoable delete: normalizes staging mappings and passes rollback and purge through', async () => {
-    invokeMock.mockResolvedValueOnce({ completed: [{ from: 'C:\\Users\\37863\\old.txt', to: 'C:\\Users\\37863\\.vrykell\\undo\\u-old.txt' }], errors: ['unavailable'] });
+    invokeMock.mockResolvedValueOnce({
+      completed: [{ from: 'C:\\Users\\37863\\old.txt', to: 'C:\\Users\\37863\\.vrykell\\undo\\u-old.txt' }],
+      errors: ['unavailable'],
+    });
     const staged = await fsStageDelete(['C:\\Users\\37863\\old.txt']);
     expect(invokeMock).toHaveBeenLastCalledWith('fs_stage_delete', { paths: ['C:/Users/37863/old.txt'] });
-    expect(staged).toEqual({ completed: [{ from: 'C:/Users/37863/old.txt', to: 'C:/Users/37863/.vrykell/undo/u-old.txt' }], errors: ['unavailable'] });
+    expect(staged).toEqual({
+      completed: [{ from: 'C:/Users/37863/old.txt', to: 'C:/Users/37863/.vrykell/undo/u-old.txt' }],
+      errors: ['unavailable'],
+    });
 
     invokeMock.mockResolvedValueOnce({ completed: [{ from: 'C:/a/old.txt', to: 'C:/s/old.txt' }], errors: [] });
     await fsRestoreStaged([{ from: 'C:\\a\\old.txt', to: 'C:\\s\\old.txt' }]);
@@ -96,11 +111,19 @@ describe('api/fs wrappers', () => {
 
   it('fsStat passes through and normalizes the returned path', async () => {
     invokeMock.mockResolvedValueOnce({
-      name: 'notes.txt', path: 'C:\\Users\\37863\\notes.txt', is_dir: false, is_symlink: false,
-      size: 42, created_ms: 1, modified_ms: 2,
+      name: 'notes.txt',
+      path: 'C:\\Users\\37863\\notes.txt',
+      is_dir: false,
+      is_symlink: false,
+      size: 42,
+      created_ms: 1,
+      modified_ms: 2,
     });
     await expect(fsStat('C:\\Users\\37863\\notes.txt')).resolves.toMatchObject({
-      name: 'notes.txt', path: 'C:/Users/37863/notes.txt', size: 42, modified_ms: 2,
+      name: 'notes.txt',
+      path: 'C:/Users/37863/notes.txt',
+      size: 42,
+      modified_ms: 2,
     });
     expect(invokeMock).toHaveBeenLastCalledWith('fs_stat', { path: 'C:/Users/37863/notes.txt' });
   });

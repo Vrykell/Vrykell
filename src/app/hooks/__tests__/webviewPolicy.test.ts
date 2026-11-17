@@ -44,7 +44,9 @@ it('suppresses the native context menu while allowing application handlers to re
   const target = document.createElement('div');
   document.body.append(target);
   let bubbled = false;
-  target.addEventListener('contextmenu', () => { bubbled = true; });
+  target.addEventListener('contextmenu', () => {
+    bubbled = true;
+  });
 
   const event = new MouseEvent('contextmenu', { bubbles: true, cancelable: true });
   target.dispatchEvent(event);

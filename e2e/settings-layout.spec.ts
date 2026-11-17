@@ -20,14 +20,18 @@ for (const theme of ['深色', '浅色']) {
     expect(b.y).toBeLessThan(a.y + 40);
     await expect(row).toHaveCSS('border-top-width', '1px');
     expect((await row.boundingBox())!.height).toBeLessThanOrEqual(70);
-    // The row bleeds to the card edges so its rule spans the whole surface.
+    // The row keeps the card inset so its rule stops short of the card edge.
     const panel = page.locator('.settings-group-panel').first();
     await expect(panel).toHaveCSS('border-top-width', '1px');
     const panelBox = (await panel.boundingBox())!;
     const rowBox = (await row.boundingBox())!;
-    expect(Math.abs(rowBox.width - panelBox.width)).toBeLessThanOrEqual(2);
-    expect(rowBox.x).toBeGreaterThanOrEqual(panelBox.x);
-    expect(rowBox.x + rowBox.width).toBeLessThanOrEqual(panelBox.x + panelBox.width + 0.5);
+    const panelContent = await panel.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    });
+    expect(Math.abs(rowBox.width - panelContent)).toBeLessThanOrEqual(2);
+    expect(rowBox.x).toBeGreaterThan(panelBox.x);
+    expect(rowBox.x + rowBox.width).toBeLessThan(panelBox.x + panelBox.width);
     // Short single-line controls stay near the 180px row-control width.
     expect(b.width).toBeLessThanOrEqual(181);
     await page.mouse.move(0, 0);
@@ -41,7 +45,7 @@ for (const theme of ['深色', '浅色']) {
     const narrowLabel = (await label.boundingBox())!;
     const narrowControl = (await control.boundingBox())!;
     expect(narrowControl.y).toBeGreaterThan(narrowLabel.y + narrowLabel.height);
-    await expect.poll(() => page.locator('.settings-content').evaluate(e => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
+    await expect.poll(() => page.locator('.settings-content').evaluate((e) => e.scrollWidth - e.clientWidth)).toBeLessThanOrEqual(1);
     await page.screenshot({ path: test.info().outputPath('grouped-theme-narrow.png'), animations: 'disabled' });
     await page.setViewportSize({ width: 1240, height: 800 });
     await page.locator('aside').getByRole('button', { name: '模型行为', exact: true }).click();

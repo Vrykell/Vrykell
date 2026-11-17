@@ -4,19 +4,54 @@ import FolderTabs from '@ui/layout/FolderTabs';
 import { tabCapabilities, type TabHandle } from '@ui/layout/tabHandle';
 import { useListReorder } from '@ui/layout/listReorder';
 
-const items: TabHandle[] = ['first', 'second'].map(id => ({ id, label: id, icon: null, tip: id, closeLabel: `Close ${id}`, capabilities: tabCapabilities({ renameable: true }) }));
+const items: TabHandle[] = ['first', 'second'].map((id) => ({
+  id,
+  label: id,
+  icon: null,
+  tip: id,
+  closeLabel: `Close ${id}`,
+  capabilities: tabCapabilities({ renameable: true }),
+}));
 
 function setup() {
-  const onSelect = vi.fn(); const onClose = vi.fn(); const onMove = vi.fn();
-  const view = render(<FolderTabs items={items} selected="first" label="Open documents" toolbar={null} onSelect={onSelect} onClose={onClose} onMove={onMove} />);
+  const onSelect = vi.fn();
+  const onClose = vi.fn();
+  const onMove = vi.fn();
+  const view = render(
+    <FolderTabs
+      items={items}
+      selected="first"
+      label="Open documents"
+      toolbar={null}
+      onSelect={onSelect}
+      onClose={onClose}
+      onMove={onMove}
+    />,
+  );
   const tabs = screen.getAllByRole('tab');
   tabs.forEach((tab, index) => {
     vi.spyOn(tab.closest('.folder-tab')!, 'getBoundingClientRect').mockReturnValue({
-      x: index * 120, y: 0, left: index * 120, right: (index + 1) * 120, top: 0, bottom: 34, width: 120, height: 34, toJSON: () => ({}),
+      x: index * 120,
+      y: 0,
+      left: index * 120,
+      right: (index + 1) * 120,
+      top: 0,
+      bottom: 34,
+      width: 120,
+      height: 34,
+      toJSON: () => ({}),
     });
   });
   vi.spyOn(screen.getByRole('tablist'), 'getBoundingClientRect').mockReturnValue({
-    x: 0, y: 0, left: 0, right: 240, top: 0, bottom: 34, width: 240, height: 34, toJSON: () => ({}),
+    x: 0,
+    y: 0,
+    left: 0,
+    right: 240,
+    top: 0,
+    bottom: 34,
+    width: 240,
+    height: 34,
+    toJSON: () => ({}),
   });
   Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: vi.fn(() => tabs[1]) });
   return { tabs, onSelect, onClose, onMove, view };
@@ -28,13 +63,30 @@ function dragFirst(tab: HTMLElement) {
 }
 
 afterEach(async () => {
-  useListReorder.getState().end(); vi.restoreAllMocks();
-  await new Promise(resolve => setTimeout(resolve, 0));
+  useListReorder.getState().end();
+  vi.restoreAllMocks();
+  await new Promise((resolve) => setTimeout(resolve, 0));
 });
 
 it('renders one drag preview when inactive resource hosts retain the same logical strip', () => {
-  const props = { items, selected: 'first', label: 'Resources', toolbar: null, listId: 'shared-resources', onSelect: vi.fn(), onClose: vi.fn(), onMove: vi.fn() };
-  render(<><div hidden><FolderTabs {...props} /></div><FolderTabs {...props} /></>);
+  const props = {
+    items,
+    selected: 'first',
+    label: 'Resources',
+    toolbar: null,
+    listId: 'shared-resources',
+    onSelect: vi.fn(),
+    onClose: vi.fn(),
+    onMove: vi.fn(),
+  };
+  render(
+    <>
+      <div hidden>
+        <FolderTabs {...props} />
+      </div>
+      <FolderTabs {...props} />
+    </>,
+  );
   const tab = screen.getAllByRole('tab')[0]!;
   Object.defineProperty(document, 'elementFromPoint', { configurable: true, value: vi.fn(() => tab) });
   fireEvent.pointerDown(tab, { pointerId: 1, button: 0, isPrimary: true, clientX: 20, clientY: 14 });
@@ -62,8 +114,9 @@ it('cancels a selected document drag without changing order or selection', () =>
   dragFirst(tabs[0]!);
   fireEvent.keyDown(window, { key: 'Escape' });
   fireEvent.pointerUp(window, { pointerId: 1, clientX: 220, clientY: 14 });
-  expect(onMove).not.toHaveBeenCalled(); expect(onSelect).not.toHaveBeenCalled();
-  expect(screen.getAllByRole('tab').map(tab => tab.textContent)).toEqual(['first', 'second']);
+  expect(onMove).not.toHaveBeenCalled();
+  expect(onSelect).not.toHaveBeenCalled();
+  expect(screen.getAllByRole('tab').map((tab) => tab.textContent)).toEqual(['first', 'second']);
   expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
 });
 
@@ -71,13 +124,28 @@ it('retains a captured gesture when selection transfers its logical strip to ano
   const { tabs, onSelect, onClose, onMove, view } = setup();
   const listId = screen.getByRole('tablist').getAttribute('data-reorder-list')!;
   fireEvent.pointerDown(tabs[0]!, { pointerId: 1, button: 0, isPrimary: true, clientX: 20, clientY: 14 });
-  const replacement = document.createElement('div'); replacement.dataset.reorderList = listId; document.body.appendChild(replacement);
-  vi.spyOn(replacement, 'getBoundingClientRect').mockReturnValue({ x: 0, y: 0, left: 0, right: 240, top: 0, bottom: 34, width: 240, height: 34, toJSON: () => ({}) });
-  view.rerender(<FolderTabs items={[]} selected="second" label="Open documents" toolbar={null} onSelect={onSelect} onClose={onClose} onMove={onMove} />);
+  const replacement = document.createElement('div');
+  replacement.dataset.reorderList = listId;
+  document.body.appendChild(replacement);
+  vi.spyOn(replacement, 'getBoundingClientRect').mockReturnValue({
+    x: 0,
+    y: 0,
+    left: 0,
+    right: 240,
+    top: 0,
+    bottom: 34,
+    width: 240,
+    height: 34,
+    toJSON: () => ({}),
+  });
+  view.rerender(
+    <FolderTabs items={[]} selected="second" label="Open documents" toolbar={null} onSelect={onSelect} onClose={onClose} onMove={onMove} />,
+  );
   fireEvent.pointerMove(window, { pointerId: 1, clientX: 220, clientY: 14 });
   expect(useListReorder.getState().drag?.id).toBe('first');
   fireEvent.pointerUp(window, { pointerId: 1, clientX: 220, clientY: 14 });
-  expect(useListReorder.getState().drag).toBeNull(); replacement.remove();
+  expect(useListReorder.getState().drag).toBeNull();
+  replacement.remove();
 });
 
 it('keeps close buttons independent of document dragging', () => {
@@ -87,7 +155,8 @@ it('keeps close buttons independent of document dragging', () => {
   fireEvent.pointerMove(window, { pointerId: 1, clientX: 220, clientY: 14 });
   fireEvent.pointerUp(window, { pointerId: 1, clientX: 220, clientY: 14 });
   fireEvent.click(close);
-  expect(onClose).toHaveBeenCalledWith('first'); expect(onMove).not.toHaveBeenCalled();
+  expect(onClose).toHaveBeenCalledWith('first');
+  expect(onMove).not.toHaveBeenCalled();
   expect(useListReorder.getState().drag).toBeNull();
 });
 
@@ -114,9 +183,20 @@ it('retains document activation without pointer events', () => {
 });
 
 it('opens document actions before the first tab without changing the selection', () => {
-  const action = vi.fn(); const onSelect = vi.fn();
-  render(<FolderTabs items={items} selected="first" label="Open documents" toolbar={null}
-    menuItems={[{ label: 'Reload document', onClick: action }]} onSelect={onSelect} onClose={vi.fn()} onMove={vi.fn()} />);
+  const action = vi.fn();
+  const onSelect = vi.fn();
+  render(
+    <FolderTabs
+      items={items}
+      selected="first"
+      label="Open documents"
+      toolbar={null}
+      menuItems={[{ label: 'Reload document', onClick: action }]}
+      onSelect={onSelect}
+      onClose={vi.fn()}
+      onMove={vi.fn()}
+    />,
+  );
   const trigger = screen.getByRole('button', { name: '更多编辑器操作' });
   expect(trigger.compareDocumentPosition(screen.getAllByRole('tab')[0]!)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   fireEvent.click(trigger);
@@ -125,7 +205,7 @@ it('opens document actions before the first tab without changing the selection',
   expect(trigger).toHaveAttribute('aria-expanded', 'false');
   expect(screen.queryByRole('menu')).toBeNull();
   fireEvent.click(trigger);
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Reload document' }));
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Reload document' }));
   expect(action).toHaveBeenCalledOnce();
   expect(onSelect).not.toHaveBeenCalled();
   expect(screen.getAllByRole('tab')[0]).toHaveAttribute('aria-selected', 'true');
@@ -133,7 +213,18 @@ it('opens document actions before the first tab without changing the selection',
 
 it('renames directly on a tab and cancels from the same input', () => {
   const onRename = vi.fn();
-  render(<FolderTabs items={items} selected="first" label="Open documents" toolbar={null} onSelect={vi.fn()} onClose={vi.fn()} onMove={vi.fn()} onRename={onRename} />);
+  render(
+    <FolderTabs
+      items={items}
+      selected="first"
+      label="Open documents"
+      toolbar={null}
+      onSelect={vi.fn()}
+      onClose={vi.fn()}
+      onMove={vi.fn()}
+      onRename={onRename}
+    />,
+  );
   fireEvent.doubleClick(screen.getAllByRole('tab')[0]!);
   const input = screen.getByRole('textbox', { name: '标签页标题' });
   fireEvent.change(input, { target: { value: 'Investigation' } });
@@ -145,8 +236,19 @@ it('renames directly on a tab and cancels from the same input', () => {
 });
 
 it('does not start a rename for rows that cannot rename', () => {
-  const readOnly = items.map(item => ({ ...item, capabilities: tabCapabilities({ renameable: false }) }));
-  render(<FolderTabs items={readOnly} selected="first" label="Open documents" toolbar={null} onSelect={vi.fn()} onClose={vi.fn()} onMove={vi.fn()} onRename={vi.fn()} />);
+  const readOnly = items.map((item) => ({ ...item, capabilities: tabCapabilities({ renameable: false }) }));
+  render(
+    <FolderTabs
+      items={readOnly}
+      selected="first"
+      label="Open documents"
+      toolbar={null}
+      onSelect={vi.fn()}
+      onClose={vi.fn()}
+      onMove={vi.fn()}
+      onRename={vi.fn()}
+    />,
+  );
   fireEvent.doubleClick(screen.getAllByRole('tab')[0]!);
   expect(screen.queryByRole('textbox', { name: '标签页标题' })).toBeNull();
 });

@@ -3,12 +3,13 @@ import { setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 test('settings navigation has static headings and save feedback appears once then disappears', async ({ page }) => {
-  await setupTauriMock(page); await page.goto('/');
+  await setupTauriMock(page);
+  await page.goto('/');
   await gotoSetting(page, '模型配置');
   const nav = page.locator('.settings-navigation');
   await expect(nav.locator('.settings-nav-heading')).toHaveCount(7);
   const rows = nav.locator('.settings-navigation-list').getByRole('button');
-  const expectedRows = await page.evaluate(() => /Win/.test(navigator.platform) ? 27 : 26);
+  const expectedRows = await page.evaluate(() => (/Win/.test(navigator.platform) ? 27 : 26));
   await expect(rows).toHaveCount(expectedRows);
   await expect(nav.locator('.settings-navigation-list [aria-expanded]')).toHaveCount(0);
   await expect(rows.locator('svg')).toHaveCount(expectedRows);
@@ -29,6 +30,8 @@ test('settings navigation has static headings and save feedback appears once the
   await nav.getByRole('button', { name: '主题', exact: true }).press('Enter');
   await expect(nav.getByRole('button', { name: '主题', exact: true })).toHaveAttribute('aria-current', 'page');
   await expect(nav.getByRole('button', { name: '主题', exact: true })).toHaveCSS('outline-style', 'solid');
-  await nav.locator('.settings-navigation-list').evaluate(element => { element.scrollTop = 0; });
+  await nav.locator('.settings-navigation-list').evaluate((element) => {
+    element.scrollTop = 0;
+  });
   await page.screenshot({ path: test.info().outputPath('static-settings-navigation.png') });
 });

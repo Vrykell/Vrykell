@@ -14,26 +14,60 @@ import { useWorkbenchStore } from '@features/workspace/stores/workbench';
 
 const { mounts, disposals } = vi.hoisted(() => ({ mounts: vi.fn(), disposals: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: vi.fn().mockResolvedValue(undefined) }));
-vi.mock('@features/workspace/services/sessionManager', () => ({ saveLayout: vi.fn(), create: vi.fn(), transferPanes: vi.fn(async () => {}), close: vi.fn(async () => {}), remove: vi.fn(async () => {}) }));
-vi.mock('../components/TerminalPanel', () => ({ default: ({ paneId }: { paneId: string }) => {
-  useEffect(() => { mounts(paneId); return () => disposals(paneId); }, [paneId]);
-  return <div data-testid={`session-${paneId}`} />;
-} }));
+vi.mock('@features/workspace/services/sessionManager', () => ({
+  saveLayout: vi.fn(),
+  create: vi.fn(),
+  transferPanes: vi.fn(async () => {}),
+  close: vi.fn(async () => {}),
+  remove: vi.fn(async () => {}),
+}));
+vi.mock('../components/TerminalPanel', () => ({
+  default: ({ paneId }: { paneId: string }) => {
+    useEffect(() => {
+      mounts(paneId);
+      return () => disposals(paneId);
+    }, [paneId]);
+    return <div data-testid={`session-${paneId}`} />;
+  },
+}));
 vi.mock('../components/InputEditor', () => ({ default: () => null }));
-vi.mock('../components/TerminalBlockList', () => ({ default: () => <div data-testid="live-block-output" />, hasVisibleContent: () => false }));
+vi.mock('../components/TerminalBlockList', () => ({
+  default: () => <div data-testid="live-block-output" />,
+  hasVisibleContent: () => false,
+}));
 vi.mock('@features/chat/components/PaneChatHistory', () => ({ default: () => null }));
 vi.mock('@features/chat/components/AiWorkspaceSurface', () => ({ default: () => null }));
 vi.mock('@features/workspace/components/TerminalLauncher', () => ({ default: () => null }));
 vi.mock('@features/ssh/components/SshStatusPanel', () => ({ default: ({ children }: { children: React.ReactNode }) => children }));
 
 beforeEach(() => {
-  mounts.mockClear(); disposals.mockClear();
-  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
-  useUiStore.setState({ settingsOpen: false, splitPlacement: { open: false, spec: null }, paneMove: { open: false, containerId: '', paneId: '' }, splitPickerOpen: false });
+  mounts.mockClear();
+  disposals.mockClear();
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
+  useUiStore.setState({
+    settingsOpen: false,
+    splitPlacement: { open: false, spec: null },
+    paneMove: { open: false, containerId: '', paneId: '' },
+    splitPickerOpen: false,
+  });
   useWorkspaceNavigation.setState({ area: 'terminal' });
   useUnifiedWorkspace.setState({ activeTabId: '', layout: null, focused: '', startActive: true });
-  useWorkspaceStore.setState({ tabs: [{ id: 'window', title: 'Terminal', kind: 'session', layout: leaf({ id: 'pane-a', kind: 'local', openMode: 'block' }) }], activeId: 'window' });
-  useTerminalStore.setState({ sessions: { 'pane-a': 'session-a' }, scenes: { 'pane-a': 'altScreen' }, focusedPaneId: 'pane-a', manualFullscreen: {} });
+  useWorkspaceStore.setState({
+    tabs: [{ id: 'window', title: 'Terminal', kind: 'session', layout: leaf({ id: 'pane-a', kind: 'local', openMode: 'block' }) }],
+    activeId: 'window',
+  });
+  useTerminalStore.setState({
+    sessions: { 'pane-a': 'session-a' },
+    scenes: { 'pane-a': 'altScreen' },
+    focusedPaneId: 'pane-a',
+    manualFullscreen: {},
+  });
 });
 
 it('keeps live terminal hosts mounted through split, move, resize and close', () => {
@@ -59,13 +93,22 @@ it('keeps live terminal hosts mounted through split, move, resize and close', ()
 it('retains the exact live content host across detach and merge of native containers', async () => {
   const split = splitLeaf(leaf({ id: 'pane-a', kind: 'local' }), 'pane-a', 'row', 'second', { id: 'pane-b', kind: 'local' });
   useWorkspaceStore.setState({ tabs: [{ id: 'window', title: 'Window', kind: 'session', layout: split }], activeId: 'window' });
-  synchronizeWorkbench(); render(<ResourceContentProvider><TerminalView /></ResourceContentProvider>);
+  synchronizeWorkbench();
+  render(
+    <ResourceContentProvider>
+      <TerminalView />
+    </ResourceContentProvider>,
+  );
   const original = screen.getByTestId('session-pane-b');
   act(() => detachWorkspacePane('terminal', 'terminal:pane-b'));
-  expect(screen.getByTestId('session-pane-b')).toBe(original); expect(disposals).not.toHaveBeenCalled();
+  expect(screen.getByTestId('session-pane-b')).toBe(original);
+  expect(disposals).not.toHaveBeenCalled();
   const detached = useWorkbenchStore.getState().snapshot.selected.terminal!;
-  await act(async () => { await mergeWorkspaceContainers(detached, 'window', { leafId: 'pane-a', dir: 'row', position: 'second' }); });
-  expect(screen.getByTestId('session-pane-b')).toBe(original); expect(disposals).not.toHaveBeenCalled();
+  await act(async () => {
+    await mergeWorkspaceContainers(detached, 'window', { leafId: 'pane-a', dir: 'row', position: 'second' });
+  });
+  expect(screen.getByTestId('session-pane-b')).toBe(original);
+  expect(disposals).not.toHaveBeenCalled();
   expect(mounts.mock.calls.filter(([paneId]) => paneId === 'pane-b')).toHaveLength(1);
 });
 
@@ -102,10 +145,14 @@ it('hosts a manually fullscreened block inside its pane when the unified workspa
   useWorkspaceNavigation.setState({ area: 'unified' });
   useUnifiedWorkspace.setState({ layout: { type: 'pane', id: 'cell-a', resourceId: 'terminal:pane-a' }, startActive: false });
   useTerminalStore.setState({ manualFullscreen: { 'pane-a': true } });
-  render(<ResourceContentProvider>
-    <section data-testid="placed"><ResourceContentSlot id="terminal:pane-a" visible focused /></section>
-    <TerminalView active={false} />
-  </ResourceContentProvider>);
+  render(
+    <ResourceContentProvider>
+      <section data-testid="placed">
+        <ResourceContentSlot id="terminal:pane-a" visible focused />
+      </section>
+      <TerminalView active={false} />
+    </ResourceContentProvider>,
+  );
   const fullscreen = screen.getByTestId('tui-fullscreen');
   expect(screen.getByTestId('placed')).toContainElement(fullscreen);
   expect(screen.getByTestId('pane-pane-a')).toContainElement(fullscreen);

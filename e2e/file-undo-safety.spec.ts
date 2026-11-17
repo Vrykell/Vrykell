@@ -13,38 +13,55 @@ test('consecutive undo preserves a real colliding file on disk', async ({ page }
     await page.exposeFunction('fileSafetyOperation', async (command: string, args: Record<string, unknown>) => {
       const checked = (value: unknown) => {
         const path = String(value);
-        if ((path !== directory && !path.startsWith(`${directory}/`)) || path.split('/').includes('..') || path.includes('\\')) throw new Error('Path outside fixture');
+        if ((path !== directory && !path.startsWith(`${directory}/`)) || path.split('/').includes('..') || path.includes('\\'))
+          throw new Error('Path outside fixture');
         return root + path.slice(directory.length);
       };
-      if (command === 'fs_list') return (await readdir(checked(args.path), { withFileTypes: true })).map(entry => ({ name: entry.name, path: `${String(args.path)}/${entry.name}`, is_dir: entry.isDirectory() }));
+      if (command === 'fs_list')
+        return (await readdir(checked(args.path), { withFileTypes: true })).map((entry) => ({
+          name: entry.name,
+          path: `${String(args.path)}/${entry.name}`,
+          is_dir: entry.isDirectory(),
+        }));
       if (command === 'fs_create_file') {
         const path = checked(`${String(args.dir)}/${String(args.name)}`);
-        await writeFile(path, 'owned', { flag: 'wx' }); return directory + path.slice(root.length);
+        await writeFile(path, 'owned', { flag: 'wx' });
+        return directory + path.slice(root.length);
       }
       if (command === 'fs_rename') {
-        const from = checked(args.oldPath); const parent = from.slice(0, from.lastIndexOf('/'));
+        const from = checked(args.oldPath);
+        const parent = from.slice(0, from.lastIndexOf('/'));
         let target = checked(directory + `${parent}/${String(args.newName)}`.slice(root.length));
         for (let index = 1; existsSync(target); index++) target = `${parent}/${String(args.newName)} (${index})`;
-        await rename(from, target); return directory + target.slice(root.length);
+        await rename(from, target);
+        return directory + target.slice(root.length);
       }
       if (command === 'fs_stage_delete') {
         await mkdir(`${root}/staging`, { recursive: true });
         const completed = [];
         for (const value of args.paths as string[]) {
-          const from = checked(value); const to = `${root}/staging/${from.split('/').pop()}`;
-          await rename(from, to); completed.push({ from: value, to: directory + to.slice(root.length) });
+          const from = checked(value);
+          const to = `${root}/staging/${from.split('/').pop()}`;
+          await rename(from, to);
+          completed.push({ from: value, to: directory + to.slice(root.length) });
         }
         return { completed, errors: [] };
       }
       throw new Error(`Unexpected fixture operation: ${command}`);
     });
     await page.addInitScript(() => {
-      const bridge = window as unknown as { fileSafetyOperation: (command: string, args: Record<string, unknown>) => Promise<unknown>; __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } };
+      const bridge = window as unknown as {
+        fileSafetyOperation: (command: string, args: Record<string, unknown>) => Promise<unknown>;
+        __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> };
+      };
       const original = bridge.__TAURI_INTERNALS__.invoke;
-      bridge.__TAURI_INTERNALS__.invoke = (command, args) => ['fs_list', 'fs_create_file', 'fs_rename', 'fs_stage_delete'].includes(command)
-        ? bridge.fileSafetyOperation(command, args ?? {}) : original(command, args);
+      bridge.__TAURI_INTERNALS__.invoke = (command, args) =>
+        ['fs_list', 'fs_create_file', 'fs_rename', 'fs_stage_delete'].includes(command)
+          ? bridge.fileSafetyOperation(command, args ?? {})
+          : original(command, args);
     });
-    await page.goto('/'); await waitForWorkbench(page);
+    await page.goto('/');
+    await waitForWorkbench(page);
     await page.locator('[data-dock-btn="files"]').click();
     const tree = page.getByTestId('local-file-tree');
     await expect(tree).toHaveAttribute('data-path', directory);
@@ -73,7 +90,8 @@ test('consecutive undo preserves a real colliding file on disk', async ({ page }
 
 test('remote copy and cut leave the local system clipboard unchanged', async ({ page }) => {
   await setupTauriMock(page, { sshHost: 'known' });
-  await page.goto('/'); await waitForWorkbench(page);
+  await page.goto('/');
+  await waitForWorkbench(page);
   await page.locator('[data-dock-btn="ssh"]').click();
   await page.getByTestId('ssh-row-ssh-1').dblclick();
   await page.getByRole('button', { name: '断开连接', exact: true }).waitFor();

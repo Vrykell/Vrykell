@@ -30,7 +30,11 @@ describe('usage sources', () => {
 
   it('does not overwrite newly saved configurations with an older request', async () => {
     let resolve: (entries: HarnessConfig[]) => void = () => {};
-    acpHarnesses.mockReturnValue(new Promise(result => { resolve = result; }));
+    acpHarnesses.mockReturnValue(
+      new Promise((result) => {
+        resolve = result;
+      }),
+    );
     const pending = useUsageSources.getState().refresh();
     useUsageSources.getState().replace(['New', 'New']);
     resolve([entry('Old')]);
@@ -40,7 +44,11 @@ describe('usage sources', () => {
 
   it('ignores errors from an outdated request', async () => {
     let reject: (cause: Error) => void = () => {};
-    acpHarnesses.mockReturnValue(new Promise((_, failure) => { reject = failure; }));
+    acpHarnesses.mockReturnValue(
+      new Promise((_, failure) => {
+        reject = failure;
+      }),
+    );
     const pending = useUsageSources.getState().refresh();
     useUsageSources.getState().replace(['New']);
     reject(new Error('Old failure'));

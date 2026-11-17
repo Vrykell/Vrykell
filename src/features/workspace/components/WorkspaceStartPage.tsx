@@ -8,7 +8,16 @@ import type { CSSProperties, ReactNode } from 'react';
  * `columns` opts into an even grid so a page with an unround number of actions never ends up
  * with ragged rows of mismatched widths. Without it the actions simply wrap and centre.
  */
-export default function WorkspaceStartPage({ icon, title, description, actions, columns, testId, contentTestId, children }: {
+export default function WorkspaceStartPage({
+  icon,
+  title,
+  description,
+  actions,
+  columns,
+  testId,
+  contentTestId,
+  children,
+}: {
   icon: ReactNode;
   title: string;
   description: string;
@@ -18,14 +27,22 @@ export default function WorkspaceStartPage({ icon, title, description, actions, 
   contentTestId?: string;
   children?: ReactNode;
 }) {
-  return <div className="workspace-empty workspace-start-page workspace-start-simple" data-testid={testId}>
-    <div className="workspace-start-simple-body" data-testid={contentTestId}>
-      <span className="workspace-start-simple-icon">{icon}</span>
-      <h2>{title}</h2>
-      <p>{description}</p>
-      {actions && <div className="workspace-start-simple-actions" data-grid={columns ? 'true' : undefined}
-        style={columns ? { '--start-actions-columns': columns } as CSSProperties : undefined}>{actions}</div>}
-      {children}
+  return (
+    <div className="workspace-empty workspace-start-page workspace-start-simple" data-testid={testId}>
+      <div className="workspace-start-simple-body" data-testid={contentTestId}>
+        <span className="workspace-start-simple-icon">{icon}</span>
+        <h2>{title}</h2>
+        <p>{description}</p>
+        {actions && (
+          <div
+            className="workspace-start-simple-actions"
+            data-grid={columns ? 'true' : undefined}
+            style={columns ? ({ '--start-actions-columns': columns } as CSSProperties) : undefined}>
+            {actions}
+          </div>
+        )}
+        {children}
+      </div>
     </div>
-  </div>;
+  );
 }

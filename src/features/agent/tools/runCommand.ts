@@ -69,17 +69,26 @@ export async function runCommandAndWait(
   if (!sessionId) {
     return terminalDisconnected(paneId)!;
   }
-  if (opts?.signal?.aborted) return { ok: false, completed: false, output: '', code: 'COMMAND_ABORTED', error: t('Command cancelled before execution.') };
+  if (opts?.signal?.aborted)
+    return { ok: false, completed: false, output: '', code: 'COMMAND_ABORTED', error: t('Command cancelled before execution.') };
   const executionState = terminalExecutionState(paneId);
   if (executionState === 'busy') {
-    return { ok: false, completed: false, output: '', code: 'TERMINAL_BUSY', error: t('The terminal is busy. Use read_terminal to inspect it before sending another command.') };
+    return {
+      ok: false,
+      completed: false,
+      output: '',
+      code: 'TERMINAL_BUSY',
+      error: t('The terminal is busy. Use read_terminal to inspect it before sending another command.'),
+    };
   }
   if (executionState === 'interactive') {
     return {
       ok: false,
       code: 'TERMINAL_INTERACTIVE',
       output: '',
-      error: t('The terminal is running a full-screen application (altScreen, for example vim or htop). run_command only runs non-interactive commands; to drive this full-screen program, use read_terminal (view the screen) and terminal_keys (send keys).'),
+      error: t(
+        'The terminal is running a full-screen application (altScreen, for example vim or htop). run_command only runs non-interactive commands; to drive this full-screen program, use read_terminal (view the screen) and terminal_keys (send keys).',
+      ),
     };
   }
 
@@ -107,13 +116,32 @@ export async function runCommandAndWait(
       retainCompletionForReadiness(paneId, completion);
       retainedCompletion = true;
     }
-    diagnostic('agent-command-completion', { paneId, completed: result.completed ?? false, ok: result.ok, exitCode: result.exitCode, outputChars: result.output.length });
+    diagnostic('agent-command-completion', {
+      paneId,
+      completed: result.completed ?? false,
+      ok: result.ok,
+      exitCode: result.exitCode,
+      outputChars: result.output.length,
+    });
     return result;
   } catch (e) {
-    if (opts?.signal?.aborted) return { ok: false, completed: false, output: '', code: 'COMMAND_ABORTED', error: t('Stopped waiting. The command may still be running in the terminal.') };
+    if (opts?.signal?.aborted)
+      return {
+        ok: false,
+        completed: false,
+        output: '',
+        code: 'COMMAND_ABORTED',
+        error: t('Stopped waiting. The command may still be running in the terminal.'),
+      };
     const disconnected = terminalDisconnected(paneId, sessionId);
     if (disconnected) return disconnected;
-    return { ok: false, completed: false, output: '', code: 'TERMINAL_WRITE_FAILED', error: t('Could not write to the terminal: {{error}}', { error: e instanceof Error ? e.message : String(e) }) };
+    return {
+      ok: false,
+      completed: false,
+      output: '',
+      code: 'TERMINAL_WRITE_FAILED',
+      error: t('Could not write to the terminal: {{error}}', { error: e instanceof Error ? e.message : String(e) }),
+    };
   } finally {
     if (!retainedCompletion) completion?.dispose();
     agentControl.release(paneId);
@@ -163,13 +191,18 @@ function waitForCompletion(
      *  the program stays in the terminal for the user to operate. */
     const unsubScene = useTerminalStore.subscribe((s) => {
       const disconnected = terminalDisconnected(paneId, sessionId);
-      if (disconnected) { finish(disconnected); return; }
+      if (disconnected) {
+        finish(disconnected);
+        return;
+      }
       if (s.scenes[paneId] === 'altScreen') {
         finish({
           ok: false,
           code: 'TERMINAL_INTERACTIVE',
           output: '',
-          error: t('The command switched into a full-screen interactive interface (TUI mode); run_command cannot read its output and stopped waiting. The program is still running in the terminal. To keep operating it, use read_terminal (view the screen) and terminal_keys (send keys), or use a non-interactive command (add a flag such as --help/--version, or redirect the output).'),
+          error: t(
+            'The command switched into a full-screen interactive interface (TUI mode); run_command cannot read its output and stopped waiting. The program is still running in the terminal. To keep operating it, use read_terminal (view the screen) and terminal_keys (send keys), or use a non-interactive command (add a flag such as --help/--version, or redirect the output).',
+          ),
         });
       }
     });
@@ -227,7 +260,15 @@ function waitForCompletion(
         if (cur === last) {
           stable += 1;
           if (stable >= 2) {
-            finish({ ok: false, completed: false, output: tail(cur), code: 'COMMAND_UNCONFIRMED', error: t('Command completion could not be confirmed. This is a terminal snapshot; use read_terminal and do not queue more commands until the shell is ready.') });
+            finish({
+              ok: false,
+              completed: false,
+              output: tail(cur),
+              code: 'COMMAND_UNCONFIRMED',
+              error: t(
+                'Command completion could not be confirmed. This is a terminal snapshot; use read_terminal and do not queue more commands until the shell is ready.',
+              ),
+            });
           }
         } else {
           last = cur;
@@ -248,9 +289,13 @@ function waitForCompletion(
 
     /** Command echoes to expect for this submission: the whole command plus each non-empty line
      *  (a multi-line script is split into one block per statement). */
-    const submitted = new Set(
-      [command.trim(), ...command.split('\n').map((line) => line.trim()).filter(Boolean)],
-    );
+    const submitted = new Set([
+      command.trim(),
+      ...command
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean),
+    ]);
 
     /** Collect every block produced by this submission, in start order; unrelated blocks
      *  (concurrent user input) are not merged in. */
@@ -293,11 +338,26 @@ function waitForCompletion(
 
     const timeoutTimer = setTimeout(() => {
       const out = getRecentOutputFor(paneId, 30);
-      finish({ ok: false, completed: false, output: tail(out), code: 'COMMAND_TIMEOUT', error: t('Command timed out after {{seconds}} seconds. It may still be running; use read_terminal before sending another command. For a scan or build, bound the next attempt with an explicit timeout or run it in the background.', { seconds: Math.round(timeoutMs / 1000) }) });
+      finish({
+        ok: false,
+        completed: false,
+        output: tail(out),
+        code: 'COMMAND_TIMEOUT',
+        error: t(
+          'Command timed out after {{seconds}} seconds. It may still be running; use read_terminal before sending another command. For a scan or build, bound the next attempt with an explicit timeout or run it in the background.',
+          { seconds: Math.round(timeoutMs / 1000) },
+        ),
+      });
     }, timeoutMs);
 
     const onAbort = () => {
-      finish({ ok: false, completed: false, output: tail(getRecentOutputFor(paneId, 30)), code: 'COMMAND_ABORTED', error: t('Stopped waiting. The command may still be running in the terminal.') });
+      finish({
+        ok: false,
+        completed: false,
+        output: tail(getRecentOutputFor(paneId, 30)),
+        code: 'COMMAND_ABORTED',
+        error: t('Stopped waiting. The command may still be running in the terminal.'),
+      });
     };
     signal?.addEventListener('abort', onAbort, { once: true });
 
@@ -309,17 +369,33 @@ function waitForCompletion(
     });
     const settleCompletion = () => {
       const result = completion?.result();
-      if (result) finish({ ok: result.exitCode === 0, completed: true, exitCode: result.exitCode, output: capOutput(result.output),
-        ...(result.exitCode !== 0 ? { error: t('Exit code: {{code}}', { code: result.exitCode }) } : {}) });
+      if (result)
+        finish({
+          ok: result.exitCode === 0,
+          completed: true,
+          exitCode: result.exitCode,
+          output: capOutput(result.output),
+          ...(result.exitCode !== 0 ? { error: t('Exit code: {{code}}', { code: result.exitCode }) } : {}),
+        });
     };
     unsubCompletion = completion?.subscribe(settleCompletion);
     if (terminalDisconnected(paneId, sessionId)) finish(terminalDisconnected(paneId, sessionId)!);
     else if (signal?.aborted) onAbort();
     else if (useTerminalStore.getState().scenes[paneId] === 'altScreen') {
-      finish({ ok: false, completed: false, output: '', code: 'TERMINAL_INTERACTIVE', error: t('The command entered an interactive screen. Use read_terminal and terminal_keys to continue.') });
+      finish({
+        ok: false,
+        completed: false,
+        output: '',
+        code: 'TERMINAL_INTERACTIVE',
+        error: t('The command entered an interactive screen. Use read_terminal and terminal_keys to continue.'),
+      });
     } else {
       settleCompletion();
-      if (!settled) { tryClaim(); collectBlocks(); settleIfDone(); }
+      if (!settled) {
+        tryClaim();
+        collectBlocks();
+        settleIfDone();
+      }
     }
   });
 }

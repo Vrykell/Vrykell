@@ -5,7 +5,10 @@ import ReadOnlyFileAccess from '../components/ReadOnlyFileAccess';
 
 vi.mock('@features/files', () => ({ openInTerminal: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('@platform/runtime', () => ({ isWindows: true }));
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 const file = { path: '/protected/config' };
 
 it('keeps elevation behind an explicit permission action', () => {

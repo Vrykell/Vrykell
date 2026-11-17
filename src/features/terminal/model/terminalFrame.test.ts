@@ -5,7 +5,7 @@ import { Terminal } from '@xterm/xterm';
 describe('SSH secret response prompts', () => {
   it('captures styled authentication states but reuses normal interactive frames', async () => {
     const term = new Terminal({ cols: 80, rows: 24 });
-    const write = (text: string) => new Promise<void>(resolve => term.write(text, resolve));
+    const write = (text: string) => new Promise<void>((resolve) => term.write(text, resolve));
     try {
       await write('Password: ');
       const authentication = captureConnectionFrame(term, null);
@@ -18,7 +18,9 @@ describe('SSH secret response prompts', () => {
       expect(captureConnectionFrame(term, interactive)).toBe(interactive);
       const disconnected = captureConnectionFrame(term, interactive, true);
       expect(disconnected.html).toContain('regular-screen-update');
-    } finally { term.dispose(); }
+    } finally {
+      term.dispose();
+    }
   });
 
   it('recognizes the final password or passphrase prompt', () => {

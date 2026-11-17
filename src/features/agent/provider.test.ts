@@ -46,7 +46,6 @@ describe('deepThinkProviderOptions', () => {
   });
 });
 
-
 describe('configured provider endpoints', () => {
   it('updates official defaults when switching providers and preserves custom gateways', () => {
     expect(baseUrlForProvider('https://api.openai.com/v1/', 'anthropic')).toBe('https://api.anthropic.com/v1');
@@ -58,7 +57,9 @@ describe('configured provider endpoints', () => {
     expect(effectiveEndpoint('anthropic', 'https://api.anthropic.com/v1/')).toBe('https://api.anthropic.com/v1/messages');
     expect(effectiveEndpoint('openai-compatible', 'https://gateway.example/v1')).toBe('https://gateway.example/v1/chat/completions');
     expect(effectiveEndpoint('opencode', '')).toBe('https://opencode.ai/zen/go/v1/chat/completions');
-    expect(effectiveEndpoint('gemini', 'https://gateway.example/v1beta', 'gemini-2.5-pro')).toBe('https://gateway.example/v1beta/models/gemini-2.5-pro:generateContent');
+    expect(effectiveEndpoint('gemini', 'https://gateway.example/v1beta', 'gemini-2.5-pro')).toBe(
+      'https://gateway.example/v1beta/models/gemini-2.5-pro:generateContent',
+    );
     expect(effectiveEndpoint('gemini', '')).toBe('https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent');
   });
   it.each([

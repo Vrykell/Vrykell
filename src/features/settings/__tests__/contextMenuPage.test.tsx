@@ -5,22 +5,43 @@ import { ContextMenuPage } from '../pages/contextMenuPage';
 import { getContextMenuStatus, manageContextMenu, type ContextMenuStatus } from '@platform/contextMenu';
 
 vi.mock('@platform/contextMenu', () => ({ getContextMenuStatus: vi.fn(), manageContextMenu: vi.fn() }));
-const initial: ContextMenuStatus = { supported: true, available: true, enabled: false, stale: false, certificateTrusted: false, certificateThumbprint: 'ABCD' };
-beforeEach(() => { vi.clearAllMocks(); vi.mocked(getContextMenuStatus).mockResolvedValue({ ...initial }); });
+const initial: ContextMenuStatus = {
+  supported: true,
+  available: true,
+  enabled: false,
+  stale: false,
+  certificateTrusted: false,
+  certificateThumbprint: 'ABCD',
+};
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.mocked(getContextMenuStatus).mockResolvedValue({ ...initial });
+});
 it('does not let an old status read undo a later trust action', async () => {
   let finish!: (status: ContextMenuStatus) => void;
-  vi.mocked(getContextMenuStatus).mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  vi.mocked(getContextMenuStatus).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
   vi.mocked(manageContextMenu).mockResolvedValue({ ...initial, certificateTrusted: true });
-  render(<StrictMode><ContextMenuPage /></StrictMode>);
+  render(
+    <StrictMode>
+      <ContextMenuPage />
+    </StrictMode>,
+  );
   fireEvent.click(await screen.findByRole('button', { name: '信任此证书' }));
   await waitFor(() => expect(screen.getByRole('button', { name: '启用右键菜单' })).toBeEnabled());
-  await act(async () => { finish({ ...initial }); });
+  await act(async () => {
+    finish({ ...initial });
+  });
   expect(screen.getByRole('button', { name: '启用右键菜单' })).toBeEnabled();
 });
 
 it('requires explicit certificate trust before enabling, then supports disabling and removing trust', async () => {
   let status = { ...initial };
-  vi.mocked(manageContextMenu).mockImplementation(async action => {
+  vi.mocked(manageContextMenu).mockImplementation(async (action) => {
     if (action === 'trust') status.certificateTrusted = true;
     if (action === 'enable') status.enabled = true;
     if (action === 'disable') status.enabled = false;

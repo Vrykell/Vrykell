@@ -25,7 +25,7 @@ test('the history singleton never persists into the terminal tab order', async (
   await boot(page);
   const ids = await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
-    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+    const { useWorkspaceStore } = (await import(path)) as typeof import('../src/features/workspace/stores/workspace');
     const ws = useWorkspaceStore.getState();
     const grouped = ws.tabs[0]!.id;
     const loose = ws.addTab({ title: 'Loose terminal' });
@@ -33,8 +33,10 @@ test('the history singleton never persists into the terminal tab order', async (
     return { grouped, loose, second };
   });
   await ensureTabsOpen(page);
-  const order = () => page.locator('[data-reorder-list="session-tabs"] > [data-tab-row-id]').evaluateAll(rows => rows
-    .map(row => row.getAttribute('data-tab-row-id')));
+  const order = () =>
+    page
+      .locator('[data-reorder-list="session-tabs"] > [data-tab-row-id]')
+      .evaluateAll((rows) => rows.map((row) => row.getAttribute('data-tab-row-id')));
   const before = await order();
   expect(before).toEqual(expect.arrayContaining([ids.grouped, ids.loose, ids.second]));
   await page.getByTestId('tab-history-btn').click();
@@ -53,25 +55,36 @@ test('failed and interrupted commands remain available to history completion', a
   await boot(page);
   await page.waitForFunction(async () => {
     const path = '/src/features/terminal/stores/terminal.ts';
-    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    const { useTerminalStore } = (await import(path)) as typeof import('../src/features/terminal/stores/terminal');
     return Object.values(useTerminalStore.getState().startupStates).includes('ready');
   });
   await page.evaluate(async () => {
     const settingsPath = '/src/features/agent/stores/agentSettings.ts';
     const configPath = '/src/features/agent/stores/aiConfig.ts';
-    const { useAgentSettings } = await import(settingsPath) as typeof import('../src/features/agent/stores/agentSettings');
-    const { useAiConfigStore } = await import(configPath) as typeof import('../src/features/agent/stores/aiConfig');
+    const { useAgentSettings } = (await import(settingsPath)) as typeof import('../src/features/agent/stores/agentSettings');
+    const { useAiConfigStore } = (await import(configPath)) as typeof import('../src/features/agent/stores/aiConfig');
     useAgentSettings.getState().update({ completeEnabled: true });
     useAiConfigStore.setState({ hasKey: false });
   });
-  for (const [command, code] of [['fixture-failed', 127], ['fixture-interrupted', 130], ['fixture-success', 0]] as const) {
+  for (const [command, code] of [
+    ['fixture-failed', 127],
+    ['fixture-interrupted', 130],
+    ['fixture-success', 0],
+  ] as const) {
     await emitPtyOutput(page, `\x1b]133;E;${btoa(command)}\x07\x1b]133;C\x07\x1b]133;D;${code}\x07\x1b]133;A\x07$ \x1b]133;B\x07`);
   }
-  await expect.poll(() => page.evaluate(async () => {
-    const path = '/src/features/terminal/stores/history.ts';
-    const { useHistoryStore } = await import(path) as typeof import('../src/features/terminal/stores/history');
-    return useHistoryStore.getState().search('fixture-failed').map(entry => entry.exitCode);
-  })).toEqual([127]);
+  await expect
+    .poll(() =>
+      page.evaluate(async () => {
+        const path = '/src/features/terminal/stores/history.ts';
+        const { useHistoryStore } = (await import(path)) as typeof import('../src/features/terminal/stores/history');
+        return useHistoryStore
+          .getState()
+          .search('fixture-failed')
+          .map((entry) => entry.exitCode);
+      }),
+    )
+    .toEqual([127]);
   await page.getByPlaceholder(/输入命令/).fill('fixture-');
   await expect(page.locator('.command-completion-suffix')).toHaveText('success');
   await page.getByPlaceholder(/输入命令/).fill('fixture-f');
@@ -89,10 +102,12 @@ test('history toolbar aligns right and compact search closes on blur', async ({ 
   const actionButtons = page.locator('.history-actions > button');
   await expect(actionButtons).toHaveCount(5);
   await expect(actionButtons.first()).toHaveAccessibleName('搜索会话');
-  const positions = await actionButtons.evaluateAll(elements => elements.map(element => {
-    const bounds = element.getBoundingClientRect();
-    return { left: bounds.left, right: bounds.right };
-  }));
+  const positions = await actionButtons.evaluateAll((elements) =>
+    elements.map((element) => {
+      const bounds = element.getBoundingClientRect();
+      return { left: bounds.left, right: bounds.right };
+    }),
+  );
   expect(positions).toEqual([...positions].sort((left, right) => left.left - right.left));
   expect(positions.at(-1)!.right).toBeGreaterThan(1_100);
   await page.screenshot({ path: info.outputPath('history-toolbar.png'), animations: 'disabled' });

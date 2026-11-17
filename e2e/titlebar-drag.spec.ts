@@ -7,10 +7,13 @@ import { setupTauriMock } from './tauri-mock';
  * so the contract is checked at real coordinates instead of trusting the markup.
  */
 async function elementAt(page: import('@playwright/test').Page, x: number, y: number) {
-  return page.evaluate(([px, py]) => {
-    const el = document.elementFromPoint(px, py) as HTMLElement | null;
-    return el ? { tag: el.tagName, isDragRegion: el.hasAttribute('data-tauri-drag-region') } : null;
-  }, [x, y]);
+  return page.evaluate(
+    ([px, py]) => {
+      const el = document.elementFromPoint(px, py) as HTMLElement | null;
+      return el ? { tag: el.tagName, isDragRegion: el.hasAttribute('data-tauri-drag-region') } : null;
+    },
+    [x, y],
+  );
 }
 
 test.beforeEach(async ({ page }) => {
@@ -64,7 +67,7 @@ for (const width of [1240, 720]) {
     const backButton = (await page.getByTestId('workspace-history-back').boundingBox())!;
     const forwardButton = (await page.getByTestId('workspace-history-forward').boundingBox())!;
     const controls = page.locator('.window-control-button');
-    const windowControl = await controls.count() ? await controls.first().boundingBox() : null;
+    const windowControl = (await controls.count()) ? await controls.first().boundingBox() : null;
     for (const target of [searchBox, dockButton, backButton, forwardButton, ...(windowControl ? [windowControl] : [])]) {
       const hit = await elementAt(page, Math.round(target.x + target.width / 2), middle);
       expect(hit?.isDragRegion).toBe(false);

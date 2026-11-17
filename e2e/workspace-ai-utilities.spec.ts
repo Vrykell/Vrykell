@@ -3,8 +3,10 @@ import { setupTauriMock } from './tauri-mock';
 import { openWorkspaceActions } from './workbench';
 
 test('an unavailable side dock keeps the same conversation visible in the main workspace', async ({ page }) => {
-  await setupTauriMock(page, {}); await page.goto('/');
-  await page.getByTestId('workspace-area-ai').click(); await page.getByTestId('ai-new-conversation').click();
+  await setupTauriMock(page, {});
+  await page.goto('/');
+  await page.getByTestId('workspace-area-ai').click();
+  await page.getByTestId('ai-new-conversation').click();
   await page.setViewportSize({ width: 500, height: 800 });
   const composer = page.locator('[data-chat-composer]:visible');
   await composer.fill('keep my visible draft');
@@ -17,7 +19,8 @@ test('an unavailable side dock keeps the same conversation visible in the main w
 });
 
 test('AI utility pages become singleton tabs while docked conversations keep their draft', async ({ page }) => {
-  await setupTauriMock(page, {}); await page.goto('/');
+  await setupTauriMock(page, {});
+  await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.getByTestId('workspace-area-ai').click();
   await page.getByTestId('ai-new-conversation').click();
@@ -29,9 +32,12 @@ test('AI utility pages become singleton tabs while docked conversations keep the
   const links = menu.locator('.chat-setting-links');
   const buttons = links.getByRole('button');
   await expect(buttons).toHaveCount(3);
-  const positions = await buttons.evaluateAll(items => items.map(item => ({ top: item.getBoundingClientRect().top, shared: item.classList.contains('outline-button') })));
-  expect(positions.every(item => item.shared && Math.abs(item.top - positions[0]!.top) < 1)).toBe(true);
-  await expect(buttons.last()).toHaveText('关闭'); await expect(buttons.last()).toHaveClass(/primary-button/);
+  const positions = await buttons.evaluateAll((items) =>
+    items.map((item) => ({ top: item.getBoundingClientRect().top, shared: item.classList.contains('outline-button') })),
+  );
+  expect(positions.every((item) => item.shared && Math.abs(item.top - positions[0]!.top) < 1)).toBe(true);
+  await expect(buttons.last()).toHaveText('关闭');
+  await expect(buttons.last()).toHaveClass(/primary-button/);
   await page.getByRole('region', { name: '会话设置' }).getByTestId('chat-usage-entry').click();
   // Utility pages are singleton tabs; the side conversation remains independently placed.
   await expect(page.locator('[data-testid="usage-page"]:visible')).toBeVisible();
@@ -49,11 +55,12 @@ test('AI utility pages become singleton tabs while docked conversations keep the
 });
 
 test('hidden terminal splits do not reserve the resource or code workspace width', async ({ page }) => {
-  await setupTauriMock(page, {}); await page.goto('/');
+  await setupTauriMock(page, {});
+  await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
-    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+    const { useWorkspaceStore } = (await import(path)) as typeof import('../src/features/workspace/stores/workspace');
     useWorkspaceStore.getState().splitFocusedDirect('row');
     useWorkspaceStore.getState().splitFocusedDirect('row');
   });

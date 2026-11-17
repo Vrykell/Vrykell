@@ -66,7 +66,9 @@ export interface FilePanelProps {
   /** External file drops: the remote panel uploads; local drops default to moving. */
   onExternalDrop?: (paths: string[], target: { rowPath: string | null; dir: string }) => void;
   /** Prepare a native drag (remote: download locally before handing it to the system). */
-  prepareNativeDrag?: (items: Array<{ path: string; name: string; is_dir: boolean }>) => Promise<{ paths: string[]; mode: 'copy' | 'move' } | null>;
+  prepareNativeDrag?: (
+    items: Array<{ path: string; name: string; is_dir: boolean }>,
+  ) => Promise<{ paths: string[]; mode: 'copy' | 'move' } | null>;
 }
 
 /**
@@ -97,7 +99,7 @@ export default function FilePanel({
   onExternalDrop,
   prepareNativeDrag,
 }: FilePanelProps) {
-  const undoEnabled = useFileUndoSettings(state => target.kind === 'ssh' ? state.remote : state.local);
+  const undoEnabled = useFileUndoSettings((state) => (target.kind === 'ssh' ? state.remote : state.local));
   const config = useMemo(() => filePanelConfigFor(target), [target]);
   const {
     ops,
@@ -243,7 +245,7 @@ export default function FilePanel({
       const rect = tree.getBoundingClientRect();
       if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) return null;
       const zone = (document.elementFromPoint(x, y) as HTMLElement | null)?.closest<HTMLElement>('[data-drop-dir]');
-      const dir = zone && tree.contains(zone) ? zone.dataset.dropDir ?? null : null;
+      const dir = zone && tree.contains(zone) ? (zone.dataset.dropDir ?? null) : null;
       if (dir) return { rowPath: zone!.dataset.path ?? null, dir };
       return path === null ? null : { rowPath: null, dir: path };
     },
@@ -281,10 +283,20 @@ export default function FilePanel({
     // Both panel-level menus (⋯ and blank area) re-read the current directory from the backend.
     onRefresh: refresh,
     ...extraHandlers,
-    onSyncToCwd: terminalCwd != null ? () => { void navigate(terminalCwd); }
-      : onSyncToTerminal ? () => useToastStore.getState().addToast(t('The terminal has not reported its working directory yet.'), 'info') : undefined,
-    onSyncToTerminal: config.syncToTerminal && onSyncToTerminal && directoryReady
-      ? () => { if (path !== null) onSyncToTerminal(path); } : undefined,
+    onSyncToCwd:
+      terminalCwd != null
+        ? () => {
+            void navigate(terminalCwd);
+          }
+        : onSyncToTerminal
+          ? () => useToastStore.getState().addToast(t('The terminal has not reported its working directory yet.'), 'info')
+          : undefined,
+    onSyncToTerminal:
+      config.syncToTerminal && onSyncToTerminal && directoryReady
+        ? () => {
+            if (path !== null) onSyncToTerminal(path);
+          }
+        : undefined,
   };
   useFileDirectoryShortcuts(enabled, handlers.onSyncToTerminal, handlers.onSyncToCwd);
 
@@ -331,9 +343,7 @@ export default function FilePanel({
   };
 
   const menuKeysFor = (entry: FsEntry): typeof config.menus.rowFile =>
-    targetsFor(entry).length > 1
-      ? config.menus.rowMulti
-      : entry.is_dir ? config.menus.rowFolder : config.menus.rowFile;
+    targetsFor(entry).length > 1 ? config.menus.rowMulti : entry.is_dir ? config.menus.rowFolder : config.menus.rowFile;
 
   /** Enter a directory or open a file; shared by double-click and Enter. */
   const activateEntry = (entry: FsEntry) => {
@@ -348,7 +358,10 @@ export default function FilePanel({
       const to = rows.findIndex((row) => row.entry.path === entry.path);
       if (from >= 0 && to >= 0) {
         const [start, end] = from <= to ? [from, to] : [to, from];
-        replaceSelection(rows.slice(start, end + 1).map((row) => row.entry.path), anchorPath);
+        replaceSelection(
+          rows.slice(start, end + 1).map((row) => row.entry.path),
+          anchorPath,
+        );
         return;
       }
     }
@@ -381,13 +394,19 @@ export default function FilePanel({
       if (rows.length === 0) return;
       event.preventDefault();
       const currentIndex = rows.findIndex((row) => row.entry.path === anchorPath);
-      const nextIndex = event.key === 'ArrowDown'
-        ? (currentIndex < 0 ? 0 : Math.min(rows.length - 1, currentIndex + 1))
-        : (currentIndex < 0 ? rows.length - 1 : Math.max(0, currentIndex - 1));
+      const nextIndex =
+        event.key === 'ArrowDown'
+          ? currentIndex < 0
+            ? 0
+            : Math.min(rows.length - 1, currentIndex + 1)
+          : currentIndex < 0
+            ? rows.length - 1
+            : Math.max(0, currentIndex - 1);
       const nextPath = rows[nextIndex]!.entry.path;
       selectOnly(nextPath);
-      const element = Array.from(scrollRef.current?.querySelectorAll<HTMLElement>(config.ids.rowSelector) ?? [])
-        .find((candidate) => candidate.dataset.path === nextPath);
+      const element = Array.from(scrollRef.current?.querySelectorAll<HTMLElement>(config.ids.rowSelector) ?? []).find(
+        (candidate) => candidate.dataset.path === nextPath,
+      );
       element?.scrollIntoView({ block: 'nearest' });
       return;
     }
@@ -410,27 +429,39 @@ export default function FilePanel({
   const openHint = t('Click to select; double-click to open with your preferred editor.');
 
   return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', height: '100%',
-      userSelect: 'none', background: 'transparent',
-    }}>
-      {/* Top bar: editable breadcrumbs plus actions, with the overflow menu at the far right. */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 2,
-        padding: '6px 8px',
-        fontSize: 'calc(11px * var(--ui-font-scale))', minHeight: 30, flexShrink: 0,
-        whiteSpace: 'nowrap',
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        userSelect: 'none',
+        background: 'transparent',
       }}>
+      {/* Top bar: editable breadcrumbs plus actions, with the overflow menu at the far right. */}
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          padding: '6px 8px',
+          fontSize: 'calc(11px * var(--ui-font-scale))',
+          minHeight: 30,
+          flexShrink: 0,
+          whiteSpace: 'nowrap',
+        }}>
         <div
           ref={crumbRef}
           data-testid={config.ids.crumbBar}
           onClick={pathDraft === null ? beginPathEdit : undefined}
           style={{
-            display: 'flex', alignItems: 'center', gap: 2,
-            flex: 1, minWidth: 0, overflow: 'hidden',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            flex: 1,
+            minWidth: 0,
+            overflow: 'hidden',
             cursor: pathDraft === null ? 'text' : undefined,
-          }}
-        >
+          }}>
           {pathDraft === null ? (
             <>
               {path === null && config.pendingLabel === 'connection' && pendingLabel ? (
@@ -446,7 +477,9 @@ export default function FilePanel({
               {hiddenCount > 0 && (
                 <>
                   <span style={{ color: 'var(--text-muted)' }}>›</span>
-                  <span data-tip={t('Parent folders are hidden')} style={{ color: 'var(--text-muted)', letterSpacing: 1 }}>…</span>
+                  <span data-tip={t('Parent folders are hidden')} style={{ color: 'var(--text-muted)', letterSpacing: 1 }}>
+                    …
+                  </span>
                 </>
               )}
               {visibleCrumbs.map((crumb, index) => {
@@ -482,18 +515,27 @@ export default function FilePanel({
               aria-label={t('Edit path')}
               data-testid={config.ids.pathInput}
               style={{
-                flex: 1, minWidth: 0, height: 22, padding: '0 6px',
-                background: 'var(--field-bg)', border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-inner)', outline: 'none',
-                fontFamily: 'var(--font-mono)', fontSize: 'calc(11px * var(--ui-font-scale))',
+                flex: 1,
+                minWidth: 0,
+                height: 22,
+                padding: '0 6px',
+                background: 'var(--field-bg)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-inner)',
+                outline: 'none',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 'calc(11px * var(--ui-font-scale))',
                 color: 'var(--text-primary)',
               }}
             />
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 2, flexShrink: 0 }}>
-          <IconBtn title={t('Search files')} data-testid={`${config.variant}-file-search-btn`}
-            disabled={!directoryReady} onClick={(event) => {
+          <IconBtn
+            title={t('Search files')}
+            data-testid={`${config.variant}-file-search-btn`}
+            disabled={!directoryReady}
+            onClick={(event) => {
               searchReturnFocus.current = event.currentTarget instanceof HTMLElement ? event.currentTarget : null;
               setSearchOpen(true);
             }}>
@@ -508,9 +550,11 @@ export default function FilePanel({
             <ArrowDown size={iconSizes.control} />
           </IconBtn>
           {/* The recovery view owns the panel while browsing is impossible: no overflow menu. */}
-          {!error && <IconBtn title={t('More actions')} data-testid={config.ids.more} onClick={openMoreMenu}>
-            <MoreHorizontal size={iconSizes.control} />
-          </IconBtn>}
+          {!error && (
+            <IconBtn title={t('More actions')} data-testid={config.ids.more} onClick={openMoreMenu}>
+              <MoreHorizontal size={iconSizes.control} />
+            </IconBtn>
+          )}
         </div>
       </div>
 
@@ -523,14 +567,25 @@ export default function FilePanel({
         onContextMenu={handleTreeContextMenu}
         data-testid={config.ids.tree}
         data-path={path ?? ''}
-        style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}
-      >
-        {error && <>
-          {renderError
-            ? renderError(error, refresh)
-            : <ErrorBox actions={<OutlineButton onClick={refresh}>{t('Retry')}</OutlineButton>}>{error}</ErrorBox>}
-          {!settled && path !== null && <TextButton style={{ margin: 12 }} onClick={() => { void navigate(null); }}>{t('Return to home directory')}</TextButton>}
-        </>}
+        style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
+        {error && (
+          <>
+            {renderError ? (
+              renderError(error, refresh)
+            ) : (
+              <ErrorBox actions={<OutlineButton onClick={refresh}>{t('Retry')}</OutlineButton>}>{error}</ErrorBox>
+            )}
+            {!settled && path !== null && (
+              <TextButton
+                style={{ margin: 12 }}
+                onClick={() => {
+                  void navigate(null);
+                }}>
+                {t('Return to home directory')}
+              </TextButton>
+            )}
+          </>
+        )}
         {loadingHint ? (
           <div role="status" style={{ padding: 16, color: 'var(--text-muted)', fontSize: 'var(--fs-label)' }}>
             {config.variant === 'ssh' ? t('files.loading.ssh') : path === null ? t('files.loading.disks') : t('files.loading.directory')}
@@ -552,7 +607,7 @@ export default function FilePanel({
                   renaming={renameTarget?.path === row.entry.path}
                   icon={renderIcon?.(row.entry)}
                   openHint={openHint}
-                  dropDir={row.entry.is_dir ? row.entry.path : ops.parentOf(row.entry.path) ?? undefined}
+                  dropDir={row.entry.is_dir ? row.entry.path : (ops.parentOf(row.entry.path) ?? undefined)}
                   onRenameCommit={requestRename}
                   onRenameCancel={cancelRename}
                   onRowClick={handleRowClick}
@@ -560,18 +615,30 @@ export default function FilePanel({
                     const picked = selection.has(row.entry.path)
                       ? rows.filter((item) => selection.has(item.entry.path)).map((item) => item.entry)
                       : [row.entry];
-                    startRowDrag(event, picked.map((item) => ({ path: item.path, name: item.name, is_dir: item.is_dir })));
+                    startRowDrag(
+                      event,
+                      picked.map((item) => ({ path: item.path, name: item.name, is_dir: item.is_dir })),
+                    );
                   }}
                   onRowDoubleClick={activateEntry}
                   onRowContextMenu={handleContextMenu}
                   onChevronClick={toggleExpand}
                 />
                 {row.expanded && childLoadingHint.has(row.entry.path) && (
-                  <div role="status" style={{ padding: `5px 10px 5px ${4 + (row.depth + 1) * 14}px`, color: 'var(--text-muted)' }}>{t('files.loading.directory')}</div>
+                  <div role="status" style={{ padding: `5px 10px 5px ${4 + (row.depth + 1) * 14}px`, color: 'var(--text-muted)' }}>
+                    {t('files.loading.directory')}
+                  </div>
                 )}
                 {row.expanded && childErrors[row.entry.path] && (
-                  <ErrorBox title={t('Unable to read directory')} details={childErrors[row.entry.path]}
-                    actions={<button type="button" onClick={() => void refreshDir(row.entry)}>{t('Retry')}</button>} />
+                  <ErrorBox
+                    title={t('Unable to read directory')}
+                    details={childErrors[row.entry.path]}
+                    actions={
+                      <button type="button" onClick={() => void refreshDir(row.entry)}>
+                        {t('Retry')}
+                      </button>
+                    }
+                  />
                 )}
               </Fragment>
             ))}
@@ -584,14 +651,24 @@ export default function FilePanel({
         )}
       </div>
 
-      {searchOpen && path !== null && enabled && <FileSearchMenu key={path} ops={ops} root={path}
-        returnFocus={searchReturnFocus.current}
-        onClose={() => setSearchOpen(false)} onChoose={(entry) => {
-          setSearchOpen(false);
-          void navigate(entry.is_dir ? entry.path : ops.parentOf(entry.path)).then((success) => {
-            if (success && !entry.is_dir) { selectOnly(entry.path); revealPath(entry.path); }
-          });
-        }} />}
+      {searchOpen && path !== null && enabled && (
+        <FileSearchMenu
+          key={path}
+          ops={ops}
+          root={path}
+          returnFocus={searchReturnFocus.current}
+          onClose={() => setSearchOpen(false)}
+          onChoose={(entry) => {
+            setSearchOpen(false);
+            void navigate(entry.is_dir ? entry.path : ops.parentOf(entry.path)).then((success) => {
+              if (success && !entry.is_dir) {
+                selectOnly(entry.path);
+                revealPath(entry.path);
+              }
+            });
+          }}
+        />
+      )}
 
       {ctxMenu && (
         <ContextMenu
@@ -615,12 +692,17 @@ export default function FilePanel({
           anchor={moreMenu}
           items={[
             // Undo appears only after a file operation; the history stack can unwind repeatedly.
-            ...(undo ? [{
-              label: undoCount > 1
-                ? t('files.undo.menuSteps', { label: t(undo.labelKey), n: undoCount })
-                : t('files.undo.menu', { label: t(undo.labelKey) }),
-              onClick: () => void runUndo(),
-            }] : []),
+            ...(undo
+              ? [
+                  {
+                    label:
+                      undoCount > 1
+                        ? t('files.undo.menuSteps', { label: t(undo.labelKey), n: undoCount })
+                        : t('files.undo.menu', { label: t(undo.labelKey) }),
+                    onClick: () => void runUndo(),
+                  },
+                ]
+              : []),
             ...buildFileMenuItems(config.menus.more, {
               entry: null,
               targets: [],
@@ -659,9 +741,13 @@ export default function FilePanel({
         message={
           confirm
             ? confirm.kind === 'delete'
-              ? !undoEnabled ? t('Delete selected items without application undo? Remote deletion is permanent; local deletion uses the system trash.') : confirm.entries.length > 1
-                ? t('Delete the {{count}} selected items? You can restore them from More → Undo delete.', { count: confirm.entries.length })
-                : t('Delete "{{name}}"? You can restore it from More → Undo delete.', { name: confirm.entries[0]!.name })
+              ? !undoEnabled
+                ? t('Delete selected items without application undo? Remote deletion is permanent; local deletion uses the system trash.')
+                : confirm.entries.length > 1
+                  ? t('Delete the {{count}} selected items? You can restore them from More → Undo delete.', {
+                      count: confirm.entries.length,
+                    })
+                  : t('Delete "{{name}}"? You can restore it from More → Undo delete.', { name: confirm.entries[0]!.name })
               : t('Rename "{{name}}" to "{{newName}}"?', { name: confirm.entry.name, newName: confirm.newName })
             : undefined
         }
@@ -760,11 +846,15 @@ function FileRow({
       onPointerDown={renaming ? undefined : onRowPointerDown}
       onDoubleClick={renaming ? undefined : () => onRowDoubleClick(entry)}
       onContextMenu={renaming ? undefined : (event) => onRowContextMenu(event, entry)}
-      data-tip={renaming
-        ? t('Enter a new name, press Enter to confirm, or Esc to cancel')
-        : entry.is_dir
-          ? (highlighted ? t('Workspace folder · click to select, double-click to open, drop files inside') : t('Click to select, double-click to open, drop files inside'))
-          : openHint}
+      data-tip={
+        renaming
+          ? t('Enter a new name, press Enter to confirm, or Esc to cancel')
+          : entry.is_dir
+            ? highlighted
+              ? t('Workspace folder · click to select, double-click to open, drop files inside')
+              : t('Click to select, double-click to open, drop files inside')
+            : openHint
+      }
       data-testid={testId}
       data-file-row="true"
       data-path={entry.path}
@@ -772,36 +862,51 @@ function FileRow({
       data-drop-dir={renaming ? undefined : dropDir}
       style={{
         ...compactSidebarRowContent,
-        display: 'flex', alignItems: 'center', gap: 4,
-        padding: `2px 10px 2px ${4 + depth * 14}px`, margin: '0 6px', borderRadius: 'var(--radius-inner)',
-        fontSize: 'var(--fs-label)', lineHeight: '20px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 4,
+        padding: `2px 10px 2px ${4 + depth * 14}px`,
+        margin: '0 6px',
+        borderRadius: 'var(--radius-inner)',
+        fontSize: 'var(--fs-label)',
+        lineHeight: '20px',
         cursor: renaming ? 'text' : 'pointer',
         background: dropTarget ? 'var(--accent-bg)' : restingBackground,
         opacity: cut ? 0.55 : 1,
         outline: dropTarget ? '1px solid var(--accent)' : undefined,
         outlineOffset: -1,
-        color: entry.is_dir
-          ? (highlighted ? 'var(--accent-warm)' : 'var(--text-primary)')
-          : 'var(--text-secondary)',
+        color: entry.is_dir ? (highlighted ? 'var(--accent-warm)' : 'var(--text-primary)') : 'var(--text-secondary)',
       }}
-      onMouseEnter={(event) => { event.currentTarget.style.background = dropTarget ? 'var(--accent-bg)' : selected ? 'var(--selection-bg)' : 'var(--hover)'; }}
-      onMouseLeave={(event) => { event.currentTarget.style.background = dropTarget ? 'var(--accent-bg)' : restingBackground; }}
-    >
+      onMouseEnter={(event) => {
+        event.currentTarget.style.background = dropTarget ? 'var(--accent-bg)' : selected ? 'var(--selection-bg)' : 'var(--hover)';
+      }}
+      onMouseLeave={(event) => {
+        event.currentTarget.style.background = dropTarget ? 'var(--accent-bg)' : restingBackground;
+      }}>
       {/* Expand chevron, folders only; empty folders keep it too (expanding shows no empty hint).
           Stop click and double-click propagation so repeated clicks toggle without entering. */}
       <span
-        onClick={entry.is_dir && !renaming ? (event) => { event.stopPropagation(); onChevronClick(entry); } : undefined}
+        onClick={
+          entry.is_dir && !renaming
+            ? (event) => {
+                event.stopPropagation();
+                onChevronClick(entry);
+              }
+            : undefined
+        }
         onDoubleClick={(event) => event.stopPropagation()}
         data-testid={expanderTestId}
         data-row-expander="true"
         style={{
-          width: iconSizes.compact, flexShrink: 0, display: 'inline-flex', justifyContent: 'center',
+          width: iconSizes.compact,
+          flexShrink: 0,
+          display: 'inline-flex',
+          justifyContent: 'center',
           color: 'var(--text-muted)',
           transition: 'transform 0.12s ease',
           transform: expanded ? 'rotate(90deg)' : 'none',
           visibility: entry.is_dir ? 'visible' : 'hidden',
-        }}
-      >
+        }}>
         <ChevronRight size={iconSizes.compact} />
       </span>
       <span style={{ width: 20, flexShrink: 0, display: 'inline-flex', justifyContent: 'center' }}>
@@ -825,10 +930,13 @@ function FileRow({
           data-testid="rename-input"
         />
       ) : (
-        <span style={{
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          fontFamily: entry.is_dir ? 'var(--font-ui)' : 'var(--font-mono)',
-        }}>
+        <span
+          style={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+            fontFamily: entry.is_dir ? 'var(--font-ui)' : 'var(--font-mono)',
+          }}>
           {entry.name}
         </span>
       )}
@@ -838,7 +946,13 @@ function FileRow({
 
 // Breadcrumb segment
 
-function Crumb({ label, onClick, active, title, dropPath }: {
+function Crumb({
+  label,
+  onClick,
+  active,
+  title,
+  dropPath,
+}: {
   label: string;
   onClick: () => void;
   active: boolean;
@@ -851,13 +965,20 @@ function Crumb({ label, onClick, active, title, dropPath }: {
       data-tip={title}
       data-drop-dir={dropPath}
       data-path={dropPath}
-      onClick={(event) => { event.stopPropagation(); onClick(); }}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
       style={{
-        cursor: 'pointer', padding: '1px 4px', borderRadius: 3,
+        cursor: 'pointer',
+        padding: '1px 4px',
+        borderRadius: 3,
         color: active ? 'var(--text-primary)' : 'var(--text-muted)',
         background: active ? 'var(--hover)' : 'transparent',
-        fontFamily: 'var(--font-mono)', fontSize: 'calc(11px * var(--ui-font-scale))',
-      }}
-    >{label}</span>
+        fontFamily: 'var(--font-mono)',
+        fontSize: 'calc(11px * var(--ui-font-scale))',
+      }}>
+      {label}
+    </span>
   );
 }

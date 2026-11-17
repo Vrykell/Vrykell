@@ -21,10 +21,13 @@ export function useTranscriptFollow(id: string, revision: unknown, active = true
   const syncLatestButton = (scroll: HTMLDivElement) => {
     if (scroll.clientHeight <= 0) return Number.POSITIVE_INFINITY;
     const distance = Math.max(0, scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight);
-    setFollowing(current => distance <= RESUME_LATEST_DISTANCE ? true : distance >= SHOW_LATEST_DISTANCE ? false : current);
+    setFollowing((current) => (distance <= RESUME_LATEST_DISTANCE ? true : distance >= SHOW_LATEST_DISTANCE ? false : current));
     return distance;
   };
-  const pauseFollow = () => { followRef.current = false; if (scrollRef.current) syncLatestButton(scrollRef.current); };
+  const pauseFollow = () => {
+    followRef.current = false;
+    if (scrollRef.current) syncLatestButton(scrollRef.current);
+  };
   const jumpToLatest = () => {
     followRef.current = true;
     setFollowing(true);
@@ -66,7 +69,10 @@ export function useTranscriptFollow(id: string, revision: unknown, active = true
     const scroll = event.currentTarget;
     const ours = Math.abs(scroll.scrollTop - lastTop.current) <= 1;
     lastTop.current = scroll.scrollTop;
-    if (syncLatestButton(scroll) <= RESUME_LATEST_DISTANCE) { followRef.current = true; return; }
+    if (syncLatestButton(scroll) <= RESUME_LATEST_DISTANCE) {
+      followRef.current = true;
+      return;
+    }
     if (!ours) followRef.current = false;
   };
   const onWheel = (event: WheelEvent<HTMLDivElement>) => {

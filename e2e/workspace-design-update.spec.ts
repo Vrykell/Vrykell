@@ -1,143 +1,195 @@
 import { expect, test } from '@playwright/test';
 import { mockAnthropic, setupTauriMock } from './tauri-mock';
 
-for (const theme of ['dark', 'light']) test(`profiles, history contrast and single menu highlight in ${theme}`, async ({ page }, info) => {
-  await setupTauriMock(page, {});
-  await page.addInitScript(theme => localStorage.setItem('vrykell-theme-mode', theme), theme);
-  await page.goto('/');
-  for (const [id, name] of [['terminal', '终端会话'], ['code', '项目文件'], ['ai', '智能对话'], ['ssh', '主机管理']]) await expect(page.getByTestId(`workspace-area-${id}`)).toHaveAttribute('aria-label', name);
-  await page.getByTestId('workspace-history').click();
-  const card = page.locator('.history-group-card').first();
-  await expect(card).toBeVisible();
-  expect(await card.evaluate(element => getComputedStyle(element).backgroundColor)).not.toBe(await page.locator('.history-page:visible').evaluate(element => getComputedStyle(element).backgroundColor));
-  await expect(card).toHaveCSS('border-top-width', '0px');
-  await page.screenshot({ path: info.outputPath(`history-${theme}.png`) });
-  await page.getByTestId('workspace-area-terminal').click();
-  await page.getByTestId('tab-new-btn').click();
-  const picker = page.getByRole('dialog', { name: '新建标签页' });
-  await picker.getByTestId('new-tab-option-shell:zsh').hover();
-  const footer = picker.getByRole('button', { name: '更多配置文件…' });
-  await footer.hover();
-  await expect(picker.getByTestId('new-tab-option-shell:zsh')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  const sectionHeading = (await picker.getByRole('heading', { name: '打开位置' }).boundingBox())!;
-  await page.mouse.move(sectionHeading.x + 3, sectionHeading.y + 3);
-  await expect(picker.getByTestId('new-tab-option-shell:zsh')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  await picker.focus(); await page.keyboard.press('ArrowDown');
-  await expect(picker).toHaveAttribute('data-keyboard-navigation', 'true');
-  await footer.hover();
-  await expect(picker).toHaveAttribute('data-keyboard-navigation', 'false');
-  await footer.click();
-  await expect(page.getByRole('group', { name: '名称与标签', exact: true })).toBeVisible();
-  await expect(page.getByRole('group', { name: '启动', exact: true })).toBeVisible();
-  await page.getByRole('textbox', { name: '配置名称' }).fill('Work shell');
-  await page.getByRole('textbox', { name: '配置名称' }).press('Enter');
-  await page.getByRole('textbox', { name: '启动目录' }).fill('/work/profile');
-  await page.getByRole('textbox', { name: '启动目录' }).press('Enter');
-  await page.getByRole('textbox', { name: '标签页标题', exact: true }).fill('Work terminal');
-  await page.getByRole('textbox', { name: '标签页标题', exact: true }).press('Enter');
-  const input = (await page.getByRole('textbox', { name: '启动目录' }).boundingBox())!;
-  const browse = (await page.getByRole('button', { name: '浏览…', exact: true }).boundingBox())!;
-  expect(Math.abs(input.y - browse.y)).toBeLessThan(5);
-  await page.screenshot({ path: info.outputPath(`profile-${theme}.png`) });
-  await page.getByTestId('workspace-area-terminal').click();
-  await page.getByTestId('tab-new-btn').click();
-  await expect(page.getByTestId('new-tab-option-shell:zsh')).toContainText('Work shell');
-  await page.getByTestId('new-tab-option-shell:zsh').click();
-  await expect(page.locator('[data-tab-row-id]').last()).toContainText('Work terminal');
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: { cwd?: string }[] }).__PTY_SPAWNS__.some(spawn => spawn.cwd === '/work/profile'))).toBe(true);
-});
-
-for (const theme of ['dark', 'light']) test(`host groups, table and native conversation launch in ${theme}`, async ({ page }, info) => {
-  await mockAnthropic(page, 'Ready.');
-  await setupTauriMock(page, { sshWorkspaceView: 'dashboard' });
-  await page.addInitScript(theme => {
-    localStorage.setItem('vrykell-theme-mode', theme);
-    localStorage.setItem('vrykell-host-library', JSON.stringify({ state: { hosts: { 'ssh-1': { group: 'Production', tags: ['api', 'production'], starred: true } } }, version: 0 }));
-  }, theme);
-  await page.goto('/');
-  await page.evaluate(async () => {
-    const storePath = '/src/features/ssh/stores/store.ts';
-    const libraryPath = '/src/features/ssh/stores/hostLibrary.ts';
-    const { useSshStore } = await import(storePath) as typeof import('../src/features/ssh/stores/store');
-    const { useHostLibrary } = await import(libraryPath) as typeof import('../src/features/ssh/stores/hostLibrary');
-    await useSshStore.getState().load();
-    const seed = useSshStore.getState().connections[0]!;
-    const names = ['bastion-tokyo', 'prod-api-tokyo-02', 'db-osaka-01', 'db-osaka-02', 'staging-web-02', 'staging-worker-01', 'ci-runner-01', 'edge-sg-cache', 'homelab-nas', 'pi-hole'];
-    const hosts = names.map((name, index) => ({ ...seed, id: `layout-${index}`, name, host: `10.24.${Math.floor(index / 3)}.${index + 11}`, lastOpenedAt: Date.now() - (index + 1) * 3_600_000 }));
-    for (const [index, host] of hosts.entries()) useHostLibrary.getState().update(host.id, {
-      group: index < 2 ? 'Production' : index < 4 ? 'Database' : index < 6 ? 'Staging' : 'Infrastructure',
-      tags: index < 4 ? ['production', index < 2 ? 'api' : 'database'] : index < 6 ? ['staging'] : ['personal'], starred: index % 3 === 0,
-    });
-    useSshStore.setState({ connections: [seed, ...hosts] });
+for (const theme of ['dark', 'light'])
+  test(`profiles, history contrast and single menu highlight in ${theme}`, async ({ page }, info) => {
+    await setupTauriMock(page, {});
+    await page.addInitScript((theme) => localStorage.setItem('vrykell-theme-mode', theme), theme);
+    await page.goto('/');
+    for (const [id, name] of [
+      ['terminal', '终端会话'],
+      ['code', '项目文件'],
+      ['ai', '智能对话'],
+      ['ssh', '主机管理'],
+    ])
+      await expect(page.getByTestId(`workspace-area-${id}`)).toHaveAttribute('aria-label', name);
+    await page.getByTestId('workspace-history').click();
+    const card = page.locator('.history-group-card').first();
+    await expect(card).toBeVisible();
+    expect(await card.evaluate((element) => getComputedStyle(element).backgroundColor)).not.toBe(
+      await page.locator('.history-page:visible').evaluate((element) => getComputedStyle(element).backgroundColor),
+    );
+    await expect(card).toHaveCSS('border-top-width', '0px');
+    await page.screenshot({ path: info.outputPath(`history-${theme}.png`) });
+    await page.getByTestId('workspace-area-terminal').click();
+    await page.getByTestId('tab-new-btn').click();
+    const picker = page.getByRole('dialog', { name: '新建标签页' });
+    await picker.getByTestId('new-tab-option-shell:zsh').hover();
+    const footer = picker.getByRole('button', { name: '更多配置文件…' });
+    await footer.hover();
+    await expect(picker.getByTestId('new-tab-option-shell:zsh')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    const sectionHeading = (await picker.getByRole('heading', { name: '打开位置' }).boundingBox())!;
+    await page.mouse.move(sectionHeading.x + 3, sectionHeading.y + 3);
+    await expect(picker.getByTestId('new-tab-option-shell:zsh')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await picker.focus();
+    await page.keyboard.press('ArrowDown');
+    await expect(picker).toHaveAttribute('data-keyboard-navigation', 'true');
+    await footer.hover();
+    await expect(picker).toHaveAttribute('data-keyboard-navigation', 'false');
+    await footer.click();
+    await expect(page.getByRole('group', { name: '名称与标签', exact: true })).toBeVisible();
+    await expect(page.getByRole('group', { name: '启动', exact: true })).toBeVisible();
+    await page.getByRole('textbox', { name: '配置名称' }).fill('Work shell');
+    await page.getByRole('textbox', { name: '配置名称' }).press('Enter');
+    await page.getByRole('textbox', { name: '启动目录' }).fill('/work/profile');
+    await page.getByRole('textbox', { name: '启动目录' }).press('Enter');
+    await page.getByRole('textbox', { name: '标签页标题', exact: true }).fill('Work terminal');
+    await page.getByRole('textbox', { name: '标签页标题', exact: true }).press('Enter');
+    const input = (await page.getByRole('textbox', { name: '启动目录' }).boundingBox())!;
+    const browse = (await page.getByRole('button', { name: '浏览…', exact: true }).boundingBox())!;
+    expect(Math.abs(input.y - browse.y)).toBeLessThan(5);
+    await page.screenshot({ path: info.outputPath(`profile-${theme}.png`) });
+    await page.getByTestId('workspace-area-terminal').click();
+    await page.getByTestId('tab-new-btn').click();
+    await expect(page.getByTestId('new-tab-option-shell:zsh')).toContainText('Work shell');
+    await page.getByTestId('new-tab-option-shell:zsh').click();
+    await expect(page.locator('[data-tab-row-id]').last()).toContainText('Work terminal');
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          (window as unknown as { __PTY_SPAWNS__: { cwd?: string }[] }).__PTY_SPAWNS__.some((spawn) => spawn.cwd === '/work/profile'),
+        ),
+      )
+      .toBe(true);
   });
-  await page.getByTestId('workspace-area-ssh').click();
-  await page.getByTestId('ssh-host-group-filter').click();
-  await expect(page.getByRole('menu', { name: '主机分组' })).toContainText('Production');
-  await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: '卡片视图', exact: true }).click();
-  await expect(page.getByTestId('ssh-row-ssh-1')).toContainText('production');
-  await page.getByRole('switch', { name: '资源占用', exact: true }).click();
-  await page.getByTestId('ssh-dashboard-metrics').click();
-  await expect(page.getByRole('menu', { name: '采集并显示' }).locator('input[type="checkbox"]')).toHaveCount(0);
-  await page.keyboard.press('Escape');
-  const firstCard = (await page.locator('.ssh-dashboard-card').nth(0).boundingBox())!;
-  const secondCard = (await page.locator('.ssh-dashboard-card').nth(1).boundingBox())!;
-  expect(secondCard.y).toBe(firstCard.y);
-  expect(firstCard.height).toBeLessThan(300);
-  await page.screenshot({ path: info.outputPath(`hosts-cards-${theme}.png`) });
-  await page.getByRole('button', { name: '表格视图', exact: true }).click();
-  const starColor = await page.evaluate(() => { const probe = document.createElement('i'); probe.style.color = 'var(--favorite-color)'; document.body.append(probe); const color = getComputedStyle(probe).color; probe.remove(); return color; });
-  await expect(page.getByTestId('ssh-row-ssh-1').locator('.sidebar-row-title > svg')).toHaveCSS('color', starColor);
-  await expect(page.locator('.ssh-host-list .ssh-dashboard-metric')).toHaveCount(33);
-  await page.screenshot({ path: info.outputPath(`hosts-table-${theme}.png`) });
-  await page.getByRole('switch', { name: '资源占用', exact: true }).click();
-  await page.getByTestId('workspace-area-ssh').click();
-  await expect(page.locator('.ssh-host-columns')).toBeVisible();
-  await expect(page.getByTestId('ssh-row-ssh-1').locator('.sidebar-row-title > svg')).toHaveCSS('color', starColor);
-  await page.screenshot({ path: info.outputPath(`hosts-list-${theme}.png`) });
-  await page.getByTestId('workspace-area-ai').click();
-  const aiEntry = page.getByTestId('workspace-area-ai');
-  const inheritedColor = await aiEntry.locator('.sidebar-row-icon').evaluate(element => getComputedStyle(element).color);
-  await expect(aiEntry.locator('.sidebar-row-icon svg')).toHaveCSS('color', inheritedColor);
-  await expect(aiEntry.locator('.sidebar-row-icon svg')).toHaveCSS('filter', 'none');
-  await expect(page.getByTestId('ai-start-new-conversation')).toBeVisible();
-  await page.getByTestId('ai-start-agents').click();
-  await expect(page.getByTestId('acp-launcher-Fake ACP')).toBeVisible();
-  await page.screenshot({ path: info.outputPath(`ai-launch-${theme}.png`) });
-  await page.setViewportSize({ width: 700, height: 800 });
-  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(700);
-  await page.screenshot({ path: info.outputPath(`ai-launch-narrow-${theme}.png`) });
-  await page.setViewportSize({ width: 500, height: 800 });
-  // The picker is a floating panel, so its rows span the content width the panel gives them.
-  const row = (await page.getByTestId('acp-launcher-Fake ACP').boundingBox())!;
-  const panel = (await page.getByTestId('acp-launcher').boundingBox())!;
-  expect(row.x).toBeGreaterThanOrEqual(panel.x);
-  expect(row.x + row.width).toBeLessThanOrEqual(panel.x + panel.width + 1);
-  expect(row.width).toBeGreaterThan(panel.width - 40);
-  await page.screenshot({ path: info.outputPath(`ai-launch-small-${theme}.png`), animations: 'disabled' });
-  await page.setViewportSize({ width: 1240, height: 800 });
-  await page.keyboard.press('Escape');
-  await page.getByTestId('ai-start-new-conversation').click();
-  await expect(page.getByRole('tablist', { name: 'AI 会话' }).locator('[data-app-mark="true"]')).toHaveCount(1);
-  const composer = page.locator('[data-chat-composer]:visible');
-  await composer.fill('Explain this command'); await composer.press('Enter');
-  const bubble = page.locator('.chat-exchange > .ai-block-question').filter({ hasText: 'Explain this command' });
-  await expect(bubble).toBeVisible();
-  expect(await bubble.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(await page.locator('.chat-send-button:visible').evaluate(element => getComputedStyle(element).backgroundColor));
-  await page.screenshot({ path: info.outputPath(`conversation-${theme}.png`) });
-  await page.setViewportSize({ width: 700, height: 800 });
-  await expect(composer).toBeVisible();
-  await page.screenshot({ path: info.outputPath(`conversation-narrow-${theme}.png`) });
-});
+
+for (const theme of ['dark', 'light'])
+  test(`host groups, table and native conversation launch in ${theme}`, async ({ page }, info) => {
+    await mockAnthropic(page, 'Ready.');
+    await setupTauriMock(page, { sshWorkspaceView: 'dashboard' });
+    await page.addInitScript((theme) => {
+      localStorage.setItem('vrykell-theme-mode', theme);
+      localStorage.setItem(
+        'vrykell-host-library',
+        JSON.stringify({ state: { hosts: { 'ssh-1': { group: 'Production', tags: ['api', 'production'], starred: true } } }, version: 0 }),
+      );
+    }, theme);
+    await page.goto('/');
+    await page.evaluate(async () => {
+      const storePath = '/src/features/ssh/stores/store.ts';
+      const libraryPath = '/src/features/ssh/stores/hostLibrary.ts';
+      const { useSshStore } = (await import(storePath)) as typeof import('../src/features/ssh/stores/store');
+      const { useHostLibrary } = (await import(libraryPath)) as typeof import('../src/features/ssh/stores/hostLibrary');
+      await useSshStore.getState().load();
+      const seed = useSshStore.getState().connections[0]!;
+      const names = [
+        'bastion-tokyo',
+        'prod-api-tokyo-02',
+        'db-osaka-01',
+        'db-osaka-02',
+        'staging-web-02',
+        'staging-worker-01',
+        'ci-runner-01',
+        'edge-sg-cache',
+        'homelab-nas',
+        'pi-hole',
+      ];
+      const hosts = names.map((name, index) => ({
+        ...seed,
+        id: `layout-${index}`,
+        name,
+        host: `10.24.${Math.floor(index / 3)}.${index + 11}`,
+        lastOpenedAt: Date.now() - (index + 1) * 3_600_000,
+      }));
+      for (const [index, host] of hosts.entries())
+        useHostLibrary.getState().update(host.id, {
+          group: index < 2 ? 'Production' : index < 4 ? 'Database' : index < 6 ? 'Staging' : 'Infrastructure',
+          tags: index < 4 ? ['production', index < 2 ? 'api' : 'database'] : index < 6 ? ['staging'] : ['personal'],
+          starred: index % 3 === 0,
+        });
+      useSshStore.setState({ connections: [seed, ...hosts] });
+    });
+    await page.getByTestId('workspace-area-ssh').click();
+    await page.getByTestId('ssh-host-group-filter').click();
+    await expect(page.getByRole('menu', { name: '主机分组' })).toContainText('Production');
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: '卡片视图', exact: true }).click();
+    await expect(page.getByTestId('ssh-row-ssh-1')).toContainText('production');
+    await page.getByRole('switch', { name: '资源占用', exact: true }).click();
+    await page.getByTestId('ssh-dashboard-metrics').click();
+    await expect(page.getByRole('menu', { name: '采集并显示' }).locator('input[type="checkbox"]')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    const firstCard = (await page.locator('.ssh-dashboard-card').nth(0).boundingBox())!;
+    const secondCard = (await page.locator('.ssh-dashboard-card').nth(1).boundingBox())!;
+    expect(secondCard.y).toBe(firstCard.y);
+    expect(firstCard.height).toBeLessThan(300);
+    await page.screenshot({ path: info.outputPath(`hosts-cards-${theme}.png`) });
+    await page.getByRole('button', { name: '表格视图', exact: true }).click();
+    const starColor = await page.evaluate(() => {
+      const probe = document.createElement('i');
+      probe.style.color = 'var(--favorite-color)';
+      document.body.append(probe);
+      const color = getComputedStyle(probe).color;
+      probe.remove();
+      return color;
+    });
+    await expect(page.getByTestId('ssh-row-ssh-1').locator('.sidebar-row-title > svg')).toHaveCSS('color', starColor);
+    await expect(page.locator('.ssh-host-list .ssh-dashboard-metric')).toHaveCount(33);
+    await page.screenshot({ path: info.outputPath(`hosts-table-${theme}.png`) });
+    await page.getByRole('switch', { name: '资源占用', exact: true }).click();
+    await page.getByTestId('workspace-area-ssh').click();
+    await expect(page.locator('.ssh-host-columns')).toBeVisible();
+    await expect(page.getByTestId('ssh-row-ssh-1').locator('.sidebar-row-title > svg')).toHaveCSS('color', starColor);
+    await page.screenshot({ path: info.outputPath(`hosts-list-${theme}.png`) });
+    await page.getByTestId('workspace-area-ai').click();
+    const aiEntry = page.getByTestId('workspace-area-ai');
+    const inheritedColor = await aiEntry.locator('.sidebar-row-icon').evaluate((element) => getComputedStyle(element).color);
+    await expect(aiEntry.locator('.sidebar-row-icon svg')).toHaveCSS('color', inheritedColor);
+    await expect(aiEntry.locator('.sidebar-row-icon svg')).toHaveCSS('filter', 'none');
+    await expect(page.getByTestId('ai-start-new-conversation')).toBeVisible();
+    await page.getByTestId('ai-start-agents').click();
+    await expect(page.getByTestId('acp-launcher-Fake ACP')).toBeVisible();
+    await page.screenshot({ path: info.outputPath(`ai-launch-${theme}.png`) });
+    await page.setViewportSize({ width: 700, height: 800 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(700);
+    await page.screenshot({ path: info.outputPath(`ai-launch-narrow-${theme}.png`) });
+    await page.setViewportSize({ width: 500, height: 800 });
+    // The picker is a floating panel, so its rows span the content width the panel gives them.
+    const row = (await page.getByTestId('acp-launcher-Fake ACP').boundingBox())!;
+    const panel = (await page.getByTestId('acp-launcher').boundingBox())!;
+    expect(row.x).toBeGreaterThanOrEqual(panel.x);
+    expect(row.x + row.width).toBeLessThanOrEqual(panel.x + panel.width + 1);
+    expect(row.width).toBeGreaterThan(panel.width - 40);
+    await page.screenshot({ path: info.outputPath(`ai-launch-small-${theme}.png`), animations: 'disabled' });
+    await page.setViewportSize({ width: 1240, height: 800 });
+    await page.keyboard.press('Escape');
+    await page.getByTestId('ai-start-new-conversation').click();
+    await expect(page.getByRole('tablist', { name: 'AI 会话' }).locator('[data-app-mark="true"]')).toHaveCount(1);
+    const composer = page.locator('[data-chat-composer]:visible');
+    await composer.fill('Explain this command');
+    await composer.press('Enter');
+    const bubble = page.locator('.chat-exchange > .ai-block-question').filter({ hasText: 'Explain this command' });
+    await expect(bubble).toBeVisible();
+    expect(await bubble.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(
+      await page.locator('.chat-send-button:visible').evaluate((element) => getComputedStyle(element).backgroundColor),
+    );
+    await page.screenshot({ path: info.outputPath(`conversation-${theme}.png`) });
+    await page.setViewportSize({ width: 700, height: 800 });
+    await expect(composer).toBeVisible();
+    await page.screenshot({ path: info.outputPath(`conversation-narrow-${theme}.png`) });
+  });
 
 test('shell icons distinguish the blue profile from the dark start-page fallback', async ({ page }, info) => {
   await setupTauriMock(page, {});
   await page.addInitScript(() => {
     localStorage.setItem('vrykell-startup-mode', 'empty');
-    const runtime = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__;
+    const runtime = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } })
+      .__TAURI_INTERNALS__;
     const original = runtime.invoke;
-    runtime.invoke = (command, args) => command === 'list_shells'
-      ? Promise.resolve([{ id: 'powershell', label: 'Windows PowerShell', default: true }]) : original(command, args);
+    runtime.invoke = (command, args) =>
+      command === 'list_shells'
+        ? Promise.resolve([{ id: 'powershell', label: 'Windows PowerShell', default: true }])
+        : original(command, args);
   });
   await page.goto('/');
   await expect(page.locator('[data-tab-row-id]').first().locator('[data-shell-mark="terminal"]')).toBeVisible();
@@ -145,7 +197,9 @@ test('shell icons distinguish the blue profile from the dark start-page fallback
   await page.getByTestId('tab-new-btn').click();
   const powerShell = page.getByTestId('new-tab-option-shell:powershell');
   await expect(powerShell.locator('[data-shell-mark="powershell"]')).toBeVisible();
-  expect(await powerShell.locator('[data-shell-mark="powershell"]').evaluate(element => (element as SVGElement).style.color)).toBe('var(--shell-powershell-accent)');
+  expect(await powerShell.locator('[data-shell-mark="powershell"]').evaluate((element) => (element as SVGElement).style.color)).toBe(
+    'var(--shell-powershell-accent)',
+  );
   await expect(page.locator('.new-tab-primary-icon')).toHaveCount(0);
   await page.screenshot({ path: info.outputPath('terminal-identities.png'), animations: 'disabled' });
   await powerShell.click();
@@ -154,7 +208,8 @@ test('shell icons distinguish the blue profile from the dark start-page fallback
 
 test('host views keep narrow layouts within their own scroll area', async ({ page }, info) => {
   await setupTauriMock(page, { sshWorkspaceView: 'dashboard' });
-  await page.goto('/'); await page.getByTestId('workspace-area-ssh').click();
+  await page.goto('/');
+  await page.getByTestId('workspace-area-ssh').click();
   await page.setViewportSize({ width: 700, height: 800 });
   await expect(page.getByTestId('ssh-row-ssh-1')).toBeVisible();
   await page.screenshot({ path: info.outputPath('hosts-cards-narrow.png') });

@@ -1,7 +1,10 @@
 import { afterEach, expect, it } from 'vitest';
 import { useHostSystems } from '../hostSystems';
 
-afterEach(() => { useHostSystems.setState({ systems: {} }); localStorage.removeItem('vrykell-host-systems'); });
+afterEach(() => {
+  useHostSystems.setState({ systems: {} });
+  localStorage.removeItem('vrykell-host-systems');
+});
 
 it('persists observed systems and ignores empty observations', async () => {
   useHostSystems.getState().remember('remote', 'Linux');

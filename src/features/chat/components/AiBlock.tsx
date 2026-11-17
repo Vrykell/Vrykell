@@ -20,10 +20,29 @@ import TerminalReferences from './TerminalReferences';
 import type { ChatExchange } from '../model/exchanges';
 
 /** Shared message content supports conversation flow and terminal block presentation. */
-export default function AiBlock({ exchange, conversationId, toolContextId, onAskAboutTool, onRetry, allowExchangeActions = true, presentation = 'block', dividerBefore = false, suppressPending = false, style }: {
-  exchange: ChatExchange; conversationId?: string; toolContextId?: string; onAskAboutTool?: (question: string) => void; onRetry?: () => void; allowExchangeActions?: boolean; presentation?: 'block' | 'conversation'; dividerBefore?: boolean;
+export default function AiBlock({
+  exchange,
+  conversationId,
+  toolContextId,
+  onAskAboutTool,
+  onRetry,
+  allowExchangeActions = true,
+  presentation = 'block',
+  dividerBefore = false,
+  suppressPending = false,
+  style,
+}: {
+  exchange: ChatExchange;
+  conversationId?: string;
+  toolContextId?: string;
+  onAskAboutTool?: (question: string) => void;
+  onRetry?: () => void;
+  allowExchangeActions?: boolean;
+  presentation?: 'block' | 'conversation';
+  dividerBefore?: boolean;
   /** Hide the inline working row when the caller renders it after a pending question. */
-  suppressPending?: boolean; style?: CSSProperties;
+  suppressPending?: boolean;
+  style?: CSSProperties;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
@@ -31,17 +50,21 @@ export default function AiBlock({ exchange, conversationId, toolContextId, onAsk
   const [confirmation, setConfirmation] = useState<'edit' | 'delete' | null>(null);
   const articleRef = useRef<HTMLElement>(null);
   const moreTrigger = useRef<HTMLButtonElement>(null);
-  const draft = useComposerDrafts(state => state.byTab[conversationId ?? exchange.paneId ?? '']);
+  const draft = useComposerDrafts((state) => state.byTab[conversationId ?? exchange.paneId ?? '']);
   const { question, answer } = exchange;
   const plain = presentation === 'conversation';
   const expanded = plain || !collapsed;
   // Only the conversation that owns this exchange decides whether its actions are available.
-  const ownerConversation = useChatStore(state => conversationId ?? Object.entries(state.byTab)
-    .find(([, messages]) => messages.some(message => message.id === exchange.id))?.[0]);
-  const sending = useChatStore(state => ownerConversation !== undefined && state.sendingTabs.includes(ownerConversation));
-  const executionPane = useChatStore(state => conversationId
-    ? state.conversations.find(conversation => conversation.id === conversationId)?.environment?.paneId ?? null
-    : exchange.paneId);
+  const ownerConversation = useChatStore(
+    (state) =>
+      conversationId ?? Object.entries(state.byTab).find(([, messages]) => messages.some((message) => message.id === exchange.id))?.[0],
+  );
+  const sending = useChatStore((state) => ownerConversation !== undefined && state.sendingTabs.includes(ownerConversation));
+  const executionPane = useChatStore((state) =>
+    conversationId
+      ? (state.conversations.find((conversation) => conversation.id === conversationId)?.environment?.paneId ?? null)
+      : exchange.paneId,
+  );
   const ownerId = () => ownerConversation;
   const regenerate = () => {
     const id = ownerId();
@@ -62,95 +85,219 @@ export default function AiBlock({ exchange, conversationId, toolContextId, onAsk
   const parts = answer?.parts;
   // Structured replies can keep their streamed text only in the ordered parts.
   const lastPart = parts?.[parts.length - 1];
-  const streamTail = parts ? lastPart?.kind === 'text' ? lastPart.text : '' : answer?.content ?? '';
+  const streamTail = parts ? (lastPart?.kind === 'text' ? lastPart.text : '') : (answer?.content ?? '');
   const showOutputCursor = Boolean(answer?.pending && visibleAssistantText(streamTail).trim());
   // ACP streams text as ordered parts; the flat content field can stay empty because the parts
   // are the source of truth. Copy the visible text first, then fall back to the tool log for a
   // stopped reply that has not produced any text yet.
-  const partsText = parts?.flatMap(part => part.kind === 'text' && part.text ? [part.text] : []).join('\n\n') ?? '';
+  const partsText = parts?.flatMap((part) => (part.kind === 'text' && part.text ? [part.text] : [])).join('\n\n') ?? '';
   const answerCopyText = answer
-    ? visibleAssistantText(answer.content).trim() || visibleAssistantText(partsText).trim()
-      || visibleAssistantText(partsToHistoryText(parts)).trim()
+    ? visibleAssistantText(answer.content).trim() ||
+      visibleAssistantText(partsText).trim() ||
+      visibleAssistantText(partsToHistoryText(parts)).trim()
     : '';
   const actions: ContextMenuItem[] = [
     ...(allowExchangeActions && !sending && question && answer ? [{ label: t('Regenerate'), onClick: regenerate }] : []),
-    ...(allowExchangeActions && !sending && question ? [
-      { label: t('Edit and resend'), onClick: () => setConfirmation('edit') },
-      { label: t('Delete'), danger: true, onClick: () => setConfirmation('delete') },
-    ] : []),
+    ...(allowExchangeActions && !sending && question
+      ? [
+          { label: t('Edit and resend'), onClick: () => setConfirmation('edit') },
+          { label: t('Delete'), danger: true, onClick: () => setConfirmation('delete') },
+        ]
+      : []),
     { label: t('Copy'), onClick: () => void writeClipboardText(answerCopyText || question?.content || '').catch(() => {}) },
   ];
-  const moreButton = <IconButton ref={moreTrigger} compact aria-label={t('More actions')} data-tip={t('More actions')} aria-haspopup="menu" aria-expanded={menu !== null}
-    onClick={event => { const rect = event.currentTarget.getBoundingClientRect(); setMenu({ x: rect.left, y: rect.bottom + 4 }); }}>
-    <Ellipsis size={14} />
-  </IconButton>;
-  return <article ref={articleRef} className={plain ? 'ai-block chat-exchange' : 'command-block ai-block'} data-exchange-id={exchange.id} data-divider-before={dividerBefore}
-    data-menu-open={menu !== null} style={style}>
-    {!plain && <div className="command-block-info ai-block-heading">
-      <Sparkles size={14} aria-hidden="true" /><span>{t('AI chat')}</span>
-      {(answer?.environment ?? question?.environment) && <span className="ai-block-environment" data-tip={(answer?.environment ?? question?.environment)?.cwd}>
-        {(answer?.environment ?? question?.environment)?.label}</span>}
-      <span className="command-block-actions ai-block-actions">
-        {answer && <IconButton compact aria-expanded={!collapsed} aria-label={t(collapsed ? 'Expand reply' : 'Collapse reply')}
-          data-tip={t(collapsed ? 'Expand reply' : 'Collapse reply')} onClick={() => setCollapsed(!collapsed)}>
-          <ChevronRight size={14} style={{ transform: collapsed ? undefined : 'rotate(90deg)' }} />
-        </IconButton>}
-        {moreButton}
-      </span>
-    </div>}
-    {!!question?.content.trim() && <div className={plain ? 'ai-block-question' : 'command-block-command ai-block-question'} data-selectable>{question.content}</div>}
-    {expanded && !!question?.attachments?.length && <div className="chat-question-attachments"><AttachmentChips atts={question.attachments} previewId={attPreviewId}
-      onPreview={id => setAttPreviewId(attPreviewId === id ? null : id)} /></div>}
-    {plain && !!question?.content.trim() && <div className="chat-question-meta">
-      <span>{formatMessageTime(question.createdAt)}</span>
-      <CopyButton className="chat-question-copy" testId="chat-question-copy" text={question.content}
-        label={t('Copy message')} style={{ width: 20, height: 20 }} />
-    </div>}
-    {expanded && question?.references?.length ? <TerminalReferences references={question.references} framed={plain} /> : null}
-    {answer && expanded && <div className={plain ? 'ai-block-answer' : 'command-block-output ai-block-answer'} data-selectable>
-      {answer.reasoning && <ThinkingBlock text={answer.reasoning} streaming={answer.pending ?? false} />}
-      {parts ? parts.map((part, index) => part.kind === 'tool'
-        ? <ToolRunCard key={part.tool.toolCallId} run={part.tool} paneId={answer.paneId ?? exchange.paneId} framed={plain} conversationId={toolContextId ?? ownerConversation} onAskAboutTool={onAskAboutTool} environment={answer.environment ?? question?.environment ?? undefined} />
-        : part.text ? <div key={index} className="md"><SafeMarkdown content={visibleAssistantText(part.text)} paneId={executionPane} />
-          {showOutputCursor && index === parts.length - 1 && <PendingCursor />}</div> : null)
-        : answer.content ? <div className="md"><SafeMarkdown content={visibleAssistantText(answer.content)} paneId={executionPane} />{showOutputCursor && <PendingCursor />}</div> : null}
-      {answer.pending && !showOutputCursor && !suppressPending && <WorkingIndicator />}
-      {answer.error && <ErrorBox placement="inline" dismissible={false} title={t('The reply could not be completed')} details={answer.errorText}
-        actions={question && !sending && (allowExchangeActions || onRetry) ? <button type="button" onClick={onRetry ?? regenerate}>{t('Retry')}</button> : undefined}>
-        {answer.errorSummary}
-      </ErrorBox>}
-      {answer.content && hasLeakedToolCallMarkup(answer.content) && (
-        <div className="chat-environment-note" data-testid="chat-leaked-tool-call">
-          {t('The provider returned a tool call as plain text, so no tool ran. Use an endpoint or model that reports tool calls in the standard format.')}
+  const moreButton = (
+    <IconButton
+      ref={moreTrigger}
+      compact
+      aria-label={t('More actions')}
+      data-tip={t('More actions')}
+      aria-haspopup="menu"
+      aria-expanded={menu !== null}
+      onClick={(event) => {
+        const rect = event.currentTarget.getBoundingClientRect();
+        setMenu({ x: rect.left, y: rect.bottom + 4 });
+      }}>
+      <Ellipsis size={14} />
+    </IconButton>
+  );
+  return (
+    <article
+      ref={articleRef}
+      className={plain ? 'ai-block chat-exchange' : 'command-block ai-block'}
+      data-exchange-id={exchange.id}
+      data-divider-before={dividerBefore}
+      data-menu-open={menu !== null}
+      style={style}>
+      {!plain && (
+        <div className="command-block-info ai-block-heading">
+          <Sparkles size={14} aria-hidden="true" />
+          <span>{t('AI chat')}</span>
+          {(answer?.environment ?? question?.environment) && (
+            <span className="ai-block-environment" data-tip={(answer?.environment ?? question?.environment)?.cwd}>
+              {(answer?.environment ?? question?.environment)?.label}
+            </span>
+          )}
+          <span className="command-block-actions ai-block-actions">
+            {answer && (
+              <IconButton
+                compact
+                aria-expanded={!collapsed}
+                aria-label={t(collapsed ? 'Expand reply' : 'Collapse reply')}
+                data-tip={t(collapsed ? 'Expand reply' : 'Collapse reply')}
+                onClick={() => setCollapsed(!collapsed)}>
+                <ChevronRight size={14} style={{ transform: collapsed ? undefined : 'rotate(90deg)' }} />
+              </IconButton>
+            )}
+            {moreButton}
+          </span>
         </div>
       )}
-      {answer.stopped && <div className="chat-environment-note">{t('Reply stopped. Terminal commands may still be running.')}</div>}
-    </div>}
-    {plain && answer && !answer.pending && <div className="chat-answer-actions">
-      <CopyButton testId="chat-answer-copy" text={answerCopyText} label={t('Copy')} iconSize={16} style={{ width: 24, height: 24 }} />
-      {allowExchangeActions && !sending && question && <IconButton compact style={{ width: 24, height: 24 }} aria-label={t('Regenerate')} data-tip={t('Regenerate')} onClick={regenerate}>
-        <RefreshCw size={16} />
-      </IconButton>}
-      {allowExchangeActions && !sending && question && <IconButton compact style={{ width: 24, height: 24 }} aria-label={t('Edit and resend')} data-tip={t('Edit and resend')} onClick={() => setConfirmation('edit')}>
-        <Pencil size={16} />
-      </IconButton>}
-      {allowExchangeActions && !sending && question && <IconButton compact style={{ width: 24, height: 24 }} tone="danger" aria-label={t('Delete')} data-tip={t('Delete')} onClick={() => setConfirmation('delete')}>
-        <Trash2 size={16} />
-      </IconButton>}
-    </div>}
-    {menu && <ContextMenu anchor={menu} items={actions} onClose={() => setMenu(null)} />}
-    {createPortal(<ConfirmDialog open={confirmation !== null} title={t(confirmation === 'delete' ? 'Delete' : 'Edit and resend')}
-      confirmLabel={t(confirmation === 'delete' ? 'Delete' : 'Edit and resend')} cancelLabel={t('Cancel')} danger={confirmation === 'delete'}
-      message={confirmation === 'delete' ? t('Delete this exchange?')
-        : `${t('Remove this question and later messages, then restore the question to the composer?')}${draft && (draft.text.trim() || draft.attachments.length || draft.references?.length) ? ` ${t('Your unsent draft and attachments will be replaced.')}` : ''}`}
-      onCancel={() => {
-        setConfirmation(null); requestAnimationFrame(() => moreTrigger.current?.focus({ preventScroll: true }));
-      }} onConfirm={() => {
-        setConfirmation(null);
-        if (confirmation === 'edit') editResend();
-        else removeExchange();
-      }} />, document.body)}
-  </article>;
+      {!!question?.content.trim() && (
+        <div className={plain ? 'ai-block-question' : 'command-block-command ai-block-question'} data-selectable>
+          {question.content}
+        </div>
+      )}
+      {expanded && !!question?.attachments?.length && (
+        <div className="chat-question-attachments">
+          <AttachmentChips
+            atts={question.attachments}
+            previewId={attPreviewId}
+            onPreview={(id) => setAttPreviewId(attPreviewId === id ? null : id)}
+          />
+        </div>
+      )}
+      {plain && !!question?.content.trim() && (
+        <div className="chat-question-meta">
+          <span>{formatMessageTime(question.createdAt)}</span>
+          <CopyButton
+            className="chat-question-copy"
+            testId="chat-question-copy"
+            text={question.content}
+            label={t('Copy message')}
+            style={{ width: 20, height: 20 }}
+          />
+        </div>
+      )}
+      {expanded && question?.references?.length ? <TerminalReferences references={question.references} framed={plain} /> : null}
+      {answer && expanded && (
+        <div className={plain ? 'ai-block-answer' : 'command-block-output ai-block-answer'} data-selectable>
+          {answer.reasoning && <ThinkingBlock text={answer.reasoning} streaming={answer.pending ?? false} />}
+          {parts ? (
+            parts.map((part, index) =>
+              part.kind === 'tool' ? (
+                <ToolRunCard
+                  key={part.tool.toolCallId}
+                  run={part.tool}
+                  paneId={answer.paneId ?? exchange.paneId}
+                  framed={plain}
+                  conversationId={toolContextId ?? ownerConversation}
+                  onAskAboutTool={onAskAboutTool}
+                  environment={answer.environment ?? question?.environment ?? undefined}
+                />
+              ) : part.text ? (
+                <div key={index} className="md">
+                  <SafeMarkdown content={visibleAssistantText(part.text)} paneId={executionPane} />
+                  {showOutputCursor && index === parts.length - 1 && <PendingCursor />}
+                </div>
+              ) : null,
+            )
+          ) : answer.content ? (
+            <div className="md">
+              <SafeMarkdown content={visibleAssistantText(answer.content)} paneId={executionPane} />
+              {showOutputCursor && <PendingCursor />}
+            </div>
+          ) : null}
+          {answer.pending && !showOutputCursor && !suppressPending && <WorkingIndicator />}
+          {answer.error && (
+            <ErrorBox
+              placement="inline"
+              dismissible={false}
+              title={t('The reply could not be completed')}
+              details={answer.errorText}
+              actions={
+                question && !sending && (allowExchangeActions || onRetry) ? (
+                  <button type="button" onClick={onRetry ?? regenerate}>
+                    {t('Retry')}
+                  </button>
+                ) : undefined
+              }>
+              {answer.errorSummary}
+            </ErrorBox>
+          )}
+          {answer.content && hasLeakedToolCallMarkup(answer.content) && (
+            <div className="chat-environment-note" data-testid="chat-leaked-tool-call">
+              {t(
+                'The provider returned a tool call as plain text, so no tool ran. Use an endpoint or model that reports tool calls in the standard format.',
+              )}
+            </div>
+          )}
+          {answer.stopped && <div className="chat-environment-note">{t('Reply stopped. Terminal commands may still be running.')}</div>}
+        </div>
+      )}
+      {plain && answer && !answer.pending && (
+        <div className="chat-answer-actions">
+          <CopyButton testId="chat-answer-copy" text={answerCopyText} label={t('Copy')} iconSize={16} style={{ width: 24, height: 24 }} />
+          {allowExchangeActions && !sending && question && (
+            <IconButton
+              compact
+              style={{ width: 24, height: 24 }}
+              aria-label={t('Regenerate')}
+              data-tip={t('Regenerate')}
+              onClick={regenerate}>
+              <RefreshCw size={16} />
+            </IconButton>
+          )}
+          {allowExchangeActions && !sending && question && (
+            <IconButton
+              compact
+              style={{ width: 24, height: 24 }}
+              aria-label={t('Edit and resend')}
+              data-tip={t('Edit and resend')}
+              onClick={() => setConfirmation('edit')}>
+              <Pencil size={16} />
+            </IconButton>
+          )}
+          {allowExchangeActions && !sending && question && (
+            <IconButton
+              compact
+              style={{ width: 24, height: 24 }}
+              tone="danger"
+              aria-label={t('Delete')}
+              data-tip={t('Delete')}
+              onClick={() => setConfirmation('delete')}>
+              <Trash2 size={16} />
+            </IconButton>
+          )}
+        </div>
+      )}
+      {menu && <ContextMenu anchor={menu} items={actions} onClose={() => setMenu(null)} />}
+      {createPortal(
+        <ConfirmDialog
+          open={confirmation !== null}
+          title={t(confirmation === 'delete' ? 'Delete' : 'Edit and resend')}
+          confirmLabel={t(confirmation === 'delete' ? 'Delete' : 'Edit and resend')}
+          cancelLabel={t('Cancel')}
+          danger={confirmation === 'delete'}
+          message={
+            confirmation === 'delete'
+              ? t('Delete this exchange?')
+              : `${t('Remove this question and later messages, then restore the question to the composer?')}${draft && (draft.text.trim() || draft.attachments.length || draft.references?.length) ? ` ${t('Your unsent draft and attachments will be replaced.')}` : ''}`
+          }
+          onCancel={() => {
+            setConfirmation(null);
+            requestAnimationFrame(() => moreTrigger.current?.focus({ preventScroll: true }));
+          }}
+          onConfirm={() => {
+            setConfirmation(null);
+            if (confirmation === 'edit') editResend();
+            else removeExchange();
+          }}
+        />,
+        document.body,
+      )}
+    </article>
+  );
 }
 
 function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }) {
@@ -159,21 +306,36 @@ function ThinkingBlock({ text, streaming }: { text: string; streaming: boolean }
   useEffect(() => {
     if (open && streaming && bodyRef.current) bodyRef.current.scrollTop = bodyRef.current.scrollHeight;
   }, [text, open, streaming]);
-  return <div className="ai-thinking ai-tool-card" data-open={open}>
-    <button type="button" data-subtle className="ai-tool-summary" aria-expanded={open} onClick={() => setOpen(!open)}>
-      <Brain size={15} aria-hidden="true" />
-      <span className="ai-tool-description">{t('Thinking process')}</span>
-      <ChevronRight size={14} aria-hidden="true" style={{ transform: open ? 'rotate(90deg)' : undefined }} />
-    </button>
-    {open && <div ref={bodyRef} className="ai-thinking-body md"><SafeMarkdown content={text} paneId={null} /></div>}
-  </div>;
+  return (
+    <div className="ai-thinking ai-tool-card" data-open={open}>
+      <button type="button" data-subtle className="ai-tool-summary" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <Brain size={15} aria-hidden="true" />
+        <span className="ai-tool-description">{t('Thinking process')}</span>
+        <ChevronRight size={14} aria-hidden="true" style={{ transform: open ? 'rotate(90deg)' : undefined }} />
+      </button>
+      {open && (
+        <div ref={bodyRef} className="ai-thinking-body md">
+          <SafeMarkdown content={text} paneId={null} />
+        </div>
+      )}
+    </div>
+  );
 }
 
 /** The shared working row, also rendered after a question that blocks the turn. */
 export function WorkingIndicator() {
-  return <div className="ai-block-working" role="status"><PendingCursor />{t('Working')}</div>;
+  return (
+    <div className="ai-block-working" role="status">
+      <PendingCursor />
+      {t('Working')}
+    </div>
+  );
 }
 
 function PendingCursor() {
-  return <span className="ai-pending-cursor" aria-hidden="true">▍</span>;
+  return (
+    <span className="ai-pending-cursor" aria-hidden="true">
+      ▍
+    </span>
+  );
 }

@@ -9,11 +9,14 @@ import { useComposerDrafts } from '../stores/composerDrafts';
 import PanelChat from '../components/PanelChat';
 
 vi.mock('@platform/api/conversation', () => ({
-  listConversations: vi.fn().mockResolvedValue([]), saveConversation: vi.fn().mockResolvedValue(undefined),
-  listConversationMessages: vi.fn().mockResolvedValue([]), appendConversationMessage: vi.fn().mockResolvedValue(undefined),
-  deleteConversation: vi.fn().mockResolvedValue(undefined), deleteConversationMessage: vi.fn().mockResolvedValue(undefined),
+  listConversations: vi.fn().mockResolvedValue([]),
+  saveConversation: vi.fn().mockResolvedValue(undefined),
+  listConversationMessages: vi.fn().mockResolvedValue([]),
+  appendConversationMessage: vi.fn().mockResolvedValue(undefined),
+  deleteConversation: vi.fn().mockResolvedValue(undefined),
+  deleteConversationMessage: vi.fn().mockResolvedValue(undefined),
 }));
-vi.mock('@platform/shells', async importOriginal => ({
+vi.mock('@platform/shells', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@platform/shells')>()),
   getAvailableShells: vi.fn().mockResolvedValue([{ id: 'bash', label: 'Bash', default: true }]),
 }));
@@ -26,14 +29,28 @@ const paneId = 'chat-tab#0';
 const openSettings = () => fireEvent.click(screen.getByRole('button', { name: '会话设置' }));
 
 it('restores recent sidebar conversations and retains the draft of each conversation', async () => {
-  useChatStore.setState({ conversations: [...useChatStore.getState().conversations, { id: 'recent', title: 'Recent session', updatedAt: 4, createdAt: 2, environment: null }], byTab: { conversation: [], recent: [] } });
-  render(<PanelChat />); const composer = screen.getByPlaceholderText('自然语言描述你想做什么…');
-  fireEvent.change(composer, { target: { value: 'Draft in first' } }); openSettings();
+  useChatStore.setState({
+    conversations: [
+      ...useChatStore.getState().conversations,
+      { id: 'recent', title: 'Recent session', updatedAt: 4, createdAt: 2, environment: null },
+    ],
+    byTab: { conversation: [], recent: [] },
+  });
+  render(<PanelChat />);
+  const composer = screen.getByPlaceholderText('自然语言描述你想做什么…');
+  fireEvent.change(composer, { target: { value: 'Draft in first' } });
+  openSettings();
   fireEvent.click(screen.getByRole('combobox', { name: '恢复最近会话' }));
-  await act(async () => { fireEvent.click(screen.getByRole('option', { name: 'Recent session' })); });
-  expect(useChatStore.getState().activeConversationId).toBe('recent'); expect(composer).toHaveValue('');
-  openSettings(); fireEvent.click(screen.getByRole('combobox', { name: '恢复最近会话' }));
-  await act(async () => { fireEvent.click(screen.getByRole('option', { name: 'Build issue' })); });
+  await act(async () => {
+    fireEvent.click(screen.getByRole('option', { name: 'Recent session' }));
+  });
+  expect(useChatStore.getState().activeConversationId).toBe('recent');
+  expect(composer).toHaveValue('');
+  openSettings();
+  fireEvent.click(screen.getByRole('combobox', { name: '恢复最近会话' }));
+  await act(async () => {
+    fireEvent.click(screen.getByRole('option', { name: 'Build issue' }));
+  });
   expect(composer).toHaveValue('Draft in first');
 });
 
@@ -47,7 +64,12 @@ it('keeps the empty prompt out of a conversation tab while retaining it in the s
 it('places main conversation actions in the toolbar and keeps settings floating without losing the draft', () => {
   function Surface({ workspace }: { workspace: boolean }) {
     const [toolbar, setToolbar] = useState<HTMLDivElement | null>(null);
-    return <><div data-testid="conversation-toolbar" ref={setToolbar} /><PanelChat workspace={workspace} toolbarTarget={toolbar} /></>;
+    return (
+      <>
+        <div data-testid="conversation-toolbar" ref={setToolbar} />
+        <PanelChat workspace={workspace} toolbarTarget={toolbar} />
+      </>
+    );
   }
   const { rerender, container } = render(<Surface workspace />);
   const toolbar = screen.getByTestId('conversation-toolbar');
@@ -74,7 +96,8 @@ it('places main conversation actions in the toolbar and keeps settings floating 
   expect(draft).toHaveValue('Keep this draft');
   expect(within(toolbar).queryByRole('button')).toBeNull();
   expect(container.querySelector('.chat-conversation-heading button[aria-label="会话设置"]')).not.toBeNull();
-  openSettings(); fireEvent.pointerDown(draft);
+  openSettings();
+  fireEvent.pointerDown(draft);
   expect(screen.queryByRole('region', { name: '会话设置' })).toBeNull();
   expect(draft).toHaveValue('Keep this draft');
 });
@@ -89,7 +112,12 @@ it('does not invent a per-pane heading when an unfocused workspace conversation 
 it('removes inactive conversation tools from a shared toolbar without losing its draft', () => {
   function Surface({ active }: { active: boolean }) {
     const [toolbar, setToolbar] = useState<HTMLDivElement | null>(null);
-    return <><div data-testid="conversation-toolbar" ref={setToolbar} /><PanelChat workspace active={active} toolbarTarget={toolbar} /></>;
+    return (
+      <>
+        <div data-testid="conversation-toolbar" ref={setToolbar} />
+        <PanelChat workspace active={active} toolbarTarget={toolbar} />
+      </>
+    );
   }
   const { rerender } = render(<Surface active />);
   const toolbar = screen.getByTestId('conversation-toolbar');
@@ -105,9 +133,20 @@ it('removes inactive conversation tools from a shared toolbar without losing its
 });
 
 beforeEach(() => {
-  useSessionStore.setState({ tabs: [{ id: 'chat-tab', title: 'Build', kind: 'session', layout: leaf({ id: paneId, kind: 'local', shellType: 'bash', cwd: '/work' }) }], activeId: 'chat-tab', terminalCwds: {} });
+  useSessionStore.setState({
+    tabs: [
+      { id: 'chat-tab', title: 'Build', kind: 'session', layout: leaf({ id: paneId, kind: 'local', shellType: 'bash', cwd: '/work' }) },
+    ],
+    activeId: 'chat-tab',
+    terminalCwds: {},
+  });
   useTerminalStore.setState({ focusedPaneId: paneId, sessions: { [paneId]: 'pty-chat' } });
-  useChatStore.setState({ conversationsLoaded: true, activeConversationId: 'conversation', conversations: [{ id: 'conversation', title: 'Build issue', createdAt: 1, updatedAt: 1, environment: null }], byTab: { conversation: [] } });
+  useChatStore.setState({
+    conversationsLoaded: true,
+    activeConversationId: 'conversation',
+    conversations: [{ id: 'conversation', title: 'Build issue', createdAt: 1, updatedAt: 1, environment: null }],
+    byTab: { conversation: [] },
+  });
 });
 
 it('uses the tab colour in execution targets while preserving failure status', () => {
@@ -123,8 +162,11 @@ it('uses the tab colour in execution targets while preserving failure status', (
   expect(selector.querySelector('.ui-select-swatch')).toHaveStyle({ background: 'var(--error)' });
 });
 afterEach(() => {
-  cleanup(); useSessionStore.setState(workspace, true); useTerminalStore.setState(terminal, true);
-  useChatStore.setState(chat, true); useComposerDrafts.setState(drafts, true);
+  cleanup();
+  useSessionStore.setState(workspace, true);
+  useTerminalStore.setState(terminal, true);
+  useChatStore.setState(chat, true);
+  useComposerDrafts.setState(drafts, true);
   useWorkspaceNavigation.setState(navigation, true);
 });
 
@@ -159,10 +201,10 @@ it('isolates new conversation drafts and opens the AI history singleton', () => 
   expect(screen.getByPlaceholderText('自然语言描述你想做什么…')).toHaveValue('');
   fireEvent.click(screen.getByRole('button', { name: 'AI 对话历史' }));
   // The AI history opens as one singleton tab in the AI workspace, never duplicated.
-  expect(useSessionStore.getState().tabs.filter(tab => tab.kind === 'ai-history')).toHaveLength(1);
-  expect(useSessionStore.getState().activeId).toBe(useSessionStore.getState().tabs.find(tab => tab.kind === 'ai-history')!.id);
+  expect(useSessionStore.getState().tabs.filter((tab) => tab.kind === 'ai-history')).toHaveLength(1);
+  expect(useSessionStore.getState().activeId).toBe(useSessionStore.getState().tabs.find((tab) => tab.kind === 'ai-history')!.id);
   fireEvent.click(screen.getByRole('button', { name: 'AI 对话历史' }));
-  expect(useSessionStore.getState().tabs.filter(tab => tab.kind === 'ai-history')).toHaveLength(1);
+  expect(useSessionStore.getState().tabs.filter((tab) => tab.kind === 'ai-history')).toHaveLength(1);
   expect(screen.getByPlaceholderText('自然语言描述你想做什么…')).toHaveValue('');
 });
 
@@ -189,8 +231,12 @@ it('keeps terminal settings above and orders attachment, approval, model and sen
   expect(container.querySelector('.terminal-composer-heading .composer-key-hints')).toHaveTextContent('发送');
   expect(container.querySelectorAll('.chat-input-status button')).toHaveLength(4);
   const footer = container.querySelector('.chat-input-status')!;
-  expect(Array.from(footer.querySelectorAll('button')).map(button => button.getAttribute('aria-label')))
-    .toEqual(['添加附件', '对话与审批模式', '切换模型', '发送']);
+  expect(Array.from(footer.querySelectorAll('button')).map((button) => button.getAttribute('aria-label'))).toEqual([
+    '添加附件',
+    '对话与审批模式',
+    '切换模型',
+    '发送',
+  ]);
   openSettings();
   const settings = screen.getByRole('region', { name: '会话设置' });
   expect(screen.getByRole('button', { name: '对话与审批模式' }).closest('.chat-input-status')).not.toBeNull();
@@ -237,7 +283,7 @@ it('opens the new-tab panel from the picker and binds the terminal it creates', 
   fireEvent.click(await within(dialog).findByTestId('new-tab-option-shell:bash'));
   expect(screen.queryByRole('dialog', { name: '新建标签页' })).not.toBeInTheDocument();
   expect(screen.getByRole('dialog', { name: '会话设置' })).toBeVisible();
-  const created = useSessionStore.getState().tabs.find(tab => tab.id !== 'chat-tab');
+  const created = useSessionStore.getState().tabs.find((tab) => tab.id !== 'chat-tab');
   expect(created).toBeDefined();
   const createdPane = firstTerminalOf(created!)?.id;
   expect(createdPane).toBeTruthy();
@@ -245,11 +291,32 @@ it('opens the new-tab panel from the picker and binds the terminal it creates', 
 });
 
 it('keeps execution context in settings without an extra status strip', () => {
-  useSessionStore.setState({ tabs: [{ id: 'chat-tab', title: 'Server', kind: 'session', layout: leaf({
-    id: paneId, kind: 'ssh', ssh: { name: 'Production', host: '10.21.76.61' },
-  }) }], terminalCwds: { [paneId]: '/srv/app' } });
-  useChatStore.setState({ conversations: [{ id: 'conversation', title: 'Deploy', createdAt: 1, updatedAt: 1,
-    environment: { paneId, label: 'Server · Production', kind: 'ssh', cwd: '/srv/app' } }] });
+  useSessionStore.setState({
+    tabs: [
+      {
+        id: 'chat-tab',
+        title: 'Server',
+        kind: 'session',
+        layout: leaf({
+          id: paneId,
+          kind: 'ssh',
+          ssh: { name: 'Production', host: '10.21.76.61' },
+        }),
+      },
+    ],
+    terminalCwds: { [paneId]: '/srv/app' },
+  });
+  useChatStore.setState({
+    conversations: [
+      {
+        id: 'conversation',
+        title: 'Deploy',
+        createdAt: 1,
+        updatedAt: 1,
+        environment: { paneId, label: 'Server · Production', kind: 'ssh', cwd: '/srv/app' },
+      },
+    ],
+  });
   render(<PanelChat />);
   expect(screen.queryByTestId('chat-conversation-context')).not.toBeInTheDocument();
   openSettings();
@@ -263,8 +330,17 @@ it('keeps execution context in settings without an extra status strip', () => {
 });
 
 it('keeps a disconnected target visible and never silently chooses another terminal', () => {
-  useChatStore.setState({ conversations: [{ id: 'conversation', title: 'Build issue', createdAt: 1, updatedAt: 1,
-    environment: { paneId: 'closed-terminal', label: 'Build terminal', kind: 'local', cwd: '/project' } }] });
+  useChatStore.setState({
+    conversations: [
+      {
+        id: 'conversation',
+        title: 'Build issue',
+        createdAt: 1,
+        updatedAt: 1,
+        environment: { paneId: 'closed-terminal', label: 'Build terminal', kind: 'local', cwd: '/project' },
+      },
+    ],
+  });
   render(<PanelChat />);
   openSettings();
   expect(screen.getByTestId('chat-execution-target')).toHaveTextContent('Build terminal · 已断开');
@@ -278,10 +354,14 @@ it('keeps a disconnected target visible and never silently chooses another termi
 });
 
 it('pauses the follow on an upward scroll but not when an inner scroller consumes it', () => {
-  useChatStore.setState({ byTab: { conversation: [
-    { id: 'q', role: 'user', content: 'Explain the build', createdAt: 1 },
-    { id: 'a', role: 'assistant', content: 'The build is fixed.', createdAt: 2 },
-  ] } });
+  useChatStore.setState({
+    byTab: {
+      conversation: [
+        { id: 'q', role: 'user', content: 'Explain the build', createdAt: 1 },
+        { id: 'a', role: 'assistant', content: 'The build is fixed.', createdAt: 2 },
+      ],
+    },
+  });
   const { container } = render(<PanelChat />);
   const transcript = container.querySelector('.chat-transcript') as HTMLElement;
   const jumpButton = () => screen.queryByRole('button', { name: '回到最新回复' });

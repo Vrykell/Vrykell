@@ -94,11 +94,11 @@ export function useSearchEngine() {
           try {
             const results = await s.search(parseSearchQuery(query).term, {
               signal: controller.signal,
-              onProgress: results => {
+              onProgress: (results) => {
                 if (reqId !== requestIdRef.current || controller.signal.aborted) return;
-                setState(prev => {
+                setState((prev) => {
                   const updated = { ...prev.sources, [s.id]: { loading: true, results } };
-                  return { ...prev, sources: updated, allResults: Object.values(updated).flatMap(source => source.results) };
+                  return { ...prev, sources: updated, allResults: Object.values(updated).flatMap((source) => source.results) };
                 });
               },
             });

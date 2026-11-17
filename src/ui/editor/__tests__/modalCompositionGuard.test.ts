@@ -15,7 +15,15 @@ function setup(value = '', accepts = false, onCommitted?: (text: string) => void
   const seen: string[] = [];
   for (const type of types) textarea.addEventListener(type, () => seen.push(type));
   const dispose = guardModalComposition(host, () => accepting, onCommitted);
-  return { host, textarea, seen, dispose, setAccepting: (next: boolean) => { accepting = next; } };
+  return {
+    host,
+    textarea,
+    seen,
+    dispose,
+    setAccepting: (next: boolean) => {
+      accepting = next;
+    },
+  };
 }
 
 function compose(textarea: HTMLTextAreaElement, preedit = 'nihao', committed = '你好') {
@@ -26,12 +34,16 @@ function compose(textarea: HTMLTextAreaElement, preedit = 'nihao', committed = '
   textarea.value = committed;
   textarea.setSelectionRange(committed.length, committed.length);
   textarea.dispatchEvent(new CompositionEvent('compositionupdate', { bubbles: true, data: committed }));
-  textarea.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertCompositionText', data: committed, isComposing: true }));
+  textarea.dispatchEvent(
+    new InputEvent('input', { bubbles: true, inputType: 'insertCompositionText', data: committed, isComposing: true }),
+  );
   textarea.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: committed }));
   textarea.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: committed, isComposing: false }));
 }
 
-afterEach(() => { document.body.replaceChildren(); });
+afterEach(() => {
+  document.body.replaceChildren();
+});
 
 it('stops composition outside text input modes and restores the hidden input', () => {
   const { textarea, seen, dispose } = setup('draft');

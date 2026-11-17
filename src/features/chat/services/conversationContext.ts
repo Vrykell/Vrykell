@@ -17,14 +17,29 @@ export function environmentForPane(paneId: string): ChatEnvironment | null {
   for (const tab of workspace.tabs) {
     if (tab.kind !== 'session') continue;
     const panes = leaves(tab.layout);
-    const pane = panes.find(item => item.id === paneId);
+    const pane = panes.find((item) => item.id === paneId);
     if (!pane) continue;
-    const name = pane.kind === 'ssh' ? pane.ssh?.name || pane.ssh?.host || 'SSH' : pane.shellType ? shellTypeLabel(pane.shellType) : t('Local terminal');
+    const name =
+      pane.kind === 'ssh'
+        ? pane.ssh?.name || pane.ssh?.host || 'SSH'
+        : pane.shellType
+          ? shellTypeLabel(pane.shellType)
+          : t('Local terminal');
     const splitLabel = panes.length > 1 ? ` · ${t('Pane {{number}}', { number: panes.indexOf(pane) + 1 })}` : '';
-    return { paneId, kind: pane.kind, label: `${tab.title} · ${name}${splitLabel}`, cwd: workspace.terminalCwds[paneId] ?? pane.cwd,
+    return {
+      paneId,
+      kind: pane.kind,
+      label: `${tab.title} · ${name}${splitLabel}`,
+      cwd: workspace.terminalCwds[paneId] ?? pane.cwd,
       ...(pane.shellType ? { shellType: pane.shellType } : {}),
-      ...(pane.kind === 'ssh' && pane.ssh ? { ssh: { host: pane.ssh.host, user: pane.ssh.user, port: pane.ssh.port },
-        aiNotes: useSshStore.getState().connections.find(connection => connection.id === pane.ssh?.connectionId)?.aiNotes ?? pane.ssh.aiNotes } : {}),
+      ...(pane.kind === 'ssh' && pane.ssh
+        ? {
+            ssh: { host: pane.ssh.host, user: pane.ssh.user, port: pane.ssh.port },
+            aiNotes:
+              useSshStore.getState().connections.find((connection) => connection.id === pane.ssh?.connectionId)?.aiNotes ??
+              pane.ssh.aiNotes,
+          }
+        : {}),
     };
   }
   return null;
@@ -32,7 +47,7 @@ export function environmentForPane(paneId: string): ChatEnvironment | null {
 
 export function showExecutionTerminal(paneId: string): void {
   const workspace = useWorkspaceStore.getState();
-  const tab = workspace.tabs.find(item => item.kind === 'session' && leaves(item.layout).some(pane => pane.id === paneId));
+  const tab = workspace.tabs.find((item) => item.kind === 'session' && leaves(item.layout).some((pane) => pane.id === paneId));
   if (!tab) return;
   workspace.activate(tab.id);
   useTerminalStore.getState().setFocusedPane(paneId);
@@ -46,25 +61,39 @@ export function askAboutTerminal(paneId: string, reference?: TerminalReference, 
   const chat = useChatStore.getState();
   const environment = environmentForPane(paneId);
   if (!reference && !text) {
-    const block = useBlockStore.getState().byTab[paneId]?.slice().reverse().find(item => !!item.command || !!item.outputText);
+    const block = useBlockStore
+      .getState()
+      .byTab[paneId]?.slice()
+      .reverse()
+      .find((item) => !!item.command || !!item.outputText);
     const output = block?.outputText || getRecentOutputFor(paneId);
-    if (block || output) reference = {
-      id: block?.id ?? `snapshot-${paneId}-${Date.now()}`, paneId, label: environment?.label ?? t('Terminal output'),
-      command: block?.command ?? '', output, cwd: block?.cwd ?? environment?.cwd,
-      exitCode: block?.exitCode, createdAt: block?.startedAt ?? Date.now(),
-    };
+    if (block || output)
+      reference = {
+        id: block?.id ?? `snapshot-${paneId}-${Date.now()}`,
+        paneId,
+        label: environment?.label ?? t('Terminal output'),
+        command: block?.command ?? '',
+        output,
+        cwd: block?.cwd ?? environment?.cwd,
+        exitCode: block?.exitCode,
+        createdAt: block?.startedAt ?? Date.now(),
+      };
   }
   const ai = useAiWorkspace.getState();
-  const sideId = availableSideConversationIds().has(ai.sideSelected) && ai.sideSelected.startsWith('chat:')
-    ? ai.sideSelected.slice(5) : '';
-  const current = chat.conversations.find(item => item.id === sideId);
-  const id = current && sideId in chat.byTab && (!current.environment || current.environment.paneId === paneId)
-    ? current.id : chat.createConversation(null, { activate: false });
+  const sideId = availableSideConversationIds().has(ai.sideSelected) && ai.sideSelected.startsWith('chat:') ? ai.sideSelected.slice(5) : '';
+  const current = chat.conversations.find((item) => item.id === sideId);
+  const id =
+    current && sideId in chat.byTab && (!current.environment || current.environment.paneId === paneId)
+      ? current.id
+      : chat.createConversation(null, { activate: false });
   ai.selectSide(`chat:${id}`);
   const drafts = useComposerDrafts.getState();
   if (reference) {
     const previous = drafts.byTab[id]?.references ?? [];
-    drafts.setReferences(id, [...previous.filter(item => item.id !== reference.id), { ...reference, label: environment?.label ?? reference.label }]);
+    drafts.setReferences(id, [
+      ...previous.filter((item) => item.id !== reference.id),
+      { ...reference, label: environment?.label ?? reference.label },
+    ]);
   }
   if (text) {
     const previous = drafts.byTab[id]?.text;

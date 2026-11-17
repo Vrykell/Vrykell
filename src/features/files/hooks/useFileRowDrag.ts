@@ -18,9 +18,12 @@ function locateDropTarget(x: number, y: number): FileDropTarget | null {
 }
 
 function isOutsideWindow(x: number, y: number): boolean {
-  return x <= -NATIVE_DRAG_MARGIN_PX || y <= -NATIVE_DRAG_MARGIN_PX
-    || x >= window.innerWidth + NATIVE_DRAG_MARGIN_PX
-    || y >= window.innerHeight + NATIVE_DRAG_MARGIN_PX;
+  return (
+    x <= -NATIVE_DRAG_MARGIN_PX ||
+    y <= -NATIVE_DRAG_MARGIN_PX ||
+    x >= window.innerWidth + NATIVE_DRAG_MARGIN_PX ||
+    y >= window.innerHeight + NATIVE_DRAG_MARGIN_PX
+  );
 }
 
 /** Payload handed to the OS drag: local paths plus the drop effect (local = move; remote = download then copy out). */
@@ -47,8 +50,9 @@ function beginNativeDrag(payload: NativeDragPayload, onEnd?: (result: DragResult
   // Leave the preview empty: a failed read means "no custom drag image" (Windows falls back to its default).
   void startDrag({ item: payload.paths, icon: '', mode: payload.mode }, (event) => {
     onEnd?.(event.result);
-  })
-    .catch(() => { onEnd?.('Cancelled'); });
+  }).catch(() => {
+    onEnd?.('Cancelled');
+  });
 }
 
 /**
@@ -106,7 +110,10 @@ export function useFileRowDrag({ onDrop, prepareNativeDrag, onNativeDragEnd }: F
       store.hover(locateDropTarget(next.clientX, next.clientY));
     };
     const suppressClick = (next: MouseEvent) => {
-      if (started) { next.preventDefault(); next.stopImmediatePropagation(); }
+      if (started) {
+        next.preventDefault();
+        next.stopImmediatePropagation();
+      }
     };
     const removeClick = () => window.removeEventListener('click', suppressClick, true);
 
@@ -121,7 +128,10 @@ export function useFileRowDrag({ onDrop, prepareNativeDrag, onNativeDragEnd }: F
       // The browser still dispatches a click after pointerup: release the suppression one tick later
       // so the drop does not double as a selection.
       clickTimer = setTimeout(removeClick, 0);
-      cleanupRef.current = () => { clearTimeout(clickTimer); removeClick(); };
+      cleanupRef.current = () => {
+        clearTimeout(clickTimer);
+        removeClick();
+      };
     };
 
     const up = (next: PointerEvent) => {
@@ -152,6 +162,10 @@ export function useFileRowDrag({ onDrop, prepareNativeDrag, onNativeDragEnd }: F
     window.addEventListener('keydown', key, true);
     window.addEventListener('blur', cancel);
     window.addEventListener('click', suppressClick, true);
-    cleanupRef.current = () => { clean(); clearTimeout(clickTimer); removeClick(); };
+    cleanupRef.current = () => {
+      clean();
+      clearTimeout(clickTimer);
+      removeClick();
+    };
   };
 }

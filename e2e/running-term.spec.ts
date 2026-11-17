@@ -21,7 +21,7 @@ async function startRunningBlock(page: import('@playwright/test').Page) {
   // Wait for the shell prompt before injecting a sustained command.
   await page.waitForFunction(async () => {
     const path = '/src/features/terminal/stores/terminal.ts';
-    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    const { useTerminalStore } = (await import(path)) as typeof import('../src/features/terminal/stores/terminal');
     return Object.values(useTerminalStore.getState().startupStates).includes('ready');
   });
   await emitPtyOutput(page, `\x1b]133;E;${btoa('sleep 100')}\x07\x1b]133;C\x07`);
@@ -134,10 +134,7 @@ test('focus lands in the textarea of the block live xterm rather than the hidden
     .poll(() =>
       page.evaluate(() => {
         const ae = document.activeElement;
-        return (
-          ae?.classList.contains('xterm-helper-textarea') === true &&
-          !!ae.closest('[data-testid="running-term"]')
-        );
+        return ae?.classList.contains('xterm-helper-textarea') === true && !!ae.closest('[data-testid="running-term"]');
       }),
     )
     .toBe(true);
@@ -213,9 +210,11 @@ test('the fullscreen terminal context menu offers shortcuts plus copy and paste'
   // Copy reads the terminal the fullscreen host displays; the hidden main terminal has no selection.
   const target = 'fullscreen-copy-target';
   await page.evaluate((text) => {
-    const terms = (window as unknown as {
-      __vrykellTerms?: Map<string, { select: (column: number, row: number, length: number) => void }>;
-    }).__vrykellTerms!;
+    const terms = (
+      window as unknown as {
+        __vrykellTerms?: Map<string, { select: (column: number, row: number, length: number) => void }>;
+      }
+    ).__vrykellTerms!;
     const key = [...terms.keys()].find((entry) => entry.startsWith('block:'))!;
     terms.get(key)!.select(0, 1, text.length);
   }, target);
@@ -287,20 +286,18 @@ test('a running block owns the wheel: xterm scrollback moves without scrolling t
   await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
 
   // Emit enough rows for the block list to overflow.
-  await emitPtyOutput(
-    page,
-    Array.from({ length: 40 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n',
-  );
+  await emitPtyOutput(page, Array.from({ length: 40 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n');
   await expectAnyTermContains(page, 'line-39', 3000);
   // The composer hides once the command is long-running; measure the settled layout.
   await expect(page.getByPlaceholder(/输入命令/)).toBeHidden({ timeout: 3000 });
 
-  const blockScroll = () => page.evaluate(() => {
-    const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
-    const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
-    const term = key ? terms?.get(key) : undefined;
-    return { viewportY: term?.buffer.active.viewportY ?? -1, baseY: term?.buffer.active.baseY ?? -1 };
-  });
+  const blockScroll = () =>
+    page.evaluate(() => {
+      const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
+      const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
+      const term = key ? terms?.get(key) : undefined;
+      return { viewportY: term?.buffer.active.viewportY ?? -1, baseY: term?.buffer.active.baseY ?? -1 };
+    });
   await page.evaluate(() => {
     const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
     const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
@@ -326,10 +323,7 @@ test('a running block hands the wheel to the command history once its own scroll
   await startRunningBlock(page);
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
-  await emitPtyOutput(
-    page,
-    Array.from({ length: 60 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n',
-  );
+  await emitPtyOutput(page, Array.from({ length: 60 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n');
   await expectAnyTermContains(page, 'line-59', 3000);
   // The composer hides once the command is long-running; measure the settled layout.
   await expect(page.getByPlaceholder(/输入命令/)).toBeHidden({ timeout: 3000 });
@@ -360,20 +354,18 @@ test('an upward wheel reads the live scrollback before older command history', a
   await startRunningBlock(page);
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
-  await emitPtyOutput(
-    page,
-    Array.from({ length: 60 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n',
-  );
+  await emitPtyOutput(page, Array.from({ length: 60 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n');
   await expectAnyTermContains(page, 'line-59', 3000);
   await expect(page.getByPlaceholder(/输入命令/)).toBeHidden({ timeout: 3000 });
   await page.waitForTimeout(200);
 
-  const blockScroll = () => page.evaluate(() => {
-    const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
-    const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
-    const term = key ? terms?.get(key) : undefined;
-    return { viewportY: term?.buffer.active.viewportY ?? -1, baseY: term?.buffer.active.baseY ?? -1 };
-  });
+  const blockScroll = () =>
+    page.evaluate(() => {
+      const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
+      const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
+      const term = key ? terms?.get(key) : undefined;
+      return { viewportY: term?.buffer.active.viewportY ?? -1, baseY: term?.buffer.active.baseY ?? -1 };
+    });
   const parent = page.locator('[data-testid^="terminal-scroll-"]').first();
   await expect.poll(() => parent.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(60);
   // The outer history sits above its newest position, yet an upward wheel over the live
@@ -392,20 +384,18 @@ test('a continuous upward burst crosses into the command history without stoppin
   await startRunningBlock(page);
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
-  await emitPtyOutput(
-    page,
-    Array.from({ length: 60 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n',
-  );
+  await emitPtyOutput(page, Array.from({ length: 60 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n');
   await expectAnyTermContains(page, 'line-59', 3000);
   await expect(page.getByPlaceholder(/输入命令/)).toBeHidden({ timeout: 3000 });
   await page.waitForTimeout(200);
 
-  const blockScroll = () => page.evaluate(() => {
-    const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
-    const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
-    const term = key ? terms?.get(key) : undefined;
-    return { viewportY: term?.buffer.active.viewportY ?? -1, baseY: term?.buffer.active.baseY ?? -1 };
-  });
+  const blockScroll = () =>
+    page.evaluate(() => {
+      const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
+      const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
+      const term = key ? terms?.get(key) : undefined;
+      return { viewportY: term?.buffer.active.viewportY ?? -1, baseY: term?.buffer.active.baseY ?? -1 };
+    });
   const parent = page.locator('[data-testid^="terminal-scroll-"]').first();
   const parentBefore = await parent.evaluate((el) => el.scrollTop);
   await pointAtLiveTerminal(page, host, parent);
@@ -426,21 +416,19 @@ test('the command history owns the wheel until it reaches its newest position', 
   await startRunningBlock(page);
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm')).toBeVisible({ timeout: 5000 });
-  await emitPtyOutput(
-    page,
-    Array.from({ length: 60 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n',
-  );
+  await emitPtyOutput(page, Array.from({ length: 60 }, (_, i) => `line-${i}`).join('\r\n') + '\r\n');
   await expectAnyTermContains(page, 'line-59', 3000);
   // The composer hides once the command is long-running; measure the settled layout.
   await expect(page.getByPlaceholder(/输入命令/)).toBeHidden({ timeout: 3000 });
   await page.waitForTimeout(200);
 
-  const liveState = () => page.evaluate(() => {
-    const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
-    const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
-    const term = key ? terms?.get(key) : undefined;
-    return { viewportY: term?.buffer.active.viewportY ?? -1, baseY: term?.buffer.active.baseY ?? -1 };
-  });
+  const liveState = () =>
+    page.evaluate(() => {
+      const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
+      const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
+      const term = key ? terms?.get(key) : undefined;
+      return { viewportY: term?.buffer.active.viewportY ?? -1, baseY: term?.buffer.active.baseY ?? -1 };
+    });
   // Park the live terminal at the top of its own scrollback so it can scroll down.
   await page.evaluate(() => {
     const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
@@ -455,7 +443,9 @@ test('the command history owns the wheel until it reaches its newest position', 
   await expect.poll(() => parent.evaluate((el) => el.scrollHeight - el.clientHeight)).toBeGreaterThan(60);
   // Reading older commands: the history still owns a downward wheel even over the live terminal,
   // because scrolling down brings the full running terminal back into view first.
-  await parent.evaluate((el) => { el.scrollTop = 0; });
+  await parent.evaluate((el) => {
+    el.scrollTop = 0;
+  });
   await pointAtLiveTerminal(page, host, parent);
   await page.mouse.wheel(0, 120);
   await expect.poll(() => parent.evaluate((el) => el.scrollTop)).toBeGreaterThan(0);
@@ -463,7 +453,9 @@ test('the command history owns the wheel until it reaches its newest position', 
 
   // At the newest position the live terminal takes over and scrolls its own scrollback on its
   // native wheel path, while the history stays pinned at its newest position.
-  await parent.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  await parent.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
   await expect.poll(() => parent.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight)).toBeLessThanOrEqual(2);
   const liveAtBottom = await liveState();
   await pointAtLiveTerminal(page, host, parent);
@@ -480,28 +472,26 @@ test('output that arrives before the running block mounts does not break the fir
   await expect(input).toBeVisible({ timeout: 5000 });
   await page.waitForFunction(async () => {
     const path = '/src/features/terminal/stores/terminal.ts';
-    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    const { useTerminalStore } = (await import(path)) as typeof import('../src/features/terminal/stores/terminal');
     return Object.values(useTerminalStore.getState().startupStates).includes('ready');
   });
 
   // Output that overflows the screen arrives right after the command starts, while the
   // running block has not mounted yet and the live terminal is still written headless.
   await emitPtyOutput(page, `\x1b]133;E;${btoa('sleep 100')}\x07\x1b]133;C\x07`);
-  await emitPtyOutput(
-    page,
-    Array.from({ length: 120 }, (_, i) => `pre-${i} ${'x'.repeat(60)}`).join('\r\n') + '\r\n',
-  );
+  await emitPtyOutput(page, Array.from({ length: 120 }, (_, i) => `pre-${i} ${'x'.repeat(60)}`).join('\r\n') + '\r\n');
 
   const host = page.getByTestId('running-term');
   await expect(host.locator('.xterm')).toBeVisible({ timeout: 8000 });
   await page.waitForTimeout(600);
 
-  const blockScroll = () => page.evaluate(() => {
-    const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
-    const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
-    const term = key ? terms?.get(key) : undefined;
-    return { viewportY: term?.buffer.active.viewportY ?? -1, baseY: term?.buffer.active.baseY ?? -1 };
-  });
+  const blockScroll = () =>
+    page.evaluate(() => {
+      const terms = (window as unknown as { __vrykellTerms?: Map<string, RunningTermScrollProbe> }).__vrykellTerms;
+      const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
+      const term = key ? terms?.get(key) : undefined;
+      return { viewportY: term?.buffer.active.viewportY ?? -1, baseY: term?.buffer.active.baseY ?? -1 };
+    });
   const before = await blockScroll();
   expect(before.baseY).toBeGreaterThan(30);
 
@@ -537,8 +527,8 @@ test('live output of a running block can be selected and copied', async ({ page 
   await page.mouse.up();
   const selection = await page.evaluate(() => {
     const terms = (window as unknown as { __vrykellTerms?: Map<string, { getSelection: () => string }> }).__vrykellTerms;
-    const key = [...(terms?.keys() ?? [])].find(entry => entry.startsWith('block:'));
-    return key ? terms?.get(key)?.getSelection() ?? '' : '';
+    const key = [...(terms?.keys() ?? [])].find((entry) => entry.startsWith('block:'));
+    return key ? (terms?.get(key)?.getSelection() ?? '') : '';
   });
   expect(selection).toContain('live-selection');
   await page.keyboard.press('Control+c');
@@ -552,11 +542,17 @@ test('a running block does not steal the selection from completed block text', a
   await expect(input).toBeVisible({ timeout: 5000 });
   await input.fill('echo completed-text');
   await input.press('Enter');
-  await expect(page.locator('[data-testid^="command-block-"]').filter({ hasText: 'completed-text' }).first()).toBeVisible({ timeout: 5000 });
+  await expect(page.locator('[data-testid^="command-block-"]').filter({ hasText: 'completed-text' }).first()).toBeVisible({
+    timeout: 5000,
+  });
   await startRunningBlock(page);
 
-  const output = page.locator('[data-testid^="command-block-"]').filter({ hasText: 'completed-text' }).first()
-    .locator('.command-block-output [data-selectable]').first();
+  const output = page
+    .locator('[data-testid^="command-block-"]')
+    .filter({ hasText: 'completed-text' })
+    .first()
+    .locator('.command-block-output [data-selectable]')
+    .first();
   const box = (await output.boundingBox())!;
   await page.mouse.move(box.x + 2, box.y + box.height / 2);
   await page.mouse.down();

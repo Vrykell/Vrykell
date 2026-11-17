@@ -22,18 +22,32 @@ interface RemotePathState {
   set: (connId: string, p: string | null) => void;
 }
 
-export const useRemotePathStore = create<RemotePathState>()(persist((set) => ({
-  path: {},
-  set: (connId, p) => set((s) => ({ path: { ...s.path, [connId]: p } })),
-}), {
-  name: 'vrykell-remote-files-locations',
-  partialize: state => ({ path: state.path }),
-  merge: (saved, current) => {
-    const path = (saved as Partial<RemotePathState> | null)?.path;
-    return { ...current, path: path && typeof path === 'object' && !Array.isArray(path)
-      ? Object.fromEntries(Object.entries(path).filter(([connectionId, value]) => connectionId && (value === null || typeof value === 'string' && value.startsWith('/')))) : {} };
-  },
-}));
+export const useRemotePathStore = create<RemotePathState>()(
+  persist(
+    (set) => ({
+      path: {},
+      set: (connId, p) => set((s) => ({ path: { ...s.path, [connId]: p } })),
+    }),
+    {
+      name: 'vrykell-remote-files-locations',
+      partialize: (state) => ({ path: state.path }),
+      merge: (saved, current) => {
+        const path = (saved as Partial<RemotePathState> | null)?.path;
+        return {
+          ...current,
+          path:
+            path && typeof path === 'object' && !Array.isArray(path)
+              ? Object.fromEntries(
+                  Object.entries(path).filter(
+                    ([connectionId, value]) => connectionId && (value === null || (typeof value === 'string' && value.startsWith('/'))),
+                  ),
+                )
+              : {},
+        };
+      },
+    },
+  ),
+);
 
 /** Normalizes a remote absolute path (POSIX semantics; implementation in the platform layer). */
 export function normalizeRemotePath(p: string): string {
@@ -58,9 +72,7 @@ export function sshPaneIdFor(connId: string): string | null {
   const at = ws.tabs.find((x) => x.id === ws.activeId);
   if (!at || !isSessionTab(at)) return null;
   const focused = useTerminalStore.getState().focusedPaneId;
-  const matched = leaves(at.layout).filter(
-    (t) => t.kind === 'ssh' && t.ssh?.connectionId === connId,
-  );
+  const matched = leaves(at.layout).filter((t) => t.kind === 'ssh' && t.ssh?.connectionId === connId);
   if (matched.length === 0) return null;
   return matched.some((t) => t.id === focused) ? focused : matched[0].id;
 }

@@ -35,9 +35,22 @@ export interface TerminalSpec {
 export type WindowLayout = PaneTree<{ type: 'leaf'; terminal: TerminalSpec }, 'dir'>;
 
 const terminalSpecSchema = z.object({
-  id: z.string().min(1).max(256), kind: z.enum(['local', 'ssh']), shellType: z.string().max(64).optional(),
-  cwd: z.string().max(8192).optional(), useProfileDirectory: z.boolean().optional(), openMode: z.enum(['classic', 'block']).optional(),
-  ssh: z.object({ name: z.string().max(320), host: z.string().min(1).max(2048), user: z.string().max(256).optional(), port: z.number().int().min(1).max(65535).optional(), connectionId: z.string().max(256).optional() }).passthrough().optional(),
+  id: z.string().min(1).max(256),
+  kind: z.enum(['local', 'ssh']),
+  shellType: z.string().max(64).optional(),
+  cwd: z.string().max(8192).optional(),
+  useProfileDirectory: z.boolean().optional(),
+  openMode: z.enum(['classic', 'block']).optional(),
+  ssh: z
+    .object({
+      name: z.string().max(320),
+      host: z.string().min(1).max(2048),
+      user: z.string().max(256).optional(),
+      port: z.number().int().min(1).max(65535).optional(),
+      connectionId: z.string().max(256).optional(),
+    })
+    .passthrough()
+    .optional(),
 });
 
 /** Validate the terminal wire encoding before converting it into live pane references. */
@@ -48,25 +61,38 @@ export function parseWindowLayout(value: unknown): WindowLayout | null {
     const node = input as Record<string, unknown>;
     if (node.type === 'leaf') {
       const result = terminalSpecSchema.safeParse(node.terminal);
-      if (!result.success || ids.has(result.data.id) || result.data.kind === 'ssh' && !result.data.ssh) return null;
-      ids.add(result.data.id); return { type: 'leaf', terminal: result.data };
+      if (!result.success || ids.has(result.data.id) || (result.data.kind === 'ssh' && !result.data.ssh)) return null;
+      ids.add(result.data.id);
+      return { type: 'leaf', terminal: result.data };
     }
-    if (node.type !== 'split' || node.dir !== 'row' && node.dir !== 'col' || typeof node.ratio !== 'number' || !Number.isFinite(node.ratio)) return null;
-    const first = parse(node.first, depth + 1); const second = parse(node.second, depth + 1);
+    if (
+      node.type !== 'split' ||
+      (node.dir !== 'row' && node.dir !== 'col') ||
+      typeof node.ratio !== 'number' ||
+      !Number.isFinite(node.ratio)
+    )
+      return null;
+    const first = parse(node.first, depth + 1);
+    const second = parse(node.second, depth + 1);
     return first && second ? { type: 'split', dir: node.dir, ratio: clampPaneRatio(node.ratio), first, second } : null;
   };
-  const layout = parse(value, 0); return ids.size <= 4 ? layout : null;
+  const layout = parse(value, 0);
+  return ids.size <= 4 ? layout : null;
 }
 
 const tree = paneTreeOperations<WindowLayout, TerminalSpec>({
-  leaf: node => node.type === 'leaf' ? node.terminal : null,
-  children: node => { const split = node as Extract<WindowLayout, { type: 'split' }>; return [split.first, split.second]; },
+  leaf: (node) => (node.type === 'leaf' ? node.terminal : null),
+  children: (node) => {
+    const split = node as Extract<WindowLayout, { type: 'split' }>;
+    return [split.first, split.second];
+  },
   join: (node, first, second) => ({ ...node, first, second }),
   withRatio: (node, ratio) => ({ ...node, ratio }),
-  id: terminal => terminal.id,
+  id: (terminal) => terminal.id,
 });
 
-export const measureWindowLayout = (layout: WindowLayout, rect?: Rect) => measurePaneTree(layout, node => node.type === 'leaf' ? { id: node.terminal.id } : node, rect);
+export const measureWindowLayout = (layout: WindowLayout, rect?: Rect) =>
+  measurePaneTree(layout, (node) => (node.type === 'leaf' ? { id: node.terminal.id } : node), rect);
 
 export interface Rect {
   x: number;
@@ -162,8 +188,8 @@ export function splitLeaf(
   ratio = 0.5,
 ): WindowLayout {
   const terminals = tree.leaves(root);
-  if (terminals.length >= 4 || terminals.some(terminal => terminal.id === newTerminal.id)) return root;
-  return tree.update(root, leafId, node => {
+  if (terminals.length >= 4 || terminals.some((terminal) => terminal.id === newTerminal.id)) return root;
+  return tree.update(root, leafId, (node) => {
     const next = leaf(newTerminal);
     return position === 'first'
       ? { type: 'split', dir, ratio, first: next, second: node }
@@ -182,10 +208,7 @@ export function removeLeaf(root: WindowLayout, leafId: string): WindowLayout | n
 }
 
 /** Geometric rect of every leaf (0..1, relative to the window). */
-export function leafRects(
-  layout: WindowLayout,
-  rect: Rect = { x: 0, y: 0, w: 1, h: 1 },
-): { terminalId: string; rect: Rect }[] {
+export function leafRects(layout: WindowLayout, rect: Rect = { x: 0, y: 0, w: 1, h: 1 }): { terminalId: string; rect: Rect }[] {
   return measureWindowLayout(layout, rect).cells.map(({ id, rect: cell }) => ({ terminalId: id, rect: cell }));
 }
 
@@ -209,12 +232,12 @@ export function moveTargets(layout: WindowLayout, dragId: string): DropTarget[] 
   for (const { terminalId, rect } of leafRects(remaining)) {
     for (const dir of ['row', 'col'] as SplitDir[]) {
       for (const position of ['first', 'second'] as const) {
-        const first = dir === 'row'
-          ? { x: rect.x, y: rect.y, w: rect.w / 2, h: rect.h }
-          : { x: rect.x, y: rect.y, w: rect.w, h: rect.h / 2 };
-        const second = dir === 'row'
-          ? { x: rect.x + rect.w / 2, y: rect.y, w: rect.w / 2, h: rect.h }
-          : { x: rect.x, y: rect.y + rect.h / 2, w: rect.w, h: rect.h / 2 };
+        const first =
+          dir === 'row' ? { x: rect.x, y: rect.y, w: rect.w / 2, h: rect.h } : { x: rect.x, y: rect.y, w: rect.w, h: rect.h / 2 };
+        const second =
+          dir === 'row'
+            ? { x: rect.x + rect.w / 2, y: rect.y, w: rect.w / 2, h: rect.h }
+            : { x: rect.x, y: rect.y + rect.h / 2, w: rect.w, h: rect.h / 2 };
         targets.push({ leafId: terminalId, dir, position, rect: position === 'first' ? first : second });
       }
     }

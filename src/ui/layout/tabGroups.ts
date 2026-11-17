@@ -1,6 +1,12 @@
 import type { MenuAnchor } from '@ui/menus/ContextMenu';
 
-export interface TabGroupHandle { id: string; title: string; collapsed: boolean; members: string[]; archivable?: boolean }
+export interface TabGroupHandle {
+  id: string;
+  title: string;
+  collapsed: boolean;
+  members: string[];
+  archivable?: boolean;
+}
 
 /** The strip owns presentation; providers implement the shared group operations. */
 export interface TabGroupController {

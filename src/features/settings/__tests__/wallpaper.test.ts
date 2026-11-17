@@ -6,7 +6,11 @@ vi.mock('@features/terminal/services/terminalDebug', () => ({ terminalDebug: vi.
 
 import { isWallpaperImage, wallpaperExtensions } from '../services/wallpaper';
 
-afterEach(() => { invokeMock.mockReset(); vi.unstubAllGlobals(); vi.useRealTimers(); });
+afterEach(() => {
+  invokeMock.mockReset();
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 it('rejects documents and archives without attempting to read them', async () => {
   expect(wallpaperExtensions).not.toContain('pdf');
@@ -24,7 +28,13 @@ it('reads the candidate through the backend and requires a decodable image', asy
     naturalHeight = 80;
     onload: (() => void) | null = null;
     onerror: (() => void) | null = null;
-    set src(value: string) { sources.push(value); queueMicrotask(() => { if (fail) this.onerror?.(); else this.onload?.(); }); }
+    set src(value: string) {
+      sources.push(value);
+      queueMicrotask(() => {
+        if (fail) this.onerror?.();
+        else this.onload?.();
+      });
+    }
   }
   vi.stubGlobal('Image', ImageStub);
   invokeMock.mockResolvedValue('data:image/jpeg;base64,AAAA');
@@ -47,7 +57,12 @@ it('rejects unreadable files without decoding', async () => {
 
 it('bounds decoding time for oversized images', async () => {
   vi.useFakeTimers();
-  vi.stubGlobal('Image', class { src = ''; });
+  vi.stubGlobal(
+    'Image',
+    class {
+      src = '';
+    },
+  );
   invokeMock.mockResolvedValue('data:image/png;base64,AAAA');
   const decoding = isWallpaperImage('/huge.jpg');
   await vi.advanceTimersByTimeAsync(5000);

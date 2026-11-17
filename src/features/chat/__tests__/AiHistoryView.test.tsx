@@ -11,9 +11,12 @@ vi.mock('@tauri-apps/plugin-dialog', () => ({ ask: vi.fn().mockResolvedValue(tru
 vi.mock('@platform/clipboard', () => ({ writeClipboardText: vi.fn().mockResolvedValue(undefined) }));
 
 vi.mock('@platform/api/conversation', () => ({
-  listConversations: vi.fn().mockResolvedValue([]), saveConversation: vi.fn().mockResolvedValue(undefined),
-  listConversationMessages: vi.fn().mockResolvedValue([]), appendConversationMessage: vi.fn().mockResolvedValue(undefined),
-  deleteConversation: vi.fn().mockResolvedValue(undefined), deleteConversationMessage: vi.fn().mockResolvedValue(undefined),
+  listConversations: vi.fn().mockResolvedValue([]),
+  saveConversation: vi.fn().mockResolvedValue(undefined),
+  listConversationMessages: vi.fn().mockResolvedValue([]),
+  appendConversationMessage: vi.fn().mockResolvedValue(undefined),
+  deleteConversation: vi.fn().mockResolvedValue(undefined),
+  deleteConversationMessage: vi.fn().mockResolvedValue(undefined),
 }));
 
 const initialChat = useChatStore.getState();
@@ -23,14 +26,22 @@ beforeEach(() => {
   vi.mocked(conversationApi.deleteConversation).mockResolvedValue(undefined);
   sessionStorage.clear();
   useHistoryMetaStore.setState(useHistoryMetaStore.getInitialState(), true);
-  useChatStore.setState({ conversationsLoaded: true, activeConversationId: 'first', conversations: [
-    { id: 'first', title: 'Build investigation', createdAt: 1, updatedAt: 3, environment: null },
-    { id: 'second', title: 'Database question', createdAt: 2, updatedAt: 4, environment: null },
-  ], byTab: { first: [], second: [] }, conversationError: null });
+  useChatStore.setState({
+    conversationsLoaded: true,
+    activeConversationId: 'first',
+    conversations: [
+      { id: 'first', title: 'Build investigation', createdAt: 1, updatedAt: 3, environment: null },
+      { id: 'second', title: 'Database question', createdAt: 2, updatedAt: 4, environment: null },
+    ],
+    byTab: { first: [], second: [] },
+    conversationError: null,
+  });
 });
 afterEach(() => {
   sessionStorage.clear();
-  cleanup(); useChatStore.setState(initialChat, true); useDockStore.setState(initialDock, true);
+  cleanup();
+  useChatStore.setState(initialChat, true);
+  useDockStore.setState(initialDock, true);
 });
 
 it('searches independent conversations and opens one in the dock', () => {
@@ -93,9 +104,22 @@ it('opens record actions on right click without opening group actions', () => {
 });
 
 it('shows remote context without hover and opens from the quick action', () => {
-  useChatStore.setState(state => ({ conversations: state.conversations.map(item => item.id === 'second'
-    ? { ...item, environment: { paneId: 'remote', label: 'Production', kind: 'ssh' as const,
-      cwd: '/srv/app', ssh: { host: 'server.test', user: 'dev', port: 2222 } } } : item) }));
+  useChatStore.setState((state) => ({
+    conversations: state.conversations.map((item) =>
+      item.id === 'second'
+        ? {
+            ...item,
+            environment: {
+              paneId: 'remote',
+              label: 'Production',
+              kind: 'ssh' as const,
+              cwd: '/srv/app',
+              ssh: { host: 'server.test', user: 'dev', port: 2222 },
+            },
+          }
+        : item,
+    ),
+  }));
   render(<AiHistoryView />);
   const row = screen.getByTestId('conversation-row-second');
   expect(row.querySelector('.sidebar-row-subtitle')).toBeVisible();
@@ -119,18 +143,19 @@ it('prevents quick deletion of locked or working conversations without activatin
 });
 
 it('keeps locked and failed records while deleting the other records in a group', async () => {
-  useChatStore.setState(state => ({ conversations: [...state.conversations,
-    { id: 'third', title: 'Successful deletion', createdAt: 3, updatedAt: 5, environment: null }] }));
+  useChatStore.setState((state) => ({
+    conversations: [...state.conversations, { id: 'third', title: 'Successful deletion', createdAt: 3, updatedAt: 5, environment: null }],
+  }));
   useHistoryMetaStore.getState().setLocked(['conversation:first'], true);
   useHistoryMetaStore.getState().setNote('conversation:second', 'Retry later');
   useHistoryMetaStore.getState().setNote('conversation:third', 'Remove with record');
-  vi.mocked(conversationApi.deleteConversation).mockImplementation(async id => {
+  vi.mocked(conversationApi.deleteConversation).mockImplementation(async (id) => {
     if (id === 'second') throw new Error('Unavailable');
   });
   render(<AiHistoryView />);
   fireEvent.click(screen.getByRole('button', { name: '分组操作' }));
   fireEvent.click(screen.getByRole('menuitem', { name: '删除 2 个匹配对话…' }));
-  await waitFor(() => expect(useChatStore.getState().conversations.map(item => item.id)).toEqual(['first', 'second']));
+  await waitFor(() => expect(useChatStore.getState().conversations.map((item) => item.id)).toEqual(['first', 'second']));
   expect(conversationApi.deleteConversation).not.toHaveBeenCalledWith('first');
   expect(useHistoryMetaStore.getState().notes['conversation:second']).toBe('Retry later');
   expect(useHistoryMetaStore.getState().notes['conversation:third']).toBeUndefined();

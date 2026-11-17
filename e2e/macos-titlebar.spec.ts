@@ -30,7 +30,7 @@ for (const width of [720, 1240]) {
     await expect(header).toHaveCSS('height', '40px');
     expect(ai.y + ai.height / 2).toBe(20);
     expect(search.y + search.height / 2).toBe(20);
-    const dragHit = await page.evaluate(x => document.elementFromPoint(x, 20)?.hasAttribute('data-tauri-drag-region'), sidebarWidth + 8);
+    const dragHit = await page.evaluate((x) => document.elementFromPoint(x, 20)?.hasAttribute('data-tauri-drag-region'), sidebarWidth + 8);
     expect(dragHit).toBe(true);
     await page.screenshot({ path: test.info().outputPath(`macos-titlebar-${width}.png`), animations: 'disabled' });
     await page.getByTestId('global-search-trigger').click();
@@ -43,7 +43,7 @@ for (const width of [720, 1240]) {
 
 test('fullscreen releases the traffic-light space and restores it on exit', async ({ page }) => {
   const setFullscreen = async (value: boolean) => {
-    await page.evaluate(fullscreen => {
+    await page.evaluate((fullscreen) => {
       const bridge = (window as unknown as { __TAURI_INTERNALS__: { setFullscreen: (value: boolean) => void } }).__TAURI_INTERNALS__;
       bridge.setFullscreen(fullscreen);
     }, value);

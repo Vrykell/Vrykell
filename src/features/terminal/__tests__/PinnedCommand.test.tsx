@@ -7,23 +7,48 @@ import { useTypographyStore } from '@config/typography';
 import { useTerminalStore } from '../stores/terminal';
 
 const { write } = vi.hoisted(() => ({ write: vi.fn().mockResolvedValue(undefined) }));
-vi.mock('@platform/pty', async importOriginal => ({ ...await importOriginal<typeof import('@platform/pty')>(), ptyWrite: write }));
+vi.mock('@platform/pty', async (importOriginal) => ({ ...(await importOriginal<typeof import('@platform/pty')>()), ptyWrite: write }));
 const terminalSnapshot = useTerminalStore.getState();
 
 const block: TermBlock = {
-  id: 'one', command: 'ls -la', cwd: '/work', status: 'done', exitCode: 0,
-  startedAt: 1000, endedAt: 1200, wasLongRunning: false, linesTruncated: 0,
-  outputHtml: '', outputRaw: '', outputText: 'result',
+  id: 'one',
+  command: 'ls -la',
+  cwd: '/work',
+  status: 'done',
+  exitCode: 0,
+  startedAt: 1000,
+  endedAt: 1200,
+  wasLongRunning: false,
+  linesTruncated: 0,
+  outputHtml: '',
+  outputRaw: '',
+  outputText: 'result',
 };
 
 function Header({ block: item = block, scrollRef }: { block?: TermBlock; scrollRef?: RefObject<HTMLDivElement | null> }) {
   const [collapsed, setCollapsed] = useState(false);
-  return <PinnedCommand block={item} paneId="pane" remaining={500} insetLeft={8} insetRight={8}
-    scrollRef={scrollRef} collapsed={collapsed} onToggle={() => setCollapsed(value => !value)} />;
+  return (
+    <PinnedCommand
+      block={item}
+      paneId="pane"
+      remaining={500}
+      insetLeft={8}
+      insetRight={8}
+      scrollRef={scrollRef}
+      collapsed={collapsed}
+      onToggle={() => setCollapsed((value) => !value)}
+    />
+  );
 }
 
 beforeEach(() => {
-  vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      disconnect() {}
+    },
+  );
   write.mockClear();
 });
 afterEach(() => {
@@ -73,8 +98,17 @@ describe('pinned command presentation', () => {
 
   it('retains running controls when completed titles are collapsed and interrupts the owning pane', async () => {
     useTerminalStore.setState({ sessions: { pane: 'pinned-session', other: 'unrelated-session' }, focusedPaneId: 'other' });
-    render(<PinnedCommand block={{ ...block, status: 'executing', endedAt: null, exitCode: null }} paneId="pane"
-      remaining={500} insetLeft={8} insetRight={8} collapsed onToggle={vi.fn()} />);
+    render(
+      <PinnedCommand
+        block={{ ...block, status: 'executing', endedAt: null, exitCode: null }}
+        paneId="pane"
+        remaining={500}
+        insetLeft={8}
+        insetRight={8}
+        collapsed
+        onToggle={vi.fn()}
+      />,
+    );
     expect(screen.getByTestId('pinned-command')).toHaveAttribute('data-collapsed', 'true');
     expect(screen.getByRole('region')).not.toHaveTextContent(block.command);
     expect(screen.getByRole('region')).not.toHaveTextContent(block.cwd!);

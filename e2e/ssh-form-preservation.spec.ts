@@ -2,11 +2,15 @@ import { test, expect } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 test('host editor keeps its actions reachable at normal and minimum window sizes', async ({ page }) => {
-  await setupTauriMock(page); await page.goto('/');
+  await setupTauriMock(page);
+  await page.goto('/');
   await page.getByTestId('workspace-area-ssh').click();
   await page.getByTestId('ssh-new-btn').click();
   const editor = page.getByTestId('ssh-host-editor');
-  for (const viewport of [{ width: 1240, height: 800 }, { width: 720, height: 480 }]) {
+  for (const viewport of [
+    { width: 1240, height: 800 },
+    { width: 720, height: 480 },
+  ]) {
     await page.setViewportSize(viewport);
     await page.evaluate(() => document.documentElement.style.setProperty('--ui-font-scale', '1.4'));
     const box = (await editor.boundingBox())!;
@@ -30,24 +34,29 @@ test('host editor keeps its actions reachable at normal and minimum window sizes
   }
 });
 
-for (const mode of ['new', 'edit']) test(`host editor preserves drafts until explicit cancellation in ${mode}`, async ({ page }) => {
-  await setupTauriMock(page); await page.goto('/');
-  await page.getByTestId('workspace-area-ssh').click();
-  const open = async () => {
-    if (mode === 'new') await page.getByTestId('ssh-new-btn').click();
-    else { await page.getByTestId('ssh-row-ssh-1').click({ button: 'right' }); await page.getByRole('button', { name: '编辑连接', exact: true }).click(); }
-  };
-  await open();
-  const editor = page.getByTestId('ssh-host-editor');
-  await editor.getByTestId('ssh-form-name').fill('Unfinished profile');
-  await editor.getByTestId('ssh-form-host').fill('test.invalid');
-  await editor.locator('.ssh-form-header').click({ position: { x: 200, y: 10 } });
-  await expect(editor).toBeVisible();
-  await expect(editor.getByTestId('ssh-form-name')).toHaveValue('Unfinished profile');
-  await editor.getByRole('button', { name: '取消', exact: true }).click();
-  await expect(editor).toHaveCount(0);
-  await open();
-  await expect(editor.getByTestId('ssh-form-name')).toHaveValue(mode === 'new' ? '' : '生产服务器');
-  await editor.getByRole('button', { name: '返回主机', exact: true }).click();
-  await expect(editor).toHaveCount(0);
-});
+for (const mode of ['new', 'edit'])
+  test(`host editor preserves drafts until explicit cancellation in ${mode}`, async ({ page }) => {
+    await setupTauriMock(page);
+    await page.goto('/');
+    await page.getByTestId('workspace-area-ssh').click();
+    const open = async () => {
+      if (mode === 'new') await page.getByTestId('ssh-new-btn').click();
+      else {
+        await page.getByTestId('ssh-row-ssh-1').click({ button: 'right' });
+        await page.getByRole('button', { name: '编辑连接', exact: true }).click();
+      }
+    };
+    await open();
+    const editor = page.getByTestId('ssh-host-editor');
+    await editor.getByTestId('ssh-form-name').fill('Unfinished profile');
+    await editor.getByTestId('ssh-form-host').fill('test.invalid');
+    await editor.locator('.ssh-form-header').click({ position: { x: 200, y: 10 } });
+    await expect(editor).toBeVisible();
+    await expect(editor.getByTestId('ssh-form-name')).toHaveValue('Unfinished profile');
+    await editor.getByRole('button', { name: '取消', exact: true }).click();
+    await expect(editor).toHaveCount(0);
+    await open();
+    await expect(editor.getByTestId('ssh-form-name')).toHaveValue(mode === 'new' ? '' : '生产服务器');
+    await editor.getByRole('button', { name: '返回主机', exact: true }).click();
+    await expect(editor).toHaveCount(0);
+  });

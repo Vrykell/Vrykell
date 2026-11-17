@@ -11,10 +11,18 @@ export function resolveLocale(preference: LanguagePreference): Locale {
 export const useLanguagePreferences = create<{
   preference: LanguagePreference;
   setPreference: (preference: LanguagePreference) => void;
-}>()(persist(set => ({
-  preference: 'zh',
-  setPreference: preference => set({ preference }),
-}), { name: 'vrykell-language', merge: (saved, current) => {
-  const value = saved as { preference?: unknown } | null;
-  return { ...current, preference: value?.preference === 'en' || value?.preference === 'system' ? value.preference : 'zh' };
-} }));
+}>()(
+  persist(
+    (set) => ({
+      preference: 'zh',
+      setPreference: (preference) => set({ preference }),
+    }),
+    {
+      name: 'vrykell-language',
+      merge: (saved, current) => {
+        const value = saved as { preference?: unknown } | null;
+        return { ...current, preference: value?.preference === 'en' || value?.preference === 'system' ? value.preference : 'zh' };
+      },
+    },
+  ),
+);

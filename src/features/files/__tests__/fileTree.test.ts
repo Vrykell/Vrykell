@@ -33,13 +33,7 @@ describe('flattenVisible', () => {
       { name: 'lib', path: '/root/src/lib', is_dir: true },
     ];
     const rows = flattenVisible(roots, new Set(['/root/src']), { '/root/src': srcChildren });
-    expect(rows.map((r) => `${r.depth}:${r.entry.name}`)).toEqual([
-      '0:docs',
-      '0:src',
-      '1:lib',
-      '1:main.ts',
-      '0:readme.md',
-    ]);
+    expect(rows.map((r) => `${r.depth}:${r.entry.name}`)).toEqual(['0:docs', '0:src', '1:lib', '1:main.ts', '0:readme.md']);
   });
 
   it('supports multiple nested expansion levels', () => {
@@ -48,13 +42,7 @@ describe('flattenVisible', () => {
       '/root/src/lib': [{ name: 'util.ts', path: '/root/src/lib/util.ts', is_dir: false }],
     };
     const rows = flattenVisible(roots, new Set(['/root/src', '/root/src/lib']), cache);
-    expect(rows.map((r) => `${r.depth}:${r.entry.name}`)).toEqual([
-      '0:docs',
-      '0:src',
-      '1:lib',
-      '2:util.ts',
-      '0:readme.md',
-    ]);
+    expect(rows.map((r) => `${r.depth}:${r.entry.name}`)).toEqual(['0:docs', '0:src', '1:lib', '2:util.ts', '0:readme.md']);
   });
 
   it('expanded but cache not loaded → loading=true, no child rows flattened', () => {

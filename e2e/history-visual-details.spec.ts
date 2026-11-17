@@ -14,9 +14,15 @@ for (const theme of ['dark', 'light'] as const) {
     await page.goto('/');
     await page.evaluate(() => {
       const now = Date.now();
-      localStorage.setItem('e2e-conversations', JSON.stringify([
-        { id: 'review', title: 'Review deployment' }, { id: 'notes', title: 'Deployment notes' },
-      ].map(item => ({ ...item, created_at: now, updated_at: now, environment: 'null' }))));
+      localStorage.setItem(
+        'e2e-conversations',
+        JSON.stringify(
+          [
+            { id: 'review', title: 'Review deployment' },
+            { id: 'notes', title: 'Deployment notes' },
+          ].map((item) => ({ ...item, created_at: now, updated_at: now, environment: 'null' })),
+        ),
+      );
     });
     await page.reload();
     await gotoSetting(page, '主题');
@@ -25,8 +31,8 @@ for (const theme of ['dark', 'light'] as const) {
     const importTheme = page.getByRole('button', { name: '导入', exact: true });
     await importTheme.scrollIntoViewIfNeeded();
     await expect(importTheme).toHaveCSS('display', /^(inline-)?flex$/);
-    expect(Math.abs(await centerY(importTheme) - await centerY(importTheme.locator('svg')))).toBeLessThan(1);
-    const surfaces = await importTheme.evaluate(element => ({
+    expect(Math.abs((await centerY(importTheme)) - (await centerY(importTheme.locator('svg'))))).toBeLessThan(1);
+    const surfaces = await importTheme.evaluate((element) => ({
       button: getComputedStyle(element).backgroundColor,
       card: getComputedStyle(element.closest('.settings-group-panel')!).backgroundColor,
       border: getComputedStyle(element).borderTopColor,
@@ -40,7 +46,7 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(page.locator('.history-header')).toHaveCSS('border-bottom-width', '0px');
     const card = page.getByTestId('history-group-card-source:archived-group');
     await expect(card.locator('.history-group-primary')).toHaveCount(0);
-    expect(Math.abs(await centerY(card.getByRole('heading')) - await centerY(card.locator('.history-group-count')))).toBeLessThan(3);
+    expect(Math.abs((await centerY(card.getByRole('heading'))) - (await centerY(card.locator('.history-group-count'))))).toBeLessThan(3);
     const row = page.getByTestId('unified-history-session:hist-group-1');
     await page.mouse.move(2, 2);
     const restore = page.getByTestId('unified-history-open-session:hist-group-1');
@@ -52,7 +58,17 @@ for (const theme of ['dark', 'light'] as const) {
     await expect(row.getByRole('button')).toHaveCount(3);
     await expect(row.getByText('恢复', { exact: true })).toHaveCount(0);
     const quick = row.locator('.history-row-quick-actions');
-    await expect(quick).toHaveCSS('background-color', await card.evaluate(element => { const probe = document.createElement('span'); probe.style.backgroundColor = 'var(--chrome-field)'; element.append(probe); const color = getComputedStyle(probe).backgroundColor; probe.remove(); return color; }));
+    await expect(quick).toHaveCSS(
+      'background-color',
+      await card.evaluate((element) => {
+        const probe = document.createElement('span');
+        probe.style.backgroundColor = 'var(--chrome-field)';
+        element.append(probe);
+        const color = getComputedStyle(probe).backgroundColor;
+        probe.remove();
+        return color;
+      }),
+    );
     const quickBox = (await quick.boundingBox())!;
     const listBox = (await page.locator('.history-list').boundingBox())!;
     expect(quickBox.x).toBeGreaterThanOrEqual(listBox.x);
@@ -60,7 +76,7 @@ for (const theme of ['dark', 'light'] as const) {
       const box = (await button.boundingBox())!;
       expect(box.width).toBe(24);
       expect(box.height).toBe(24);
-      expect(Math.abs(await centerY(button) - await centerY(row.locator('.sidebar-row-title')))).toBeLessThan(1);
+      expect(Math.abs((await centerY(button)) - (await centerY(row.locator('.sidebar-row-title'))))).toBeLessThan(1);
       await expect(button).toHaveCSS('border-top-width', '0px');
     }
     await restore.hover();
@@ -68,7 +84,12 @@ for (const theme of ['dark', 'light'] as const) {
     await row.hover();
     await expect(row.locator('.sidebar-row-title')).toHaveCSS('font-size', '14px');
     await expect(row.locator('.sidebar-row-title')).toHaveCSS('text-decoration-line', 'underline');
-    const channels = await row.locator('.sidebar-row-title').evaluate(element => getComputedStyle(element).color.match(/[0-9.]+/g)!.slice(0, 3).map(Number));
+    const channels = await row.locator('.sidebar-row-title').evaluate((element) =>
+      getComputedStyle(element)
+        .color.match(/[0-9.]+/g)!
+        .slice(0, 3)
+        .map(Number),
+    );
     expect(channels[2]!).toBeGreaterThan(channels[0]!);
     await expect(row.locator('.history-row-icon svg')).toHaveCSS('width', '18px');
     await expect(row.locator('.sidebar-row-content')).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
@@ -92,7 +113,9 @@ for (const theme of ['dark', 'light'] as const) {
     await card.getByRole('heading').click({ button: 'right' });
     const menu = page.getByRole('menu', { name: '分组操作' });
     await expect(menu.getByRole('menuitem', { name: '恢复整组', exact: true })).toBeVisible();
-    const widths = await menu.getByRole('separator').evaluateAll(elements => elements.map(element => getComputedStyle(element).borderTopWidth));
+    const widths = await menu
+      .getByRole('separator')
+      .evaluateAll((elements) => elements.map((element) => getComputedStyle(element).borderTopWidth));
     expect(widths.length).toBeGreaterThan(2);
     expect(new Set(widths).size).toBe(1);
     expect(parseFloat(widths[0]!)).toBeGreaterThan(0);
@@ -120,7 +143,7 @@ for (const theme of ['dark', 'light'] as const) {
     await page.screenshot({ path: testInfo.outputPath(`history-palette-${theme}.png`), animations: 'disabled' });
     await page.keyboard.press('Escape');
 
-    if (!await page.locator('[data-chat-composer]:visible').isVisible()) await page.locator('[data-dock-btn="chat"]').click();
+    if (!(await page.locator('[data-chat-composer]:visible').isVisible())) await page.locator('[data-dock-btn="chat"]').click();
     await page.getByRole('button', { name: 'AI 对话历史', exact: true }).click();
     const aiCard = page.getByTestId('unified-history-page').locator('.history-group-card');
     const selected = page.getByTestId('unified-history-conversation:review');

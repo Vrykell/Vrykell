@@ -22,7 +22,11 @@ it('keeps connection actions in the keyboard menu without icon color controls', 
   expect(screen.getByRole('button', { name: '编辑连接' })).toBeVisible();
   expect(row.querySelector('svg')).toHaveAttribute('data-shell-mark', 'linux');
 });
-afterEach(() => { cleanup(); useSshStore.setState(snapshot, true); localStorage.removeItem('vrykell-ssh-workspace-view'); });
+afterEach(() => {
+  cleanup();
+  useSshStore.setState(snapshot, true);
+  localStorage.removeItem('vrykell-ssh-workspace-view');
+});
 
 it('keeps the SSH tile color stable while selection highlights the row', () => {
   render(<PanelSsh />);
@@ -44,5 +48,7 @@ it('renders a filled yellow favorite independently of the row text color', () =>
     render(<PanelSsh />);
     const star = screen.getByTestId('ssh-row-remote').querySelector<SVGElement>('.sidebar-row-title > svg');
     expect(star?.style.color).toBe('var(--favorite-color)');
-  } finally { useHostLibrary.setState({ hosts: {} }); }
+  } finally {
+    useHostLibrary.setState({ hosts: {} });
+  }
 });

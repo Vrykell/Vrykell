@@ -25,41 +25,36 @@ function paneCommands(paneId: string): string[] {
 }
 
 /** Navigate one terminal pane's command history by prefix, keeping the draft typed before paging. */
-export function useCommandHistoryNavigation({
-  paneId,
-  text,
-  setText,
-  inputRef,
-  onNavigate,
-}: UseCommandHistoryNavigationOptions) {
+export function useCommandHistoryNavigation({ paneId, text, setText, inputRef, onNavigate }: UseCommandHistoryNavigationOptions) {
   const navigationRef = useRef<{ index: number; base: string }>({ index: -1, base: '' });
 
   const reset = useCallback(() => {
     navigationRef.current = { index: -1, base: '' };
   }, []);
 
-  const navigate = useCallback((direction: 1 | -1) => {
-    const commands = paneCommands(paneId);
-    const navigation = navigationRef.current;
-    const base = navigation.index === -1 ? text : navigation.base;
-    const candidates = commands.filter(
-      (command) => command.startsWith(base) && command.length > base.length,
-    );
-    const nextIndex = navigation.index + direction;
-    if (nextIndex < -1 || nextIndex >= candidates.length) return false;
+  const navigate = useCallback(
+    (direction: 1 | -1) => {
+      const commands = paneCommands(paneId);
+      const navigation = navigationRef.current;
+      const base = navigation.index === -1 ? text : navigation.base;
+      const candidates = commands.filter((command) => command.startsWith(base) && command.length > base.length);
+      const nextIndex = navigation.index + direction;
+      if (nextIndex < -1 || nextIndex >= candidates.length) return false;
 
-    navigationRef.current = { index: nextIndex, base };
-    setText(nextIndex === -1 ? base : candidates[nextIndex]!);
-    onNavigate?.();
+      navigationRef.current = { index: nextIndex, base };
+      setText(nextIndex === -1 ? base : candidates[nextIndex]!);
+      onNavigate?.();
 
-    const element = inputRef.current;
-    if (element) {
-      requestAnimationFrame(() => {
-        element.selectionStart = element.selectionEnd = element.value.length;
-      });
-    }
-    return true;
-  }, [inputRef, onNavigate, paneId, setText, text]);
+      const element = inputRef.current;
+      if (element) {
+        requestAnimationFrame(() => {
+          element.selectionStart = element.selectionEnd = element.value.length;
+        });
+      }
+      return true;
+    },
+    [inputRef, onNavigate, paneId, setText, text],
+  );
 
   return { reset, navigate };
 }

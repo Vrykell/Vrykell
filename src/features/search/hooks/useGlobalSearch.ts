@@ -135,9 +135,10 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
 
   /** Enabled sources that failed this round (errors are collected by the engine). */
   const failedSources = useMemo(
-    () => getSources()
-      .filter((source) => enabledIds.has(source.id) && state.sources[source.id]?.error)
-      .map((source) => ({ id: source.id, label: source.label, error: state.sources[source.id]!.error! })),
+    () =>
+      getSources()
+        .filter((source) => enabledIds.has(source.id) && state.sources[source.id]?.error)
+        .map((source) => ({ id: source.id, label: source.label, error: state.sources[source.id]!.error! })),
     [enabledIds, state.sources],
   );
 
@@ -174,7 +175,7 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
         }
         case 'setting': {
           const data = result.data as SettingResultData;
-          const setting = getSettings().find(item => item.id === data.settingId);
+          const setting = getSettings().find((item) => item.id === data.settingId);
           if (setting) setting.onSelect();
           else useSessionStore.getState().openSettings();
           break;
@@ -204,7 +205,9 @@ export function useGlobalSearch({ open, onClose }: UseGlobalSearchOptions) {
   const handleKey = useCallback(
     (event: ReactKeyboardEvent) => {
       if (event.key === 'Backspace' && query.source && !query.term && event.target === inputRef.current) {
-        event.preventDefault(); handleInput(''); return;
+        event.preventDefault();
+        handleInput('');
+        return;
       }
       if (filterOpen && event.key === 'Escape') {
         event.preventDefault();

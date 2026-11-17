@@ -8,8 +8,12 @@ vi.mock('@tauri-apps/api/core', () => ({
   invoke: invokeMock,
   Channel: class {
     onmessage: ((ev: unknown) => void) | null = null;
-    constructor() { this.onmessage = null; }
-    send(ev: unknown) { this.onmessage?.(ev); }
+    constructor() {
+      this.onmessage = null;
+    }
+    send(ev: unknown) {
+      this.onmessage?.(ev);
+    }
   },
 }));
 
@@ -51,23 +55,28 @@ describe('createProxyFetch', () => {
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toBe('text/plain');
     expect(await res.text()).toBe('hello');
-    expect(invokeMock).toHaveBeenCalledWith('llm_stream', expect.objectContaining({
-      req: expect.objectContaining({
-        url: 'https://api.example.com/v1/chat',
-        method: 'POST',
-        headers: expect.arrayContaining([['content-type', 'application/json']]),
+    expect(invokeMock).toHaveBeenCalledWith(
+      'llm_stream',
+      expect.objectContaining({
+        req: expect.objectContaining({
+          url: 'https://api.example.com/v1/chat',
+          method: 'POST',
+          headers: expect.arrayContaining([['content-type', 'application/json']]),
+        }),
       }),
-    }));
+    );
   });
 
   it('routed endpoints carry a stable session header; other endpoints never do', async () => {
     const sent: [string, string][][] = [];
-    invokeMock.mockImplementation((_cmd: string, args: { onEvent: { send: (ev: unknown) => void }; req: { headers: [string, string][] } }) => {
-      sent.push(args.req.headers);
-      args.onEvent.send({ kind: 'started', status: 200 });
-      args.onEvent.send({ kind: 'done' });
-      return Promise.resolve();
-    });
+    invokeMock.mockImplementation(
+      (_cmd: string, args: { onEvent: { send: (ev: unknown) => void }; req: { headers: [string, string][] } }) => {
+        sent.push(args.req.headers);
+        args.onEvent.send({ kind: 'started', status: 200 });
+        args.onEvent.send({ kind: 'done' });
+        return Promise.resolve();
+      },
+    );
     const conversation = createProxyFetch('opencode', 'tab-1');
     await conversation('https://opencode.ai/zen/go/v1/chat/completions');
     await conversation('https://opencode.ai/zen/go/v1/chat/completions');
@@ -87,26 +96,33 @@ describe('createProxyFetch', () => {
   });
 
   it('URL/Request input with explicit method/body; an existing content-type is not added twice', async () => {
-    invokeMock.mockImplementation((_cmd: string, args: { req: { method: string; headers: [string, string][] }; onEvent: { send: (ev: unknown) => void } }) => {
-      expect(args.req.method).toBe('GET');
-      expect(args.req.headers).toEqual([['accept', 'application/json'], ['content-type', 'application/json']]);
-      args.onEvent.send({ kind: 'started', status: 200 });
-      args.onEvent.send({ kind: 'done' });
-      return Promise.resolve();
-    });
+    invokeMock.mockImplementation(
+      (_cmd: string, args: { req: { method: string; headers: [string, string][] }; onEvent: { send: (ev: unknown) => void } }) => {
+        expect(args.req.method).toBe('GET');
+        expect(args.req.headers).toEqual([
+          ['accept', 'application/json'],
+          ['content-type', 'application/json'],
+        ]);
+        args.onEvent.send({ kind: 'started', status: 200 });
+        args.onEvent.send({ kind: 'done' });
+        return Promise.resolve();
+      },
+    );
     const res = await fetchProxy(new URL('https://x.example/api'), {
       method: 'GET',
       headers: new Headers({ accept: 'application/json' }),
     });
     expect(res.status).toBe(200);
     // array headers + string body
-    invokeMock.mockImplementation((_cmd: string, args: { req: { headers: [string, string][]; body?: string }; onEvent: { send: (ev: unknown) => void } }) => {
-      expect(args.req.headers).toEqual([['content-type', 'application/json']]);
-      expect(args.req.body).toBe('{"q":1}');
-      args.onEvent.send({ kind: 'started', status: 200 });
-      args.onEvent.send({ kind: 'done' });
-      return Promise.resolve();
-    });
+    invokeMock.mockImplementation(
+      (_cmd: string, args: { req: { headers: [string, string][]; body?: string }; onEvent: { send: (ev: unknown) => void } }) => {
+        expect(args.req.headers).toEqual([['content-type', 'application/json']]);
+        expect(args.req.body).toBe('{"q":1}');
+        args.onEvent.send({ kind: 'started', status: 200 });
+        args.onEvent.send({ kind: 'done' });
+        return Promise.resolve();
+      },
+    );
     await fetchProxy('https://x.example/api', { headers: [], body: '{"q":1}' });
   });
 
@@ -140,9 +156,12 @@ describe('createProxyFetch', () => {
   it('invoke rejected: fetch rejects as a whole', async () => {
     invokeMock.mockRejectedValue(new Error('Rust 拒绝'));
     await expect(fetchProxy('https://x.example')).rejects.toThrow('Rust 拒绝');
-    expect(invokeMock).toHaveBeenCalledWith('llm_stream', expect.objectContaining({
-      req: expect.objectContaining({ url: 'https://x.example' }),
-    }));
+    expect(invokeMock).toHaveBeenCalledWith(
+      'llm_stream',
+      expect.objectContaining({
+        req: expect.objectContaining({ url: 'https://x.example' }),
+      }),
+    );
   });
 
   it('abort mid-stream: calls llm_abort and ends the local stream with AbortError (otherwise the reader hangs forever)', async () => {

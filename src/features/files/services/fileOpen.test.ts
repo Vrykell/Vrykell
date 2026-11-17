@@ -111,7 +111,9 @@ describe('config read/write', () => {
     expect(loadConfig()).toEqual(c);
   });
   it('reports a failed storage write instead of claiming a successful save', () => {
-    const storage = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => { throw new Error('quota'); });
+    const storage = vi.spyOn(Storage.prototype, 'setItem').mockImplementationOnce(() => {
+      throw new Error('quota');
+    });
     expect(saveConfig(cfg())).toBe(false);
     storage.mockRestore();
   });

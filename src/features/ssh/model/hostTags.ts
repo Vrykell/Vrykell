@@ -11,8 +11,10 @@ export function groupHosts(connections: SshConnection[], metadata: Record<string
   const groups = new Map<string, SshConnection[]>();
   for (const connection of connections) {
     const meta = metadata[connection.id];
-    const names = by === 'tags' ? meta?.tags.length ? meta.tags : [''] : by === 'none' ? [''] : [meta?.group ?? ''];
+    const names = by === 'tags' ? (meta?.tags.length ? meta.tags : ['']) : by === 'none' ? [''] : [meta?.group ?? ''];
     for (const name of names) groups.set(name, [...(groups.get(name) ?? []), connection]);
   }
-  return [...groups].sort(([first], [second]) => !first ? 1 : !second ? -1 : first.localeCompare(second)).map(([name, hosts]) => ({ name, hosts }));
+  return [...groups]
+    .sort(([first], [second]) => (!first ? 1 : !second ? -1 : first.localeCompare(second)))
+    .map(([name, hosts]) => ({ name, hosts }));
 }

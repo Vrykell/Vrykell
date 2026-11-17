@@ -8,7 +8,9 @@ const flushes = new Set<() => void>();
 
 export function registerEditorChangeFlush(flush: () => void): () => void {
   flushes.add(flush);
-  return () => { flushes.delete(flush); };
+  return () => {
+    flushes.delete(flush);
+  };
 }
 
 export function flushEditorChanges(): void {

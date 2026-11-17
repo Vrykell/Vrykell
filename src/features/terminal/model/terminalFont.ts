@@ -2,7 +2,9 @@
 import { terminalFontFamily, terminalTypographyChanged, useTypographyStore } from '@config/typography';
 export const TERMINAL_FONT_FAMILY = 'var(--terminal-font-family)';
 
-export function getTerminalFontSize(): number { return useTypographyStore.getState().terminalFontSize; }
+export function getTerminalFontSize(): number {
+  return useTypographyStore.getState().terminalFontSize;
+}
 
 /** Resolve the same font settings for canvas output and historical DOM output. */
 export function getTerminalFontOptions() {
@@ -67,7 +69,7 @@ export function measureTerminalDomCellHeight(
   const measured = cellHeightFromLineBox(measureTerminalNaturalLineBox(fontSize), lineHeight);
   if (measured > 0) return measured;
   // Without a measuring DOM (unit tests) keep the previous estimate rather than collapsing rows.
-  return Math.ceil(fontSize * 16 / 14 * lineHeight);
+  return Math.ceil(((fontSize * 16) / 14) * lineHeight);
 }
 
 /** Natural line box of the terminal font: ascent plus descent, before the line-height factor. */

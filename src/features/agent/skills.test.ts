@@ -7,14 +7,55 @@ const { invokeMock } = vi.hoisted(() => ({ invokeMock: vi.fn() }));
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 
 import {
-  buildSkillsContext, availableSkillMetas,
-  listSkills, getSkill, setSkillState, readSkillFile, removeSkill, installSkillMd,
-  importSkillsFromPath, fetchRemoteSkills, type SkillMeta,
+  buildSkillsContext,
+  availableSkillMetas,
+  listSkills,
+  getSkill,
+  setSkillState,
+  readSkillFile,
+  removeSkill,
+  installSkillMd,
+  importSkillsFromPath,
+  fetchRemoteSkills,
+  type SkillMeta,
 } from '@features/agent/services/skills';
 
-const m1: SkillMeta = { name: '写单测', description: '写测试', dir: '/s/a', files: ['scripts/x.py'], hasScripts: true, allowedTools: '', source: '内置', trusted: true, enabled: true, modified: false };
-const m2: SkillMeta = { name: '代码审查', description: '审查', dir: '/s/b', files: [], hasScripts: false, allowedTools: '', source: 'AI 安装', trusted: false, enabled: true, modified: true };
-const m3: SkillMeta = { name: '停用', description: 'x', dir: '/s/c', files: [], hasScripts: false, allowedTools: '', source: '内置', trusted: true, enabled: false, modified: false };
+const m1: SkillMeta = {
+  name: '写单测',
+  description: '写测试',
+  dir: '/s/a',
+  files: ['scripts/x.py'],
+  hasScripts: true,
+  allowedTools: '',
+  source: '内置',
+  trusted: true,
+  enabled: true,
+  modified: false,
+};
+const m2: SkillMeta = {
+  name: '代码审查',
+  description: '审查',
+  dir: '/s/b',
+  files: [],
+  hasScripts: false,
+  allowedTools: '',
+  source: 'AI 安装',
+  trusted: false,
+  enabled: true,
+  modified: true,
+};
+const m3: SkillMeta = {
+  name: '停用',
+  description: 'x',
+  dir: '/s/c',
+  files: [],
+  hasScripts: false,
+  allowedTools: '',
+  source: '内置',
+  trusted: true,
+  enabled: false,
+  modified: false,
+};
 
 describe('availableSkillMetas / buildSkillsContext', () => {
   it('keeps only enabled and trusted skills', () => {

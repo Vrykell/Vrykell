@@ -18,8 +18,10 @@ export const IMAGE_TOKEN_ESTIMATE = 1105;
 
 export function messageTokens(message: ModelMessage): number {
   if (typeof message.content === 'string') return estimateTokens(message.content) + 16;
-  return message.content.reduce((total, part) => total + (part.type === 'image' ? IMAGE_TOKEN_ESTIMATE
-    : estimateTokens(JSON.stringify(part))), 16);
+  return message.content.reduce(
+    (total, part) => total + (part.type === 'image' ? IMAGE_TOKEN_ESTIMATE : estimateTokens(JSON.stringify(part))),
+    16,
+  );
 }
 
 export interface SizedMessage {
@@ -33,8 +35,8 @@ export interface SizedMessage {
 export function sizeModelMessages(messages: ModelMessage[]): SizedMessage[] {
   let exchange: string | undefined;
   return messages.map((msg, index) => {
-    if (msg.role === 'assistant' && Array.isArray(msg.content)
-      && msg.content.some(part => part.type === 'tool-call')) exchange = `exchange:${index}`;
+    if (msg.role === 'assistant' && Array.isArray(msg.content) && msg.content.some((part) => part.type === 'tool-call'))
+      exchange = `exchange:${index}`;
     else if (msg.role !== 'tool') exchange = undefined;
     return { msg, tokens: messageTokens(msg), group: exchange };
   });
@@ -68,10 +70,7 @@ export function estimateTokens(text: string): number {
   for (let i = 0; i < text.length; i++) {
     const code = text.charCodeAt(i);
     // CJK ideographs / kana / hangul / full-width punctuation → 1 token per character
-    const cjk =
-      (code >= 0x3000 && code <= 0x9fff) ||
-      (code >= 0xff00 && code <= 0xffef) ||
-      (code >= 0xac00 && code <= 0xd7af);
+    const cjk = (code >= 0x3000 && code <= 0x9fff) || (code >= 0xff00 && code <= 0xffef) || (code >= 0xac00 && code <= 0xd7af);
     t += cjk ? 1 : 0.25;
   }
   return Math.ceil(t);
@@ -104,9 +103,7 @@ function messageText(s: SizedMessage): string {
   if (typeof m.content === 'string') {
     content = m.content;
   } else if (Array.isArray(m.content)) {
-    content = m.content
-      .map(p => 'text' in p ? p.text : JSON.stringify(p))
-      .join('\n');
+    content = m.content.map((p) => ('text' in p ? p.text : JSON.stringify(p))).join('\n');
   } else {
     content = '';
   }
@@ -131,7 +128,10 @@ async function summarize(
     .join('\n');
   const capacity = Math.max(0, Math.min(32_000, inputBudget - estimateTokens(instructions) - Math.max(64, maxTokens) - 96));
   if (capacity === 0) return null;
-  const history = content.length > capacity ? `[Earlier history omitted to fit the input budget; complete tool results remain in stored history.]\n${content.slice(-capacity)}` : content;
+  const history =
+    content.length > capacity
+      ? `[Earlier history omitted to fit the input budget; complete tool results remain in stored history.]\n${content.slice(-capacity)}`
+      : content;
   const prompt = `${instructions}\n\nHistory to summarize:\n${history}`;
   try {
     const { text } = await generateText({
@@ -204,12 +204,15 @@ export async function planContext(opts: PlanContextOptions): Promise<PlanContext
   const available = Math.max(1, maxTokens - (opts.reservedTokens ?? 0));
   let requestIndex = -1;
   for (let i = sized.length - 1; i >= 0; i--) {
-    if (sized[i]!.msg.role === 'user') { requestIndex = i; break; }
+    if (sized[i]!.msg.role === 'user') {
+      requestIndex = i;
+      break;
+    }
   }
   const request = sized[requestIndex];
-  const pinnedTokens = (start: number) => requestIndex >= 0 && requestIndex < start ? request!.tokens : 0;
+  const pinnedTokens = (start: number) => (requestIndex >= 0 && requestIndex < start ? request!.tokens : 0);
   const withRequest = (items: SizedMessage[], start: number) =>
-    (request && requestIndex < start ? [request, ...items] : items).map(item => item.msg);
+    (request && requestIndex < start ? [request, ...items] : items).map((item) => item.msg);
   let keep = sized.length;
   let used = 0;
   for (let i = sized.length - 1; i >= 0;) {
@@ -242,8 +245,10 @@ export async function planContext(opts: PlanContextOptions): Promise<PlanContext
   while (kept.length > 1 && used + pinnedTokens(keep) + summaryBudget > available) {
     const group = kept[0]!.group;
     if (group && group === kept[kept.length - 1]!.group) break;
-    do { used -= kept.shift()!.tokens; keep++; }
-    while (kept.length > 0 && group && kept[0]!.group === group);
+    do {
+      used -= kept.shift()!.tokens;
+      keep++;
+    } while (kept.length > 0 && group && kept[0]!.group === group);
   }
   dropped = discarded();
   const summary = await buildSummary(dropped, summaryBudget, model, tabId, signal, available, opts.previousSummary);

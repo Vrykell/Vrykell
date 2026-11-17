@@ -2,12 +2,20 @@ import { test, expect, type Page } from '@playwright/test';
 import { setupTauriMock, emitPtyOutput, expectAnyTermContains, ptyWrites } from './tauri-mock';
 import { readFileSync } from 'node:fs';
 
-const conptyOutput = JSON.parse(readFileSync(new URL('./fixtures/ssh-conpty-output.json', import.meta.url), 'utf8')) as Array<{ command: string; output: string }>;
+const conptyOutput = JSON.parse(readFileSync(new URL('./fixtures/ssh-conpty-output.json', import.meta.url), 'utf8')) as Array<{
+  command: string;
+  output: string;
+}>;
 
 for (const sshPreexec of [true, false]) {
   test(`SSH block commands render ls and pwd output with preexec=${sshPreexec}`, async ({ page }) => {
     await setupTauriMock(page, { sshPreexec });
-    await page.addInitScript(() => localStorage.setItem('vrykell-agent-settings', JSON.stringify({ version: 8, state: { global: { sshOpenMode: 'block' }, overrides: {} } })));
+    await page.addInitScript(() =>
+      localStorage.setItem(
+        'vrykell-agent-settings',
+        JSON.stringify({ version: 8, state: { global: { sshOpenMode: 'block' }, overrides: {} } }),
+      ),
+    );
     await page.goto('/');
     await page.locator('[data-dock-btn="ssh"]').click();
     await page.getByTestId('ssh-row-ssh-1').dblclick();
@@ -16,29 +24,38 @@ for (const sshPreexec of [true, false]) {
     for (let index = 0; index < 2; index++) {
       await editor.fill('ls');
       await editor.press('Enter');
-      await expect(page.locator('[data-testid^="command-block-"]').filter({ hasText: 'Documents Downloads notes.txt' })).toHaveCount(index + 1);
+      await expect(page.locator('[data-testid^="command-block-"]').filter({ hasText: 'Documents Downloads notes.txt' })).toHaveCount(
+        index + 1,
+      );
       const block = page.locator('[data-testid^="command-block-"]').filter({ hasText: 'Documents Downloads notes.txt' }).last();
       await expect(block.locator('[data-selectable]').last()).toBeInViewport();
-      await expect.poll(() => block.evaluate(el => el.getBoundingClientRect().height)).toBeLessThan(140);
+      await expect.poll(() => block.evaluate((el) => el.getBoundingClientRect().height)).toBeLessThan(140);
     }
     await editor.fill('pwd');
     await editor.press('Enter');
-    await expect(page.locator('[data-testid^="command-block-"] .command-block-output').filter({ hasText: '/home/e2e/project' })).toHaveCount(1);
-    expect((await ptyWrites(page)).filter(data => data === 'ls\n')).toHaveLength(2);
+    await expect(
+      page.locator('[data-testid^="command-block-"] .command-block-output').filter({ hasText: '/home/e2e/project' }),
+    ).toHaveCount(1);
+    expect((await ptyWrites(page)).filter((data) => data === 'ls\n')).toHaveLength(2);
     await expect(page.locator('[data-testid^="running-block-"]')).toHaveCount(0);
   });
 }
 
 async function openSsh(page: Page, host: 'known' | 'unknown' | 'changed', confirmed = true) {
   await setupTauriMock(page, { integration: false, sshHost: host, sshTrustConfirmed: confirmed });
-  await page.addInitScript(() => localStorage.setItem('vrykell-agent-settings', JSON.stringify({ version: 8, state: { global: { sshOpenMode: 'block' }, overrides: {} } })));
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'vrykell-agent-settings',
+      JSON.stringify({ version: 8, state: { global: { sshOpenMode: 'block' }, overrides: {} } }),
+    ),
+  );
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
   await page.getByTestId('ssh-row-ssh-1').dblclick();
 }
 
 async function ipcRecords(page: Page, key: string): Promise<Record<string, unknown>[]> {
-  return page.evaluate(name => (window as unknown as Record<string, Record<string, unknown>[]>)[name] ?? [], key);
+  return page.evaluate((name) => (window as unknown as Record<string, Record<string, unknown>[]>)[name] ?? [], key);
 }
 
 test('the connection screen keeps no scrollbar of its own', async ({ page }) => {
@@ -54,18 +71,31 @@ test('the connection screen keeps no scrollbar of its own', async ({ page }) => 
 
 test('a block preference falls back to classic for a profile without integration and tracks real password prompts', async ({ page }) => {
   await setupTauriMock(page, { integration: false });
-  await page.addInitScript(() => localStorage.setItem('vrykell-agent-settings', JSON.stringify({ version: 8, state: { global: { sshOpenMode: 'block' }, overrides: {} } })));
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'vrykell-agent-settings',
+      JSON.stringify({ version: 8, state: { global: { sshOpenMode: 'block' }, overrides: {} } }),
+    ),
+  );
   await page.goto('/');
   await page.locator('[data-dock-btn="ssh"]').click();
   await expect(page.getByTestId('ssh-row-ssh-1')).toBeVisible();
   await page.evaluate(async () => {
     const path = '/src/features/ssh/stores/store.ts';
-    const { useSshStore } = await import(path) as typeof import('../src/features/ssh/stores/store');
-    const connection = useSshStore.getState().connections.find(item => item.id === 'ssh-1')!;
+    const { useSshStore } = (await import(path)) as typeof import('../src/features/ssh/stores/store');
+    const connection = useSshStore.getState().connections.find((item) => item.id === 'ssh-1')!;
     await useSshStore.getState().save({ ...connection, shellIntegration: false });
   });
   await page.getByTestId('ssh-row-ssh-1').dblclick();
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __PTY_SPAWNS__: { openMode?: string; ssh?: unknown }[] }).__PTY_SPAWNS__.find(item => item.ssh)?.openMode)).toBe('classic');
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          (window as unknown as { __PTY_SPAWNS__: { openMode?: string; ssh?: unknown }[] }).__PTY_SPAWNS__.find((item) => item.ssh)
+            ?.openMode,
+      ),
+    )
+    .toBe('classic');
   await emitPtyOutput(page, '\x1b[2J\x1b[HMenu application\r\nChoose an item');
   const surface = page.getByTestId('ssh-connection-input');
   await expect(surface.locator('.xterm-screen')).toBeVisible();
@@ -103,32 +133,42 @@ test('SSH authentication snapshots and disconnected output follow the terminal t
   await expect(snapshot).toHaveCSS('font-size', '14px');
   await page.evaluate(async () => {
     const path = '/src/config/typography.ts';
-    const { useTypographyStore } = await import(path) as typeof import('../src/config/typography');
-    useTypographyStore.getState().update({ terminalFontPreset: 'Cascadia Code', terminalFontSize: 18, terminalFontWeight: 600, terminalLineHeight: 1.2 });
+    const { useTypographyStore } = (await import(path)) as typeof import('../src/config/typography');
+    useTypographyStore
+      .getState()
+      .update({ terminalFontPreset: 'Cascadia Code', terminalFontSize: 18, terminalFontWeight: 600, terminalLineHeight: 1.2 });
   });
   await expect(snapshot).toHaveCSS('font-size', '18px');
   await expect(snapshot).toHaveCSS('font-weight', '600');
-  await expect.poll(() => snapshot.evaluate(element => getComputedStyle(element).fontFamily)).toContain('Cascadia Code');
-  const measure = () => snapshot.evaluate(async element => {
-    const css = getComputedStyle(element);
-    const root = getComputedStyle(document.documentElement);
-    const path = '/src/features/terminal/stores/terminal.ts';
-    const { termInstances } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
-    const metricsPath = '/src/utils/termMetrics.ts';
-    const { getCellMetrics } = await import(metricsPath) as typeof import('../src/utils/termMetrics');
-    const term = [...termInstances.values()].find(item => item.element?.closest('[data-testid="ssh-connection-input"]'))!;
-    const probe = document.createElement('span');
-    probe.style.cssText = 'display:inline-block;white-space:pre';
-    probe.textContent = 'W'.repeat(100);
-    element.append(probe);
-    const advance = probe.getBoundingClientRect().width / 100;
-    probe.remove();
-    return { advance, cellWidth: getCellMetrics(term).width, height: css.lineHeight, expectedHeight: root.getPropertyValue('--terminal-row-height').trim() };
-  });
-  await expect.poll(async () => {
-    const metrics = await measure();
-    return metrics.height === metrics.expectedHeight && Math.abs(metrics.advance - metrics.cellWidth) < 0.05;
-  }).toBe(true);
+  await expect.poll(() => snapshot.evaluate((element) => getComputedStyle(element).fontFamily)).toContain('Cascadia Code');
+  const measure = () =>
+    snapshot.evaluate(async (element) => {
+      const css = getComputedStyle(element);
+      const root = getComputedStyle(document.documentElement);
+      const path = '/src/features/terminal/stores/terminal.ts';
+      const { termInstances } = (await import(path)) as typeof import('../src/features/terminal/stores/terminal');
+      const metricsPath = '/src/utils/termMetrics.ts';
+      const { getCellMetrics } = (await import(metricsPath)) as typeof import('../src/utils/termMetrics');
+      const term = [...termInstances.values()].find((item) => item.element?.closest('[data-testid="ssh-connection-input"]'))!;
+      const probe = document.createElement('span');
+      probe.style.cssText = 'display:inline-block;white-space:pre';
+      probe.textContent = 'W'.repeat(100);
+      element.append(probe);
+      const advance = probe.getBoundingClientRect().width / 100;
+      probe.remove();
+      return {
+        advance,
+        cellWidth: getCellMetrics(term).width,
+        height: css.lineHeight,
+        expectedHeight: root.getPropertyValue('--terminal-row-height').trim(),
+      };
+    });
+  await expect
+    .poll(async () => {
+      const metrics = await measure();
+      return metrics.height === metrics.expectedHeight && Math.abs(metrics.advance - metrics.cellWidth) < 0.05;
+    })
+    .toBe(true);
   await page.screenshot({ path: 'test-results/ssh-auth-font-wide.png' });
   await page.setViewportSize({ width: 720, height: 800 });
   await expect(snapshot).toHaveCSS('font-size', '18px');
@@ -137,7 +177,7 @@ test('SSH authentication snapshots and disconnected output follow the terminal t
   const ended = page.getByTestId('ssh-terminal-ended');
   await expect(ended).toHaveCSS('font-size', '18px');
   await expect(ended).toHaveCSS('font-weight', '600');
-  await expect.poll(() => ended.evaluate(element => getComputedStyle(element).fontFamily)).toContain('Cascadia Code');
+  await expect.poll(() => ended.evaluate((element) => getComputedStyle(element).fontFamily)).toContain('Cascadia Code');
 });
 
 test('native SSH recordings distinguish an empty directory from missing command output', async ({ page }) => {
@@ -170,8 +210,15 @@ test('first SSH connection confirms its fingerprint and accepts authentication i
   const dialogs = await ipcRecords(page, '__SSH_DIALOGS__');
   expect(dialogs).toHaveLength(1);
   expect(dialogs[0]?.message).toContain('SHA256:e2e-verified-key');
-  expect(await ipcRecords(page, '__SSH_TRUSTS__')).toMatchObject([{ host: 'prod.example.com', port: 22, expectedFingerprint: 'SHA256:e2e-verified-key', options: expect.objectContaining({ authenticationMode: 'password' }) }]);
-  const sshSpawns = (await ipcRecords(page, '__PTY_SPAWNS__')).filter(s => s.ssh);
+  expect(await ipcRecords(page, '__SSH_TRUSTS__')).toMatchObject([
+    {
+      host: 'prod.example.com',
+      port: 22,
+      expectedFingerprint: 'SHA256:e2e-verified-key',
+      options: expect.objectContaining({ authenticationMode: 'password' }),
+    },
+  ]);
+  const sshSpawns = (await ipcRecords(page, '__PTY_SPAWNS__')).filter((s) => s.ssh);
   expect(sshSpawns).toHaveLength(1);
   expect(sshSpawns[0]?.ssh).toMatchObject({ hostKeyType: 'ed25519' });
   // Authentication input follows remote output: it appears only when the server actually asks for a password
@@ -223,7 +270,10 @@ test('a logged-in SSH command does not retain the previous password prompt', asy
   const surface = page.getByTestId('ssh-connection-input');
   await emitPtyOutput(page, "user@server's password: ");
   await expect(surface.getByLabel('SSH 认证响应')).toBeEnabled();
-  await emitPtyOutput(page, "user@server's password: \r\n\x1b]133;A\x07user@server's password: \r\nls\r\n\x1b]133;E;bHM=\x07\x1b]133;C\x07\x1b[H\x1b[2Jfile.txt\r\n\x1b]133;D;0\x07\x1b]133;A\x07");
+  await emitPtyOutput(
+    page,
+    "user@server's password: \r\n\x1b]133;A\x07user@server's password: \r\nls\r\n\x1b]133;E;bHM=\x07\x1b]133;C\x07\x1b[H\x1b[2Jfile.txt\r\n\x1b]133;D;0\x07\x1b]133;A\x07",
+  );
   await expect(surface).toBeHidden();
   await expect(page.getByLabel('SSH 认证响应')).toHaveCount(0);
   await expect(page.getByText('file.txt', { exact: true })).toBeVisible();
@@ -240,7 +290,7 @@ test('SSH block mode remains directly interactive when the remote server has no 
   await response.press('Enter');
 
   // A forced-command/chat server can redraw its normal screen without emitting OSC 133.
-  await emitPtyOutput(page, '\r\n\x1b[2J\x1b[H已登录交互程序\r\n方向键选择，Enter 确认，Esc 退出\r\nuser@server\'s password: ');
+  await emitPtyOutput(page, "\r\n\x1b[2J\x1b[H已登录交互程序\r\n方向键选择，Enter 确认，Esc 退出\r\nuser@server's password: ");
   await expect(page.getByTestId('ssh-session-toolbar').last().getByRole('status')).toHaveText('SSH 交互会话');
   await expect(surface.getByLabel('SSH 认证响应')).toHaveCount(0);
   await expect(surface.locator('.xterm-screen')).toBeVisible();
@@ -292,7 +342,7 @@ test('canceling host trust does not spawn SSH or record a key', async ({ page })
   await openSsh(page, 'unknown', false);
   await expect(page.getByTestId('ssh-terminal-ended')).toContainText('已取消 SSH 连接');
   expect(await ipcRecords(page, '__SSH_TRUSTS__')).toEqual([]);
-  expect((await ipcRecords(page, '__PTY_SPAWNS__')).filter(s => s.ssh)).toEqual([]);
+  expect((await ipcRecords(page, '__PTY_SPAWNS__')).filter((s) => s.ssh)).toEqual([]);
   // Without a password prompt there is no authentication input box
   await expect(page.getByLabel('SSH 认证响应')).toHaveCount(0);
 });
@@ -302,10 +352,12 @@ test('changed host keys fail without asking to overwrite trust', async ({ page }
   await expect(page.getByTestId('ssh-terminal-ended')).toContainText('中间人攻击');
   expect(await ipcRecords(page, '__SSH_DIALOGS__')).toEqual([]);
   expect(await ipcRecords(page, '__SSH_TRUSTS__')).toEqual([]);
-  expect((await ipcRecords(page, '__PTY_SPAWNS__')).filter(s => s.ssh)).toEqual([]);
+  expect((await ipcRecords(page, '__PTY_SPAWNS__')).filter((s) => s.ssh)).toEqual([]);
 });
 
-test('the authentication input bar is horizontally symmetric inside the terminal area (no longer pushed right by an 8px left margin)', async ({ page }) => {
+test('the authentication input bar is horizontally symmetric inside the terminal area (no longer pushed right by an 8px left margin)', async ({
+  page,
+}) => {
   await openSsh(page, 'known');
   const surface = page.getByTestId('ssh-connection-input');
   await emitPtyOutput(page, "user@server's password: ");

@@ -41,14 +41,25 @@ export default function PanelFiles() {
   const { focusedSpec, activeTab } = useActiveWorkspace();
   const connectionId = terminal.isBound
     ? terminal.connectionId
-    : activeTab?.kind === 'editor' ? activeTab.selected.connectionId : focusedSpec?.ssh?.connectionId;
+    : activeTab?.kind === 'editor'
+      ? activeTab.selected.connectionId
+      : focusedSpec?.ssh?.connectionId;
   const sshConnections = useSshStore((s) => s.connections);
   const sshLoaded = useSshStore((s) => s.loaded);
-  const filesOpen = useDockStore(s => (s.leftPanels.includes('files') || s.rightPanels.includes('files')) && !s.collapsedPanels.includes('files'));
-  useEffect(() => { ensureSshLoaded(); }, []);
+  const filesOpen = useDockStore(
+    (s) => (s.leftPanels.includes('files') || s.rightPanels.includes('files')) && !s.collapsedPanels.includes('files'),
+  );
+  useEffect(() => {
+    ensureSshLoaded();
+  }, []);
   const terminalMenu: TerminalBindingMenu = {
     value: terminal.boundPaneId,
-    options: terminal.options.map(option => ({ id: option.paneId, label: option.label, description: option.description, live: option.live })),
+    options: terminal.options.map((option) => ({
+      id: option.paneId,
+      label: option.label,
+      description: option.description,
+      live: option.live,
+    })),
     onSelect: terminal.bind,
   };
 
@@ -60,19 +71,28 @@ export default function PanelFiles() {
 }
 
 /** Local panel: provides the local-only menu entries, icons and disk view. */
-function LocalFiles({ enabled, terminal, terminalMenu }: { enabled: boolean; terminal: PanelTerminalState; terminalMenu: TerminalBindingMenu }) {
+function LocalFiles({
+  enabled,
+  terminal,
+  terminalMenu,
+}: {
+  enabled: boolean;
+  terminal: PanelTerminalState;
+  terminalMenu: TerminalBindingMenu;
+}) {
   const [transferPage, setTransferPage] = useState<'upload' | 'download' | null>(null);
   const workspaceDirs = useWorkspaceDirsStore();
   const rememberedPath = useLocalPathStore((state) => state.remembered);
-  const sessions = useTerminalStore(state => state.sessions);
-  const shellTypes = useTerminalStore(state => state.shellTypes);
+  const sessions = useTerminalStore((state) => state.sessions);
+  const shellTypes = useTerminalStore((state) => state.shellTypes);
   const paneId = terminal.paneId;
   const shellType = (paneId ? shellTypes?.[paneId] : undefined) ?? terminal.spec?.shellType;
 
   /** Open a local file with the system default application. */
   const openWithSystemApp = (path: string) => {
     void openPath(path).catch((error) =>
-      useToastStore.getState().addToast(`${t('Could not open the file')}: ${String((error as Error)?.message ?? error)}`, 'error'));
+      useToastStore.getState().addToast(`${t('Could not open the file')}: ${String((error as Error)?.message ?? error)}`, 'error'),
+    );
   };
 
   /** Open a local file in the terminal editor. */
@@ -82,7 +102,13 @@ function LocalFiles({ enabled, terminal, terminalMenu }: { enabled: boolean; ter
     const shells = await getAvailableShells();
     const shellType = preferredShell(useTerminalDefaults.getState().shell, shells);
     try {
-      const result = await openFile(entry.path, (nextCommand) => { command = nextCommand; }, shellType);
+      const result = await openFile(
+        entry.path,
+        (nextCommand) => {
+          command = nextCommand;
+        },
+        shellType,
+      );
       if (result.via === 'system') {
         if (result.degraded) addToast(t('No terminal editor is available; opened with the system default application.'), 'info');
         return;
@@ -112,11 +138,11 @@ function LocalFiles({ enabled, terminal, terminalMenu }: { enabled: boolean; ter
     <FilePanel
       target={LOCAL_TARGET}
       enabled={enabled}
-      initialPath={rememberedPath ? rememberedPath.path : terminal.cwd ?? null}
+      initialPath={rememberedPath ? rememberedPath.path : (terminal.cwd ?? null)}
       initialResolved={rememberedPath !== null}
       onPathChange={(next) => useLocalPathStore.getState().remember(next)}
       terminalCwd={terminal.cwd ?? null}
-      followCwd={terminal.isBound ? terminal.cwd ?? null : null}
+      followCwd={terminal.isBound ? (terminal.cwd ?? null) : null}
       terminalMenu={terminalMenu}
       openEntry={(entry) => void openPreferredFile({ path: entry.path }, () => openFileInTerminal(entry))}
       onSyncToTerminal={(dir) => {
@@ -125,20 +151,23 @@ function LocalFiles({ enabled, terminal, terminalMenu }: { enabled: boolean; ter
           useToastStore.getState().addToast(t('The terminal session is not ready.'), 'info');
           return;
         }
-        void Promise.resolve().then(() => ptyWrite(sid, `${directoryCommand(dir, shellType)}\r`)).catch((error) =>
-          useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error'));
+        void Promise.resolve()
+          .then(() => ptyWrite(sid, `${directoryCommand(dir, shellType)}\r`))
+          .catch((error) => useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error'));
       }}
       renderIcon={(entry) => {
         if (entry.is_dir) {
-          return workspaceDirs.contains(entry.path)
-            ? <StarFilled size={iconSizes.row} color="var(--favorite-color)" />
-            : <Folder size={iconSizes.row} fill="none" />;
+          return workspaceDirs.contains(entry.path) ? (
+            <StarFilled size={iconSizes.row} color="var(--favorite-color)" />
+          ) : (
+            <Folder size={iconSizes.row} fill="none" />
+          );
         }
         const Icon = fileIcon(entry.name);
         return <Icon size={iconSizes.row} fill="none" />;
       }}
       isHighlighted={(entryPath) => workspaceDirs.contains(entryPath)}
-      renderNullPathView={({ disks, settled, navigate }) => (
+      renderNullPathView={({ disks, settled, navigate }) =>
         disks.length === 0 ? (
           settled && (
             <div style={{ padding: 16, fontSize: 'calc(12px * var(--ui-font-scale))', color: 'var(--text-muted)', textAlign: 'center' }}>
@@ -147,16 +176,23 @@ function LocalFiles({ enabled, terminal, terminalMenu }: { enabled: boolean; ter
           )
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '4px 10px' }}>
-            {disks.map((disk) => <DiskCard key={disk.path} disk={disk} onOpen={() => navigate(disk.path)} />)}
+            {disks.map((disk) => (
+              <DiskCard key={disk.path} disk={disk} onOpen={() => navigate(disk.path)} />
+            ))}
           </div>
         )
-      )}
+      }
       handlers={{
         onOpenEditor: (entry) => void openPreferredFile({ path: entry.path }, () => openFileInTerminal(entry)),
         onOpenSystem: (entry) => openWithSystemApp(entry.path),
-        onOpenWith: (entry) => void fileOpenWith(entry.path).catch((error) =>
-          useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error')),
-        onOpenTab: (entry) => { const id = useSessionStore.getState().addTab({ cwd: entry.path, title: entry.name }); presentWorkspaceResource(`terminal:${id}#0`); },
+        onOpenWith: (entry) =>
+          void fileOpenWith(entry.path).catch((error) =>
+            useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error'),
+          ),
+        onOpenTab: (entry) => {
+          const id = useSessionStore.getState().addTab({ cwd: entry.path, title: entry.name });
+          presentWorkspaceResource(`terminal:${id}#0`);
+        },
         onWorkspaceToggle: (entry, inWorkspace) => {
           if (inWorkspace) {
             const workspace = workspaceDirs.dirs.find((item) => item.path === entry.path);
@@ -165,13 +201,20 @@ function LocalFiles({ enabled, terminal, terminalMenu }: { enabled: boolean; ter
             void workspaceDirs.add(entry.path, entry.name);
           }
         },
-        onNewTabHere: (dir) => { const id = useSessionStore.getState().addTab({ cwd: dir, title: dir.split(/[\\/]/).filter(Boolean).pop() ?? dir }); presentWorkspaceResource(`terminal:${id}#0`); },
+        onNewTabHere: (dir) => {
+          const id = useSessionStore.getState().addTab({ cwd: dir, title: dir.split(/[\\/]/).filter(Boolean).pop() ?? dir });
+          presentWorkspaceResource(`terminal:${id}#0`);
+        },
         onOpenDownloads: () => setTransferPage('download'),
         onOpenUploads: () => setTransferPage('upload'),
-        onReveal: (entry) => void fileRevealInDir(entry.path).catch((error) =>
-          useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error')),
-        onRevealDir: (dir) => void fileRevealInDir(dir).catch((error) =>
-          useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error')),
+        onReveal: (entry) =>
+          void fileRevealInDir(entry.path).catch((error) =>
+            useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error'),
+          ),
+        onRevealDir: (dir) =>
+          void fileRevealInDir(dir).catch((error) =>
+            useToastStore.getState().addToast(String((error as Error)?.message ?? error), 'error'),
+          ),
       }}
     />
   );
@@ -188,29 +231,47 @@ function DiskCard({ disk, onOpen }: { disk: DiskEntry; onOpen: () => void }) {
       data-tip={t('{{path}} · {{total}} total · {{percent}}% used', { path: disk.path, total: fmtSize(total), percent: pct })}
       data-testid={`disk-card-${disk.name}`}
       style={{
-        display: 'flex', alignItems: 'center', gap: 10,
-        padding: '6px 10px', borderRadius: 'var(--radius-card)',
-        cursor: 'pointer', userSelect: 'none',
-      }}
-    >
-      <span style={{
-        width: 34, height: 34, borderRadius: 'var(--radius-inner)', flexShrink: 0,
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        background: 'var(--hover)', color: 'var(--primary-action)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '6px 10px',
+        borderRadius: 'var(--radius-card)',
+        cursor: 'pointer',
+        userSelect: 'none',
       }}>
+      <span
+        style={{
+          width: 34,
+          height: 34,
+          borderRadius: 'var(--radius-inner)',
+          flexShrink: 0,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          background: 'var(--hover)',
+          color: 'var(--primary-action)',
+        }}>
         <HardDrive size={iconSizes.row} />
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{
-          fontSize: 'calc(12px * var(--ui-font-scale))', fontWeight: 'var(--fw-semibold)', color: 'var(--text-primary)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>
+        <div
+          style={{
+            fontSize: 'calc(12px * var(--ui-font-scale))',
+            fontWeight: 'var(--fw-semibold)',
+            color: 'var(--text-primary)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
           {disk.name}
         </div>
-        <div style={{
-          fontSize: 'calc(10.5px * var(--ui-font-scale))', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)',
-          marginTop: 1,
-        }}>
+        <div
+          style={{
+            fontSize: 'calc(10.5px * var(--ui-font-scale))',
+            color: 'var(--text-muted)',
+            fontFamily: 'var(--font-mono)',
+            marginTop: 1,
+          }}>
           {total > 0 ? t('{{free}} free', { free: fmtSize(free) }) : '—'}
         </div>
       </div>

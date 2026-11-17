@@ -4,11 +4,27 @@ import { I18nProvider, resolveLocale, t, useLanguagePreferences, useT } from '..
 import zh from '../zh';
 import en from '../en';
 
-afterEach(() => { cleanup(); useLanguagePreferences.setState({ preference: 'zh' }); vi.restoreAllMocks(); });
+afterEach(() => {
+  cleanup();
+  useLanguagePreferences.setState({ preference: 'zh' });
+  vi.restoreAllMocks();
+});
 
 it('changes visible text without remounting or losing a draft', () => {
-  function Sample() { const { t } = useT(); return <><span>{t('Settings')}</span><input defaultValue="draft" /></>; }
-  render(<I18nProvider><Sample /></I18nProvider>);
+  function Sample() {
+    const { t } = useT();
+    return (
+      <>
+        <span>{t('Settings')}</span>
+        <input defaultValue="draft" />
+      </>
+    );
+  }
+  render(
+    <I18nProvider>
+      <Sample />
+    </I18nProvider>,
+  );
   const input = screen.getByRole('textbox');
   expect(screen.getByText('设置')).toBeVisible();
   act(() => useLanguagePreferences.getState().setPreference('en'));
@@ -32,7 +48,7 @@ it('resolves system language and preserves interpolation and unknown labels', ()
 });
 
 it('provides English labels for every internal catalog key', () => {
-  for (const key of Object.keys(zh).filter(key => /^[a-z][\w.-]*\.[\w.-]+$/.test(key))) {
+  for (const key of Object.keys(zh).filter((key) => /^[a-z][\w.-]*\.[\w.-]+$/.test(key))) {
     expect(en[key], key).toBeTruthy();
   }
 });

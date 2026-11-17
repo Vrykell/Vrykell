@@ -9,7 +9,10 @@ import { setupTauriMock, emitPtyOutput } from './tauri-mock';
  */
 test('a running block keeps a solid cursor after the command input takes focus', async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { terminalRenderer: 'dom', terminalCursorBlink: true } }));
+    localStorage.setItem(
+      'vrykell-typography',
+      JSON.stringify({ version: 0, state: { terminalRenderer: 'dom', terminalCursorBlink: true } }),
+    );
   });
   await setupTauriMock(page);
   await page.goto('/');
@@ -20,12 +23,13 @@ test('a running block keeps a solid cursor after the command input takes focus',
   await emitPtyOutput(page, `\x1b]133;E;${btoa('sleep 100')}\x07\x1b]133;C\x07`);
   await expect(page.getByTestId('running-term').locator('.xterm')).toBeVisible({ timeout: 5000 });
 
-  const cursorClass = () => page.evaluate(() => {
-    const map = (window as unknown as { __vrykellTerms: Map<string, { element?: HTMLElement }> }).__vrykellTerms;
-    const key = [...map.keys()].find((candidate) => candidate.startsWith('block:'));
-    const cell = map.get(key!)?.element?.querySelector('[class*="xterm-cursor"]');
-    return cell?.className ?? '';
-  });
+  const cursorClass = () =>
+    page.evaluate(() => {
+      const map = (window as unknown as { __vrykellTerms: Map<string, { element?: HTMLElement }> }).__vrykellTerms;
+      const key = [...map.keys()].find((candidate) => candidate.startsWith('block:'));
+      const cell = map.get(key!)?.element?.querySelector('[class*="xterm-cursor"]');
+      return cell?.className ?? '';
+    });
 
   // Focused on the running terminal: a blinking block.
   await page.waitForFunction(() => document.activeElement?.classList.contains('xterm-helper-textarea'));
@@ -57,10 +61,9 @@ test('a blocking command hands the keyboard to its live terminal without the old
   await emitPtyOutput(page, 'Password: ');
 
   await expect(input).toBeHidden({ timeout: 1500 });
-  await expect.poll(
-    () => page.evaluate(() => document.activeElement?.classList.contains('xterm-helper-textarea') ?? false),
-    { timeout: 1500 },
-  ).toBe(true);
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.classList.contains('xterm-helper-textarea') ?? false), { timeout: 1500 })
+    .toBe(true);
 });
 
 /**
@@ -70,7 +73,10 @@ test('a blocking command hands the keyboard to its live terminal without the old
  */
 test('with blinking disabled, a program cursor blink request only changes the shape', async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem('vrykell-typography', JSON.stringify({ version: 0, state: { terminalRenderer: 'dom', terminalCursorBlink: false } }));
+    localStorage.setItem(
+      'vrykell-typography',
+      JSON.stringify({ version: 0, state: { terminalRenderer: 'dom', terminalCursorBlink: false } }),
+    );
   });
   await setupTauriMock(page);
   await page.goto('/');
@@ -81,12 +87,13 @@ test('with blinking disabled, a program cursor blink request only changes the sh
   await expect(page.getByTestId('running-term').locator('.xterm')).toBeVisible({ timeout: 5000 });
   await page.waitForFunction(() => document.activeElement?.classList.contains('xterm-helper-textarea'));
 
-  const cursorClass = () => page.evaluate(() => {
-    const map = (window as unknown as { __vrykellTerms: Map<string, { element?: HTMLElement }> }).__vrykellTerms;
-    const key = [...map.keys()].find((candidate) => candidate.startsWith('block:'));
-    const cell = map.get(key!)?.element?.querySelector('[class*="xterm-cursor"]');
-    return cell?.className ?? '';
-  });
+  const cursorClass = () =>
+    page.evaluate(() => {
+      const map = (window as unknown as { __vrykellTerms: Map<string, { element?: HTMLElement }> }).__vrykellTerms;
+      const key = [...map.keys()].find((candidate) => candidate.startsWith('block:'));
+      const cell = map.get(key!)?.element?.querySelector('[class*="xterm-cursor"]');
+      return cell?.className ?? '';
+    });
   await expect.poll(cursorClass).not.toContain('xterm-cursor-blink');
 
   // Blinking bar request: the shape applies, the blink bit does not.

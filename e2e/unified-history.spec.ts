@@ -4,10 +4,18 @@ import { fillHistorySearch } from './history-search';
 
 test('unified history searches terminals and AI conversations and routes to their workspaces', async ({ page }) => {
   await page.addInitScript(() => {
-    localStorage.setItem('e2e-conversations', JSON.stringify([{
-      id: 'conversation-history', title: 'Explain deployment', created_at: Date.now() - 1000,
-      updated_at: Date.now(), environment: '',
-    }]));
+    localStorage.setItem(
+      'e2e-conversations',
+      JSON.stringify([
+        {
+          id: 'conversation-history',
+          title: 'Explain deployment',
+          created_at: Date.now() - 1000,
+          updated_at: Date.now(),
+          environment: '',
+        },
+      ]),
+    );
     localStorage.setItem('e2e-conversation-messages', '[]');
   });
   await setupTauriMock(page, {});
@@ -67,7 +75,7 @@ test('filter cards stay on one line and secondary controls collapse into more ac
   const cards = page.getByTestId('history-filter-cards');
   await expect(cards.locator('.search-scope-chip')).toHaveCount(3);
   await page.setViewportSize({ width: 560, height: 700 });
-  await expect.poll(() => cards.evaluate(element => getComputedStyle(element).flexWrap)).toBe('nowrap');
+  await expect.poll(() => cards.evaluate((element) => getComputedStyle(element).flexWrap)).toBe('nowrap');
   await expect(cards).toHaveCSS('overflow-x', 'hidden');
   await expect(page.getByTestId('unified-history-filter')).toBeHidden();
   await expect(page.getByTestId('unified-history-sort')).toBeHidden();

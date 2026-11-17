@@ -2,10 +2,13 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { applyTheme, setThemeOverrides } from '@config/theme/tokens';
 import { readXtermTheme } from '../xtermTheme';
 
-afterEach(() => { setThemeOverrides({}); applyTheme('dark'); });
+afterEach(() => {
+  setThemeOverrides({});
+  applyTheme('dark');
+});
 
 describe('terminal scrollbar theme', () => {
-  it.each(['dark', 'light'] as const)('shares the %s palette with native content scrollbars', mode => {
+  it.each(['dark', 'light'] as const)('shares the %s palette with native content scrollbars', (mode) => {
     applyTheme(mode);
     const styles = getComputedStyle(document.documentElement);
     const theme = readXtermTheme();

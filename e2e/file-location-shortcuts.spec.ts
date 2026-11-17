@@ -15,7 +15,7 @@ test('restores the last directory on launch without restoring the navigation tra
   await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
   await expect(page.getByTestId('local-back-btn')).toBeEnabled();
   await page.reload({ waitUntil: 'domcontentloaded' });
-  if (!await tree.isVisible()) await page.locator('[data-dock-btn="files"]').click();
+  if (!(await tree.isVisible())) await page.locator('[data-dock-btn="files"]').click();
   await expect(tree).toHaveAttribute('data-path', '/home/e2e/Documents');
   await expect(page.getByTestId('local-back-btn')).toBeDisabled();
   await expect(page.getByTestId('local-forward-btn')).toBeDisabled();
@@ -26,7 +26,8 @@ test('restores the last directory on launch without restoring the navigation tra
   for (const width of [1240, 760]) {
     await page.setViewportSize({ width, height: 800 });
     const box = (await menu.boundingBox())!;
-    expect(box.x).toBeGreaterThanOrEqual(0); expect(box.x + box.width).toBeLessThanOrEqual(width);
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(width);
     await page.screenshot({ path: info.outputPath(`file-shortcuts-${width}.png`) });
   }
   await page.keyboard.press('Escape');
@@ -39,8 +40,8 @@ test('restores the last directory on launch without restoring the navigation tra
 test('completes real local paths with Tab even with predictive suggestions disabled', async ({ page }) => {
   await page.evaluate(async () => {
     const path = '/src/features/agent/stores/agentSettings.ts';
-    const { useAgentSettings } = await import(path) as typeof import('../src/features/agent/stores/agentSettings');
-    useAgentSettings.setState(state => ({ global: { ...state.global, completeEnabled: false } }));
+    const { useAgentSettings } = (await import(path)) as typeof import('../src/features/agent/stores/agentSettings');
+    useAgentSettings.setState((state) => ({ global: { ...state.global, completeEnabled: false } }));
     (window as unknown as { __FS_EXTRA_ENTRIES__: unknown[] }).__FS_EXTRA_ENTRIES__ = [
       { name: 'notes-two.txt', path: '/home/e2e/notes-two.txt', is_dir: false },
       { name: 'my file.txt', path: '/home/e2e/my file.txt', is_dir: false },
@@ -53,31 +54,46 @@ test('completes real local paths with Tab even with predictive suggestions disab
     await input.pressSequentially(value);
     await expect(input).toHaveValue(value);
   };
-  await input.fill('cat not'); await input.press('Tab');
+  await input.fill('cat not');
+  await input.press('Tab');
   await expect(input).toHaveValue('cat notes-two.txt');
-  await input.press('Tab'); await expect(input).toHaveValue('cat notes.txt');
-  await input.press('Shift+Tab'); await expect(input).toHaveValue('cat notes-two.txt');
-  await input.press('Escape'); await expect(input).toHaveValue('cat not');
-  await replace('cd Doc'); await input.press('Tab'); await expect(input).toHaveValue('cd Documents/');
-  await replace('cat my'); await input.press('Tab'); await expect(input).toHaveValue('cat my\\ file.txt');
+  await input.press('Tab');
+  await expect(input).toHaveValue('cat notes.txt');
+  await input.press('Shift+Tab');
+  await expect(input).toHaveValue('cat notes-two.txt');
+  await input.press('Escape');
+  await expect(input).toHaveValue('cat not');
+  await replace('cd Doc');
+  await input.press('Tab');
+  await expect(input).toHaveValue('cd Documents/');
+  await replace('cat my');
+  await input.press('Tab');
+  await expect(input).toHaveValue('cat my\\ file.txt');
   await expect(input).toBeFocused();
-  expect((await ptyWrites(page)).some(write => write.includes('cat notes'))).toBe(false);
+  expect((await ptyWrites(page)).some((write) => write.includes('cat notes'))).toBe(false);
 });
 
 test('keeps late completion responses out of an edited draft', async ({ page }) => {
   await page.evaluate(() => {
-    const host = window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> }; __COMPLETE_PENDING__?: boolean; __FINISH_COMPLETE__?: () => void };
+    const host = window as unknown as {
+      __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> };
+      __COMPLETE_PENDING__?: boolean;
+      __FINISH_COMPLETE__?: () => void;
+    };
     const original = host.__TAURI_INTERNALS__.invoke;
     host.__TAURI_INTERNALS__.invoke = async (command, args) => {
       if (command === 'fs_list' && args?.path === '/home/e2e/project') {
         host.__COMPLETE_PENDING__ = true;
-        await new Promise<void>(resolve => { host.__FINISH_COMPLETE__ = resolve; });
+        await new Promise<void>((resolve) => {
+          host.__FINISH_COMPLETE__ = resolve;
+        });
       }
       return original(command, args);
     };
   });
   const input = page.getByPlaceholder(/输入命令/);
-  await input.fill('cat not'); await input.press('Tab');
+  await input.fill('cat not');
+  await input.press('Tab');
   await expect.poll(() => page.evaluate(() => (window as unknown as { __COMPLETE_PENDING__?: boolean }).__COMPLETE_PENDING__)).toBe(true);
   await input.fill('cat other');
   await page.evaluate(() => (window as unknown as { __FINISH_COMPLETE__?: () => void }).__FINISH_COMPLETE__?.());
@@ -88,13 +104,15 @@ test('restores remote locations separately and completes paths through the remot
   const openRemote = async () => {
     await page.evaluate(async () => {
       const settingsPath = '/src/features/agent/stores/agentSettings.ts';
-      const { useAgentSettings } = await import(settingsPath) as typeof import('../src/features/agent/stores/agentSettings');
-      useAgentSettings.setState(state => ({ global: { ...state.global, sshOpenMode: 'block', completeEnabled: false } }));
+      const { useAgentSettings } = (await import(settingsPath)) as typeof import('../src/features/agent/stores/agentSettings');
+      useAgentSettings.setState((state) => ({ global: { ...state.global, sshOpenMode: 'block', completeEnabled: false } }));
       const workspacePath = '/src/features/workspace/stores/workspace.ts';
-      const { useWorkspaceStore } = await import(workspacePath) as typeof import('../src/features/workspace/stores/workspace');
-      useWorkspaceStore.getState().addTab({ kind: 'ssh', ssh: { connectionId: 'ssh-1', host: 'prod.example.com', user: 'root', name: 'Remote' } });
+      const { useWorkspaceStore } = (await import(workspacePath)) as typeof import('../src/features/workspace/stores/workspace');
+      useWorkspaceStore
+        .getState()
+        .addTab({ kind: 'ssh', ssh: { connectionId: 'ssh-1', host: 'prod.example.com', user: 'root', name: 'Remote' } });
     });
-    if (!await page.getByTestId('remote-file-tree').isVisible()) await page.locator('[data-dock-btn="files"]').click();
+    if (!(await page.getByTestId('remote-file-tree').isVisible())) await page.locator('[data-dock-btn="files"]').click();
     await expect(page.getByTestId('remote-file-tree')).toBeVisible();
   };
   await openRemote();
@@ -103,7 +121,10 @@ test('restores remote locations separately and completes paths through the remot
   await tree.locator('[data-path="/home/root/Documents"]').dblclick();
   await expect(tree).toHaveAttribute('data-path', '/home/root/Documents');
   await page.evaluate(() => {
-    const host = window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> }; __PATH_CHANNELS__: string[] };
+    const host = window as unknown as {
+      __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> };
+      __PATH_CHANNELS__: string[];
+    };
     const original = host.__TAURI_INTERNALS__.invoke;
     host.__PATH_CHANNELS__ = [];
     host.__TAURI_INTERNALS__.invoke = async (command, args) => {
@@ -112,7 +133,9 @@ test('restores remote locations separately and completes paths through the remot
     };
   });
   const input = page.locator('textarea[data-terminal-input="true"]:visible');
-  await input.fill('cat app'); await input.press('Tab'); await expect(input).toHaveValue('cat app.log');
+  await input.fill('cat app');
+  await input.press('Tab');
+  await expect(input).toHaveValue('cat app.log');
   expect(await page.evaluate(() => (window as unknown as { __PATH_CHANNELS__: string[] }).__PATH_CHANNELS__)).toEqual(['ssh_list']);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await openRemote();

@@ -15,9 +15,7 @@ describe('FilterPopover', () => {
 
   it('switching open from false to true does not crash (stable hook order, regression for a conditional hook crash)', () => {
     const { rerender } = render(<FilterPopover open={false} onClose={() => {}} counts={{}} />);
-    expect(() =>
-      rerender(<FilterPopover open={true} onClose={() => {}} counts={{}} />),
-    ).not.toThrow();
+    expect(() => rerender(<FilterPopover open={true} onClose={() => {}} counts={{}} />)).not.toThrow();
 
     expect(screen.getByText('搜索范围')).toBeInTheDocument();
     expect(screen.getByText('命令历史')).toBeInTheDocument();

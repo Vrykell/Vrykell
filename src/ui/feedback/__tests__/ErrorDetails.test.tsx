@@ -69,17 +69,25 @@ describe('ErrorDetails', () => {
       const copyButton = screen.getByTestId('details-copy');
 
       fireEvent.click(copyButton);
-      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
       expect(copyButton).toHaveAttribute('data-tip', '已复制');
 
       // Second click at t=800ms: the first timer would clear the check at
       // t=1500ms, so the restart has to keep it alive past that point.
-      await act(async () => { await vi.advanceTimersByTimeAsync(800); });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(800);
+      });
       fireEvent.click(copyButton);
-      await act(async () => { await vi.advanceTimersByTimeAsync(800); });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(800);
+      });
       expect(copyButton).toHaveAttribute('data-tip', '已复制');
 
-      await act(async () => { await vi.advanceTimersByTimeAsync(800); });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(800);
+      });
       expect(copyButton).toHaveAttribute('data-tip', '复制组件堆栈');
     } finally {
       vi.useRealTimers();

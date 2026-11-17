@@ -75,16 +75,18 @@ describe('useFileRowDrag native drag-out', () => {
       window.dispatchEvent(pointerMove(1, -20, 10));
     });
 
-    expect(startDragMock).toHaveBeenCalledWith(
-      { item: ['/tmp/a.txt'], icon: '', mode: 'move' },
-      expect.any(Function),
-    );
+    expect(startDragMock).toHaveBeenCalledWith({ item: ['/tmp/a.txt'], icon: '', mode: 'move' }, expect.any(Function));
     expect(onNativeDragEnd).toHaveBeenCalledWith('Dropped', items, { paths: ['/tmp/a.txt'], mode: 'move' });
   });
 
   it('prepares one download while repeated pointer moves cross the window edge', async () => {
     let finish: (payload: { paths: string[]; mode: 'copy' }) => void = () => {};
-    const prepareNativeDrag = vi.fn(() => new Promise<{ paths: string[]; mode: 'copy' }>(resolve => { finish = resolve; }));
+    const prepareNativeDrag = vi.fn(
+      () =>
+        new Promise<{ paths: string[]; mode: 'copy' }>((resolve) => {
+          finish = resolve;
+        }),
+    );
     startDragMock.mockResolvedValue(undefined);
     const { result } = renderHook(() => useFileRowDrag({ onDrop: vi.fn(), prepareNativeDrag }));
 
@@ -97,7 +99,9 @@ describe('useFileRowDrag native drag-out', () => {
     expect(prepareNativeDrag).toHaveBeenCalledExactlyOnceWith(items);
     expect(startDragMock).not.toHaveBeenCalled();
 
-    await act(async () => { finish({ paths: ['/Downloads/folder'], mode: 'copy' }); });
+    await act(async () => {
+      finish({ paths: ['/Downloads/folder'], mode: 'copy' });
+    });
     expect(startDragMock).toHaveBeenCalledOnce();
   });
 });

@@ -19,12 +19,7 @@ import { t } from '@i18n';
 import { DESC_READ_TERMINAL, DESC_TERMINAL_KEYS } from '@features/agent/model/toolTexts';
 import { z } from 'zod';
 import { ptyWrite } from '@platform/pty';
-import {
-  getFocusedTerminalId,
-  getTerminalScreen,
-  useTerminalStore,
-  useBlockStore,
-} from '@features/terminal';
+import { getFocusedTerminalId, getTerminalScreen, useTerminalStore, useBlockStore } from '@features/terminal';
 import { gate, type ToolContext } from '@features/agent/stores/permissions';
 import { terminalDisconnected, terminalExecutionState } from '../services/terminalAvailability';
 
@@ -57,9 +52,7 @@ function blockListContent(paneId: string): string {
   const withOutput = blocks.filter((b) => b.outputText && b.outputText.trim().length > 0);
   const tail = withOutput.slice(-BLOCK_COUNT);
   if (tail.length === 0) return t('No command blocks have output yet.');
-  return tail
-    .map((b) => `$ ${b.command || t('No command')}\n${b.outputText.slice(-BLOCK_OUTPUT_CAP)}`)
-    .join('\n\n');
+  return tail.map((b) => `$ ${b.command || t('No command')}\n${b.outputText.slice(-BLOCK_OUTPUT_CAP)}`).join('\n\n');
 }
 
 export function buildTerminalTools(ctx: ToolContext) {
@@ -95,8 +88,16 @@ export function buildTerminalTools(ctx: ToolContext) {
     terminal_keys: tool({
       description: DESC_TERMINAL_KEYS,
       inputSchema: z.object({
-        keys: z.string().default('').describe('Raw keys; escapes such as \\b, \\u0018, \\e, \\u001b[A and \\xNN are decoded; omit to only wait'),
-        wait_ms: z.number().int().min(0).optional().describe('Milliseconds to wait for screen updates, default 300; values above 10000 are clamped'),
+        keys: z
+          .string()
+          .default('')
+          .describe('Raw keys; escapes such as \\b, \\u0018, \\e, \\u001b[A and \\xNN are decoded; omit to only wait'),
+        wait_ms: z
+          .number()
+          .int()
+          .min(0)
+          .optional()
+          .describe('Milliseconds to wait for screen updates, default 300; values above 10000 are clamped'),
       }),
       execute: async ({ keys, wait_ms }, { toolCallId }) => {
         const g = await gate('terminal_keys', { keys }, toolCallId, ctx);
@@ -122,7 +123,10 @@ export function buildTerminalTools(ctx: ToolContext) {
         } catch (e) {
           const disconnected = terminalDisconnected(paneId, sessionId);
           if (disconnected) return disconnected;
-          return { ok: false, error: t('Could not write to the terminal: {{error}}', { error: e instanceof Error ? e.message : String(e) }) };
+          return {
+            ok: false,
+            error: t('Could not write to the terminal: {{error}}', { error: e instanceof Error ? e.message : String(e) }),
+          };
         }
         const wait = Math.min(wait_ms ?? DEFAULT_WAIT_MS, MAX_WAIT_MS);
         if (wait > 0 && !(await waitForScreen(wait, ctx.signal))) {
@@ -166,7 +170,10 @@ function normalizeKeys(raw: string): { keys: string; error?: string } {
   if (m) {
     return {
       keys,
-      error: t('Invalid escape sequence "{{escape}}…": use \\uXXXX (for example \\u0018) or \\xNN (for example \\x1b) for control characters, or type the visible characters directly; the tool never sends an unrecognized escape.', { escape: m[0] }),
+      error: t(
+        'Invalid escape sequence "{{escape}}…": use \\uXXXX (for example \\u0018) or \\xNN (for example \\x1b) for control characters, or type the visible characters directly; the tool never sends an unrecognized escape.',
+        { escape: m[0] },
+      ),
     };
   }
   return { keys };

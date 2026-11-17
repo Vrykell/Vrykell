@@ -16,7 +16,11 @@ export async function generateCommitMessage(target: GitTarget, signal?: AbortSig
     maxOutputTokens: 500,
     abortSignal: signal,
   });
-  const message = text.trim().replace(/^```[^\n]*\n/, '').replace(/\n```$/, '').trim();
+  const message = text
+    .trim()
+    .replace(/^```[^\n]*\n/, '')
+    .replace(/\n```$/, '')
+    .trim();
   if (!message) throw new Error(t('The model returned an empty commit message. Try again.'));
   return message;
 }

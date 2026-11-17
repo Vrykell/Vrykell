@@ -14,10 +14,11 @@ test.beforeEach(async ({ page }) => {
 test.describe('MCP settings page', () => {
   test('deleting during an automatic rename waits for the save and removes the renamed server', async ({ page }) => {
     await page.evaluate(() => {
-      const bridge = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__;
+      const bridge = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } })
+        .__TAURI_INTERNALS__;
       const original = bridge.invoke;
       bridge.invoke = async (command, args) => {
-        if (command === 'mcp_save_server') await new Promise(resolve => setTimeout(resolve, 400));
+        if (command === 'mcp_save_server') await new Promise((resolve) => setTimeout(resolve, 400));
         return original(command, args);
       };
     });
@@ -54,7 +55,7 @@ test.describe('MCP settings page', () => {
     await draftCard.getByPlaceholder('command，如 npx').fill('npx');
     await draftCard.getByPlaceholder('args，空格分隔').fill('-y @scope/server');
     await draftCard.getByPlaceholder(/环境变量/).fill('TOKEN=abc');
-    await expect.poll(async () => (await mcpOps(page)).filter(op => op.op === 'save' && op.name === 'e2e-mcp').length).toBe(1);
+    await expect.poll(async () => (await mcpOps(page)).filter((op) => op.op === 'save' && op.name === 'e2e-mcp').length).toBe(1);
 
     const ops = await mcpOps(page);
     const save = ops.find((o) => o.op === 'save' && o.name === 'e2e-mcp');

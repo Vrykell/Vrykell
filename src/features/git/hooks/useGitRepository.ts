@@ -11,7 +11,7 @@ export function useGitRepository(target: GitTarget | null, visible: boolean) {
   const key = JSON.stringify([cwd, connectionId]);
   const [state, setState] = useState<{ key: string; snapshot: GitSnapshot | null; error: string; loading: boolean }>();
   const [revision, setRevision] = useState(0);
-  const refresh = useCallback(() => setRevision(value => value + 1), []);
+  const refresh = useCallback(() => setRevision((value) => value + 1), []);
   useEffect(() => {
     if (!visible || !cwd) return;
     let disposed = false;
@@ -21,16 +21,25 @@ export function useGitRepository(target: GitTarget | null, visible: boolean) {
       if (busy || document.hidden) return;
       busy = true;
       lastLoadAt = Date.now();
-      setState(previous => ({ key, snapshot: previous?.key === key ? previous.snapshot : null, error: previous?.key === key ? previous.error : '', loading: true }));
+      setState((previous) => ({
+        key,
+        snapshot: previous?.key === key ? previous.snapshot : null,
+        error: previous?.key === key ? previous.error : '',
+        loading: true,
+      }));
       try {
         const snapshot = await getGitSnapshot({ cwd, connectionId });
         if (!disposed) setState({ key, snapshot, error: '', loading: false });
       } catch (reason) {
         if (!disposed) setState({ key, snapshot: null, error: reason instanceof Error ? reason.message : String(reason), loading: false });
-      } finally { busy = false; }
+      } finally {
+        busy = false;
+      }
     };
     void load();
-    const timer = window.setInterval(() => { void load(); }, 5000);
+    const timer = window.setInterval(() => {
+      void load();
+    }, 5000);
     const onFocus = () => {
       if (Date.now() - lastLoadAt < FOCUS_REFRESH_DEBOUNCE_MS) return;
       void load();
@@ -45,5 +54,10 @@ export function useGitRepository(target: GitTarget | null, visible: boolean) {
     };
   }, [cwd, connectionId, key, visible, revision]);
   const current = state?.key === key ? state : undefined;
-  return { snapshot: current?.snapshot ?? null, error: current?.error ?? '', loading: !!cwd && visible && (current?.loading ?? true), refresh };
+  return {
+    snapshot: current?.snapshot ?? null,
+    error: current?.error ?? '',
+    loading: !!cwd && visible && (current?.loading ?? true),
+    refresh,
+  };
 }

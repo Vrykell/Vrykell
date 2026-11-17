@@ -4,8 +4,9 @@ import { setupTauriMock, emitPtyOutput } from './tauri-mock';
 /** Find the scroll container of the block list. */
 async function scrollEl(page: import('@playwright/test').Page) {
   const handle = await page.evaluateHandle(() => {
-    const card = document.querySelector('[data-testid^="command-block-"] [data-testid="exit-code"]')
-      ?? document.querySelector('[data-testid="exit-code"]');
+    const card =
+      document.querySelector('[data-testid^="command-block-"] [data-testid="exit-code"]') ??
+      document.querySelector('[data-testid="exit-code"]');
     let el = card?.parentElement ?? null;
     while (el && !['auto', 'scroll'].includes(getComputedStyle(el).overflowY)) el = el.parentElement;
     return el;
@@ -14,8 +15,7 @@ async function scrollEl(page: import('@playwright/test').Page) {
 }
 
 /** Completed commands in the block list: the pinned mirror repeats its block's exit code. */
-const exitCodes = (page: import('@playwright/test').Page) =>
-  page.locator('[data-testid^="command-block-"] [data-testid="exit-code"]');
+const exitCodes = (page: import('@playwright/test').Page) => page.locator('[data-testid^="command-block-"] [data-testid="exit-code"]');
 
 test('running a new command after scrolling up re-pins to the bottom', async ({ page }) => {
   await setupTauriMock(page);
@@ -32,11 +32,11 @@ test('running a new command after scrolling up re-pins to the bottom', async ({ 
 
   // The user scrolls up 300px to read earlier output.
   const el = await scrollEl(page);
-  await el.evaluate((e) => { e.scrollTop -= 300; });
+  await el.evaluate((e) => {
+    e.scrollTop -= 300;
+  });
   await page.waitForTimeout(100);
-  const gapAfterScrollUp = await el.evaluate(
-    (e) => e.scrollHeight - e.scrollTop - e.clientHeight,
-  );
+  const gapAfterScrollUp = await el.evaluate((e) => e.scrollHeight - e.scrollTop - e.clientHeight);
   expect(gapAfterScrollUp).toBeGreaterThan(32);
 
   // The user runs a new command: the view must jump back to the bottom.
@@ -45,9 +45,7 @@ test('running a new command after scrolling up re-pins to the bottom', async ({ 
   await expect(exitCodes(page)).toHaveCount(16, { timeout: 5000 });
   await page.waitForTimeout(300);
 
-  const gapAfterNewCmd = await el.evaluate(
-    (e) => e.scrollHeight - e.scrollTop - e.clientHeight,
-  );
+  const gapAfterNewCmd = await el.evaluate((e) => e.scrollHeight - e.scrollTop - e.clientHeight);
   console.log(`gap after scroll up: ${gapAfterScrollUp}, after new cmd: ${gapAfterNewCmd}`);
   expect(gapAfterNewCmd).toBeLessThan(32);
 });
@@ -58,8 +56,14 @@ test('resizing the terminal preserves the reading position and keeps a pinned vi
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
   await page.waitForFunction(() => {
-    const scope = window as unknown as { __vrykellSessionRegistry?: { controllers: Map<string, import('../src/features/terminal/services/pipeline/sessionController').SessionController> } };
-    return [...(scope.__vrykellSessionRegistry?.controllers.values() ?? [])].some(controller => controller.activeBlock?.status === 'pending' && !!controller.activeBlock.cwd);
+    const scope = window as unknown as {
+      __vrykellSessionRegistry?: {
+        controllers: Map<string, import('../src/features/terminal/services/pipeline/sessionController').SessionController>;
+      };
+    };
+    return [...(scope.__vrykellSessionRegistry?.controllers.values() ?? [])].some(
+      (controller) => controller.activeBlock?.status === 'pending' && !!controller.activeBlock.cwd,
+    );
   });
 
   await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
@@ -75,19 +79,24 @@ test('resizing the terminal preserves the reading position and keeps a pinned vi
   await target.evaluate((el) => el.scrollIntoView({ block: 'start' }));
   // Reading anchors settle after a scroll gesture so hit testing does not block wheel input.
   await page.waitForTimeout(180);
-  const relativeTop = async () => target.evaluate((el) => {
-    const scroll = el.closest<HTMLElement>('[data-testid^="terminal-scroll-"]')!;
-    return el.getBoundingClientRect().top - scroll.getBoundingClientRect().top;
-  });
+  const relativeTop = async () =>
+    target.evaluate((el) => {
+      const scroll = el.closest<HTMLElement>('[data-testid^="terminal-scroll-"]')!;
+      return el.getBoundingClientRect().top - scroll.getBoundingClientRect().top;
+    });
   const before = await relativeTop();
   await page.setViewportSize({ width: 720, height: 500 });
   // A long suite leaves the machine busy: give the terminal refit and its anchor restoration time
   // to land instead of measuring the frame that still holds the old layout.
   await expect.poll(async () => Math.abs((await relativeTop()) - before), { timeout: 15_000 }).toBeLessThan(24);
 
-  await scroller.evaluate((el) => { el.scrollTop = el.scrollHeight; });
+  await scroller.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
   await page.setViewportSize({ width: 980, height: 500 });
-  await expect.poll(() => scroller.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight), { timeout: 15_000 }).toBeLessThan(32);
+  await expect
+    .poll(() => scroller.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight), { timeout: 15_000 })
+    .toBeLessThan(32);
 });
 
 test('live output continues following after content grows and the viewport changes', async ({ page }) => {
@@ -98,25 +107,34 @@ test('live output continues following after content grows and the viewport chang
   await expect(page.locator('[data-testid^="terminal-scroll-"]').first()).toBeVisible();
   await page.waitForFunction(async () => {
     const path = '/src/features/terminal/stores/terminal.ts';
-    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    const { useTerminalStore } = (await import(path)) as typeof import('../src/features/terminal/stores/terminal');
     return Object.values(useTerminalStore.getState().startupStates).includes('ready');
   });
   for (let i = 0; i < 5; i++) {
     const command = `history-${i}`;
-    await emitPtyOutput(page, `\x1b]133;E;${btoa(command)}\x07\x1b]133;C\x07${'history output\r\n'.repeat(20)}\x1b]133;D;0\x07\x1b]133;A\x07`);
+    await emitPtyOutput(
+      page,
+      `\x1b]133;E;${btoa(command)}\x07\x1b]133;C\x07${'history output\r\n'.repeat(20)}\x1b]133;D;0\x07\x1b]133;A\x07`,
+    );
     await expect(exitCodes(page)).toHaveCount(i + 1);
   }
   await emitPtyOutput(page, '\x1b]133;E;c3RyZWFt\x07\x1b]133;C\x07');
   const scroller = page.locator('[data-testid^="terminal-scroll-"]').first();
-  const gap = () => scroller.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight);
+  const gap = () => scroller.evaluate((el) => el.scrollHeight - el.scrollTop - el.clientHeight);
   for (let i = 0; i < 6; i++) {
     await emitPtyOutput(page, Array.from({ length: 18 }, (_, line) => `chunk-${i}-${line}\r\n`).join(''));
-    await expect.poll(() => page.evaluate((marker) => {
-      const terms = (window as unknown as { __vrykellTerms: Map<string, import('@xterm/xterm').Terminal> }).__vrykellTerms;
-      const term = [...terms.entries()].find(([key]) => key.startsWith('block:'))?.[1];
-      if (!term) return false;
-      return Array.from({ length: term.buffer.active.length }, (_, row) => term.buffer.active.getLine(row)?.translateToString()).some(line => line?.includes(marker));
-    }, `chunk-${i}-17`)).toBe(true);
+    await expect
+      .poll(() =>
+        page.evaluate((marker) => {
+          const terms = (window as unknown as { __vrykellTerms: Map<string, import('@xterm/xterm').Terminal> }).__vrykellTerms;
+          const term = [...terms.entries()].find(([key]) => key.startsWith('block:'))?.[1];
+          if (!term) return false;
+          return Array.from({ length: term.buffer.active.length }, (_, row) => term.buffer.active.getLine(row)?.translateToString()).some(
+            (line) => line?.includes(marker),
+          );
+        }, `chunk-${i}-17`),
+      )
+      .toBe(true);
     await expect.poll(gap).toBeLessThan(32);
     if (i === 2) await page.setViewportSize({ width: 720, height: 400 });
   }
@@ -128,19 +146,21 @@ test('live output continues following after content grows and the viewport chang
   // The reading position is the text at the top of the viewport: the app anchors that text
   // (a range, not the raw scroll offset), so scrollTop may shift while the text stays put.
   // Arriving output must never re-engage the follow either.
-  const readingAnchor = () => scroller.evaluate(element => {
-    const bounds = element.getBoundingClientRect();
-    const caret = (document as Document & { caretPositionFromPoint?: (x: number, y: number) => CaretPosition | null })
-      .caretPositionFromPoint?.(bounds.left + 60, bounds.top + 2);
-    if (!caret?.offsetNode) return null;
-    const range = document.createRange();
-    range.setStart(caret.offsetNode, caret.offset);
-    range.setEnd(caret.offsetNode, caret.offset);
-    return {
-      line: (caret.offsetNode.textContent ?? '').slice(caret.offset, caret.offset + 16),
-      textTop: Math.round((range.getBoundingClientRect().top - bounds.top) * 10) / 10,
-    };
-  });
+  const readingAnchor = () =>
+    scroller.evaluate((element) => {
+      const bounds = element.getBoundingClientRect();
+      const caret = (
+        document as Document & { caretPositionFromPoint?: (x: number, y: number) => CaretPosition | null }
+      ).caretPositionFromPoint?.(bounds.left + 60, bounds.top + 2);
+      if (!caret?.offsetNode) return null;
+      const range = document.createRange();
+      range.setStart(caret.offsetNode, caret.offset);
+      range.setEnd(caret.offsetNode, caret.offset);
+      return {
+        line: (caret.offsetNode.textContent ?? '').slice(caret.offset, caret.offset + 16),
+        textTop: Math.round((range.getBoundingClientRect().top - bounds.top) * 10) / 10,
+      };
+    });
   const anchor = await readingAnchor();
   expect(anchor).not.toBeNull();
   await emitPtyOutput(page, 'output-while-reading\r\n'.repeat(20));
@@ -154,7 +174,6 @@ test('live output continues following after content grows and the viewport chang
   await emitPtyOutput(page, '\x1b]133;D;0\x07\x1b]133;A\x07');
 });
 
-
 test('short commands preserve real wrapped history geometry without a reverse scroll frame', async ({ page }) => {
   await setupTauriMock(page);
   await page.setViewportSize({ width: 720, height: 500 });
@@ -164,39 +183,48 @@ test('short commands preserve real wrapped history geometry without a reverse sc
   // Wait for the startup prompt before injecting command output.
   await page.waitForFunction(async () => {
     const path = '/src/features/terminal/stores/terminal.ts';
-    const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+    const { useTerminalStore } = (await import(path)) as typeof import('../src/features/terminal/stores/terminal');
     return Object.values(useTerminalStore.getState().startupStates).includes('ready');
   });
   for (let i = 0; i < 12; i++) {
     const command = `wrapped-${i}`;
-    await emitPtyOutput(page, `\x1b]133;E;${btoa(command)}\x07\x1b]133;C\x07${'wrapped-long-output '.repeat(25)}\r\n\x1b]133;D;0\x07\x1b]133;A\x07`);
+    await emitPtyOutput(
+      page,
+      `\x1b]133;E;${btoa(command)}\x07\x1b]133;C\x07${'wrapped-long-output '.repeat(25)}\r\n\x1b]133;D;0\x07\x1b]133;A\x07`,
+    );
     await expect(exitCodes(page)).toHaveCount(i + 1);
   }
   await page.evaluate(() => {
     const scroll = document.querySelector<HTMLElement>('[data-testid^="terminal-scroll-"]')!;
-    const marker = scroll.querySelector<HTMLElement>('[data-testid^="command-block-"]:last-child')
-      ?? [...scroll.querySelectorAll<HTMLElement>('[data-testid^="command-block-"]')].at(-1)!;
+    const marker =
+      scroll.querySelector<HTMLElement>('[data-testid^="command-block-"]:last-child') ??
+      [...scroll.querySelectorAll<HTMLElement>('[data-testid^="command-block-"]')].at(-1)!;
     scroll.scrollTop = scroll.scrollHeight;
     const scope = window as unknown as { historyFrames: Array<{ top: number; gap: number; height: number }>; historyFrame: number };
     scope.historyFrames = [];
     const sample = () => {
-      scope.historyFrames.push({ top: marker.getBoundingClientRect().top, gap: scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight, height: marker.offsetHeight });
+      scope.historyFrames.push({
+        top: marker.getBoundingClientRect().top,
+        gap: scroll.scrollHeight - scroll.scrollTop - scroll.clientHeight,
+        height: marker.offsetHeight,
+      });
       scope.historyFrame = requestAnimationFrame(sample);
     };
     scope.historyFrame = requestAnimationFrame(sample);
   });
   for (let i = 0; i < 4; i++) {
-    await input.fill('ls'); await input.press('Enter');
+    await input.fill('ls');
+    await input.press('Enter');
     await expect(exitCodes(page)).toHaveCount(13 + i);
   }
   const frames = await page.evaluate(async () => {
-    await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+    await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
     const scope = window as unknown as { historyFrames: Array<{ top: number; gap: number; height: number }>; historyFrame: number };
     cancelAnimationFrame(scope.historyFrame);
     return scope.historyFrames;
   });
   expect(frames.length).toBeGreaterThan(3);
-  expect(new Set(frames.map(frame => frame.height)).size).toBe(1);
+  expect(new Set(frames.map((frame) => frame.height)).size).toBe(1);
   expect(Math.max(...frames.slice(1).map((frame, index) => frame.top - frames[index]!.top))).toBeLessThan(1.1);
-  expect(Math.max(...frames.map(frame => frame.gap))).toBeLessThan(2);
+  expect(Math.max(...frames.map((frame) => frame.gap))).toBeLessThan(2);
 });

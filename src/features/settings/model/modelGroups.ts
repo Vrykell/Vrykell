@@ -28,29 +28,23 @@ export function groupModelsByVendor(models: ModelProfile[]): ModelGroup[] {
   const groups = new Map<string, ModelGroup>();
   for (const model of models) {
     const custom = model.group?.trim() ?? '';
-    const vendor = custom
-      ? `custom:${custom}`
-      : model.model.trim() ? modelVendor(model.provider, model.model, model.baseUrl) : UNASSIGNED;
+    const vendor = custom ? `custom:${custom}` : model.model.trim() ? modelVendor(model.provider, model.model, model.baseUrl) : UNASSIGNED;
     const group = groups.get(vendor) ?? {
       key: vendor,
-      label: custom || (vendor === UNASSIGNED
-        ? t('Unassigned')
-        : modelVendorInfo(model.provider, model.model, model.baseUrl).label),
+      label: custom || (vendor === UNASSIGNED ? t('Unassigned') : modelVendorInfo(model.provider, model.model, model.baseUrl).label),
       models: [],
     };
     group.models.push(model);
     groups.set(vendor, group);
   }
-  return [...groups.values()].map(group => ({ ...group, models: group.models.sort((a, b) =>
-    (a.name || a.model).localeCompare(b.name || b.model, 'en', { sensitivity: 'base', numeric: true })) }));
+  return [...groups.values()].map((group) => ({
+    ...group,
+    models: group.models.sort((a, b) => (a.name || a.model).localeCompare(b.name || b.model, 'en', { sensitivity: 'base', numeric: true })),
+  }));
 }
 
 /** Search matches the display name and the API model id; the capability filter keeps one kind. */
-export function filterModels(
-  models: ModelProfile[],
-  query: string,
-  capability: ModelCapability | 'all',
-): ModelProfile[] {
+export function filterModels(models: ModelProfile[], query: string, capability: ModelCapability | 'all'): ModelProfile[] {
   const needle = query.trim().toLowerCase();
   return models.filter((model) => {
     if (needle && !`${model.name} ${model.model}`.toLowerCase().includes(needle)) return false;

@@ -8,7 +8,9 @@ async function openHistory(page: import('@playwright/test').Page) {
 }
 
 test.beforeEach(async ({ page }, testInfo) => {
-  await setupTauriMock(page, { groupedHistoricalSession: testInfo.title === 'restoring one session from an archived group keeps it visible in the tab list' });
+  await setupTauriMock(page, {
+    groupedHistoricalSession: testInfo.title === 'restoring one session from an archived group keeps it visible in the tab list',
+  });
   await page.goto('/');
 });
 
@@ -41,7 +43,12 @@ test.describe('Session history management', () => {
     await page.reload();
     // Open the session history page idempotently (the panel state may be persisted, so avoid toggling it closed).
     await expect(page.locator('[data-testid^="tab-row-"]').first()).toBeVisible();
-    if (!(await page.locator('[data-testid="tab-history-btn"]').isVisible().catch(() => false))) {
+    if (
+      !(await page
+        .locator('[data-testid="tab-history-btn"]')
+        .isVisible()
+        .catch(() => false))
+    ) {
       await ensureTabsOpen(page);
     }
     await expect(page.locator('[data-testid="tab-history-btn"]')).toBeVisible({ timeout: 5000 });
@@ -100,6 +107,6 @@ test.describe('Opening files by double-click', () => {
     // command reaches the terminal.
     await expect(page.getByTestId('file-editor')).toBeVisible();
     await expect(page.getByTestId('file-editor').locator('.monaco-editor')).toBeVisible({ timeout: 15_000 });
-    expect((await ptyWrites(page)).some(call => call.includes('vim'))).toBe(false);
+    expect((await ptyWrites(page)).some((call) => call.includes('vim'))).toBe(false);
   });
 });

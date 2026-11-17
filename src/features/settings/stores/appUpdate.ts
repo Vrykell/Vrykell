@@ -1,7 +1,13 @@
 import { create } from 'zustand';
 import { interceptEditorClose } from '@core/editor';
 import { t } from '@i18n';
-import { applicationVersion, checkApplicationUpdate, prepareApplicationUpdate, restartApplication, type AppUpdate } from '@platform/updater';
+import {
+  applicationVersion,
+  checkApplicationUpdate,
+  prepareApplicationUpdate,
+  restartApplication,
+  type AppUpdate,
+} from '@platform/updater';
 
 type Phase = 'idle' | 'checking' | 'current' | 'available' | 'downloading' | 'ready' | 'installing' | 'restarting' | 'installed';
 type Operation = 'check' | 'download' | 'install' | 'restart';
@@ -28,17 +34,27 @@ const DOWNLOAD_RETRIES = 2;
 
 /** Keep the native update resource alive when settings navigation changes. */
 export const useAppUpdate = create<UpdateState>((set, get) => ({
-  currentVersion: '', phase: 'idle', version: '', notes: '', downloaded: 0, error: '', operation: 'check',
+  currentVersion: '',
+  phase: 'idle',
+  version: '',
+  notes: '',
+  downloaded: 0,
+  error: '',
+  operation: 'check',
   loadVersion: async () => {
     if (get().currentVersion) return;
-    try { set({ currentVersion: await applicationVersion() }); }
-    catch (error) { set({ error: String(error), operation: 'check' }); }
+    try {
+      set({ currentVersion: await applicationVersion() });
+    } catch (error) {
+      set({ error: String(error), operation: 'check' });
+    }
   },
   clearError: () => set({ error: '' }),
   check: async () => {
     if (busy(get().phase) || get().phase === 'installed') return;
     set({ phase: 'checking', error: '', operation: 'check', version: '', notes: '', downloaded: 0, total: undefined });
-    const previous = pending; pending = null;
+    const previous = pending;
+    pending = null;
     await previous?.close().catch(() => {});
     try {
       const update = await checkApplicationUpdate();
@@ -47,8 +63,16 @@ export const useAppUpdate = create<UpdateState>((set, get) => ({
         throw new Error(t('Only stable releases can be installed.'));
       }
       pending = update;
-      set({ phase: update ? 'available' : 'current', version: update?.version ?? '', notes: update?.body?.slice(0, 20000) ?? '', downloaded: 0, total: undefined });
-    } catch (error) { set({ phase: 'idle', error: String(error) }); }
+      set({
+        phase: update ? 'available' : 'current',
+        version: update?.version ?? '',
+        notes: update?.body?.slice(0, 20000) ?? '',
+        downloaded: 0,
+        total: undefined,
+      });
+    } catch (error) {
+      set({ phase: 'idle', error: String(error) });
+    }
   },
   download: async () => {
     const update = pending;
@@ -59,11 +83,14 @@ export const useAppUpdate = create<UpdateState>((set, get) => ({
       if (pending !== update || get().phase !== 'downloading') return;
       set({ downloaded: 0, total: undefined });
       try {
-        await update.download(event => {
-          if (pending !== update || get().phase !== 'downloading') return;
-          if (event.event === 'Started') set({ total: event.data.contentLength });
-          if (event.event === 'Progress') set(state => ({ downloaded: state.downloaded + event.data.chunkLength }));
-        }, { timeout: DOWNLOAD_TIMEOUT_MS });
+        await update.download(
+          (event) => {
+            if (pending !== update || get().phase !== 'downloading') return;
+            if (event.event === 'Started') set({ total: event.data.contentLength });
+            if (event.event === 'Progress') set((state) => ({ downloaded: state.downloaded + event.data.chunkLength }));
+          },
+          { timeout: DOWNLOAD_TIMEOUT_MS },
+        );
         // Completion is published only after the native signature verification succeeds.
         set({ phase: 'ready', downloaded: 0, total: undefined });
         return;
@@ -86,10 +113,17 @@ export const useAppUpdate = create<UpdateState>((set, get) => ({
         try {
           await prepareApplicationUpdate();
           if (phase === 'ready') await update.install({ restartAfterInstall: true });
-        } catch (error) { set({ phase, error: String(error) }); return; }
+        } catch (error) {
+          set({ phase, error: String(error) });
+          return;
+        }
         set({ phase: 'restarting', operation: 'restart' });
-        try { await restartApplication(); set({ phase: 'installed' }); }
-        catch (error) { set({ phase: 'installed', error: String(error) }); }
+        try {
+          await restartApplication();
+          set({ phase: 'installed' });
+        } catch (error) {
+          set({ phase: 'installed', error: String(error) });
+        }
       })();
     };
     if (!interceptEditorClose('all', proceed)) proceed();

@@ -30,16 +30,23 @@ const EMPTY: PaneInput = { text: '', aiMode: false };
 export const useInputStore = create<InputState>((set) => ({
   byPane: {},
 
-  stageText: (paneId, text) => set(s => {
-    const current = s.byPane[paneId] ?? EMPTY;
-    const draft = current.aiMode ? current.commandDraft ?? '' : current.text;
-    return { byPane: { ...s.byPane, [paneId]: {
-      ...current, aiMode: false,
-      ...(current.aiMode ? { aiDraft: current.text } : {}),
-      text: draft ? `${draft}${draft.endsWith('\n') ? '' : '\n'}${text}` : text,
-      focusRequest: (current.focusRequest ?? 0) + 1,
-    } } };
-  }),
+  stageText: (paneId, text) =>
+    set((s) => {
+      const current = s.byPane[paneId] ?? EMPTY;
+      const draft = current.aiMode ? (current.commandDraft ?? '') : current.text;
+      return {
+        byPane: {
+          ...s.byPane,
+          [paneId]: {
+            ...current,
+            aiMode: false,
+            ...(current.aiMode ? { aiDraft: current.text } : {}),
+            text: draft ? `${draft}${draft.endsWith('\n') ? '' : '\n'}${text}` : text,
+            focusRequest: (current.focusRequest ?? 0) + 1,
+          },
+        },
+      };
+    }),
 
   setText: (paneId, text) =>
     set((s) => ({

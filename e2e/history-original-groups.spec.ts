@@ -65,7 +65,8 @@ test('restores original membership and order and retains history after the last 
   await ensureTabsOpen(page);
   const tabs = page.locator('[data-tab-row-id][data-tab-group="archived-group"]');
   await expect(tabs).toHaveCount(3);
-  await expect.poll(() => tabs.evaluateAll(items => items.map(item => item.getAttribute('data-tab-row-id'))))
+  await expect
+    .poll(() => tabs.evaluateAll((items) => items.map((item) => item.getAttribute('data-tab-row-id'))))
     .toEqual(['hist-group-1', 'hist-group-2', 'hist-group-3']);
   for (const id of ['hist-group-1', 'hist-group-2', 'hist-group-3']) {
     await page.getByTestId(`tab-row-${id}`).hover();

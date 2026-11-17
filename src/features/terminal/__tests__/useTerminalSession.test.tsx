@@ -47,7 +47,9 @@ vi.mock('@xterm/xterm', () => ({
     focus() {}
     attachCustomKeyEventHandler() {}
     attachCustomWheelEventHandler() {}
-    getSelection() { return ''; }
+    getSelection() {
+      return '';
+    }
     onData(h: (d: string) => void) {
       onDataHandlers.push(h);
       return { dispose() {} };
@@ -57,9 +59,17 @@ vi.mock('@xterm/xterm', () => ({
     }
   },
 }));
-vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { proposeDimensions() { return fitProposal; } } }));
+vi.mock('@xterm/addon-fit', () => ({
+  FitAddon: class {
+    proposeDimensions() {
+      return fitProposal;
+    }
+  },
+}));
 vi.mock('@xterm/addon-web-links', () => ({ WebLinksAddon: class {} }));
-vi.mock('@features/ssh/services/hostTrust', () => ({ prepareSshHost: vi.fn().mockResolvedValue({ known: true, fingerprint: 'SHA256:test', keyType: 'ed25519' }) }));
+vi.mock('@features/ssh/services/hostTrust', () => ({
+  prepareSshHost: vi.fn().mockResolvedValue({ known: true, fingerprint: 'SHA256:test', keyType: 'ed25519' }),
+}));
 vi.mock('@features/ssh/services/forwarding', () => ({ startAutomaticForwarding: vi.fn().mockResolvedValue(undefined) }));
 
 invokeMock.mockResolvedValue('sess-x');
@@ -116,24 +126,46 @@ function setTab(openMode: 'classic' | 'block') {
 /** Configure an SSH tab with optional automatic reconnect. */
 function setSshTab(autoReconnect: boolean) {
   useWorkspaceStore.setState({
-    tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'classic', ssh: { name: 'server', host: 'server', autoReconnect } }) }],
+    tabs: [
+      {
+        id: 't1',
+        title: 'ssh',
+        kind: 'session',
+        layout: leaf({ id: 't1', kind: 'ssh', openMode: 'classic', ssh: { name: 'server', host: 'server', autoReconnect } }),
+      },
+    ],
     activeId: 't1',
   });
 }
 
 function TestHarness({ tabId, paneId = tabId, onReady }: { tabId: string; paneId?: string; onReady: (sessionId: string) => void }) {
   const { ref, closeSession, reconnect, sshAuthenticated, sshLog } = useTerminalSession(paneId, tabId, onReady);
-  return <><div ref={ref} data-testid="term-host" /><output data-testid="ssh-auth-state">{sshAuthenticated ? 'authenticated' : 'unconfirmed'}</output><output data-testid="ssh-log">{sshLog.map(entry => entry.text).join(' | ')}</output><button onClick={() => void closeSession()}>关闭连接</button><button onClick={() => void reconnect()}>重连</button></>;
+  return (
+    <>
+      <div ref={ref} data-testid="term-host" />
+      <output data-testid="ssh-auth-state">{sshAuthenticated ? 'authenticated' : 'unconfirmed'}</output>
+      <output data-testid="ssh-log">{sshLog.map((entry) => entry.text).join(' | ')}</output>
+      <button onClick={() => void closeSession()}>关闭连接</button>
+      <button onClick={() => void reconnect()}>重连</button>
+    </>
+  );
 }
 
 describe('useTerminalSession', () => {
   it('keeps the process attached when a stable pane moves to a different container', async () => {
     setTab('block');
-    const ready = vi.fn(); const view = render(<TestHarness tabId="t1" paneId="t1" onReady={ready} />);
+    const ready = vi.fn();
+    const view = render(<TestHarness tabId="t1" paneId="t1" onReady={ready} />);
     await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalledOnce());
-    act(() => useWorkspaceStore.setState({ tabs: [{ id: 'moved', title: 'Moved', kind: 'session', layout: leaf({ id: 't1', kind: 'local', openMode: 'block' }) }], activeId: 'moved' }));
+    act(() =>
+      useWorkspaceStore.setState({
+        tabs: [{ id: 'moved', title: 'Moved', kind: 'session', layout: leaf({ id: 't1', kind: 'local', openMode: 'block' }) }],
+        activeId: 'moved',
+      }),
+    );
     view.rerender(<TestHarness tabId="moved" paneId="t1" onReady={ready} />);
-    expect(mockedPtySpawn).toHaveBeenCalledOnce(); expect(ptyClose).not.toHaveBeenCalled();
+    expect(mockedPtySpawn).toHaveBeenCalledOnce();
+    expect(ptyClose).not.toHaveBeenCalled();
   });
   beforeEach(() => {
     terminalGrid.cols = 80;
@@ -184,16 +216,24 @@ describe('useTerminalSession', () => {
   });
 
   it('records the resolved system shell for a live process and clears it on disposal', async () => {
-    invokeMock.mockImplementation(command => Promise.resolve(command === 'list_shells'
-      ? [{ id: 'pwsh', label: 'Shell', default: true }] : 'sess-x'));
+    invokeMock.mockImplementation((command) =>
+      Promise.resolve(command === 'list_shells' ? [{ id: 'pwsh', label: 'Shell', default: true }] : 'sess-x'),
+    );
     try {
-      const view = render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+      const view = render(<TestHarness tabId="t1" onReady={(id) => useTerminalStore.getState().setSession('t1', id)} />);
       await waitFor(() => expect(useTerminalStore.getState().shellTypes.t1).toBe('pwsh'));
-      expect(vi.mocked(mockedPtySpawn)).toHaveBeenCalledWith(expect.any(Number), expect.any(Number), undefined, expect.objectContaining({ shell: 'pwsh' }));
+      expect(vi.mocked(mockedPtySpawn)).toHaveBeenCalledWith(
+        expect.any(Number),
+        expect.any(Number),
+        undefined,
+        expect.objectContaining({ shell: 'pwsh' }),
+      );
       view.unmount();
       expect(useTerminalStore.getState().shellTypes.t1).toBeUndefined();
       expect(useTerminalStore.getState().sessions.t1).toBeUndefined();
-    } finally { invokeMock.mockResolvedValue('sess-x'); }
+    } finally {
+      invokeMock.mockResolvedValue('sess-x');
+    }
   });
 
   it('records the window return with the renderer state of each surface', async () => {
@@ -203,7 +243,9 @@ describe('useTerminalSession', () => {
       window.dispatchEvent(new Event('blur'));
       window.dispatchEvent(new Event('focus'));
     });
-    const returns = diagnosticSnapshot().slice(before).filter(record => record.event === 'terminal-window-return');
+    const returns = diagnosticSnapshot()
+      .slice(before)
+      .filter((record) => record.event === 'terminal-window-return');
     expect(returns).toHaveLength(1);
     // The record answers what the terminal came back as: a missing WebGL addon here means the
     // pane silently stepped down to the DOM renderer while the window was away.
@@ -212,13 +254,23 @@ describe('useTerminalSession', () => {
 
   it('re-applies the settled font options so a late-loaded face re-measures the terminal grid', async () => {
     let resolveReady!: () => void;
-    Object.defineProperty(document, 'fonts', { value: { ready: new Promise<void>(resolve => { resolveReady = resolve; }) }, configurable: true });
+    Object.defineProperty(document, 'fonts', {
+      value: {
+        ready: new Promise<void>((resolve) => {
+          resolveReady = resolve;
+        }),
+      },
+      configurable: true,
+    });
     try {
       render(<TestHarness tabId="t1" onReady={() => {}} />);
       const term = terminalInstances[terminalInstances.length - 1]!;
       // The terminal was created with pre-load options, as a fallback face measured at creation.
       expect(term.options.fontSize).toBe(13);
-      await act(async () => { resolveReady(); await Promise.resolve(); });
+      await act(async () => {
+        resolveReady();
+        await Promise.resolve();
+      });
       expect(term.options.fontSize).toBe(useTypographyStore.getState().terminalFontSize);
       expect(term.options.letterSpacing).toBeTypeOf('number');
     } finally {
@@ -241,7 +293,7 @@ describe('useTerminalSession', () => {
 
   it('confirms SSH authentication only after a remote prompt marker and resets on reconnect', async () => {
     setSshTab(false);
-    const view = render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    const view = render(<TestHarness tabId="t1" onReady={(id) => useTerminalStore.getState().setSession('t1', id)} />);
     await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
     expect(view.getByTestId('ssh-auth-state')).toHaveTextContent('unconfirmed');
     vi.useFakeTimers();
@@ -252,51 +304,88 @@ describe('useTerminalSession', () => {
       });
       expect(useTerminalStore.getState().startupStates.t1).toBe('ready');
       expect(view.getByTestId('ssh-auth-state')).toHaveTextContent('unconfirmed');
-      await act(async () => { ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;B', payload: '', raw: '\x1b]133;B\x07' }]); });
+      await act(async () => {
+        ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;B', payload: '', raw: '\x1b]133;B\x07' }]);
+      });
       expect(view.getByTestId('ssh-auth-state')).toHaveTextContent('authenticated');
-      await act(async () => { fireEvent.click(view.getByText('重连')); });
+      await act(async () => {
+        fireEvent.click(view.getByText('重连'));
+      });
       expect(view.getByTestId('ssh-auth-state')).toHaveTextContent('unconfirmed');
-    } finally { vi.useRealTimers(); }
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('starts saved automatic forwarding only once after authentication for each connection', async () => {
-    useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'classic', ssh: { name: 'server', host: 'server', connectionId: 'saved' } }) }], activeId: 't1' });
-    const view = render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    useWorkspaceStore.setState({
+      tabs: [
+        {
+          id: 't1',
+          title: 'ssh',
+          kind: 'session',
+          layout: leaf({ id: 't1', kind: 'ssh', openMode: 'classic', ssh: { name: 'server', host: 'server', connectionId: 'saved' } }),
+        },
+      ],
+      activeId: 't1',
+    });
+    const view = render(<TestHarness tabId="t1" onReady={(id) => useTerminalStore.getState().setSession('t1', id)} />);
     await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
     expect(startAutomaticForwarding).not.toHaveBeenCalled();
     const ready = [{ kind: 'osc', code: '133;B', payload: '', raw: '\x1b]133;B\x07' }];
-    await act(async () => { ptyOutputHandlers[0]!('sess-x', ready); ptyOutputHandlers[0]!('sess-x', ready); });
+    await act(async () => {
+      ptyOutputHandlers[0]!('sess-x', ready);
+      ptyOutputHandlers[0]!('sess-x', ready);
+    });
     expect(startAutomaticForwarding).toHaveBeenCalledExactlyOnceWith('saved');
-    view.rerender(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    view.rerender(<TestHarness tabId="t1" onReady={(id) => useTerminalStore.getState().setSession('t1', id)} />);
     expect(startAutomaticForwarding).toHaveBeenCalledTimes(1);
-    await act(async () => { fireEvent.click(view.getByText('重连')); });
+    await act(async () => {
+      fireEvent.click(view.getByText('重连'));
+    });
     await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalledTimes(2));
-    await act(async () => { ptyOutputHandlers[1]!('sess-x', ready); });
+    await act(async () => {
+      ptyOutputHandlers[1]!('sess-x', ready);
+    });
     expect(startAutomaticForwarding).toHaveBeenCalledTimes(2);
   });
 
   it('logs real client output, shell readiness and the exit code', async () => {
     setSshTab(false);
-    const view = render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    const view = render(<TestHarness tabId="t1" onReady={(id) => useTerminalStore.getState().setSession('t1', id)} />);
     await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
     const log = () => view.getByTestId('ssh-log').textContent ?? '';
-    await act(async () => { ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'private-shell-output-before-any-marker\r\n' }]); });
+    await act(async () => {
+      ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'private-shell-output-before-any-marker\r\n' }]);
+    });
     expect(log()).not.toContain('private-shell-output-before-any-marker');
-    await act(async () => { ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: '\x1b[31mWarning: Permanently added server to the list of known hosts.\x1b[0m\r\n' }]); });
+    await act(async () => {
+      ptyOutputHandlers[0]!('sess-x', [
+        { kind: 'data', text: '\x1b[31mWarning: Permanently added server to the list of known hosts.\x1b[0m\r\n' },
+      ]);
+    });
     expect(log()).toContain('Warning: Permanently added server');
-    await act(async () => { ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;B', payload: '', raw: '\x1b]133;B\x07' }]); });
+    await act(async () => {
+      ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;B', payload: '', raw: '\x1b]133;B\x07' }]);
+    });
     expect(log()).toContain('远端 Shell 就绪');
-    await act(async () => { ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'deploy@server$ ls\r\n' }]); });
+    await act(async () => {
+      ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'deploy@server$ ls\r\n' }]);
+    });
     expect(log()).not.toContain('deploy@server$ ls');
-    await act(async () => { ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'Connection to server closed.\r\n' }]); });
+    await act(async () => {
+      ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'Connection to server closed.\r\n' }]);
+    });
     expect(log()).toContain('Connection to server closed.');
-    await act(async () => { ptyExitHandlers[0]!('sess-x', 0); });
+    await act(async () => {
+      ptyExitHandlers[0]!('sess-x', 0);
+    });
     expect(log()).toContain('连接结束（退出码 0）');
   });
 
   it('keeps startup pending until the shell emits its prompt-end marker', async () => {
     const before = diagnosticSnapshot().slice(-1)[0]?.sequence ?? 0;
-    render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    render(<TestHarness tabId="t1" onReady={(id) => useTerminalStore.getState().setSession('t1', id)} />);
     await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
 
     ptyOutputHandlers[0]!('sess-x', [
@@ -307,11 +396,23 @@ describe('useTerminalSession', () => {
 
     ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;B', payload: '', raw: '\x1b]133;B\x07' }]);
     await waitFor(() => expect(useTerminalStore.getState().startupStates.t1).toBe('ready'));
-    const records = diagnosticSnapshot().filter(record => record.sequence > before && record.event === 'terminal-startup-stage');
-    expect(records.map(record => (record.detail as { stage: string }).stage)).toEqual(expect.arrayContaining([
-      'effect-start', 'renderer-load-start', 'renderer-loaded', 'terminal-opened', 'initial-fit',
-      'shell-detection-start', 'shell-detection-complete', 'pty-invoke', 'pty-returned', 'first-output', 'prompt-marker', 'input-ready',
-    ]));
+    const records = diagnosticSnapshot().filter((record) => record.sequence > before && record.event === 'terminal-startup-stage');
+    expect(records.map((record) => (record.detail as { stage: string }).stage)).toEqual(
+      expect.arrayContaining([
+        'effect-start',
+        'renderer-load-start',
+        'renderer-loaded',
+        'terminal-opened',
+        'initial-fit',
+        'shell-detection-start',
+        'shell-detection-complete',
+        'pty-invoke',
+        'pty-returned',
+        'first-output',
+        'prompt-marker',
+        'input-ready',
+      ]),
+    );
     expect(records.slice(-1)[0]?.detail).toMatchObject({ reason: 'prompt-marker', integrated: true, timerLagMs: expect.any(Number) });
     expect(JSON.stringify(records)).not.toContain('~/project $');
   });
@@ -320,7 +421,7 @@ describe('useTerminalSession', () => {
     const before = diagnosticSnapshot().slice(-1)[0]?.sequence ?? 0;
     vi.useFakeTimers();
     try {
-      render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+      render(<TestHarness tabId="t1" onReady={(id) => useTerminalStore.getState().setSession('t1', id)} />);
       await vi.advanceTimersByTimeAsync(1);
       expect(useTerminalStore.getState().sessions.t1).toBe('sess-x');
 
@@ -331,8 +432,12 @@ describe('useTerminalSession', () => {
       expect(useTerminalStore.getState().startupStates.t1).toBe('starting');
       await vi.advanceTimersByTimeAsync(200);
       expect(useTerminalStore.getState().startupStates.t1).toBe('ready');
-      const ready = diagnosticSnapshot().find(record => record.sequence > before && record.event === 'terminal-startup-stage'
-        && (record.detail as { stage: string }).stage === 'input-ready');
+      const ready = diagnosticSnapshot().find(
+        (record) =>
+          record.sequence > before &&
+          record.event === 'terminal-startup-stage' &&
+          (record.detail as { stage: string }).stage === 'input-ready',
+      );
       expect(ready?.detail).toMatchObject({ reason: 'idle-fallback', integrated: false });
     } finally {
       vi.useRealTimers();
@@ -340,7 +445,9 @@ describe('useTerminalSession', () => {
   });
 
   it('restores legacy CMD block sessions into an interactive classic scene', async () => {
-    useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'CMD', kind: 'session', layout: leaf({ id: 't1', kind: 'local', shellType: 'cmd', openMode: 'block' }) }] });
+    useWorkspaceStore.setState({
+      tabs: [{ id: 't1', title: 'CMD', kind: 'session', layout: leaf({ id: 't1', kind: 'local', shellType: 'cmd', openMode: 'block' }) }],
+    });
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalled());
     expect(vi.mocked(mockedPtySpawn).mock.calls[0]?.[3]).toMatchObject({ shell: 'cmd', openMode: 'classic' });
@@ -350,7 +457,7 @@ describe('useTerminalSession', () => {
   });
 
   it('hands the surface back when a real alternate screen starts under a manual fullscreen', async () => {
-    render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    render(<TestHarness tabId="t1" onReady={(id) => useTerminalStore.getState().setSession('t1', id)} />);
     await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
     // The user fullscreened the running block terminal; the foreground program then switches to
     // the alternate buffer, whose live screen is drawn by the main xterm.
@@ -366,11 +473,26 @@ describe('useTerminalSession', () => {
   });
 
   it('keeps SSH block authentication interactive until the remote prompt arrives', async () => {
-    useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', user: 'user' } }) }], activeId: 't1' });
+    useWorkspaceStore.setState({
+      tabs: [
+        {
+          id: 't1',
+          title: 'ssh',
+          kind: 'session',
+          layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', user: 'user' } }),
+        },
+      ],
+      activeId: 't1',
+    });
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalled());
     expect(prepareSshHost).toHaveBeenCalledWith('server', undefined, expect.any(AbortSignal), expect.objectContaining({ host: 'server' }));
-    expect(mockedPtySpawn).toHaveBeenCalledWith(80, 24, undefined, expect.objectContaining({ ssh: expect.objectContaining({ hostKeyType: 'ed25519' }), openMode: 'block' }));
+    expect(mockedPtySpawn).toHaveBeenCalledWith(
+      80,
+      24,
+      undefined,
+      expect.objectContaining({ ssh: expect.objectContaining({ hostKeyType: 'ed25519' }), openMode: 'block' }),
+    );
     expect(useTerminalStore.getState().scenes.t1).toBe('classic');
     ptyOutputHandlers[0]!('sess-x', [{ kind: 'data', text: 'Password: ' }]);
     expect(writeMock).toHaveBeenCalledWith('Password: ', expect.any(Function));
@@ -380,10 +502,25 @@ describe('useTerminalSession', () => {
     await waitFor(() => expect(useTerminalStore.getState().scenes.t1).toBe('blockList'));
   });
   it('uses classic rendering when the remote profile disables integration despite a block preference', async () => {
-    useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', shellIntegration: false } }) }], activeId: 't1' });
+    useWorkspaceStore.setState({
+      tabs: [
+        {
+          id: 't1',
+          title: 'ssh',
+          kind: 'session',
+          layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', shellIntegration: false } }),
+        },
+      ],
+      activeId: 't1',
+    });
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalledWith(80, 24, undefined, expect.objectContaining({ openMode: 'classic' })));
-    act(() => ptyOutputHandlers[0]!('sess-x', [{ kind: 'osc', code: '133;A', payload: '', raw: '\x1b]133;A\x07' }, { kind: 'data', text: 'menu application' }]));
+    act(() =>
+      ptyOutputHandlers[0]!('sess-x', [
+        { kind: 'osc', code: '133;A', payload: '', raw: '\x1b]133;A\x07' },
+        { kind: 'data', text: 'menu application' },
+      ]),
+    );
     expect(useTerminalStore.getState().scenes.t1).toBe('classic');
     expect(writeMock).toHaveBeenCalledWith(expect.stringContaining('menu application'), expect.any(Function));
   });
@@ -392,18 +529,43 @@ describe('useTerminalSession', () => {
     // An old server may fail to negotiate with the preflight library: ssh then verifies the host itself,
     // and the connection must still work.
     vi.mocked(prepareSshHost).mockRejectedValueOnce(new Error('SSH 握手失败：[Session(-5)] Unable to exchange encryption keys'));
-    useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', user: 'user' } }) }], activeId: 't1' });
+    useWorkspaceStore.setState({
+      tabs: [
+        {
+          id: 't1',
+          title: 'ssh',
+          kind: 'session',
+          layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', user: 'user' } }),
+        },
+      ],
+      activeId: 't1',
+    });
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalled());
-    expect(mockedPtySpawn).toHaveBeenCalledWith(80, 24, undefined, expect.objectContaining({
-      ssh: expect.objectContaining({ hostKeyPolicy: 'ask' }),
-    }));
+    expect(mockedPtySpawn).toHaveBeenCalledWith(
+      80,
+      24,
+      undefined,
+      expect.objectContaining({
+        ssh: expect.objectContaining({ hostKeyPolicy: 'ask' }),
+      }),
+    );
     expect(vi.mocked(mockedPtySpawn).mock.calls[0]?.[3]).not.toHaveProperty('ssh.hostKeyType');
   });
 
   it('stops before spawning when the recorded host key changed', async () => {
     vi.mocked(prepareSshHost).mockRejectedValueOnce(new Error('主机密钥不匹配（可能存在中间人攻击）：server'));
-    useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', user: 'user' } }) }], activeId: 't1' });
+    useWorkspaceStore.setState({
+      tabs: [
+        {
+          id: 't1',
+          title: 'ssh',
+          kind: 'session',
+          layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', user: 'user' } }),
+        },
+      ],
+      activeId: 't1',
+    });
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(writeMock).toHaveBeenCalledWith(expect.stringContaining('SSH 连接失败'), expect.any(Function)));
     expect(mockedPtySpawn).not.toHaveBeenCalled();
@@ -411,8 +573,20 @@ describe('useTerminalSession', () => {
 
   it('stops before spawning when host trust was cancelled without localized text', async () => {
     // Cancellation carries a stable error name so a locale change cannot turn it into a retry.
-    vi.mocked(prepareSshHost).mockRejectedValueOnce(Object.assign(new Error('Host trust was cancelled'), { name: 'SshHostTrustCancelledError' }));
-    useWorkspaceStore.setState({ tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', user: 'user' } }) }], activeId: 't1' });
+    vi.mocked(prepareSshHost).mockRejectedValueOnce(
+      Object.assign(new Error('Host trust was cancelled'), { name: 'SshHostTrustCancelledError' }),
+    );
+    useWorkspaceStore.setState({
+      tabs: [
+        {
+          id: 't1',
+          title: 'ssh',
+          kind: 'session',
+          layout: leaf({ id: 't1', kind: 'ssh', openMode: 'block', ssh: { name: 'server', host: 'server', user: 'user' } }),
+        },
+      ],
+      activeId: 't1',
+    });
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(writeMock).toHaveBeenCalledWith(expect.stringContaining('SSH 连接失败'), expect.any(Function)));
     expect(mockedPtySpawn).not.toHaveBeenCalled();
@@ -428,7 +602,7 @@ describe('useTerminalSession', () => {
   });
 
   it('closes the PTY and ignores output and keyboard input after cancellation', async () => {
-    const { getByText } = render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    const { getByText } = render(<TestHarness tabId="t1" onReady={(id) => useTerminalStore.getState().setSession('t1', id)} />);
     await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
     fireEvent.click(getByText('关闭连接'));
     await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBeUndefined());
@@ -442,7 +616,12 @@ describe('useTerminalSession', () => {
 
   it('closes a late spawn without publishing a session after cancellation', async () => {
     let finish!: (id: string) => void;
-    vi.mocked(mockedPtySpawn).mockImplementationOnce(() => new Promise<string>(resolve => { finish = resolve; }));
+    vi.mocked(mockedPtySpawn).mockImplementationOnce(
+      () =>
+        new Promise<string>((resolve) => {
+          finish = resolve;
+        }),
+    );
     const onReady = vi.fn();
     const { getByText } = render(<TestHarness tabId="t1" onReady={onReady} />);
     await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalled());
@@ -453,7 +632,7 @@ describe('useTerminalSession', () => {
   });
 
   it('removes the session mapping when its process exits', async () => {
-    render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    render(<TestHarness tabId="t1" onReady={(id) => useTerminalStore.getState().setSession('t1', id)} />);
     await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
     ptyExitHandlers[0]!('sess-x');
     expect(useTerminalStore.getState().sessions.t1).toBeUndefined();
@@ -461,7 +640,7 @@ describe('useTerminalSession', () => {
 
   it('reopens an interrupted SSH session automatically and leaves a clean exit alone', async () => {
     setSshTab(true);
-    render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    render(<TestHarness tabId="t1" onReady={(id) => useTerminalStore.getState().setSession('t1', id)} />);
     await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
     expect(mockedPtySpawn).toHaveBeenCalledTimes(1);
 
@@ -471,33 +650,45 @@ describe('useTerminalSession', () => {
 
     // A clean exit (the remote shell ended on purpose) leaves the session closed.
     await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
-    await act(async () => { ptyExitHandlers[1]!('sess-x', 0); });
-    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1500)); });
+    await act(async () => {
+      ptyExitHandlers[1]!('sess-x', 0);
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    });
     expect(mockedPtySpawn).toHaveBeenCalledTimes(2);
   });
 
   it('cancels a pending automatic retry when the user disconnects', async () => {
     setSshTab(true);
-    const { getByText } = render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    const { getByText } = render(<TestHarness tabId="t1" onReady={(id) => useTerminalStore.getState().setSession('t1', id)} />);
     await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
-    await act(async () => { ptyExitHandlers[0]!('sess-x', 255); });
+    await act(async () => {
+      ptyExitHandlers[0]!('sess-x', 255);
+    });
     fireEvent.click(getByText('关闭连接'));
-    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1500)); });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    });
     expect(mockedPtySpawn).toHaveBeenCalledTimes(1);
   });
 
   it('does not retry a remote command that exits with a nonzero status', async () => {
     setSshTab(true);
-    render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    render(<TestHarness tabId="t1" onReady={(id) => useTerminalStore.getState().setSession('t1', id)} />);
     await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
-    await act(async () => { ptyExitHandlers[0]!('sess-x', 1); });
-    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1500)); });
+    await act(async () => {
+      ptyExitHandlers[0]!('sess-x', 1);
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    });
     expect(mockedPtySpawn).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the retry budget bounded across quiet authentication prompts and renews it on manual retry', async () => {
     setSshTab(true);
-    const { getByText } = render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    const { getByText } = render(<TestHarness tabId="t1" onReady={(id) => useTerminalStore.getState().setSession('t1', id)} />);
     await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
     vi.useFakeTimers();
     try {
@@ -512,7 +703,9 @@ describe('useTerminalSession', () => {
         });
         expect(mockedPtySpawn).toHaveBeenCalledTimes(1 + Math.min(retry + 1, 5));
       }
-      await act(async () => { fireEvent.click(getByText('重连')); });
+      await act(async () => {
+        fireEvent.click(getByText('重连'));
+      });
       expect(mockedPtySpawn).toHaveBeenCalledTimes(7);
       await act(async () => {
         ptyExitHandlers[ptyExitHandlers.length - 1]!('sess-x', 255);
@@ -535,20 +728,37 @@ describe('useTerminalSession', () => {
 
   it('preflights a profile with an explicitly disabled jump host', async () => {
     useWorkspaceStore.setState({
-      tabs: [{ id: 't1', title: 'ssh', kind: 'session', layout: leaf({ id: 't1', kind: 'ssh', openMode: 'classic', ssh: { name: 'direct', host: 'direct', jumpHost: 'none' } }) }], activeId: 't1',
+      tabs: [
+        {
+          id: 't1',
+          title: 'ssh',
+          kind: 'session',
+          layout: leaf({ id: 't1', kind: 'ssh', openMode: 'classic', ssh: { name: 'direct', host: 'direct', jumpHost: 'none' } }),
+        },
+      ],
+      activeId: 't1',
     });
     render(<TestHarness tabId="t1" onReady={() => {}} />);
     await waitFor(() => expect(mockedPtySpawn).toHaveBeenCalled());
-    expect(prepareSshHost).toHaveBeenCalledWith('direct', undefined, expect.any(AbortSignal), expect.objectContaining({ host: 'direct', jumpHost: 'none' }));
+    expect(prepareSshHost).toHaveBeenCalledWith(
+      'direct',
+      undefined,
+      expect.any(AbortSignal),
+      expect.objectContaining({ host: 'direct', jumpHost: 'none' }),
+    );
   });
 
   it('does not reopen an interrupted session when the connection has no automatic reconnect', async () => {
     setSshTab(false);
-    render(<TestHarness tabId="t1" onReady={id => useTerminalStore.getState().setSession('t1', id)} />);
+    render(<TestHarness tabId="t1" onReady={(id) => useTerminalStore.getState().setSession('t1', id)} />);
     await waitFor(() => expect(useTerminalStore.getState().sessions.t1).toBe('sess-x'));
 
-    await act(async () => { ptyExitHandlers[0]!('sess-x', 255); });
-    await act(async () => { await new Promise(resolve => setTimeout(resolve, 1500)); });
+    await act(async () => {
+      ptyExitHandlers[0]!('sess-x', 255);
+    });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    });
     expect(mockedPtySpawn).toHaveBeenCalledTimes(1);
   });
 

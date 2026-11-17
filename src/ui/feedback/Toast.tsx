@@ -40,7 +40,7 @@ const LEAVE_MS = 200;
 /** Marks a toast as leaving and removes it once the animation ends. */
 function dismiss(id: number): void {
   const state = useToastStore.getState();
-  if (!state.toasts.some(item => item.id === id && !item.leaving)) return;
+  if (!state.toasts.some((item) => item.id === id && !item.leaving)) return;
   const timer = state.timers[id];
   if (timer) clearTimeout(timer);
   useToastStore.setState((s) => {
@@ -55,10 +55,13 @@ function dismiss(id: number): void {
 
 function startTimer(id: number): void {
   const state = useToastStore.getState();
-  const item = state.toasts.find(toast => toast.id === id);
+  const item = state.toasts.find((toast) => toast.id === id);
   if (!item || item.leaving || item.duration <= 0 || item.paused.length || state.background || state.timers[id]) return;
   const timer = setTimeout(() => dismiss(id), item.remaining);
-  useToastStore.setState(s => ({ timers: { ...s.timers, [id]: timer }, toasts: s.toasts.map(toast => toast.id === id ? { ...toast, startedAt: Date.now() } : toast) }));
+  useToastStore.setState((s) => ({
+    timers: { ...s.timers, [id]: timer },
+    toasts: s.toasts.map((toast) => (toast.id === id ? { ...toast, startedAt: Date.now() } : toast)),
+  }));
 }
 
 export const useToastStore = create<ToastState>((set, get) => ({
@@ -69,31 +72,40 @@ export const useToastStore = create<ToastState>((set, get) => ({
   addToast: (message, type = 'info', duration) => {
     const id = nextId++;
     const timeout = Math.max(0, duration ?? Math.min(12000, Math.max(DEFAULT_DURATION[type], message.length * 65)));
-    set((s) => ({ toasts: [...s.toasts, { id, message, type, duration: timeout, remaining: timeout, paused: s.background ? ['background'] : [] }] }));
+    set((s) => ({
+      toasts: [...s.toasts, { id, message, type, duration: timeout, remaining: timeout, paused: s.background ? ['background'] : [] }],
+    }));
     startTimer(id);
   },
 
   removeToast: dismiss,
 
   pause: (id, reason = 'pointer') => {
-    const item = get().toasts.find(toast => toast.id === id);
+    const item = get().toasts.find((toast) => toast.id === id);
     if (!item || item.leaving || item.duration <= 0 || item.paused.includes(reason)) return;
     clearTimeout(get().timers[id]);
     const remaining = Math.max(0, item.remaining - (item.startedAt === undefined ? 0 : Math.max(0, Date.now() - item.startedAt)));
     set((s) => {
       const timers = { ...s.timers };
       delete timers[id];
-      return { timers, toasts: s.toasts.map(toast => toast.id === id ? { ...toast, remaining, startedAt: undefined, paused: [...toast.paused, reason] } : toast) };
+      return {
+        timers,
+        toasts: s.toasts.map((toast) =>
+          toast.id === id ? { ...toast, remaining, startedAt: undefined, paused: [...toast.paused, reason] } : toast,
+        ),
+      };
     });
   },
 
   resume: (id, reason = 'pointer') => {
-    const item = get().toasts.find(toast => toast.id === id);
+    const item = get().toasts.find((toast) => toast.id === id);
     if (!item || item.leaving || !item.paused.includes(reason)) return;
-    set(s => ({ toasts: s.toasts.map(toast => toast.id === id ? { ...toast, paused: toast.paused.filter(value => value !== reason) } : toast) }));
+    set((s) => ({
+      toasts: s.toasts.map((toast) => (toast.id === id ? { ...toast, paused: toast.paused.filter((value) => value !== reason) } : toast)),
+    }));
     startTimer(id);
   },
-  setBackground: background => {
+  setBackground: (background) => {
     set({ background });
     for (const item of get().toasts) {
       if (background) get().pause(item.id, 'background');
@@ -113,14 +125,22 @@ export default function ToastContainer() {
     document.addEventListener('visibilitychange', sync);
     window.addEventListener('blur', blur);
     window.addEventListener('focus', focus);
-    return () => { document.removeEventListener('visibilitychange', sync); window.removeEventListener('blur', blur); window.removeEventListener('focus', focus); };
+    return () => {
+      document.removeEventListener('visibilitychange', sync);
+      window.removeEventListener('blur', blur);
+      window.removeEventListener('focus', focus);
+    };
   }, []);
   if (toasts.length === 0) return null;
 
   return (
-    <NotificationPortal followOwner={false}><div className="notification-toasts">
-      {toasts.map((t) => <ToastItem key={t.id} t={t} />)}
-    </div></NotificationPortal>
+    <NotificationPortal followOwner={false}>
+      <div className="notification-toasts">
+        {toasts.map((t) => (
+          <ToastItem key={t.id} t={t} />
+        ))}
+      </div>
+    </NotificationPortal>
   );
 }
 
@@ -129,13 +149,34 @@ function ToastItem({ t }: { t: ToastItem }) {
   const removeToast = useToastStore((s) => s.removeToast);
   const pause = useToastStore((s) => s.pause);
   const resume = useToastStore((s) => s.resume);
-  const dismiss = () => { removeToast(t.id); if (previousFocus.current?.isConnected) previousFocus.current.focus(); };
-  return <NotificationCard role="status" tone={t.type} message={t.message} leaving={t.leaving} onDismiss={dismiss}
-    onMouseEnter={() => pause(t.id)} onMouseLeave={() => resume(t.id)}
-    onFocusCapture={event => {
-      if (event.relatedTarget instanceof HTMLElement && !event.currentTarget.contains(event.relatedTarget)) previousFocus.current = event.relatedTarget;
-      pause(t.id, 'focus');
-    }} onBlurCapture={event => {
-      if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) resume(t.id, 'focus');
-    }} onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); dismiss(); } }} />;
+  const dismiss = () => {
+    removeToast(t.id);
+    if (previousFocus.current?.isConnected) previousFocus.current.focus();
+  };
+  return (
+    <NotificationCard
+      role="status"
+      tone={t.type}
+      message={t.message}
+      leaving={t.leaving}
+      onDismiss={dismiss}
+      onMouseEnter={() => pause(t.id)}
+      onMouseLeave={() => resume(t.id)}
+      onFocusCapture={(event) => {
+        if (event.relatedTarget instanceof HTMLElement && !event.currentTarget.contains(event.relatedTarget))
+          previousFocus.current = event.relatedTarget;
+        pause(t.id, 'focus');
+      }}
+      onBlurCapture={(event) => {
+        if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) resume(t.id, 'focus');
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          event.stopPropagation();
+          dismiss();
+        }
+      }}
+    />
+  );
 }

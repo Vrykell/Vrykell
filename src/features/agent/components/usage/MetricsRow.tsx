@@ -28,26 +28,41 @@ function hitRateLabel(totals: UsageTotals): string {
 export default function MetricsRow({ totals }: { totals: UsageTotals }) {
   const cards: Array<{ key: string; testId: string; label: string; value: string; exact?: string; hint?: string }> = [
     {
-      key: 'tokens', testId: 'usage-total-tokens', label: t('Total tokens'), value: formatCompact(realTokens(totals)),
+      key: 'tokens',
+      testId: 'usage-total-tokens',
+      label: t('Total tokens'),
+      value: formatCompact(realTokens(totals)),
       exact: formatTokens(realTokens(totals)),
       hint: t('Prompt and completion tokens as the provider reported them.'),
     },
     { key: 'requests', testId: 'usage-total-requests', label: t('Requests'), value: formatTokens(totals.turns) },
     {
-      key: 'fresh-input', testId: 'usage-fresh-input', label: t('Fresh input'), value: formatCompact(freshInputTokens(totals)),
+      key: 'fresh-input',
+      testId: 'usage-fresh-input',
+      label: t('Fresh input'),
+      value: formatCompact(freshInputTokens(totals)),
       exact: formatTokens(freshInputTokens(totals)),
       hint: t('Fresh input excludes the prompt tokens served from cache.'),
     },
     {
-      key: 'cache-hit', testId: 'usage-cache-hit', label: t('Cache hit rate'), value: hitRateLabel(totals),
+      key: 'cache-hit',
+      testId: 'usage-cache-hit',
+      label: t('Cache hit rate'),
+      value: hitRateLabel(totals),
       hint: t('Cache hit rate is the share of prompt tokens the provider served from its cache.'),
     },
     {
-      key: 'output', testId: 'usage-output', label: t('Output'), value: formatCompact(totals.outputTokens),
+      key: 'output',
+      testId: 'usage-output',
+      label: t('Output'),
+      value: formatCompact(totals.outputTokens),
       exact: formatTokens(totals.outputTokens),
     },
     {
-      key: 'cache-read', testId: 'usage-cache-read', label: t('Cache read'), value: formatCompact(totals.cachedInputTokens),
+      key: 'cache-read',
+      testId: 'usage-cache-read',
+      label: t('Cache read'),
+      value: formatCompact(totals.cachedInputTokens),
       exact: formatTokens(totals.cachedInputTokens),
       hint: t('Prompt tokens the provider served from its cache.'),
     },
@@ -56,11 +71,12 @@ export default function MetricsRow({ totals }: { totals: UsageTotals }) {
   ];
 
   return (
-    <section aria-label={t('Usage summary')} data-testid="usage-metrics"
+    <section
+      aria-label={t('Usage summary')}
+      data-testid="usage-metrics"
       style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 10 }}>
       {cards.map((card) => (
-        <MetricCard key={card.key} testId={card.testId} label={card.label}
-          value={card.value} exact={card.exact} hint={card.hint} />
+        <MetricCard key={card.key} testId={card.testId} label={card.label} value={card.value} exact={card.exact} hint={card.hint} />
       ))}
     </section>
   );

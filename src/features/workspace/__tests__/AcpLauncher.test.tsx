@@ -37,7 +37,9 @@ describe('AcpLauncher', () => {
     expect(screen.getByText('今日 Tokens').nextElementSibling).toHaveTextContent('0');
     view.unmount();
     useUsageStore.getState().recordTurn({ provider: 'provider', model: 'model', inputTokens: 120, outputTokens: 40 });
-    useUsageStore.getState().recordTurn({ provider: 'provider', model: 'model', inputTokens: 900, outputTokens: 200, at: Date.now() - 86_400_000 });
+    useUsageStore
+      .getState()
+      .recordTurn({ provider: 'provider', model: 'model', inputTokens: 900, outputTokens: 200, at: Date.now() - 86_400_000 });
     useUsageStore.getState().acpTurn('Claude Code');
     await useUsageStore.persist.rehydrate();
     render(<AcpLauncher embedded open onClose={() => {}} onNewConversation={() => {}} />);
@@ -94,8 +96,12 @@ describe('AcpLauncher', () => {
   it('shows the default workspace used when no project folder is chosen', async () => {
     render(<AcpLauncher open onClose={() => {}} />);
     await screen.findByTestId('acp-launcher-Claude Code');
-    await waitFor(() => expect(screen.getByRole('textbox', { name: '项目路径' })).toHaveAttribute(
-      'placeholder', '在 C:/Users/test/AppData/Local/com.vrykell.app/acp-workspace 下新建文件夹'));
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: '项目路径' })).toHaveAttribute(
+        'placeholder',
+        '在 C:/Users/test/AppData/Local/com.vrykell.app/acp-workspace 下新建文件夹',
+      ),
+    );
   });
 
   it('marks a server whose program is not on PATH as unavailable', async () => {

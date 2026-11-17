@@ -14,10 +14,7 @@ interface Props {
   onClose: () => void;
 }
 
-type StatState =
-  | { status: 'loading' }
-  | { status: 'ready'; value: FileStat }
-  | { status: 'error'; message: string };
+type StatState = { status: 'loading' } | { status: 'ready'; value: FileStat } | { status: 'error'; message: string };
 
 /** Extension without the leading dot; hidden files (.bashrc) count as extension-less. */
 function extOf(name: string): string {
@@ -37,10 +34,16 @@ export default function FilePropertiesDialog({ entry, location, stat, onClose }:
     let alive = true;
     setState({ status: 'loading' });
     stat(entry.path).then(
-      (value) => { if (alive) setState({ status: 'ready', value }); },
-      (cause: unknown) => { if (alive) setState({ status: 'error', message: String((cause as Error)?.message ?? cause) }); },
+      (value) => {
+        if (alive) setState({ status: 'ready', value });
+      },
+      (cause: unknown) => {
+        if (alive) setState({ status: 'error', message: String((cause as Error)?.message ?? cause) });
+      },
     );
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [entry.path, stat]);
 
   const rows: Array<{ key: string; label: string; value: string }> = [];
@@ -55,8 +58,10 @@ export default function FilePropertiesDialog({ entry, location, stat, onClose }:
     });
     if (location) rows.push({ key: 'location', label: t('Location'), value: location });
     if (!info.is_dir) rows.push({ key: 'size', label: t('Size'), value: fmtSize(info.size) });
-    if (info.modified_ms !== null) rows.push({ key: 'modified', label: t('Modified time'), value: new Date(info.modified_ms).toLocaleString() });
-    if (info.created_ms !== null) rows.push({ key: 'created', label: t('Created time'), value: new Date(info.created_ms).toLocaleString() });
+    if (info.modified_ms !== null)
+      rows.push({ key: 'modified', label: t('Modified time'), value: new Date(info.modified_ms).toLocaleString() });
+    if (info.created_ms !== null)
+      rows.push({ key: 'created', label: t('Created time'), value: new Date(info.created_ms).toLocaleString() });
   }
 
   return (
@@ -76,12 +81,15 @@ export default function FilePropertiesDialog({ entry, location, stat, onClose }:
       {state.status === 'ready' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, userSelect: 'text' }}>
           {rows.map((row) => (
-            <div key={row.key} style={{ display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 'calc(12px * var(--ui-font-scale))', lineHeight: 1.5 }}>
+            <div
+              key={row.key}
+              style={{ display: 'flex', gap: 10, alignItems: 'baseline', fontSize: 'calc(12px * var(--ui-font-scale))', lineHeight: 1.5 }}>
               <span style={{ width: 64, flexShrink: 0, color: 'var(--text-muted)' }}>{row.label}</span>
               <span
                 data-testid={`file-property-${row.key}`}
-                style={{ flex: 1, minWidth: 0, color: 'var(--text-primary)', wordBreak: 'break-all' }}
-              >{row.value}</span>
+                style={{ flex: 1, minWidth: 0, color: 'var(--text-primary)', wordBreak: 'break-all' }}>
+                {row.value}
+              </span>
             </div>
           ))}
         </div>

@@ -66,7 +66,11 @@ it('never treats a classic screen or a controlled pane as ready', () => {
 });
 
 it('reports a disconnected or fullscreen pane as unavailable', () => {
-  useTerminalStore.setState({ sessions: { [paneId]: 'pty-readiness' }, startupStates: { [paneId]: 'closed' }, scenes: { [paneId]: 'blockList' } });
+  useTerminalStore.setState({
+    sessions: { [paneId]: 'pty-readiness' },
+    startupStates: { [paneId]: 'closed' },
+    scenes: { [paneId]: 'blockList' },
+  });
   expect(terminalExecutionState(paneId)).toBe('unknown');
   expect(terminalCommandReady(paneId)).toBe(false);
 

@@ -10,10 +10,15 @@ vi.mock('../services/proxies', () => ({ getProxies: vi.fn().mockResolvedValue({ 
 const original = useSshStore.getState();
 const save = vi.fn().mockResolvedValue(undefined);
 beforeEach(() => {
-  save.mockClear(); useSshStore.setState({ save });
+  save.mockClear();
+  useSshStore.setState({ save });
   useHostLibrary.setState({ hosts: { existing: { group: 'Production', tags: ['production', 'api'], starred: false } } });
 });
-afterEach(() => { cleanup(); useSshStore.setState(original, true); useHostLibrary.setState({ hosts: {} }); });
+afterEach(() => {
+  cleanup();
+  useSshStore.setState(original, true);
+  useHostLibrary.setState({ hosts: {} });
+});
 
 it('edits a complete host in the workspace page and applies a default port', async () => {
   const close = vi.fn();
@@ -38,7 +43,13 @@ it('edits a complete host in the workspace page and applies a default port', asy
   fireEvent.click(screen.getByTestId('ssh-save-btn'));
   await waitFor(() => expect(close).toHaveBeenCalledOnce());
   const connection = save.mock.calls[0][0] as SshConnection;
-  expect(connection).toMatchObject({ name: 'deploy@api.test', port: 22, environment: { LANG: 'en_US.UTF-8' }, notes: 'Inventory', aiNotes: 'Avoid restarting services.' });
+  expect(connection).toMatchObject({
+    name: 'deploy@api.test',
+    port: 22,
+    environment: { LANG: 'en_US.UTF-8' },
+    notes: 'Inventory',
+    aiNotes: 'Avoid restarting services.',
+  });
   expect(useHostLibrary.getState().hosts[connection.id]).toEqual({ group: 'Production', tags: ['production'], starred: true });
 });
 
@@ -55,9 +66,16 @@ it('validates environment names and byte limits without discarding the draft', a
 });
 
 it('keeps tag identity stable and groups multi-tag hosts without duplicating untagged ones', () => {
-  const hosts: SshConnection[] = [{ id: 'existing', name: 'API', host: 'h', user: '', authMethod: 'key' }, { id: 'other', name: 'Other', host: 'other', user: '', authMethod: 'key' }];
+  const hosts: SshConnection[] = [
+    { id: 'existing', name: 'API', host: 'h', user: '', authMethod: 'key' },
+    { id: 'other', name: 'Other', host: 'other', user: '', authMethod: 'key' },
+  ];
   const groups = groupHosts(hosts, useHostLibrary.getState().hosts, 'tags');
-  expect(groups.map(group => [group.name, group.hosts.length])).toEqual([['api', 1], ['production', 1], ['', 1]]);
+  expect(groups.map((group) => [group.name, group.hosts.length])).toEqual([
+    ['api', 1],
+    ['production', 1],
+    ['', 1],
+  ]);
   expect(tagColor('production')).toBe(tagColor('production'));
   expect(tagColor('api')).toMatch(/^var\(--group-/);
 });
@@ -75,12 +93,30 @@ it('selects a saved jump profile, excludes itself and disables cyclic choices', 
   expect(screen.queryByTestId('ssh-form-jump')).not.toBeInTheDocument();
   expect(screen.getByRole('button', { name: '认证跳板服务' })).toBeVisible();
   fireEvent.click(screen.getByTestId('ssh-save-btn'));
-  await waitFor(() => expect(save).toHaveBeenCalledWith(expect.objectContaining({ id: 'target', user: 'target-user', jumpConnectionId: 'jump', jumpHost: undefined })));
+  await waitFor(() =>
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'target', user: 'target-user', jumpConnectionId: 'jump', jumpHost: undefined }),
+    ),
+  );
 });
 
 it('retains a missing jump reference and prevents saving until it is replaced', () => {
   useSshStore.setState({ connections: [] });
-  render(<SshFormModal page open initial={{ id: 'target', name: 'Internal', host: 'internal.test', user: 'target-user', authMethod: 'key', jumpConnectionId: 'deleted' }} onClose={vi.fn()} />);
+  render(
+    <SshFormModal
+      page
+      open
+      initial={{
+        id: 'target',
+        name: 'Internal',
+        host: 'internal.test',
+        user: 'target-user',
+        authMethod: 'key',
+        jumpConnectionId: 'deleted',
+      }}
+      onClose={vi.fn()}
+    />,
+  );
   expect(screen.getByTestId('ssh-form-jump-connection')).toHaveTextContent('已保存的跳板连接不可用');
   fireEvent.click(screen.getByTestId('ssh-save-btn'));
   expect(save).not.toHaveBeenCalled();

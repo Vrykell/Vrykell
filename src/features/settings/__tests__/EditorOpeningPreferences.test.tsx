@@ -29,10 +29,30 @@ it('keeps file-opening destinations separate from the shared editor preferences'
 it('adjusts editor typography independently and resets only editor metrics', () => {
   useTypographyStore.getState().update({ terminalFontSize: 17, chatFontSize: 16 });
   render(<FontSettings />);
-  for (const [name, option] of [['编辑器字体', 'JetBrains Mono'], ['编辑器字号', '18px'], ['编辑器字重', '550'], ['编辑器行距', '1.8×']]) {
-    fireEvent.click(screen.getByRole('combobox', { name })); fireEvent.click(screen.getByRole('option', { name: option }));
+  for (const [name, option] of [
+    ['编辑器字体', 'JetBrains Mono'],
+    ['编辑器字号', '18px'],
+    ['编辑器字重', '550'],
+    ['编辑器行距', '1.8×'],
+  ]) {
+    fireEvent.click(screen.getByRole('combobox', { name }));
+    fireEvent.click(screen.getByRole('option', { name: option }));
   }
-  expect(useTypographyStore.getState()).toMatchObject({ terminalFontSize: 17, chatFontSize: 16, editorFontPreset: 'JetBrains Mono', editorFontSize: 18, editorFontWeight: 550, editorLineHeight: 1.8 });
+  expect(useTypographyStore.getState()).toMatchObject({
+    terminalFontSize: 17,
+    chatFontSize: 16,
+    editorFontPreset: 'JetBrains Mono',
+    editorFontSize: 18,
+    editorFontWeight: 550,
+    editorLineHeight: 1.8,
+  });
   fireEvent.click(screen.getByRole('button', { name: '恢复编辑器字体设置' }));
-  expect(useTypographyStore.getState()).toMatchObject({ terminalFontSize: 17, chatFontSize: 16, editorFontPreset: 'system', editorFontSize: 13, editorFontWeight: 400, editorLineHeight: 1.5 });
+  expect(useTypographyStore.getState()).toMatchObject({
+    terminalFontSize: 17,
+    chatFontSize: 16,
+    editorFontPreset: 'system',
+    editorFontSize: 13,
+    editorFontWeight: 400,
+    editorLineHeight: 1.5,
+  });
 });

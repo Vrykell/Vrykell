@@ -16,13 +16,9 @@ test.describe('Theme settings page', () => {
     const theme = await page.evaluate(() => document.documentElement.dataset.theme);
     expect(theme).toBe('dark');
     await selectThemeMode(page, '浅色');
-    await expect
-      .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
-      .toBe('light');
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('light');
     await selectThemeMode(page, '深色');
-    await expect
-      .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
-      .toBe('dark');
+    await expect.poll(() => page.evaluate(() => document.documentElement.dataset.theme)).toBe('dark');
   });
 
   test('color scheme cards remain available when following the system', async ({ page }) => {
@@ -76,12 +72,13 @@ test.describe('Opening mode settings page', () => {
     await gotoSetting(page, 'Zsh');
     await expect(modes.getByRole('radio', { name: '块模式', exact: true })).toBeChecked();
     for (const theme of ['深色', '浅色']) {
-      await gotoSetting(page, '主题'); await selectThemeMode(page, theme);
+      await gotoSetting(page, '主题');
+      await selectThemeMode(page, theme);
       await gotoSetting(page, 'Zsh');
       for (const width of [760, 1240]) {
         await page.setViewportSize({ width, height: 800 });
         await expect(modes.getByRole('radio')).toHaveCount(2);
-        expect(await modes.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+        expect(await modes.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
         await modes.screenshot({ path: testInfo.outputPath(`opening-mode-${theme}-${width}.png`) });
       }
     }
@@ -108,16 +105,19 @@ test.describe('Keyboard shortcuts page', () => {
     await expect(page.getByText('全局搜索')).toBeVisible();
     await expect(page.getByText('打开设置')).toBeVisible();
     // Shortcut badges follow the platform modifier the app advertises.
-    const mod = await page.evaluate(() => /Mac/.test(navigator.userAgent) ? 'Meta' : 'Control');
+    const mod = await page.evaluate(() => (/Mac/.test(navigator.userAgent) ? 'Meta' : 'Control'));
     await expect(page.getByLabel(`${mod}+T`, { exact: true })).toBeVisible();
     await expect(page.locator('.settings-screen').getByLabel(`${mod}+F`, { exact: true })).toBeVisible();
-    // Rules between shortcut rows run edge to edge inside the card.
+    // Rules between shortcut rows stay inside the card inset instead of reaching its edges.
     const card = page.locator('.settings-group-panel').first();
     const rows = card.locator('.settings-shortcut-row');
     await expect(rows.nth(1)).toHaveCSS('border-top-width', '1px');
-    const cardBox = (await card.boundingBox())!;
+    const cardContent = await card.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    });
     const rowBox = (await rows.first().boundingBox())!;
-    expect(Math.abs(rowBox.width - cardBox.width)).toBeLessThanOrEqual(2);
+    expect(Math.abs(rowBox.width - cardContent)).toBeLessThanOrEqual(2);
   });
 });
 
@@ -150,7 +150,7 @@ test.describe('Model permissions page', () => {
     for (const width of [760, 1240]) {
       await page.setViewportSize({ width, height: 800 });
       await expect(runPermissions.getByRole('radio')).toHaveCount(3);
-      expect(await runRow.evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
+      expect(await runRow.evaluate((element) => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
       const first = (await runRow.boundingBox())!;
       const second = (await rowOf(page, '读取文件').boundingBox())!;
       if (width === 1240) expect(Math.abs(first.y - second.y)).toBeLessThanOrEqual(1);

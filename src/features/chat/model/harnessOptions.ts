@@ -10,7 +10,7 @@ const permissionIds = ['mode', 'approval_mode', 'approval_policy', 'permission_m
 
 /** A config option that changes what the agent may do, shown as the permission choice. */
 export function isPermissionOption(option: AcpConfigOption): boolean {
-  return permissionIds.includes(option.id) || option.category === 'mode' && option.id !== 'collaboration_mode';
+  return permissionIds.includes(option.id) || (option.category === 'mode' && option.id !== 'collaboration_mode');
 }
 
 /** A config option that selects the model, shown on the composer's right side. */
@@ -20,7 +20,5 @@ export function isModelOption(option: AcpConfigOption): boolean {
 
 /** Every value a select option offers, with grouped values flattened into one list. */
 export function optionValues(option: AcpConfigOption): string[] {
-  return (option.options ?? []).flatMap((entry) => 'group' in entry
-    ? entry.options.map((value) => value.value)
-    : [entry.value]);
+  return (option.options ?? []).flatMap((entry) => ('group' in entry ? entry.options.map((value) => value.value) : [entry.value]));
 }

@@ -6,7 +6,8 @@ it('keeps drafts separate by repository and connection and serializes operations
   const local = gitTargetKey({ cwd: '/repo' });
   const remote = gitTargetKey({ cwd: '/repo', connectionId: 'ssh' });
   const store = useGitOperations.getState();
-  store.draft(local, 'feat: local'); store.draft(remote, 'fix: remote');
+  store.draft(local, 'feat: local');
+  store.draft(remote, 'fix: remote');
   expect(store.begin(local, 'commit')).toBe(true);
   expect(store.begin(local, 'push')).toBe(false);
   expect(store.begin(remote, 'fetch')).toBe(true);

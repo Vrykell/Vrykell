@@ -4,7 +4,12 @@ import { formatCommandSubmission } from '@features/terminal/model/commandSubmiss
 import { blockTerminalFor } from '@features/terminal/services/terminalRepaint';
 import { ScanHelper } from '@features/terminal/services/pipeline/__tests__/scanHelper';
 
-function wire(tabId = 't1', deferBlockUntilPreexec = false, pendingUiCommand?: { command: string; wireCommand?: string }, deferFallbackMs = 3000) {
+function wire(
+  tabId = 't1',
+  deferBlockUntilPreexec = false,
+  pendingUiCommand?: { command: string; wireCommand?: string },
+  deferFallbackMs = 3000,
+) {
   const st = {
     written: '',
     blocksChanged: 0,
@@ -17,20 +22,40 @@ function wire(tabId = 't1', deferBlockUntilPreexec = false, pendingUiCommand?: {
   };
   let staged = pendingUiCommand;
   const sinks: SessionSinks = {
-    writeMain: (d) => { st.written += d; },
-    onBlocksChanged: () => { st.blocksChanged++; },
-    onSceneChanged: (s) => { st.scenes.push(s); },
-    onCwd: (p) => { st.cwds.push(p); },
-    onBlockStart: (b) => { st.started.push(b.command); },
-    onBlockComplete: (b) => { st.completed.push(b.command); },
-    onTerminalData: data => { st.replies.push(data); },
-    onProgramTitle: (title) => { st.programTitles.push(title); },
-    takePendingUiCommand: pendingUiCommand ? () => {
-      const pending = staged;
+    writeMain: (d) => {
+      st.written += d;
+    },
+    onBlocksChanged: () => {
+      st.blocksChanged++;
+    },
+    onSceneChanged: (s) => {
+      st.scenes.push(s);
+    },
+    onCwd: (p) => {
+      st.cwds.push(p);
+    },
+    onBlockStart: (b) => {
+      st.started.push(b.command);
+    },
+    onBlockComplete: (b) => {
+      st.completed.push(b.command);
+    },
+    onTerminalData: (data) => {
+      st.replies.push(data);
+    },
+    onProgramTitle: (title) => {
+      st.programTitles.push(title);
+    },
+    takePendingUiCommand: pendingUiCommand
+      ? () => {
+          const pending = staged;
+          staged = undefined;
+          return pending ?? null;
+        }
+      : undefined,
+    clearPendingUiCommand: () => {
       staged = undefined;
-      return pending ?? null;
-    } : undefined,
-    clearPendingUiCommand: () => { staged = undefined; },
+    },
   };
   const ctrl = new SessionController(tabId, 80, sinks, 24, 'classic', true, deferBlockUntilPreexec, deferFallbackMs);
   const scan = new ScanHelper();
@@ -69,17 +94,28 @@ describe('SessionController', () => {
     const { ctrl, feed, st } = wire();
     feed(`${OSC7('/Users/test/work')}${A}`);
     ctrl.appendBlankLines(3);
-    const submitted = ctrl.blocks.filter(block => block.status === 'done');
+    const submitted = ctrl.blocks.filter((block) => block.status === 'done');
     expect(submitted).toHaveLength(3);
-    expect(new Set(submitted.map(block => block.id)).size).toBe(3);
-    expect(submitted.every(block => block.cwd === '/Users/test/work' && block.command === '' && block.outputText === '' && block.startedAt !== null && block.outputHtml === '')).toBe(true);
+    expect(new Set(submitted.map((block) => block.id)).size).toBe(3);
+    expect(
+      submitted.every(
+        (block) =>
+          block.cwd === '/Users/test/work' &&
+          block.command === '' &&
+          block.outputText === '' &&
+          block.startedAt !== null &&
+          block.outputHtml === '',
+      ),
+    ).toBe(true);
     expect(st.completed).toHaveLength(3);
     expect(ctrl.activeBlock?.status).toBe('pending');
     feed(A + A + A);
-    expect(ctrl.blocks.filter(block => block.outputText === '' && block.startedAt !== null)).toHaveLength(3);
+    expect(ctrl.blocks.filter((block) => block.outputText === '' && block.startedAt !== null)).toHaveLength(3);
     const restored = wire('restored');
     restored.ctrl.seed(submitted);
-    expect(restored.ctrl.blocks.map(block => [block.cwd, block.outputText])).toEqual(submitted.map(block => [block.cwd, block.outputText]));
+    expect(restored.ctrl.blocks.map((block) => [block.cwd, block.outputText])).toEqual(
+      submitted.map((block) => [block.cwd, block.outputText]),
+    );
     restored.ctrl.dispose();
     ctrl.dispose();
   });
@@ -239,7 +275,7 @@ describe('SessionController', () => {
     feed(`${payload}\r\n${A}${E(payload)}${C}one\r\ntwo\r\n${D(0)}`);
     await waitFor(() => st.completed.length === 1);
     expect(st.completed).toEqual([script]);
-    const completed = ctrl.blocks.find(block => block.command === script);
+    const completed = ctrl.blocks.find((block) => block.command === script);
     expect(completed?.outputText).toBe('one\ntwo');
     ctrl.dispose();
   });
@@ -314,8 +350,10 @@ describe('SessionController', () => {
       feed(`${command}\r\nresult-${command}\r\n${D(0)}${A}`);
     }
     await waitFor(() => st.completed.length === 2);
-    expect(ctrl.blocks.slice(0, 2).map(block => [block.command, block.outputText, block.exitCode]))
-      .toEqual([['ls', 'result-ls', 0], ['pwd', 'result-pwd', 0]]);
+    expect(ctrl.blocks.slice(0, 2).map((block) => [block.command, block.outputText, block.exitCode])).toEqual([
+      ['ls', 'result-ls', 0],
+      ['pwd', 'result-pwd', 0],
+    ]);
     ctrl.dispose();
   });
 
@@ -324,7 +362,7 @@ describe('SessionController', () => {
     feed(A);
     ctrl.setPendingCommand('echo never', 'echo never');
     ctrl.clearPendingCommand();
-    await new Promise(resolve => setTimeout(resolve, 25));
+    await new Promise((resolve) => setTimeout(resolve, 25));
     expect(ctrl.activeBlock?.status).toBe('pending');
     ctrl.dispose();
   });
@@ -424,11 +462,25 @@ describe('SessionController', () => {
 
   it('coalesces a classic output batch into one main write', () => {
     const written: string[] = [];
-    const ctrl = new SessionController('classic-batch', 80, {
-      writeMain: data => { written.push(data); },
-      onBlocksChanged: () => {}, onSceneChanged: () => {}, onCwd: () => {},
-      onBlockStart: () => {}, onBlockComplete: () => {}, onTerminalData: () => {}, onProgramTitle: () => {},
-    }, 24, 'classic', false);
+    const ctrl = new SessionController(
+      'classic-batch',
+      80,
+      {
+        writeMain: (data) => {
+          written.push(data);
+        },
+        onBlocksChanged: () => {},
+        onSceneChanged: () => {},
+        onCwd: () => {},
+        onBlockStart: () => {},
+        onBlockComplete: () => {},
+        onTerminalData: () => {},
+        onProgramTitle: () => {},
+      },
+      24,
+      'classic',
+      false,
+    );
     ctrl.handleEvents([
       { kind: 'data', text: 'one' },
       { kind: 'osc', code: '8', payload: '', raw: '\x1b]8;;x\x07' },
@@ -547,8 +599,8 @@ describe('SessionController', () => {
     const { st, ctrl, feed } = wire();
     feed(`${OSC7('/home/a')}${A}a$ ${E('cd /home/b')}${C}${OSC7('/home/b')}${D(0)}${A}b$ `);
     await waitFor(() => st.completed.length === 1);
-    expect(ctrl.blocks[0]!.cwd).toBe('/home/a');   // cwd while the command ran
-    expect(ctrl.blocks[1]!.cwd).toBe('/home/b');   // New pending block (current location row)
+    expect(ctrl.blocks[0]!.cwd).toBe('/home/a'); // cwd while the command ran
+    expect(ctrl.blocks[1]!.cwd).toBe('/home/b'); // New pending block (current location row)
   });
 
   it('after clear(), later events do not backfill old blocks', async () => {
@@ -592,7 +644,7 @@ describe('SessionController', () => {
     feed(`${A}p$ ${E('vi')}${C}`);
     feed('\x1b[?1049h');
     feed('VI FULLSCREEN'); // During the alt screen it only reaches the main xterm
-    feed('\x1b[?1049l');   // The full-screen frame is not backfilled into the block
+    feed('\x1b[?1049l'); // The full-screen frame is not backfilled into the block
     feed(`zsh: terminated  vi\r\n${D(143)}`);
     await waitFor(() => !!ctrl.blocks[0]?.outputText.includes('zsh: terminated'));
     expect(ctrl.blocks[0]!.outputText).not.toContain('VI FULLSCREEN');
@@ -770,7 +822,10 @@ describe('SessionController', () => {
     await waitFor(() => {
       if (st.completed.length !== 0) return false;
       if (st.blocksChanged === lastBlocks) stableTicks++;
-      else { stableTicks = 0; lastBlocks = st.blocksChanged; }
+      else {
+        stableTicks = 0;
+        lastBlocks = st.blocksChanged;
+      }
       return stableTicks >= 5;
     });
     expect(st.completed).toEqual([]);

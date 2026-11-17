@@ -2,7 +2,15 @@
  * AI chat panel e2e: panel conversation, model menu, thinking effort, deep-thinking and Agent toggles, input locking.
  */
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, mockAnthropic, aiModelCalls, ensureChatSettingsOpen, paceLlmStream, mockAnthropicToolCall, clipboardText } from './tauri-mock';
+import {
+  setupTauriMock,
+  mockAnthropic,
+  aiModelCalls,
+  ensureChatSettingsOpen,
+  paceLlmStream,
+  mockAnthropicToolCall,
+  clipboardText,
+} from './tauri-mock';
 
 type MockOptions = Parameters<typeof setupTauriMock>[1];
 
@@ -12,10 +20,18 @@ async function boot(page: import('@playwright/test').Page, reply: string, option
   await setupTauriMock(page, options);
   // Seed the dock layout: the chat panel button sits in the left zone (the default layout keeps chat out of every zone)
   await page.addInitScript(() => {
-    if (!localStorage.getItem('dock-layout-v6')) localStorage.setItem('dock-layout-v6', JSON.stringify({
-      layoutVersion: 6, leftZone: [], rightZone: ['files', 'git', 'command-history', 'chat'],
-      leftPanels: [], rightPanels: [], panelWidths: {},
-    }));
+    if (!localStorage.getItem('dock-layout-v6'))
+      localStorage.setItem(
+        'dock-layout-v6',
+        JSON.stringify({
+          layoutVersion: 6,
+          leftZone: [],
+          rightZone: ['files', 'git', 'command-history', 'chat'],
+          leftPanels: [],
+          rightPanels: [],
+          panelWidths: {},
+        }),
+      );
   });
   await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible({ timeout: 5000 });
@@ -63,7 +79,7 @@ test.describe('AI chat panel', () => {
     // The panel needs an active conversation before sending: without one the request falls back to
     // the workspace tab and the stop button has nothing to match.
     await page.waitForFunction(async () => {
-      const mod = await import('/src/features/chat/stores/chat.ts') as typeof import('../src/features/chat/stores/chat');
+      const mod = (await import('/src/features/chat/stores/chat.ts')) as typeof import('../src/features/chat/stores/chat');
       const state = mod.useChatStore.getState();
       return !!state.activeConversationId && state.activeConversationId in state.byTab;
     });
@@ -111,7 +127,7 @@ test.describe('AI chat panel', () => {
     const input = page.locator('[data-chat-composer]:visible');
     await expect(input).toBeVisible({ timeout: 3000 });
     await page.waitForFunction(async () => {
-      const mod = await import('/src/features/chat/stores/chat.ts') as typeof import('../src/features/chat/stores/chat');
+      const mod = (await import('/src/features/chat/stores/chat.ts')) as typeof import('../src/features/chat/stores/chat');
       const state = mod.useChatStore.getState();
       return !!state.activeConversationId && state.activeConversationId in state.byTab;
     });

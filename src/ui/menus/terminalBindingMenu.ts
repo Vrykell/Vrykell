@@ -18,7 +18,7 @@ export interface TerminalBindingMenu {
 
 /** Shared submenu for panels that can follow one terminal instead of the focused pane. */
 export function terminalBindingMenuItem(menu: TerminalBindingMenu): ContextMenuItem {
-  const live = menu.options.filter(option => option.live);
+  const live = menu.options.filter((option) => option.live);
   return {
     label: t('Bind terminal'),
     group: 'view',
@@ -30,12 +30,12 @@ export function terminalBindingMenuItem(menu: TerminalBindingMenu): ContextMenuI
           onClick: () => menu.onSelect(null),
         },
         ...(live.length
-          ? live.map(option => ({
-            label: option.label,
-            tip: option.description,
-            checked: menu.value === option.id,
-            onClick: () => menu.onSelect(option.id),
-          }))
+          ? live.map((option) => ({
+              label: option.label,
+              tip: option.description,
+              checked: menu.value === option.id,
+              onClick: () => menu.onSelect(option.id),
+            }))
           : [{ label: t('No active terminals'), disabled: true }]),
       ],
     },

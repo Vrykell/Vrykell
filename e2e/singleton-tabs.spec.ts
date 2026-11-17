@@ -2,7 +2,8 @@ import { expect, test } from '@playwright/test';
 import { ensureTabsOpen, setupTauriMock } from './tauri-mock';
 
 test('settings stay outside the tab list while history opens one singleton tab per workspace', async ({ page }) => {
-  await setupTauriMock(page); await page.goto('/');
+  await setupTauriMock(page);
+  await page.goto('/');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await ensureTabsOpen(page);
   const before = await page.locator('[data-tab-row-id]').count();
@@ -36,20 +37,22 @@ test('local and remote tabs retain profile identities before and after activatio
   await ensureTabsOpen(page);
   await page.evaluate(async () => {
     const path = '/src/features/workspace/stores/workspace.ts';
-    const { useWorkspaceStore } = await import(path) as typeof import('../src/features/workspace/stores/workspace');
+    const { useWorkspaceStore } = (await import(path)) as typeof import('../src/features/workspace/stores/workspace');
     useWorkspaceStore.getState().addTab({ shellType: 'bash', title: 'Local test' });
     useWorkspaceStore.getState().addTab({ kind: 'ssh', title: 'Remote test', ssh: { name: 'Remote test', host: 'example.invalid' } });
   });
-  for (const [label, mark] of [['Local test', 'bash'], ['Remote test', 'linux']]) {
+  for (const [label, mark] of [
+    ['Local test', 'bash'],
+    ['Remote test', 'linux'],
+  ]) {
     const row = page.locator('[data-tab-row-id]').filter({ hasText: label });
     const icon = row.locator('svg').first();
     await expect(icon).toHaveAttribute('data-shell-mark', mark);
     await expect(icon).toHaveCSS('width', '18px');
     await expect(icon).toHaveCSS('height', '18px');
     if (mark === 'bash') await expect(icon).toHaveAttribute('style', /color: var\(--shell-bash-accent\)/);
-    const color = await icon.evaluate(element => getComputedStyle(element).color);
+    const color = await icon.evaluate((element) => getComputedStyle(element).color);
     await row.click();
     await expect(icon).toHaveCSS('color', color);
   }
 });
-

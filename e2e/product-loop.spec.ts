@@ -33,7 +33,7 @@ test('AI drafts and attachments are kept per conversation and can still be sent 
   await expect(input).toHaveValue('终端一的草稿');
   await expect(page.locator('[data-tip="移除附件"]')).toHaveCount(1);
   const visibleComposer = page.locator('[data-chat-composer]:visible');
-  if (!await visibleComposer.isVisible()) await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
+  if (!(await visibleComposer.isVisible())) await page.getByRole('button', { name: 'AI 助手', exact: true }).click();
   await expect(visibleComposer).toBeVisible();
   await visibleComposer.press('Enter');
   await expect(page.getByText('任务完成', { exact: true })).toBeVisible({ timeout: 10_000 });
@@ -51,7 +51,9 @@ test('AI drafts and attachments are kept per conversation and can still be sent 
 test('failed directory navigation retains the view and can be retried', async ({ page }) => {
   await setupTauriMock(page);
   await page.addInitScript(() => {
-    const internals = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }).__TAURI_INTERNALS__;
+    const internals = (
+      window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } }
+    ).__TAURI_INTERNALS__;
     const original = internals.invoke;
     let attempts = 0;
     internals.invoke = async (command, args) => {

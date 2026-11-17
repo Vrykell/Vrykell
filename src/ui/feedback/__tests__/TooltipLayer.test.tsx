@@ -15,7 +15,14 @@ it('places a tall hint below a trigger near the top viewport edge', () => {
     }
     return { top: 40, bottom: 64, left: 24, right: 48, width: 24, height: 24 } as DOMRect;
   });
-  render(<><button data-tip="Group by" data-tip-description="A longer explanation of grouping">Group</button><TooltipLayer /></>);
+  render(
+    <>
+      <button data-tip="Group by" data-tip-description="A longer explanation of grouping">
+        Group
+      </button>
+      <TooltipLayer />
+    </>,
+  );
 
   fireEvent.mouseOver(screen.getByRole('button', { name: 'Group' }));
   act(() => vi.advanceTimersByTime(300));

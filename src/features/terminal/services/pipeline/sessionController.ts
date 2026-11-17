@@ -40,8 +40,8 @@ export interface SessionSinks {
 }
 
 const RAW_CAP = 256 * 1024;
-const MAX_FULL_BLOCKS = 200;    // Beyond this, drop the oldest blocks' output but keep their headers
-const MAX_TOTAL_BLOCKS = 500;   // Hard cap for block history, including header-only entries.
+const MAX_FULL_BLOCKS = 200; // Beyond this, drop the oldest blocks' output but keep their headers
+const MAX_TOTAL_BLOCKS = 500; // Hard cap for block history, including header-only entries.
 /** A command still executing after this long is treated as long-running even while silent. */
 const LONG_RUNNING_BASE_MS = 500;
 /** Minimum runtime before a quiet gap after output marks the command as waiting for input. */
@@ -272,8 +272,8 @@ export class SessionController {
     }
     // classic/altScreen: forward raw OSC to the main terminal (keeps OSC 8 hyperlinks working),
     // but 133/7 are integration markers and never reach the main terminal.
-    const isIntegration = code === '133;A' || code === '133;B' || code === '133;C' || code === '133;D'
-      || code === '133;E' || code === '133;G' || code === '7';
+    const isIntegration =
+      code === '133;A' || code === '133;B' || code === '133;C' || code === '133;D' || code === '133;E' || code === '133;G' || code === '7';
     if (this._scene !== 'blockList' && !isIntegration) {
       this.sinks.writeMain(raw);
       return;
@@ -462,10 +462,12 @@ export class SessionController {
     registerBlockTerminal(this.tabId, blk.term);
     // Subscribe before the first write. UI mounting can follow a scene transition,
     // otherwise early capability replies are lost or arrive after the editor timeout.
-    const inputSub = blk.term.onData(data => {
+    const inputSub = blk.term.onData((data) => {
       if (!this._disposed && ab.status === 'executing') this.sinks.onTerminalData?.(data);
     });
-    const tracker = trackBufferTruncation(blk.term, lines => { ab.linesTruncated += lines; });
+    const tracker = trackBufferTruncation(blk.term, (lines) => {
+      ab.linesTruncated += lines;
+    });
     ab._truncationTracker = tracker;
     ab._outputDispose = () => {
       inputSub.dispose();
@@ -536,10 +538,7 @@ export class SessionController {
     const now = Date.now();
     this.lastRunningOutputAt = now;
     if (this.longRunningQuietTimer) return;
-    const dueAt = Math.max(
-      now + LONG_RUNNING_QUIET_MS,
-      (ab.startedAt ?? now) + LONG_RUNNING_MIN_MS + LONG_RUNNING_QUIET_MS,
-    );
+    const dueAt = Math.max(now + LONG_RUNNING_QUIET_MS, (ab.startedAt ?? now) + LONG_RUNNING_MIN_MS + LONG_RUNNING_QUIET_MS);
     this.scheduleQuietCheck(ab, dueAt - now);
   }
 
@@ -556,10 +555,7 @@ export class SessionController {
     }, delay);
   }
 
-  private promoteLongRunning(
-    ab: InternalBlock,
-    reason: 'base-timeout' | 'output-quiet' | 'alternate-screen',
-  ): void {
+  private promoteLongRunning(ab: InternalBlock, reason: 'base-timeout' | 'output-quiet' | 'alternate-screen'): void {
     if (this._disposed || this.activeBlock !== ab || ab.status !== 'executing' || ab.wasLongRunning) return;
     this.clearLongRunningTimers();
     ab.wasLongRunning = true;
@@ -784,17 +780,9 @@ export class SessionController {
         const xtermCellWidth = term.element ? getCellMetrics(term).width : 0;
         const domCellWidth = measureTerminalDomCellWidth();
         const fontSize = getTerminalFontSize();
-        const letterSpacingEm = domCellWidth > 0 && fontSize > 0
-          ? ((xtermCellWidth || Math.round(domCellWidth)) - domCellWidth) / fontSize
-          : 0;
-        const snap = extractSnapshotFromBuffer(
-          term.buffer.active,
-          term.cols,
-          undefined,
-          undefined,
-          letterSpacingEm,
-          true,
-        );
+        const letterSpacingEm =
+          domCellWidth > 0 && fontSize > 0 ? ((xtermCellWidth || Math.round(domCellWidth)) - domCellWidth) / fontSize : 0;
+        const snap = extractSnapshotFromBuffer(term.buffer.active, term.cols, undefined, undefined, letterSpacingEm, true);
         if (isTerminalDebugEnabled() && Math.abs(letterSpacingEm) >= 0.001) {
           terminalDebug('block-snapshot-cell-width', {
             tabId: this.tabId,
@@ -939,9 +927,18 @@ export class SessionController {
     const now = Date.now();
     for (let index = 0; index < count; index++) {
       const blank: InternalBlock = {
-        ...pending, id: `b${BLOCK_PREFIX}-${nextId++}`, command: '', status: 'done', exitCode: 0,
-        startedAt: now, endedAt: now, outputHtml: '', outputRaw: '', outputText: '',
-        earlyBuf: '', _fromA: false,
+        ...pending,
+        id: `b${BLOCK_PREFIX}-${nextId++}`,
+        command: '',
+        status: 'done',
+        exitCode: 0,
+        startedAt: now,
+        endedAt: now,
+        outputHtml: '',
+        outputRaw: '',
+        outputText: '',
+        earlyBuf: '',
+        _fromA: false,
       };
       this._blocks.splice(this._blocks.length - 1, 0, blank);
       this.sinks.onBlockComplete(blank);

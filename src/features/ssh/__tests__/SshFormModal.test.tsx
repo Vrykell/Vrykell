@@ -20,10 +20,17 @@ describe('SSH form dismissal', () => {
     fireEvent.change(screen.getByTestId('ssh-form-jump'), { target: { value: 'user@jump:2222' } });
     fireEvent.change(screen.getByTestId('ssh-form-keepalive'), { target: { value: '45' } });
     fireEvent.click(screen.getByTestId('ssh-connect-btn'));
-    await waitFor(() => expect(onConnect).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'tester@target', identityFile: 'C:/private/key', jumpHost: 'user@jump:2222',
-      serverAliveInterval: 45, shellIntegration: false,
-    })));
+    await waitFor(() =>
+      expect(onConnect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'tester@target',
+          identityFile: 'C:/private/key',
+          jumpHost: 'user@jump:2222',
+          serverAliveInterval: 45,
+          shellIntegration: false,
+        }),
+      ),
+    );
   });
   it('keeps port forwards and automatic reconnect in the connection read from the form', async () => {
     const onConnect = vi.fn();
@@ -38,12 +45,16 @@ describe('SSH form dismissal', () => {
     expect(screen.queryByTestId('ssh-section-tab-advanced')).toBeNull();
     fireEvent.click(screen.getByTestId('ssh-form-auto-reconnect'));
     fireEvent.click(screen.getByTestId('ssh-connect-btn'));
-    await waitFor(() => expect(onConnect).toHaveBeenCalledWith(expect.objectContaining({
-      localForwards: ['8080:localhost:80', '9090:db:5432'],
-      dynamicForwards: ['1080'],
-      remoteForwards: undefined,
-      autoReconnect: true,
-    })));
+    await waitFor(() =>
+      expect(onConnect).toHaveBeenCalledWith(
+        expect.objectContaining({
+          localForwards: ['8080:localhost:80', '9090:db:5432'],
+          dynamicForwards: ['1080'],
+          remoteForwards: undefined,
+          autoReconnect: true,
+        }),
+      ),
+    );
   });
 
   it('focuses the host for quick connection, traps Tab and cancels on Escape', async () => {

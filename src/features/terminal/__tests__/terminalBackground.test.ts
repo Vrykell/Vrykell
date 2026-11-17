@@ -16,19 +16,23 @@ describe('shared terminal background', () => {
       expect(block.term.options.theme?.background).toBe(readXtermTheme().background);
       expect(block.el.style.background).toBe('var(--xterm-bg)');
       document.documentElement.style.setProperty('--xterm-bg', '#f8f9fb');
-      await new Promise<void>(resolve => queueMicrotask(resolve));
+      await new Promise<void>((resolve) => queueMicrotask(resolve));
       expect(block.term.options.theme?.background).toBe('#f8f9fb');
-    } finally { block.dispose(); }
+    } finally {
+      block.dispose();
+    }
   });
 
   it('uses the terminal background for default inverse text while retaining explicit ANSI colors', async () => {
     const block = createBlockTerm(80, 24);
     try {
-      await new Promise<void>(resolve => block.term.write('\x1b[7mselected\x1b[0m \x1b[48;2;1;2;3mcolored\x1b[0m', resolve));
+      await new Promise<void>((resolve) => block.term.write('\x1b[7mselected\x1b[0m \x1b[48;2;1;2;3mcolored\x1b[0m', resolve));
       const snapshot = extractSnapshotFromBuffer(block.term.buffer.active, 80);
       expect(snapshot.html).toContain('color:var(--xterm-bg)');
       expect(snapshot.html).toContain('background:#010203');
-    } finally { block.dispose(); }
+    } finally {
+      block.dispose();
+    }
   });
 
   // Block art is drawn as reverse-video padding, so a fully painted row must survive the
@@ -36,12 +40,14 @@ describe('shared terminal background', () => {
   it('keeps a fully painted reverse-video row intact', async () => {
     const block = createBlockTerm(80, 24);
     try {
-      await new Promise<void>(resolve => block.term.write('\x1b[7m' + ' '.repeat(12) + '\x1b[0m', resolve));
+      await new Promise<void>((resolve) => block.term.write('\x1b[7m' + ' '.repeat(12) + '\x1b[0m', resolve));
       const snapshot = extractSnapshotFromBuffer(block.term.buffer.active, 80);
       const painted = snapshot.html.match(/<span style="([^"]*)">( *)<\/span>/);
       expect(painted).not.toBeNull();
       expect(painted![1]).toContain('background:');
       expect(painted![2]).toHaveLength(12);
-    } finally { block.dispose(); }
+    } finally {
+      block.dispose();
+    }
   });
 });

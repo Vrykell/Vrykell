@@ -51,50 +51,108 @@ export default function HistoryPage({
   const composing = useRef(false);
   const [compositionDraft, setCompositionDraft] = useState('');
   const requestedHeight = useRef(0);
-  useEffect(() => { requestedHeight.current = 0; }, [query, listLabel]);
-  useEffect(() => { if (searchOpen) requestAnimationFrame(() => searchRef.current?.focus()); }, [searchOpen]);
-  const closeSearch = () => { if (query) onQueryChange(''); setSearchOpen(false); };
+  useEffect(() => {
+    requestedHeight.current = 0;
+  }, [query, listLabel]);
+  useEffect(() => {
+    if (searchOpen) requestAnimationFrame(() => searchRef.current?.focus());
+  }, [searchOpen]);
+  const closeSearch = () => {
+    if (query) onQueryChange('');
+    setSearchOpen(false);
+  };
   const collapseSearch = () => setSearchOpen(false);
-  return <div className="history-page" data-testid={pageTestId} aria-busy={busy}>
-    <div className="history-header">
-      <div className="history-heading">
-        {icon}
-        <strong>{title}</strong>
-        <span className="history-count">· {count}</span>
-      </div>
-      {filterChips && <div className="history-filter-cards" data-testid="history-filter-cards">{filterChips}</div>}
-      <div className="history-toolbar">
-        {searchOpen && <div className="history-search">
-          <Search size={12} aria-hidden="true" />
-          <TextInput ref={searchRef} className="history-search-input" aria-label={searchLabel} placeholder={searchPlaceholder}
-            value={composing.current ? compositionDraft : query} onChange={event => { if (composing.current) setCompositionDraft(event.target.value); else onQueryChange(event.target.value); }} data-testid={searchTestId}
-            onCompositionStart={() => { composing.current = true; setCompositionDraft(query); }}
-            onCompositionEnd={event => { composing.current = false; onQueryChange(event.currentTarget.value); }}
-            onBlur={event => {
-              if (!event.relatedTarget || !event.currentTarget.parentElement?.contains(event.relatedTarget)) collapseSearch();
-            }}
-            onKeyDown={event => { if (event.key === 'Escape') { event.preventDefault(); closeSearch(); } }} />
-          {query && <IconButton compact aria-label={t('Clear search')} data-tip={t('Clear search')} onClick={() => { onQueryChange(''); searchRef.current?.focus(); }}><X size={14} /></IconButton>}
-        </div>}
-        <div className="history-actions">
-          {!searchOpen && <IconButton compact className="history-icon-button" aria-label={searchLabel}
-            data-tip={searchLabel} data-testid="history-search-toggle" aria-expanded="false"
-            onClick={() => setSearchOpen(true)}><Search size={16} /></IconButton>}
-          {headerActions}
-          {searchActions}
+  return (
+    <div className="history-page" data-testid={pageTestId} aria-busy={busy}>
+      <div className="history-header">
+        <div className="history-heading">
+          {icon}
+          <strong>{title}</strong>
+          <span className="history-count">· {count}</span>
+        </div>
+        {filterChips && (
+          <div className="history-filter-cards" data-testid="history-filter-cards">
+            {filterChips}
+          </div>
+        )}
+        <div className="history-toolbar">
+          {searchOpen && (
+            <div className="history-search">
+              <Search size={12} aria-hidden="true" />
+              <TextInput
+                ref={searchRef}
+                className="history-search-input"
+                aria-label={searchLabel}
+                placeholder={searchPlaceholder}
+                value={composing.current ? compositionDraft : query}
+                onChange={(event) => {
+                  if (composing.current) setCompositionDraft(event.target.value);
+                  else onQueryChange(event.target.value);
+                }}
+                data-testid={searchTestId}
+                onCompositionStart={() => {
+                  composing.current = true;
+                  setCompositionDraft(query);
+                }}
+                onCompositionEnd={(event) => {
+                  composing.current = false;
+                  onQueryChange(event.currentTarget.value);
+                }}
+                onBlur={(event) => {
+                  if (!event.relatedTarget || !event.currentTarget.parentElement?.contains(event.relatedTarget)) collapseSearch();
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeSearch();
+                  }
+                }}
+              />
+              {query && (
+                <IconButton
+                  compact
+                  aria-label={t('Clear search')}
+                  data-tip={t('Clear search')}
+                  onClick={() => {
+                    onQueryChange('');
+                    searchRef.current?.focus();
+                  }}>
+                  <X size={14} />
+                </IconButton>
+              )}
+            </div>
+          )}
+          <div className="history-actions">
+            {!searchOpen && (
+              <IconButton
+                compact
+                className="history-icon-button"
+                aria-label={searchLabel}
+                data-tip={searchLabel}
+                data-testid="history-search-toggle"
+                aria-expanded="false"
+                onClick={() => setSearchOpen(true)}>
+                <Search size={16} />
+              </IconButton>
+            )}
+            {headerActions}
+            {searchActions}
+          </div>
         </div>
       </div>
+      {overlays}
+      <div
+        className={`history-list scroll-region${listClassName ? ` ${listClassName}` : ''}`}
+        aria-label={listLabel}
+        onScroll={(event) => {
+          const list = event.currentTarget;
+          if (list.scrollHeight - list.scrollTop - list.clientHeight < 160 && requestedHeight.current !== list.scrollHeight) {
+            requestedHeight.current = list.scrollHeight;
+            onLoadMore?.();
+          }
+        }}>
+        {children}
+      </div>
     </div>
-    {overlays}
-    <div className={`history-list scroll-region${listClassName ? ` ${listClassName}` : ''}`} aria-label={listLabel}
-      onScroll={event => {
-        const list = event.currentTarget;
-        if (list.scrollHeight - list.scrollTop - list.clientHeight < 160 && requestedHeight.current !== list.scrollHeight) {
-          requestedHeight.current = list.scrollHeight;
-          onLoadMore?.();
-        }
-      }}>
-      {children}
-    </div>
-  </div>;
+  );
 }

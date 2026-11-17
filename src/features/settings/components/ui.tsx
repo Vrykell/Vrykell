@@ -8,7 +8,7 @@ import ToggleControl from '@ui/fields/Toggle';
  * Shared settings fields, controls and form styles.
  */
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
-import { iconSizes, Plus, X  } from '@ui/icons';
+import { iconSizes, Plus, X } from '@ui/icons';
 import AutoSaveInput from './AutoSaveInput';
 import { useAutoSave } from '../hooks/useAutoSave';
 import SaveStatus from './SaveStatus';
@@ -18,26 +18,43 @@ export { inputStyle } from './formStyles';
 
 export function SettingsGroup({ title, children, testId }: { title: string; children: ReactNode; testId?: string }) {
   const id = useId();
-  return <div className="settings-group" role="group" aria-labelledby={id}>
-    <h2 id={id} className="settings-group-title">{localizeLabel(title)}</h2>
-    <div className="settings-group-panel" data-testid={testId}>{children}</div>
-  </div>;
+  return (
+    <div className="settings-group" role="group" aria-labelledby={id}>
+      <h2 id={id} className="settings-group-title">
+        {localizeLabel(title)}
+      </h2>
+      <div className="settings-group-panel" data-testid={testId}>
+        {children}
+      </div>
+    </div>
+  );
 }
 
-export function Field({ title, description, children, layout = 'row' }: {
-  title: string; description?: ReactNode; children: ReactNode; layout?: 'row' | 'stacked';
+export function Field({
+  title,
+  description,
+  children,
+  layout = 'row',
+}: {
+  title: string;
+  description?: ReactNode;
+  children: ReactNode;
+  layout?: 'row' | 'stacked';
 }) {
   const ref = useRef<HTMLDivElement>(null);
-  const target = useSettingsNavigationStore(state => state.targetField);
-  const control = useSettingsNavigationStore(state => state.targetControl);
-  const request = useSettingsNavigationStore(state => state.request);
+  const target = useSettingsNavigationStore((state) => state.targetField);
+  const control = useSettingsNavigationStore((state) => state.targetControl);
+  const request = useSettingsNavigationStore((state) => state.request);
   useEffect(() => {
     if (target !== title) return;
     ref.current?.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
-    const controls = [...(ref.current?.querySelectorAll<HTMLElement>('input, textarea, button, [tabindex="0"], [role="radiogroup"]') ?? [])];
-    const requested = controls.find(element => control && element.getAttribute('aria-label') === control) ?? controls[0];
+    const controls = [
+      ...(ref.current?.querySelectorAll<HTMLElement>('input, textarea, button, [tabindex="0"], [role="radiogroup"]') ?? []),
+    ];
+    const requested = controls.find((element) => control && element.getAttribute('aria-label') === control) ?? controls[0];
     const focusTarget = requested?.matches('[role="radiogroup"]')
-      ? requested.querySelector<HTMLElement>('[aria-checked="true"]') : requested;
+      ? requested.querySelector<HTMLElement>('[aria-checked="true"]')
+      : requested;
     focusTarget?.focus({ preventScroll: true });
   }, [target, title, control, request]);
   return (
@@ -53,14 +70,42 @@ export function Field({ title, description, children, layout = 'row' }: {
 
 // ── Switch (for the AI behavior page) ──
 
-export function Toggle({ on, onChange, label, disabled = false, showState = false }: { on: boolean; onChange: (v: boolean) => void | Promise<void>; label?: string; disabled?: boolean; showState?: boolean }) {
+export function Toggle({
+  on,
+  onChange,
+  label,
+  disabled = false,
+  showState = false,
+}: {
+  on: boolean;
+  onChange: (v: boolean) => void | Promise<void>;
+  label?: string;
+  disabled?: boolean;
+  showState?: boolean;
+}) {
   const { save } = useSettingsSave();
   return (
-    <span className="settings-toggle"><ToggleControl on={on} label={label} disabled={disabled} onChange={value => { void save(() => onChange(value)); }} />{showState && <span aria-hidden="true">{t(on ? 'On' : 'Off')}</span>}</span>
+    <span className="settings-toggle">
+      <ToggleControl
+        on={on}
+        label={label}
+        disabled={disabled}
+        onChange={(value) => {
+          void save(() => onChange(value));
+        }}
+      />
+      {showState && <span aria-hidden="true">{t(on ? 'On' : 'Off')}</span>}
+    </span>
   );
 }
 
-export function NumberInput({ value, onChange, min, max, label }: {
+export function NumberInput({
+  value,
+  onChange,
+  min,
+  max,
+  label,
+}: {
   value: number;
   onChange: (v: number) => void | Promise<void>;
   min: number;
@@ -74,24 +119,26 @@ export function NumberInput({ value, onChange, min, max, label }: {
       value={String(value)}
       min={min}
       max={max}
-      normalize={next => String(Math.min(max, Math.max(min, Math.round(Number(next)))))}
-      onCommit={next => {
+      normalize={(next) => String(Math.min(max, Math.max(min, Math.round(Number(next)))))}
+      onCommit={(next) => {
         const n = Math.round(Number(next));
         if (Number.isFinite(n)) return onChange(Math.min(max, Math.max(min, n)));
       }}
-      validate={next => next.trim() && Number.isFinite(Number(next)) ? undefined : t('Enter a valid number')}
+      validate={(next) => (next.trim() && Number.isFinite(Number(next)) ? undefined : t('Enter a valid number'))}
       style={{ width: 120 }}
     />
   );
 }
-export function TemplateListEditor({ value, onChange, placeholder }: {
+export function TemplateListEditor({
+  value,
+  onChange,
+  placeholder,
+}: {
   value: Record<string, string>;
   onChange: (v: Record<string, string>) => void;
   placeholder: string;
 }) {
-  const [rows, setRows] = useState<{ ext: string; cmd: string }[]>(() =>
-    Object.entries(value).map(([ext, cmd]) => ({ ext, cmd })),
-  );
+  const [rows, setRows] = useState<{ ext: string; cmd: string }[]>(() => Object.entries(value).map(([ext, cmd]) => ({ ext, cmd })));
 
   const saving = useAutoSave(value, onChange);
   const sync = (next: { ext: string; cmd: string }[], immediate = false) => {
@@ -127,16 +174,34 @@ export function TemplateListEditor({ value, onChange, placeholder }: {
             onChange={(e) => updateRow(i, { cmd: e.target.value })}
             style={{ ...inputStyle, flex: 1 }}
           />
-          <IconButton compact tone="danger" onClick={() => sync(rows.filter((_, j) => j !== i), true)} data-tip={t('Delete row')} aria-label={t('Delete row')}><X size={iconSizes.compact} /></IconButton>
+          <IconButton
+            compact
+            tone="danger"
+            onClick={() =>
+              sync(
+                rows.filter((_, j) => j !== i),
+                true,
+              )
+            }
+            data-tip={t('Delete row')}
+            aria-label={t('Delete row')}>
+            <X size={iconSizes.compact} />
+          </IconButton>
         </div>
       ))}
-      <OutlineButton
-        onClick={() => sync([...rows, { ext: '', cmd: '' }])}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
-      >
+      <OutlineButton onClick={() => sync([...rows, { ext: '', cmd: '' }])} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
         <Plus size={iconSizes.compact} /> {t('Add')}
       </OutlineButton>
-      <div><SaveStatus inline status={saving.status} error={saving.error} onRetry={() => { void saving.flush(); }} /></div>
+      <div>
+        <SaveStatus
+          inline
+          status={saving.status}
+          error={saving.error}
+          onRetry={() => {
+            void saving.flush();
+          }}
+        />
+      </div>
     </div>
   );
 }

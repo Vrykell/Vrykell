@@ -2,7 +2,12 @@
  * agentSettings - global/model override/migration tests.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useAgentSettings, defaultOpenModeForShell, DEFAULT_AGENT_SETTINGS, type AgentSettings } from '@features/agent/stores/agentSettings';
+import {
+  useAgentSettings,
+  defaultOpenModeForShell,
+  DEFAULT_AGENT_SETTINGS,
+  type AgentSettings,
+} from '@features/agent/stores/agentSettings';
 
 beforeEach(() => {
   useAgentSettings.setState({ global: { ...DEFAULT_AGENT_SETTINGS }, overrides: {} });
@@ -27,7 +32,9 @@ describe('agentSettings', () => {
   });
 
   it('defaultOpenModeForShell: returns by shell and falls back to block for unknown shells', () => {
-    useAgentSettings.getState().update({ openModeByShell: { zsh: 'classic', bash: 'block', powershell: 'block', pwsh: 'block', cmd: 'block' } });
+    useAgentSettings
+      .getState()
+      .update({ openModeByShell: { zsh: 'classic', bash: 'block', powershell: 'block', pwsh: 'block', cmd: 'block' } });
     expect(defaultOpenModeForShell('zsh')).toBe('classic');
     expect(defaultOpenModeForShell('bash')).toBe('block');
     expect(defaultOpenModeForShell('weird-shell')).toBe('block');
@@ -51,7 +58,8 @@ describe('agentSettings', () => {
   it('migrate: v1 flat structure is folded into global and maxSteps<50 is raised to 50', () => {
     const migrate = useAgentSettings.persist.getOptions().migrate!;
     const out = migrate({ agentMode: false, deepThink: true, maxSteps: 3 } as never, 1) as {
-      global: AgentSettings; overrides: Record<string, unknown>;
+      global: AgentSettings;
+      overrides: Record<string, unknown>;
     };
     expect(out.global.agentMode).toBe(false);
     expect(out.global.deepThink).toBe(true);
@@ -64,7 +72,8 @@ describe('agentSettings', () => {
   it('migrate: structured data fills in default fields and overrides', () => {
     const migrate = useAgentSettings.persist.getOptions().migrate!;
     const out = migrate({ global: { maxSteps: 60 } } as never, 8) as {
-      global: AgentSettings; overrides: Record<string, unknown>;
+      global: AgentSettings;
+      overrides: Record<string, unknown>;
     };
     expect(out.global.maxSteps).toBe(60);
     expect(out.global.agentMode).toBe(true);

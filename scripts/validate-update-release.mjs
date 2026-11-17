@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 export function validateReleaseVersion(tag, versions) {
   if (!/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(tag)) throw new Error('A stable vMAJOR.MINOR.PATCH tag is required');
   const version = tag.slice(1);
-  if (versions.some(value => value !== version)) throw new Error('Release tag and application versions must match');
+  if (versions.some((value) => value !== version)) throw new Error('Release tag and application versions must match');
   return version;
 }
 
@@ -13,9 +13,15 @@ export function validateUpdateManifest(manifest, tag) {
   validateReleaseVersion(tag, [manifest.version]);
   for (const platform of ['windows-x86_64', 'linux-x86_64', 'darwin-aarch64', 'darwin-x86_64']) {
     const artifact = manifest.platforms?.[platform];
-    if (!artifact || typeof artifact.signature !== 'string' || artifact.signature.length < 80) throw new Error(`Missing signed update for ${platform}`);
+    if (!artifact || typeof artifact.signature !== 'string' || artifact.signature.length < 80)
+      throw new Error(`Missing signed update for ${platform}`);
     const url = new URL(artifact.url);
-    if (url.protocol !== 'https:' || url.hostname !== 'github.com' || !url.pathname.startsWith(`/Vrykell/Vrykell/releases/download/${tag}/`)) throw new Error(`Unexpected update URL for ${platform}`);
+    if (
+      url.protocol !== 'https:' ||
+      url.hostname !== 'github.com' ||
+      !url.pathname.startsWith(`/Vrykell/Vrykell/releases/download/${tag}/`)
+    )
+      throw new Error(`Unexpected update URL for ${platform}`);
   }
 }
 

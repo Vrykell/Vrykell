@@ -16,7 +16,9 @@ export interface CompletionKey {
 export function completionShortcut(event: CompletionKey): string | undefined {
   if (event.ctrlKey || event.altKey || event.metaKey) {
     if (!/^[a-z0-9]$/i.test(event.key)) return undefined;
-    return [event.ctrlKey && 'Control', event.altKey && 'Alt', event.metaKey && 'Meta', event.shiftKey && 'Shift', event.key.toUpperCase()].filter(Boolean).join('+');
+    return [event.ctrlKey && 'Control', event.altKey && 'Alt', event.metaKey && 'Meta', event.shiftKey && 'Shift', event.key.toUpperCase()]
+      .filter(Boolean)
+      .join('+');
   }
   if (event.key === 'ArrowRight') return event.shiftKey ? 'Shift+ArrowRight' : 'ArrowRight';
   if (event.key === 'Tab') return event.shiftKey ? 'Shift+Tab' : 'Tab';
@@ -24,8 +26,11 @@ export function completionShortcut(event: CompletionKey): string | undefined {
 }
 
 export function validCustomCompletionShortcut(value: unknown): value is string {
-  return typeof value === 'string' && /^(?:Control\+)?(?:Alt\+)?(?:Meta\+)?(?:Shift\+)?[A-Z0-9]$/.test(value)
-    && /^(Control|Alt|Meta)\+/.test(value);
+  return (
+    typeof value === 'string' &&
+    /^(?:Control\+)?(?:Alt\+)?(?:Meta\+)?(?:Shift\+)?[A-Z0-9]$/.test(value) &&
+    /^(Control|Alt|Meta)\+/.test(value)
+  );
 }
 
 interface CompletionPreferences {
@@ -35,28 +40,53 @@ interface CompletionPreferences {
   setCustom: (shortcut: string) => void;
 }
 
-export const useCompletionPreferences = create<CompletionPreferences>()(persist(set => ({
-  shortcuts: [...defaults],
-  customShortcut: undefined,
-  toggle: shortcut => set(state => {
-    if (!COMPLETION_SHORTCUTS.some(key => key === shortcut) && shortcut !== state.customShortcut) return state;
-    const shortcuts = state.shortcuts.includes(shortcut) ? state.shortcuts.filter(key => key !== shortcut) : [...state.shortcuts, shortcut];
-    return shortcuts.length ? { shortcuts } : state;
-  }),
-  setCustom: shortcut => set(state => validCustomCompletionShortcut(shortcut)
-    ? { customShortcut: shortcut, shortcuts: [...state.shortcuts.filter(key => key !== state.customShortcut), shortcut] }
-    : state),
-}), {
-  name: 'vrykell-completion',
-  merge: (saved, current) => {
-    const values = saved as Partial<CompletionPreferences> | undefined;
-    const customShortcut = validCustomCompletionShortcut(values?.customShortcut) ? values.customShortcut : undefined;
-    const shortcuts = Array.isArray(values?.shortcuts) ? [...new Set(values.shortcuts.filter(key => typeof key === 'string' && (COMPLETION_SHORTCUTS.some(known => known === key) || key === customShortcut)))] : [];
-    return { ...current, shortcuts: shortcuts.length ? shortcuts : [...defaults], customShortcut };
-  },
-}));
+export const useCompletionPreferences = create<CompletionPreferences>()(
+  persist(
+    (set) => ({
+      shortcuts: [...defaults],
+      customShortcut: undefined,
+      toggle: (shortcut) =>
+        set((state) => {
+          if (!COMPLETION_SHORTCUTS.some((key) => key === shortcut) && shortcut !== state.customShortcut) return state;
+          const shortcuts = state.shortcuts.includes(shortcut)
+            ? state.shortcuts.filter((key) => key !== shortcut)
+            : [...state.shortcuts, shortcut];
+          return shortcuts.length ? { shortcuts } : state;
+        }),
+      setCustom: (shortcut) =>
+        set((state) =>
+          validCustomCompletionShortcut(shortcut)
+            ? { customShortcut: shortcut, shortcuts: [...state.shortcuts.filter((key) => key !== state.customShortcut), shortcut] }
+            : state,
+        ),
+    }),
+    {
+      name: 'vrykell-completion',
+      merge: (saved, current) => {
+        const values = saved as Partial<CompletionPreferences> | undefined;
+        const customShortcut = validCustomCompletionShortcut(values?.customShortcut) ? values.customShortcut : undefined;
+        const shortcuts = Array.isArray(values?.shortcuts)
+          ? [
+              ...new Set(
+                values.shortcuts.filter(
+                  (key) => typeof key === 'string' && (COMPLETION_SHORTCUTS.some((known) => known === key) || key === customShortcut),
+                ),
+              ),
+            ]
+          : [];
+        return { ...current, shortcuts: shortcuts.length ? shortcuts : [...defaults], customShortcut };
+      },
+    },
+  ),
+);
 
-export function acceptsCompletionKey(event: CompletionKey, shortcuts: readonly string[], selectionStart: number, selectionEnd: number, textLength: number): boolean {
+export function acceptsCompletionKey(
+  event: CompletionKey,
+  shortcuts: readonly string[],
+  selectionStart: number,
+  selectionEnd: number,
+  textLength: number,
+): boolean {
   const shortcut = completionShortcut(event);
   if (shortcut === 'Shift+Tab') return shortcuts.includes('Tab');
   if (!shortcut || !shortcuts.includes(shortcut)) return false;

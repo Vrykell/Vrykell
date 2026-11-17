@@ -37,36 +37,49 @@ export default class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.error) {
-      return this.props.fallback ?? (
-        <DefaultFallback
-          error={this.state.error}
-          componentStack={this.state.errorInfo?.componentStack ?? undefined}
-          onReset={this.handleReset}
-        />
+      return (
+        this.props.fallback ?? (
+          <DefaultFallback
+            error={this.state.error}
+            componentStack={this.state.errorInfo?.componentStack ?? undefined}
+            onReset={this.handleReset}
+          />
+        )
       );
     }
     return this.props.children;
   }
 }
 
-function DefaultFallback({ error, componentStack, onReset }: {
-  error: Error;
-  componentStack?: string;
-  onReset: () => void;
-}) {
+function DefaultFallback({ error, componentStack, onReset }: { error: Error; componentStack?: string; onReset: () => void }) {
   return (
-    <div style={{
-      height: '100vh', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center',
-      background: 'var(--canvas)', color: 'var(--text-primary)',
-      fontFamily: 'var(--font-ui)', padding: 40, gap: 16,
-    }}>
-      <div style={{ opacity: 0.3 }}><TriangleAlert size={48} /></div>
-      <h2 style={{ margin: 0, fontWeight: 'var(--fw-semibold)' }}>{t('Page render error')}</h2>
-      <p data-selectable style={{
-        margin: 0, color: 'var(--text-secondary)', fontSize: 'calc(13px * var(--ui-font-scale))',
-        maxWidth: 480, textAlign: 'center', lineHeight: 1.6,
+    <div
+      style={{
+        height: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--canvas)',
+        color: 'var(--text-primary)',
+        fontFamily: 'var(--font-ui)',
+        padding: 40,
+        gap: 16,
       }}>
+      <div style={{ opacity: 0.3 }}>
+        <TriangleAlert size={48} />
+      </div>
+      <h2 style={{ margin: 0, fontWeight: 'var(--fw-semibold)' }}>{t('Page render error')}</h2>
+      <p
+        data-selectable
+        style={{
+          margin: 0,
+          color: 'var(--text-secondary)',
+          fontSize: 'calc(13px * var(--ui-font-scale))',
+          maxWidth: 480,
+          textAlign: 'center',
+          lineHeight: 1.6,
+        }}>
         {error.message}
       </p>
       <ErrorDetails
@@ -77,7 +90,8 @@ function DefaultFallback({ error, componentStack, onReset }: {
         style={{ maxWidth: 520, width: '100%' }}
         preStyle={{
           fontSize: 'calc(9px * var(--ui-font-scale))',
-          color: 'var(--error)', maxHeight: 120,
+          color: 'var(--error)',
+          maxHeight: 120,
         }}
       />
       {componentStack && (
@@ -88,7 +102,8 @@ function DefaultFallback({ error, componentStack, onReset }: {
           style={{ maxWidth: 520, width: '100%' }}
           preStyle={{
             fontSize: 'calc(10px * var(--ui-font-scale))',
-            color: 'var(--text-muted)', maxHeight: 200,
+            color: 'var(--text-muted)',
+            maxHeight: 200,
           }}
         />
       )}
@@ -96,11 +111,15 @@ function DefaultFallback({ error, componentStack, onReset }: {
         className="primary-button"
         onClick={onReset}
         style={{
-          marginTop: 8, padding: '8px 24px', fontSize: 'calc(13px * var(--ui-font-scale))',
-          background: 'var(--primary-button-bg)', border: 'none', borderRadius: 'var(--radius-inner)',
-          color: 'var(--primary-button-text)', cursor: 'pointer',
-        }}
-      >
+          marginTop: 8,
+          padding: '8px 24px',
+          fontSize: 'calc(13px * var(--ui-font-scale))',
+          background: 'var(--primary-button-bg)',
+          border: 'none',
+          borderRadius: 'var(--radius-inner)',
+          color: 'var(--primary-button-text)',
+          cursor: 'pointer',
+        }}>
         {t('Retry')}
       </button>
     </div>

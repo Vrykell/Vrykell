@@ -16,14 +16,14 @@ import { getTerminalInputOptions } from './terminalInput';
 
 function getFgCss(cell: IBufferCell): string | null {
   if (cell.isFgDefault()) return null;
-  if (cell.isFgRGB())     return rgbToCss(cell.getFgColor());
+  if (cell.isFgRGB()) return rgbToCss(cell.getFgColor());
   if (cell.isFgPalette()) return indexToCss(cell.getFgColor());
   return null;
 }
 
 function getBgCss(cell: IBufferCell): string | null {
   if (cell.isBgDefault()) return null;
-  if (cell.isBgRGB())     return rgbToCss(cell.getBgColor());
+  if (cell.isBgRGB()) return rgbToCss(cell.getBgColor());
   if (cell.isBgPalette()) return indexToCss(cell.getBgColor());
   return null;
 }
@@ -57,11 +57,11 @@ function cellStyle(cell: IBufferCell): string {
     if (bg) parts.push(`background:${bg}`);
   }
 
-  if (cell.isBold())           parts.push('font-weight:bold');
-  if (cell.isItalic())         parts.push('font-style:italic');
-  if (cell.isUnderline())      parts.push('text-decoration:underline');
-  if (cell.isStrikethrough())  parts.push('text-decoration:line-through');
-  if (cell.isDim())            parts.push('opacity:0.6');
+  if (cell.isBold()) parts.push('font-weight:bold');
+  if (cell.isItalic()) parts.push('font-style:italic');
+  if (cell.isUnderline()) parts.push('text-decoration:underline');
+  if (cell.isStrikethrough()) parts.push('text-decoration:line-through');
+  if (cell.isDim()) parts.push('opacity:0.6');
 
   return parts.join(';');
 }
@@ -72,7 +72,15 @@ export interface TerminalSnapshot {
 }
 
 export function extractSnapshotFromBuffer(
-  buf: { length: number; getLine(y: number): { isWrapped?: boolean; translateToString(trim?: boolean): string; getCell(x: number, cell?: IBufferCell): IBufferCell | undefined } | undefined; getNullCell(): IBufferCell },
+  buf: {
+    length: number;
+    getLine(
+      y: number,
+    ):
+      | { isWrapped?: boolean; translateToString(trim?: boolean): string; getCell(x: number, cell?: IBufferCell): IBufferCell | undefined }
+      | undefined;
+    getNullCell(): IBufferCell;
+  },
   cols: number,
   startLine?: number,
   endLine?: number,
@@ -84,9 +92,7 @@ export function extractSnapshotFromBuffer(
   const htmlLines: string[] = [];
   const textLines: string[] = [];
   const cell = buf.getNullCell();
-  const spacing = Number.isFinite(letterSpacingEm) && Math.abs(letterSpacingEm) <= 0.2
-    ? letterSpacingEm
-    : 0;
+  const spacing = Number.isFinite(letterSpacingEm) && Math.abs(letterSpacingEm) <= 0.2 ? letterSpacingEm : 0;
 
   for (let y = start; y < end && y < buf.length; y++) {
     const line = buf.getLine(y);
@@ -127,14 +133,12 @@ export function extractSnapshotFromBuffer(
         // (positioned in ch units) and everything after it then drift right, so
         // wrap each glyph in an inline-block sized 2ch to match the grid exactly.
         if (currentText) {
-          spans.push(currentStyle
-            ? `<span style="${currentStyle}">${currentText}</span>`
-            : currentText);
+          spans.push(currentStyle ? `<span style="${currentStyle}">${currentText}</span>` : currentText);
         }
         const wide = 'display:inline-block;width:2ch';
-        spans.push(style
-          ? `<span style="${style};${wide}">${escapeHtml(chars)}</span>`
-          : `<span style="${wide}">${escapeHtml(chars)}</span>`);
+        spans.push(
+          style ? `<span style="${style};${wide}">${escapeHtml(chars)}</span>` : `<span style="${wide}">${escapeHtml(chars)}</span>`,
+        );
         currentStyle = '';
         currentText = '';
         continue;
@@ -144,9 +148,7 @@ export function extractSnapshotFromBuffer(
         currentText += escapeHtml(chars);
       } else {
         if (currentText) {
-          spans.push(currentStyle
-            ? `<span style="${currentStyle}">${currentText}</span>`
-            : currentText);
+          spans.push(currentStyle ? `<span style="${currentStyle}">${currentText}</span>` : currentText);
         }
         currentStyle = style;
         currentText = escapeHtml(chars);
@@ -154,17 +156,14 @@ export function extractSnapshotFromBuffer(
     }
 
     if (currentText) {
-      spans.push(currentStyle
-        ? `<span style="${currentStyle}">${currentText}</span>`
-        : currentText);
+      spans.push(currentStyle ? `<span style="${currentStyle}">${currentText}</span>` : currentText);
     }
 
     const renderedLine = continues ? spans.join('') : spans.join('').replace(/ +$/, '');
     // Keep blank rows empty so metric styling cannot turn viewport padding
     // into visible output after trailing rows are trimmed.
-    const html = spacing && renderedLine.trim()
-      ? `<span style="letter-spacing:${spacing.toFixed(5)}em">${renderedLine}</span>`
-      : renderedLine;
+    const html =
+      spacing && renderedLine.trim() ? `<span style="letter-spacing:${spacing.toFixed(5)}em">${renderedLine}</span>` : renderedLine;
     if (wrapped) htmlLines[htmlLines.length - 1] += html;
     else htmlLines.push(html);
   }
@@ -185,7 +184,9 @@ export async function captureTerminalOutput(rawAnsi: string, cols: number): Prom
 
   const { term, dispose } = createOffscreenTerm(safeCols);
   try {
-    await new Promise<void>((resolve) => { term.write(cleanAnsi, () => resolve()); });
+    await new Promise<void>((resolve) => {
+      term.write(cleanAnsi, () => resolve());
+    });
     await new Promise((r) => setTimeout(r, 0));
     return extractSnapshotFromBuffer(term.buffer.active, safeCols);
   } finally {
@@ -193,14 +194,9 @@ export async function captureTerminalOutput(rawAnsi: string, cols: number): Prom
   }
 }
 
-export function createOffscreenTerm(
-  cols: number,
-  rows = 24,
-  scrollback = 5000,
-): { term: Terminal; dispose: () => void } {
+export function createOffscreenTerm(cols: number, rows = 24, scrollback = 5000): { term: Terminal; dispose: () => void } {
   const el = document.createElement('div');
-  el.style.cssText =
-    'position:absolute;left:0;top:0;visibility:hidden;width:800px;height:600px;overflow:hidden;pointer-events:none';
+  el.style.cssText = 'position:absolute;left:0;top:0;visibility:hidden;width:800px;height:600px;overflow:hidden;pointer-events:none';
   document.body.appendChild(el);
   const term = new Terminal({
     cols: Math.max(cols || 80, 1),
@@ -220,10 +216,7 @@ export function createOffscreenTerm(
 }
 
 function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /**
@@ -236,10 +229,7 @@ function escapeHtml(s: string): string {
  * controller owns its lifecycle; completed blocks use a matching HTML snapshot and
  * font metrics.
  */
-export function createBlockTerm(
-  cols: number,
-  rows: number,
-): { term: Terminal; el: HTMLDivElement; dispose: () => void } {
+export function createBlockTerm(cols: number, rows: number): { term: Terminal; el: HTMLDivElement; dispose: () => void } {
   // Use the same terminal background for live output and completed snapshots.
   const el = document.createElement('div');
   el.style.cssText = 'overflow:hidden;width:100%;background:var(--xterm-bg)';

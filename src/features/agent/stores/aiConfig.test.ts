@@ -7,7 +7,27 @@ const { invokeMock, listenMock } = vi.hoisted(() => ({
 vi.mock('@tauri-apps/api/core', () => ({ invoke: invokeMock }));
 vi.mock('@tauri-apps/api/event', () => ({ listen: listenMock }));
 
-import { anthropicStream, activeModelProfile, isApiKeyConfigured, getModel, getAiBaseUrl, useAiConfigStore, refreshAiConfig, setApiKey, clearApiKey, setAiBaseUrl, setAiModel, setAiProvider, setAiModels, setActiveModel, setProviderKey, clearProviderKey, setTavilyKey, clearTavilyKey, selectProvider } from '@features/agent/stores/aiConfig';
+import {
+  anthropicStream,
+  activeModelProfile,
+  isApiKeyConfigured,
+  getModel,
+  getAiBaseUrl,
+  useAiConfigStore,
+  refreshAiConfig,
+  setApiKey,
+  clearApiKey,
+  setAiBaseUrl,
+  setAiModel,
+  setAiProvider,
+  setAiModels,
+  setActiveModel,
+  setProviderKey,
+  clearProviderKey,
+  setTavilyKey,
+  clearTavilyKey,
+  selectProvider,
+} from '@features/agent/stores/aiConfig';
 
 describe('anthropicStream', () => {
   beforeEach(() => {
@@ -36,9 +56,12 @@ describe('anthropicStream', () => {
     const got: string[] = [];
     await anthropicStream([{ role: 'user', content: 'hi' }], (t) => got.push(t));
     expect(got).toEqual(['你好', '！']);
-    expect(invokeMock).toHaveBeenCalledWith('ai_stream', expect.objectContaining({
-      messages: [{ role: 'user', content: 'hi' }],
-    }));
+    expect(invokeMock).toHaveBeenCalledWith(
+      'ai_stream',
+      expect.objectContaining({
+        messages: [{ role: 'user', content: 'hi' }],
+      }),
+    );
   });
 });
 
@@ -57,7 +80,10 @@ describe('ai mirror helpers (new)', () => {
   it('isApiKeyConfigured: checks the key per provider', () => {
     useAiConfigStore.setState({
       providerKeys: ['openai-compatible|https://api.openai.com/v1'],
-      provider: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', models: [], activeModel: '',
+      provider: 'openai-compatible',
+      baseUrl: 'https://api.openai.com/v1',
+      models: [],
+      activeModel: '',
     });
     expect(isApiKeyConfigured()).toBe(true);
     useAiConfigStore.setState({ providerKeys: ['anthropic|https://api.anthropic.com/v1'], provider: 'anthropic', baseUrl: '' });
@@ -89,7 +115,10 @@ describe('ai mirror helpers (new)', () => {
   it('isApiKeyConfigured: gemini branch', () => {
     useAiConfigStore.setState({
       providerKeys: ['gemini|https://generativelanguage.googleapis.com/v1beta'],
-      provider: 'gemini', baseUrl: '', models: [], activeModel: '',
+      provider: 'gemini',
+      baseUrl: '',
+      models: [],
+      activeModel: '',
     });
     expect(isApiKeyConfigured()).toBe(true);
     useAiConfigStore.setState({ providerKeys: [] });
@@ -98,8 +127,13 @@ describe('ai mirror helpers (new)', () => {
 
   it('refreshAiConfig: syncs the Rust config; keeps defaults when the backend is unavailable', async () => {
     invokeMock.mockResolvedValue({
-      has_key: true, base_url: 'u', model: 'm', provider: 'anthropic',
-      has_anthropic_key: true, has_gemini_key: false, has_tavily_key: true,
+      has_key: true,
+      base_url: 'u',
+      model: 'm',
+      provider: 'anthropic',
+      has_anthropic_key: true,
+      has_gemini_key: false,
+      has_tavily_key: true,
       provider_keys: ['anthropic|u'],
       models: [{ id: 'x', name: 'X', provider: 'anthropic', baseUrl: 'u', model: 'm' }],
       active_model: 'x',
@@ -125,12 +159,16 @@ describe('ai mirror helpers (new)', () => {
 
   it('setApiKey / clearApiKey / setAiBaseUrl / setAiModel / setAiProvider', async () => {
     useAiConfigStore.setState({
-      provider: 'openai-compatible', baseUrl: 'https://api.openai.com/v1',
-      models: [], activeModel: '', providerKeys: [],
+      provider: 'openai-compatible',
+      baseUrl: 'https://api.openai.com/v1',
+      models: [],
+      activeModel: '',
+      providerKeys: [],
     });
     await setApiKey('  sk-abc  ');
     expect(invokeMock).toHaveBeenCalledWith('set_provider_key', {
-      providerId: 'openai-compatible|https://api.openai.com/v1', key: 'sk-abc',
+      providerId: 'openai-compatible|https://api.openai.com/v1',
+      key: 'sk-abc',
     });
     expect(useAiConfigStore.getState().providerKeys).toEqual(['openai-compatible|https://api.openai.com/v1']);
     await setApiKey('   ');
@@ -182,7 +220,8 @@ describe('ai mirror helpers (new)', () => {
   it('setProviderKey / clearProviderKey: stores keys separately per provider identity', async () => {
     await setProviderKey('anthropic|https://api.anthropic.com/v1', ' key-a ');
     expect(invokeMock).toHaveBeenCalledWith('set_provider_key', {
-      providerId: 'anthropic|https://api.anthropic.com/v1', key: 'key-a',
+      providerId: 'anthropic|https://api.anthropic.com/v1',
+      key: 'key-a',
     });
     expect(useAiConfigStore.getState().providerKeys).toEqual(['anthropic|https://api.anthropic.com/v1']);
     await setProviderKey('gemini|https://generativelanguage.googleapis.com/v1beta', 'k');
@@ -191,7 +230,9 @@ describe('ai mirror helpers (new)', () => {
     await setProviderKey('anthropic|https://api.anthropic.com/v1', '  ');
     expect(invokeMock).toHaveBeenCalledTimes(3);
     await clearProviderKey('gemini|https://generativelanguage.googleapis.com/v1beta');
-    expect(invokeMock).toHaveBeenCalledWith('clear_provider_key', { providerId: 'gemini|https://generativelanguage.googleapis.com/v1beta' });
+    expect(invokeMock).toHaveBeenCalledWith('clear_provider_key', {
+      providerId: 'gemini|https://generativelanguage.googleapis.com/v1beta',
+    });
     expect(useAiConfigStore.getState().providerKeys).toHaveLength(2);
     await clearProviderKey('openai-compatible|https://api.deepseek.com/v1');
     expect(useAiConfigStore.getState().providerKeys).toEqual(['anthropic|https://api.anthropic.com/v1']);

@@ -8,7 +8,7 @@ for (const [shell, directory, command] of [
 ] as const) {
   test(`directory synchronization uses the focused ${shell} shell`, async ({ page }) => {
     await setupTauriMock(page, { shells: [{ id: shell, label: shell, default: true }] });
-    await page.addInitScript(directory => {
+    await page.addInitScript((directory) => {
       localStorage.setItem('vrykell-files-location', JSON.stringify({ state: { remembered: { path: directory } }, version: 0 }));
     }, directory);
     await page.goto('/');
@@ -23,12 +23,14 @@ for (const [shell, directory, command] of [
 test('a partial deletion keeps an undo action for the completed item', async ({ page }) => {
   await setupTauriMock(page, {});
   await page.addInitScript(() => {
-    const host = window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> } };
+    const host = window as unknown as {
+      __TAURI_INTERNALS__: { invoke: (command: string, args?: Record<string, unknown>) => Promise<unknown> };
+    };
     const original = host.__TAURI_INTERNALS__.invoke;
     host.__TAURI_INTERNALS__.invoke = async (command, args) => {
       if (command !== 'fs_stage_delete') return original(command, args);
       const paths = args?.paths as string[];
-      const result = await original(command, { ...args, paths: [paths[0]] }) as { completed: unknown[]; errors: string[] };
+      const result = (await original(command, { ...args, paths: [paths[0]] })) as { completed: unknown[]; errors: string[] };
       return { ...result, errors: ['Access denied for the remaining item'] };
     };
   });
@@ -42,8 +44,8 @@ test('a partial deletion keeps an undo action for the completed item', async ({ 
   await notes.click({ button: 'right' });
   await page.getByRole('button', { name: '删除 2 项', exact: true }).click();
   await page.getByTestId('confirm-ok').click();
-  await expect.poll(async () => (await fsOps(page)).filter(operation => operation.op === 'delete')).toHaveLength(1);
+  await expect.poll(async () => (await fsOps(page)).filter((operation) => operation.op === 'delete')).toHaveLength(1);
   await page.getByTestId('local-more-btn').click();
   await page.getByRole('button', { name: /^回退删除/ }).click();
-  await expect.poll(async () => (await fsOps(page)).filter(operation => operation.op === 'restore')).toHaveLength(1);
+  await expect.poll(async () => (await fsOps(page)).filter((operation) => operation.op === 'restore')).toHaveLength(1);
 });

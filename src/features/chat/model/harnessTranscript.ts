@@ -51,7 +51,7 @@ function metaRecord(update: Record<string, unknown>, key: string): Record<string
   const meta = update._meta;
   if (!meta || typeof meta !== 'object' || Array.isArray(meta)) return undefined;
   const entry = (meta as Record<string, unknown>)[key];
-  return entry && typeof entry === 'object' && !Array.isArray(entry) ? entry as Record<string, unknown> : undefined;
+  return entry && typeof entry === 'object' && !Array.isArray(entry) ? (entry as Record<string, unknown>) : undefined;
 }
 
 /** Streamed command text carried by an ACP output channel. */
@@ -63,9 +63,10 @@ function metaText(update: Record<string, unknown>, key: string): string {
 /** Exit code of a command that reported it under `terminal_exit` or `rawOutput`. */
 function exitCodeOf(update: Record<string, unknown>): number | undefined {
   const exit = metaRecord(update, 'terminal_exit');
-  const raw = update.rawOutput && typeof update.rawOutput === 'object' && !Array.isArray(update.rawOutput)
-    ? update.rawOutput as Record<string, unknown>
-    : undefined;
+  const raw =
+    update.rawOutput && typeof update.rawOutput === 'object' && !Array.isArray(update.rawOutput)
+      ? (update.rawOutput as Record<string, unknown>)
+      : undefined;
   for (const value of [exit?.exit_code, exit?.exitCode, raw?.exit_code, raw?.exitCode]) {
     if (typeof value === 'number' && Number.isFinite(value)) return value;
   }
@@ -86,26 +87,44 @@ function withLast(messages: ChatMessage[], update: (message: ChatMessage) => Cha
 function appendText(message: ChatMessage, text: string): ChatMessage {
   const parts = message.parts ?? (message.content ? [{ kind: 'text' as const, text: message.content }] : []);
   const last = parts[parts.length - 1];
-  const nextParts = last && last.kind === 'text'
-    ? [...parts.slice(0, -1), { kind: 'text' as const, text: last.text + text }]
-    : [...parts, { kind: 'text' as const, text }];
+  const nextParts =
+    last && last.kind === 'text'
+      ? [...parts.slice(0, -1), { kind: 'text' as const, text: last.text + text }]
+      : [...parts, { kind: 'text' as const, text }];
   return { ...message, parts: nextParts };
 }
 
-export function upsertHarnessTool(messages: ChatMessage[], run: ToolRun, context: Pick<ChatMessage, 'paneId' | 'environment'> = {}): ChatMessage[] {
+export function upsertHarnessTool(
+  messages: ChatMessage[],
+  run: ToolRun,
+  context: Pick<ChatMessage, 'paneId' | 'environment'> = {},
+): ChatMessage[] {
   const index = messages.findIndex((message) =>
-    message.parts?.some((part) => part.kind === 'tool' && part.tool.toolCallId === run.toolCallId));
+    message.parts?.some((part) => part.kind === 'tool' && part.tool.toolCallId === run.toolCallId),
+  );
   if (index < 0) {
     const last = lastMessage(messages);
-    if (last?.role === 'assistant') return withLast(messages, message => ({
-      ...message, ...context, parts: [...(message.parts ?? (message.content ? [{ kind: 'text' as const, text: message.content }] : [])), { kind: 'tool', tool: run }],
-    }));
+    if (last?.role === 'assistant')
+      return withLast(messages, (message) => ({
+        ...message,
+        ...context,
+        parts: [
+          ...(message.parts ?? (message.content ? [{ kind: 'text' as const, text: message.content }] : [])),
+          { kind: 'tool', tool: run },
+        ],
+      }));
     // A tool report without a message yet opens one, so the row never floats without context.
-    return [...messages, {
-      id: nextId('harness-assistant'), role: 'assistant', content: '', createdAt: Date.now(),
-      ...context,
-      parts: [{ kind: 'tool', tool: run }],
-    }];
+    return [
+      ...messages,
+      {
+        id: nextId('harness-assistant'),
+        role: 'assistant',
+        content: '',
+        createdAt: Date.now(),
+        ...context,
+        parts: [{ kind: 'tool', tool: run }],
+      },
+    ];
   }
   return messages.map((message, at) => {
     if (at !== index) return message;
@@ -129,12 +148,21 @@ export function groupHarnessMessages(messages: ChatMessage[]): ChatMessage[] {
   const grouped: ChatMessage[] = [];
   for (const message of messages) {
     const previous = lastMessage(grouped);
-    if (message.role !== 'assistant' || previous?.role !== 'assistant') { grouped.push(message); continue; }
+    if (message.role !== 'assistant' || previous?.role !== 'assistant') {
+      grouped.push(message);
+      continue;
+    }
     const parts = (value: ChatMessage) => value.parts ?? (value.content ? [{ kind: 'text' as const, text: value.content }] : []);
-    grouped[grouped.length - 1] = { ...previous, parts: [...parts(previous), ...parts(message)],
-      reasoning: (previous.reasoning ?? '') + (message.reasoning ?? ''), pending: message.pending,
-      error: message.error ?? previous.error, errorSummary: message.errorSummary ?? previous.errorSummary,
-      errorText: message.errorText ?? previous.errorText, stopped: message.stopped ?? previous.stopped };
+    grouped[grouped.length - 1] = {
+      ...previous,
+      parts: [...parts(previous), ...parts(message)],
+      reasoning: (previous.reasoning ?? '') + (message.reasoning ?? ''),
+      pending: message.pending,
+      error: message.error ?? previous.error,
+      errorSummary: message.errorSummary ?? previous.errorSummary,
+      errorText: message.errorText ?? previous.errorText,
+      stopped: message.stopped ?? previous.stopped,
+    };
   }
   return grouped;
 }
@@ -145,7 +173,7 @@ export function groupHarnessMessages(messages: ChatMessage[]): ChatMessage[] {
  * keeps a live session from silently staying empty.
  */
 export function harnessUpdate(payload: Record<string, unknown>): Record<string, unknown> {
-  const params = ((payload.params ?? payload) ?? {}) as Record<string, unknown>;
+  const params = (payload.params ?? payload ?? {}) as Record<string, unknown>;
   return (params.update ?? {}) as Record<string, unknown>;
 }
 
@@ -177,10 +205,16 @@ export function applyHarnessUpdate(messages: ChatMessage[], payload: Record<stri
       const text = textOf(update.content);
       const last = lastMessage(messages);
       if (last && last.role === 'assistant') return withLast(messages, (message) => appendText(message, text));
-      return [...messages, {
-        id: nextId('harness-assistant'), role: 'assistant', content: '', createdAt: Date.now(),
-        parts: [{ kind: 'text', text }],
-      }];
+      return [
+        ...messages,
+        {
+          id: nextId('harness-assistant'),
+          role: 'assistant',
+          content: '',
+          createdAt: Date.now(),
+          parts: [{ kind: 'text', text }],
+        },
+      ];
     }
     case 'agent_thought_chunk': {
       const text = textOf(update.content);
@@ -188,15 +222,24 @@ export function applyHarnessUpdate(messages: ChatMessage[], payload: Record<stri
       if (last && last.role === 'assistant') {
         return withLast(messages, (message) => ({ ...message, reasoning: (message.reasoning ?? '') + text }));
       }
-      return [...messages, {
-        id: nextId('harness-assistant'), role: 'assistant', content: '', createdAt: Date.now(), reasoning: text,
-      }];
+      return [
+        ...messages,
+        {
+          id: nextId('harness-assistant'),
+          role: 'assistant',
+          content: '',
+          createdAt: Date.now(),
+          reasoning: text,
+        },
+      ];
     }
     case 'tool_call':
     case 'tool_call_update': {
       const toolCallId = String(update.toolCallId ?? '');
       if (!toolCallId) return messages;
-      const previous = messages.flatMap(message => message.parts ?? []).find(part => part.kind === 'tool' && part.tool.toolCallId === toolCallId);
+      const previous = messages
+        .flatMap((message) => message.parts ?? [])
+        .find((part) => part.kind === 'tool' && part.tool.toolCallId === toolCallId);
       const existing = previous?.kind === 'tool' ? previous.tool : undefined;
       const title = typeof update.title === 'string' ? update.title : '';
       // The application MCP server runs through ApplicationToolSession, which already adds its
@@ -206,7 +249,7 @@ export function applyHarnessUpdate(messages: ChatMessage[], payload: Record<stri
       const run: ToolRun = {
         toolCallId,
         // Our card falls back to the provided title for tools it does not know (the ACP case).
-        toolName: typeof update.kind === 'string' ? update.kind : existing?.toolName ?? 'other',
+        toolName: typeof update.kind === 'string' ? update.kind : (existing?.toolName ?? 'other'),
         input: { ...(title ? { title } : {}), ...(update.rawInput ? { rawInput: update.rawInput } : {}) },
         state: update.status === undefined && existing ? existing.state : toolState(update.status),
         startedAt: existing?.startedAt ?? Date.now(),

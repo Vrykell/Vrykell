@@ -10,7 +10,8 @@ import { useUsageSources } from '@features/agent';
 
 const server = { name: 'Agent', command: 'runner', args: ['path with spaces', '--flag'], enabled: true, env: {}, cwd: '' };
 beforeEach(() => {
-  ipc.list.mockResolvedValue([server]); ipc.save.mockReset().mockResolvedValue(undefined);
+  ipc.list.mockResolvedValue([server]);
+  ipc.save.mockReset().mockResolvedValue(undefined);
   useUsageSources.getState().replace([]);
 });
 
@@ -29,8 +30,17 @@ it('preserves argument boundaries and keeps the editor open until persistence su
 
 it('persists a new server before leaving its editor without a debounce window', async () => {
   let finish: (() => void) | undefined;
-  ipc.save.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
-  render(<SettingsSaveProvider><HarnessPage /></SettingsSaveProvider>);
+  ipc.save.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  render(
+    <SettingsSaveProvider>
+      <HarnessPage />
+    </SettingsSaveProvider>,
+  );
   await screen.findByTestId('harness-row-0');
   expect(useUsageSources.getState().configured).toEqual(['Agent']);
   fireEvent.click(screen.getByTestId('harness-add'));
@@ -49,7 +59,11 @@ it('persists a new server before leaving its editor without a debounce window', 
 
 it('does not add an unsaved configuration to usage sources', async () => {
   ipc.save.mockRejectedValueOnce(new Error('Unavailable'));
-  render(<SettingsSaveProvider><HarnessPage /></SettingsSaveProvider>);
+  render(
+    <SettingsSaveProvider>
+      <HarnessPage />
+    </SettingsSaveProvider>,
+  );
   await screen.findByTestId('harness-row-0');
   fireEvent.click(screen.getByTestId('harness-add'));
   fireEvent.change(screen.getByTestId('harness-dialog-name'), { target: { value: 'Unsaved agent' } });
@@ -61,7 +75,11 @@ it('does not add an unsaved configuration to usage sources', async () => {
 
 it('shows a configuration failure with retry instead of reporting an empty list', async () => {
   ipc.list.mockRejectedValueOnce(new Error('unavailable'));
-  render(<SettingsSaveProvider><HarnessPage /></SettingsSaveProvider>);
+  render(
+    <SettingsSaveProvider>
+      <HarnessPage />
+    </SettingsSaveProvider>,
+  );
   await screen.findByText('无法加载服务器');
   expect(screen.queryByTestId('harness-none')).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: '重试' }));

@@ -37,7 +37,9 @@ describe('FilePropertiesDialog', () => {
       <FilePropertiesDialog
         entry={{ name: 'Documents', path: '/home/e2e/Documents', is_dir: true }}
         location="/home/e2e"
-        stat={async () => stat({ name: 'Documents', path: '/home/e2e/Documents', is_dir: true, size: 0, created_ms: null, modified_ms: null })}
+        stat={async () =>
+          stat({ name: 'Documents', path: '/home/e2e/Documents', is_dir: true, size: 0, created_ms: null, modified_ms: null })
+        }
         onClose={() => {}}
       />,
     );
@@ -49,7 +51,16 @@ describe('FilePropertiesDialog', () => {
   });
 
   it('renders a readable error box when metadata cannot be read', async () => {
-    render(<FilePropertiesDialog entry={file} location="" stat={async () => { throw new Error('permission denied'); }} onClose={() => {}} />);
+    render(
+      <FilePropertiesDialog
+        entry={file}
+        location=""
+        stat={async () => {
+          throw new Error('permission denied');
+        }}
+        onClose={() => {}}
+      />,
+    );
 
     const box = await screen.findByRole('alert');
     expect(box).toHaveTextContent('无法读取文件属性');

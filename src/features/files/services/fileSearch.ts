@@ -8,8 +8,13 @@ export interface FileSearchResult {
 }
 
 /** Bounded traversal shared by local and remote file services. */
-export async function searchFiles(ops: Pick<FileOps, 'list' | 'search'>, root: string, query: string,
-  signal: AbortSignal, onProgress: (result: FileSearchResult) => void): Promise<FileSearchResult> {
+export async function searchFiles(
+  ops: Pick<FileOps, 'list' | 'search'>,
+  root: string,
+  query: string,
+  signal: AbortSignal,
+  onProgress: (result: FileSearchResult) => void,
+): Promise<FileSearchResult> {
   const needle = query.trim().toLocaleLowerCase();
   const result: FileSearchResult = { entries: [], truncated: false, skipped: 0 };
   if (!needle) return result;
@@ -27,15 +32,19 @@ export async function searchFiles(ops: Pick<FileOps, 'list' | 'search'>, root: s
     if (seen.has(directory.path)) continue;
     seen.add(directory.path);
     let entries: FsEntry[];
-    try { entries = (await ops.list(directory.path)).entries; }
-    catch (error) {
+    try {
+      entries = (await ops.list(directory.path)).entries;
+    } catch (error) {
       if (directory.path === root) throw error;
       result.skipped++;
       continue;
     }
     if (signal.aborted) break;
     for (const entry of entries) {
-      if (++scanned > 20000 || result.entries.length >= 200) { result.truncated = true; break; }
+      if (++scanned > 20000 || result.entries.length >= 200) {
+        result.truncated = true;
+        break;
+      }
       if (entry.name.toLocaleLowerCase().includes(needle)) result.entries.push(entry);
       if (entry.is_dir && !entry.is_symlink) {
         if (directory.depth < 12 && queue.length < 500) queue.push({ path: entry.path, depth: directory.depth + 1 });

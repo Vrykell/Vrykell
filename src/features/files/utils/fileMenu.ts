@@ -80,9 +80,13 @@ function itemFor(key: FileMenuItemKey, ctx: FileMenuContext): ContextMenuItem | 
     case 'new-folder':
       return currentDir === null ? null : { label: t('New folder'), onClick: () => handlers.onNew('dir', entry) };
     case 'workspace-add':
-      return ctx.inWorkspace || !single ? null : { label: t('Add to workspace'), onClick: () => handlers.onWorkspaceToggle?.(single, false) };
+      return ctx.inWorkspace || !single
+        ? null
+        : { label: t('Add to workspace'), onClick: () => handlers.onWorkspaceToggle?.(single, false) };
     case 'workspace-remove':
-      return ctx.inWorkspace && single ? { label: t('Remove from workspace'), onClick: () => handlers.onWorkspaceToggle?.(single, true) } : null;
+      return ctx.inWorkspace && single
+        ? { label: t('Remove from workspace'), onClick: () => handlers.onWorkspaceToggle?.(single, true) }
+        : null;
     case 'open-tab':
       return single ? { label: t('Open in new tab'), onClick: () => handlers.onOpenTab?.(single) } : null;
     case 'open-editor':
@@ -121,7 +125,10 @@ function itemFor(key: FileMenuItemKey, ctx: FileMenuContext): ContextMenuItem | 
       return single ? { label: t('Rename'), onClick: () => handlers.onRename(single) } : null;
     case 'download':
       return handlers.onDownload
-        ? { label: single.is_dir ? cmdLabel(t('Download folder to local'), count) : cmdLabel(t('Download to local'), count), onClick: () => handlers.onDownload!(targets) }
+        ? {
+            label: single.is_dir ? cmdLabel(t('Download folder to local'), count) : cmdLabel(t('Download to local'), count),
+            onClick: () => handlers.onDownload!(targets),
+          }
         : null;
     case 'delete':
       return { label: cmdLabel(t('Delete'), count), danger: true, onClick: () => handlers.onDelete(targets) };
@@ -134,9 +141,13 @@ function itemFor(key: FileMenuItemKey, ctx: FileMenuContext): ContextMenuItem | 
     case 'bind-terminal':
       return ctx.terminalMenu ? terminalBindingMenuItem(ctx.terminalMenu) : null;
     case 'sync-cwd':
-      return handlers.onSyncToCwd ? { label: t('files.syncToCwd'), shortcut: FILE_DIRECTORY_SHORTCUTS.panel, onClick: handlers.onSyncToCwd } : null;
+      return handlers.onSyncToCwd
+        ? { label: t('files.syncToCwd'), shortcut: FILE_DIRECTORY_SHORTCUTS.panel, onClick: handlers.onSyncToCwd }
+        : null;
     case 'sync-terminal':
-      return handlers.onSyncToTerminal ? { label: t('Switch terminal to this directory'), shortcut: FILE_DIRECTORY_SHORTCUTS.terminal, onClick: handlers.onSyncToTerminal } : null;
+      return handlers.onSyncToTerminal
+        ? { label: t('Switch terminal to this directory'), shortcut: FILE_DIRECTORY_SHORTCUTS.terminal, onClick: handlers.onSyncToTerminal }
+        : null;
     case 'uploads-view':
       return handlers.onOpenUploads ? { label: t('Upload manager'), onClick: handlers.onOpenUploads } : null;
     case 'downloads-view':
@@ -157,10 +168,25 @@ export function buildFileMenuItems(keys: FileMenuItemKey[], ctx: FileMenuContext
     const item = itemFor(key, ctx);
     if (item) {
       const clipboard = ['cut', 'copy', 'paste', 'copy-path'];
-      const group: MenuGroup = key.startsWith('open-') || key === 'new-tab-here' ? 'primary'
-        : clipboard.includes(key) ? 'clipboard'
-          : ['new-file', 'new-folder', 'rename', 'upload-file', 'upload-dir', 'download'].includes(key) ? 'edit'
-            : ['reveal', 'sync-terminal', 'sync-cwd', 'bind-terminal', 'downloads-view', 'uploads-view', 'collapse-all', 'refresh'].includes(key) ? 'view' : 'organize';
+      const group: MenuGroup =
+        key.startsWith('open-') || key === 'new-tab-here'
+          ? 'primary'
+          : clipboard.includes(key)
+            ? 'clipboard'
+            : ['new-file', 'new-folder', 'rename', 'upload-file', 'upload-dir', 'download'].includes(key)
+              ? 'edit'
+              : [
+                    'reveal',
+                    'sync-terminal',
+                    'sync-cwd',
+                    'bind-terminal',
+                    'downloads-view',
+                    'uploads-view',
+                    'collapse-all',
+                    'refresh',
+                  ].includes(key)
+                ? 'view'
+                : 'organize';
       items.push({ ...item, group, order: clipboard.includes(key) ? clipboard.indexOf(key) : 0 });
     }
   }

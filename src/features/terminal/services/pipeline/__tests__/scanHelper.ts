@@ -20,7 +20,13 @@ function altDirection(seq: string): boolean | null {
   const body = seq.slice(3);
   const finalByte = body.slice(-1);
   if (finalByte !== 'h' && finalByte !== 'l') return null;
-  if (!body.slice(0, -1).split(';').some(param => ALT_CODES.has(param))) return null;
+  if (
+    !body
+      .slice(0, -1)
+      .split(';')
+      .some((param) => ALT_CODES.has(param))
+  )
+    return null;
   return finalByte === 'h';
 }
 

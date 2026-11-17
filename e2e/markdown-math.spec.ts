@@ -23,7 +23,9 @@ for (const scale of [1, 1.25, 1.5]) {
     const page = await context.newPage();
     try {
       const failedFonts: string[] = [];
-      page.on('requestfailed', request => { if (/KaTeX_.*\.(woff2?|ttf)/.test(request.url())) failedFonts.push(request.url()); });
+      page.on('requestfailed', (request) => {
+        if (/KaTeX_.*\.(woff2?|ttf)/.test(request.url())) failedFonts.push(request.url());
+      });
       await mockAnthropic(page, answer);
       await setupTauriMock(page, {});
       await paceLlmStream(page, 5);
@@ -32,7 +34,7 @@ for (const scale of [1, 1.25, 1.5]) {
       await page.getByRole('button', { name: '询问 AI', exact: true }).click();
       const input = page.locator('[data-chat-composer]:visible');
       await page.waitForFunction(async () => {
-        const { useChatStore } = await import('/src/features/chat/stores/chat.ts') as typeof import('../src/features/chat/stores/chat');
+        const { useChatStore } = (await import('/src/features/chat/stores/chat.ts')) as typeof import('../src/features/chat/stores/chat');
         const state = useChatStore.getState();
         return !!state.activeConversationId && state.activeConversationId in state.byTab;
       });
@@ -43,24 +45,38 @@ for (const scale of [1, 1.25, 1.5]) {
       await expect(page.locator('.chat-send-button')).toHaveAttribute('aria-label', '发送', { timeout: 10000 });
       await expect(formulas).toHaveCount(3);
       await expect(input).toBeEnabled();
-      await page.evaluate(async () => { await document.fonts.ready; });
+      await page.evaluate(async () => {
+        await document.fonts.ready;
+      });
       expect(failedFonts).toEqual([]);
-      expect(await page.evaluate(() => document.fonts.check('16px KaTeX_Main') && document.fonts.check('italic 16px KaTeX_Math'))).toBe(true);
+      expect(await page.evaluate(() => document.fonts.check('16px KaTeX_Main') && document.fonts.check('italic 16px KaTeX_Math'))).toBe(
+        true,
+      );
       for (const width of [1240, 680]) {
         await page.setViewportSize({ width, height: 900 });
         for (const formula of await formulas.all()) {
           await formula.scrollIntoViewIfNeeded();
-          await formula.evaluate(element => { element.scrollLeft = 0; });
+          await formula.evaluate((element) => {
+            element.scrollLeft = 0;
+          });
           await expect(formula.locator('.katex-base').first()).toHaveCSS('display', 'inline-block');
-          const bounds = await formula.evaluate(element => {
+          const bounds = await formula.evaluate((element) => {
             const outer = element.getBoundingClientRect();
             const inner = element.querySelector('.katex-display')!.getBoundingClientRect();
-            const glyphs = [...element.querySelectorAll<HTMLElement>('.katex-html .mord, .katex-html .mop, .katex-html .frac-line, .katex-html .sqrt svg')]
-              .map(glyph => glyph.getBoundingClientRect()).filter(rect => rect.height > 0);
-            return { topSpace: Math.min(inner.top, ...glyphs.map(rect => rect.top)) - outer.top,
-              bottomSpace: outer.bottom - Math.max(inner.bottom, ...glyphs.map(rect => rect.bottom)),
-              leftSpace: inner.left - outer.left, heightOverflow: element.scrollHeight - element.clientHeight,
-              fontSize: parseFloat(getComputedStyle(element.querySelector('.katex')!).fontSize) };
+            const glyphs = [
+              ...element.querySelectorAll<HTMLElement>(
+                '.katex-html .mord, .katex-html .mop, .katex-html .frac-line, .katex-html .sqrt svg',
+              ),
+            ]
+              .map((glyph) => glyph.getBoundingClientRect())
+              .filter((rect) => rect.height > 0);
+            return {
+              topSpace: Math.min(inner.top, ...glyphs.map((rect) => rect.top)) - outer.top,
+              bottomSpace: outer.bottom - Math.max(inner.bottom, ...glyphs.map((rect) => rect.bottom)),
+              leftSpace: inner.left - outer.left,
+              heightOverflow: element.scrollHeight - element.clientHeight,
+              fontSize: parseFloat(getComputedStyle(element.querySelector('.katex')!).fontSize),
+            };
           });
           expect(bounds.topSpace).toBeGreaterThanOrEqual(1);
           expect(bounds.bottomSpace).toBeGreaterThanOrEqual(1);
@@ -69,18 +85,26 @@ for (const scale of [1, 1.25, 1.5]) {
           expect(bounds.fontSize).toBeGreaterThanOrEqual(16);
         }
         const wide = formulas.last();
-        expect(await wide.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
+        expect(await wide.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
         await wide.focus();
         await page.keyboard.press('End');
-        await wide.evaluate(element => { element.scrollLeft = element.scrollWidth; });
-        expect(await wide.evaluate(element => element.scrollLeft)).toBeGreaterThan(0);
-        const rightInset = await wide.evaluate(element => element.getBoundingClientRect().right - element.querySelector('.katex-display')!.getBoundingClientRect().right);
+        await wide.evaluate((element) => {
+          element.scrollLeft = element.scrollWidth;
+        });
+        expect(await wide.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+        const rightInset = await wide.evaluate(
+          (element) => element.getBoundingClientRect().right - element.querySelector('.katex-display')!.getBoundingClientRect().right,
+        );
         expect(rightInset).toBeGreaterThanOrEqual(0);
         await formulas.first().scrollIntoViewIfNeeded();
-        await wide.evaluate(element => { element.scrollLeft = 0; });
+        await wide.evaluate((element) => {
+          element.scrollLeft = 0;
+        });
         await page.mouse.move(0, 0);
         await page.screenshot({ path: testInfo.outputPath(`math-${scale}-${width}.png`) });
       }
-    } finally { await context.close(); }
+    } finally {
+      await context.close();
+    }
   });
 }

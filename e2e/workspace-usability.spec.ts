@@ -23,11 +23,13 @@ test.beforeEach(async ({ page }) => {
 test('global search stays centered without covering actions or the title in both page types', async ({ page }) => {
   for (const width of [600, 720, 900, 1240, 1550]) {
     await page.setViewportSize({ width, height: 800 });
-    await expect.poll(async () => {
-      const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
-      const bar = (await page.locator('.workspace-titlebar').boundingBox())!;
-      return Math.abs(search.x + search.width / 2 - bar.x - bar.width / 2);
-    }).toBeLessThan(1);
+    await expect
+      .poll(async () => {
+        const search = (await page.getByTestId('global-search-trigger').boundingBox())!;
+        const bar = (await page.locator('.workspace-titlebar').boundingBox())!;
+        return Math.abs(search.x + search.width / 2 - bar.x - bar.width / 2);
+      })
+      .toBeLessThan(1);
     const search = await page.getByTestId('global-search-trigger').boundingBox();
     const actions = await page.locator('.workspace-title-actions').boundingBox();
     const title = await page.locator('.workspace-title').boundingBox();
@@ -56,12 +58,14 @@ test('Windows working directories show their drive prefix without the URI slash'
 
 test('terminal error notifications follow the active gray theme and can be closed', async ({ page }) => {
   await page.evaluate(() => {
-    const bridge = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } }).__TAURI_INTERNALS__;
+    const bridge = (window as unknown as { __TAURI_INTERNALS__: { invoke: (command: string, args?: unknown) => Promise<unknown> } })
+      .__TAURI_INTERNALS__;
     const invoke = bridge.invoke;
-    bridge.invoke = (command, args) => command === 'plugin:clipboard-manager|write_text'
-      ? Promise.reject(new Error('clipboard unavailable')) : invoke(command, args);
+    bridge.invoke = (command, args) =>
+      command === 'plugin:clipboard-manager|write_text' ? Promise.reject(new Error('clipboard unavailable')) : invoke(command, args);
     Object.defineProperty(navigator, 'clipboard', {
-      configurable: true, value: { writeText: () => Promise.reject(new Error('clipboard unavailable')) },
+      configurable: true,
+      value: { writeText: () => Promise.reject(new Error('clipboard unavailable')) },
     });
     document.execCommand = () => false;
   });
@@ -98,10 +102,12 @@ test('navigation supports Enter and Space and shows its active state', async ({ 
   const terminal = page.getByTestId('workspace-area-terminal');
   const code = page.getByTestId('workspace-area-code');
   await expect(terminal).toHaveAttribute('aria-current', 'page');
-  await code.focus(); await code.press('Enter');
+  await code.focus();
+  await code.press('Enter');
   await expect(page.getByTestId('code-start-page')).toBeVisible();
   await expect(code).toHaveAttribute('aria-current', 'page');
-  await terminal.focus(); await terminal.press('Space');
+  await terminal.focus();
+  await terminal.press('Space');
   await expect(page.getByPlaceholder(/输入命令/)).toBeVisible();
   await expect(terminal).toHaveAttribute('aria-current', 'page');
 });
@@ -124,28 +130,35 @@ test('the full-height navigation and titlebar separate workspace and auxiliary c
   expect(await nav.boundingBox()).toMatchObject({ x: 0, y: 0, width: 208, height: 800 });
   expect((await panel.boundingBox())!.width).toBe(200);
   const active = nav.locator('[aria-current="page"]');
-  expect(await active.evaluate(el => getComputedStyle(el, '::before').content)).toBe('none');
+  expect(await active.evaluate((el) => getComputedStyle(el, '::before').content)).toBe('none');
   await expect(active).toHaveCSS('border-top-style', 'none');
   await expect(page.locator('.workspace-titlebar')).toHaveCSS('border-bottom-style', 'none');
   await expect(panel.locator('.workspace-panel-heading')).toHaveCSS('border-bottom-style', 'none');
   await expect(panel).toHaveCSS('border-left-style', 'none');
-  const panelBg = await panel.locator(':scope > div').first().evaluate(el => getComputedStyle(el).backgroundColor);
-  expect(panelBg).not.toBe(await nav.evaluate(el => getComputedStyle(el).backgroundColor));
+  const panelBg = await panel
+    .locator(':scope > div')
+    .first()
+    .evaluate((el) => getComputedStyle(el).backgroundColor);
+  expect(panelBg).not.toBe(await nav.evaluate((el) => getComputedStyle(el).backgroundColor));
   expect(panelBg).toBe(await resolvedColor(page, '--auxiliary-bg'));
-  const contentBg = await page.locator('main').evaluate(el => getComputedStyle(el).backgroundColor);
+  const contentBg = await page.locator('main').evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(panelBg).not.toBe(contentBg);
-  expect(contentBg).not.toBe(await nav.evaluate(el => getComputedStyle(el).backgroundColor));
+  expect(contentBg).not.toBe(await nav.evaluate((el) => getComputedStyle(el).backgroundColor));
   const mainRect = await page.locator('main').boundingBox();
   expect(mainRect!.y).toBeGreaterThan(0);
   expect(mainRect!.y + mainRect!.height).toBe(800);
   for (const id of ['files', 'git', 'command-history']) {
-    if (await page.locator(`[data-dock-btn="${id}"]`).getAttribute('aria-pressed') === 'true') await page.locator(`[data-dock-btn="${id}"]`).click();
+    if ((await page.locator(`[data-dock-btn="${id}"]`).getAttribute('aria-pressed')) === 'true')
+      await page.locator(`[data-dock-btn="${id}"]`).click();
     await page.locator(`[data-dock-btn="${id}"]`).click();
     await expect(page.locator('.workspace-side-panel[data-side="right"]:visible > div:first-child')).toHaveCSS('background-color', panelBg);
   }
   await page.locator('[data-dock-btn="chat"]').click();
   await expect(page.locator('.workspace-side-panel[data-side="right"]:visible > div:first-child')).toHaveCSS('background-color', panelBg);
-  await expect(page.locator('.workspace-side-panel[data-side="right"] .terminal-composer')).toHaveCSS('background-color', await resolvedColor(page, '--composer-bg'));
+  await expect(page.locator('.workspace-side-panel[data-side="right"] .terminal-composer')).toHaveCSS(
+    'background-color',
+    await resolvedColor(page, '--composer-bg'),
+  );
 });
 
 test('workspace regions have square corners and flush resize boundaries', async ({ page }) => {
@@ -177,7 +190,7 @@ test('workspace regions have square corners and flush resize boundaries', async 
 
 test('settings use the auxiliary background and remain distinct from terminal content', async ({ page }) => {
   await page.locator('[data-dock-btn="files"]').click();
-  const background = async (selector: string) => page.locator(selector).evaluate(el => getComputedStyle(el).backgroundColor);
+  const background = async (selector: string) => page.locator(selector).evaluate((el) => getComputedStyle(el).backgroundColor);
   const terminalBg = await resolvedColor(page, '--xterm-bg');
   const auxiliaryBg = await resolvedColor(page, '--auxiliary-bg');
   await gotoSetting(page, '模型配置');
@@ -196,7 +209,7 @@ test('settings use the auxiliary background and remain distinct from terminal co
     expect(await background('.settings-content')).toBe(await resolvedColor(page, '--canvas'));
     const aliases = await page.evaluate(() => {
       const css = getComputedStyle(document.documentElement);
-      return ['--text-title', '--text-primary', '--tab-hover', '--hover'].map(key => css.getPropertyValue(key).trim());
+      return ['--text-title', '--text-primary', '--tab-hover', '--hover'].map((key) => css.getPropertyValue(key).trim());
     });
     expect(aliases[0]).toBe(aliases[1]);
     expect(aliases[2]).toBe(aliases[3]);
@@ -204,7 +217,11 @@ test('settings use the auxiliary background and remain distinct from terminal co
 });
 
 test('settings keep the auxiliary background while editor, diffs and history use content surfaces', async ({ page }) => {
-  const background = async (selector: string) => page.locator(selector).first().evaluate(el => getComputedStyle(el).backgroundColor);
+  const background = async (selector: string) =>
+    page
+      .locator(selector)
+      .first()
+      .evaluate((el) => getComputedStyle(el).backgroundColor);
   const terminalBg = await resolvedColor(page, '--xterm-bg');
   const auxiliaryBg = await resolvedColor(page, '--auxiliary-bg');
   const canvasBg = await resolvedColor(page, '--canvas');
@@ -373,9 +390,14 @@ test('panel headings close auxiliary content without hiding the workspace', asyn
 test('dragging a navigation action preserves panel placement and order', async ({ page }) => {
   const source = (await page.locator('[data-dock-btn="files"]').boundingBox())!;
   const target = (await page.locator('[data-dock-btn="git"]').boundingBox())!;
-  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2); await page.mouse.down();
-  await page.mouse.move(target.x + target.width - 2, target.y + target.height / 2, { steps: 8 }); await page.mouse.up();
-  const ids = await page.getByRole('navigation', { name: '辅助面板' }).locator('[data-dock-btn]').evaluateAll(elements => elements.map(el => el.getAttribute('data-dock-btn')));
+  await page.mouse.move(source.x + source.width / 2, source.y + source.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(target.x + target.width - 2, target.y + target.height / 2, { steps: 8 });
+  await page.mouse.up();
+  const ids = await page
+    .getByRole('navigation', { name: '辅助面板' })
+    .locator('[data-dock-btn]')
+    .evaluateAll((elements) => elements.map((el) => el.getAttribute('data-dock-btn')));
   expect(ids).toEqual(['git', 'files', 'command-history', 'chat']);
   await page.locator('[data-dock-btn="files"]').click();
   await expect(page.getByText('notes.txt')).toBeVisible();

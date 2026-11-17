@@ -3,8 +3,17 @@ import { projectBlocks } from '../blockProjection';
 import type { TermBlock } from '../../services/pipeline/termBlock';
 
 const block: TermBlock = {
-  id: 'history', command: 'ls', status: 'done', exitCode: 0, startedAt: 1, endedAt: 2,
-  wasLongRunning: false, outputHtml: '', outputText: 'file', outputRaw: 'file', linesTruncated: 0,
+  id: 'history',
+  command: 'ls',
+  status: 'done',
+  exitCode: 0,
+  startedAt: 1,
+  endedAt: 2,
+  wasLongRunning: false,
+  outputHtml: '',
+  outputText: 'file',
+  outputRaw: 'file',
+  linesTruncated: 0,
 };
 
 describe('block projection', () => {
@@ -17,7 +26,14 @@ describe('block projection', () => {
 
   it('invalidates modified output, truncation and agent markers without copying other history', () => {
     const previous = projectBlocks([block, { ...block, id: 'other' }], [], () => false);
-    const next = projectBlocks([{ ...block, outputText: '', linesTruncated: 50 }, { ...block, id: 'other' }], previous, id => id === 'history');
+    const next = projectBlocks(
+      [
+        { ...block, outputText: '', linesTruncated: 50 },
+        { ...block, id: 'other' },
+      ],
+      previous,
+      (id) => id === 'history',
+    );
     expect(next[0]).not.toBe(previous[0]);
     expect(next[0]).toMatchObject({ outputText: '', linesTruncated: 50, agent: true });
     expect(next[1]).toBe(previous[1]);

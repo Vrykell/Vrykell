@@ -16,5 +16,9 @@ export function hostLastConnected(timestamp?: number, now = Date.now()): string 
   const time = date.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit', hour12: false });
   if (date.toDateString() === today.toDateString()) return t('Today {{time}}', { time });
   if (date.toDateString() === yesterday.toDateString()) return t('Yesterday {{time}}', { time });
-  return date.toLocaleDateString(locale, { year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined, month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(locale, {
+    year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
+    month: 'short',
+    day: 'numeric',
+  });
 }

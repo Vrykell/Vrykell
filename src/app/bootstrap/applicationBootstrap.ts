@@ -27,11 +27,7 @@ function defaultErrorHandler(taskName: string, error: unknown): void {
   console.warn(`[application] ${taskName} failed to initialize:`, error);
 }
 
-function runTask(
-  taskName: string,
-  task: ApplicationTask,
-  onError: (taskName: string, error: unknown) => void,
-): void {
+function runTask(taskName: string, task: ApplicationTask, onError: (taskName: string, error: unknown) => void): void {
   try {
     Promise.resolve(task()).catch((error: unknown) => onError(taskName, error));
   } catch (error) {

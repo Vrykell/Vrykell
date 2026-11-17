@@ -11,7 +11,10 @@ import { hasChatContent } from '@features/chat/model/chatContent';
 import { useHarnessStore, type HarnessSession } from '@features/chat/stores/harness';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import {
-  deleteHarnessTranscript, harnessTranscriptTitle, saveHarnessTranscript, type RetainedHarnessTranscript,
+  deleteHarnessTranscript,
+  harnessTranscriptTitle,
+  saveHarnessTranscript,
+  type RetainedHarnessTranscript,
 } from './harnessTranscripts';
 
 const SAVE_DELAY_MS = 300;
@@ -54,7 +57,7 @@ function snapshotOf(session: HarnessSession): Snapshot | null {
 }
 
 function signatureOf(snapshot: Snapshot): string {
-  const messages = snapshot.messages.map(message => {
+  const messages = snapshot.messages.map((message) => {
     const copy = { ...message };
     delete copy.reasoning;
     return copy;
@@ -71,14 +74,25 @@ function enqueue(snapshot: Snapshot): Promise<void> {
   const signature = signatureOf(snapshot);
   if (signatures.get(key) === signature) return queues.get(key) ?? Promise.resolve();
   const previous = queues.get(key) ?? Promise.resolve();
-  const operation = previous.catch(() => {}).then(async () => {
-    await saveHarnessTranscript(snapshot);
-    signatures.set(key, signature);
-  }).catch((error: unknown) => {
-    terminalDebug('harness-transcript-save-failed', { harness: snapshot.harness, sessionId: snapshot.sessionId, reason: String(error).slice(0, 200) });
-  });
+  const operation = previous
+    .catch(() => {})
+    .then(async () => {
+      await saveHarnessTranscript(snapshot);
+      signatures.set(key, signature);
+    })
+    .catch((error: unknown) => {
+      terminalDebug('harness-transcript-save-failed', {
+        harness: snapshot.harness,
+        sessionId: snapshot.sessionId,
+        reason: String(error).slice(0, 200),
+      });
+    });
   queues.set(key, operation);
-  void operation.finally(() => { if (queues.get(key) === operation) queues.delete(key); }).catch(() => {});
+  void operation
+    .finally(() => {
+      if (queues.get(key) === operation) queues.delete(key);
+    })
+    .catch(() => {});
   return operation;
 }
 
@@ -99,12 +113,15 @@ function schedule(tabId: string) {
   const existing = timers.get(tabId);
   if (existing) clearTimeout(existing);
   const delay = Math.max(0, Math.min(SAVE_DELAY_MS, scheduledAt + MAX_SAVE_WAIT_MS - Date.now()));
-  timers.set(tabId, setTimeout(() => {
-    timers.delete(tabId);
-    firstScheduledAt.delete(tabId);
-    const pending = snapshots.get(tabId);
-    if (pending) void enqueue(pending);
-  }, delay));
+  timers.set(
+    tabId,
+    setTimeout(() => {
+      timers.delete(tabId);
+      firstScheduledAt.delete(tabId);
+      const pending = snapshots.get(tabId);
+      if (pending) void enqueue(pending);
+    }, delay),
+  );
 }
 
 /**
@@ -136,7 +153,7 @@ export async function flushHarnessTranscripts(): Promise<void> {
     const live = snapshotOf(useHarnessStore.getState().byTab[tabId]!);
     if (live) snapshots.set(tabId, live);
   }
-  await Promise.all([...snapshots.values()].map(snapshot => enqueue(snapshot)));
+  await Promise.all([...snapshots.values()].map((snapshot) => enqueue(snapshot)));
   await Promise.all([...queues.values()]);
 }
 
@@ -155,7 +172,10 @@ export function startHarnessTranscriptRuntime(): () => void {
     for (const [tabId, session] of Object.entries(previous.byTab)) {
       if (state.byTab[tabId]) continue;
       const timer = timers.get(tabId);
-      if (timer) { clearTimeout(timer); timers.delete(tabId); }
+      if (timer) {
+        clearTimeout(timer);
+        timers.delete(tabId);
+      }
       firstScheduledAt.delete(tabId);
       const snapshot = snapshotOf(session);
       snapshots.delete(tabId);

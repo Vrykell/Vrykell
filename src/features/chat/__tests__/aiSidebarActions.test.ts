@@ -1,5 +1,11 @@
 import { beforeEach, expect, it, vi } from 'vitest';
-import { availableSideConversationIds, createSideAgent, createSideConversation, moveMainConversationToSide, moveSideConversationToMain } from '../services/aiWorkspace';
+import {
+  availableSideConversationIds,
+  createSideAgent,
+  createSideConversation,
+  moveMainConversationToSide,
+  moveSideConversationToMain,
+} from '../services/aiWorkspace';
 import { useAiWorkspace } from '../stores/aiWorkspace';
 import { useChatStore } from '../stores/chat';
 import { useHarnessWorkspace } from '../stores/harnessWorkspace';
@@ -34,7 +40,8 @@ it('creates native and external conversations without replacing the main selecti
 });
 
 it('keeps previous side conversations assigned to the sidebar until explicitly moved', () => {
-  const first = createSideConversation(); const second = createSideConversation();
+  const first = createSideConversation();
+  const second = createSideConversation();
   expect(availableSideConversationIds()).toEqual(new Set([`chat:${first}`, `chat:${second}`]));
   useAiWorkspace.getState().openNative(first);
   expect(availableSideConversationIds()).toEqual(new Set([`chat:${second}`]));
@@ -51,10 +58,19 @@ it('moves the selected side conversation into the AI workspace when the current 
 });
 
 it('detaches only the explicitly moved conversation from a main split', () => {
-  const first = useChatStore.getState().createConversation(); const second = useChatStore.getState().createConversation();
+  const first = useChatStore.getState().createConversation();
+  const second = useChatStore.getState().createConversation();
   useAiWorkspace.setState({ nativeTabs: [first, second], selected: `chat:${second}` });
-  scopedPaneStores.ai.getState().restore({ type: 'split', direction: 'row', ratio: 0.5,
-    first: { type: 'pane', id: 'first', resourceId: `chat:${first}` }, second: { type: 'pane', id: 'second', resourceId: `chat:${second}` } }, 'second');
+  scopedPaneStores.ai.getState().restore(
+    {
+      type: 'split',
+      direction: 'row',
+      ratio: 0.5,
+      first: { type: 'pane', id: 'first', resourceId: `chat:${first}` },
+      second: { type: 'pane', id: 'second', resourceId: `chat:${second}` },
+    },
+    'second',
+  );
   moveMainConversationToSide(`chat:${second}`);
   expect(workspacePaneCells(scopedPaneStores.ai.getState().layout!)).toHaveLength(1);
   expect(workspacePaneCells(scopedPaneStores.ai.getState().layout!)[0].resourceId).toBe(`chat:${first}`);

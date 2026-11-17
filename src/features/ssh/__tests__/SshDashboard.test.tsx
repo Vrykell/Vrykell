@@ -7,22 +7,46 @@ import { useHostView } from '../stores/hostView';
 import { useSessionAuthenticationStore } from '../stores/sessionAuthentication';
 
 const status = vi.hoisted(() => vi.fn());
-vi.mock('../services/api', async importOriginal => ({ ...(await importOriginal<typeof import('../services/api')>()), sshSystemStatus: status }));
+vi.mock('../services/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../services/api')>()),
+  sshSystemStatus: status,
+}));
 const snapshot = useSshStore.getState();
 beforeEach(() => {
   useHostView.setState({ groupFilter: null });
   localStorage.removeItem('vrykell-host-view-v2');
-  status.mockResolvedValue({ system: 'Linux', cpuTotal: 100, cpuIdle: 80, memoryTotal: 100, memoryAvailable: 40, diskTotal: 100, diskUsed: 25 });
-  useSshStore.setState({ loaded: true, loading: false, connections: [
-    { id: 'ssh-1', name: 'Production', host: 'prod.test', port: 22, user: 'root', authMethod: 'password' },
-    { id: 'ssh-2', name: 'Database', host: 'db.test', port: 22, user: 'ops', authMethod: 'key' },
-  ] });
-  useHostLibrary.setState({ hosts: {
-    'ssh-1': { group: 'Tokyo', tags: ['production', 'api'], starred: true },
-    'ssh-2': { group: 'Osaka', tags: ['database'], starred: false },
-  } });
+  status.mockResolvedValue({
+    system: 'Linux',
+    cpuTotal: 100,
+    cpuIdle: 80,
+    memoryTotal: 100,
+    memoryAvailable: 40,
+    diskTotal: 100,
+    diskUsed: 25,
+  });
+  useSshStore.setState({
+    loaded: true,
+    loading: false,
+    connections: [
+      { id: 'ssh-1', name: 'Production', host: 'prod.test', port: 22, user: 'root', authMethod: 'password' },
+      { id: 'ssh-2', name: 'Database', host: 'db.test', port: 22, user: 'ops', authMethod: 'key' },
+    ],
+  });
+  useHostLibrary.setState({
+    hosts: {
+      'ssh-1': { group: 'Tokyo', tags: ['production', 'api'], starred: true },
+      'ssh-2': { group: 'Osaka', tags: ['database'], starred: false },
+    },
+  });
 });
-afterEach(() => { cleanup(); vi.clearAllMocks(); useSshStore.setState(snapshot, true); useHostLibrary.setState({ hosts: {} }); useHostView.setState({ groupFilter: null }); localStorage.removeItem('vrykell-host-view-v2'); });
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+  useSshStore.setState(snapshot, true);
+  useHostLibrary.setState({ hosts: {} });
+  useHostView.setState({ groupFilter: null });
+  localStorage.removeItem('vrykell-host-view-v2');
+});
 
 it('starts with one host list and only collects resources when explicitly enabled', async () => {
   render(<SshDashboard onManage={vi.fn()} onOpenTerminal={vi.fn()} />);
@@ -97,7 +121,7 @@ it.each([
   expect(screen.getByRole('menuitemcheckbox', { name: option })).toHaveAttribute('aria-checked', 'true');
 });
 
-it.each(['卡片视图', '表格视图'])('centers unmatched hosts in %s and searches full connection addresses', layout => {
+it.each(['卡片视图', '表格视图'])('centers unmatched hosts in %s and searches full connection addresses', (layout) => {
   render(<SshDashboard onManage={vi.fn()} onOpenTerminal={vi.fn()} />);
   fireEvent.click(screen.getByRole('button', { name: layout }));
   fireEvent.change(screen.getByTestId('ssh-search'), { target: { value: 'ssh root@prod.test' } });
@@ -108,7 +132,7 @@ it.each(['卡片视图', '表格视图'])('centers unmatched hosts in %s and sea
   expect(screen.queryByTestId('ssh-row-ssh-1')).toBeNull();
 });
 
-it.each(['卡片视图', '表格视图'])('shows the selected group and matching host count in the %s heading', layout => {
+it.each(['卡片视图', '表格视图'])('shows the selected group and matching host count in the %s heading', (layout) => {
   useHostLibrary.getState().update('ssh-2', { group: '' });
   render(<SshDashboard onManage={vi.fn()} onOpenTerminal={vi.fn()} />);
   fireEvent.click(screen.getByRole('button', { name: layout }));
@@ -154,7 +178,8 @@ it('uses separate status and metric columns and exposes addresses only on hover'
 });
 
 it('opens real host details with Space and offers contextual connection and collection actions', async () => {
-  const connect = vi.fn(); const remove = vi.fn();
+  const connect = vi.fn();
+  const remove = vi.fn();
   render(<SshDashboard onManage={vi.fn()} onOpenTerminal={connect} onDelete={remove} />);
   const row = screen.getByTestId('ssh-row-ssh-1');
   fireEvent.keyDown(row, { key: ' ' });
@@ -162,23 +187,28 @@ it('opens real host details with Space and offers contextual connection and coll
   fireEvent.click(screen.getByRole('button', { name: /^关闭$/ }));
   fireEvent.contextMenu(row);
   const menu = screen.getByRole('menu');
-  for (const label of ['连接', '编辑连接', '复制主机', '复制地址', '重试', '不读取资源占用', '删除']) expect(within(menu).getByText(label, { exact: true })).toBeVisible();
-  expect(within(menu).queryByText('查看详情')).toBeNull(); expect(menu.querySelector('svg')).toBeNull();
+  for (const label of ['连接', '编辑连接', '复制主机', '复制地址', '重试', '不读取资源占用', '删除'])
+    expect(within(menu).getByText(label, { exact: true })).toBeVisible();
+  expect(within(menu).queryByText('查看详情')).toBeNull();
+  expect(menu.querySelector('svg')).toBeNull();
   fireEvent.click(within(menu).getByText('不读取资源占用', { exact: true }));
   expect(useHostLibrary.getState().hosts['ssh-1'].resourceDisabled).toBe(true);
   fireEvent.click(screen.getByRole('switch', { name: '资源占用' }));
   await waitFor(() => expect(status).toHaveBeenCalledTimes(1));
   expect(row).toHaveTextContent('未采集');
-  fireEvent.contextMenu(row); fireEvent.click(screen.getByRole('menu').querySelector('button')!);
+  fireEvent.contextMenu(row);
+  fireEvent.click(screen.getByRole('menu').querySelector('button')!);
   expect(connect).toHaveBeenCalledWith(expect.objectContaining({ id: 'ssh-1' }));
-  fireEvent.contextMenu(row); fireEvent.click(screen.getByRole('menu').querySelector('button:last-child')!);
+  fireEvent.contextMenu(row);
+  fireEvent.click(screen.getByRole('menu').querySelector('button:last-child')!);
   expect(remove).toHaveBeenCalledWith(expect.objectContaining({ id: 'ssh-1' }));
 }, 15_000);
 
 it('does not show last connection times on failed cards', async () => {
   status.mockRejectedValue(new Error('Connection refused'));
   render(<SshDashboard onManage={vi.fn()} onOpenTerminal={vi.fn()} />);
-  fireEvent.click(screen.getByRole('button', { name: '卡片视图' })); fireEvent.click(screen.getByRole('switch', { name: '资源占用' }));
+  fireEvent.click(screen.getByRole('button', { name: '卡片视图' }));
+  fireEvent.click(screen.getByRole('switch', { name: '资源占用' }));
   await screen.findAllByText('离线');
   expect(screen.getByTestId('ssh-row-ssh-1').querySelector('.ssh-host-last-connected')).toBeNull();
 });

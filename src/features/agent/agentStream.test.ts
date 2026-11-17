@@ -54,11 +54,21 @@ function setupInvoke(sseBody: string, status = 200, vision = false) {
         has_anthropic_key: false,
         has_gemini_key: false,
         has_tavily_key: false,
-        models: [{ id: 'default', name: '默认', provider: 'openai-compatible', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini', capabilities: { vision, reasoning: false, tools: true, search: false } }],
+        models: [
+          {
+            id: 'default',
+            name: '默认',
+            provider: 'openai-compatible',
+            baseUrl: 'https://api.openai.com/v1',
+            model: 'gpt-4o-mini',
+            capabilities: { vision, reasoning: false, tools: true, search: false },
+          },
+        ],
         active_model: 'default',
       } as never;
     }
-    if (cmd === 'read_attachment') return 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aCKcAAAAASUVORK5CYII=' as never;
+    if (cmd === 'read_attachment')
+      return 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aCKcAAAAASUVORK5CYII=' as never;
     if (cmd === 'llm_stream') {
       const ch = (args as { onEvent: Channel<unknown> }).onEvent;
       const send = ch.onmessage as (ev: unknown) => void;
@@ -78,18 +88,50 @@ describe('agentStream (mocked IPC boundary)', () => {
     const initial = useAgentSettings.getState().global;
     useAgentSettings.setState({ global: { ...initial, agentMode: false } });
     try {
-      await agentStream([{ role: 'user', content: 'Read this image', attachments: [{ id: 'image', kind: 'image', name: 'sample.png', mime: 'image/png', size: 68, blobPath: '/attachments/sample.png' }] }], () => {});
+      await agentStream(
+        [
+          {
+            role: 'user',
+            content: 'Read this image',
+            attachments: [
+              { id: 'image', kind: 'image', name: 'sample.png', mime: 'image/png', size: 68, blobPath: '/attachments/sample.png' },
+            ],
+          },
+        ],
+        () => {},
+      );
       const raw = mockInvoke.mock.calls.find(([name]) => name === 'llm_stream')?.[1] as { req: { body: string } };
-      const request = JSON.parse(raw.req.body) as { messages: { role: string; content: { type: string; image_url?: { url: string } }[] }[]; tools?: unknown };
-      expect(request.messages.find(message => message.role === 'user')?.content.some(part => part.type === 'image_url' && part.image_url?.url.startsWith('data:image/png;base64,'))).toBe(true);
+      const request = JSON.parse(raw.req.body) as {
+        messages: { role: string; content: { type: string; image_url?: { url: string } }[] }[];
+        tools?: unknown;
+      };
+      expect(
+        request.messages
+          .find((message) => message.role === 'user')
+          ?.content.some((part) => part.type === 'image_url' && part.image_url?.url.startsWith('data:image/png;base64,')),
+      ).toBe(true);
       expect(request.tools).toBeUndefined();
-    } finally { useAgentSettings.setState({ global: initial }); }
+    } finally {
+      useAgentSettings.setState({ global: initial });
+    }
   });
 
   it('reports unsupported image input instead of silently discarding the new image', async () => {
     setupInvoke('');
-    await expect(agentStream([{ role: 'user', content: 'Read this image', attachments: [{ id: 'image', kind: 'image', name: 'sample.png', mime: 'image/png', size: 68, blobPath: '/attachments/sample.png' }] }], () => {}))
-      .rejects.toThrow(t('The selected model does not support image input. Choose a model with image input enabled.'));
+    await expect(
+      agentStream(
+        [
+          {
+            role: 'user',
+            content: 'Read this image',
+            attachments: [
+              { id: 'image', kind: 'image', name: 'sample.png', mime: 'image/png', size: 68, blobPath: '/attachments/sample.png' },
+            ],
+          },
+        ],
+        () => {},
+      ),
+    ).rejects.toThrow(t('The selected model does not support image input. Choose a model with image input enabled.'));
     expect(mockInvoke.mock.calls.some(([command]) => command === 'llm_stream')).toBe(false);
   });
   it('keeps persisted tool results as plain chat history without tool-call schema', async () => {
@@ -98,24 +140,47 @@ describe('agentStream (mocked IPC boundary)', () => {
     useAgentSettings.setState({ global: { ...original, agentMode: false, contextStrategy: 'off' } });
     const full = JSON.stringify({ files: ['one.ts', 'two.ts'], detail: 'evidence '.repeat(4000) });
     try {
-      await agentStream([
-        { role: 'user', content: 'Read the file' },
-        { role: 'assistant', content: 'Read completed', parts: [
-          { kind: 'tool', tool: { toolCallId: 'previous-call', toolName: 'read_file', input: { path: '/project/one.ts' }, state: 'done', startedAt: 1, output: 'short preview', modelOutput: full } },
-          { kind: 'text', text: 'Read completed' },
-        ] },
-        { role: 'user', content: 'Use the previous evidence' },
-      ], () => {}, { paneId: null, tabId: 'history-owner' });
+      await agentStream(
+        [
+          { role: 'user', content: 'Read the file' },
+          {
+            role: 'assistant',
+            content: 'Read completed',
+            parts: [
+              {
+                kind: 'tool',
+                tool: {
+                  toolCallId: 'previous-call',
+                  toolName: 'read_file',
+                  input: { path: '/project/one.ts' },
+                  state: 'done',
+                  startedAt: 1,
+                  output: 'short preview',
+                  modelOutput: full,
+                },
+              },
+              { kind: 'text', text: 'Read completed' },
+            ],
+          },
+          { role: 'user', content: 'Use the previous evidence' },
+        ],
+        () => {},
+        { paneId: null, tabId: 'history-owner' },
+      );
       const raw = mockInvoke.mock.calls.find(([name]) => name === 'llm_stream')?.[1] as { req: { body: string } };
-      const request = JSON.parse(raw.req.body) as { messages: Array<{ role: string; content: string; tool_calls?: unknown[]; tool_call_id?: string }> };
-      expect(request.messages.some(message => message.tool_calls?.length)).toBe(false);
-      expect(request.messages.some(message => message.role === 'tool')).toBe(false);
-      const history = request.messages.find(message => message.role === 'assistant');
+      const request = JSON.parse(raw.req.body) as {
+        messages: Array<{ role: string; content: string; tool_calls?: unknown[]; tool_call_id?: string }>;
+      };
+      expect(request.messages.some((message) => message.tool_calls?.length)).toBe(false);
+      expect(request.messages.some((message) => message.role === 'tool')).toBe(false);
+      const history = request.messages.find((message) => message.role === 'assistant');
       expect(history?.content).toContain('Read completed');
       expect(history?.content).toContain('Earlier tool call in Agent mode');
       expect(history?.content).toContain('Untrusted tool output');
       expect(history?.content).toContain(full);
-    } finally { useAgentSettings.setState({ global: original }); }
+    } finally {
+      useAgentSettings.setState({ global: original });
+    }
   });
   it('names policy-disabled tools so the model does not call an absent tool', async () => {
     setupInvoke('data: {"choices":[{"delta":{"content":"ok"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
@@ -127,7 +192,7 @@ describe('agentStream (mocked IPC boundary)', () => {
       await agentStream([{ role: 'user', content: 'Run ls' }], () => {}, { paneId: null });
       const raw = mockInvoke.mock.calls.find(([name]) => name === 'llm_stream')?.[1] as { req: { body: string } };
       const request = JSON.parse(raw.req.body) as { messages: Array<{ role: string; content: string }> };
-      const system = request.messages.find(message => message.role === 'system')?.content ?? '';
+      const system = request.messages.find((message) => message.role === 'system')?.content ?? '';
       expect(system).toContain('Tools disabled by the current policy');
       expect(system).toContain('run_command');
       expect(system).toContain('mcp__*');
@@ -146,22 +211,41 @@ describe('agentStream (mocked IPC boundary)', () => {
   });
 
   it('does not surface a tool call in chat mode without tools', async () => {
-    setupInvoke('data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"chat-call","type":"function","function":{"name":"run_command","arguments":"{\\"command\\":\\"pwd\\"}"}}]},"finish_reason":"tool_calls"}]}\n\ndata: [DONE]\n\n');
+    setupInvoke(
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"chat-call","type":"function","function":{"name":"run_command","arguments":"{\\"command\\":\\"pwd\\"}"}}]},"finish_reason":"tool_calls"}]}\n\ndata: [DONE]\n\n',
+    );
     const original = useAgentSettings.getState().global;
     useAgentSettings.setState({ global: { ...original, agentMode: false, contextStrategy: 'off' } });
     const events: unknown[] = [];
     const chunks: string[] = [];
     try {
-      await agentStream([{ role: 'user', content: 'Where am I?' }], chunk => { chunks.push(chunk); }, {
-        paneId: null, handlers: { onToolEvent: run => { events.push(run); } },
-      });
+      await agentStream(
+        [{ role: 'user', content: 'Where am I?' }],
+        (chunk) => {
+          chunks.push(chunk);
+        },
+        {
+          paneId: null,
+          handlers: {
+            onToolEvent: (run) => {
+              events.push(run);
+            },
+          },
+        },
+      );
       expect(events).toEqual([]);
-      expect(chunks.join('')).toContain(t('The model attempted to use a tool, but tools are disabled in chat mode. Enable Agent mode to execute it.'));
-    } finally { useAgentSettings.setState({ global: original }); }
+      expect(chunks.join('')).toContain(
+        t('The model attempted to use a tool, but tools are disabled in chat mode. Enable Agent mode to execute it.'),
+      );
+    } finally {
+      useAgentSettings.setState({ global: original });
+    }
   });
 
   it('turns an unavailable tool call into a note instead of a tool error card', async () => {
-    setupInvoke('data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"missing-call","type":"function","function":{"name":"run_command","arguments":"{\\"command\\":\\"pwd\\"}"}}]},"finish_reason":"tool_calls"}]}\n\ndata: [DONE]\n\n');
+    setupInvoke(
+      'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"missing-call","type":"function","function":{"name":"run_command","arguments":"{\\"command\\":\\"pwd\\"}"}}]},"finish_reason":"tool_calls"}]}\n\ndata: [DONE]\n\n',
+    );
     const originalSettings = useAgentSettings.getState().global;
     const originalLevels = usePermissions.getState().levels;
     useAgentSettings.setState({ global: { ...originalSettings, agentMode: true, maxSteps: 1 } });
@@ -169,11 +253,26 @@ describe('agentStream (mocked IPC boundary)', () => {
     const events: unknown[] = [];
     const chunks: string[] = [];
     try {
-      await agentStream([{ role: 'user', content: 'Run ls' }], chunk => { chunks.push(chunk); }, {
-        paneId: null, handlers: { onToolEvent: run => { events.push(run); } },
-      });
+      await agentStream(
+        [{ role: 'user', content: 'Run ls' }],
+        (chunk) => {
+          chunks.push(chunk);
+        },
+        {
+          paneId: null,
+          handlers: {
+            onToolEvent: (run) => {
+              events.push(run);
+            },
+          },
+        },
+      );
       expect(events).toEqual([]);
-      expect(chunks.join('')).toContain(t('The model tried to call an unavailable tool ({{tool}}). Only tools provided in this request can be used.', { tool: 'run_command' }));
+      expect(chunks.join('')).toContain(
+        t('The model tried to call an unavailable tool ({{tool}}). Only tools provided in this request can be used.', {
+          tool: 'run_command',
+        }),
+      );
     } finally {
       usePermissions.setState({ levels: originalLevels });
       useAgentSettings.setState({ global: originalSettings });
@@ -194,19 +293,44 @@ describe('agentStream (mocked IPC boundary)', () => {
       requests.push(JSON.parse(request.req.body) as Record<string, unknown>);
       const send = request.onEvent.onmessage!;
       send({ kind: 'started', status: 200, headers: [['content-type', 'text/event-stream']] });
-      const response = requests.length === 1
-        ? `data: ${JSON.stringify({ choices: [{ delta: { tool_calls: [
-          { index: 0, id: 'blocked', type: 'function', function: { name: 'run_command', arguments: JSON.stringify({ command: 'echo check' }) } },
-          { index: 1, id: 'queued-file', type: 'function', function: { name: 'read_file', arguments: JSON.stringify({ path: '/project/file' }) } },
-        ] } }] })}\n\ndata: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\ndata: [DONE]\n\n`
-        : 'data: {"choices":[{"delta":{"content":"Waiting for authorization"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n';
+      const response =
+        requests.length === 1
+          ? `data: ${JSON.stringify({
+              choices: [
+                {
+                  delta: {
+                    tool_calls: [
+                      {
+                        index: 0,
+                        id: 'blocked',
+                        type: 'function',
+                        function: { name: 'run_command', arguments: JSON.stringify({ command: 'echo check' }) },
+                      },
+                      {
+                        index: 1,
+                        id: 'queued-file',
+                        type: 'function',
+                        function: { name: 'read_file', arguments: JSON.stringify({ path: '/project/file' }) },
+                      },
+                    ],
+                  },
+                },
+              ],
+            })}\n\ndata: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\ndata: [DONE]\n\n`
+          : 'data: {"choices":[{"delta":{"content":"Waiting for authorization"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n';
       for (const chunk of toChunks(response, 11)) send({ kind: 'chunk', data: chunk });
       send({ kind: 'done' });
       return undefined as never;
     });
     try {
       let text = '';
-      await agentStream([{ role: 'user', content: 'Inspect the service' }], chunk => { text += chunk; }, { paneId: 'fixed', tabId: 'owner' });
+      await agentStream(
+        [{ role: 'user', content: 'Inspect the service' }],
+        (chunk) => {
+          text += chunk;
+        },
+        { paneId: 'fixed', tabId: 'owner' },
+      );
       expect(requests).toHaveLength(2);
       expect(requests[1]!.tool_choice).toBe('none');
       expect(authorize).toHaveBeenCalledOnce();
@@ -237,7 +361,8 @@ describe('agentStream (mocked IPC boundary)', () => {
   it('includes host notes as context without granting execution permissions', async () => {
     setupInvoke('data: {"choices":[{"delta":{"content":"Acknowledged"},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n');
     await agentStream([{ role: 'user', content: 'Summarize the host' }], () => {}, {
-      paneId: 'remote-notes', environment: { paneId: 'remote-notes', kind: 'ssh', label: 'Production', aiNotes: 'Do not restart the production database.' },
+      paneId: 'remote-notes',
+      environment: { paneId: 'remote-notes', kind: 'ssh', label: 'Production', aiNotes: 'Do not restart the production database.' },
     });
     const request = mockInvoke.mock.calls.find(([command]) => command === 'llm_stream')?.[1] as { req: { body: string } };
     expect(request.req.body).toContain('Do not restart the production database.');
@@ -246,15 +371,16 @@ describe('agentStream (mocked IPC boundary)', () => {
 
   it('HTTP error: throws an error containing the server message and records the failure in diagnostics', async () => {
     setupInvoke('{"error":{"message":"The `content[].thinking` in the thinking mode must be passed back to the API."}}', 400);
-    await expect(agentStream([{ role: 'user', content: 'hi' }], () => {})).rejects.toThrow(
-      'thinking mode must be passed back',
+    await expect(agentStream([{ role: 'user', content: 'hi' }], () => {})).rejects.toThrow('thinking mode must be passed back');
+    expect(vi.mocked(diagnostic)).toHaveBeenCalledWith(
+      'agent-stream-error',
+      expect.objectContaining({
+        provider: 'openai-compatible',
+        model: 'gpt-4o-mini',
+        baseUrl: 'https://api.openai.com/v1',
+        error: expect.stringContaining('thinking mode must be passed back'),
+      }),
     );
-    expect(vi.mocked(diagnostic)).toHaveBeenCalledWith('agent-stream-error', expect.objectContaining({
-      provider: 'openai-compatible',
-      model: 'gpt-4o-mini',
-      baseUrl: 'https://api.openai.com/v1',
-      error: expect.stringContaining('thinking mode must be passed back'),
-    }));
   });
 
   it('reports provider usage into the usage store', async () => {
@@ -282,11 +408,23 @@ describe('agentStream (mocked IPC boundary)', () => {
     mockInvoke.mockImplementation(async (cmd, args) => {
       if (cmd === 'get_ai_config') {
         return {
-          has_key: false, has_anthropic_key: true,
+          has_key: false,
+          has_anthropic_key: true,
           base_url: 'https://api.deepseek.com/anthropic',
-          model: 'deepseek-flash', provider: 'anthropic',
-          has_gemini_key: false, has_tavily_key: false,
-          models: [{ id: 'default', name: '默认', provider: 'anthropic', baseUrl: 'https://api.deepseek.com/anthropic', model: 'deepseek-flash', capabilities: { vision: false, reasoning: false, tools: true, search: false } }],
+          model: 'deepseek-flash',
+          provider: 'anthropic',
+          has_gemini_key: false,
+          has_tavily_key: false,
+          models: [
+            {
+              id: 'default',
+              name: '默认',
+              provider: 'anthropic',
+              baseUrl: 'https://api.deepseek.com/anthropic',
+              model: 'deepseek-flash',
+              capabilities: { vision: false, reasoning: false, tools: true, search: false },
+            },
+          ],
           active_model: 'default',
         } as never;
       }
@@ -317,11 +455,23 @@ describe('agentStream (mocked IPC boundary)', () => {
     mockInvoke.mockImplementation(async (cmd, args) => {
       if (cmd === 'get_ai_config') {
         return {
-          has_key: false, base_url: 'https://opencode.ai/zen/go/v1',
-          model: 'deepseek-v4.1-flash', provider: 'opencode',
-          has_anthropic_key: false, has_gemini_key: false, has_tavily_key: false,
+          has_key: false,
+          base_url: 'https://opencode.ai/zen/go/v1',
+          model: 'deepseek-v4.1-flash',
+          provider: 'opencode',
+          has_anthropic_key: false,
+          has_gemini_key: false,
+          has_tavily_key: false,
           provider_keys: ['opencode|https://opencode.ai/zen/go/v1'],
-          models: [{ id: 'default', name: 'OpenCode', provider: 'opencode', baseUrl: 'https://opencode.ai/zen/go/v1', model: 'deepseek-v4.1-flash' }],
+          models: [
+            {
+              id: 'default',
+              name: 'OpenCode',
+              provider: 'opencode',
+              baseUrl: 'https://opencode.ai/zen/go/v1',
+              model: 'deepseek-v4.1-flash',
+            },
+          ],
           active_model: 'default',
         } as never;
       }
@@ -330,7 +480,8 @@ describe('agentStream (mocked IPC boundary)', () => {
         headers = (args as { req: { headers: [string, string][] } }).req.headers;
         const send = (args as { onEvent: Channel<unknown> }).onEvent.onmessage as (ev: unknown) => void;
         send({ kind: 'started', status: 200, headers: [['content-type', 'text/event-stream']] });
-        const body = 'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n' +
+        const body =
+          'data: {"choices":[{"delta":{"content":"hi"}}]}\n\n' +
           'data: {"choices":[{"delta":{},"finish_reason":"stop"}]}\n\ndata: [DONE]\n\n';
         for (const c of toChunks(body, 9)) send({ kind: 'chunk', data: c });
         send({ kind: 'done' });
@@ -357,8 +508,6 @@ describe('agentStream (mocked IPC boundary)', () => {
       }
       throw new Error(`unexpected invoke: ${cmd}`);
     });
-    await expect(agentStream([{ role: 'user', content: 'hi' }], () => {})).rejects.toThrow(
-      '尚未配置 API Key',
-    );
+    await expect(agentStream([{ role: 'user', content: 'hi' }], () => {})).rejects.toThrow('尚未配置 API Key');
   });
 });

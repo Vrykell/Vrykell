@@ -9,7 +9,12 @@ import ErrorBox from '@ui/feedback/ErrorBox';
 import ResizeHandle from '@ui/layout/ResizeHandle';
 import { writeClipboardText } from '@platform/clipboard';
 import { useToastStore } from '@ui/feedback/Toast';
-import { hideSshStatus, showSshStatus, useSshStatusDismissRequest, useSshStatusOpenRequest } from '@features/workspace/hooks/useAuxiliarySidebar';
+import {
+  hideSshStatus,
+  showSshStatus,
+  useSshStatusDismissRequest,
+  useSshStatusOpenRequest,
+} from '@features/workspace/hooks/useAuxiliarySidebar';
 import { sshSystemStatus, type SshSystemStatus } from '../services/api';
 import { isSshAuthenticationFailure } from '../model/fileServiceState';
 import { sshConnectionFailureMessage } from '../model/connectionFailure';
@@ -19,14 +24,26 @@ import SshNetworkRates from './SshNetworkRates';
 import { networkRates, type NetworkRateSample } from '../model/networkRates';
 import { terminalDebug } from '@features/terminal/services/terminalDebug';
 import './SshStatusPanel.css';
-import { forgetSshAuthentication, requestSshAuthentication, useHasTemporarySshAuthentication, useSshAuthenticationRevision } from '../hooks/useSessionAuthentication';
+import {
+  forgetSshAuthentication,
+  requestSshAuthentication,
+  useHasTemporarySshAuthentication,
+  useSshAuthenticationRevision,
+} from '../hooks/useSessionAuthentication';
 
 type Target = SshOptions & { name: string; host: string; user?: string; port?: number; connectionId?: string };
 function StatusPlacement({ children }: { children: ReactNode }) {
   const host = document.getElementById('ssh-status-sidebar-host');
   return host ? createPortal(children, host) : children;
 }
-const phaseLabels = { connecting: 'Connecting…', connected: 'Connected', interactive: 'SSH interactive session', authenticating: 'Authenticating…', disconnected: 'Disconnected', unavailable: 'Connection unavailable' } as const;
+const phaseLabels = {
+  connecting: 'Connecting…',
+  connected: 'Connected',
+  interactive: 'SSH interactive session',
+  authenticating: 'Authenticating…',
+  disconnected: 'Disconnected',
+  unavailable: 'Connection unavailable',
+} as const;
 /** Status width bounds. Dragging to the minimum folds the panel; releasing there closes it. */
 const MIN_STATUS_WIDTH = 240;
 /** Ceiling used only while the workspace geometry cannot be measured; real drags stop where the terminal hits its minimum width. */
@@ -34,8 +51,8 @@ const FALLBACK_STATUS_MAX = 560;
 
 export function statusDuration(seconds: number): string {
   const value = Math.max(0, Math.floor(seconds));
-  if (value >= 86400) return t('{{d}}d {{h}}h', { d: Math.floor(value / 86400), h: Math.floor(value % 86400 / 3600) });
-  if (value >= 3600) return t('{{h}}h {{m}}m', { h: Math.floor(value / 3600), m: Math.floor(value % 3600 / 60) });
+  if (value >= 86400) return t('{{d}}d {{h}}h', { d: Math.floor(value / 86400), h: Math.floor((value % 86400) / 3600) });
+  if (value >= 3600) return t('{{h}}h {{m}}m', { h: Math.floor(value / 3600), m: Math.floor((value % 3600) / 60) });
   return t('{{m}}m {{s}}s', { m: Math.floor(value / 60), s: value % 60 });
 }
 
@@ -43,29 +60,86 @@ export function cpuUsage(previous: SshSystemStatus | null, current: SshSystemSta
   if (previous?.cpuTotal == null || previous.cpuIdle == null || current.cpuTotal == null || current.cpuIdle == null) return null;
   const total = current.cpuTotal - previous.cpuTotal;
   const idle = current.cpuIdle - previous.cpuIdle;
-  return total > 0 && idle >= 0 && idle <= total ? 100 * (total - idle) / total : null;
+  return total > 0 && idle >= 0 && idle <= total ? (100 * (total - idle)) / total : null;
 }
 
-function Metric({ resource = 'cpu', label, used, total, percentage, detail }: { resource?: 'cpu' | 'memory' | 'disk'; label: string; used?: number | null; total?: number | null; percentage?: number | null; detail?: string }) {
-  const percent = percentage !== undefined ? percentage : used != null && total != null && total > 0 ? used / total * 100 : null;
-  const reading = used != null && total != null ? `${fmtSize(used).replace(/ /g, '\u00a0')} / ${fmtSize(total).replace(/ /g, '\u00a0')}` : null;
-  return <div className="ssh-status-metric" data-resource={resource}>
-    <dt className="ssh-status-metric-label" data-tip={label}>{resource === 'cpu' ? 'CPU' : t(resource === 'memory' ? 'Memory' : 'Root disk')}</dt>
-    <dd className="ssh-status-metric-value" data-testid={`ssh-resource-${resource}`} data-empty={percent == null || undefined}>{percent == null ? t('Unavailable') : `${Math.round(percent)}%`}</dd>
-    <dd className="ssh-status-caption ssh-status-metric-caption">{detail ?? reading ?? t('Usage details unavailable')}</dd>
-  </div>;
+function Metric({
+  resource = 'cpu',
+  label,
+  used,
+  total,
+  percentage,
+  detail,
+}: {
+  resource?: 'cpu' | 'memory' | 'disk';
+  label: string;
+  used?: number | null;
+  total?: number | null;
+  percentage?: number | null;
+  detail?: string;
+}) {
+  const percent = percentage !== undefined ? percentage : used != null && total != null && total > 0 ? (used / total) * 100 : null;
+  const reading =
+    used != null && total != null ? `${fmtSize(used).replace(/ /g, '\u00a0')} / ${fmtSize(total).replace(/ /g, '\u00a0')}` : null;
+  return (
+    <div className="ssh-status-metric" data-resource={resource}>
+      <dt className="ssh-status-metric-label" data-tip={label}>
+        {resource === 'cpu' ? 'CPU' : t(resource === 'memory' ? 'Memory' : 'Root disk')}
+      </dt>
+      <dd className="ssh-status-metric-value" data-testid={`ssh-resource-${resource}`} data-empty={percent == null || undefined}>
+        {percent == null ? t('Unavailable') : `${Math.round(percent)}%`}
+      </dd>
+      <dd className="ssh-status-caption ssh-status-metric-caption">{detail ?? reading ?? t('Usage details unavailable')}</dd>
+    </div>
+  );
 }
 
-export default function SshStatusPanel({ paneId, target, state, active, focused = true, onReconnect, width = 300, onWidthChange, onToolbarReady, compact = false, statusTrigger, openRequest = 0, toggleRequest = 0, onOpenChange, children }: { paneId?: string; target: Target; state: SshSessionStatus; active: boolean; focused?: boolean; onReconnect?: () => Promise<void>; width?: number; onWidthChange?: (width: number) => void; onToolbarReady?: (host: HTMLDivElement | null) => void; compact?: boolean; statusTrigger?: HTMLButtonElement | null; openRequest?: number; toggleRequest?: number; onOpenChange?: (open: boolean) => void; children?: ReactNode }) {
+export default function SshStatusPanel({
+  paneId,
+  target,
+  state,
+  active,
+  focused = true,
+  onReconnect,
+  width = 300,
+  onWidthChange,
+  onToolbarReady,
+  compact = false,
+  statusTrigger,
+  openRequest = 0,
+  toggleRequest = 0,
+  onOpenChange,
+  children,
+}: {
+  paneId?: string;
+  target: Target;
+  state: SshSessionStatus;
+  active: boolean;
+  focused?: boolean;
+  onReconnect?: () => Promise<void>;
+  width?: number;
+  onWidthChange?: (width: number) => void;
+  onToolbarReady?: (host: HTMLDivElement | null) => void;
+  compact?: boolean;
+  statusTrigger?: HTMLButtonElement | null;
+  openRequest?: number;
+  toggleRequest?: number;
+  onOpenChange?: (open: boolean) => void;
+  children?: ReactNode;
+}) {
   const authenticationRevision = useSshAuthenticationRevision(target.connectionId);
   const temporaryAuthentication = useHasTemporarySshAuthentication(target.connectionId);
   const [open, setOpen] = useState(false);
   const globalRequest = useSshStatusOpenRequest(paneId);
-  useEffect(() => { if (globalRequest > 0) setOpen(true); }, [globalRequest]);
+  useEffect(() => {
+    if (globalRequest > 0) setOpen(true);
+  }, [globalRequest]);
   const fallbackId = useId();
   const sidebarOwner = paneId ?? fallbackId;
   const displayOpen = open && active && focused;
-  useEffect(() => { onOpenChange?.(displayOpen); }, [displayOpen, onOpenChange]);
+  useEffect(() => {
+    onOpenChange?.(displayOpen);
+  }, [displayOpen, onOpenChange]);
   useEffect(() => {
     if (!displayOpen) return;
     showSshStatus(sidebarOwner);
@@ -107,9 +181,16 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
   const committedWidth = useRef(width);
   const dragPaneWidth = useRef<number | null>(null);
   const dragMaximum = useRef(FALLBACK_STATUS_MAX);
-  useEffect(() => { widthRef.current = width; setLiveWidth(width); }, [width]);
-  useEffect(() => { if (openRequest > 0) setOpen(true); }, [openRequest]);
-  useEffect(() => { if (toggleRequest > 0) setOpen(value => !value); }, [toggleRequest]);
+  useEffect(() => {
+    widthRef.current = width;
+    setLiveWidth(width);
+  }, [width]);
+  useEffect(() => {
+    if (openRequest > 0) setOpen(true);
+  }, [openRequest]);
+  useEffect(() => {
+    if (toggleRequest > 0) setOpen((value) => !value);
+  }, [toggleRequest]);
   const connected = (state.phase === 'connected' || state.phase === 'interactive') && !state.retrying;
   const host = target.host.includes(':') && !target.host.startsWith('[') ? `[${target.host}]` : target.host;
   const address = `${target.user ? `${target.user}@` : ''}${host}:${target.port ?? 22}`;
@@ -129,13 +210,23 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
   }, [connected]);
 
   useEffect(() => {
-    setSample(null); setCpu(null); setUpdatedAt(null); setSampleValid(false);
-    setCpuHistory([]); setMemoryHistory([]); setDiskHistory([]); previous.current = null;
-    setTrafficHistory([]); trafficPrevious.current = null;
+    setSample(null);
+    setCpu(null);
+    setUpdatedAt(null);
+    setSampleValid(false);
+    setCpuHistory([]);
+    setMemoryHistory([]);
+    setDiskHistory([]);
+    previous.current = null;
+    setTrafficHistory([]);
+    trafficPrevious.current = null;
   }, [target.connectionId, target.host, target.port, target.user]);
 
   // Follow the newest log line; the box keeps a bounded history.
-  useEffect(() => { const element = logRef.current; if (element) element.scrollTop = element.scrollHeight; }, [state.log.length]);
+  useEffect(() => {
+    const element = logRef.current;
+    if (element) element.scrollTop = element.scrollHeight;
+  }, [state.log.length]);
 
   useEffect(() => {
     if (!displayOpen) return;
@@ -155,7 +246,8 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
       if (document.hidden || inFlight.current) {
         if (!blocked) terminalDebug('ssh-resource-poll', { phase: 'waiting', hidden: document.hidden, inFlight: inFlight.current });
         blocked = true;
-        timer = setTimeout(() => void collect(), 1000); return;
+        timer = setTimeout(() => void collect(), 1000);
+        return;
       }
       blocked = false;
       terminalDebug('ssh-resource-poll', { phase: 'request' });
@@ -170,25 +262,40 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
           const time = Date.now();
           const rates = networkRates(trafficPrevious.current, result, time);
           trafficPrevious.current = { sample: result, time };
-          setTrafficHistory(values => [...values.filter(value => time - value.time <= RESOURCE_HISTORY_MS), rates].slice(-21));
-          setCpu(usage); previous.current = result;
-          setSample(result); setSampleValid(true); setUpdatedAt(time); setNow(time); setError('');
-          setCpuHistory(values => {
-            const recent = values.filter(value => time - value.time <= RESOURCE_HISTORY_MS);
+          setTrafficHistory((values) => [...values.filter((value) => time - value.time <= RESOURCE_HISTORY_MS), rates].slice(-21));
+          setCpu(usage);
+          previous.current = result;
+          setSample(result);
+          setSampleValid(true);
+          setUpdatedAt(time);
+          setNow(time);
+          setError('');
+          setCpuHistory((values) => {
+            const recent = values.filter((value) => time - value.time <= RESOURCE_HISTORY_MS);
             return usage == null ? recent : [...recent, { time, value: usage }].slice(-21);
           });
           const pushPercent = (setter: typeof setCpuHistory, used: number | null | undefined, total: number | null | undefined) => {
-            setter(values => {
-              const recent = values.filter(value => time - value.time <= RESOURCE_HISTORY_MS);
-              const percent = used != null && total != null && total > 0 ? used / total * 100 : null;
+            setter((values) => {
+              const recent = values.filter((value) => time - value.time <= RESOURCE_HISTORY_MS);
+              const percent = used != null && total != null && total > 0 ? (used / total) * 100 : null;
               return percent == null ? recent : [...recent, { time, value: percent }].slice(-21);
             });
           };
-          pushPercent(setMemoryHistory, result.memoryTotal != null && result.memoryAvailable != null ? result.memoryTotal - result.memoryAvailable : null, result.memoryTotal);
+          pushPercent(
+            setMemoryHistory,
+            result.memoryTotal != null && result.memoryAvailable != null ? result.memoryTotal - result.memoryAvailable : null,
+            result.memoryTotal,
+          );
           pushPercent(setDiskHistory, result.diskUsed, result.diskTotal);
         }
-      } catch (reason) { if (!disposed) { setError(String(reason)); nextDelay = 30000; retryAllowed = !isSshAuthenticationFailure(String(reason)); authenticationBlocked = !retryAllowed; } }
-      finally {
+      } catch (reason) {
+        if (!disposed) {
+          setError(String(reason));
+          nextDelay = 30000;
+          retryAllowed = !isSshAuthenticationFailure(String(reason));
+          authenticationBlocked = !retryAllowed;
+        }
+      } finally {
         inFlight.current = false;
         setBusy(false);
         if (!disposed && retryAllowed) {
@@ -198,16 +305,41 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
       }
     };
     const resumeVisible = () => {
-      if (!document.hidden && !inFlight.current) { clearTimeout(timer); void collect(); }
+      if (!document.hidden && !inFlight.current) {
+        clearTimeout(timer);
+        void collect();
+      }
     };
     document.addEventListener('visibilitychange', resumeVisible);
     void collect();
-    return () => { disposed = true; clearTimeout(timer); document.removeEventListener('visibilitychange', resumeVisible); terminalDebug('ssh-resource-poll', { phase: 'stopped' }); };
-  }, [displayOpen, connected, paused, unsupported, target.connectionId, target.host, target.port, target.user, refresh, authenticationRevision]);
+    return () => {
+      disposed = true;
+      clearTimeout(timer);
+      document.removeEventListener('visibilitychange', resumeVisible);
+      terminalDebug('ssh-resource-poll', { phase: 'stopped' });
+    };
+  }, [
+    displayOpen,
+    connected,
+    paused,
+    unsupported,
+    target.connectionId,
+    target.host,
+    target.port,
+    target.user,
+    refresh,
+    authenticationRevision,
+  ]);
 
-  const close = () => { setOpen(false); (statusTrigger ?? trigger.current)?.focus(); };
+  const close = () => {
+    setOpen(false);
+    (statusTrigger ?? trigger.current)?.focus();
+  };
   // The live width stays local: publishing it per drag frame would re-render the terminal pane subtree and make the drag jitter.
-  const applyWidth = (next: number) => { widthRef.current = next; setLiveWidth(next); };
+  const applyWidth = (next: number) => {
+    widthRef.current = next;
+    setLiveWidth(next);
+  };
   const publishWidth = (next: number) => onWidthChange?.(next);
   const workspaceTerminalMin = () => {
     const body = document.querySelector<HTMLElement>('.workspace-body');
@@ -215,16 +347,23 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
     return Number.isFinite(value) ? Math.max(360, value) : 360;
   };
   /** Grow until the workspace terminal reaches its minimum width, like every other side panel. */
-  const maximumWidth = (paneWidth: number) => paneWidth <= 0 ? FALLBACK_STATUS_MAX : Math.max(MIN_STATUS_WIDTH, Math.round(paneWidth - workspaceTerminalMin()));
+  const maximumWidth = (paneWidth: number) =>
+    paneWidth <= 0 ? FALLBACK_STATUS_MAX : Math.max(MIN_STATUS_WIDTH, Math.round(paneWidth - workspaceTerminalMin()));
   /** Terminal and panel share one width budget; the terminal measurement plus the panel width recovers it. */
   const paneWidthAt = () => {
     const workspaceWidth = document.querySelector<HTMLElement>('.workspace-main')?.getBoundingClientRect().width;
-    return workspaceWidth != null ? workspaceWidth + widthRef.current : frameRef.current?.closest('.terminal-pane')?.getBoundingClientRect().width ?? 0;
+    return workspaceWidth != null
+      ? workspaceWidth + widthRef.current
+      : (frameRef.current?.closest('.terminal-pane')?.getBoundingClientRect().width ?? 0);
   };
   const dragStep = (delta: number) => {
     const next = Math.round(widthRef.current - delta);
     // Reaching the minimum folds the panel: it stays mounted and hidden, so dragging back out before release restores it.
-    if (next <= MIN_STATUS_WIDTH) { applyWidth(MIN_STATUS_WIDTH); setFolded(true); return; }
+    if (next <= MIN_STATUS_WIDTH) {
+      applyWidth(MIN_STATUS_WIDTH);
+      setFolded(true);
+      return;
+    }
     applyWidth(Math.min(dragMaximum.current, next));
     setFolded(false);
   };
@@ -273,104 +412,332 @@ export default function SshStatusPanel({ paneId, target, state, active, focused 
     { label: t('Memory'), samples: memoryHistory, color: 'var(--chart-violet)' },
     { label: t('Root disk'), samples: diskHistory, color: 'var(--chart-amber)' },
   ];
-  return <div className="ssh-status-shell" data-open={displayOpen} data-active={active} data-compact={compact}>
-    {!compact && <div className="ssh-status-toolbar" onMouseDown={event => event.stopPropagation()} onContextMenu={event => event.stopPropagation()}>
-      <div className="ssh-session-toolbar-slot" ref={onToolbarReady}>
-        {(!onToolbarReady || !statusTrigger || state.phase === 'unavailable') && <TextButton ref={trigger} className="ssh-session-status" data-testid="ssh-status-toggle" aria-label={t('SSH status')} data-tip={t(displayOpen ? 'Close SSH status' : 'Open SSH status')} aria-expanded={displayOpen} aria-controls={panelId} onClick={() => setOpen(value => !value)}>
-          <i className="ssh-status-dot" data-phase={state.phase} /><span role="status">{t(phaseLabels[state.phase])}</span>
-        </TextButton>}
-      </div>
-    </div>}
-    <div className="ssh-status-body">
-      {children}
-      {displayOpen && <StatusPlacement><div ref={frameRef} className="ssh-status-frame" data-folded={folded || undefined} style={{ width: folded ? 0 : liveWidth }} onMouseDown={event => event.stopPropagation()} onContextMenu={event => event.stopPropagation()}>
-      {onWidthChange && <div role="separator" aria-label={t('Resize SSH status')} aria-orientation="vertical" aria-valuemin={MIN_STATUS_WIDTH} aria-valuemax={maxWidth} aria-valuenow={liveWidth} tabIndex={0} className="ssh-status-resize" onKeyDown={event => {
-        if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') { event.preventDefault(); event.stopPropagation(); nudgeWidth(event.key === 'ArrowLeft' ? 16 : -16); }
-        if (event.key === 'Escape') { event.stopPropagation(); close(); }
-      }}><ResizeHandle axis="x" edge="left" onDelta={resize} onUp={commitResize} testId="ssh-status-resize-handle" /></div>}
-      <aside id={panelId} aria-label={t('SSH status')} data-testid="ssh-status-panel" className="ssh-status-panel" style={{ display: folded ? 'none' : undefined }} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
-        <div className="ssh-status-scroll scroll-region">
-          <header className="sidebar-heading">
-            <div className="ssh-status-endpoint"><strong className="ssh-status-identity" data-tip={address}>{address}</strong><IconBtn compact title={t('Copy connection address')} onClick={() => { void writeClipboardText(address).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}><Copy size={iconSizes.copy} /></IconBtn></div>
-            <div className="ssh-status-header-actions">
-            <IconBtn title={t('Refresh remote resources')} disabled={!connected || !!unsupported || busy} onClick={() => { setPaused(false); setRefresh(value => value + 1); }}><RefreshCw size={iconSizes.compact} /></IconBtn>
-            <IconBtn title={t('Close SSH status')} onClick={close}><X size={iconSizes.control} /></IconBtn>
-          </div></header>
-          {onReconnect && (state.phase === 'disconnected' || state.retrying) && <section className="ssh-status-overview">
-            <TextButton className="ssh-status-reconnect" disabled={reconnecting} onClick={() => {
-              setReconnecting(true);
-              void onReconnect().catch(reason => useToastStore.getState().addToast(String(reason), 'error')).finally(() => setReconnecting(false));
-            }}>{t('Reconnect SSH session')}</TextButton>
-          </section>}
-          <SshNetworkProbe host={target.host} port={target.port ?? 22} jumpHost={target.jumpHost ?? target.jumpConnectionId} paused={paused} revision={refresh}>
-            {sample && <SshNetworkRates samples={trafficHistory} now={chartTime} windowMs={historyWindow} available={sample.networkReceived != null || sample.networkTransmitted != null} />}
-          </SshNetworkProbe>
-          <section className="ssh-status-resource">
-            <div className="ssh-status-section-heading"><h3>{t('Resource usage')}</h3></div>
-            {unsupported ? <div className="ssh-status-state"><ErrorBox tone="info">{unsupported}</ErrorBox></div> : <>
-              {(error || !sample) && <div className="ssh-status-state">
-                {error && <ErrorBox title={t(authenticationFailed ? 'Saved SSH authentication failed' : 'Resource collection failed')} details={error} detailsTitle={t('Technical details')} actions={authenticationFailed && target.connectionId ? <TextButton className="user-primary-action" onClick={() => requestSshAuthentication({ ...target, connectionId: target.connectionId! })}>{t('Authenticate services')}</TextButton> : undefined}>{sshConnectionFailureMessage(error) ?? t(authenticationFailed ? 'Authenticate these services with the working server password or private key passphrase. The terminal session stays connected.' : 'The terminal connection is independent of resource monitoring.')}</ErrorBox>}
-                {!sample && <p className="ssh-status-caption">{!connected ? t('Resources are collected after connecting.') : busy ? t('Collecting remote resources…') : t('No resource sample yet.')}</p>}
-              </div>}
-              {sample && <div className="ssh-status-sample" data-stale={stale}>
-                <div className="ssh-status-resource-summary">
-                  <ul className="ssh-resource-legend" aria-label={t('Resource chart legend')}>
-                    {resourceSeries.map(series => <li key={series.label}><i style={{ background: series.color }} aria-hidden="true" />{series.label}</li>)}
-                  </ul>
-                  <SshResourceChart series={resourceSeries} endTime={chartTime} windowMs={historyWindow} label={t('Resource usage history')} caption={t('Resource utilization')} />
-                  <dl className="ssh-status-metrics" aria-label={t('Current resource readings')}>
-                    <Metric label={t('CPU usage')} percentage={cpu} detail={cpu != null ? t('{{percent}}% idle', { percent: 100 - Math.round(cpu) }) : t(sample.cpuTotal != null ? 'CPU usage requires two samples.' : 'Usage details unavailable')} />
-                    <Metric resource="memory" label={t('Memory usage')} used={sample.memoryTotal != null && sample.memoryAvailable != null ? sample.memoryTotal - sample.memoryAvailable : null} total={sample.memoryTotal} />
-                    <Metric resource="disk" label={t('Root disk usage')} used={sample.diskUsed} total={sample.diskTotal} />
-                  </dl>
-                </div>
-                <section className="ssh-status-system-section ssh-status-details">
-                  <h4>{t('System information')}</h4>
-                  <div className="ssh-status-system-body">
-                  <div className="ssh-status-system"><strong>{sample.hostname || t('Unavailable')}</strong><span>{sample.system || t('Unavailable')}</span></div>
-                  <dl className="ssh-status-facts">
-                    <div className="ssh-status-row"><dt>{t('System uptime')}</dt><dd>{sample.uptimeSeconds == null ? t('Unavailable') : statusDuration(sample.uptimeSeconds)}</dd></div>
-                    <div className="ssh-status-row ssh-status-load"><dt>{t('System load')}</dt><dd>
-                      {sample.load.trim().split(/\s+/).length === 3 ? sample.load.trim().split(/\s+/).map((value, index) => <span key={index}><strong>{value}</strong><small>{t('{{minutes}} min', { minutes: [1, 5, 15][index] })}</small></span>) : sample.load || t('Unavailable')}
-                    </dd></div>
-                  </dl>
-                  </div>
-                </section>
-              </div>}
-            </>}
-          </section>
-          <section className="ssh-status-groups">
-            <section className="ssh-status-details ssh-status-connection">
-              <h4>{t('Connection details')}</h4>
-              <dl className="ssh-status-facts">
-                <div className="ssh-status-row"><dt>{state.phase === 'interactive' ? t('Session duration') : t('Connected for')}</dt><dd>{connectedAt == null ? '—' : statusDuration((now - connectedAt) / 1000)}</dd></div>
-                <div className="ssh-status-row"><dt>{t('Reconnect attempts')}</dt><dd>{state.reconnectAttempt}</dd></div>
-                {sample && <div className="ssh-status-row" data-tip={t('Measured on a separate SSH connection.')}><dt>{t('Probe latency')}</dt><dd>{sample.latencyMs} ms</dd></div>}
-              </dl>
-            </section>
-            <section className="ssh-status-details ssh-status-history">
-              <h4>{t('Connection log')}</h4>
-              <div className="ssh-status-details-body">
-                <div className="ssh-status-log scroll-region" ref={logRef}>
-                  {state.log.length === 0
-                    ? <p className="ssh-status-caption">{t('No connection output yet.')}</p>
-                    : <ol className="ssh-status-events">{state.log.map((entry, index) => <li key={`${entry.time}-${index}`}><time>{new Date(entry.time).toLocaleTimeString()}</time><span>{entry.text}</span></li>)}</ol>}
-                </div>
-              </div>
-            </section>
-          </section>
+  return (
+    <div className="ssh-status-shell" data-open={displayOpen} data-active={active} data-compact={compact}>
+      {!compact && (
+        <div
+          className="ssh-status-toolbar"
+          onMouseDown={(event) => event.stopPropagation()}
+          onContextMenu={(event) => event.stopPropagation()}>
+          <div className="ssh-session-toolbar-slot" ref={onToolbarReady}>
+            {(!onToolbarReady || !statusTrigger || state.phase === 'unavailable') && (
+              <TextButton
+                ref={trigger}
+                className="ssh-session-status"
+                data-testid="ssh-status-toggle"
+                aria-label={t('SSH status')}
+                data-tip={t(displayOpen ? 'Close SSH status' : 'Open SSH status')}
+                aria-expanded={displayOpen}
+                aria-controls={panelId}
+                onClick={() => setOpen((value) => !value)}>
+                <i className="ssh-status-dot" data-phase={state.phase} />
+                <span role="status">{t(phaseLabels[state.phase])}</span>
+              </TextButton>
+            )}
+          </div>
         </div>
-        <footer className="ssh-status-controls">
-          <div className="ssh-status-controls-actions">
-            <TextButton disabled={!target.host} onClick={() => setPaused(value => !value)}>{paused ? t('Resume monitoring') : t('Pause monitoring')}</TextButton>
-            {temporaryAuthentication && target.connectionId && <TextButton onClick={() => { void forgetSshAuthentication(target.connectionId!).catch(reason => useToastStore.getState().addToast(String(reason), 'error')); }}>{t('Clear temporary credentials')}</TextButton>}
-          </div>
-          <div>
-            {updatedAt && <p className="ssh-status-caption">{stale ? t('Last sample') : t('Updated')} · {t('{{seconds}}s ago', { seconds: Math.max(0, Math.floor((now - updatedAt) / 1000)) })}</p>}
-            {paused && <p className="ssh-status-caption">{t('Monitoring paused')}</p>}
-          </div>
-        </footer>
-      </aside></div></StatusPlacement>}
+      )}
+      <div className="ssh-status-body">
+        {children}
+        {displayOpen && (
+          <StatusPlacement>
+            <div
+              ref={frameRef}
+              className="ssh-status-frame"
+              data-folded={folded || undefined}
+              style={{ width: folded ? 0 : liveWidth }}
+              onMouseDown={(event) => event.stopPropagation()}
+              onContextMenu={(event) => event.stopPropagation()}>
+              {onWidthChange && (
+                <div
+                  role="separator"
+                  aria-label={t('Resize SSH status')}
+                  aria-orientation="vertical"
+                  aria-valuemin={MIN_STATUS_WIDTH}
+                  aria-valuemax={maxWidth}
+                  aria-valuenow={liveWidth}
+                  tabIndex={0}
+                  className="ssh-status-resize"
+                  onKeyDown={(event) => {
+                    if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      nudgeWidth(event.key === 'ArrowLeft' ? 16 : -16);
+                    }
+                    if (event.key === 'Escape') {
+                      event.stopPropagation();
+                      close();
+                    }
+                  }}>
+                  <ResizeHandle axis="x" edge="left" onDelta={resize} onUp={commitResize} testId="ssh-status-resize-handle" />
+                </div>
+              )}
+              <aside
+                id={panelId}
+                aria-label={t('SSH status')}
+                data-testid="ssh-status-panel"
+                className="ssh-status-panel"
+                style={{ display: folded ? 'none' : undefined }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.stopPropagation();
+                    close();
+                  }
+                }}>
+                <div className="ssh-status-scroll scroll-region">
+                  <header className="sidebar-heading">
+                    <div className="ssh-status-endpoint">
+                      <strong className="ssh-status-identity" data-tip={address}>
+                        {address}
+                      </strong>
+                      <IconBtn
+                        compact
+                        title={t('Copy connection address')}
+                        onClick={() => {
+                          void writeClipboardText(address).catch((reason) => useToastStore.getState().addToast(String(reason), 'error'));
+                        }}>
+                        <Copy size={iconSizes.copy} />
+                      </IconBtn>
+                    </div>
+                    <div className="ssh-status-header-actions">
+                      <IconBtn
+                        title={t('Refresh remote resources')}
+                        disabled={!connected || !!unsupported || busy}
+                        onClick={() => {
+                          setPaused(false);
+                          setRefresh((value) => value + 1);
+                        }}>
+                        <RefreshCw size={iconSizes.compact} />
+                      </IconBtn>
+                      <IconBtn title={t('Close SSH status')} onClick={close}>
+                        <X size={iconSizes.control} />
+                      </IconBtn>
+                    </div>
+                  </header>
+                  {onReconnect && (state.phase === 'disconnected' || state.retrying) && (
+                    <section className="ssh-status-overview">
+                      <TextButton
+                        className="ssh-status-reconnect"
+                        disabled={reconnecting}
+                        onClick={() => {
+                          setReconnecting(true);
+                          void onReconnect()
+                            .catch((reason) => useToastStore.getState().addToast(String(reason), 'error'))
+                            .finally(() => setReconnecting(false));
+                        }}>
+                        {t('Reconnect SSH session')}
+                      </TextButton>
+                    </section>
+                  )}
+                  <SshNetworkProbe
+                    host={target.host}
+                    port={target.port ?? 22}
+                    jumpHost={target.jumpHost ?? target.jumpConnectionId}
+                    paused={paused}
+                    revision={refresh}>
+                    {sample && (
+                      <SshNetworkRates
+                        samples={trafficHistory}
+                        now={chartTime}
+                        windowMs={historyWindow}
+                        available={sample.networkReceived != null || sample.networkTransmitted != null}
+                      />
+                    )}
+                  </SshNetworkProbe>
+                  <section className="ssh-status-resource">
+                    <div className="ssh-status-section-heading">
+                      <h3>{t('Resource usage')}</h3>
+                    </div>
+                    {unsupported ? (
+                      <div className="ssh-status-state">
+                        <ErrorBox tone="info">{unsupported}</ErrorBox>
+                      </div>
+                    ) : (
+                      <>
+                        {(error || !sample) && (
+                          <div className="ssh-status-state">
+                            {error && (
+                              <ErrorBox
+                                title={t(authenticationFailed ? 'Saved SSH authentication failed' : 'Resource collection failed')}
+                                details={error}
+                                detailsTitle={t('Technical details')}
+                                actions={
+                                  authenticationFailed && target.connectionId ? (
+                                    <TextButton
+                                      className="user-primary-action"
+                                      onClick={() => requestSshAuthentication({ ...target, connectionId: target.connectionId! })}>
+                                      {t('Authenticate services')}
+                                    </TextButton>
+                                  ) : undefined
+                                }>
+                                {sshConnectionFailureMessage(error) ??
+                                  t(
+                                    authenticationFailed
+                                      ? 'Authenticate these services with the working server password or private key passphrase. The terminal session stays connected.'
+                                      : 'The terminal connection is independent of resource monitoring.',
+                                  )}
+                              </ErrorBox>
+                            )}
+                            {!sample && (
+                              <p className="ssh-status-caption">
+                                {!connected
+                                  ? t('Resources are collected after connecting.')
+                                  : busy
+                                    ? t('Collecting remote resources…')
+                                    : t('No resource sample yet.')}
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {sample && (
+                          <div className="ssh-status-sample" data-stale={stale}>
+                            <div className="ssh-status-resource-summary">
+                              <ul className="ssh-resource-legend" aria-label={t('Resource chart legend')}>
+                                {resourceSeries.map((series) => (
+                                  <li key={series.label}>
+                                    <i style={{ background: series.color }} aria-hidden="true" />
+                                    {series.label}
+                                  </li>
+                                ))}
+                              </ul>
+                              <SshResourceChart
+                                series={resourceSeries}
+                                endTime={chartTime}
+                                windowMs={historyWindow}
+                                label={t('Resource usage history')}
+                                caption={t('Resource utilization')}
+                              />
+                              <dl className="ssh-status-metrics" aria-label={t('Current resource readings')}>
+                                <Metric
+                                  label={t('CPU usage')}
+                                  percentage={cpu}
+                                  detail={
+                                    cpu != null
+                                      ? t('{{percent}}% idle', { percent: 100 - Math.round(cpu) })
+                                      : t(sample.cpuTotal != null ? 'CPU usage requires two samples.' : 'Usage details unavailable')
+                                  }
+                                />
+                                <Metric
+                                  resource="memory"
+                                  label={t('Memory usage')}
+                                  used={
+                                    sample.memoryTotal != null && sample.memoryAvailable != null
+                                      ? sample.memoryTotal - sample.memoryAvailable
+                                      : null
+                                  }
+                                  total={sample.memoryTotal}
+                                />
+                                <Metric resource="disk" label={t('Root disk usage')} used={sample.diskUsed} total={sample.diskTotal} />
+                              </dl>
+                            </div>
+                            <section className="ssh-status-system-section ssh-status-details">
+                              <h4>{t('System information')}</h4>
+                              <div className="ssh-status-system-body">
+                                <div className="ssh-status-system">
+                                  <strong>{sample.hostname || t('Unavailable')}</strong>
+                                  <span>{sample.system || t('Unavailable')}</span>
+                                </div>
+                                <dl className="ssh-status-facts">
+                                  <div className="ssh-status-row">
+                                    <dt>{t('System uptime')}</dt>
+                                    <dd>{sample.uptimeSeconds == null ? t('Unavailable') : statusDuration(sample.uptimeSeconds)}</dd>
+                                  </div>
+                                  <div className="ssh-status-row ssh-status-load">
+                                    <dt>{t('System load')}</dt>
+                                    <dd>
+                                      {sample.load.trim().split(/\s+/).length === 3
+                                        ? sample.load
+                                            .trim()
+                                            .split(/\s+/)
+                                            .map((value, index) => (
+                                              <span key={index}>
+                                                <strong>{value}</strong>
+                                                <small>{t('{{minutes}} min', { minutes: [1, 5, 15][index] })}</small>
+                                              </span>
+                                            ))
+                                        : sample.load || t('Unavailable')}
+                                    </dd>
+                                  </div>
+                                </dl>
+                              </div>
+                            </section>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </section>
+                  <section className="ssh-status-groups">
+                    <section className="ssh-status-details ssh-status-connection">
+                      <h4>{t('Connection details')}</h4>
+                      <dl className="ssh-status-facts">
+                        <div className="ssh-status-row">
+                          <dt>{state.phase === 'interactive' ? t('Session duration') : t('Connected for')}</dt>
+                          <dd>{connectedAt == null ? '—' : statusDuration((now - connectedAt) / 1000)}</dd>
+                        </div>
+                        <div className="ssh-status-row">
+                          <dt>{t('Reconnect attempts')}</dt>
+                          <dd>{state.reconnectAttempt}</dd>
+                        </div>
+                        {sample && (
+                          <div className="ssh-status-row" data-tip={t('Measured on a separate SSH connection.')}>
+                            <dt>{t('Probe latency')}</dt>
+                            <dd>{sample.latencyMs} ms</dd>
+                          </div>
+                        )}
+                      </dl>
+                    </section>
+                    <section className="ssh-status-details ssh-status-history">
+                      <h4>{t('Connection log')}</h4>
+                      <div className="ssh-status-details-body">
+                        <div className="ssh-status-log scroll-region" ref={logRef}>
+                          {state.log.length === 0 ? (
+                            <p className="ssh-status-caption">{t('No connection output yet.')}</p>
+                          ) : (
+                            <ol className="ssh-status-events">
+                              {state.log.map((entry, index) => (
+                                <li key={`${entry.time}-${index}`}>
+                                  <time>{new Date(entry.time).toLocaleTimeString()}</time>
+                                  <span>{entry.text}</span>
+                                </li>
+                              ))}
+                            </ol>
+                          )}
+                        </div>
+                      </div>
+                    </section>
+                  </section>
+                </div>
+                <footer className="ssh-status-controls">
+                  <div className="ssh-status-controls-actions">
+                    <TextButton disabled={!target.host} onClick={() => setPaused((value) => !value)}>
+                      {paused ? t('Resume monitoring') : t('Pause monitoring')}
+                    </TextButton>
+                    {temporaryAuthentication && target.connectionId && (
+                      <TextButton
+                        onClick={() => {
+                          void forgetSshAuthentication(target.connectionId!).catch((reason) =>
+                            useToastStore.getState().addToast(String(reason), 'error'),
+                          );
+                        }}>
+                        {t('Clear temporary credentials')}
+                      </TextButton>
+                    )}
+                  </div>
+                  <div>
+                    {updatedAt && (
+                      <p className="ssh-status-caption">
+                        {stale ? t('Last sample') : t('Updated')} ·{' '}
+                        {t('{{seconds}}s ago', { seconds: Math.max(0, Math.floor((now - updatedAt) / 1000)) })}
+                      </p>
+                    )}
+                    {paused && <p className="ssh-status-caption">{t('Monitoring paused')}</p>}
+                  </div>
+                </footer>
+              </aside>
+            </div>
+          </StatusPlacement>
+        )}
+      </div>
     </div>
-  </div>;
+  );
 }

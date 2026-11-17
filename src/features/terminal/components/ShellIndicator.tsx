@@ -58,31 +58,28 @@ export default function ShellIndicator({ shell, connected, focused, compact, lab
   const fg = SHELL_FG[info.type];
   const bg = SHELL_BG[info.type];
   // Status dot: disconnected = red; connected and focused = green; connected but unfocused = muted
-  const dotColor = connected === false
-    ? 'var(--shell-disconnected)'
-    : focused
-      ? 'var(--shell-connected)'
-      : 'var(--text-muted)';
+  const dotColor = connected === false ? 'var(--shell-disconnected)' : focused ? 'var(--shell-connected)' : 'var(--text-muted)';
 
   return (
     <span
       className={compact ? undefined : 'terminal-chip'}
       data-tip={label ?? info.label}
-      style={compact
-        ? {
-            display: 'inline-flex',
-            flexShrink: 0,
-            whiteSpace: 'nowrap',
-            alignItems: 'center',
-            gap: 5,
-            fontFamily: 'var(--font-mono)',
-            fontSize: 'calc(11px * var(--ui-font-scale))',
-            fontWeight: 'var(--fw-medium)',
-            color: fg,
-            userSelect: 'none',
-          }
-        : { color: fg, background: bg, fontWeight: 'var(--fw-medium)', userSelect: 'none' }}
-    >
+      style={
+        compact
+          ? {
+              display: 'inline-flex',
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
+              alignItems: 'center',
+              gap: 5,
+              fontFamily: 'var(--font-mono)',
+              fontSize: 'calc(11px * var(--ui-font-scale))',
+              fontWeight: 'var(--fw-medium)',
+              color: fg,
+              userSelect: 'none',
+            }
+          : { color: fg, background: bg, fontWeight: 'var(--fw-medium)', userSelect: 'none' }
+      }>
       {connected !== undefined && (
         <span
           style={{

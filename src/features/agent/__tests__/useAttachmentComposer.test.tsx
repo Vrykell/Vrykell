@@ -46,12 +46,16 @@ describe('useAttachmentComposer', () => {
     const longText = 'x'.repeat(LIMITS.pasteFoldChars + 1);
 
     let shortAdded = true;
-    act(() => { shortAdded = result.current.addPastedText(shortText); });
+    act(() => {
+      shortAdded = result.current.addPastedText(shortText);
+    });
     expect(shortAdded).toBe(false);
     expect(result.current.attachments).toHaveLength(0);
 
     let longAdded = false;
-    act(() => { longAdded = result.current.addPastedText(longText); });
+    act(() => {
+      longAdded = result.current.addPastedText(longText);
+    });
     expect(longAdded).toBe(true);
     expect(result.current.attachments).toHaveLength(1);
     expect(result.current.attachments[0]?.textContent).toBe(longText);
@@ -78,11 +82,19 @@ describe('useAttachmentComposer', () => {
     let listeners: Set<EventCallback<DragDropEvent>>;
     let subscriptions: (() => void)[];
 
-    const drop = () => act(() => {
-      for (const handler of listeners) handler({ event: 'tauri://drag-drop', id: 1,
-        payload: { type: 'drop', paths: ['C:\\files\\notes.txt'], position: new PhysicalPosition(40, 40) } });
-    });
-    const finishSubscriptions = () => act(async () => { subscriptions.forEach(resolve => resolve()); });
+    const drop = () =>
+      act(() => {
+        for (const handler of listeners)
+          handler({
+            event: 'tauri://drag-drop',
+            id: 1,
+            payload: { type: 'drop', paths: ['C:\\files\\notes.txt'], position: new PhysicalPosition(40, 40) },
+          });
+      });
+    const finishSubscriptions = () =>
+      act(async () => {
+        subscriptions.forEach((resolve) => resolve());
+      });
 
     beforeEach(() => {
       vi.stubGlobal('__TAURI_INTERNALS__', {});
@@ -90,11 +102,21 @@ describe('useAttachmentComposer', () => {
       subscriptions = [];
       mocks.listen.mockReset().mockImplementation((handler: EventCallback<DragDropEvent>) => {
         listeners.add(handler);
-        return new Promise<() => void>(resolve => {
-          subscriptions.push(() => resolve(() => { listeners.delete(handler); }));
+        return new Promise<() => void>((resolve) => {
+          subscriptions.push(() =>
+            resolve(() => {
+              listeners.delete(handler);
+            }),
+          );
         });
       });
-      vi.spyOn(attachmentApi, 'importFileAsAttachment').mockResolvedValue({ id: 'file', kind: 'file', name: 'notes.txt', mime: 'text/plain', size: 10 });
+      vi.spyOn(attachmentApi, 'importFileAsAttachment').mockResolvedValue({
+        id: 'file',
+        kind: 'file',
+        name: 'notes.txt',
+        mime: 'text/plain',
+        size: 10,
+      });
     });
 
     afterEach(() => {
@@ -126,15 +148,24 @@ describe('useAttachmentComposer', () => {
     });
 
     it('refuses an attachment the caller rejects', async () => {
-      const view = renderHook(() => useAttachmentComposer({
-        attachments: [], updateAttachments: vi.fn(), scopeKey: 'rejected', accept: () => 'cannot send this file',
-      }), { wrapper: StrictMode });
+      const view = renderHook(
+        () =>
+          useAttachmentComposer({
+            attachments: [],
+            updateAttachments: vi.fn(),
+            scopeKey: 'rejected',
+            accept: () => 'cannot send this file',
+          }),
+        { wrapper: StrictMode },
+      );
       view.result.current.panelRef.current = panel();
       await finishSubscriptions();
 
       drop();
 
-      await waitFor(() => expect(useToastStore.getState().toasts[useToastStore.getState().toasts.length - 1]?.message).toBe('cannot send this file'));
+      await waitFor(() =>
+        expect(useToastStore.getState().toasts[useToastStore.getState().toasts.length - 1]?.message).toBe('cannot send this file'),
+      );
       expect(view.result.current.attachments).toHaveLength(0);
     });
 
@@ -153,9 +184,12 @@ describe('useAttachmentComposer', () => {
     it('does not retain the previous draft listener after switching sessions', async () => {
       const firstUpdate = vi.fn();
       const secondUpdate = vi.fn();
-      const view = renderHook(({ scopeKey, updateAttachments }) => useAttachmentComposer({ attachments: [], scopeKey, updateAttachments }), {
-        initialProps: { scopeKey: 'first', updateAttachments: firstUpdate },
-      });
+      const view = renderHook(
+        ({ scopeKey, updateAttachments }) => useAttachmentComposer({ attachments: [], scopeKey, updateAttachments }),
+        {
+          initialProps: { scopeKey: 'first', updateAttachments: firstUpdate },
+        },
+      );
       view.result.current.panelRef.current = panel();
       view.rerender({ scopeKey: 'second', updateAttachments: secondUpdate });
 

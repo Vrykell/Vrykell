@@ -5,7 +5,9 @@ import { useAgentSettings } from '../stores/agentSettings';
 
 vi.mock('@tauri-apps/api/core', () => ({
   invoke: vi.fn(),
-  Channel: class { onmessage: ((event: unknown) => void) | null = null; },
+  Channel: class {
+    onmessage: ((event: unknown) => void) | null = null;
+  },
 }));
 
 const initial = useAgentSettings.getState();
@@ -19,14 +21,20 @@ const success = (send: (event: unknown) => void) => {
 };
 
 beforeEach(() => {
-  vi.useFakeTimers(); attempts = 0;
+  vi.useFakeTimers();
+  attempts = 0;
   useAgentSettings.setState({ global: { ...initial.global, agentMode: false } });
   invokeMock.mockReset();
   invokeMock.mockImplementation(async (command, args) => {
-    if (command === 'get_ai_config') return {
-      has_key: true, provider: 'openai-compatible', base_url: 'https://api.example.com/v1', model: 'test',
-      models: [], active_model: 'test',
-    } as never;
+    if (command === 'get_ai_config')
+      return {
+        has_key: true,
+        provider: 'openai-compatible',
+        base_url: 'https://api.example.com/v1',
+        model: 'test',
+        models: [],
+        active_model: 'test',
+      } as never;
     if (command === 'llm_stream') {
       attempts++;
       respond((args as { onEvent: Channel<unknown> }).onEvent.onmessage!);
@@ -34,10 +42,13 @@ beforeEach(() => {
     return undefined as never;
   });
 });
-afterEach(() => { vi.useRealTimers(); useAgentSettings.setState(initial, true); });
+afterEach(() => {
+  vi.useRealTimers();
+  useAgentSettings.setState(initial, true);
+});
 
 it('retries connection failures twice with backoff and preserves a single reply', async () => {
-  respond = send => attempts < 3 ? send({ kind: 'error', retryable: true, message: 'Connection reset' }) : success(send);
+  respond = (send) => (attempts < 3 ? send({ kind: 'error', retryable: true, message: 'Connection reset' }) : success(send));
   const chunk = vi.fn();
   const running = agentStream([{ role: 'user', content: 'Hello' }], chunk);
   await vi.waitFor(() => expect(attempts).toBe(1));
@@ -51,7 +62,7 @@ it('retries connection failures twice with backoff and preserves a single reply'
 });
 
 it('reports the final failure after three attempts', async () => {
-  respond = send => send({ kind: 'error', retryable: true, message: 'Connection unavailable' });
+  respond = (send) => send({ kind: 'error', retryable: true, message: 'Connection unavailable' });
   const running = agentStream([{ role: 'user', content: 'Hello' }], () => {});
   const failed = expect(running).rejects.toThrow('Connection unavailable');
   await vi.advanceTimersByTimeAsync(7000);
@@ -60,7 +71,7 @@ it('reports the final failure after three attempts', async () => {
 });
 
 it('stops during retry backoff without starting another request', async () => {
-  respond = send => send({ kind: 'error', retryable: true, message: 'Connection reset' });
+  respond = (send) => send({ kind: 'error', retryable: true, message: 'Connection reset' });
   const controller = new AbortController();
   const running = agentStream([{ role: 'user', content: 'Hello' }], () => {}, { signal: controller.signal });
   await vi.waitFor(() => expect(attempts).toBe(1));
@@ -71,7 +82,7 @@ it('stops during retry backoff without starting another request', async () => {
 });
 
 it('does not retry authentication failures', async () => {
-  respond = send => {
+  respond = (send) => {
     send({ kind: 'started', status: 401, headers: [['content-type', 'application/json']] });
     send({ kind: 'chunk', data: btoa('{"error":{"message":"Invalid API key"}}') });
     send({ kind: 'done' });
@@ -81,7 +92,7 @@ it('does not retry authentication failures', async () => {
 });
 
 it('does not replay a response after streaming has started', async () => {
-  respond = send => {
+  respond = (send) => {
     send({ kind: 'started', status: 200, headers: [['content-type', 'text/event-stream']] });
     send({ kind: 'chunk', data: btoa('data: {"choices":[{"delta":{"content":"Partial"}}]}\n\n') });
     queueMicrotask(() => send({ kind: 'error', retryable: true, message: 'Connection lost while reading' }));

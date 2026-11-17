@@ -3,9 +3,13 @@ import { setupTauriMock } from './tauri-mock';
 import { gotoSetting } from './settings';
 
 test('command coloring is optional, persists and leaves native input editing intact', async ({ page }) => {
-  await setupTauriMock(page); await page.goto('/');
+  await setupTauriMock(page);
+  await page.goto('/');
   await gotoSetting(page, '字体与显示');
-  const toggle = page.locator('.settings-field').filter({ has: page.getByText('命令语法高亮', { exact: true }) }).getByRole('switch');
+  const toggle = page
+    .locator('.settings-field')
+    .filter({ has: page.getByText('命令语法高亮', { exact: true }) })
+    .getByRole('switch');
   await expect(toggle).toHaveAttribute('aria-checked', 'false');
   await toggle.click();
   await page.getByRole('button', { name: '设置', exact: true }).click();
@@ -73,7 +77,8 @@ test('command coloring is optional, persists and leaves native input editing int
 });
 
 test('completion stays anchored while typing and its acceptance keys persist', async ({ page }) => {
-  await setupTauriMock(page); await page.goto('/');
+  await setupTauriMock(page);
+  await page.goto('/');
   const input = page.getByPlaceholder(/输入命令/);
   await input.fill('npm');
   const trigger = page.getByRole('button', { name: '补全快捷键', exact: true });
@@ -95,7 +100,7 @@ test('completion stays anchored while typing and its acceptance keys persist', a
   }
   const positions = await page.evaluate(() => (window as unknown as { completionPositions: number[] }).completionPositions);
   expect(positions.length).toBeGreaterThan(5);
-  expect(positions.every(value => Math.abs(value - x) < 0.5)).toBe(true);
+  expect(positions.every((value) => Math.abs(value - x) < 0.5)).toBe(true);
   await trigger.click();
   const menu = page.getByRole('menu', { name: '补全快捷键', exact: true });
   await menu.getByRole('menuitemcheckbox', { name: 'Tab', exact: true }).click();
@@ -115,29 +120,39 @@ test('completion stays anchored while typing and its acceptance keys persist', a
   await trigger.click();
   await expect(menu).toHaveCount(0);
   await expect(input).toBeFocused();
-  await input.evaluate(element => element.setSelectionRange(1, 1));
+  await input.evaluate((element) => element.setSelectionRange(1, 1));
   await input.press('ArrowRight');
   await expect(input).toHaveValue('npm');
-  expect(await input.evaluate(element => element.selectionStart)).toBe(2);
-  await input.evaluate(element => element.setSelectionRange(element.value.length, element.value.length));
+  expect(await input.evaluate((element) => element.selectionStart)).toBe(2);
+  await input.evaluate((element) => element.setSelectionRange(element.value.length, element.value.length));
   await input.press('ArrowRight');
   await expect(input).toHaveValue('npm run dev');
 });
 
 test('the colored input mirror stays aligned while multiline content overflows the capped height', async ({ page }) => {
-  await setupTauriMock(page); await page.goto('/');
+  await setupTauriMock(page);
+  await page.goto('/');
   await gotoSetting(page, '字体与显示');
-  const toggle = page.locator('.settings-field').filter({ has: page.getByText('命令语法高亮', { exact: true }) }).getByRole('switch');
+  const toggle = page
+    .locator('.settings-field')
+    .filter({ has: page.getByText('命令语法高亮', { exact: true }) })
+    .getByRole('switch');
   await toggle.click();
   await page.getByRole('button', { name: '设置', exact: true }).click();
   const input = page.getByPlaceholder(/输入命令/);
   await input.focus();
   for (let index = 0; index < 6; index += 1) await page.keyboard.press('Shift+Enter');
-  const geometry = () => input.evaluate(node => {
-    const textarea = node as HTMLTextAreaElement;
-    const overlay = textarea.parentElement!.querySelector<HTMLElement>('.command-input-overlay')!;
-    return { offset: textarea.scrollTop, mirrorOffset: overlay.scrollTop, height: textarea.scrollHeight, mirrorHeight: overlay.scrollHeight };
-  });
+  const geometry = () =>
+    input.evaluate((node) => {
+      const textarea = node as HTMLTextAreaElement;
+      const overlay = textarea.parentElement!.querySelector<HTMLElement>('.command-input-overlay')!;
+      return {
+        offset: textarea.scrollTop,
+        mirrorOffset: overlay.scrollTop,
+        height: textarea.scrollHeight,
+        mirrorHeight: overlay.scrollHeight,
+      };
+    });
   // The caret line overflows the cap: both layers must share the scroll geometry, including the
   // reserved caret line the trailing newline needs in the mirror.
   const scrolled = await geometry();
@@ -157,21 +172,28 @@ test('the colored input mirror stays aligned while multiline content overflows t
 });
 
 test('a long completion suffix cannot push the typed word out of the visible mirror line', async ({ page }) => {
-  await setupTauriMock(page); await page.goto('/');
+  await setupTauriMock(page);
+  await page.goto('/');
   await page.evaluate(async () => {
     const path = '/src/config/typography.ts';
-    const { useTypographyStore } = await import(path) as typeof import('../src/config/typography');
+    const { useTypographyStore } = (await import(path)) as typeof import('../src/config/typography');
     useTypographyStore.getState().update({ commandHighlighting: true, terminalFontSize: 15 });
   });
   const input = page.getByPlaceholder(/输入命令/);
   // A long history path matching the typed prefix glues an unbreakable word to the last character.
   await page.evaluate(async () => {
     const path = '/src/features/terminal/stores/history.ts';
-    const { useHistoryStore } = await import(path) as typeof import('../src/features/terminal/stores/history');
-    useHistoryStore.setState({ entries: [{
-      command: 'cd C:\\Users\\37863\\.local\\share\\opencode\\worktree\\ac4358\\integration-verify-chip-panel',
-      cwd: '/home/e2e/project', timestamp: 1, exitCode: 0,
-    }] });
+    const { useHistoryStore } = (await import(path)) as typeof import('../src/features/terminal/stores/history');
+    useHistoryStore.setState({
+      entries: [
+        {
+          command: 'cd C:\\Users\\37863\\.local\\share\\opencode\\worktree\\ac4358\\integration-verify-chip-panel',
+          cwd: '/home/e2e/project',
+          timestamp: 1,
+          exitCode: 0,
+        },
+      ],
+    });
   });
   await page.setViewportSize({ width: 900, height: 800 });
   await input.focus();
@@ -180,7 +202,7 @@ test('a long completion suffix cannot push the typed word out of the visible mir
   await page.keyboard.type('C');
   await expect(input).toHaveValue('cd C');
   // The typed character must stay inside the capped mirror box instead of wrapping below it.
-  const geometry = await input.evaluate(node => {
+  const geometry = await input.evaluate((node) => {
     const textarea = node as HTMLTextAreaElement;
     const overlay = textarea.parentElement!.querySelector<HTMLElement>('.command-input-overlay')!;
     const token = overlay.querySelector<HTMLElement>('.command-token[data-kind="argument"]')!;
@@ -188,7 +210,8 @@ test('a long completion suffix cannot push the typed word out of the visible mir
     const tokenRect = token.getBoundingClientRect();
     return {
       tokenInsideInput: tokenRect.y + tokenRect.height <= inputRect.y + inputRect.height + 1,
-      offset: textarea.scrollTop, mirrorOffset: overlay.scrollTop,
+      offset: textarea.scrollTop,
+      mirrorOffset: overlay.scrollTop,
     };
   });
   expect(geometry.tokenInsideInput).toBe(true);

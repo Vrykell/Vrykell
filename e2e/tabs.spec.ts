@@ -13,7 +13,7 @@ test.describe('Multi-tab workspace', () => {
     await expect(page.locator('[data-terminal-input]')).toBeVisible();
     await page.waitForFunction(async () => {
       const path = '/src/features/terminal/stores/terminal.ts';
-      const { useTerminalStore } = await import(path) as typeof import('../src/features/terminal/stores/terminal');
+      const { useTerminalStore } = (await import(path)) as typeof import('../src/features/terminal/stores/terminal');
       return Object.values(useTerminalStore.getState().startupStates).includes('ready');
     });
     const original = await page.locator('[data-tab-row-id]').first().getAttribute('data-tab-row-id');

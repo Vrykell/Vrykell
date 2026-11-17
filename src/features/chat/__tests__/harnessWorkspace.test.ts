@@ -7,9 +7,14 @@ import { acpOpen } from '@platform/api/acp';
 vi.mock('@platform/api/acp', () => ({
   onAcpSession: vi.fn(async () => () => {}),
   acpOpen: vi.fn(async () => ({
-    sessionId: 'runtime-one', resumeSessionId: 'remote-one', harness: 'Agent', cwd: '/project',
+    sessionId: 'runtime-one',
+    resumeSessionId: 'remote-one',
+    harness: 'Agent',
+    cwd: '/project',
     agent: { protocolVersion: 1, agentInfo: null, agentCapabilities: null, authMethods: [] },
-    modes: null, models: null, configOptions: null,
+    modes: null,
+    models: null,
+    configOptions: null,
   })),
   acpClose: vi.fn(async () => undefined),
 }));
@@ -21,10 +26,10 @@ beforeEach(() => {
   vi.mocked(acpOpen).mockClear();
 });
 afterEach(() => {
-  useHarnessWorkspace.getState().close(useHarnessWorkspace.getState().connections.map(item => item.id));
+  useHarnessWorkspace.getState().close(useHarnessWorkspace.getState().connections.map((item) => item.id));
 });
 
-it.each(['', '/project'])('creates independent fresh connections in the same directory: %s', cwd => {
+it.each(['', '/project'])('creates independent fresh connections in the same directory: %s', (cwd) => {
   const first = useHarnessWorkspace.getState().connect('Agent', cwd);
   const second = useHarnessWorkspace.getState().connect('Agent', cwd);
   expect(second).not.toBe(first);
@@ -62,6 +67,6 @@ it('finds a newly opened live conversation by the remote identity and resolved d
 
 it('creates a fresh session even if a historical identity was also provided', () => {
   const id = useHarnessWorkspace.getState().connect('Agent', '/project', true, 'history-one');
-  expect(useHarnessWorkspace.getState().connections.find(item => item.id === id)).toMatchObject({ fresh: true });
+  expect(useHarnessWorkspace.getState().connections.find((item) => item.id === id)).toMatchObject({ fresh: true });
   expect(useHarnessWorkspace.getState().connections[0].resumeSessionId).toBeUndefined();
 });

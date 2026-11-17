@@ -9,16 +9,24 @@ import { useWorkspaceNavigation } from '../stores/navigation';
 import { groupRename } from '@platform/api/group';
 import { useWorkbenchStore } from '../stores/workbench';
 
-vi.mock('@platform/api/group', async original => ({ ...await original<typeof import('@platform/api/group')>(), groupRename: vi.fn().mockResolvedValue(undefined) }));
+vi.mock('@platform/api/group', async (original) => ({
+  ...(await original<typeof import('@platform/api/group')>()),
+  groupRename: vi.fn().mockResolvedValue(undefined),
+}));
 
-vi.mock('@platform/shells', async original => ({ ...await original<typeof import('@platform/shells')>(), getAvailableShells: vi.fn().mockResolvedValue([
-  { id: 'zsh', label: 'Zsh', default: true }, { id: 'bash', label: 'Bash', default: false },
-]) }));
+vi.mock('@platform/shells', async (original) => ({
+  ...(await original<typeof import('@platform/shells')>()),
+  getAvailableShells: vi.fn().mockResolvedValue([
+    { id: 'zsh', label: 'Zsh', default: true },
+    { id: 'bash', label: 'Bash', default: false },
+  ]),
+}));
 
 vi.mock('@features/agent/services/title', () => ({ regenerateTitle: vi.fn() }));
 vi.mock('../components/NewTabModal', () => ({
-  default: ({ open, groupId }: { open: boolean; groupId?: string }) =>
-    <div data-testid="new-tab-modal" data-open={String(open)} data-group={groupId ?? ''} />,
+  default: ({ open, groupId }: { open: boolean; groupId?: string }) => (
+    <div data-testid="new-tab-modal" data-open={String(open)} data-group={groupId ?? ''} />
+  ),
 }));
 const snapshot = useSessionStore.getState();
 beforeEach(() => {
@@ -26,18 +34,28 @@ beforeEach(() => {
   useWorkspaceNavigation.setState({ groupColors: {} });
   useSessionStore.setState({
     tabs: [
-      { id: 'local', title: 'Shell', kind: 'session', layout: { type: 'leaf', terminal: { id: 'local#0', kind: 'local', shellType: 'bash' } } },
+      {
+        id: 'local',
+        title: 'Shell',
+        kind: 'session',
+        layout: { type: 'leaf', terminal: { id: 'local#0', kind: 'local', shellType: 'bash' } },
+      },
       { id: 'ai-history', title: 'Conversations', kind: 'ai-history' },
       { id: 'history', title: 'History', kind: 'history' },
-    ], activeId: 'ai-history', groups: [], loadGroups: vi.fn().mockResolvedValue(undefined),
+    ],
+    activeId: 'ai-history',
+    groups: [],
+    loadGroups: vi.fn().mockResolvedValue(undefined),
   });
 });
 
 it('colors a restored unspecified shell from the machine default and preserves explicit shell colors', async () => {
-  useSessionStore.setState({ tabs: [
-    { id: 'restored', title: 'Terminal', kind: 'session', layout: { type: 'leaf', terminal: { id: 'restored#0', kind: 'local' } } },
-    ...useSessionStore.getState().tabs,
-  ] });
+  useSessionStore.setState({
+    tabs: [
+      { id: 'restored', title: 'Terminal', kind: 'session', layout: { type: 'leaf', terminal: { id: 'restored#0', kind: 'local' } } },
+      ...useSessionStore.getState().tabs,
+    ],
+  });
   render(<PanelTabs />);
   await screen.findByTestId('tab-row-restored');
   const { waitFor } = await import('@testing-library/react');
@@ -66,10 +84,23 @@ it('routes container menu actions to their terminal owner and keeps the containe
   const previous = useWorkbenchStore.getState();
   const duplicateTab = vi.fn();
   useSessionStore.setState({ activeId: 'local', duplicateTab });
-  useWorkbenchStore.setState({ ready: true, snapshot: { version: 2, groups: [], order: {},
-    tabs: [{ id: 'layout-local', scope: 'terminal', focused: 'local-pane', layout: { type: 'pane', id: 'local-pane', resourceId: 'terminal:local#0' } }],
-    selected: { terminal: 'layout-local' },
-  } });
+  useWorkbenchStore.setState({
+    ready: true,
+    snapshot: {
+      version: 2,
+      groups: [],
+      order: {},
+      tabs: [
+        {
+          id: 'layout-local',
+          scope: 'terminal',
+          focused: 'local-pane',
+          layout: { type: 'pane', id: 'local-pane', resourceId: 'terminal:local#0' },
+        },
+      ],
+      selected: { terminal: 'layout-local' },
+    },
+  });
   try {
     render(<PanelTabs />);
     const row = screen.getByTestId('tab-row-layout-local');
@@ -83,7 +114,11 @@ it('routes container menu actions to their terminal owner and keeps the containe
   }
 });
 
-afterEach(() => { cleanup(); useListReorder.getState().end(); useSessionStore.setState(snapshot, true); });
+afterEach(() => {
+  cleanup();
+  useListReorder.getState().end();
+  useSessionStore.setState(snapshot, true);
+});
 
 it('keeps the start page canvas surface in its drag preview', () => {
   useSessionStore.setState({ tabs: [{ id: 'start', kind: 'start', title: 'Start' }], activeId: 'start' });
@@ -106,7 +141,13 @@ it('leaves the tab list empty instead of showing an unmatched-search message whe
 it('creates ungrouped tabs from the panel button and keeps only the group button scoped', () => {
   useSessionStore.setState({
     tabs: [
-      { id: 'grouped', title: 'Grouped', kind: 'session', groupId: 'group-a', layout: { type: 'leaf', terminal: { id: 'grouped#0', kind: 'local', shellType: 'bash' } } },
+      {
+        id: 'grouped',
+        title: 'Grouped',
+        kind: 'session',
+        groupId: 'group-a',
+        layout: { type: 'leaf', terminal: { id: 'grouped#0', kind: 'local', shellType: 'bash' } },
+      },
     ],
     activeId: 'grouped',
     groups: [{ id: 'group-a', title: 'Group', collapsed: false }],
@@ -143,7 +184,9 @@ it('retains terminal actions in the strip context menu and styles the search as 
   fireEvent.contextMenu(screen.getByRole('tablist', { name: '终端会话' }));
   const menu = screen.getByRole('menu', { name: '更多终端操作' });
   expect(menu).toHaveTextContent('新建终端选项');
-  await act(async () => { fireEvent.click(within(menu).getByRole('menuitem', { name: '搜索会话…' })); });
+  await act(async () => {
+    fireEvent.click(within(menu).getByRole('menuitem', { name: '搜索会话…' }));
+  });
   expect(screen.getByTestId('tab-search')).toHaveClass('text-input-field');
 });
 
@@ -182,22 +225,29 @@ it('filters singleton pages without hiding other rows', () => {
 });
 
 it('keeps group rows intact through renaming and reordering', () => {
-  useSessionStore.setState({ groups: [
-    { id: 'group-a', title: 'First', collapsed: false },
-    { id: 'group-b', title: 'Second', collapsed: false },
-  ] });
+  useSessionStore.setState({
+    groups: [
+      { id: 'group-a', title: 'First', collapsed: false },
+      { id: 'group-b', title: 'Second', collapsed: false },
+    ],
+  });
   render(<PanelTabs />);
   expect(screen.getByTestId('group-title-group-a')).toHaveTextContent('First');
   expect(screen.getByTestId('group-header-group-a')).toHaveAttribute('aria-expanded', 'true');
-  act(() => useSessionStore.setState({ groups: [
-    { id: 'group-b', title: 'Second', collapsed: false },
-    { id: 'group-a', title: 'Renamed', collapsed: false },
-  ] }));
+  act(() =>
+    useSessionStore.setState({
+      groups: [
+        { id: 'group-b', title: 'Second', collapsed: false },
+        { id: 'group-a', title: 'Renamed', collapsed: false },
+      ],
+    }),
+  );
   expect(screen.getByTestId('group-header-group-a')).toHaveTextContent('Renamed');
 });
 
 it('renames groups in a styled menu input, commits on dismissal and cancels on Escape', async () => {
-  const renameGroup = vi.mocked(groupRename); renameGroup.mockClear();
+  const renameGroup = vi.mocked(groupRename);
+  renameGroup.mockClear();
   useSessionStore.setState({ groups: [{ id: 'work', title: 'Work', collapsed: false }] });
   render(<PanelTabs />);
   const header = screen.getByTestId('group-header-work');
@@ -215,17 +265,21 @@ it('renames groups in a styled menu input, commits on dismissal and cancels on E
   expect(renameGroup).not.toHaveBeenCalled();
   fireEvent.contextMenu(header);
   fireEvent.change(screen.getByRole('textbox', { name: '分组名称' }), { target: { value: 'Production' } });
-  await act(async () => { fireEvent.keyDown(screen.getByRole('textbox', { name: '分组名称' }), { key: 'Enter' }); });
+  await act(async () => {
+    fireEvent.keyDown(screen.getByRole('textbox', { name: '分组名称' }), { key: 'Enter' });
+  });
   expect(renameGroup).toHaveBeenCalledExactlyOnceWith('work', 'Production');
   fireEvent.contextMenu(header);
   fireEvent.change(screen.getByRole('textbox', { name: '分组名称' }), { target: { value: 'On blur' } });
-  await act(async () => { fireEvent.pointerDown(document.body); });
+  await act(async () => {
+    fireEvent.pointerDown(document.body);
+  });
   expect(renameGroup).toHaveBeenLastCalledWith('work', 'On blur');
 });
 
 it('keeps group actions and color controls keyboard-accessible without changing member icons', () => {
-  useSessionStore.setState(state => ({
-    tabs: state.tabs.map(tab => tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab),
+  useSessionStore.setState((state) => ({
+    tabs: state.tabs.map((tab) => (tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab)),
     groups: [{ id: 'group-a', title: 'Group', collapsed: false }],
   }));
   render(<PanelTabs />);
@@ -246,8 +300,8 @@ it('keeps group actions and color controls keyboard-accessible without changing 
 
 it('keeps a filtered nonempty group protected by the archive confirmation', () => {
   const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
-  useSessionStore.setState(state => ({
-    tabs: state.tabs.map(tab => tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab),
+  useSessionStore.setState((state) => ({
+    tabs: state.tabs.map((tab) => (tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab)),
     groups: [{ id: 'group-a', title: 'Group', collapsed: false }],
   }));
   render(<PanelTabs />);
@@ -289,9 +343,10 @@ it('opens the panel menu on a blank-area right click even while the native menu 
 
 it('keeps an empty session drop zone expandable and previews grouped tabs outside singleton rows', () => {
   const moveTab = vi.fn();
-  useSessionStore.setState(state => ({
-    tabs: state.tabs.map(tab => tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab),
-    groups: [{ id: 'group-a', title: 'Group', collapsed: false }], moveTab,
+  useSessionStore.setState((state) => ({
+    tabs: state.tabs.map((tab) => (tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab)),
+    groups: [{ id: 'group-a', title: 'Group', collapsed: false }],
+    moveTab,
   }));
   const { container } = render(<PanelTabs />);
   const zone = container.querySelector<HTMLElement>('[data-reorder-zone="ungrouped"]')!;
@@ -308,8 +363,8 @@ it('keeps an empty session drop zone expandable and previews grouped tabs outsid
 });
 
 it('gives a collapsed group the tab surface only while it owns the active tab, is hovered or dragged', () => {
-  useSessionStore.setState(state => ({
-    tabs: state.tabs.map(tab => tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab),
+  useSessionStore.setState((state) => ({
+    tabs: state.tabs.map((tab) => (tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab)),
     activeId: 'ai-history',
     groups: [{ id: 'group-a', title: 'Group', collapsed: true }],
   }));
@@ -331,8 +386,8 @@ it('gives a collapsed group the tab surface only while it owns the active tab, i
 });
 
 it('treats expanded groups as inactive cards and only folds them visually while dragged', () => {
-  useSessionStore.setState(state => ({
-    tabs: state.tabs.map(tab => tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab),
+  useSessionStore.setState((state) => ({
+    tabs: state.tabs.map((tab) => (tab.kind === 'session' ? { ...tab, groupId: 'group-a' } : tab)),
     activeId: 'local',
     groups: [{ id: 'group-a', title: 'Group', collapsed: false }],
   }));

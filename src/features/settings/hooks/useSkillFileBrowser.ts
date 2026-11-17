@@ -23,29 +23,35 @@ export function useSkillFileBrowser({ skillName, files }: UseSkillFileBrowserOpt
     setError('');
   }, [filesKey, skillName]);
 
-  const read = useCallback(async (path: string) => {
-    setContent('');
-    setError('');
-    try {
-      setContent(await readSkillFile(skillName, path));
-    } catch (cause) {
-      setError(String((cause as Error)?.message ?? cause));
-    }
-  }, [skillName]);
+  const read = useCallback(
+    async (path: string) => {
+      setContent('');
+      setError('');
+      try {
+        setContent(await readSkillFile(skillName, path));
+      } catch (cause) {
+        setError(String((cause as Error)?.message ?? cause));
+      }
+    },
+    [skillName],
+  );
 
-  const pick = useCallback(async (node: FileNode) => {
-    if (node.isDir) {
-      setOpen((previous) => {
-        const next = new Set(previous);
-        if (next.has(node.path)) next.delete(node.path);
-        else next.add(node.path);
-        return next;
-      });
-      return;
-    }
-    setSelected(node.path);
-    await read(node.path);
-  }, [read]);
+  const pick = useCallback(
+    async (node: FileNode) => {
+      if (node.isDir) {
+        setOpen((previous) => {
+          const next = new Set(previous);
+          if (next.has(node.path)) next.delete(node.path);
+          else next.add(node.path);
+          return next;
+        });
+        return;
+      }
+      setSelected(node.path);
+      await read(node.path);
+    },
+    [read],
+  );
 
   const reload = useCallback(() => {
     if (selected) void read(selected);

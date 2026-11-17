@@ -8,7 +8,12 @@ describe('notification surface', () => {
     vi.spyOn(document, 'hasFocus').mockReturnValue(true);
     useToastStore.setState({ toasts: [], timers: {}, background: false });
   });
-  afterEach(() => { cleanup(); vi.clearAllTimers(); vi.useRealTimers(); vi.restoreAllMocks(); });
+  afterEach(() => {
+    cleanup();
+    vi.clearAllTimers();
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
 
   it('keeps the notification accessible and dismissible after its appearance changes', () => {
     useToastStore.getState().addToast('终端尚未连接', 'error', 0);
@@ -31,7 +36,12 @@ describe('notification surface', () => {
   });
 
   it('retains a keyboard-focused notification after the pointer leaves and restores focus on Escape', () => {
-    render(<><button>Source</button><ToastContainer /></>);
+    render(
+      <>
+        <button>Source</button>
+        <ToastContainer />
+      </>,
+    );
     act(() => useToastStore.getState().addToast('Keyboard notification', 'info', 1000));
     const source = screen.getByRole('button', { name: 'Source' });
     source.focus();

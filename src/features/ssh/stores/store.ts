@@ -12,8 +12,14 @@ import { safeJsonParse, safeLocalStorageGet, safeLocalStorageSet } from '@utils/
 const ORDER_KEY = 'vrykell-ssh-order';
 function applySavedOrder(connections: SshConnection[]): SshConnection[] {
   const saved = safeJsonParse<unknown>(safeLocalStorageGet(ORDER_KEY) ?? '');
-  const rank = new Map(Array.isArray(saved) ? saved.filter((id): id is string => typeof id === 'string').map((id, index) => [id, index]) : []);
-  return rank.size ? [...connections].sort((first, second) => (rank.get(first.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(second.id) ?? Number.MAX_SAFE_INTEGER)) : connections;
+  const rank = new Map(
+    Array.isArray(saved) ? saved.filter((id): id is string => typeof id === 'string').map((id, index) => [id, index]) : [],
+  );
+  return rank.size
+    ? [...connections].sort(
+        (first, second) => (rank.get(first.id) ?? Number.MAX_SAFE_INTEGER) - (rank.get(second.id) ?? Number.MAX_SAFE_INTEGER),
+      )
+    : connections;
 }
 
 /**
@@ -54,7 +60,10 @@ export const useSshStore = create<SshState>((set, get) => {
             if (!reloadRequested) set({ connections: [], loaded: true });
           }
         } while (reloadRequested);
-      })().finally(() => { pendingLoad = undefined; set({ loading: false }); });
+      })().finally(() => {
+        pendingLoad = undefined;
+        set({ loading: false });
+      });
       return pendingLoad;
     },
 
@@ -81,7 +90,7 @@ export const useSshStore = create<SshState>((set, get) => {
       const [moved] = connections.splice(from, 1);
       connections.splice(Math.max(0, Math.min(to, connections.length)), 0, moved!);
       set({ connections });
-      safeLocalStorageSet(ORDER_KEY, JSON.stringify(connections.map(connection => connection.id)));
+      safeLocalStorageSet(ORDER_KEY, JSON.stringify(connections.map((connection) => connection.id)));
     },
   };
 });

@@ -10,10 +10,10 @@ import { usePasteConfirm } from '@features/terminal/hooks/usePasteConfirm';
 export default function PasteConfirmHost() {
   const { request, confirm, cancel } = usePasteConfirm();
   if (!request) return null;
-  const message = t(
-    request.reason === 'lines' ? 'terminal.clipboard.confirmPasteLines' : 'terminal.clipboard.confirmPasteSize',
-    { lines: request.lines, chars: request.chars },
-  );
+  const message = t(request.reason === 'lines' ? 'terminal.clipboard.confirmPasteLines' : 'terminal.clipboard.confirmPasteSize', {
+    lines: request.lines,
+    chars: request.chars,
+  });
   return (
     <ConfirmDialog
       open

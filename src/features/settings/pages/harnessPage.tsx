@@ -43,13 +43,15 @@ export default function HarnessPage() {
   const reload = useCallback(() => {
     setLoadError('');
     void acpHarnesses()
-      .then(entries => {
-        useUsageSources.getState().replace(entries.map(entry => entry.name));
-        setList(entries.map(entry => ({ ...entry })));
+      .then((entries) => {
+        useUsageSources.getState().replace(entries.map((entry) => entry.name));
+        setList(entries.map((entry) => ({ ...entry })));
       })
       .catch((error: unknown) => setLoadError(String(error)));
   }, []);
-  useEffect(() => { reload(); }, [reload]);
+  useEffect(() => {
+    reload();
+  }, [reload]);
 
   // Ask once per command whether the program exists, so a preset that cannot run says so before the
   // user presses anything: most presets need a program the machine may not have.
@@ -77,7 +79,7 @@ export default function HarnessPage() {
     try {
       await saveSettings(async () => {
         await acpHarnessSave(next);
-        useUsageSources.getState().replace(next.map(entry => entry.name));
+        useUsageSources.getState().replace(next.map((entry) => entry.name));
         setList(next);
         saved = true;
       });
@@ -88,7 +90,7 @@ export default function HarnessPage() {
   };
 
   const test = async (name: string) => {
-    setProbeErrors(current => ({ ...current, [name]: '' }));
+    setProbeErrors((current) => ({ ...current, [name]: '' }));
     setProbe((current) => ({ ...current, [name]: t('Testing…') }));
     try {
       const agent: AgentDescription = await acpHandshake(name);
@@ -98,8 +100,8 @@ export default function HarnessPage() {
         [name]: `${info?.title || info?.name || name}${info?.version ? ` ${info.version}` : ''} · ACP v${agent.protocolVersion ?? '?'}`,
       }));
     } catch (error) {
-      setProbe(current => ({ ...current, [name]: '' }));
-      setProbeErrors(current => ({ ...current, [name]: String(error) }));
+      setProbe((current) => ({ ...current, [name]: '' }));
+      setProbeErrors((current) => ({ ...current, [name]: String(error) }));
     }
   };
 
@@ -112,13 +114,24 @@ export default function HarnessPage() {
 
   return (
     <SettingsGroup title={t('ACP')}>
-      <Field layout="stacked" title={t('Servers')}
-        description={t('A harness is a program you add to the list. Adding it is the authorization: it runs with your account, like a command typed into the terminal. Third-party programs are not bundled — install them yourself and follow their licences.')}>
-        {loadError && <ErrorBox title={t('Could not load servers')} details={loadError}
-          actions={<OutlineButton onClick={reload}>{t('Retry')}</OutlineButton>} />}
+      <Field
+        layout="stacked"
+        title={t('Servers')}
+        description={t(
+          'A harness is a program you add to the list. Adding it is the authorization: it runs with your account, like a command typed into the terminal. Third-party programs are not bundled — install them yourself and follow their licences.',
+        )}>
+        {loadError && (
+          <ErrorBox
+            title={t('Could not load servers')}
+            details={loadError}
+            actions={<OutlineButton onClick={reload}>{t('Retry')}</OutlineButton>}
+          />
+        )}
         {list === null && !loadError && <span style={{ color: 'var(--text-muted)' }}>{t('Loading…')}</span>}
         {problems.length > 0 && (
-          <ErrorBox compact testId="harness-problems">{problems.join(' · ')}</ErrorBox>
+          <ErrorBox compact testId="harness-problems">
+            {problems.join(' · ')}
+          </ErrorBox>
         )}
         {list?.length === 0 && (
           <span data-testid="harness-none" style={{ color: 'var(--text-muted)' }}>
@@ -128,84 +141,137 @@ export default function HarnessPage() {
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {list?.map((harness, index) => (
             <div key={`${harness.name}-${index}`} className="acp-row-item">
-            <div data-testid={`harness-row-${index}`} className="acp-row">
-              <HarnessBadge name={harness.name} size={30} />
-              <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
-                  <span style={{
-                    fontWeight: 'var(--fw-semibold)', minWidth: 0,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                    opacity: harness.enabled ? 1 : 0.6,
-                  }}>
-                    {harness.name}
+              <div data-testid={`harness-row-${index}`} className="acp-row">
+                <HarnessBadge name={harness.name} size={30} />
+                <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                    <span
+                      style={{
+                        fontWeight: 'var(--fw-semibold)',
+                        minWidth: 0,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        opacity: harness.enabled ? 1 : 0.6,
+                      }}>
+                      {harness.name}
+                    </span>
+                    {installed[harness.command.trim()] === false && (
+                      <span
+                        data-testid={`harness-missing-${index}`}
+                        style={{
+                          color: 'var(--text-secondary)',
+                          fontSize: 'var(--fs-micro)',
+                          padding: '1px 6px',
+                          borderRadius: 4,
+                          background: 'var(--hover)',
+                          flexShrink: 0,
+                        }}>
+                        {t('Not installed on PATH')}
+                      </span>
+                    )}
+                    {probe[harness.name] && (
+                      <span
+                        data-testid={`harness-probe-${index}`}
+                        style={{
+                          color: 'var(--text-muted)',
+                          fontSize: 'var(--fs-micro)',
+                          minWidth: 0,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}>
+                        {probe[harness.name]}
+                      </span>
+                    )}
                   </span>
-                  {installed[harness.command.trim()] === false && (
-                    <span data-testid={`harness-missing-${index}`} style={{
-                      color: 'var(--text-secondary)', fontSize: 'var(--fs-micro)',
-                      padding: '1px 6px', borderRadius: 4, background: 'var(--hover)', flexShrink: 0,
+                  <span
+                    data-tip={t('The command line this harness runs')}
+                    style={{
+                      color: 'var(--text-muted)',
+                      fontSize: 'var(--fs-micro)',
+                      marginTop: 2,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
                     }}>
-                      {t('Not installed on PATH')}
-                    </span>
-                  )}
-                  {probe[harness.name] && (
-                    <span data-testid={`harness-probe-${index}`} style={{
-                      color: 'var(--text-muted)', fontSize: 'var(--fs-micro)', minWidth: 0,
-                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    {harness.command} {harness.args.join(' ')}
+                  </span>
+                </span>
+                <div className="settings-row-actions">
+                  <button
+                    data-subtle
+                    data-testid={`harness-connect-${index}`}
+                    disabled={!harness.enabled || busy}
+                    onClick={() => {
+                      // Settings render as a workspace screen over the tabs: leaving it open would hide
+                      // the session this button just opened.
+                      useUiStore.getState().setSettingsOpen(false);
+                      useSessionStore.getState().openHarnessTab(harness.name);
+                    }}
+                    style={{
+                      padding: '5px 12px',
+                      border: 0,
+                      borderRadius: 'var(--radius-inner)',
+                      flexShrink: 0,
+                      cursor: harness.enabled ? 'pointer' : 'default',
+                      background: harness.enabled ? 'var(--primary-button-bg)' : 'transparent',
+                      color: harness.enabled ? 'var(--primary-button-text)' : 'var(--text-muted)',
+                      font: `${'var(--fs-caption)'} var(--font-ui)`,
                     }}>
-                      {probe[harness.name]}
-                    </span>
-                  )}
-                </span>
-                <span data-tip={t('The command line this harness runs')} style={{
-                  color: 'var(--text-muted)', fontSize: 'var(--fs-micro)', marginTop: 2,
-                  overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                }}>
-                  {harness.command} {harness.args.join(' ')}
-                </span>
-              </span>
-              <div className="settings-row-actions">
-              <button data-subtle data-testid={`harness-connect-${index}`} disabled={!harness.enabled || busy}
-                onClick={() => {
-                  // Settings render as a workspace screen over the tabs: leaving it open would hide
-                  // the session this button just opened.
-                  useUiStore.getState().setSettingsOpen(false);
-                  useSessionStore.getState().openHarnessTab(harness.name);
-                }} style={{
-                  padding: '5px 12px', border: 0, borderRadius: 'var(--radius-inner)', flexShrink: 0,
-                  cursor: harness.enabled ? 'pointer' : 'default',
-                  background: harness.enabled ? 'var(--primary-button-bg)' : 'transparent',
-                  color: harness.enabled ? 'var(--primary-button-text)' : 'var(--text-muted)',
-                  font: `${'var(--fs-caption)'} var(--font-ui)`,
-                }}>{t('Connect')}</button>
-              <IconButton data-testid={`harness-test-${index}`}
-                aria-label={t('Test connection')} data-tip={t('Test connection')} onClick={() => void test(harness.name)}>
-                <RefreshCw size={16} />
-              </IconButton>
-              <IconButton data-testid={`harness-edit-${index}`}
-                disabled={busy}
-                aria-label={t('Edit server')} data-tip={t('Edit server')} onClick={() => setEditing({ index })}>
-                <Settings size={16} />
-              </IconButton>
-              <IconButton tone="danger" data-testid={`harness-remove-${index}`}
-                disabled={busy}
-                aria-label={t('Remove')} data-tip={t('Remove')} onClick={() => setConfirmRemove(index)}>
-                <Trash2 size={16} />
-              </IconButton>
+                    {t('Connect')}
+                  </button>
+                  <IconButton
+                    data-testid={`harness-test-${index}`}
+                    aria-label={t('Test connection')}
+                    data-tip={t('Test connection')}
+                    onClick={() => void test(harness.name)}>
+                    <RefreshCw size={16} />
+                  </IconButton>
+                  <IconButton
+                    data-testid={`harness-edit-${index}`}
+                    disabled={busy}
+                    aria-label={t('Edit server')}
+                    data-tip={t('Edit server')}
+                    onClick={() => setEditing({ index })}>
+                    <Settings size={16} />
+                  </IconButton>
+                  <IconButton
+                    tone="danger"
+                    data-testid={`harness-remove-${index}`}
+                    disabled={busy}
+                    aria-label={t('Remove')}
+                    data-tip={t('Remove')}
+                    onClick={() => setConfirmRemove(index)}>
+                    <Trash2 size={16} />
+                  </IconButton>
+                </div>
               </div>
-            </div>
-            {probeErrors[harness.name] && <ErrorBox title={t('Connection failed')} details={probeErrors[harness.name]}
-              actions={<OutlineButton onClick={() => void test(harness.name)}>{t('Retry')}</OutlineButton>} />}
+              {probeErrors[harness.name] && (
+                <ErrorBox
+                  title={t('Connection failed')}
+                  details={probeErrors[harness.name]}
+                  actions={<OutlineButton onClick={() => void test(harness.name)}>{t('Retry')}</OutlineButton>}
+                />
+              )}
             </div>
           ))}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
-          <OutlineButton data-testid="harness-add" disabled={busy || list === null} onClick={() => setEditing({ index: null })}
+          <OutlineButton
+            data-testid="harness-add"
+            disabled={busy || list === null}
+            onClick={() => setEditing({ index: null })}
             style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
             <Plus size={12} /> {t('Add server')}
           </OutlineButton>
           <span style={{ flex: 1 }} />
-          <OutlineButton data-testid="harness-save" disabled={busy || list === null} onClick={() => list && void persist(list)}>{t('Save the list')}</OutlineButton>
-          <IconButton disabled={busy} aria-label={t('Reload')} data-tip={t('Reload')} onClick={reload}><RefreshCw size={16} /></IconButton>
+          <OutlineButton data-testid="harness-save" disabled={busy || list === null} onClick={() => list && void persist(list)}>
+            {t('Save the list')}
+          </OutlineButton>
+          <IconButton disabled={busy} aria-label={t('Reload')} data-tip={t('Reload')} onClick={reload}>
+            <RefreshCw size={16} />
+          </IconButton>
         </div>
         {list?.some((entry) => installed[entry.command] === false) && (
           <span style={{ color: 'var(--text-secondary)', fontSize: 'var(--fs-caption)' }}>
@@ -214,13 +280,18 @@ export default function HarnessPage() {
         )}
       </Field>
 
-      <Field layout="stacked" title={t('Presets')}
+      <Field
+        layout="stacked"
+        title={t('Presets')}
         description={t('Fills in the command line a harness is usually started with. The program itself still has to be installed.')}>
         <div data-testid="harness-presets" style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {HARNESS_PRESETS.map((preset) => (
-            <OutlineButton key={preset.name} data-testid={`harness-preset-${preset.name}`}
+            <OutlineButton
+              key={preset.name}
+              data-testid={`harness-preset-${preset.name}`}
               disabled={busy || list === null}
-              data-tip={`${preset.command} ${preset.args.join(' ')}`} data-tip-description={t(preset.hint)}
+              data-tip={`${preset.command} ${preset.args.join(' ')}`}
+              data-tip-description={t(preset.hint)}
               onClick={() => list && void persist(upsertPreset(list, preset))}>
               <HarnessBadge name={preset.name} size={19} /> {preset.name}
             </OutlineButton>
@@ -228,30 +299,36 @@ export default function HarnessPage() {
         </div>
       </Field>
 
-      <Field title={t('Approvals')}
-        description={t('When a harness asks to run something, the request appears as a card in its conversation and waits for your answer; nothing a harness asks for runs unnoticed.')}>
-        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>{t('An unanswered card is refused after ten minutes.')}</span>
+      <Field
+        title={t('Approvals')}
+        description={t(
+          'When a harness asks to run something, the request appears as a card in its conversation and waits for your answer; nothing a harness asks for runs unnoticed.',
+        )}>
+        <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-caption)' }}>
+          {t('An unanswered card is refused after ten minutes.')}
+        </span>
       </Field>
 
       <HarnessDialog
         open={editing !== null}
-        entry={editing?.index != null ? list?.[editing.index] ?? null : null}
+        entry={editing?.index != null ? (list?.[editing.index] ?? null) : null}
         onClose={() => setEditing(null)}
         onSave={writeEntry}
       />
       <ConfirmDialog
         open={confirmRemove !== null}
         title={t('Remove server')}
-        message={confirmRemove !== null
-          ? t('Remove {{name}} from the list?', { name: list?.[confirmRemove]?.name ?? '' })
-          : ''}
+        message={confirmRemove !== null ? t('Remove {{name}} from the list?', { name: list?.[confirmRemove]?.name ?? '' }) : ''}
         confirmLabel={t('Remove')}
         cancelLabel={t('Cancel')}
         danger
         onConfirm={() => {
           const at = confirmRemove;
           if (at === null) return;
-          if (list) void persist(list.filter((_entry, index) => index !== at)).then(saved => { if (saved) setConfirmRemove(null); });
+          if (list)
+            void persist(list.filter((_entry, index) => index !== at)).then((saved) => {
+              if (saved) setConfirmRemove(null);
+            });
         }}
         onCancel={() => setConfirmRemove(null)}
       />

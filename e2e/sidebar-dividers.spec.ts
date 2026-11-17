@@ -5,22 +5,40 @@ async function pinCommandTitle(page: Page) {
   await page.getByPlaceholder(/输入命令/).fill('echo divider');
   await page.getByPlaceholder(/输入命令/).press('Enter');
   await page.evaluate(() => {
-    const scope = window as unknown as { __vrykellSessionRegistry: {
-      controllers: Map<string, { seed(blocks: import('../src/features/terminal/services/pipeline/termBlock').TermBlock[]): void }>;
-    } };
-    [...scope.__vrykellSessionRegistry.controllers.values()][0]!.seed([{
-      id: 'divider-output', command: 'echo divider', cwd: '/work', status: 'done', exitCode: 0,
-      startedAt: 1000, endedAt: 1200, wasLongRunning: false, linesTruncated: 0,
-      outputText: 'divider output\n'.repeat(100), outputHtml: '', outputRaw: '',
-    }]);
+    const scope = window as unknown as {
+      __vrykellSessionRegistry: {
+        controllers: Map<string, { seed(blocks: import('../src/features/terminal/services/pipeline/termBlock').TermBlock[]): void }>;
+      };
+    };
+    [...scope.__vrykellSessionRegistry.controllers.values()][0]!.seed([
+      {
+        id: 'divider-output',
+        command: 'echo divider',
+        cwd: '/work',
+        status: 'done',
+        exitCode: 0,
+        startedAt: 1000,
+        endedAt: 1200,
+        wasLongRunning: false,
+        linesTruncated: 0,
+        outputText: 'divider output\n'.repeat(100),
+        outputHtml: '',
+        outputRaw: '',
+      },
+    ]);
   });
-  await page.locator('[data-testid^="terminal-scroll-"]').first().evaluate(element => { element.scrollTop = 140; });
+  await page
+    .locator('[data-testid^="terminal-scroll-"]')
+    .first()
+    .evaluate((element) => {
+      element.scrollTop = 140;
+    });
   await expect(page.getByTestId('pinned-command')).toBeVisible();
 }
 
 async function expectUniformDrag(page: Page, mode: string, width: number) {
   for (const id of ['files', 'chat']) {
-    if (!await page.getByTestId(`resize-handle-${id}`).isVisible()) await page.locator(`[data-dock-btn="${id}"]`).click();
+    if (!(await page.getByTestId(`resize-handle-${id}`).isVisible())) await page.locator(`[data-dock-btn="${id}"]`).click();
     const handle = page.getByTestId(`resize-handle-${id}`);
     const bounds = (await handle.boundingBox())!;
     const grabX = bounds.x + bounds.width / 2 + 2;
@@ -31,35 +49,45 @@ async function expectUniformDrag(page: Page, mode: string, width: number) {
     const dragBounds = (await handle.boundingBox())!;
     expect((await handle.locator('..').boundingBox())!.width).toBe(panelWidth + 35);
     const line = handle.locator('[data-resize-line]');
-    await expect.poll(() => line.evaluate(element => (element as HTMLElement).style.backgroundColor)).toBe('var(--border-strong)');
-    const color = await line.evaluate(element => getComputedStyle(element).backgroundColor);
+    await expect.poll(() => line.evaluate((element) => (element as HTMLElement).style.backgroundColor)).toBe('var(--border-strong)');
+    const color = await line.evaluate((element) => getComputedStyle(element).backgroundColor);
     const lineBounds = (await line.boundingBox())!;
     const png = await page.screenshot({ path: test.info().outputPath(`${mode}-${id}-${width}-divider.png`), animations: 'disabled' });
-    const widths = await page.evaluate(async ({ png, bounds, lineBounds, color }) => {
-      const image = new Image();
-      image.src = `data:image/png;base64,${png}`;
-      await image.decode();
-      const canvas = document.createElement('canvas');
-      canvas.width = image.width;
-      canvas.height = image.height;
-      const context = canvas.getContext('2d')!;
-      context.drawImage(image, 0, 0);
-      return [20, 120, bounds.height / 2, bounds.height - 30].map(offset => {
-        // The divider is one CSS pixel wide; scan its span plus one device pixel on
-        // either side, because fractional scales blend the edge into the surface.
-        let brightest = [0, 0, 0];
-        let brightestSum = -1;
-        for (let x = Math.floor(lineBounds.x * devicePixelRatio) - 1; x <= Math.ceil((lineBounds.x + lineBounds.width) * devicePixelRatio); x++) {
-          const [r, g, b] = context.getImageData(x, Math.floor((bounds.y + offset) * devicePixelRatio), 1, 1).data;
-          if (r + g + b > brightestSum) {
-            brightestSum = r + g + b;
-            brightest = [r, g, b];
+    const widths = await page.evaluate(
+      async ({ png, bounds, lineBounds, color }) => {
+        const image = new Image();
+        image.src = `data:image/png;base64,${png}`;
+        await image.decode();
+        const canvas = document.createElement('canvas');
+        canvas.width = image.width;
+        canvas.height = image.height;
+        const context = canvas.getContext('2d')!;
+        context.drawImage(image, 0, 0);
+        return [20, 120, bounds.height / 2, bounds.height - 30].map((offset) => {
+          // The divider is one CSS pixel wide; scan its span plus one device pixel on
+          // either side, because fractional scales blend the edge into the surface.
+          let brightest = [0, 0, 0];
+          let brightestSum = -1;
+          for (
+            let x = Math.floor(lineBounds.x * devicePixelRatio) - 1;
+            x <= Math.ceil((lineBounds.x + lineBounds.width) * devicePixelRatio);
+            x++
+          ) {
+            const [r, g, b] = context.getImageData(x, Math.floor((bounds.y + offset) * devicePixelRatio), 1, 1).data;
+            if (r + g + b > brightestSum) {
+              brightestSum = r + g + b;
+              brightest = [r, g, b];
+            }
           }
-        }
-        return brightest;
-      });
-    }, { png: png.toString('base64'), bounds: dragBounds, lineBounds, color });
-    const expected = color.match(/[\d.]+/g)!.slice(0, 3).map(Number);
+          return brightest;
+        });
+      },
+      { png: png.toString('base64'), bounds: dragBounds, lineBounds, color },
+    );
+    const expected = color
+      .match(/[\d.]+/g)!
+      .slice(0, 3)
+      .map(Number);
     const channelDrift = (sample: number[], reference: number[]) =>
       Math.max(...sample.map((channel, index) => Math.abs(channel - reference[index])));
     const [first, ...rest] = widths;
@@ -67,10 +95,12 @@ async function expectUniformDrag(page: Page, mode: string, width: number) {
     for (const sample of rest) {
       expect(channelDrift(sample, first), `${mode} ${id} at ${width}`).toBeLessThanOrEqual(8);
     }
-    expect(await handle.evaluate(element => {
-      const bounds = element.getBoundingClientRect();
-      return [20, 120].every(offset => element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + offset)));
-    })).toBe(true);
+    expect(
+      await handle.evaluate((element) => {
+        const bounds = element.getBoundingClientRect();
+        return [20, 120].every((offset) => element.contains(document.elementFromPoint(bounds.x + bounds.width / 2, bounds.y + offset)));
+      }),
+    ).toBe(true);
     await page.mouse.move(grabX, bounds.y + 150);
     await page.mouse.up();
   }
@@ -88,7 +118,7 @@ for (const density of [1, 1.25, 1.5, 2]) {
       await pinCommandTitle(page);
       for (const mode of ['terminal', 'editor', 'diff']) {
         await page.setViewportSize({ width: 1240, height: 800 });
-        if (!await page.getByTestId('resize-handle-chat').isVisible()) await page.locator('[data-dock-btn="chat"]').click();
+        if (!(await page.getByTestId('resize-handle-chat').isVisible())) await page.locator('[data-dock-btn="chat"]').click();
         if (mode !== 'terminal') {
           await page.locator('[data-dock-btn="git"]').click();
           const row = page.getByTestId('git-unstaged-src/main.ts');

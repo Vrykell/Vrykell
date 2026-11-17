@@ -48,8 +48,7 @@ function reset() {
   useSessionStore.setState({ tabs: [mkTab('t1')], activeId: 't1' });
 }
 
-const doneBlock = (id: string, command: string) =>
-  ({ id, command, status: 'done' as const }) as never;
+const doneBlock = (id: string, command: string) => ({ id, command, status: 'done' as const }) as never;
 
 function setThreeDoneBlocks(tabId: string) {
   useBlockStore.setState({
@@ -78,11 +77,7 @@ describe('automatic title trigger', () => {
     reset();
     useBlockStore.setState({
       byTab: {
-        't1#0': [
-          doneBlock('b1', 'git status'),
-          doneBlock('b2', 'cargo test'),
-          doneBlock('b3', 'git push'),
-        ],
+        't1#0': [doneBlock('b1', 'git status'), doneBlock('b2', 'cargo test'), doneBlock('b3', 'git push')],
       },
     });
     expect(await maybeAutoTitle('t1')).toBe(true);

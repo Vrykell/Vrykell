@@ -8,11 +8,23 @@ it('keeps header consumers stable while their parent resizes', () => {
   const renderHeader = vi.fn();
   const Header = memo(function Header() {
     renderHeader();
-    return <WorkspaceHeader><button>Header action</button></WorkspaceHeader>;
+    return (
+      <WorkspaceHeader>
+        <button>Header action</button>
+      </WorkspaceHeader>
+    );
   });
   function Layout() {
     const [width, setWidth] = useState(200);
-    return <WorkspaceHeaderProvider><button onClick={() => setWidth(value => value + 10)}>Resize</button><div style={{ width }}><WorkspaceHeaderSlot /><Header /></div></WorkspaceHeaderProvider>;
+    return (
+      <WorkspaceHeaderProvider>
+        <button onClick={() => setWidth((value) => value + 10)}>Resize</button>
+        <div style={{ width }}>
+          <WorkspaceHeaderSlot />
+          <Header />
+        </div>
+      </WorkspaceHeaderProvider>
+    );
   }
   render(<Layout />);
   const before = renderHeader.mock.calls.length;

@@ -2,7 +2,8 @@ import { expect, test } from '@playwright/test';
 import { setupTauriMock } from './tauri-mock';
 
 test('bounds resource titles while preserving full names and selection', async ({ page }, info) => {
-  await setupTauriMock(page); await page.goto('/');
+  await setupTauriMock(page);
+  await page.goto('/');
   await expect(page.locator('[data-terminal-input]:visible')).toBeVisible();
   await page.getByTestId('workspace-area-ai').click();
   await page.getByTestId('ai-new-conversation').click();
@@ -11,9 +12,9 @@ test('bounds resource titles while preserving full names and selection', async (
   expect((await page.getByRole('menu', { name: '全部工作区标签' }).boundingBox())!.width).toBeLessThan(320);
   await page.keyboard.press('Escape');
   const title = 'Review saved facts and pending memories '.repeat(3).slice(0, 80).trim();
-  await page.evaluate(async title => {
+  await page.evaluate(async (title) => {
     const chatPath = '/src/features/chat/stores/chat.ts';
-    const { useChatStore } = await import(chatPath) as typeof import('../src/features/chat/stores/chat');
+    const { useChatStore } = (await import(chatPath)) as typeof import('../src/features/chat/stores/chat');
     const id = useChatStore.getState().activeConversationId;
     useChatStore.getState().renameConversation(id, title);
   }, title);
@@ -27,7 +28,7 @@ test('bounds resource titles while preserving full names and selection', async (
     const label = item.locator('[data-menu-label]');
     await expect(label).toHaveCSS('white-space', 'nowrap');
     await expect(label).toHaveCSS('text-overflow', 'ellipsis');
-    expect(await label.evaluate(element => element.scrollWidth > element.clientWidth)).toBe(true);
+    expect(await label.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(true);
     await page.screenshot({ path: info.outputPath(`resource-menu-${width}.png`) });
     if (width === 500) {
       await item.click();

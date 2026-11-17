@@ -2,17 +2,19 @@ import { useLayoutEffect, useRef, type RefObject } from 'react';
 
 let activeMenu: { id: symbol; close: () => void } | null = null;
 
-export function closeActiveMenu() { activeMenu?.close(); }
+export function closeActiveMenu() {
+  activeMenu?.close();
+}
 
 /** Controlled floating content remains part of the menu that owns its trigger. */
 function controlsPopup(root: HTMLElement | null, id: string): boolean {
-  return Array.from(root?.querySelectorAll('[aria-controls]') ?? [])
-    .some(control => control.getAttribute('aria-controls')?.split(/\s+/).includes(id));
+  return Array.from(root?.querySelectorAll('[aria-controls]') ?? []).some((control) =>
+    control.getAttribute('aria-controls')?.split(/\s+/).includes(id),
+  );
 }
 
 export function hasOwnedListbox(root: HTMLElement | null): boolean {
-  return Array.from(document.querySelectorAll<HTMLElement>('[role="listbox"][id]'))
-    .some(listbox => controlsPopup(root, listbox.id));
+  return Array.from(document.querySelectorAll<HTMLElement>('[role="listbox"][id]')).some((listbox) => controlsPopup(root, listbox.id));
 }
 
 /** Independent action menus replace each other, including right-click openings. */

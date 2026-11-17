@@ -5,8 +5,20 @@ import { describe, it, expect } from 'vitest';
 import type { TermBlock } from '../services/pipeline/termBlock';
 import { useBlockStore, selectBlocks } from '@features/terminal/stores/blocks';
 
-const mk = (id: string): TermBlock =>
-  ({ id, command: '', status: 'done', exitCode: 0, startedAt: 1, endedAt: 2, cwd: '', outputHtml: '', outputText: '', outputRaw: '', linesTruncated: 0, wasLongRunning: false });
+const mk = (id: string): TermBlock => ({
+  id,
+  command: '',
+  status: 'done',
+  exitCode: 0,
+  startedAt: 1,
+  endedAt: 2,
+  cwd: '',
+  outputHtml: '',
+  outputText: '',
+  outputRaw: '',
+  linesTruncated: 0,
+  wasLongRunning: false,
+});
 
 describe('blocks store', () => {
   it('addBlock / updateBlock / setBlocks / clearBlocks / dropTab', () => {

@@ -4,7 +4,10 @@ import { check } from '@tauri-apps/plugin-updater';
 
 vi.mock('@tauri-apps/api/core', () => ({ isTauri: () => true }));
 vi.mock('@tauri-apps/plugin-updater', () => ({ check: vi.fn(async () => null) }));
-afterEach(() => { vi.unstubAllEnvs(); vi.clearAllMocks(); });
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.clearAllMocks();
+});
 
 it('never checks for updates in portable builds', async () => {
   vi.stubEnv('VITE_DISABLE_UPDATES', 'true');

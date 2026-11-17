@@ -31,8 +31,10 @@ beforeEach(() => {
 
 it('exposes ordered handles and routes activation through the owning document', () => {
   const { result } = renderHook(() => useCodeWorkspaceTabs());
-  expect(result.current.handles.map(handle => handle.id)).toEqual([
-    `file:${editorFileKey(first)}`, `file:${editorFileKey(second)}`, 'diff:cmp',
+  expect(result.current.handles.map((handle) => handle.id)).toEqual([
+    `file:${editorFileKey(first)}`,
+    `file:${editorFileKey(second)}`,
+    'diff:cmp',
   ]);
   act(() => result.current.onSelect(`file:${editorFileKey(second)}`));
   expect(openEditorFile).toHaveBeenCalledWith(second);
@@ -49,10 +51,12 @@ it('routes close through the same file and comparison guards', () => {
 });
 
 it('moves using the currently projected ids so stale saved ids never leak in', () => {
-  useWorkbenchStore.getState().update(state => ({ ...state, order: { code: ['stale', 'tab:diff:cmp'] } }));
+  useWorkbenchStore.getState().update((state) => ({ ...state, order: { code: ['stale', 'tab:diff:cmp'] } }));
   const { result } = renderHook(() => useCodeWorkspaceTabs());
   act(() => result.current.onMove('diff:cmp', `file:${editorFileKey(first)}`, false));
   expect(workspaceStripEntities(useWorkbenchStore.getState().snapshot, 'code')).toEqual([
-    'tab:diff:cmp', `tab:file:${editorFileKey(first)}`, `tab:file:${editorFileKey(second)}`,
+    'tab:diff:cmp',
+    `tab:file:${editorFileKey(first)}`,
+    `tab:file:${editorFileKey(second)}`,
   ]);
 });

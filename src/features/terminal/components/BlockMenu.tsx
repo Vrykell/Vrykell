@@ -25,9 +25,7 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
   const ref = useRef<HTMLDivElement>(null);
   const navigation = useListNavigationMode(true);
   useExclusiveMenu(ref, onClose);
-  const preferredPosition = anchor.kind === 'pointer'
-    ? { left: anchor.x, top: anchor.y }
-    : { left: anchor.left, top: anchor.top };
+  const preferredPosition = anchor.kind === 'pointer' ? { left: anchor.x, top: anchor.y } : { left: anchor.left, top: anchor.top };
   const [position, setPosition] = useState(preferredPosition);
 
   useLayoutEffect(() => {
@@ -35,11 +33,13 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
       const menu = ref.current;
       if (!menu) return;
       const rect = menu.getBoundingClientRect();
-      setPosition(clampMenuPosition(
-        preferredPosition,
-        { width: rect.width, height: rect.height },
-        { width: window.innerWidth, height: window.innerHeight },
-      ));
+      setPosition(
+        clampMenuPosition(
+          preferredPosition,
+          { width: rect.width, height: rect.height },
+          { width: window.innerWidth, height: window.innerHeight },
+        ),
+      );
     };
 
     updatePosition();
@@ -65,8 +65,10 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
       else if (event.key === 'ArrowUp') next = (index - 1 + items.length) % items.length;
       else if (event.key === 'Home') next = 0;
       else if (event.key === 'End') next = items.length - 1;
-      else if (event.key === 'Tab') { onClose(); return; }
-      else return;
+      else if (event.key === 'Tab') {
+        onClose();
+        return;
+      } else return;
       event.preventDefault();
       event.stopPropagation();
       items[next]?.focus();
@@ -75,8 +77,11 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
     return () => {
       cancelAnimationFrame(frame);
       window.removeEventListener('keydown', handleKey, true);
-      if (trigger instanceof HTMLElement && trigger.isConnected &&
-          (document.activeElement === document.body || ref.current?.contains(document.activeElement))) {
+      if (
+        trigger instanceof HTMLElement &&
+        trigger.isConnected &&
+        (document.activeElement === document.body || ref.current?.contains(document.activeElement))
+      ) {
         trigger.focus({ preventScroll: true });
       }
     };
@@ -92,15 +97,23 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
 
   const sendToAI = useCallback(() => {
     const output = getOutputText();
-    askAboutTerminal(paneId, {
-      id: block.id, paneId, label: t('Terminal output'), command: block.command, output,
-      cwd: block.cwd, exitCode: block.exitCode, createdAt: block.startedAt ?? Date.now(),
-    }, t('Help me analyze this command result.'));
+    askAboutTerminal(
+      paneId,
+      {
+        id: block.id,
+        paneId,
+        label: t('Terminal output'),
+        command: block.command,
+        output,
+        cwd: block.cwd,
+        exitCode: block.exitCode,
+        createdAt: block.startedAt ?? Date.now(),
+      },
+      t('Help me analyze this command result.'),
+    );
   }, [block, paneId, getOutputText]);
 
-  const duration = block.endedAt !== null && block.startedAt !== null
-    ? fmtDuration(block.endedAt - block.startedAt)
-    : '';
+  const duration = block.endedAt !== null && block.startedAt !== null ? fmtDuration(block.endedAt - block.startedAt) : '';
 
   const clearAllBlocks = useCallback(() => {
     clearSessionBlocks(paneId);
@@ -108,12 +121,16 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
 
   return createPortal(
     <div
-      {...navigation.props} ref={ref}
+      {...navigation.props}
+      ref={ref}
       className="workspace-floating"
       role="menu"
       aria-label={t('Command block actions')}
       data-no-drag
-      onContextMenu={event => { event.preventDefault(); event.stopPropagation(); }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      }}
       style={{
         position: 'fixed',
         zIndex: 9999,
@@ -127,49 +144,55 @@ export default function BlockMenu({ block, paneId, anchor, onClose, getOutputTex
         fontFamily: 'var(--font-ui)',
         userSelect: 'none',
         overflow: 'hidden',
-      }}
-    >
-      {/* Summarize the command without taking space from its output. */}
-      <div style={{
-        padding: '6px 12px 5px',
-        borderBottom: '1px solid var(--border)',
-        color: 'var(--text-muted)',
-        fontSize: 'calc(11px * var(--ui-font-scale))',
       }}>
-        <code style={{
+      {/* Summarize the command without taking space from its output. */}
+      <div
+        style={{
+          padding: '6px 12px 5px',
+          borderBottom: '1px solid var(--border)',
+          color: 'var(--text-muted)',
           fontSize: 'calc(11px * var(--ui-font-scale))',
-          fontFamily: 'var(--font-mono)',
-          color: 'var(--block-cmd-text)',
-          display: 'block',
-          // Long commands ellipsize here; without a cap their unbroken line would
-          // stretch the whole menu up to the viewport limit.
-          maxWidth: 340,
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
         }}>
+        <code
+          style={{
+            fontSize: 'calc(11px * var(--ui-font-scale))',
+            fontFamily: 'var(--font-mono)',
+            color: 'var(--block-cmd-text)',
+            display: 'block',
+            // Long commands ellipsize here; without a cap their unbroken line would
+            // stretch the whole menu up to the viewport limit.
+            maxWidth: 340,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
           $ {block.command}
         </code>
         <div style={{ display: 'flex', gap: 10, marginTop: 2 }}>
           {duration && <span>{duration}</span>}
           {block.exitCode !== null && (
-            <span style={{
-              color: block.exitCode === 0 ? 'var(--success)' : 'var(--error)',
-              fontWeight: 'var(--fw-semibold)',
-            }}>
+            <span
+              style={{
+                color: block.exitCode === 0 ? 'var(--success)' : 'var(--error)',
+                fontWeight: 'var(--fw-semibold)',
+              }}>
               {t('Exit code {{code}}', { code: block.exitCode })}
             </span>
           )}
         </div>
       </div>
 
-      <ContextMenuItems itemRole="menuitem" onClose={onClose} items={[
-        { label: t('Rerun command'), onClick: rerun, group: 'primary' },
-        { label: t('Send to AI for analysis'), onClick: sendToAI, group: 'primary' },
-        { label: t('Copy command'), onClick: () => copy(block.command), group: 'clipboard' },
-        { label: t('Copy output'), onClick: () => copy(getOutputText()), group: 'clipboard' },
-        { label: t('Clear all blocks'), onClick: clearAllBlocks, danger: true },
-      ]} />
+      <ContextMenuItems
+        itemRole="menuitem"
+        onClose={onClose}
+        items={[
+          { label: t('Rerun command'), onClick: rerun, group: 'primary' },
+          { label: t('Send to AI for analysis'), onClick: sendToAI, group: 'primary' },
+          { label: t('Copy command'), onClick: () => copy(block.command), group: 'clipboard' },
+          { label: t('Copy output'), onClick: () => copy(getOutputText()), group: 'clipboard' },
+          { label: t('Clear all blocks'), onClick: clearAllBlocks, danger: true },
+        ]}
+      />
     </div>,
     document.body,
   );

@@ -16,7 +16,13 @@ import SettingsDialog from './SettingsDialog';
 
 type Toast = (msg: string, type: 'info' | 'success' | 'error') => void;
 
-export default function KeyDialog({ open, row, hasKey, toast, onClose }: {
+export default function KeyDialog({
+  open,
+  row,
+  hasKey,
+  toast,
+  onClose,
+}: {
   open: boolean;
   row: ProviderRow<ModelProfile>;
   hasKey: boolean;
@@ -61,31 +67,43 @@ export default function KeyDialog({ open, row, hasKey, toast, onClose }: {
       width={460}
       onClose={onClose}
       icon={
-        <span style={{
-          width: 24, height: 24, flexShrink: 0, display: 'inline-flex', alignItems: 'center',
-          justifyContent: 'center', color: modelHue(row.kind, '', row.baseUrl),
-        }}>
+        <span
+          style={{
+            width: 24,
+            height: 24,
+            flexShrink: 0,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: modelHue(row.kind, '', row.baseUrl),
+          }}>
           <Mark size={20} aria-hidden="true" />
         </span>
       }
-      footer={<>
-        <OutlineButton onClick={onClose} data-testid="key-dialog-cancel">{t('Cancel')}</OutlineButton>
-        <button
-          type="button"
-          className="primary-button"
-          onClick={() => void save()}
-          data-testid="key-dialog-save"
-          style={{
-            padding: '5px 16px', fontSize: 'calc(12px * var(--ui-font-scale))', border: 'none',
-            borderRadius: 'var(--radius-inner)', background: 'var(--primary-button-bg)',
-            color: 'var(--primary-button-text)', cursor: 'pointer',
-            opacity: value.trim() ? 1 : 0.6,
-          }}
-        >
-          {t('Save and close')}
-        </button>
-      </>}
-    >
+      footer={
+        <>
+          <OutlineButton onClick={onClose} data-testid="key-dialog-cancel">
+            {t('Cancel')}
+          </OutlineButton>
+          <button
+            type="button"
+            className="primary-button"
+            onClick={() => void save()}
+            data-testid="key-dialog-save"
+            style={{
+              padding: '5px 16px',
+              fontSize: 'calc(12px * var(--ui-font-scale))',
+              border: 'none',
+              borderRadius: 'var(--radius-inner)',
+              background: 'var(--primary-button-bg)',
+              color: 'var(--primary-button-text)',
+              cursor: 'pointer',
+              opacity: value.trim() ? 1 : 0.6,
+            }}>
+            {t('Save and close')}
+          </button>
+        </>
+      }>
       <PasswordInput
         autoFocus
         value={value}
@@ -95,7 +113,9 @@ export default function KeyDialog({ open, row, hasKey, toast, onClose }: {
         revealTestId="key-dialog-reveal"
         revealLabel={{ show: t('Reveal API key'), hide: t('Hide API key') }}
         onChange={(event) => setValue(event.target.value)}
-        onKeyDown={(event) => { if (event.key === 'Enter') void save(); }}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') void save();
+        }}
         style={{ fontFamily: 'var(--font-mono)' }}
       />
       <span style={{ color: 'var(--text-muted)', fontSize: 'var(--fs-micro)' }}>

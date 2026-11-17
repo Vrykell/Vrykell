@@ -6,7 +6,15 @@ export interface CommandEnvironment {
 
 export function commandEnvironment(environment: CommandEnvironment): { target: string; shell: string } {
   return environment.kind === 'ssh'
-    ? { target: JSON.stringify(['ssh', environment.ssh?.host.toLowerCase() ?? '', environment.ssh?.port ?? 22, environment.ssh?.user ?? '']), shell: 'posix' }
+    ? {
+        target: JSON.stringify([
+          'ssh',
+          environment.ssh?.host.toLowerCase() ?? '',
+          environment.ssh?.port ?? 22,
+          environment.ssh?.user ?? '',
+        ]),
+        shell: 'posix',
+      }
     : { target: 'local', shell: environment.shellType ?? 'system' };
 }
 
@@ -23,11 +31,25 @@ export interface HistoryCommandEntry {
   runCount: number;
 }
 
-export interface HistoryCommandRule { id: string; kind: 'name' | 'prefix'; value: string }
-export interface HistoryCommandFavorite { id: string; name: string; command: string; cwd: string; shell: string }
+export interface HistoryCommandRule {
+  id: string;
+  kind: 'name' | 'prefix';
+  value: string;
+}
+export interface HistoryCommandFavorite {
+  id: string;
+  name: string;
+  command: string;
+  cwd: string;
+  shell: string;
+}
 export type HistoryCommandKey = Pick<HistoryCommandFavorite, 'shell' | 'cwd' | 'command'>;
 export type HistoryCommandDraft = Omit<HistoryCommandFavorite, 'id'>;
-export interface HistoryCommandGroup { id: string; name: string; commandKeys: string[] }
+export interface HistoryCommandGroup {
+  id: string;
+  name: string;
+  commandKeys: string[];
+}
 export interface HistoryCommandMutation {
   target: string;
   root: string;
@@ -47,4 +69,8 @@ export interface HistoryCommandPreferences {
   historyOrder?: string[];
   groupOrder?: string[];
 }
-export interface HistoryCommandContext { root: string; files: { path: string; text: string }[]; platform: string }
+export interface HistoryCommandContext {
+  root: string;
+  files: { path: string; text: string }[];
+  platform: string;
+}

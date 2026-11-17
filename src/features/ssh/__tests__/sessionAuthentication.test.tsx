@@ -11,13 +11,28 @@ const mocks = vi.hoisted(() => ({ forget: vi.fn() }));
 vi.mock('../services/api', () => ({ sshForgetSessionAuth: mocks.forget }));
 
 beforeEach(() => {
-  vi.clearAllMocks(); mocks.forget.mockResolvedValue(undefined);
+  vi.clearAllMocks();
+  mocks.forget.mockResolvedValue(undefined);
   useSessionAuthenticationStore.setState({ request: null, revisions: {}, temporary: {} });
   useSshStore.setState({ connections: [] });
   const pane = (id: string) => leaf({ id, kind: 'ssh', ssh: { host: 'server.test', name: 'Server', connectionId: 'one' } });
-  useSessionStore.setState({ activeId: 'tab', tabs: [{ id: 'tab', kind: 'session', title: 'SSH', layout: {
-    type: 'split', dir: 'row', ratio: 0.5, first: pane('first'), second: pane('second'),
-  } }] });
+  useSessionStore.setState({
+    activeId: 'tab',
+    tabs: [
+      {
+        id: 'tab',
+        kind: 'session',
+        title: 'SSH',
+        layout: {
+          type: 'split',
+          dir: 'row',
+          ratio: 0.5,
+          first: pane('first'),
+          second: pane('second'),
+        },
+      },
+    ],
+  });
   useTerminalStore.setState({ sessions: { first: 'session-one', second: 'session-two' } });
 });
 
@@ -41,10 +56,12 @@ it('publishes only the matching authentication completion and isolates profile r
 });
 
 it('keeps shared hop credentials until every dependent terminal closes and refreshes dependents after authentication', async () => {
-  useSshStore.setState({ connections: [
-    { id: 'gateway', name: 'Gateway', host: 'gateway.test', user: 'gateway-user', authMethod: 'key' },
-    { id: 'one', name: 'Internal', host: 'server.test', user: 'tester', authMethod: 'key', jumpConnectionId: 'gateway' },
-  ] });
+  useSshStore.setState({
+    connections: [
+      { id: 'gateway', name: 'Gateway', host: 'gateway.test', user: 'gateway-user', authMethod: 'key' },
+      { id: 'one', name: 'Internal', host: 'server.test', user: 'tester', authMethod: 'key', jumpConnectionId: 'gateway' },
+    ],
+  });
   renderHook(useSshAuthenticationLifetime);
   const revision = renderHook(() => useSshAuthenticationRevision('one'));
   expect(revision.result.current).toBe(0);

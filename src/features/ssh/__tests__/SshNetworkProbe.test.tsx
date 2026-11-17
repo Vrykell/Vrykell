@@ -6,12 +6,25 @@ import { StrictMode } from 'react';
 
 const mocks = vi.hoisted(() => ({ probe: vi.fn() }));
 vi.mock('../services/api', () => ({ sshNetworkProbe: mocks.probe }));
-const result: NetworkProbe = { dnsMs: 1, attempts: [{ latencyMs: 20, errorKind: null }, { latencyMs: 40, errorKind: null }] };
-beforeEach(() => { vi.clearAllMocks(); mocks.probe.mockResolvedValue(result); });
+const result: NetworkProbe = {
+  dnsMs: 1,
+  attempts: [
+    { latencyMs: 20, errorKind: null },
+    { latencyMs: 40, errorKind: null },
+  ],
+};
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.probe.mockResolvedValue(result);
+});
 afterEach(() => vi.useRealTimers());
 
 it('shares an in-flight check when strict effects mount twice', async () => {
-  render(<StrictMode><SshNetworkProbe host="host" port={22} /></StrictMode>);
+  render(
+    <StrictMode>
+      <SshNetworkProbe host="host" port={22} />
+    </StrictMode>,
+  );
   await screen.findByText('可连通');
   expect(mocks.probe).toHaveBeenCalledTimes(1);
 });
@@ -31,7 +44,13 @@ it('automatically probes and displays measured connectivity and latency', async 
 });
 
 it('shows interrupted connectivity without treating TCP failures as zero latency', async () => {
-  mocks.probe.mockResolvedValue({ dnsMs: 2, attempts: [{ latencyMs: 20, errorKind: null }, { latencyMs: null, errorKind: 'timeout' }] });
+  mocks.probe.mockResolvedValue({
+    dnsMs: 2,
+    attempts: [
+      { latencyMs: 20, errorKind: null },
+      { latencyMs: null, errorKind: 'timeout' },
+    ],
+  });
   render(<SshNetworkProbe host="host" port={2222} />);
   await screen.findByText('连接不稳定');
   expect(screen.getByText('50%')).toBeInTheDocument();
@@ -41,7 +60,11 @@ it('shows interrupted connectivity without treating TCP failures as zero latency
 
 it('disables overlapping requests, resets on target changes and discards late results', async () => {
   let resolve!: (value: NetworkProbe) => void;
-  mocks.probe.mockReturnValue(new Promise<NetworkProbe>(done => { resolve = done; }));
+  mocks.probe.mockReturnValue(
+    new Promise<NetworkProbe>((done) => {
+      resolve = done;
+    }),
+  );
   const view = render(<SshNetworkProbe host="old" port={22} />);
   expect(screen.getByRole('button', { name: '探测中…' })).toBeDisabled();
   view.rerender(<SshNetworkProbe host="::1" port={2222} jumpHost="bastion" paused />);
@@ -71,17 +94,25 @@ it('repeats automatically, pauses with monitoring and skips hidden documents', a
   const view = render(<SshNetworkProbe host="host" port={22} />);
   await act(async () => {});
   expect(screen.getByText('可连通')).toBeInTheDocument();
-  await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(30_000);
+  });
   expect(mocks.probe).toHaveBeenCalledTimes(2);
   view.rerender(<SshNetworkProbe host="host" port={22} paused />);
-  await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(60_000);
+  });
   expect(mocks.probe).toHaveBeenCalledTimes(2);
   const hidden = vi.spyOn(document, 'hidden', 'get').mockReturnValue(true);
   view.rerender(<SshNetworkProbe host="host" port={22} />);
-  await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1000);
+  });
   expect(mocks.probe).toHaveBeenCalledTimes(2);
   hidden.mockReturnValue(false);
-  await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(1000);
+  });
   expect(mocks.probe).toHaveBeenCalledTimes(3);
   hidden.mockRestore();
 });

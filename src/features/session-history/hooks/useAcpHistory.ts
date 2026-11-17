@@ -24,7 +24,9 @@ export function useAcpHistory() {
   }, []);
   useEffect(() => {
     void reload();
-    return () => { generation.current += 1; };
+    return () => {
+      generation.current += 1;
+    };
   }, [reload]);
   return { summaries, error, loading, reload };
 }

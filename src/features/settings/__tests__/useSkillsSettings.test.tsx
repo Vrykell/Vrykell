@@ -56,7 +56,9 @@ describe('useSkillsSettings', () => {
     const { result } = renderHook(() => useSkillsSettings());
 
     act(() => result.current.setImportUrl(' https://example.com/skills.json '));
-    await act(async () => { await result.current.doImportUrl(); });
+    await act(async () => {
+      await result.current.doImportUrl();
+    });
 
     expect(skillMocks.fetchRemoteSkills).toHaveBeenCalledWith('https://example.com/skills.json');
     expect(skillMocks.installSkillMd).toHaveBeenCalledWith('remote', '远程', '内容');
@@ -65,7 +67,12 @@ describe('useSkillsSettings', () => {
   });
   it('does not reopen a detail after the user has returned to the list', async () => {
     let finish!: (value: SkillDetail) => void;
-    skillMocks.getSkill.mockImplementationOnce(() => new Promise<SkillDetail>(resolve => { finish = resolve; }));
+    skillMocks.getSkill.mockImplementationOnce(
+      () =>
+        new Promise<SkillDetail>((resolve) => {
+          finish = resolve;
+        }),
+    );
     const { result } = renderHook(() => useSkillsSettings());
     act(() => void result.current.openDetail(meta.name));
     act(() => result.current.setDetail(null));

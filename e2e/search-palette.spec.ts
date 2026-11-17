@@ -11,8 +11,9 @@ for (const theme of ['深色', '浅色']) {
     await page.keyboard.press('Meta+1');
     await page.getByTestId('tab-new-btn').click();
     const picker = page.getByRole('dialog', { name: '新建标签页' });
-    const colors = await picker.locator('[data-shell-mark="zsh"], [data-shell-mark="bash"]').evaluateAll(elements =>
-      elements.map(element => getComputedStyle(element).color));
+    const colors = await picker
+      .locator('[data-shell-mark="zsh"], [data-shell-mark="bash"]')
+      .evaluateAll((elements) => elements.map((element) => getComputedStyle(element).color));
     expect(colors).toHaveLength(2);
     await picker.screenshot({ path: test.info().outputPath('colored-shell-picker.png'), animations: 'disabled' });
     await picker.press('Escape');
@@ -20,7 +21,7 @@ for (const theme of ['深色', '浅色']) {
     const dialog = page.getByRole('dialog', { name: '全局搜索' });
     const input = dialog.getByRole('textbox', { name: '搜索工作区' });
     await expect(input).toBeFocused();
-    const bodyColors = await dialog.locator('.global-search-body').evaluate(element => {
+    const bodyColors = await dialog.locator('.global-search-body').evaluate((element) => {
       const actual = getComputedStyle(element).backgroundColor;
       const probe = document.createElement('span');
       probe.style.background = 'transparent';
@@ -35,7 +36,7 @@ for (const theme of ['深色', '浅色']) {
     // The prefix badge: no border and a grey background.
     const prefixBadge = dialog.locator('.global-search-sources kbd').first();
     await expect(prefixBadge).toHaveCSS('border-top-style', 'none');
-    const badgeBackground = await prefixBadge.evaluate(element => {
+    const badgeBackground = await prefixBadge.evaluate((element) => {
       const actual = getComputedStyle(element).backgroundColor;
       const probe = document.createElement('span');
       probe.style.background = 'var(--hover)';
@@ -69,7 +70,7 @@ for (const theme of ['深色', '浅色']) {
     await expect(dialog.getByText('历史会话', { exact: true })).toHaveCount(0);
     const secondResult = dialog.locator('[data-search-result]').nth(1);
     await secondResult.hover();
-    const hoverBackground = await secondResult.evaluate(element => {
+    const hoverBackground = await secondResult.evaluate((element) => {
       const probe = document.createElement('span');
       probe.style.background = 'var(--hover)';
       element.appendChild(probe);
@@ -77,7 +78,7 @@ for (const theme of ['深色', '浅色']) {
       probe.remove();
       return expected;
     });
-    await expect.poll(() => secondResult.evaluate(element => getComputedStyle(element).backgroundColor)).toBe(hoverBackground);
+    await expect.poll(() => secondResult.evaluate((element) => getComputedStyle(element).backgroundColor)).toBe(hoverBackground);
     await expect(secondResult).toHaveCSS('border-radius', '8px');
     await dialog.getByTestId('search-filter-button').press('Enter');
     await expect(dialog.getByRole('menu')).toBeVisible();
@@ -134,10 +135,10 @@ test('arrow keys switch the selected result and follow it once it leaves the bod
 
   const body = dialog.locator('.global-search-body');
   const bodyBox = (await body.boundingBox())!;
-  const start = await body.evaluate(element => element.scrollTop);
+  const start = await body.evaluate((element) => element.scrollTop);
   for (let index = 0; index < 8; index++) await input.press('ArrowDown');
   await expect(results.nth(8)).toHaveAttribute('data-selected', 'true');
-  await expect.poll(() => body.evaluate(element => element.scrollTop)).toBeGreaterThan(start);
+  await expect.poll(() => body.evaluate((element) => element.scrollTop)).toBeGreaterThan(start);
 
   const selectedBox = (await results.nth(8).boundingBox())!;
   expect(selectedBox.y).toBeGreaterThanOrEqual(bodyBox.y);
@@ -155,7 +156,7 @@ test('prefixes scope results temporarily and settings search focuses individual 
   const result = dialog.locator('[data-search-result]').filter({ hasText: '终端字号' }).first();
   await expect(result).toBeVisible();
   expect(await dialog.locator('[data-search-result]').count()).toBe(1);
-  const selectedBackground = await result.evaluate(el => {
+  const selectedBackground = await result.evaluate((el) => {
     const probe = document.createElement('span');
     probe.style.background = 'var(--hover)';
     el.appendChild(probe);
@@ -163,7 +164,7 @@ test('prefixes scope results temporarily and settings search focuses individual 
     probe.remove();
     return expected;
   });
-  await expect.poll(() => result.evaluate(el => getComputedStyle(el).backgroundColor)).toBe(selectedBackground);
+  await expect.poll(() => result.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe(selectedBackground);
   await expect(result).toHaveCSS('border-radius', '8px');
   await result.click();
   await expect(page.getByRole('combobox', { name: '终端字号', exact: true })).toBeFocused();
@@ -185,12 +186,15 @@ test('prefixes scope results temporarily and settings search focuses individual 
   await expect(dialog.getByTestId('search-scope-chip').locator('svg').first()).toHaveCSS('width', '18px');
   await expect(dialog.locator('[data-search-result]').first()).toBeVisible();
   for (const theme of ['dark', 'light'] as const) {
-    await page.evaluate(async theme => { const { applyTheme } = await import('/src/config/theme/tokens.ts'); applyTheme(theme); }, theme);
+    await page.evaluate(async (theme) => {
+      const { applyTheme } = await import('/src/config/theme/tokens.ts');
+      applyTheme(theme);
+    }, theme);
     await dialog.screenshot({ path: test.info().outputPath(`shared-filter-chip-${theme}.png`), animations: 'disabled' });
   }
   await input.press('Escape');
   await page.getByTestId('global-search-trigger').click();
   const history = dialog.locator('.global-search-history').first();
   await expect(history).toBeVisible();
-  expect(await history.evaluate(el => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
+  expect(await history.evaluate((el) => getComputedStyle(el).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
 });

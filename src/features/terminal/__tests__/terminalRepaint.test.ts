@@ -55,7 +55,7 @@ describe('terminal surface resets', () => {
     expect(renderer).not.toHaveBeenCalledWith(otherPane, 'dom');
     // The glyph atlas is shared by every WebGL terminal, so it is cleared exactly once and every
     // live terminal rebuilds from its buffer afterwards - including the other pane's terminal.
-    const wipes = [main, block, otherPane].flatMap(term => term.clearTextureAtlas.mock.calls);
+    const wipes = [main, block, otherPane].flatMap((term) => term.clearTextureAtlas.mock.calls);
     expect(wipes).toHaveLength(1);
     for (const term of [main, block, otherPane]) {
       expect(term.refresh).toHaveBeenCalledWith(0, 23);
@@ -83,22 +83,26 @@ describe('terminal surface resets', () => {
     const main = surface();
     terminals.set('focused', main as unknown as Terminal);
     redrawTerminal();
-    expect(debug).toHaveBeenCalledWith('terminal-atlas-reset', expect.objectContaining({
-      reason: 'manual',
-      rendererRebuilds: 1,
-      terminals: 1,
-      syncMs: expect.any(Number),
-      rebuildMs: expect.any(Number),
-      wipeMs: expect.any(Number),
-      repaintMs: expect.any(Number),
-    }));
+    expect(debug).toHaveBeenCalledWith(
+      'terminal-atlas-reset',
+      expect.objectContaining({
+        reason: 'manual',
+        rendererRebuilds: 1,
+        terminals: 1,
+        syncMs: expect.any(Number),
+        rebuildMs: expect.any(Number),
+        wipeMs: expect.any(Number),
+        repaintMs: expect.any(Number),
+      }),
+    );
   });
 
   it('restores only the terminal input that held focus before rebuilding its renderer', () => {
     const main = surface();
     const input = document.createElement('textarea');
     input.className = 'xterm-helper-textarea';
-    main.element.append(input); document.body.append(main.element);
+    main.element.append(input);
+    document.body.append(main.element);
     const focus = vi.fn(() => input.focus());
     terminals.set('focused', { ...main, focus } as unknown as Terminal);
     input.focus();
@@ -106,7 +110,8 @@ describe('terminal surface resets', () => {
     redrawTerminal();
     expect(focus).toHaveBeenCalledOnce();
     expect(document.activeElement).toBe(input);
-    main.element.remove(); renderer.mockReset();
+    main.element.remove();
+    renderer.mockReset();
   });
 
   it('coalesces the window-restore reset so the shared atlas is cleared once per event', async () => {
@@ -122,8 +127,8 @@ describe('terminal surface resets', () => {
     recoverTerminalSurfaces();
     await Promise.resolve();
 
-    expect([main, block, otherPane].flatMap(term => term.clearTextureAtlas.mock.calls)).toHaveLength(1);
-    expect([main, block, otherPane].every(term => term.refresh.mock.calls.length === 1)).toBe(true);
+    expect([main, block, otherPane].flatMap((term) => term.clearTextureAtlas.mock.calls)).toHaveLength(1);
+    expect([main, block, otherPane].every((term) => term.refresh.mock.calls.length === 1)).toBe(true);
     // A context lost while the window was hidden is re-attached for every live terminal.
     for (const term of [main, block, otherPane]) {
       expect(renderer).toHaveBeenCalledWith(term, 'webgl');
@@ -133,7 +138,9 @@ describe('terminal surface resets', () => {
   it('keeps the recovery path usable when a reset fails', async () => {
     const main = surface();
     terminals.set('focused', main as unknown as Terminal);
-    main.clearTextureAtlas.mockImplementation(() => { throw new Error('context gone'); });
+    main.clearTextureAtlas.mockImplementation(() => {
+      throw new Error('context gone');
+    });
 
     recoverTerminalSurfaces();
     await Promise.resolve();

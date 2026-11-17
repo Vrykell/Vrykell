@@ -48,17 +48,25 @@ describe('CopyButton', () => {
       const button = screen.getByTestId('copy');
 
       fireEvent.click(button);
-      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
       expect(button).toHaveAttribute('data-copied', 'true');
 
       // Second click at t=800ms: the first timer would clear the check at
       // t=1500ms, so the restart has to keep it alive past that point.
-      await act(async () => { await vi.advanceTimersByTimeAsync(800); });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(800);
+      });
       fireEvent.click(button);
-      await act(async () => { await vi.advanceTimersByTimeAsync(800); });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(800);
+      });
       expect(button).toHaveAttribute('data-copied', 'true');
 
-      await act(async () => { await vi.advanceTimersByTimeAsync(800); });
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(800);
+      });
       expect(button).toHaveAttribute('data-copied', 'false');
     } finally {
       vi.useRealTimers();

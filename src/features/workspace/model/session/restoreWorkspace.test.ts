@@ -16,7 +16,9 @@ function createDependencies(overrides: Partial<RestoreWorkspaceDependencies> = {
 describe('restoreWorkspaceWithDependencies', () => {
   it('restores only saved terminal owners and archives leftover active records without deleting history', async () => {
     const deps = createDependencies({
-      restorableSessionIds: new Set(['saved', 'mixed-owner']), archiveSession: vi.fn(async () => {}), hasTabs: () => true,
+      restorableSessionIds: new Set(['saved', 'mixed-owner']),
+      archiveSession: vi.fn(async () => {}),
+      hasTabs: () => true,
       listSessions: vi.fn(async () => [
         { id: 'saved', title: 'Saved', status: 'active', sortOrder: 0, kind: 'session' },
         { id: 'mixed-owner', title: 'Mixed owner', status: 'active', sortOrder: 1, kind: 'session' },
@@ -30,7 +32,12 @@ describe('restoreWorkspaceWithDependencies', () => {
   });
   it('opens a shell-requested directory without archiving or restoring saved sessions', async () => {
     const openDirectory = vi.fn();
-    const deps = createDependencies({ launchDirectory: 'C:\\Work space\\project', openDirectory, startupMode: 'empty', archiveSession: vi.fn() });
+    const deps = createDependencies({
+      launchDirectory: 'C:\\Work space\\project',
+      openDirectory,
+      startupMode: 'empty',
+      archiveSession: vi.fn(),
+    });
     await restoreWorkspaceWithDependencies(deps);
     expect(openDirectory).toHaveBeenCalledExactlyOnceWith('C:\\Work space\\project');
     expect(deps.listSessions).not.toHaveBeenCalled();

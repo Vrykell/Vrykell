@@ -5,7 +5,7 @@ export const wallpaperExtensions = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp', 
 
 /** Resolve only when the source decodes to an image with real pixel dimensions. */
 function decodesAsImage(src: string): Promise<boolean> {
-  return new Promise(resolve => {
+  return new Promise((resolve) => {
     const image = new Image();
     const finish = (valid: boolean) => {
       clearTimeout(timeout);

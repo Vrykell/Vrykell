@@ -15,7 +15,10 @@ function document(file: EditorFile, text: string, value = text): DocumentState {
 
 const editor: Tab = { id: 'page', title: 'Editor', kind: 'editor', files: [first, second], selected: first };
 const review: Tab = {
-  id: 'review', title: 'Review', kind: 'git-diff', selection,
+  id: 'review',
+  title: 'Review',
+  kind: 'git-diff',
+  selection,
   comparisons: [
     { id: 'cmp-unstaged', selection },
     { id: 'cmp-staged', selection: { ...selection, scope: 'staged' } },
@@ -23,12 +26,16 @@ const review: Tab = {
 };
 
 it('projects files and comparisons with stable row ids and shared capabilities', () => {
-  const handles = projectCodeTabs([editor, review], {}).map(target => target.handle);
-  expect(handles.map(handle => handle.id)).toEqual([
-    `file:${editorFileKey(first)}`, `file:${editorFileKey(second)}`, 'diff:cmp-unstaged', 'diff:cmp-staged',
+  const handles = projectCodeTabs([editor, review], {}).map((target) => target.handle);
+  expect(handles.map((handle) => handle.id)).toEqual([
+    `file:${editorFileKey(first)}`,
+    `file:${editorFileKey(second)}`,
+    'diff:cmp-unstaged',
+    'diff:cmp-staged',
   ]);
   expect(handles[0]).toMatchObject({
-    label: 'one.ts', tip: '/repo/one.ts',
+    label: 'one.ts',
+    tip: '/repo/one.ts',
     capabilities: { renameable: false, groupable: false },
   });
   expect(handles[2]).toMatchObject({ tip: '/repo/two.ts' });
@@ -39,7 +46,7 @@ it('marks a dirty document without changing its identity', () => {
   const handles = projectCodeTabs([editor], {
     [editorFileKey(first)]: document(first, 'saved', 'edited'),
     [editorFileKey(second)]: document(second, 'same'),
-  }).map(target => target.handle);
+  }).map((target) => target.handle);
   expect(handles[0]!.label).toBe('one.ts •');
   expect(handles[1]!.label).toBe('two.ts');
 });
@@ -53,11 +60,16 @@ it('falls back to a single comparison row for a legacy review page', () => {
 });
 
 it('keeps the file target attached for activation and close guards', () => {
-  const [target] = projectCodeTabs([editor], {}).filter(item => 'file' in item && item.file.path === second.path);
+  const [target] = projectCodeTabs([editor], {}).filter((item) => 'file' in item && item.file.path === second.path);
   expect(target && 'file' in target ? target.file : undefined).toBe(second);
 });
 
 it('ignores tabs that are neither editor pages nor comparisons', () => {
-  const terminal: Tab = { id: 'shell', title: 'Shell', kind: 'session', layout: { type: 'leaf', terminal: { id: 'shell#0', kind: 'local' } } };
+  const terminal: Tab = {
+    id: 'shell',
+    title: 'Shell',
+    kind: 'session',
+    layout: { type: 'leaf', terminal: { id: 'shell#0', kind: 'local' } },
+  };
   expect(projectCodeTabs([terminal], {})).toEqual([]);
 });

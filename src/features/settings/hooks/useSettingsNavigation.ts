@@ -1,4 +1,21 @@
-import { BrainCircuit, FileCode, Keyboard, Settings, SquareTerminal, History, FileText, ShieldCheck, Globe, Folder, Plug, Bot, Sun, Palette, TextFont, Info } from '@ui/icons';
+import {
+  BrainCircuit,
+  FileCode,
+  Keyboard,
+  Settings,
+  SquareTerminal,
+  History,
+  FileText,
+  ShieldCheck,
+  Globe,
+  Folder,
+  Plug,
+  Bot,
+  Sun,
+  Palette,
+  TextFont,
+  Info,
+} from '@ui/icons';
 import type { PageId } from '../model/navigation';
 import { isSettingsPageAvailable } from '../model/navigation';
 import { t } from '@i18n';
@@ -21,7 +38,8 @@ export interface SettingGroup {
 
 export const SETTINGS_GROUPS: SettingGroup[] = [
   {
-    id: 'application', label: 'Application',
+    id: 'application',
+    label: 'Application',
     items: [
       { id: 'application-language', icon: Globe, label: 'Language' },
       { id: 'startup', icon: History, label: 'Startup' },
@@ -32,7 +50,8 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
     ],
   },
   {
-    id: 'ai', label: 'AI models',
+    id: 'ai',
+    label: 'AI models',
     items: [
       { id: 'ai-model', icon: BrainCircuit, label: 'Model configuration' },
       { id: 'ai-behavior', icon: Settings, label: 'Model behavior' },
@@ -44,12 +63,18 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
     ],
   },
   {
-    id: 'terminal', label: 'Terminal',
+    id: 'terminal',
+    label: 'Terminal',
     items: [{ id: 'command-history', icon: SquareTerminal, label: 'Command history' }],
   },
-  { id: 'profiles', label: 'Shell profiles', items: SHELL_TYPES.map(shell => ({ id: `profile:${shell}` as const, icon: shellIconFor(shell), label: shellTypeLabel(shell) })) },
   {
-    id: 'editor', label: 'Editor',
+    id: 'profiles',
+    label: 'Shell profiles',
+    items: SHELL_TYPES.map((shell) => ({ id: `profile:${shell}` as const, icon: shellIconFor(shell), label: shellTypeLabel(shell) })),
+  },
+  {
+    id: 'editor',
+    label: 'Editor',
     items: [
       { id: 'editor-preferences', icon: FileCode, label: 'Editor preferences' },
       { id: 'editor-local', icon: FileCode, label: 'Local file opening' },
@@ -57,7 +82,8 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
     ],
   },
   {
-    id: 'appearance', label: 'Appearance',
+    id: 'appearance',
+    label: 'Appearance',
     items: [
       { id: 'appearance-theme', icon: Sun, label: 'Theme' },
       { id: 'appearance-blocks', icon: Palette, label: 'Block appearance' },
@@ -66,16 +92,23 @@ export const SETTINGS_GROUPS: SettingGroup[] = [
     ],
   },
   {
-    id: 'shortcuts', label: 'Shortcuts',
+    id: 'shortcuts',
+    label: 'Shortcuts',
     items: [{ id: 'shortcuts', icon: Keyboard, label: 'Keyboard shortcuts' }],
   },
 ];
 
 /** Keep the active settings page in sync with external navigation. */
 export function useSettingsNavigation() {
-  const selected = useSettingsNavigationStore(state => isSettingsPageAvailable(state.selected) ? state.selected : 'application-language');
-  const setSelected = useSettingsNavigationStore(state => state.setSelected);
-  const groups = SETTINGS_GROUPS.map(group => ({ ...group, label: t(group.label), items: group.items.filter(item => isSettingsPageAvailable(item.id)).map(item => ({ ...item, label: t(item.label) })) }));
-  const activeLabel = groups.flatMap(group => group.items).find(item => item.id === selected)?.label ?? t('Settings');
+  const selected = useSettingsNavigationStore((state) =>
+    isSettingsPageAvailable(state.selected) ? state.selected : 'application-language',
+  );
+  const setSelected = useSettingsNavigationStore((state) => state.setSelected);
+  const groups = SETTINGS_GROUPS.map((group) => ({
+    ...group,
+    label: t(group.label),
+    items: group.items.filter((item) => isSettingsPageAvailable(item.id)).map((item) => ({ ...item, label: t(item.label) })),
+  }));
+  const activeLabel = groups.flatMap((group) => group.items).find((item) => item.id === selected)?.label ?? t('Settings');
   return { selected, setSelected, activeLabel, groups };
 }

@@ -39,13 +39,20 @@ export function captureConnectionFrame(term: Terminal, previous: TerminalFrame |
   const prompt = secretResponsePrompt(text);
   if (!disconnected && prompt === null) {
     const cellWidth = getCellMetrics(term).width;
-    if (previous?.html === '' && previous.cols === term.cols && previous.rows === term.rows && previous.cellWidth === cellWidth) return previous;
+    if (previous?.html === '' && previous.cols === term.cols && previous.rows === term.rows && previous.cellWidth === cellWidth)
+      return previous;
     return { html: '', plainText: '', cols: term.cols, rows: term.rows, cellWidth, snapshotSpacing: frameSpacing(cellWidth) };
   }
-  if (!disconnected && previous && prompt === secretResponsePrompt(previous.plainText)
-    && secretResponseWasRejected(text) === secretResponseWasRejected(previous.plainText)
-    && previous.cols === term.cols && previous.rows === term.rows
-    && previous.cellWidth === getCellMetrics(term).width) return previous;
+  if (
+    !disconnected &&
+    previous &&
+    prompt === secretResponsePrompt(previous.plainText) &&
+    secretResponseWasRejected(text) === secretResponseWasRejected(previous.plainText) &&
+    previous.cols === term.cols &&
+    previous.rows === term.rows &&
+    previous.cellWidth === getCellMetrics(term).width
+  )
+    return previous;
   return captureFrame(term);
 }
 
@@ -60,7 +67,11 @@ export function needsSecretResponse(text: string): boolean {
 }
 
 export function secretResponseWasRejected(text: string): boolean {
-  const lines = text.trimEnd().split('\n').map(line => line.trim()).filter(Boolean);
+  const lines = text
+    .trimEnd()
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean);
   const previous = lines.length > 1 ? lines[lines.length - 2]! : '';
   return /(?:permission denied|authentication failed|incorrect (?:password|passphrase)|密码错误|认证失败|请重试)/i.test(previous);
 }

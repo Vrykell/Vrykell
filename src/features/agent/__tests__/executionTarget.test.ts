@@ -15,7 +15,11 @@ beforeEach(() => {
   vi.clearAllMocks();
   useTerminalStore.setState({ sessions: { first: 'pty-first', second: 'pty-second' }, focusedPaneId: 'second', scenes: {} });
 });
-afterEach(() => { useTerminalStore.setState(terminal, true); usePermissions.setState(permissions, true); useSessionStore.setState(workspace, true); });
+afterEach(() => {
+  useTerminalStore.setState(terminal, true);
+  usePermissions.setState(permissions, true);
+  useSessionStore.setState(workspace, true);
+});
 
 describe('explicit execution targets', () => {
   it('writes to the selected terminal even when a different pane has focus', async () => {
@@ -39,7 +43,16 @@ describe('explicit execution targets', () => {
     expect(tools).toHaveProperty('read_terminal');
   });
   it('derives remote file isolation from the target pane for older callers', () => {
-    useSessionStore.setState({ tabs: [{ id: 'remote', kind: 'session', title: 'Server', layout: leaf({ id: 'first', kind: 'ssh', ssh: { name: 'Server', host: 'server' } }) }] });
+    useSessionStore.setState({
+      tabs: [
+        {
+          id: 'remote',
+          kind: 'session',
+          title: 'Server',
+          layout: leaf({ id: 'first', kind: 'ssh', ssh: { name: 'Server', host: 'server' } }),
+        },
+      ],
+    });
     const tools = buildTools({ paneId: 'first' });
     for (const name of ['read_file', 'write_file', 'edit_file', 'list_dir', 'search_files']) expect(tools).not.toHaveProperty(name);
     expect(tools).toHaveProperty('run_command');

@@ -6,22 +6,34 @@ import { persistedSessionIds } from './sessionManager';
 
 export async function applySessionGrouping(proposals: GroupingProposal[]): Promise<void> {
   const before = useWorkspaceStore.getState();
-  const active = new Set(before.tabs.filter(isSessionTab).map(tab => tab.id));
-  if (proposals.some(group => group.itemIds.some(id => !active.has(id)))) throw new Error(t('Items changed. Generate a new grouping plan.'));
-  const assignments = proposals.map(proposal => ({
-    id: before.groups.find(group => group.title.toLowerCase() === proposal.name.toLowerCase())?.id ?? crypto.randomUUID(),
-    title: proposal.name, itemIds: proposal.itemIds,
+  const active = new Set(before.tabs.filter(isSessionTab).map((tab) => tab.id));
+  if (proposals.some((group) => group.itemIds.some((id) => !active.has(id))))
+    throw new Error(t('Items changed. Generate a new grouping plan.'));
+  const assignments = proposals.map((proposal) => ({
+    id: before.groups.find((group) => group.title.toLowerCase() === proposal.name.toLowerCase())?.id ?? crypto.randomUUID(),
+    title: proposal.name,
+    itemIds: proposal.itemIds,
   }));
-  const persisted = await persistedSessionIds(assignments.flatMap(group => group.itemIds));
-  const current = new Set(useWorkspaceStore.getState().tabs.filter(isSessionTab).map(tab => tab.id));
-  if (assignments.some(group => group.itemIds.some(id => !current.has(id)))) throw new Error(t('Items changed. Generate a new grouping plan.'));
-  await applyTabGroups(assignments.map(group => ({ ...group, itemIds: group.itemIds.filter(id => persisted.has(id)) })));
-  useWorkspaceStore.setState(state => {
-    const groups = [...state.groups]; let tabs = [...state.tabs];
+  const persisted = await persistedSessionIds(assignments.flatMap((group) => group.itemIds));
+  const current = new Set(
+    useWorkspaceStore
+      .getState()
+      .tabs.filter(isSessionTab)
+      .map((tab) => tab.id),
+  );
+  if (assignments.some((group) => group.itemIds.some((id) => !current.has(id))))
+    throw new Error(t('Items changed. Generate a new grouping plan.'));
+  await applyTabGroups(assignments.map((group) => ({ ...group, itemIds: group.itemIds.filter((id) => persisted.has(id)) })));
+  useWorkspaceStore.setState((state) => {
+    const groups = [...state.groups];
+    let tabs = [...state.tabs];
     for (const group of assignments) {
-      if (!groups.some(entry => entry.id === group.id)) groups.push({ id: group.id, title: group.title, collapsed: false });
-      const moved = group.itemIds.flatMap(id => { const tab = tabs.find(tab => tab.id === id); return tab && isSessionTab(tab) ? [{ ...tab, groupId: group.id }] : []; });
-      tabs = [...tabs.filter(tab => !group.itemIds.includes(tab.id)), ...moved];
+      if (!groups.some((entry) => entry.id === group.id)) groups.push({ id: group.id, title: group.title, collapsed: false });
+      const moved = group.itemIds.flatMap((id) => {
+        const tab = tabs.find((tab) => tab.id === id);
+        return tab && isSessionTab(tab) ? [{ ...tab, groupId: group.id }] : [];
+      });
+      tabs = [...tabs.filter((tab) => !group.itemIds.includes(tab.id)), ...moved];
     }
     return { groups, tabs };
   });

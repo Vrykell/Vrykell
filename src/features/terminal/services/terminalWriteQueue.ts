@@ -22,7 +22,10 @@ interface WriteJob {
   cancelled?: boolean;
 }
 
-export interface TerminalInputGuard { epoch: number; isCurrent: () => boolean }
+export interface TerminalInputGuard {
+  epoch: number;
+  isCurrent: () => boolean;
+}
 const pasteScopes = new Map<string, { guard: TerminalInputGuard; writes: Promise<void>[] }>();
 
 /** Keep the parser's synchronous paste encoding while binding all emitted writes to one owner. */
@@ -30,13 +33,19 @@ export async function writeTerminalPaste(sessionId: string, guard: TerminalInput
   const previous = pasteScopes.get(sessionId);
   const scope = { guard, writes: [] as Promise<void>[] };
   pasteScopes.set(sessionId, scope);
-  try { emit(); }
-  finally { if (previous) pasteScopes.set(sessionId, previous); else pasteScopes.delete(sessionId); }
+  try {
+    emit();
+  } finally {
+    if (previous) pasteScopes.set(sessionId, previous);
+    else pasteScopes.delete(sessionId);
+  }
   await Promise.all(scope.writes);
 }
 
 export class TerminalInputTargetChanged extends Error {
-  constructor() { super('terminal input target changed'); }
+  constructor() {
+    super('terminal input target changed');
+  }
 }
 
 interface SessionQueue {
@@ -66,8 +75,18 @@ export function writeTerminalInput(sessionId: string, data: string, signal?: Abo
       if (index >= 0) queue.jobs.splice(index, 1);
       job.reject(new DOMException('The operation was aborted.', 'AbortError'));
     };
-    const finish = (settle: () => void) => { signal?.removeEventListener('abort', abort); settle(); };
-    const job: WriteJob = { data, offset: 0, resolve: () => finish(resolve), reject: error => finish(() => reject(error)), guard: scope?.guard, signal };
+    const finish = (settle: () => void) => {
+      signal?.removeEventListener('abort', abort);
+      settle();
+    };
+    const job: WriteJob = {
+      data,
+      offset: 0,
+      resolve: () => finish(resolve),
+      reject: (error) => finish(() => reject(error)),
+      guard: scope?.guard,
+      signal,
+    };
     signal?.addEventListener('abort', abort, { once: true });
     queues.set(sessionId, queue);
     queue.jobs.push(job);
@@ -115,7 +134,9 @@ async function drain(sessionId: string, queue: SessionQueue): Promise<void> {
       }
       const job = queue.jobs[0]!;
       if (job.guard && !job.guard.isCurrent()) {
-        queue.jobs.shift(); job.reject(new TerminalInputTargetChanged()); continue;
+        queue.jobs.shift();
+        job.reject(new TerminalInputTargetChanged());
+        continue;
       }
       const end = chunkEnd(job.data, job.offset, job.guard ? 1024 : TERMINAL_INPUT_CHUNK_UNITS);
       const chunk = job.data.slice(job.offset, end);
@@ -138,7 +159,7 @@ async function drain(sessionId: string, queue: SessionQueue): Promise<void> {
         job.resolve();
       }
       // Let output and foreground completion invalidate the owner before another paste chunk.
-      if (job.guard && queue.jobs[0] === job) await new Promise<void>(resolve => setTimeout(resolve, 0));
+      if (job.guard && queue.jobs[0] === job) await new Promise<void>((resolve) => setTimeout(resolve, 0));
     }
   } finally {
     queue.draining = false;

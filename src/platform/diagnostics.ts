@@ -42,8 +42,54 @@ export function flushDiagnostics(): Promise<void> {
   }
   return writeQueue;
 }
-const privateKeys = new Set(['password', 'passphrase', 'responses', 'key', 'apikey', 'accesstoken', 'refreshtoken', 'token', 'secret', 'authorization', 'cookie', 'privatekey', 'privatekeycontent', 'env', 'environment', 'lease', 'uilease']);
-const contentKeys = new Set(['data', 'raw', 'output', 'outputclean', 'outputhtml', 'outputraw', 'outputtext', 'outputansi', 'outputplain', 'stdout', 'stderr', 'content', 'text', 'payload', 'prompt', 'command', 'question', 'query', 'messages', 'notes', 'ainotes', 'cursor', 'parts', 'modeloutput', 'attachments', 'database64', 'textcontent']);
+const privateKeys = new Set([
+  'password',
+  'passphrase',
+  'responses',
+  'key',
+  'apikey',
+  'accesstoken',
+  'refreshtoken',
+  'token',
+  'secret',
+  'authorization',
+  'cookie',
+  'privatekey',
+  'privatekeycontent',
+  'env',
+  'environment',
+  'lease',
+  'uilease',
+]);
+const contentKeys = new Set([
+  'data',
+  'raw',
+  'output',
+  'outputclean',
+  'outputhtml',
+  'outputraw',
+  'outputtext',
+  'outputansi',
+  'outputplain',
+  'stdout',
+  'stderr',
+  'content',
+  'text',
+  'payload',
+  'prompt',
+  'command',
+  'question',
+  'query',
+  'messages',
+  'notes',
+  'ainotes',
+  'cursor',
+  'parts',
+  'modeloutput',
+  'attachments',
+  'database64',
+  'textcontent',
+]);
 
 /** Match key spellings that differ only by case, underscores or hyphens. */
 function normalizedKey(key: string): string {
@@ -63,10 +109,16 @@ export function sanitizeDiagnostic(value: unknown, key = '', depth = 0): unknown
   if (privateKeys.has(normalized)) return '[redacted]';
   if (contentKeys.has(normalized)) return { redacted: true, length: typeof value === 'string' ? value.length : undefined };
   if (depth > 6) return '[truncated]';
-  if (value instanceof Error) return { name: value.name, message: redactText(value.message), stack: redactText(value.stack ?? '').slice(0, 4000) };
+  if (value instanceof Error)
+    return { name: value.name, message: redactText(value.message), stack: redactText(value.stack ?? '').slice(0, 4000) };
   if (typeof value === 'string') return redactText(value).slice(0, 4000);
-  if (Array.isArray(value)) return value.slice(0, 100).map(item => sanitizeDiagnostic(item, '', depth + 1));
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).slice(0, 100).map(([name, child]) => [name, sanitizeDiagnostic(child, name, depth + 1)]));
+  if (Array.isArray(value)) return value.slice(0, 100).map((item) => sanitizeDiagnostic(item, '', depth + 1));
+  if (value && typeof value === 'object')
+    return Object.fromEntries(
+      Object.entries(value)
+        .slice(0, 100)
+        .map(([name, child]) => [name, sanitizeDiagnostic(child, name, depth + 1)]),
+    );
   return value;
 }
 
@@ -104,7 +156,14 @@ export function setDiagnosticInputTrace(enabled: boolean): void {
 
 export function diagnostic(event: string, detail: unknown = {}, level: DiagnosticRecord['level'] = 'debug'): void {
   try {
-    const record: DiagnosticRecord = { timestampMs: Date.now(), sequence: ++sequence, source: 'frontend', level, event, detail: sanitizeDiagnostic(detail) };
+    const record: DiagnosticRecord = {
+      timestampMs: Date.now(),
+      sequence: ++sequence,
+      source: 'frontend',
+      level,
+      event,
+      detail: sanitizeDiagnostic(detail),
+    };
     const length = JSON.stringify(record).length;
     records.push(record);
     bytes += length;
@@ -112,14 +171,19 @@ export function diagnostic(event: string, detail: unknown = {}, level: Diagnosti
     if (useDiagnosticSettings.getState().autoSave) {
       pendingRecords.push(record);
       if (pendingRecords.length >= 64) void flushDiagnostics();
-      else if (flushTimer === null) flushTimer = setTimeout(() => { void flushDiagnostics(); }, 50);
+      else if (flushTimer === null)
+        flushTimer = setTimeout(() => {
+          void flushDiagnostics();
+        }, 50);
     }
   } catch {
     // Diagnostics must never interrupt an application operation.
   }
 }
 
-export function diagnosticSnapshot(): DiagnosticRecord[] { return [...records]; }
+export function diagnosticSnapshot(): DiagnosticRecord[] {
+  return [...records];
+}
 
 /** Frame gaps at or above this are a main-thread stall the user feels as lag. */
 export const FRAME_STALL_MS = 250;
@@ -159,7 +223,9 @@ export async function setDiagnosticAutoSave(enabled: boolean): Promise<void> {
   } catch (error) {
     useDiagnosticSettings.setState({ error: t('Could not save the log setting: {{error}}', { error: redactText(String(error)) }) });
     throw error;
-  } finally { useDiagnosticSettings.setState({ saving: false }); }
+  } finally {
+    useDiagnosticSettings.setState({ saving: false });
+  }
 }
 
 /** Track IPC timing and context without retaining terminal or model contents. */
@@ -169,7 +235,8 @@ export async function invoke<T>(command: string, args?: InvokeArgs, options?: In
   diagnostic('ipc-start', { requestId, commandName: command, parameters: args });
   try {
     if (sharedCommands.includes(command) && typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window) {
-      if (args instanceof ArrayBuffer || args instanceof Uint8Array || Array.isArray(args)) throw new Error('Shared commands require named arguments');
+      if (args instanceof ArrayBuffer || args instanceof Uint8Array || Array.isArray(args))
+        throw new Error('Shared commands require named arguments');
       const payload = { ...(args ?? {}) };
       if (!('lease' in payload) && !('uiLease' in payload)) {
         const uiLease = await rawInvoke<string>('authorize_ui_command', { command, args: payload });
@@ -177,15 +244,26 @@ export async function invoke<T>(command: string, args?: InvokeArgs, options?: In
         args = { ...payload, uiLease };
       }
     }
-    const result = options !== undefined
-      ? await rawInvoke<T>(command, args, options)
-      : args !== undefined
-        ? await rawInvoke<T>(command, args)
-        : await rawInvoke<T>(command);
-    diagnostic('ipc-complete', { requestId, commandName: command, durationMs: Math.round((performance.now() - started) * 100) / 100, resultType: Array.isArray(result) ? 'array' : typeof result, resultCount: Array.isArray(result) ? result.length : undefined });
+    const result =
+      options !== undefined
+        ? await rawInvoke<T>(command, args, options)
+        : args !== undefined
+          ? await rawInvoke<T>(command, args)
+          : await rawInvoke<T>(command);
+    diagnostic('ipc-complete', {
+      requestId,
+      commandName: command,
+      durationMs: Math.round((performance.now() - started) * 100) / 100,
+      resultType: Array.isArray(result) ? 'array' : typeof result,
+      resultCount: Array.isArray(result) ? result.length : undefined,
+    });
     return result;
   } catch (error) {
-    diagnostic('ipc-error', { requestId, commandName: command, durationMs: Math.round((performance.now() - started) * 100) / 100, error }, 'error');
+    diagnostic(
+      'ipc-error',
+      { requestId, commandName: command, durationMs: Math.round((performance.now() - started) * 100) / 100, error },
+      'error',
+    );
     throw error;
   }
 }
@@ -194,13 +272,32 @@ let installed = false;
 export function initializeDiagnostics(): void {
   if (installed) return;
   installed = true;
-  diagnostic('application-start', { userAgent: navigator.userAgent, language: navigator.language, viewport: { width: innerWidth, height: innerHeight }, devicePixelRatio, build: import.meta.env.MODE }, 'info');
+  diagnostic(
+    'application-start',
+    {
+      userAgent: navigator.userAgent,
+      language: navigator.language,
+      viewport: { width: innerWidth, height: innerHeight },
+      devicePixelRatio,
+      build: import.meta.env.MODE,
+    },
+    'info',
+  );
   for (const level of ['info', 'warn', 'error'] as const) {
     const original = console[level].bind(console);
-    console[level] = (...args: unknown[]) => { diagnostic(`console-${level}`, { arguments: args }, level); original(...args); };
+    console[level] = (...args: unknown[]) => {
+      diagnostic(`console-${level}`, { arguments: args }, level);
+      original(...args);
+    };
   }
-  window.addEventListener('error', event => diagnostic('uncaught-error', { error: event.error, message: event.message, filename: event.filename, line: event.lineno, column: event.colno }, 'error'));
-  window.addEventListener('unhandledrejection', event => diagnostic('unhandled-rejection', { error: event.reason }, 'error'));
+  window.addEventListener('error', (event) =>
+    diagnostic(
+      'uncaught-error',
+      { error: event.error, message: event.message, filename: event.filename, line: event.lineno, column: event.colno },
+      'error',
+    ),
+  );
+  window.addEventListener('unhandledrejection', (event) => diagnostic('unhandled-rejection', { error: event.reason }, 'error'));
   document.addEventListener('visibilitychange', () => {
     diagnostic('visibility-change', { state: document.visibilityState });
     if (document.visibilityState === 'hidden') void flushDiagnostics();
@@ -208,18 +305,32 @@ export function initializeDiagnostics(): void {
   window.addEventListener('focus', () => reportWindowFocus(true));
   window.addEventListener('blur', () => reportWindowFocus(false));
   const stopPerformanceProbe = startPerformanceProbe(diagnostic, reportFrameGap, FRAME_STALL_MS);
-  window.addEventListener('pagehide', () => { stopPerformanceProbe(); void flushDiagnostics(); });
+  window.addEventListener('pagehide', () => {
+    stopPerformanceProbe();
+    void flushDiagnostics();
+  });
   const initialSettingsRevision = autoSaveRevision;
-  void rawInvoke<boolean>('diagnostics_auto_save').then(autoSave => {
-    if (initialSettingsRevision !== autoSaveRevision) return;
-    useDiagnosticSettings.setState({ autoSave: autoSave === true });
-    diagnostic('diagnostics-ready', { autoSave: autoSave === true }, 'info');
-  }).catch(error => diagnostic('diagnostics-initialize-error', { error }, 'error'));
+  void rawInvoke<boolean>('diagnostics_auto_save')
+    .then((autoSave) => {
+      if (initialSettingsRevision !== autoSaveRevision) return;
+      useDiagnosticSettings.setState({ autoSave: autoSave === true });
+      diagnostic('diagnostics-ready', { autoSave: autoSave === true }, 'info');
+    })
+    .catch((error) => diagnostic('diagnostics-initialize-error', { error }, 'error'));
 }
 
 export async function exportDiagnostics(path: string): Promise<void> {
   await flushDiagnostics();
-  await rawInvoke('diagnostics_export', { path, frontend: diagnosticSnapshot(), context: { userAgent: navigator.userAgent, viewport: { width: innerWidth, height: innerHeight }, devicePixelRatio, build: import.meta.env.MODE } });
+  await rawInvoke('diagnostics_export', {
+    path,
+    frontend: diagnosticSnapshot(),
+    context: {
+      userAgent: navigator.userAgent,
+      viewport: { width: innerWidth, height: innerHeight },
+      devicePixelRatio,
+      build: import.meta.env.MODE,
+    },
+  });
 }
 
 /** Absolute path of the directory that holds the hourly log segments. */

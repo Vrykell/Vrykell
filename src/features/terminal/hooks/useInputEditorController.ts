@@ -30,7 +30,7 @@ export function useInputEditorController({ paneId, focused, isLongRunning, onEnd
   const context = useTerminalInputContext({ paneId, focused, isLongRunning });
   const { sessions, pendingInput, setPendingInput, isFocused, visible, tabCwd } = context;
   const input = useInputStore(selectPaneInput(paneId));
-  const text = input.aiMode ? input.commandDraft ?? '' : input.text;
+  const text = input.aiMode ? (input.commandDraft ?? '') : input.text;
   const setText = useCallback((value: string) => useInputStore.getState().setText(paneId, value), [paneId]);
   useAutoSizeTextarea(inputRef, text, 120, visible);
   useEffect(() => {
@@ -64,10 +64,34 @@ export function useInputEditorController({ paneId, focused, isLongRunning, onEnd
     if (isFocused && !wasFocused.current && visible) inputRef.current?.focus();
     wasFocused.current = isFocused;
   }, [isFocused, visible]);
-  const resetHeight = useCallback(() => { if (inputRef.current) inputRef.current.style.height = 'auto'; }, []);
-  const { acceptPathCompletion, restorePathCompletion, ownsCompletion, isCyclingPathCompletion } = usePathCompletion({ paneId, text, cwd: tabCwd, visible, isFocused, inputRef, setText });
-  const { ghost, clearGhost, acceptCompletion, restoreCompletion, isCyclingCompletion } = useCommandCompletion({ text, aiMode: false, isFocused, visible: visible && !ownsCompletion, cwd: tabCwd, inputRef, setText });
-  const { reset: resetHistNav, navigate: navHistory } = useCommandHistoryNavigation({ paneId, text, setText, inputRef, onNavigate: clearGhost });
+  const resetHeight = useCallback(() => {
+    if (inputRef.current) inputRef.current.style.height = 'auto';
+  }, []);
+  const { acceptPathCompletion, restorePathCompletion, ownsCompletion, isCyclingPathCompletion } = usePathCompletion({
+    paneId,
+    text,
+    cwd: tabCwd,
+    visible,
+    isFocused,
+    inputRef,
+    setText,
+  });
+  const { ghost, clearGhost, acceptCompletion, restoreCompletion, isCyclingCompletion } = useCommandCompletion({
+    text,
+    aiMode: false,
+    isFocused,
+    visible: visible && !ownsCompletion,
+    cwd: tabCwd,
+    inputRef,
+    setText,
+  });
+  const { reset: resetHistNav, navigate: navHistory } = useCommandHistoryNavigation({
+    paneId,
+    text,
+    setText,
+    inputRef,
+    onNavigate: clearGhost,
+  });
 
   const execute = useCallback(() => {
     const latest = selectPaneInput(paneId)(useInputStore.getState());
@@ -81,7 +105,8 @@ export function useInputEditorController({ paneId, focused, isLongRunning, onEnd
       return;
     }
     useInputStore.getState().clearText(paneId);
-    resetHeight(); resetHistNav();
+    resetHeight();
+    resetHistNav();
     const sessionId = sessions[paneId];
     terminalDebug('command-submit', { paneId, commandChars: command.length, sessionReady: Boolean(sessionId) });
     if (sessionId) {
@@ -89,7 +114,7 @@ export function useInputEditorController({ paneId, focused, isLongRunning, onEnd
       terminalDebug('pty-write-request', { sessionId, chars: wire.length });
       void writeTerminalCommand(paneId, sessionId, command || payload, wire)
         .then(() => terminalDebug('pty-write-complete', { sessionId, chars: wire.length }))
-        .catch(error => {
+        .catch((error) => {
           terminalDebug('pty-write-error', { sessionId, errorType: error instanceof Error ? error.name : typeof error });
           clearPendingTerminalCommand(paneId);
           if (!useInputStore.getState().byPane[paneId]?.text) useInputStore.getState().setText(paneId, latest.text);
@@ -107,49 +132,141 @@ export function useInputEditorController({ paneId, focused, isLongRunning, onEnd
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [visible, onEndPress]);
-  const handleChange = useCallback((event: ChangeEvent<HTMLTextAreaElement>) => {
-    resetHistNav();
-    const value = event.target.value;
-    // Command text never lands in diagnostics: lengths, the delta and the composition flag only.
-    if (isTerminalInputTraceEnabled()) {
-      const previous = useInputStore.getState().byPane[paneId]?.text ?? '';
-      terminalDebug('composer-input-change', {
-        paneId, chars: value.length, delta: value.length - previous.length,
-        composing: Boolean((event.nativeEvent as InputEvent).isComposing),
-      });
-    }
-    setText(value);
-  }, [paneId, resetHistNav, setText]);
-  const handleKeyDown = useCallback((event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!text.includes('\n') && (event.key === 'ArrowUp' || event.key === 'ArrowDown') && navHistory(event.key === 'ArrowUp' ? 1 : -1)) {
-      event.preventDefault(); return;
-    }
-    const element = event.currentTarget;
-    if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.nativeEvent.isComposing && event.keyCode !== 229
-      && isCyclingPathCompletion() && acceptPathCompletion(event.shiftKey)) {
-      event.preventDefault(); event.stopPropagation(); resetHistNav(); return;
-    }
-    if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.nativeEvent.isComposing && event.keyCode !== 229
-      && (isCyclingCompletion?.() || acceptsCompletionKey(event, useCompletionPreferences.getState().shortcuts, element.selectionStart, element.selectionEnd, text.length))
-      && acceptCompletion(event.shiftKey)) {
-      event.preventDefault(); event.stopPropagation(); resetHistNav(); return;
-    }
-    if (event.key === 'Tab' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.nativeEvent.isComposing && event.keyCode !== 229
-      && acceptPathCompletion(event.shiftKey)) {
-      event.preventDefault(); event.stopPropagation(); clearGhost(); resetHistNav(); return;
-    }
-    if (completionShortcut(event) && !event.nativeEvent.isComposing && acceptsCompletionKey(event, useCompletionPreferences.getState().shortcuts,
-      element.selectionStart, element.selectionEnd, text.length) && acceptCompletion(event.key === 'Tab' && event.shiftKey)) {
-      event.preventDefault(); event.stopPropagation(); resetHistNav(); return;
-    }
-    if (event.key === 'Escape') {
-      if (restorePathCompletion()) { event.preventDefault(); event.stopPropagation(); return; }
-      if (restoreCompletion()) return;
-      if (ghost) { clearGhost(); return; }
-      if (text) { setText(''); resetHeight(); }
-    }
-    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); clearGhost(); execute(); }
-  }, [text, navHistory, acceptPathCompletion, restorePathCompletion, isCyclingPathCompletion, acceptCompletion, isCyclingCompletion, resetHistNav, restoreCompletion, ghost, clearGhost, setText, resetHeight, execute]);
-  const askAi = useCallback(() => { askAboutTerminal(paneId); }, [paneId]);
+  const handleChange = useCallback(
+    (event: ChangeEvent<HTMLTextAreaElement>) => {
+      resetHistNav();
+      const value = event.target.value;
+      // Command text never lands in diagnostics: lengths, the delta and the composition flag only.
+      if (isTerminalInputTraceEnabled()) {
+        const previous = useInputStore.getState().byPane[paneId]?.text ?? '';
+        terminalDebug('composer-input-change', {
+          paneId,
+          chars: value.length,
+          delta: value.length - previous.length,
+          composing: Boolean((event.nativeEvent as InputEvent).isComposing),
+        });
+      }
+      setText(value);
+    },
+    [paneId, resetHistNav, setText],
+  );
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (!text.includes('\n') && (event.key === 'ArrowUp' || event.key === 'ArrowDown') && navHistory(event.key === 'ArrowUp' ? 1 : -1)) {
+        event.preventDefault();
+        return;
+      }
+      const element = event.currentTarget;
+      if (
+        event.key === 'Tab' &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !event.nativeEvent.isComposing &&
+        event.keyCode !== 229 &&
+        isCyclingPathCompletion() &&
+        acceptPathCompletion(event.shiftKey)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        resetHistNav();
+        return;
+      }
+      if (
+        event.key === 'Tab' &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !event.nativeEvent.isComposing &&
+        event.keyCode !== 229 &&
+        (isCyclingCompletion?.() ||
+          acceptsCompletionKey(
+            event,
+            useCompletionPreferences.getState().shortcuts,
+            element.selectionStart,
+            element.selectionEnd,
+            text.length,
+          )) &&
+        acceptCompletion(event.shiftKey)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        resetHistNav();
+        return;
+      }
+      if (
+        event.key === 'Tab' &&
+        !event.ctrlKey &&
+        !event.metaKey &&
+        !event.altKey &&
+        !event.nativeEvent.isComposing &&
+        event.keyCode !== 229 &&
+        acceptPathCompletion(event.shiftKey)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        clearGhost();
+        resetHistNav();
+        return;
+      }
+      if (
+        completionShortcut(event) &&
+        !event.nativeEvent.isComposing &&
+        acceptsCompletionKey(
+          event,
+          useCompletionPreferences.getState().shortcuts,
+          element.selectionStart,
+          element.selectionEnd,
+          text.length,
+        ) &&
+        acceptCompletion(event.key === 'Tab' && event.shiftKey)
+      ) {
+        event.preventDefault();
+        event.stopPropagation();
+        resetHistNav();
+        return;
+      }
+      if (event.key === 'Escape') {
+        if (restorePathCompletion()) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        if (restoreCompletion()) return;
+        if (ghost) {
+          clearGhost();
+          return;
+        }
+        if (text) {
+          setText('');
+          resetHeight();
+        }
+      }
+      if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+        event.preventDefault();
+        clearGhost();
+        execute();
+      }
+    },
+    [
+      text,
+      navHistory,
+      acceptPathCompletion,
+      restorePathCompletion,
+      isCyclingPathCompletion,
+      acceptCompletion,
+      isCyclingCompletion,
+      resetHistNav,
+      restoreCompletion,
+      ghost,
+      clearGhost,
+      setText,
+      resetHeight,
+      execute,
+    ],
+  );
+  const askAi = useCallback(() => {
+    askAboutTerminal(paneId);
+  }, [paneId]);
   return { ...context, inputRef, panelRef, text, ghost, execute, handleChange, handleKeyDown, askAi };
 }

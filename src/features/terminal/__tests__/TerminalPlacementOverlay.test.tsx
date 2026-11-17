@@ -7,7 +7,14 @@ import { useDockDragStore } from '@features/workspace';
 import { leaf, type DropTarget, type TerminalSpec, type WindowLayout } from '@features/workspace/model/windowLayout';
 
 const viewport = {
-  x: 0, y: 0, top: 0, left: 0, right: 1000, bottom: 800, width: 1000, height: 800,
+  x: 0,
+  y: 0,
+  top: 0,
+  left: 0,
+  right: 1000,
+  bottom: 800,
+  width: 1000,
+  height: 800,
   toJSON: () => ({}),
 } as DOMRect;
 
@@ -77,21 +84,29 @@ describe('PlacementOverlay', () => {
     expect(overlay).toBeVisible();
 
     // A press inside the overlay is a normal pick, not a focus loss.
-    act(() => { overlay.dispatchEvent(new Event('pointerdown', { bubbles: true })); });
+    act(() => {
+      overlay.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    });
     expect(onCancel).not.toHaveBeenCalled();
 
-    act(() => { document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })); });
+    act(() => {
+      document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }));
+    });
     expect(onCancel).toHaveBeenCalledTimes(1);
 
     fireEvent.keyDown(window, { key: 'Escape' });
     expect(onCancel).toHaveBeenCalledTimes(2);
 
-    act(() => { window.dispatchEvent(new Event('blur')); });
+    act(() => {
+      window.dispatchEvent(new Event('blur'));
+    });
     expect(onCancel).toHaveBeenCalledTimes(3);
 
     // After unmounting it no longer reacts to focus changes.
     unmount();
-    act(() => { window.dispatchEvent(new Event('blur')); });
+    act(() => {
+      window.dispatchEvent(new Event('blur'));
+    });
     expect(onCancel).toHaveBeenCalledTimes(3);
   });
 
@@ -116,7 +131,11 @@ describe('PlacementOverlay', () => {
 
 describe('MoveDragLayer', () => {
   const layout: WindowLayout = {
-    type: 'split', dir: 'row', ratio: 0.5, first: leaf(specA), second: leaf(specB),
+    type: 'split',
+    dir: 'row',
+    ratio: 0.5,
+    first: leaf(specA),
+    second: leaf(specB),
   };
 
   it('previews the release slot under the pointer and commits it on mouse up', () => {
@@ -140,7 +159,9 @@ describe('MoveDragLayer', () => {
     expect(useDockDragStore.getState().draggingTerminalId).toBeNull();
 
     useDockDragStore.setState({ draggingTerminalId: 'b' });
-    act(() => { window.dispatchEvent(new Event('blur')); });
+    act(() => {
+      window.dispatchEvent(new Event('blur'));
+    });
     expect(useDockDragStore.getState().draggingTerminalId).toBeNull();
   });
 

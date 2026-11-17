@@ -62,7 +62,14 @@ function count(value: number | undefined): number {
 }
 
 const freshAcp = (source: string): AcpUsageRecord => ({
-  source, at: Date.now(), turns: 0, toolCalls: 0, contextUsed: 0, contextSize: 0, cost: null, currency: '',
+  source,
+  at: Date.now(),
+  turns: 0,
+  toolCalls: 0,
+  contextUsed: 0,
+  contextSize: 0,
+  cost: null,
+  currency: '',
 });
 
 export const useUsageStore = create<UsageState>()(

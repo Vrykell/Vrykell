@@ -62,11 +62,7 @@ export function buildSearchTools(ctx: ToolContext) {
         try {
           const hits = await invoke<FsSearchHit[]>('fs_search', { ...args, lease: g.lease ?? null });
           const result =
-            hits.length === 0
-              ? '（无匹配）'
-              : hits
-                  .map((h) => (h.line != null ? `${h.path}:${h.line}  ${h.preview}` : h.path))
-                  .join('\n');
+            hits.length === 0 ? '（无匹配）' : hits.map((h) => (h.line != null ? `${h.path}:${h.line}  ${h.preview}` : h.path)).join('\n');
           return { ok: true, result };
         } catch (e) {
           return { ok: false, error: e instanceof Error ? e.message : String(e) };

@@ -35,7 +35,7 @@ async function setupNativeDropMock(page: Page) {
         const handler = Number(args?.handler);
         listeners.set(handler, { event, handler });
         host.__DRAG_LISTENERS__ = listeners.size;
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
         return handler;
       }
       if (command === 'plugin:event|unlisten' && event.startsWith('tauri://drag-')) return undefined;
@@ -58,7 +58,9 @@ async function setupNativeDropMock(page: Page) {
 }
 
 async function waitForDragListeners(page: Page): Promise<void> {
-  await expect.poll(() => page.evaluate(() => (window as unknown as { __DRAG_LISTENERS__: number }).__DRAG_LISTENERS__)).toBeGreaterThanOrEqual(3);
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { __DRAG_LISTENERS__: number }).__DRAG_LISTENERS__))
+    .toBeGreaterThanOrEqual(3);
 }
 
 test('uploads a dragged folder once per drop after returning from the transfer manager', async ({ page }) => {
@@ -67,22 +69,31 @@ test('uploads a dragged folder once per drop after returning from the transfer m
   await waitForWorkbench(page);
   await page.evaluate(async () => {
     const modulePath = '/src/features/workspace/stores/workspace.ts';
-    const { useWorkspaceStore } = await import(modulePath) as typeof import('../src/features/workspace/stores/workspace');
-    useWorkspaceStore.getState().addTab({ kind: 'ssh', ssh: { connectionId: 'ssh-1', host: 'prod.example.com', user: 'root', name: 'Remote' } });
+    const { useWorkspaceStore } = (await import(modulePath)) as typeof import('../src/features/workspace/stores/workspace');
+    useWorkspaceStore
+      .getState()
+      .addTab({ kind: 'ssh', ssh: { connectionId: 'ssh-1', host: 'prod.example.com', user: 'root', name: 'Remote' } });
     const dockPath = '/src/features/workspace/stores/dock.ts';
-    const { useDockStore } = await import(dockPath) as typeof import('../src/features/workspace/stores/dock');
+    const { useDockStore } = (await import(dockPath)) as typeof import('../src/features/workspace/stores/dock');
     useDockStore.getState().openPanel('files');
   });
   const tree = page.getByTestId('remote-file-tree');
   await expect(tree).toHaveAttribute('data-path', '/home/root');
   await waitForDragListeners(page);
 
-  const uploads = () => page.evaluate(() => (window as unknown as {
-    __FOLDER_UPLOADS__: { id: string; remoteDir: string; localPath: string }[];
-  }).__FOLDER_UPLOADS__);
+  const uploads = () =>
+    page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __FOLDER_UPLOADS__: { id: string; remoteDir: string; localPath: string }[];
+          }
+        ).__FOLDER_UPLOADS__,
+    );
   const dropFolder = async (point: { x: number; y: number }) => {
     await page.evaluate(({ x, y }) => {
-      const api = (window as unknown as { __TAURI_INTERNALS__: { emitEvent: (event: string, payload: unknown) => void } }).__TAURI_INTERNALS__;
+      const api = (window as unknown as { __TAURI_INTERNALS__: { emitEvent: (event: string, payload: unknown) => void } })
+        .__TAURI_INTERNALS__;
       const payload = { paths: ['C:\\projects\\project-folder'], position: { x: x * devicePixelRatio, y: y * devicePixelRatio } };
       api.emitEvent('tauri://drag-enter', payload);
       api.emitEvent('tauri://drag-drop', payload);
@@ -116,10 +127,14 @@ test('imports one attachment per native drop after repeatedly reopening the pane
   const drop = async () => {
     const bounds = await composer.boundingBox();
     if (!bounds) throw new Error('Conversation composer is unavailable');
-    await page.evaluate(({ x, y }) => {
-      const api = (window as unknown as { __TAURI_INTERNALS__: { emitEvent: (event: string, payload: unknown) => void } }).__TAURI_INTERNALS__;
-      api.emitEvent('tauri://drag-drop', { paths: ['/local/notes.txt'], position: { x: x * devicePixelRatio, y: y * devicePixelRatio } });
-    }, { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 });
+    await page.evaluate(
+      ({ x, y }) => {
+        const api = (window as unknown as { __TAURI_INTERNALS__: { emitEvent: (event: string, payload: unknown) => void } })
+          .__TAURI_INTERNALS__;
+        api.emitEvent('tauri://drag-drop', { paths: ['/local/notes.txt'], position: { x: x * devicePixelRatio, y: y * devicePixelRatio } });
+      },
+      { x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 },
+    );
   };
   const imports = () => page.evaluate(() => (window as unknown as { __ATTACHMENT_IMPORTS__: string[] }).__ATTACHMENT_IMPORTS__);
 

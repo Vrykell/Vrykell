@@ -3,11 +3,16 @@ import { clampPaneRatio, paneTreeOperations, type PaneTree } from '../paneTree';
 
 type Leaf = { type: 'pane'; id: string };
 type Tree = PaneTree<Leaf>;
-const a: Leaf = { type: 'pane', id: 'a' }; const b: Leaf = { type: 'pane', id: 'b' };
+const a: Leaf = { type: 'pane', id: 'a' };
+const b: Leaf = { type: 'pane', id: 'b' };
 const tree = paneTreeOperations<Tree, Leaf>({
-  leaf: node => node.type === 'pane' ? node : null,
-  children: node => { const split = node as Extract<Tree, { type: 'split' }>; return [split.first, split.second]; },
-  join: (node, first, second) => ({ ...node as Extract<Tree, { type: 'split' }>, first, second }), id: node => node.id,
+  leaf: (node) => (node.type === 'pane' ? node : null),
+  children: (node) => {
+    const split = node as Extract<Tree, { type: 'split' }>;
+    return [split.first, split.second];
+  },
+  join: (node, first, second) => ({ ...(node as Extract<Tree, { type: 'split' }>), first, second }),
+  id: (node) => node.id,
   withRatio: (node, ratio) => ({ ...node, ratio }),
 });
 const pair: Tree = { type: 'split', direction: 'row', ratio: 0.5, first: a, second: b };

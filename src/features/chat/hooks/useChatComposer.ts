@@ -65,25 +65,26 @@ export function useChatComposer({
     historyRef.current = { index: -1, base: '' };
   }, []);
 
-  const navigateHistory = useCallback((direction: 1 | -1) => {
-    const history = historyRef.current;
-    const base = history.index === -1 ? text : history.base;
-    const candidates = questions.filter((question) =>
-      question.startsWith(base) && question.length > base.length,
-    );
-    const nextIndex = history.index + direction;
-    if (nextIndex < -1 || nextIndex >= candidates.length) return false;
+  const navigateHistory = useCallback(
+    (direction: 1 | -1) => {
+      const history = historyRef.current;
+      const base = history.index === -1 ? text : history.base;
+      const candidates = questions.filter((question) => question.startsWith(base) && question.length > base.length);
+      const nextIndex = history.index + direction;
+      if (nextIndex < -1 || nextIndex >= candidates.length) return false;
 
-    historyRef.current = { index: nextIndex, base };
-    setText(nextIndex === -1 ? base : candidates[nextIndex]!);
-    const element = inputRef.current;
-    if (element) {
-      requestAnimationFrame(() => {
-        element.selectionStart = element.selectionEnd = element.value.length;
-      });
-    }
-    return true;
-  }, [questions, text, setText]);
+      historyRef.current = { index: nextIndex, base };
+      setText(nextIndex === -1 ? base : candidates[nextIndex]!);
+      const element = inputRef.current;
+      if (element) {
+        requestAnimationFrame(() => {
+          element.selectionStart = element.selectionEnd = element.value.length;
+        });
+      }
+      return true;
+    },
+    [questions, text, setText],
+  );
 
   const submit = useCallback(() => {
     const question = text.trim();
@@ -96,26 +97,46 @@ export function useChatComposer({
     clearAttachments();
     clearReferences?.();
     void send(question, { paneId: targetPane, attachments: payload, ...(conversationId ? { conversationId, references } : {}) });
-  }, [attachments, clearAttachments, clearReferences, conversationId, references, isSession, queueWhileSending, resetHistory, send, sending, targetPane, text, setText]);
+  }, [
+    attachments,
+    clearAttachments,
+    clearReferences,
+    conversationId,
+    references,
+    isSession,
+    queueWhileSending,
+    resetHistory,
+    send,
+    sending,
+    targetPane,
+    text,
+    setText,
+  ]);
 
-  const handleChange = useCallback((event: React.ChangeEvent<HTMLTextAreaElement>) => {
-    resetHistory();
-    setText(event.target.value);
-  }, [resetHistory, setText]);
+  const handleChange = useCallback(
+    (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+      resetHistory();
+      setText(event.target.value);
+    },
+    [resetHistory, setText],
+  );
 
-  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (!text.includes('\n') && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
-      if (navigateHistory(event.key === 'ArrowUp' ? 1 : -1)) {
-        event.preventDefault();
-        return;
+  const handleKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (!text.includes('\n') && (event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
+        if (navigateHistory(event.key === 'ArrowUp' ? 1 : -1)) {
+          event.preventDefault();
+          return;
+        }
       }
-    }
-    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
-      event.preventDefault();
-      submit();
-    }
-    if (event.key === 'Escape') setText('');
-  }, [navigateHistory, submit, text, setText]);
+      if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
+        event.preventDefault();
+        submit();
+      }
+      if (event.key === 'Escape') setText('');
+    },
+    [navigateHistory, submit, text, setText],
+  );
 
   return {
     text,

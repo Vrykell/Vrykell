@@ -3,7 +3,7 @@ import { create } from 'zustand';
 export const useHostView = create<{
   groupFilter: string | null;
   toggleGroupFilter: (group: string) => void;
-}>(set => ({
+}>((set) => ({
   groupFilter: null,
-  toggleGroupFilter: group => set(state => ({ groupFilter: state.groupFilter === group ? null : group })),
+  toggleGroupFilter: (group) => set((state) => ({ groupFilter: state.groupFilter === group ? null : group })),
 }));

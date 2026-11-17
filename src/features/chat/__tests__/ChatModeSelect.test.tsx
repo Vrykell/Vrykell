@@ -35,7 +35,11 @@ describe('model-scoped conversation controls', () => {
     const trigger = screen.getByRole('button', { name: '对话与审批模式' });
     fireEvent.click(trigger);
     fireEvent.click(screen.getByRole('option', { name: /^纯聊天/ }));
-    for (const [label, permission] of [['严格权限', 'strict'], ['放行模式', 'relaxed'], ['标准权限', 'standard']] as const) {
+    for (const [label, permission] of [
+      ['严格权限', 'strict'],
+      ['放行模式', 'relaxed'],
+      ['标准权限', 'standard'],
+    ] as const) {
       fireEvent.click(trigger);
       fireEvent.click(screen.getByRole('option', { name: new RegExp(`^${label}`) }));
       expect(usePermissions.getState().mode).toBe(permission);
@@ -50,12 +54,17 @@ describe('model-scoped conversation controls', () => {
     const chat = screen.getByRole('option', { name: /^纯聊天/ });
     const relaxed = screen.getByRole('option', { name: /^放行模式/ });
     expect(standard).toHaveFocus();
-    fireEvent.keyDown(standard, { key: 'Home' }); expect(chat).toHaveFocus();
-    fireEvent.keyDown(chat, { key: 'ArrowUp' }); expect(relaxed).toHaveFocus();
-    fireEvent.keyDown(relaxed, { key: 'ArrowDown' }); expect(chat).toHaveFocus();
-    fireEvent.keyDown(chat, { key: 'Escape' }); expect(trigger).toHaveFocus();
+    fireEvent.keyDown(standard, { key: 'Home' });
+    expect(chat).toHaveFocus();
+    fireEvent.keyDown(chat, { key: 'ArrowUp' });
+    expect(relaxed).toHaveFocus();
+    fireEvent.keyDown(relaxed, { key: 'ArrowDown' });
+    expect(chat).toHaveFocus();
+    fireEvent.keyDown(chat, { key: 'Escape' });
+    expect(trigger).toHaveFocus();
     expect(screen.queryByRole('listbox')).toBeNull();
-    fireEvent.click(trigger); fireEvent.pointerDown(document.body);
+    fireEvent.click(trigger);
+    fireEvent.pointerDown(document.body);
     expect(screen.queryByRole('listbox')).toBeNull();
     expect(usePermissions.getState().mode).toBe('standard');
   });
