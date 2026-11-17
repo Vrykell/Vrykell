@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { t } from '@i18n';
 import { TextInput } from '@ui/fields/TextInput';
+import PasswordInput from '@ui/fields/PasswordInput';
 import Select from '@ui/fields/Select';
 import ErrorBox from '@ui/feedback/ErrorBox';
 import { OutlineButton } from '@ui/actions/OutlineButton';
@@ -26,7 +27,7 @@ export default function CustomProviderFields({ onAdd }: { onAdd: (draft: CustomP
     <Field layout="stacked" title={t('Provider name')}><TextInput autoFocus variant="field" aria-label={t('Provider name')} value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} disabled={busy} /></Field>
     <Field layout="stacked" title={t('API family')}><Select aria-label={t('API family')} value={draft.provider} options={[{ value: 'openai-compatible', label: 'OpenAI-compatible' }, { value: 'anthropic', label: 'Anthropic' }, { value: 'gemini', label: 'Gemini' }]} onChange={provider => setDraft({ ...draft, provider })} disabled={busy} /></Field>
     <Field layout="stacked" title={t('Base URL')}><TextInput variant="field" aria-label={t('Base URL')} value={draft.baseUrl} onChange={event => setDraft({ ...draft, baseUrl: event.target.value })} disabled={busy} /></Field>
-    <Field layout="stacked" title={t('API Key')}><TextInput variant="field" type="password" aria-label={t('API Key')} value={draft.key} onChange={event => setDraft({ ...draft, key: event.target.value })} disabled={busy} /></Field>
+    <Field layout="stacked" title={t('API Key')}><PasswordInput aria-label={t('API Key')} value={draft.key} onChange={event => setDraft({ ...draft, key: event.target.value })} disabled={busy} /></Field>
     <Field layout="stacked" title={t('Model ID')}><TextInput variant="field" aria-label={t('Model ID')} value={draft.model} onChange={event => setDraft({ ...draft, model: event.target.value })} disabled={busy} /></Field>
     {error && <ErrorBox title={t('Could not add provider')} details={error} />}
     <OutlineButton className="primary-button" disabled={busy} onClick={() => { void add(); }}>{t('Add provider')}</OutlineButton>

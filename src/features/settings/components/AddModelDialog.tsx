@@ -92,6 +92,7 @@ export default function AddModelDialog({ open, row, toast, onClose, onAdd }: {
           {t('Model ID')} <span style={{ color: 'var(--error)' }}>*</span>
         </label>
         <TextInput
+          variant="field"
           id="add-model-id"
           autoFocus
           value={modelId}
@@ -105,6 +106,7 @@ export default function AddModelDialog({ open, row, toast, onClose, onAdd }: {
           {t('Model name')}
         </label>
         <TextInput
+          variant="field"
           id="add-model-name"
           value={name}
           data-testid="add-model-name"
@@ -116,6 +118,7 @@ export default function AddModelDialog({ open, row, toast, onClose, onAdd }: {
           {t('Group')}
         </label>
         <TextInput
+          variant="field"
           id="add-model-group"
           value={group}
           data-testid="add-model-group"

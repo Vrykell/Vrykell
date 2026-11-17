@@ -87,12 +87,12 @@
   --shell-bash-accent: #30D158;
   --shell-mark-ink: #FFFFFF;
   --resource-accent: color-mix(in srgb, var(--group-blue) 80%, var(--primary-action));
-  --chart-blue: var(--cmd-argument);
-  --chart-violet: var(--cmd-pipe);
-  --chart-amber: var(--cmd-number);
-  --chart-cyan: var(--cmd-path);
+  --chart-blue: var(--group-blue);
+  --chart-violet: var(--group-violet);
+  --chart-amber: var(--group-amber);
+  --chart-cyan: var(--group-cyan);
   --chart-grid: color-mix(in srgb, var(--border) 85%, var(--text-muted));
-  --history-link-color: var(--group-blue);
+  --history-link-color: var(--accent-blue);
   --key-hint-bg: var(--field-bg);
   --control-active-bg: var(--selection-bg);
   --control-accent-color: var(--primary-action);
@@ -342,25 +342,25 @@ button.chat-mode-trigger:hover, button.chat-mode-trigger[aria-expanded="true"] {
 .settings-navigation { width: clamp(180px, 20vw, 224px); flex-shrink: 0; min-width: 0; min-height: 0; display: flex; flex-direction: column; padding-top: 16px; border-right: 1px solid var(--resize-divider); background: var(--auxiliary-bg); }
 .settings-navigation-title { flex-shrink: 0; padding: 0 20px 12px; color: var(--text-primary); font-size: var(--fs-subtitle); font-weight: var(--fw-semibold); }
 .settings-navigation-list { flex: 1; min-height: 0; overflow-y: auto; padding: 0 6px 8px; }
-.settings-content { container: settings / inline-size; flex: 1; min-width: 0; min-height: 0; overflow: auto; padding: 28px 40px; background: var(--canvas); }
+.settings-content { --settings-inset: 20px; container: settings / inline-size; flex: 1; min-width: 0; min-height: 0; overflow: auto; padding: 24px 32px; background: var(--canvas); }
 .settings-page-body, .settings-page-header { min-width: calc(280px * var(--ui-font-scale)); max-width: 1000px; margin-inline: auto; }
-.settings-page-header { margin-bottom: 28px; padding-right: 40px; }
-.settings-page-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-.settings-page-header h1 { margin: 0; font-size: calc(24px * var(--ui-font-scale)); font-weight: var(--fw-medium); color: var(--text-primary); }
-@container settings-layout (max-width: 900px) { .settings-content { padding: 24px; } }
-@container settings-layout (max-width: 704px) { .settings-content { padding: 24px 16px; } }
+.settings-page-header { margin-bottom: 20px; padding-right: 40px; }
+.settings-page-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.settings-page-header h1 { margin: 0; font-size: calc(22px * var(--ui-font-scale)); font-weight: var(--fw-medium); color: var(--text-primary); }
+@container settings-layout (max-width: 900px) { .settings-content { padding: 20px 24px; } }
+@container settings-layout (max-width: 704px) { .settings-content { padding: 20px 16px; } }
 .settings-save-hint { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: var(--fs-caption); color: var(--text-muted); }
-.settings-group { margin-bottom: 28px; min-width: 0; }
-.settings-group-title { margin: 0 0 12px; font-size: var(--fs-label); font-weight: var(--fw-medium); color: var(--text-primary); }
-.settings-group-panel { padding: 0 20px; background: var(--card-bg); border: 0; border-radius: var(--radius-block); box-shadow: none; min-width: 0; }
-.settings-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto); column-gap: 24px; row-gap: 4px; align-items: center; padding: 18px 20px; margin-bottom: 16px; background: var(--card-bg); border: 0; border-radius: var(--radius-inner); min-width: 0; }
-.settings-group-panel > .settings-field { padding: 18px 0; margin: 0; background: transparent; border-radius: 0; }
+.settings-group { margin-bottom: 20px; min-width: 0; }
+.settings-group-title { margin: 0 0 8px; font-size: var(--fs-label); font-weight: var(--fw-medium); color: var(--text-primary); }
+.settings-group-panel { padding: 0 var(--settings-inset); background: var(--card-bg); border: 1px solid var(--border); border-radius: var(--radius-block); box-shadow: none; min-width: 0; }
+.settings-field { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, auto); column-gap: 24px; row-gap: 2px; align-items: center; box-sizing: border-box; padding: 12px 20px; margin-bottom: 12px; background: var(--card-bg); border: 0; border-radius: var(--radius-inner); min-width: 0; }
+.settings-group-panel > .settings-field { min-height: 60px; padding: 12px var(--settings-inset); margin: 0 calc(var(--settings-inset) * -1); background: transparent; border-radius: 0; }
 .settings-group-panel > .settings-field + .settings-field, .settings-record + .settings-record { border-top: 1px solid var(--border); }
 .block-appearance-controls { display: flex; align-items: center; gap: 12px; }
 .block-appearance-controls input[type="color"] { width: 44px; height: 28px; padding: 2px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--field-bg); cursor: pointer; }
 .settings-field-title { grid-column: 1; font-size: var(--fs-label); font-weight: var(--fw-medium); color: var(--text-primary); overflow-wrap: anywhere; }
-.settings-description { grid-column: 1; font-size: var(--fs-caption); line-height: 1.55; color: var(--text-secondary); overflow-wrap: anywhere; }
-.settings-field-control { grid-column: 2; grid-row: 1 / span 2; min-width: 0; width: 240px; max-width: 100%; justify-self: end; text-align: right; }
+.settings-description { grid-column: 1; font-size: var(--fs-caption); line-height: 1.45; color: var(--text-secondary); overflow-wrap: anywhere; }
+.settings-field-control { grid-column: 2; grid-row: 1 / span 2; min-width: 0; width: 180px; max-width: 100%; justify-self: end; text-align: right; }
 .settings-field-control > * { max-width: 100%; }
 .settings-field-control > div { text-align: left; margin-left: auto; }
 .settings-field[data-layout="row"] > .settings-field-control > div { justify-content: flex-end; }
@@ -370,39 +370,45 @@ button.chat-mode-trigger:hover, button.chat-mode-trigger[aria-expanded="true"] {
 .settings-field-control:has(> .segmented-control) { width: auto; }
 .settings-field-control .settings-font-row > button { max-width: 100%; }
 .settings-field[data-layout="stacked"] { grid-template-columns: minmax(0, 1fr); }
-.settings-field[data-layout="stacked"] > .settings-field-control { grid-column: 1; grid-row: auto; width: 100%; margin-top: 10px; text-align: left; }
+.settings-field[data-layout="stacked"] > .settings-field-control { grid-column: 1; grid-row: auto; width: 100%; margin-top: 8px; text-align: left; }
+/* Stacked single-line controls keep a readable width; long editors stay full width. */
+.settings-field[data-layout="stacked"] > .settings-field-control > :is(.autosave-input:not([data-multiline="true"]), input.text-input-field, .ui-select, .password-input) { width: min(100%, 320px); }
+/* Nested lists reach the card edge so their separators span the whole surface. */
+.settings-field[data-layout="stacked"] > .settings-field-control > .settings-record-list > .settings-record { margin-inline: calc(var(--settings-inset) * -1); padding-inline: var(--settings-inset); }
+.settings-field[data-layout="stacked"] > .settings-field-control > .settings-record-list > .settings-record + .settings-record { border-top: 1px solid var(--border); }
 .settings-custom-provider { display: grid; gap: 12px; }
 .settings-custom-provider > .settings-field { padding: 0; margin: 0; background: transparent; }
 .settings-custom-provider > .settings-field > .settings-field-control { margin-top: 0; }
 .settings-custom-provider > button { justify-self: end; }
-.settings-option-list > div { padding: 12px 0; gap: 12px; }
+.settings-option-list > div { padding: 10px 0; gap: 12px; }
 .settings-option-list > div + div { border-top: 1px solid var(--border); }
 .settings-permission-list { display: grid; grid-template-columns: minmax(0, 1fr); column-gap: 24px; }
-.settings-permission-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; padding: 10px 0; }
+.settings-field[data-layout="stacked"] > .settings-field-control > .settings-permission-list { margin-inline: calc(var(--settings-inset) * -1); max-width: none; }
+.settings-permission-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; padding: 6px var(--settings-inset); }
 .settings-permission-row + .settings-permission-row { border-top: 1px solid var(--border); }
 @container settings (min-width: 740px) {
   .settings-permission-list { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 0; }
   .settings-permission-list > .settings-permission-row { position: relative; border-top: 0; }
-  .settings-permission-row:nth-child(odd) { padding-right: 12px; }
-  .settings-permission-row:nth-child(even) { padding-left: 12px; }
+  .settings-permission-row:nth-child(odd) { padding-left: var(--settings-inset); padding-right: 12px; }
+  .settings-permission-row:nth-child(even) { padding-left: 12px; padding-right: var(--settings-inset); }
   .settings-permission-row:nth-child(2n+3)::before { content: ''; position: absolute; top: 0; left: 0; width: 200%; height: 0; border-top: 1px solid var(--border); pointer-events: none; }
 }
-.settings-record { min-width: 0; padding: 18px 0; }
+.settings-record { min-width: 0; padding: 12px 0; }
 .settings-record:first-child { padding-top: 0; }
-.settings-group-panel > .settings-record { padding-block: 18px; }
+.settings-group-panel > .settings-record { padding-block: 12px; }
 .settings-typography-page .settings-group-panel > .settings-record { padding: 0 0 12px; }
 .settings-typography-page .settings-font-preview { margin: 0; }
 .settings-typography-page .settings-field:has(+ .settings-record) { padding-bottom: 12px; }
 .settings-record-list { display: flex; flex-direction: column; min-width: 0; }
-.settings-group-panel > .settings-record-list { padding-block: 18px; }
+.settings-group-panel > .settings-record-list { padding-block: 12px; }
 .settings-record-list > button { margin-top: 12px; align-self: flex-start; }
 @container settings (max-width: 580px) {
-  .settings-field { grid-template-columns: minmax(0, 1fr); gap: 4px; }
-  .settings-field-control { grid-column: 1; grid-row: auto; width: 100%; margin-top: 10px; justify-self: start; text-align: left; }
+  .settings-field { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .settings-field-control { grid-column: 1; grid-row: auto; width: 100%; margin-top: 8px; justify-self: start; text-align: left; }
   .settings-field-control .settings-font-row { justify-content: flex-start; }
   .settings-field[data-layout="row"] > .settings-field-control > div { margin-left: 0; justify-content: flex-start; }
-  .settings-group-panel { padding-inline: 16px; }
-  .settings-page-header h1 { font-size: calc(22px * var(--ui-font-scale)); }
+  .settings-content { --settings-inset: 16px; }
+  .settings-page-header h1 { font-size: calc(20px * var(--ui-font-scale)); }
   .settings-option-list > div { flex-wrap: wrap; }
 }
 .settings-field input:focus-visible, .settings-field textarea:focus-visible { outline: none; }
@@ -548,11 +554,6 @@ input.ssh-auth-response { padding: 0; line-height: 32px; font-size: calc(20px * 
 /* Empty inputs use the same font metrics as their placeholder. */
 input.ssh-auth-response:placeholder-shown { font-size: calc(13px * var(--ui-font-scale)); letter-spacing: normal; }
 input.ssh-auth-response::placeholder { font-size: inherit; letter-spacing: inherit; }
-/* The authentication row carries its own reveal toggle: hide the browser-painted eye so the
-   WebView's oversized native button does not compete with the themed control. */
-input.ssh-auth-response::-ms-reveal, input.ssh-auth-response::-ms-clear { display: none; }
-input.ssh-auth-response::-webkit-credentials-auto-fill-button,
-input.ssh-auth-response::-webkit-strong-password-auto-fill-button { display: none; }
 .terminal-composer-heading { display: flex; justify-content: space-between; gap: 12px; color: var(--text-muted); font-size: calc(11px * var(--ui-font-scale)); margin-bottom: 6px; }
 .terminal-composer-heading > span:last-child { color: var(--text-muted); white-space: nowrap; }
 .terminal-composer-heading .composer-key-hints { display: inline-flex; align-items: center; gap: 6px; color: var(--text-muted); }
@@ -1097,8 +1098,15 @@ input, textarea {
 }
 input::placeholder, textarea::placeholder { color: var(--text-muted); }
 :is(input, textarea).text-input-field { box-sizing: border-box; width: 100%; min-width: 0; min-height: 32px; padding: 6px 8px; border: 1px solid var(--border); border-radius: var(--radius-inner); background: var(--field-bg); color: var(--text-primary); font: calc(12px * var(--ui-font-scale))/1.5 var(--font-ui); outline: none; }
+/* Single-line fields share the compact connection-form geometry; multiline editors keep their roomier padding. */
+input.text-input-field { min-height: var(--control-size-compact); padding: 4px 8px; }
 :is(input, textarea).text-input-field:focus { border-color: var(--border-strong); }
 :is(input, textarea).text-input-field:disabled { opacity: 0.55; }
+/* Password fields pair a themed reveal control; the WebView's own eye moves the caret and cannot be styled. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear,
+input[type="password"]::-webkit-credentials-auto-fill-button,
+input[type="password"]::-webkit-strong-password-auto-fill-button { display: none; }
 .settings-view :is(input, textarea)::placeholder { font-family: var(--font-ui); font-size: inherit; opacity: 1; }
 
 /* Markdown typography inside the chat area. */
@@ -1463,7 +1471,9 @@ button.terminal-chip:disabled:hover { background: var(--hover); }
 
 
 .settings-shortcuts { display: flex; flex-direction: column; }
-.settings-shortcut-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 0; color: var(--text-secondary); font-size: var(--fs-label); }
+.settings-group-panel > .settings-record:has(.settings-shortcuts) { margin-inline: calc(var(--settings-inset) * -1); padding: 0; }
+.settings-shortcut-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px var(--settings-inset); color: var(--text-secondary); font-size: var(--fs-label); }
+.settings-shortcut-row + .settings-shortcut-row { border-top: 1px solid var(--border); }
 .settings-shortcut-row > span:last-child { display: inline-flex; gap: 4px; flex-shrink: 0; }
 
 button.toolbar-icon-button { -webkit-app-region: no-drag; }
@@ -1552,11 +1562,11 @@ button.provider-option-add:hover { color: var(--text-primary); }
 .settings-model-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 0 0 8px; min-width: 0; }
 .settings-model-search { position: relative; display: flex; flex: 1 1 200px; align-items: center; gap: 2px; min-width: 140px; max-width: 420px; }
 .settings-model-search > svg { position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
-.settings-model-search > input.text-input-field { height: 32px; min-height: 32px; padding: 4px 34px 4px 32px; }
+.settings-model-search > input.text-input-field { padding: 4px 34px 4px 32px; }
 .settings-model-search > input.text-input-field::-webkit-search-cancel-button { display: none; }
 .settings-model-search > button.icon-button { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); }
 .settings-model-toolbar-actions { display: inline-flex; align-items: center; gap: 4px; margin-left: auto; flex-shrink: 0; }
-.settings-model-toolbar-actions > button.outline-button { min-height: 32px; white-space: nowrap; }
+.settings-model-toolbar-actions > button.outline-button { min-height: var(--control-size-compact); white-space: nowrap; }
 .settings-model-group-header { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; background: var(--field-bg); color: var(--text-primary); cursor: pointer; text-align: left; font: var(--fw-medium) var(--fs-caption) var(--font-ui); transition: background var(--dur-fast) var(--ease); }
 .settings-model-group-header:hover { background: var(--button-hover); }
 .settings-model-group-header:focus-visible { outline: 2px solid var(--border-strong); outline-offset: -2px; }
@@ -1572,8 +1582,10 @@ button.provider-option-add:hover { color: var(--text-primary); }
   .settings-model-id:not([data-missing]) { display: none; }
 }
 /* ACP server rows: flat at rest, a soft highlight on hover, actions on the right. */
-.acp-row { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: var(--radius-inner); background: transparent; transition: background var(--dur-fast) var(--ease); }
+.acp-row { display: flex; align-items: center; gap: 10px; padding: 8px var(--settings-inset); border-radius: 0; background: transparent; transition: background var(--dur-fast) var(--ease); }
 .acp-row:hover { background: var(--hover); }
+.acp-row-item { margin-inline: calc(var(--settings-inset) * -1); }
+.acp-row-item + .acp-row-item { border-top: 1px solid var(--border); }
 /* Capability marks share the same supported state in model lists and pickers. */
 .model-cap-chip { --model-capability-color: var(--group-blue); display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 20px; flex-shrink: 0; border-radius: 999px; color: var(--model-capability-color); background: color-mix(in srgb, var(--model-capability-color) 12%, transparent); }
 .model-cap-chip[data-capability="vision"] { --model-capability-color: var(--group-green); }

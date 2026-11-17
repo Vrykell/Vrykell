@@ -22,7 +22,6 @@ export function useSkillsSettings() {
   const [importUrl, setImportUrl] = useState('');
   const [importing, setImporting] = useState(false);
   const [warnDismissed, setWarnDismissed] = useState(false);
-  const [market, setMarket] = useState(false);
 
   const toast = useCallback((message: string, type: 'info' | 'success' | 'error') => {
     useToastStore.getState().addToast(message, type);
@@ -129,10 +128,8 @@ export function useSkillsSettings() {
     importUrl,
     importing,
     warnDismissed,
-    market,
     setImportUrl,
     setWarnDismissed,
-    setMarket,
     setDetail,
     refresh,
     openDetail,

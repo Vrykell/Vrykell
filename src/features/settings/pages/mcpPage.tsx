@@ -179,6 +179,7 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         <TextInput
+          variant="field"
           value={name}
           placeholder={t('Server name')}
           onChange={(e) => change({ name: e.target.value })}
@@ -212,12 +213,14 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
       </div>
       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
         <TextInput
+          variant="field"
           value={command}
           placeholder={t('Command, e.g. npx')}
           onChange={(e) => change({ command: e.target.value })}
           style={{ ...inputStyle, flex: 1 }}
         />
         <TextInput
+          variant="field"
           value={args}
           placeholder={t('Arguments, space-separated')}
           onChange={(e) => change({ args: e.target.value })}
@@ -225,6 +228,7 @@ function McpServerCard({ s, draft, busy, onConnect, onDisconnect, onDelete, onSa
         />
       </div>
       <TextInput
+        variant="field"
         value={url}
         placeholder={t('Remote URL, optional')}
         onChange={(e) => change({ url: e.target.value })}

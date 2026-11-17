@@ -63,8 +63,9 @@ button.workspace-sidebar-toggle.icon-button:focus-visible { outline: 1px solid v
 /* Actions wrap and centre by default; a page whose buttons would otherwise end up ragged
    opts into an even grid, which gives every action the same width. */
 .workspace-start-simple-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; margin-top: 6px; }
-.workspace-start-simple-actions[data-grid="true"] { display: grid; grid-template-columns: repeat(var(--start-actions-columns, 2), minmax(0, 1fr)); width: 100%; max-width: 360px; }
+.workspace-start-simple-actions[data-grid="true"] { display: grid; grid-template-columns: repeat(var(--start-actions-columns, 2), minmax(0, 1fr)); width: 100%; max-width: 420px; }
 .workspace-start-simple-actions[data-grid="true"] > * { width: 100%; }
+.workspace-start-simple-actions > * { white-space: nowrap; }
 .workspace-resource-page { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; background: var(--canvas); }
 .terminal-instance-header { flex: 1; user-select: none; min-width: 0; }
 .terminal-tab-tools { order: 2; }

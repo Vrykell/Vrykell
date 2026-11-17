@@ -987,17 +987,6 @@ export async function setupTauriMock(page: Page | BrowserContext, opts: TauriMoc
             return null;
           case 'shell_complete': return [];
           case 'warm_shell_completion': return null;
-          case 'market_github_list':
-            return [
-              { name: 'github-skill-1', dir: 'skills/github-skill-1', description: 'GitHub 操作技能' },
-              { name: 'github-skill-2', dir: 'skills/github-skill-2', description: '第二个仓库技能' },
-            ];
-          case 'market_github_install': {
-            const meta = { name: (args.dir as string).split('/').pop(), description: '来自市场', source: 'market', trusted: false, enabled: false, hasScripts: false, modified: false, files: ['SKILL.md'], dir: `/home/e2e/.vrykell/skills/${(args.dir as string).split('/').pop()}`, prompt: '市场安装的正文' };
-            skills.push(meta);
-            skillOps.push({ op: 'market_install', name: meta.name as string });
-            return meta;
-          }
           // ── MCP ──
           case 'mcp_get_servers':
             return mcpServers.map((s) => ({ ...s }));
@@ -2013,7 +2002,7 @@ export function aiModelCalls(page: Page): Promise<{ kind: string; models?: unkno
   return page.evaluate(() => (window as unknown as { __AI_MODEL_CALLS__: { kind: string; models?: unknown[]; active?: string; id?: string }[] }).__AI_MODEL_CALLS__);
 }
 
-/** Read the skill operation log (set_state/remove/install/market_install) */
+/** Read the skill operation log (set_state/remove/install) */
 export function skillOps(page: Page): Promise<{ op: string; name: string; trusted?: boolean | null; enabled?: boolean | null; prompt?: string }[]> {
   return page.evaluate(() => (window as unknown as { __SKILL_OPS__: { op: string; name: string; trusted?: boolean | null; enabled?: boolean | null; prompt?: string }[] }).__SKILL_OPS__);
 }

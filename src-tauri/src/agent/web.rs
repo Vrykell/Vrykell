@@ -112,22 +112,12 @@ fn http_client() -> Result<reqwest::Client, String> {
 
 /// Client with follow_redirects=false: fetch_public validates every redirect hop to prevent SSRF.
 pub(crate) fn http_client_impl(follow_redirects: bool) -> Result<reqwest::Client, String> {
-    http_client_impl_ext(follow_redirects, true)
-}
-
-/// Client for trusted endpoints (skill marketplace GitHub API/raw): pins DNS only, without private-network validation.
-/// Hosts are constrained by the is_github_host allowlist, so DNS-level blocking is unnecessary.
-pub(crate) fn http_client_trusted() -> Result<reqwest::Client, String> {
-    http_client_impl_ext(false, false)
-}
-
-fn http_client_impl_ext(follow_redirects: bool, validate_dns: bool) -> Result<reqwest::Client, String> {
     let mut b = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(10))
         .timeout(Duration::from_secs(30))
         .user_agent(USER_AGENT)
         // DNS pinning: resolve once, validate and cache, then reuse the same result for connections to prevent alternating answers (rebinding)
-        .dns_resolver(std::sync::Arc::new(PinnedResolver::new(validate_dns, proxy_hostnames())));
+        .dns_resolver(std::sync::Arc::new(PinnedResolver::new(true, proxy_hostnames())));
     if !follow_redirects {
         b = b.redirect(reqwest::redirect::Policy::none());
     }
@@ -408,38 +398,6 @@ pub(crate) async fn fetch_public(client: &reqwest::Client, url: &str) -> Result<
     fetch_with_validation(client, url, |u| Box::pin(validate_public_url(u))).await
 }
 
-/// GitHub-related host allowlist: both the first hop and redirects of an unchecked fetch must stay on these hosts.
-fn is_github_host(host: &str) -> bool {
-    let h = host.to_lowercase();
-    [
-        "github.com",
-        "api.github.com",
-        "raw.githubusercontent.com",
-        "objects.githubusercontent.com",
-        "githubusercontent.com",
-    ]
-    .iter()
-    .any(|d| h == *d || h.ends_with(&format!(".{d}")))
-}
-
-/// Fetch without SSRF validation. Only for trusted endpoints with a **hardcoded hostname** (such as
-/// skill marketplace GitHub API/raw files): user input only reaches path segments and never becomes a hostname.
-/// Redirects are likewise restricted to GitHub domains, so the "hardcoded host" promise cannot be broken by a redirect.
-/// Arbitrary URLs from the user or the LLM must go through `fetch_public`.
-pub(crate) async fn fetch_public_unchecked(client: &reqwest::Client, url: &str) -> Result<reqwest::Response, String> {
-    fetch_with_validation(client, url, |u| {
-        Box::pin(async move {
-            let parsed = url::Url::parse(u).map_err(|_| "无效 URL".to_string())?;
-            let host = parsed.host_str().ok_or("URL 缺少主机名")?.to_string();
-            if is_github_host(&host) {
-                Ok(())
-            } else {
-                Err(format!("仅允许访问 GitHub 域名，当前主机：{host}"))
-            }
-        })
-    })
-    .await
-}
 
 /// Simple URL percent-encoding (keeps RFC3986 unreserved characters, spaces become `+`).
 fn url_encode(s: &str) -> String {
@@ -1087,18 +1045,6 @@ mod tests {
         assert!(!is_private_ip("::ffff:8.8.8.8".parse().unwrap()));
     }
 
-    #[test]
-    fn github_host_allowlist_matches_only_known_hosts() {
-        assert!(is_github_host("api.github.com"));
-        assert!(is_github_host("raw.githubusercontent.com"));
-        assert!(is_github_host("objects.githubusercontent.com"));
-        assert!(is_github_host("github.com"));
-        assert!(is_github_host("foo.githubusercontent.com"));
-        assert!(!is_github_host("evil.com"));
-        assert!(!is_github_host("github.com.evil.com"));
-        assert!(!is_github_host("127.0.0.1"));
-        assert!(!is_github_host("gitlab.com"));
-    }
 
     #[test]
     fn validate_resolved_blocks_private_mixed_and_mapped() {

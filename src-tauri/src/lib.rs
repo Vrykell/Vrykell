@@ -178,8 +178,6 @@ pub fn run() {
             agent::memory::query_memories,
             agent::memory::save_memory,
             agent::memory::memory_stats,
-            agent::skills::market_github_list,
-            agent::skills::market_github_install,
             agent::mcp::mcp_get_servers,
             agent::mcp::mcp_save_server,
             agent::mcp::mcp_remove_server,

@@ -22,7 +22,7 @@ for (const theme of ['dark', 'light'] as const) {
     await gotoSetting(page, '主题');
     await page.getByRole('radio', { name: theme === 'dark' ? '始终深色' : '始终浅色', exact: true }).click();
     await page.locator('aside').getByRole('button', { name: '主题文件', exact: true }).click();
-    const importTheme = page.getByRole('button', { name: '导入主题', exact: true });
+    const importTheme = page.getByRole('button', { name: '导入', exact: true });
     await importTheme.scrollIntoViewIfNeeded();
     await expect(importTheme).toHaveCSS('display', /^(inline-)?flex$/);
     expect(Math.abs(await centerY(importTheme) - await centerY(importTheme.locator('svg')))).toBeLessThan(1);
@@ -105,6 +105,11 @@ for (const theme of ['dark', 'light'] as const) {
     await card.getByRole('button', { name: '分组颜色', exact: true }).click();
     const palette = page.getByRole('dialog', { name: '分组颜色' });
     const swatches = palette.locator('.history-palette-swatch');
+    if (theme === 'light') {
+      // Decorative swatches keep vivid group hues instead of the darker text palette.
+      await expect(palette.locator('.history-palette-swatch[data-color="violet"]')).toHaveCSS('background-color', 'rgb(168, 85, 247)');
+      await expect(palette.locator('.history-palette-swatch[data-color="rose"]')).toHaveCSS('background-color', 'rgb(236, 72, 153)');
+    }
     const first = (await swatches.first().boundingBox())!;
     const last = (await swatches.last().boundingBox())!;
     const automatic = (await palette.getByRole('button', { name: '自动配色' }).boundingBox())!;

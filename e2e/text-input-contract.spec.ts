@@ -49,6 +49,28 @@ for (const [theme, width] of [['dark', 1240], ['light', 720]] as const) {
   });
 }
 
+test('shared single-line fields use the compact connection-form geometry', async ({ page }) => {
+  await openApp(page);
+  await gotoSetting(page, '模型行为');
+  const titleModel = page.getByPlaceholder('沿用聊天模型').first();
+  await expect(titleModel).toBeVisible();
+  await expect(titleModel).toHaveClass(/text-input-field/);
+  await expect(titleModel).toHaveCSS('height', '28px');
+  await expect(titleModel).toHaveCSS('padding-top', '4px');
+  const resting = await titleModel.evaluate(element => getComputedStyle(element).borderColor);
+  await titleModel.focus();
+  const focused = await titleModel.evaluate(element => getComputedStyle(element).borderColor);
+  expect(focused).not.toBe(resting);
+});
+
+test('light composer keeps a visible resting edge on the light canvas', async ({ page }) => {
+  await openApp(page, 'light');
+  const composer = page.locator('.terminal-composer').first();
+  await expect(composer).toBeVisible();
+  await expect(composer).toHaveCSS('outline-width', '1px');
+  await expect(composer).toHaveCSS('outline-style', 'solid');
+});
+
 test('project root submission uses application validation instead of native validation bubbles', async ({ page }) => {
   await openApp(page);
   await page.getByRole('button', { name: '历史命令', exact: true }).click();
