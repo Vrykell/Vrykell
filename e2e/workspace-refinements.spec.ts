@@ -131,5 +131,14 @@ test('command menus use semantic groups and historical output shares the termina
   await expect(menu).toBeVisible();
   expect(await menu.getByRole('menuitem').allTextContents()).toEqual(['重新运行', '发给 AI 分析', '复制命令', '复制输出', '清除所有块']);
   await expect(menu.getByRole('separator')).toHaveCount(2);
+  const menuBox = (await menu.boundingBox())!;
+  const separatorEdges = await menu.getByRole('separator').evaluateAll(elements => elements.map(element => {
+    const rect = element.getBoundingClientRect();
+    return [rect.left, rect.right];
+  }));
+  for (const [left, right] of separatorEdges) {
+    expect(left! - menuBox.x).toBeGreaterThan(4);
+    expect(menuBox.x + menuBox.width - right!).toBeGreaterThan(4);
+  }
   await menu.screenshot({ path: test.info().outputPath('command-menu.png') });
 });

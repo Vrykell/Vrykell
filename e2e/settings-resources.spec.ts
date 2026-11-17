@@ -13,6 +13,10 @@ for (const theme of ['dark', 'light']) for (const width of [760, 1280]) {
     const listRowBox = (await page.locator('.skill-list-row').first().boundingBox())!;
     expect(Math.abs(listRowBox.width - listBox.width)).toBeLessThanOrEqual(2);
     expect(await page.locator('.skill-list-row').nth(1).evaluate(row => getComputedStyle(row, '::before').borderTopWidth)).toBe('1px');
+    expect(await page.locator('.skill-list-row').nth(1).evaluate(row => {
+      const style = getComputedStyle(row, '::before');
+      return [style.left, style.right];
+    })).toEqual(['16px', '16px']);
     expect(await page.locator('.skill-open').first().evaluate(element => getComputedStyle(element).backgroundColor)).toBe('rgba(0, 0, 0, 0)');
     await expect(page.getByRole('textbox', { name: '搜索技能…' })).toHaveClass(/text-input-field/);
     await expect(page.locator('.resource-library-count')).toHaveCount(0);
@@ -33,9 +37,12 @@ for (const theme of ['dark', 'light']) for (const width of [760, 1280]) {
     await expect(page.getByTestId('skill-detail')).toBeVisible();
     const detailCard = page.locator('.skill-detail .settings-group-panel').first();
     const detailRow = detailCard.locator('.resource-setting-row').first();
-    const detailCardBox = (await detailCard.boundingBox())!;
     const detailRowBox = (await detailRow.boundingBox())!;
-    expect(Math.abs(detailRowBox.width - detailCardBox.width)).toBeLessThanOrEqual(2);
+    const detailContent = await detailCard.evaluate(element => {
+      const style = getComputedStyle(element);
+      return element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    });
+    expect(Math.abs(detailRowBox.width - detailContent)).toBeLessThanOrEqual(2);
     await expect(detailCard.locator('.resource-setting-row').nth(1)).toHaveCSS('border-top-width', '1px');
     await page.screenshot({ path: info.outputPath(`skill-detail-${theme}-${width}.png`), fullPage: true });
     await expect(page.locator('.settings-content h1')).toHaveCount(0);
@@ -48,9 +55,12 @@ for (const theme of ['dark', 'light']) for (const width of [760, 1280]) {
     expect(await page.locator('.memory-overview').evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
     const memoryCard = page.locator('.memory-status');
     const memoryRow = memoryCard.locator('> .resource-setting-row').first();
-    const memoryCardBox = (await memoryCard.boundingBox())!;
     const memoryRowBox = (await memoryRow.boundingBox())!;
-    expect(Math.abs(memoryRowBox.width - memoryCardBox.width)).toBeLessThanOrEqual(2);
+    const memoryContent = await memoryCard.evaluate(element => {
+      const style = getComputedStyle(element);
+      return element.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+    });
+    expect(Math.abs(memoryRowBox.width - memoryContent)).toBeLessThanOrEqual(2);
     await expect(memoryRow).toHaveCSS('border-top-width', '1px');
     await expect(page.locator('.memory-overview svg')).toHaveCount(0);
     await page.evaluate(() => document.documentElement.style.setProperty('--radius-lg', '23px'));

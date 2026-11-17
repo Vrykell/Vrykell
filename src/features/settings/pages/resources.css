@@ -25,7 +25,7 @@
 .skill-list-row:is(:hover, :focus-within) { background: var(--hover); }
 .skill-list-row > button.icon-button:hover { background: transparent; }
 .skill-list-row > button.icon-button:focus-visible { background: transparent; outline: 2px solid var(--focus-ring); outline-offset: -2px; }
-.skill-list-row + .skill-list-row::before { content: ''; position: absolute; top: 0; left: 0; right: 0; border-top: 1px solid var(--border); pointer-events: none; }
+.skill-list-row + .skill-list-row::before { content: ''; position: absolute; top: 0; left: 16px; right: 16px; border-top: 1px solid var(--border); pointer-events: none; }
 .skill-open { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 0; padding: 10px 6px; border: 0; border-radius: var(--radius-inner); background: transparent; color: var(--text-primary); cursor: pointer; }
 .skill-open:hover { background: transparent; }
 .skill-open:focus-visible { outline: 2px solid var(--primary-action); outline-offset: -2px; }
@@ -42,9 +42,6 @@
 .resource-metadata { margin: 0; font-size: var(--fs-caption); }
 .resource-metadata > div { display: grid; grid-template-columns: minmax(80px, 22%) 1fr; gap: 16px; padding: 10px 0; }
 .resource-metadata > div + div { border-top: 1px solid var(--border); }
-/* Rows inside a settings card bleed to its edges so their rules span the card. */
-.settings-group-panel > .resource-setting-row,
-.settings-group-panel > .resource-metadata > div { margin-inline: calc(var(--settings-inset) * -1); padding-inline: var(--settings-inset); }
 .resource-metadata dt { color: var(--text-muted); }
 .resource-metadata dd { margin: 0; overflow-wrap: anywhere; }
 .memory-intro { color: var(--text-secondary); font-size: var(--fs-caption); margin: 0 0 16px; }
@@ -53,7 +50,7 @@
 .memory-status .resource-identity { flex: 1; }
 .memory-counts { display: flex; flex-wrap: wrap; gap: 2px 16px; font-size: var(--fs-caption); color: var(--text-secondary); }
 .memory-counts > span > span { color: var(--text-primary); font-variant-numeric: tabular-nums; }
-.memory-status > .resource-setting-row { margin-inline: calc(var(--settings-inset) * -1); padding-inline: var(--settings-inset); border-top: 1px solid var(--border); gap: 14px; padding-block: 12px; }
+.memory-status > .resource-setting-row { border-top: 1px solid var(--border); gap: 14px; padding-block: 12px; }
 .model-options-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 12px; row-gap: 10px; }
 .model-option { display: flex; flex-direction: column; align-items: stretch; gap: 5px; min-width: 0; font-size: var(--fs-caption); }
 .model-option > span { min-width: 0; overflow-wrap: anywhere; color: var(--text-secondary); line-height: 1.4; }
