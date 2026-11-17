@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { setupTauriMock, themeConfig } from './tauri-mock';
+import { setupTauriMock, themeConfig, windowFrameCalls } from './tauri-mock';
 import { gotoSetting, selectThemeMode } from './settings';
 
 /** Inject a bare block so the stylesheet contract can be probed without real output. */
@@ -72,11 +72,24 @@ test('near-black colors persist and original dark remains available', async ({ p
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--xterm-bg').trim())).toBe('#111111');
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary-action-text').trim())).toBe('#FFFFFF');
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--selection-bg').trim())).toBe('rgba(72, 72, 72, 1)');
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--border').trim())).toBe('#333333');
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--border-strong').trim())).toBe('#454545');
+  await expect.poll(async () => (await windowFrameCalls(page)).at(-1)?.color).toBe('#454545');
   for (const width of [760, 1240]) {
     await page.setViewportSize({ width, height: 900 });
     await expect(page.getByRole('radio', { name: '默认深色', exact: true })).toBeVisible();
     expect(await page.locator('.settings-content').evaluate(element => element.scrollWidth - element.clientWidth)).toBeLessThanOrEqual(1);
     await page.screenshot({ path: info.outputPath(`deep-black-${width}.png`), animations: 'disabled' });
+  }
+  const close = page.getByTestId('window-close');
+  if (await close.count()) {
+    await close.hover();
+    const colors = await close.evaluate(element => ({
+      background: getComputedStyle(element).backgroundColor,
+      color: getComputedStyle(element).color,
+    }));
+    expect(colors.color).not.toBe(colors.background);
+    await page.screenshot({ path: info.outputPath('deep-black-close.png'), clip: { x: 1240 - 120, y: 0, width: 120, height: 80 } });
   }
   if (await page.getByRole('button', { name: '展开侧栏', exact: true }).isVisible()) await page.getByRole('button', { name: '展开侧栏', exact: true }).click();
   await page.getByTestId('workspace-area-ssh').click();
